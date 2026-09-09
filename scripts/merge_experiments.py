@@ -134,6 +134,15 @@ PROFILE_CSVS: dict[str, str] = {
     "seldefault-tlsf": "results-seldefault-tlsf.csv",
     "seldefault-tlsf-cm": "results-seldefault-tlsf.csv",
     "matched": "results-matched.csv",
+    # The 2026-09-04 re-match. Both landed on main with no entry in either
+    # table, which `test_experiment_paths` reports and which `campaign.py
+    # collect` would have raised as a KeyError after the campaign finished --
+    # the same omission the `weakening-arbiter` note above records. The
+    # calibration keeps its own CSV for the reason `curves-calib` does: six
+    # families at 2 seeds sized the main phase, and merging those rows in would
+    # put a different corpus and seed count under one key.
+    "rematch": "results-rematch.csv",
+    "rematch-calib": "results-rematch-calib.csv",
 }
 
 # Per-run output directory each profile writes under experiments/. Most profiles
@@ -180,6 +189,8 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
     "seldefault-tlsf": "results-seldefault-tlsf",
     "seldefault-tlsf-cm": "results-seldefault-tlsf",
     "matched": "results-matched",
+    "rematch": "results-rematch",
+    "rematch-calib": "results-rematch-calib",
 }
 
 # Natural key of a results row: one run per (sweep, level_name, selection,
