@@ -1,0 +1,88 @@
+name = "2026-09-09-fretish-grading"
+branch = "campaign/fretish-selection-grading"
+profile = "gradsel-fret"
+description = "The FRETISH replication of 2026-08-28-selection-grading: a 2x2 cross of selection_scheme (nsga2-apportion against weighted) with fitness.status_grading (mrs against aurus), over the five-family FRETISH corpus at 30 seeds. No decision rule is pre-registered; the endpoints are found_repair, implies_ideal, n_repairs and wall_s, read per cell."
+
+# Seeds 0-29 split evenly. Both factors are crossed within a host, as on the
+# TLSF twin: run_experiments.py crosses the two schemes and the two grading
+# levels itself, so a host difference cancels inside the (spec, seed) cell every
+# endpoint is read over. Splitting on a factor instead would confound it with
+# the host.
+#
+# The seed list must stay equal to the `gradsel-fret` profile's -- the two are
+# the same number written twice, and a host range wider than the profile's list
+# runs nothing for the excess. Topping up later costs nothing: the runner
+# resumes off the results CSV key, so added seeds re-run only what is missing.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+# Generated on the host at stage time, the branch carrying this declaration and
+# not the config tree. One call: this campaign reads one configs directory.
+#
+# Each flag, and why it is stated rather than inherited:
+#
+#   --sweeps K --levels mrs,aurus   the grading factor. Sweep K rather than the
+#                                   TLSF table's G: the FRETISH G is the
+#                                   model-count bound and was there first, so
+#                                   this is the same factor under a free letter
+#                                   rather than a letter reused across tables
+#   --schemes nsga2-apportion weighted   the selection factor; the scheme is the
+#                                   config directory read back into `selection`
+#   --weights 0.1 0.2 0.7           AuRUS's published triple, as the TLSF twin
+#                                   ran it. Only the weighted scheme reads them,
+#                                   so they are inert in the two
+#                                   nsga2-apportion arms. They are stated to
+#                                   keep the two campaigns' weighted arms on one
+#                                   scalarisation, which is what makes the
+#                                   cross-path reading possible at all --
+#                                   inheriting the binary's 0.2/0.5/0.5 would
+#                                   have made this campaign's weighted arm a
+#                                   different arm from that campaign's
+#   --generations 40 --population-size 1000   the operating point every FRETISH
+#                                   campaign since cj-large has used, so the
+#                                   control arm is checkable against their rows
+#   --max-wall-s 7200               a backstop rather than the design. Unlike
+#                                   the TLSF twin, which sized a 400 s deadline
+#                                   so every run spent it, these runs are meant
+#                                   to finish on the generation count; the
+#                                   deadline is there so a family that does not
+#                                   still writes run.json and its repairs rather
+#                                   than being censored by the harness kill.
+#                                   The profile caps at 16200 s externally,
+#                                   which is 2.25x the deadline -- the twin
+#                                   overran its own by 2.2x, the deadline
+#                                   bounding neither the final gate nor the
+#                                   implication filter
+#   --metric log --weakening off    the shipping configuration
+#   --pin-vintage                   writes the moved defaults out. It also
+#                                   writes status_grading, which sweep K then
+#                                   overrides per level; overrides win,
+#                                   make_toml merging them last
+#
+# filters.run_implication = true and tlsf.repair_mode = "monolithic" reach the
+# emitted TOML from gen_configs.py's own DEFAULTS at the binary's value, so
+# neither needs a flag; genetic.accumulate_repairs is left to the binary default
+# (true) for the reason the twin leaves it there.
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion weighted --sweeps K --levels mrs,aurus --metric log --weakening off --weights 0.1 0.2 0.7 --generations 40 --population-size 1000 --max-wall-s 7200 --out-dir experiments/configs-gradsel-fret --pin-vintage"
+
+# One phase: 600 runs, 150 a host per arm-pair. jobs = 4 as on every FRETISH
+# profile -- ltlsynt is not in play here, so the per-call RAM ceiling that pins
+# the TLSF profiles to 1 does not bind.
+#
+# The cost is bounded rather than estimated. The 10-run probe that sized this
+# ran against a binary predating the 2026-09-09 final-filter change, which
+# re-tuned the stage the probe measured at 71-89% of every run, so its per-run
+# figures do not carry: `fsm` finished in 151 s and 152 s, `takeoff` in 250 s
+# and once not at all, `mode-arbiter` in 345 s and 606 s, and `fsm-timing` and
+# `fsm-combined` were killed at 900 s on both seeds. What the deadline bounds
+# is 600 x 7200 s = 1200 core-hours worst case, about 150 hours of wall at
+# eight concurrent; what it will actually cost is unmeasured on the merged
+# binary. Read the real figure off the first ~40 rows rather than off this
+# comment.
+#
+# There is no second phase. The maximality curve wants `maximal`, which reads
+# .tlsf files and parses them with tlsf::parse, so it cannot score a FRETISH
+# results directory as it stands. That pass runs afterwards as its own score
+# campaign over experiments/results-gradsel-fret, in the shape
+# experiments/separation-maximal has, once `maximal` routes on extension the
+# way `compare` already does.
+phases = [ { profile = "gradsel-fret", jobs = 4 } ]

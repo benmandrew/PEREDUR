@@ -60,12 +60,33 @@ def _spec(name: str, ext: str) -> dict[str, Path]:
 # FRETISH (JSON) specs: the original repair benchmark. repair_mode is TLSF-only
 # and does not affect these, so the mono-vs-muc factor is never crossed over
 # them — the "muc" profile uses the TLSF specs below.
+# mode-arbiter is the one scoped family, and the only run that exercises the
+# scope machinery at all: every other example here is global-scoped and declares
+# no modes. Its single ideal, fixes/guard-maintenance.json, is out of reach of
+# the search -- the fix guards a condition with the mode `maintenance`, and the
+# mutation atom pool is m_in_atoms + m_out_atoms, with m_modes reaching
+# mutate_requirement only as the scope arm's mode_pool -- so it contributes
+# implies_ideal = 0 by construction and is carried for found_repair and
+# n_repairs rather than for the quality endpoint. lint-ideals reports
+# `reachable ok` here, which is not evidence: check_fretish_reachable compares
+# list lengths only, and its comment predates m_scope.
 FRETISH_SPECS: dict[str, dict[str, Path]] = {
     "takeoff": _spec("takeoff", "json"),
     "fsm": _spec("fsm", "json"),
     "fsm-timing": _spec("fsm-timing", "json"),
     "fsm-combined": _spec("fsm-combined", "json"),
+    "mode-arbiter": _spec("mode-arbiter", "json"),
 }
+
+# The four-family corpus every FRETISH profile before 2026-09-09 ran, frozen as
+# its own name. mode-arbiter joined FRETISH_SPECS with the selection x grading
+# campaign, and FRETISH_SPECS is the path registry rather than any campaign's
+# corpus: a profile that spelled its specs as list(FRETISH_SPECS) would have
+# silently gained a fifth family, widening the spec set a closed campaign is the
+# record of. New profiles name the corpus they want.
+FRETISH_SPECS_2026_07: list[str] = [
+    "takeoff", "fsm", "fsm-timing", "fsm-combined",
+]
 
 # Basic-TLSF specs with ideal fixes. PEREDUR infers the TLSF format from the
 # .tlsf extension, and compare reads the .tlsf ideals the same way. The first
@@ -542,7 +563,7 @@ PROFILES: dict[str, dict] = {
             "A": ["gen5", "gen10", "gen20", "gen40"],
             "B": ["pop50", "pop100", "pop200", "pop500", "pop1000"],
         },
-        "specs": list(FRETISH_SPECS),
+        "specs": list(FRETISH_SPECS_2026_07),
         "seeds": list(range(N_SEEDS)),
         "timeout_caps": None,
         "baseline_aliases": BASELINE_ALIASES,
@@ -562,7 +583,7 @@ PROFILES: dict[str, dict] = {
         "repair_modes": None,
         "sweeps": None,  # every sweep found in experiments/configs/
         "levels": {},
-        "specs": list(FRETISH_SPECS),
+        "specs": list(FRETISH_SPECS_2026_07),
         "seeds": list(range(100)),
         "timeout_caps": None,
         "baseline_aliases": BASELINE_ALIASES,
@@ -584,7 +605,7 @@ PROFILES: dict[str, dict] = {
         "repair_modes": None,
         "sweeps": ["C"],
         "levels": {"C": ["default"]},
-        "specs": list(FRETISH_SPECS),
+        "specs": list(FRETISH_SPECS_2026_07),
         "seeds": list(range(100)),
         "timeout_caps": {"takeoff": 600, "fsm": 600, "fsm-timing": 600,
                          "fsm-combined": 900},
@@ -737,7 +758,7 @@ PROFILES: dict[str, dict] = {
         "repair_modes": None,
         "sweeps": ["C"],
         "levels": {"C": ["default"]},
-        "specs": list(FRETISH_SPECS),
+        "specs": list(FRETISH_SPECS_2026_07),
         "seeds": list(range(30)),
         # The cj-large/metric caps for the same operating point: measured worst
         # case there was ~41s, so these are 15-20x margin — a cap that bites
@@ -1364,7 +1385,7 @@ PROFILES: dict[str, dict] = {
         "repair_modes": None,
         "sweeps": ["R", "S"],
         "levels": {},
-        "specs": list(FRETISH_SPECS),
+        "specs": list(FRETISH_SPECS_2026_07),
         # Seed-major disjoint ranges across av2/av3 (pass --seeds on launch).
         # 200 pairs per cell resolves ~0.15 absolute on implies_ideal at fsm's
         # p~=0.5, ~0.10 pooled over the two elitism levels. Smaller effects are
@@ -1594,7 +1615,7 @@ PROFILES: dict[str, dict] = {
         "repair_modes": None,
         "sweeps": ["R"],
         "levels": {"R": ["elit0.1"]},
-        "specs": list(FRETISH_SPECS),
+        "specs": list(FRETISH_SPECS_2026_07),
         # 4 specs x 70 seeds = 280 pairs per contrast, which is what PLAN §7's
         # power table requires for the 0.05 margin to clear at a true adverse
         # effect of -0.01, given the 0.341 paired SD measured on the elitism
@@ -1623,7 +1644,7 @@ PROFILES: dict[str, dict] = {
         "repair_modes": None,
         "sweeps": ["S"],
         "levels": {"S": ["cm-elit0.1"]},
-        "specs": list(FRETISH_SPECS),
+        "specs": list(FRETISH_SPECS_2026_07),
         "seeds": list(range(70)),
         # Arm C runs more generations than arm A by construction, so it must not
         # inherit a cap sized for A: censoring the control alone is how replicate
@@ -1708,6 +1729,88 @@ PROFILES: dict[str, dict] = {
     # be regenerated, and merge_experiments.py keeps its entries for them so the
     # archived CSVs stay mergeable. Each archive reproduces from its own
     # vendored scripts/ at the commit its PROVENANCE.json names.
+    # ── 2026-09-09 FRETISH selection x grading ───────────────────────────────
+    #
+    # The FRETISH replication of experiments/2026-08-28-selection-grading:
+    # selection_scheme (nsga2-apportion against weighted) crossed with
+    # fitness.status_grading (mrs, PEREDUR's own, against aurus, AuRUS's
+    # six-level ladder). Two schemes x two sweep-K levels is the whole cross;
+    # the schemes are config directories and the grading arm rides in
+    # level_name, so both are already key columns and neither needs a new one.
+    #
+    # The factor is only measurable on this path from 2026-09-09. The FRETISH
+    # final realizability gate hard-coded Tiered until then, so a run configured
+    # `aurus` scored its search on the six-level ladder and judged its output on
+    # the three-point one; the admitted set never moved, the correctness table
+    # being applied whatever the scale folded in, but the grading arm could not
+    # be read at the gate. Running this against an earlier binary measures the
+    # search alone.
+    #
+    # Unlike the TLSF twin this is a point rather than a curve: it runs the
+    # FRETISH ablation operating point, gen40/pop1000, which is what every
+    # archived FRETISH sweep ran, and genetic.max_wall_s = 7200 is a backstop
+    # rather than the terminator. A 10-run probe at gen40/pop1000 measured
+    # fsm at 151s, mode-arbiter at 345-606s and takeoff at 250s, so most runs
+    # end on generations; the deadline exists because that probe ran under a
+    # 900s harness timeout and lost five of ten runs, and a run that stops on
+    # its own deadline writes its repairs and run.json where a harness kill
+    # writes neither.
+    #
+    # timeout_caps at 16200s is the backstop above the backstop, sized on the
+    # 2.2x rule: 2026-08-28-selection-grading ran a 400s deadline into 335
+    # compute-hours against the 67 the cap predicted, and 245 of its 600 runs
+    # were then killed by a 3600s timeout_caps and lost their manifests. The
+    # gate and the implication filter run past max_wall_s uncapped, and the
+    # filter is quadratic in the accumulated set, so the margin is deliberate.
+    #
+    # The weights are 0.1 / 0.2 / 0.7 (syntactic / semantic / status), AuRUS's
+    # published triple, matching the TLSF campaign exactly so the two are
+    # readable against each other on the grading factor. Only the weighted
+    # scheme reads them, so they are inert for the two nsga2-apportion arms.
+    # This makes the selection factor "NSGA-II against AuRUS-weighted
+    # scalarisation" rather than "against weighting in general", the confound
+    # 2026-08-28-selection-grading/PLAN.md registered before its own run.
+    #
+    # run_weakening is off, matching the binary's default since 2026-08-20
+    # rather than gen_configs.py's pinned true, so the campaign measures the
+    # shipping screen rather than one no default run applies.
+    #
+    # Generate with
+    #   python3 scripts/gen_configs.py --schemes nsga2-apportion weighted \
+    #       --sweeps K --levels mrs,aurus --metric log --weakening off \
+    #       --weights 0.1 0.2 0.7 --generations 40 --population-size 1000 \
+    #       --max-wall-s 7200 \
+    #       --out-dir experiments/configs-gradsel-fret --pin-vintage
+    "gradsel-fret": {
+        "schemes": ["nsga2-apportion", "weighted"],
+        # Both stated rather than left None, and they must match the generator's
+        # --weakening/--metric flags: these are path segments of the config tree
+        # rather than declarations, so a None here globs `<scheme>/sweep_*.toml`
+        # while gen_configs.py has written `<scheme>/wkoff/log/sweep_*.toml`,
+        # and the runner exits on an empty configs directory.
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["mrs", "aurus"]},
+        # All five families, mode-arbiter included: it contributes
+        # implies_ideal = 0 by construction (see FRETISH_SPECS) and is carried
+        # for found_repair and n_repairs, being the only scoped family and so
+        # the only run that exercises the scope machinery at all.
+        "specs": list(FRETISH_SPECS),
+        "seeds": list(range(30)),
+        "timeout_caps": {"takeoff": 16200, "fsm": 16200, "fsm-timing": 16200,
+                         "fsm-combined": 16200, "mode-arbiter": 16200},
+        # Only sweep K runs, so there is no A/gen baseline to alias onto.
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-gradsel-fret",
+        "results_dir": EXPERIMENTS_DIR / "results-gradsel-fret",
+        "results_csv": EXPERIMENTS_DIR / "results-gradsel-fret.csv",
+        # 4 as on every FRETISH profile; ltlsynt is not in play here, so the
+        # per-call RAM ceiling that pins the TLSF profiles to 1 does not bind.
+        "default_jobs": 4,
+    },
+
 }
 
 

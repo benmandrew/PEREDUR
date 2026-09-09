@@ -143,6 +143,11 @@ PROFILE_CSVS: dict[str, str] = {
     # put a different corpus and seed count under one key.
     "rematch": "results-rematch.csv",
     "rematch-calib": "results-rematch-calib.csv",
+    # The 2026-09-09 selection x grading cross on the FRETISH path, replicating
+    # `curves`. Its own CSV rather than that campaign's: the sweep letter, the
+    # corpus and the path all differ, and neither the corpus nor the path is in
+    # the key.
+    "gradsel-fret": "results-gradsel-fret.csv",
 }
 
 # Per-run output directory each profile writes under experiments/. Most profiles
@@ -191,6 +196,7 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
     "matched": "results-matched",
     "rematch": "results-rematch",
     "rematch-calib": "results-rematch-calib",
+    "gradsel-fret": "results-gradsel-fret",
 }
 
 # Natural key of a results row: one run per (sweep, level_name, selection,

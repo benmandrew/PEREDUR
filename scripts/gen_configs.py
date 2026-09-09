@@ -493,6 +493,23 @@ SWEEP_I: list[tuple[str, dict]] = [
 # vendored per-campaign scripts/ at the commit their PROVENANCE.json names, as
 # sweeps C, O and V do.
 
+# Sweep K: the status objective's grading scale, on the FRETISH path. The TLSF
+# table carries the same three levels under G; the FRETISH G is the model-count
+# bound and was there first, so this is the same factor under a free letter
+# rather than a letter reused across the two tables. K is unused in both, and O
+# and U are avoided as retired rather than free.
+#
+# The scale is only measurable on this path from 2026-09-09: the FRETISH final
+# realizability gate hard-coded Tiered until then, so a run configured `aurus`
+# scored its search on the six-level ladder and judged its output on the
+# three-point one. Generating this sweep against an earlier binary measures the
+# search alone with a gate that ignores the factor.
+SWEEP_K: list[tuple[str, dict]] = [
+    ("tiered", {"status_grading": "tiered"}),
+    ("mrs",    {"status_grading": "mrs"}),
+    ("aurus",  {"status_grading": "aurus"}),
+]
+
 # Sweep R: vary elitism, for the nsga2-vs-nsga2-replicate campaign. Elitism
 # carries the top fraction over verbatim, which re-injects exact duplicates into
 # the pool -- the mechanism nsga2-replicate deduplicates away. The scheme's
@@ -564,6 +581,7 @@ SWEEPS: list[tuple[str, list]] = [
     ("G", SWEEP_G),
     ("H", SWEEP_H),
     ("I", SWEEP_I),
+    ("K", SWEEP_K),
     ("R", SWEEP_R),
     # Placeholder levels at the default operating point and match factor: main()
     # rebuilds this entry from --generations/--compute-match-factor. It is
