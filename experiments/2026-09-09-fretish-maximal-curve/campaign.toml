@@ -1,0 +1,55 @@
+name = "2026-09-09-fretish-maximal-curve"
+branch = "campaign/fretish-maximal-curve"
+description = "The maximality curve over 2026-09-09-fretish-grading: per run, how many distinct maximal repairs the accumulated set held at each of 20 log-spaced time cuts, and how many of them imply an ideal. It is the FRETISH half of what experiments/separation-maximal measured on the TLSF corpus, and it is the reason src/maximal.cpp grew a FRETISH front end."
+
+# Seeds 0-29 split as the campaign it scores, so each host scores the runs it
+# produced and reads nothing over the network. The two are enqueued in order,
+# so results-gradsel-fret exists on both hosts by the time this stages.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+# No `configs`. A score phase reads a results directory rather than a configs
+# tree, so there is nothing to generate.
+#
+# No `profile` either, and that is the deliberate half. `gradsel-fret` lives on
+# campaign/fretish-selection-grading alone, and campaign.py refuses a profile
+# this checkout's run_experiments.py does not define; naming the results
+# directory outright is what experiments/separation-maximal does for the same
+# reason, and it is the field the scorer actually reads.
+
+# One phase, 600 run directories, 300 a host. What each cut costs is
+# **unmeasured on FRETISH accumulated sets** -- nothing in experiments/ holds
+# one, every archived accumulated corpus being TLSF -- so the budgets below are
+# the separation-maximal precedent's rather than a figure derived for this.
+# Read the real cost off the first ~40 rows of timings.txt, not off this
+# comment.
+#
+# Two things bound the exposure. The pass on this branch is one `maximal`
+# process per cut over a prefix of the accumulated set, an O(n^2) pairwise
+# sweep with no fingerprint prefilter -- that prefilter and the running-antichain
+# walk are on feat/fingerprint-curves and are not merged -- so a large
+# accumulated set is the case to watch. And the degradation is graceful:
+# maximal_timeout abandons one cut and score_curves.py keeps the survivors of
+# the last cut that decided, while deadline_s stops new cuts on a run that is
+# spending them. A run that overruns yields a shorter curve rather than
+# nothing, and the campaign yields a thinner figure rather than failing.
+#
+# The worst case is therefore the wall cap times the run count: 300 runs a host
+# at 5400 s, eight at a time, is about 56 hours of wall a host. The FRETISH
+# implication oracle decomposes per requirement where the TLSF one lowers the
+# whole specification, so its queries are smaller and the real figure should sit
+# well under that; it is a bound, not an estimate.
+#
+# The budgets are carried explicitly rather than defaulted so the host's
+# score-manifest names what this declaration meant. They are the scorer's own
+# values, which is what separation-maximal ran.
+[[phases]]
+name = "curve"
+kind = "score"
+results = "experiments/results-gradsel-fret"
+out = "experiments/curves-gradsel-fret"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 600
+deadline_s = 4500
