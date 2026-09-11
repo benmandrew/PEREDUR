@@ -4,7 +4,7 @@ description = "The maximality curve over 2026-09-09-fretish-grading: per run, ho
 
 # Seeds 0-29 split as the campaign it scores, so each host scores the runs it
 # produced and reads nothing over the network. The two are enqueued in order,
-# so results-gradsel-fret exists on both hosts by the time this stages.
+# so results-gradsel-fret-m exists on both hosts by the time this stages.
 hosts = { av2 = "0-14", av3 = "15-29" }
 
 # No `configs`. A score phase reads a results directory rather than a configs
@@ -25,19 +25,27 @@ hosts = { av2 = "0-14", av3 = "15-29" }
 #
 # Two things bound the exposure. The pass on this branch is one `maximal`
 # process per cut over a prefix of the accumulated set, an O(n^2) pairwise
-# sweep with no fingerprint prefilter -- that prefilter and the running-antichain
-# walk are on feat/fingerprint-curves and are not merged -- so a large
-# accumulated set is the case to watch. And the degradation is graceful:
+# sweep with no fingerprint prefilter. The prefilter reached main with the
+# whole-specification implication change, and src/maximal.cpp here templated the
+# tool over both front ends before that landed, so the rebase owes a re-wiring
+# of it into both SpecOps specialisations; the running-antichain walk is still
+# on feat/fingerprint-curves and is not merged. Until the re-wiring lands these
+# budgets are the ones that apply and a large accumulated set is the case to
+# watch. And the degradation is graceful:
 # maximal_timeout abandons one cut and score_curves.py keeps the survivors of
 # the last cut that decided, while deadline_s stops new cuts on a run that is
 # spending them. A run that overruns yields a shorter curve rather than
 # nothing, and the campaign yields a thinner figure rather than failing.
 #
 # The worst case is therefore the wall cap times the run count: 300 runs a host
-# at 5400 s, eight at a time, is about 56 hours of wall a host. The FRETISH
-# implication oracle decomposes per requirement where the TLSF one lowers the
-# whole specification, so its queries are smaller and the real figure should sit
-# well under that; it is a bound, not an estimate.
+# at 5400 s, eight at a time, is about 56 hours of wall a host. Nothing narrows
+# that from the query side any more: FRETISH decomposed its implication oracle
+# per requirement until 2026-09-11 and now lowers the whole specification as the
+# TLSF one does, so both ask one query of 1000-1600 characters per pair. What
+# does narrow it is the operating point -- the runs this scores are gen10/pop200
+# rather than the gen40/pop1000 the declaration was first written against, so the
+# accumulated sets are smaller and the O(n^2) sweep shorter. By how much is
+# unmeasured, which is what the first ~40 rows of timings.txt answer.
 #
 # The budgets are carried explicitly rather than defaulted so the host's
 # score-manifest names what this declaration meant. They are the scorer's own
@@ -45,8 +53,8 @@ hosts = { av2 = "0-14", av3 = "15-29" }
 [[phases]]
 name = "curve"
 kind = "score"
-results = "experiments/results-gradsel-fret"
-out = "experiments/curves-gradsel-fret"
+results = "experiments/results-gradsel-fret-m"
+out = "experiments/curves-gradsel-fret-m"
 workers = 8
 cores = 4
 cuts = 20
