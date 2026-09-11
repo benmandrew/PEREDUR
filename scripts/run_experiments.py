@@ -1778,9 +1778,9 @@ PROFILES: dict[str, dict] = {
     # Generate with
     #   python3 scripts/gen_configs.py --schemes nsga2-apportion weighted \
     #       --sweeps K --levels mrs,aurus --metric log --weakening off \
-    #       --weights 0.1 0.2 0.7 --generations 40 --population-size 1000 \
-    #       --max-wall-s 7200 \
-    #       --out-dir experiments/configs-gradsel-fret --pin-vintage
+    #       --weights 0.1 0.2 0.7 --generations 10 --population-size 200 \
+    #       --max-wall-s 1800 \
+    #       --out-dir experiments/configs-gradsel-fret-m --pin-vintage
     "gradsel-fret": {
         "schemes": ["nsga2-apportion", "weighted"],
         # Both stated rather than left None, and they must match the generator's
@@ -1799,13 +1799,21 @@ PROFILES: dict[str, dict] = {
         # the only run that exercises the scope machinery at all.
         "specs": list(FRETISH_SPECS),
         "seeds": list(range(30)),
-        "timeout_caps": {"takeoff": 16200, "fsm": 16200, "fsm-timing": 16200,
-                         "fsm-combined": 16200, "mode-arbiter": 16200},
+        # 2.25x the 1800 s deadline, which the deadline itself does not bound:
+        # the final gate and the implication filter both run past it, and the
+        # TLSF twin overran its own by 2.2x.
+        "timeout_caps": {"takeoff": 4050, "fsm": 4050, "fsm-timing": 4050,
+                         "fsm-combined": 4050, "mode-arbiter": 4050},
         # Only sweep K runs, so there is no A/gen baseline to alias onto.
         "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-gradsel-fret",
-        "results_dir": EXPERIMENTS_DIR / "results-gradsel-fret",
-        "results_csv": EXPERIMENTS_DIR / "results-gradsel-fret.csv",
+        # -m for matched: the first declaration ran gen40/pop1000 and its 94
+        # surviving rows are under the unsuffixed names on both hosts. The
+        # resume key holds neither the operating point nor the binary, so a
+        # re-run against those directories would skip the finished cells and
+        # merge two operating points and two implication checks into one CSV.
+        "configs_dir": EXPERIMENTS_DIR / "configs-gradsel-fret-m",
+        "results_dir": EXPERIMENTS_DIR / "results-gradsel-fret-m",
+        "results_csv": EXPERIMENTS_DIR / "results-gradsel-fret-m.csv",
         # 4 as on every FRETISH profile; ltlsynt is not in play here, so the
         # per-call RAM ceiling that pins the TLSF profiles to 1 does not bind.
         "default_jobs": 4,

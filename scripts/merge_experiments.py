@@ -147,7 +147,7 @@ PROFILE_CSVS: dict[str, str] = {
     # `curves`. Its own CSV rather than that campaign's: the sweep letter, the
     # corpus and the path all differ, and neither the corpus nor the path is in
     # the key.
-    "gradsel-fret": "results-gradsel-fret.csv",
+    "gradsel-fret": "results-gradsel-fret-m.csv",
 }
 
 # Per-run output directory each profile writes under experiments/. Most profiles
@@ -196,7 +196,7 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
     "matched": "results-matched",
     "rematch": "results-rematch",
     "rematch-calib": "results-rematch-calib",
-    "gradsel-fret": "results-gradsel-fret",
+    "gradsel-fret": "results-gradsel-fret-m",
 }
 
 # Natural key of a results row: one run per (sweep, level_name, selection,

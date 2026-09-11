@@ -37,21 +37,38 @@ hosts = { av2 = "0-14", av3 = "15-29" }
 #                                   inheriting the binary's 0.2/0.5/0.5 would
 #                                   have made this campaign's weighted arm a
 #                                   different arm from that campaign's
-#   --generations 40 --population-size 1000   the operating point every FRETISH
-#                                   campaign since cj-large has used, so the
-#                                   control arm is checkable against their rows
-#   --max-wall-s 7200               a backstop rather than the design. Unlike
+#   --generations 10 --population-size 200   the TLSF twin's operating point.
+#                                   Every FRETISH campaign since cj-large ran
+#                                   gen40/pop1000, and this one was declared
+#                                   there too until the 2026-09-11 cost audit
+#                                   read the first 94 manifests: a median run
+#                                   cost 884.4 s against the twin's 30.1 s, and
+#                                   `fsm` alone goes 3.3 s to 119.2 s across the
+#                                   two points, the implication filter being
+#                                   quadratic over a set the search grows. The
+#                                   cross-path reading is what this campaign is
+#                                   for, so the budget is matched to the side it
+#                                   is read against rather than to the FRETISH
+#                                   archive, which no longer compares anyway --
+#                                   the 2026-09-11 implication check is a
+#                                   different check (see config.hpp on
+#                                   run_implication_filter)
+#   --max-wall-s 1800               a backstop rather than the design. Unlike
 #                                   the TLSF twin, which sized a 400 s deadline
 #                                   so every run spent it, these runs are meant
 #                                   to finish on the generation count; the
 #                                   deadline is there so a family that does not
 #                                   still writes run.json and its repairs rather
 #                                   than being censored by the harness kill.
-#                                   The profile caps at 16200 s externally,
-#                                   which is 2.25x the deadline -- the twin
-#                                   overran its own by 2.2x, the deadline
-#                                   bounding neither the final gate nor the
-#                                   implication filter
+#                                   It came down with the operating point: at
+#                                   gen10/pop200 a control run of the five
+#                                   families finished in 3.3 s to 12.0 s, so
+#                                   1800 s is two orders of magnitude of slack
+#                                   rather than a budget. The profile caps at
+#                                   4050 s externally, 2.25x the deadline --
+#                                   the twin overran its own by 2.2x, the
+#                                   deadline bounding neither the final gate nor
+#                                   the implication filter
 #   --metric log --weakening off    the shipping configuration
 #   --pin-vintage                   writes the moved defaults out. It also
 #                                   writes status_grading, which sweep K then
@@ -62,7 +79,7 @@ hosts = { av2 = "0-14", av3 = "15-29" }
 # emitted TOML from gen_configs.py's own DEFAULTS at the binary's value, so
 # neither needs a flag; genetic.accumulate_repairs is left to the binary default
 # (true) for the reason the twin leaves it there.
-configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion weighted --sweeps K --levels mrs,aurus --metric log --weakening off --weights 0.1 0.2 0.7 --generations 40 --population-size 1000 --max-wall-s 7200 --out-dir experiments/configs-gradsel-fret --pin-vintage"
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion weighted --sweeps K --levels mrs,aurus --metric log --weakening off --weights 0.1 0.2 0.7 --generations 10 --population-size 200 --max-wall-s 1800 --out-dir experiments/configs-gradsel-fret-m --pin-vintage"
 
 # One phase: 600 runs, 150 a host per arm-pair. jobs = 4 as on every FRETISH
 # profile -- ltlsynt is not in play here, so the per-call RAM ceiling that pins
