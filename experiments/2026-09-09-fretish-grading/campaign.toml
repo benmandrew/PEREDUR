@@ -3,17 +3,25 @@ branch = "campaign/fretish-selection-grading"
 profile = "gradsel-fret"
 description = "The FRETISH replication of 2026-08-28-selection-grading: a 2x2 cross of selection_scheme (nsga2-apportion against weighted) with fitness.status_grading (mrs against aurus), over the five-family FRETISH corpus at 30 seeds. No decision rule is pre-registered; the endpoints are found_repair, implies_ideal, n_repairs and wall_s, read per cell."
 
-# Seeds 0-29 split evenly. Both factors are crossed within a host, as on the
+# All 30 seeds on one host. Both factors are crossed within a host, as on the
 # TLSF twin: run_experiments.py crosses the two schemes and the two grading
 # levels itself, so a host difference cancels inside the (spec, seed) cell every
 # endpoint is read over. Splitting on a factor instead would confound it with
 # the host.
 #
+# The split was av2 = "0-14", av3 = "15-29" until the 2026-09-12 cost probe.
+# Two things closed it. av3 has been unreachable since before the relaunch ("No
+# route to host"), so half the design had no host at all; and the measured cost
+# is 7.3 s a run (see the phase comment below), which puts the whole 600 on one
+# host in about 23 minutes. A two-host split of a 23-minute campaign buys
+# nothing and costs the one thing a split can cost, which is a host difference
+# landing inside a cell. Restoring av3 means moving seeds here and nowhere else.
+#
 # The seed list must stay equal to the `gradsel-fret` profile's -- the two are
 # the same number written twice, and a host range wider than the profile's list
 # runs nothing for the excess. Topping up later costs nothing: the runner
 # resumes off the results CSV key, so added seeds re-run only what is missing.
-hosts = { av2 = "0-14", av3 = "15-29" }
+hosts = { av2 = "0-29" }
 
 # Generated on the host at stage time, the branch carrying this declaration and
 # not the config tree. One call: this campaign reads one configs directory.
@@ -69,7 +77,15 @@ hosts = { av2 = "0-14", av3 = "15-29" }
 #                                   the twin overran its own by 2.2x, the
 #                                   deadline bounding neither the final gate nor
 #                                   the implication filter
-#   --metric log --weakening off    the shipping configuration
+#   --metric log                    the shipping configuration
+#   --weakening off                 the shipping default since 2026-08-20, and
+#                                   as of the retirement of the weakening filter
+#                                   on main this flag emits no config key at
+#                                   all. It survives here because gen_configs.py
+#                                   still spells it into the output directory
+#                                   path, as the `wkoff` component, and the
+#                                   configs directory this declaration names is
+#                                   read back by that path
 #   --pin-vintage                   writes the moved defaults out. It also
 #                                   writes status_grading, which sweep K then
 #                                   overrides per level; overrides win,
@@ -81,25 +97,48 @@ hosts = { av2 = "0-14", av3 = "15-29" }
 # (true) for the reason the twin leaves it there.
 configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion weighted --sweeps K --levels mrs,aurus --metric log --weakening off --weights 0.1 0.2 0.7 --generations 10 --population-size 200 --max-wall-s 1800 --out-dir experiments/configs-gradsel-fret-m --pin-vintage"
 
-# One phase: 600 runs, 150 a host per arm-pair. jobs = 4 as on every FRETISH
+# One phase: 600 runs, all on av2. jobs = 4 as on every FRETISH
 # profile -- ltlsynt is not in play here, so the per-call RAM ceiling that pins
 # the TLSF profiles to 1 does not bind.
 #
-# The cost is bounded rather than estimated. The 10-run probe that sized this
-# ran against a binary predating the 2026-09-09 final-filter change, which
-# re-tuned the stage the probe measured at 71-89% of every run, so its per-run
-# figures do not carry: `fsm` finished in 151 s and 152 s, `takeoff` in 250 s
-# and once not at all, `mode-arbiter` in 345 s and 606 s, and `fsm-timing` and
-# `fsm-combined` were killed at 900 s on both seeds. What the deadline bounds
-# is 600 x 7200 s = 1200 core-hours worst case, about 150 hours of wall at
-# eight concurrent; what it will actually cost is unmeasured on the merged
-# binary. Read the real figure off the first ~40 rows rather than off this
-# comment.
+# The cost is measured rather than bounded. A 20-run probe on av2 at
+# 2026-09-12 crossed both factors against all five families at seed 0, four
+# concurrent, against the merged binary at dbf284b: every run exited 0, the
+# mean was 7.3 s and the worst 37.0 s (`mode-arbiter` x aurus x
+# nsga2-apportion). Per family the means are `fsm` 3.6 s, `fsm-timing` 5.3 s,
+# `takeoff` 6.6 s, `fsm-combined` 7.3 s and `mode-arbiter` 13.5 s. So 600 runs
+# is 1.2 core-hours, about 18 minutes of wall at jobs = 4, and about 23 with
+# the 27% margin a saturated calibration under-reads by.
 #
-# There is no second phase. The maximality curve wants `maximal`, which reads
-# .tlsf files and parses them with tlsf::parse, so it cannot score a FRETISH
-# results directory as it stands. That pass runs afterwards as its own score
-# campaign over experiments/results-gradsel-fret, in the shape
-# experiments/separation-maximal has, once `maximal` routes on extension the
-# way `compare` already does.
+# That is three orders of magnitude under the figures this comment used to
+# carry, and the earlier campaign was cancelled on them. Two changes account
+# for it. The operating point came down from gen40/pop1000, which the
+# implication filter pays for quadratically over a set the search grows; and
+# main has since merged the sampled-word implication prefilter, the in-process
+# guard counting that removed ganak from the run entirely, and the split
+# scoring dispatch. The old probe's numbers -- `fsm` at 151 s, `fsm-timing` and
+# `fsm-combined` killed at 900 s -- were taken against a binary carrying none
+# of that. Read the real figure off the first ~40 rows rather than off this
+# comment, which is the standing rule and not a hedge on these.
+#
+# The streaming maximality filter is on, and unstated, because it has no config
+# key: implication_streams(cfg) reads accumulate_repairs && run_implication_filter
+# and both are true here. So the O(n^2) sweep overlaps the search rather than
+# following it, and each run writes accumulated/maximal.tsv, a one-column
+# listing of the survivors, beside accumulated/index.tsv. The 7.3 s above is
+# measured with it on.
+#
+# The probe also gives the first FRETISH reading of the sampled-word
+# implication prefilter, which CLAUDE.md records as measured on TLSF alone.
+# Pooled over the 20 runs it refutes 122,945 of 135,578 ordered directions,
+# 90.7%, against the 95.9% measured on a TLSF `round-robin-arbiter-aurus` set,
+# and 3 implication queries timed out across the whole probe. That is a large
+# part of why the per-run cost fell as far as it did.
+#
+# There is no second phase here. The maximality curve is its own score
+# campaign, 2026-09-09-fretish-maximal-curve, over the results directory this
+# one writes; it is queued behind this campaign and must stay behind it.
+# `maximal` routes on file extension since de92e64, so it reads a FRETISH
+# results directory directly and the blocker this comment used to record is
+# gone.
 phases = [ { profile = "gradsel-fret", jobs = 4 } ]
