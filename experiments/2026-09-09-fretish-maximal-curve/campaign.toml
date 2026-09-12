@@ -2,10 +2,16 @@ name = "2026-09-09-fretish-maximal-curve"
 branch = "campaign/fretish-maximal-curve"
 description = "The maximality curve over 2026-09-09-fretish-grading: per run, how many distinct maximal repairs the accumulated set held at each of 20 log-spaced time cuts, and how many of them imply an ideal. It is the FRETISH half of what experiments/separation-maximal measured on the TLSF corpus, and it is the reason src/maximal.cpp grew a FRETISH front end."
 
-# Seeds 0-29 split as the campaign it scores, so each host scores the runs it
-# produced and reads nothing over the network. The two are enqueued in order,
-# so results-gradsel-fret-m exists on both hosts by the time this stages.
-hosts = { av2 = "0-14", av3 = "15-29" }
+# All 30 seeds on one host, matching the campaign this scores, so the host
+# scores the runs it produced and reads nothing over the network. The two are
+# enqueued in order, so results-gradsel-fret-m exists by the time this stages.
+#
+# This was av2 = "0-14", av3 = "15-29" until 2026-09-12. av3 has been
+# unreachable since before the relaunch and the measured cost no longer needs
+# two hosts; the grading campaign moved the same way and for the same reasons,
+# and the two must move together, since a score phase scoring seeds its host
+# never ran finds no run directories for them.
+hosts = { av2 = "0-29" }
 
 # No `configs`. A score phase reads a results directory rather than a configs
 # tree, so there is nothing to generate.
@@ -16,36 +22,35 @@ hosts = { av2 = "0-14", av3 = "15-29" }
 # directory outright is what experiments/separation-maximal does for the same
 # reason, and it is the field the scorer actually reads.
 
-# One phase, 600 run directories, 300 a host. What each cut costs is
-# **unmeasured on FRETISH accumulated sets** -- nothing in experiments/ holds
-# one, every archived accumulated corpus being TLSF -- so the budgets below are
-# the separation-maximal precedent's rather than a figure derived for this.
-# Read the real cost off the first ~40 rows of timings.txt, not off this
-# comment.
+# One phase, 600 run directories, all on av2. The cost is measured. On
+# 2026-09-12 the 20 runs of the grading campaign's own cost probe were scored
+# on av2 at these settings -- 20 cuts, jobs 4, --maximality -- and the pass
+# cost a mean of 3.5 s a run and a worst of 11 s, with all 20 exiting 0. Their
+# accumulated sets average 137 candidates and reach 273, which is the input
+# size that matters, the sweep being quadratic in it. So 600 runs is about 35
+# core-minutes, a few minutes of wall at workers = 8.
 #
-# Two things bound the exposure. The pass on this branch is one `maximal`
-# process per cut over a prefix of the accumulated set, an O(n^2) pairwise
-# sweep with no fingerprint prefilter. The prefilter reached main with the
-# whole-specification implication change, and src/maximal.cpp here templated the
-# tool over both front ends before that landed, so the rebase owes a re-wiring
-# of it into both SpecOps specialisations; the running-antichain walk is still
-# on feat/fingerprint-curves and is not merged. Until the re-wiring lands these
-# budgets are the ones that apply and a large accumulated set is the case to
-# watch. And the degradation is graceful:
-# maximal_timeout abandons one cut and score_curves.py keeps the survivors of
-# the last cut that decided, while deadline_s stops new cuts on a run that is
-# spending them. A run that overruns yields a shorter curve rather than
-# nothing, and the campaign yields a thinner figure rather than failing.
+# That replaces the 56 hours a host this comment used to carry, which was the
+# wall cap times the run count and assumed no prefilter. Three things closed
+# the gap. The runs this scores are gen10/pop200 rather than gen40/pop1000, so
+# the accumulated sets are smaller; `maximal` now carries the sampled-word
+# fingerprint prefilter, quotient_by_equivalence and fingerprints_of being in
+# src/maximal.cpp templated over Spec, so the re-wiring this comment owed is
+# done; and the prefilter measures well on FRETISH, refuting 90.7% of ordered
+# directions over that probe. The running-antichain walk is still on
+# feat/fingerprint-curves and is still not merged, so the pass remains one
+# `maximal` process per cut over a prefix rather than one walk a run. Read the
+# real cost off the first ~40 rows of timings.txt, which is the standing rule
+# and not a hedge on these.
 #
-# The worst case is therefore the wall cap times the run count: 300 runs a host
-# at 5400 s, eight at a time, is about 56 hours of wall a host. Nothing narrows
-# that from the query side any more: FRETISH decomposed its implication oracle
-# per requirement until 2026-09-11 and now lowers the whole specification as the
-# TLSF one does, so both ask one query of 1000-1600 characters per pair. What
-# does narrow it is the operating point -- the runs this scores are gen10/pop200
-# rather than the gen40/pop1000 the declaration was first written against, so the
-# accumulated sets are smaller and the O(n^2) sweep shorter. By how much is
-# unmeasured, which is what the first ~40 rows of timings.txt answer.
+# The degradation is graceful either way: maximal_timeout abandons one cut and
+# score_curves.py keeps the survivors of the last cut that decided, while
+# deadline_s stops new cuts on a run that is spending them. A run that overruns
+# yields a shorter curve rather than nothing, and the campaign yields a thinner
+# figure rather than failing. Nothing narrows the budgets from the query side:
+# FRETISH decomposed its implication oracle per requirement until 2026-09-11
+# and now lowers the whole specification as the TLSF one does, so both ask one
+# query of 1000-1600 characters per pair.
 #
 # The budgets are carried explicitly rather than defaulted so the host's
 # score-manifest names what this declaration meant. They are the scorer's own
