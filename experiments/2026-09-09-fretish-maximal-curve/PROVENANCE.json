@@ -22,9 +22,10 @@
     "branch": "campaign/fretish-maximal-curve",
     "subject": "docs(experiments): size the fretish curve campaign off a measured pass",
     "note": "bd8a583 declares the campaign, f0062d0 points it at the gen10/pop200 results stem, and 336838a re-sizes it off a measured pass and moves every seed to av2. All three sit on 5c94d66. The first declaration was queued at 30ad56c on 2026-09-09 and cancelled while still queued on 2026-09-11, so no row depends on that sha.",
-    "reachable_from_main": "expected after the close merges; see held_by_tag",
+    "reachable_from_main": false,
     "held_by_tag": "provenance/fretish-maximal-curve",
-    "held_by_tag_note": "The annotated tag is cut at 336838a on 2026-09-14, before the close commit was written. The branch is expected to merge into main through a pull request, which keeps every sha here reachable on its own; the tag covers the case where the branch is rebased or split first. Never delete it."
+    "held_by_tag_note": "The annotated tag is cut at 336838a on 2026-09-14, before the close commit was written. The branch is expected to merge into main through a pull request, which keeps every sha here reachable on its own; the tag covers the case where the branch is rebased or split first. Never delete it.",
+    "rebased": "On 2026-09-14, after the close, the branch was rebased onto campaign/fretish-selection-grading at 5286a48 so its pull request could stack on that campaign's. That rewrote bd8a583 to eb7b483, f0062d0 to 72116cb, 336838a to 66111a3 and the close commit 72f7e0d to 2862209. The shas in this file are not repointed, being the commits the host ran and the binaries reported; provenance/fretish-maximal-curve holds 336838a and its ancestors reachable. The rebase changed no C++ file and none of the three vendored scripts that scored the pass, whose blobs at 66111a3 equal those at 336838a; the rebased tree adds only the grading campaign's commits beneath it."
   },
   "scoring_binaries": {
     "maximal": { "commit": "336838a", "dirty": false },
