@@ -9,9 +9,10 @@
 # comment wording alone.
 #
 # The scorers come from this branch, feat/separation-scorer merged with
-# campaign/paper-rerun. The search binary's sources are unchanged from the
-# paper-rerun commit 93936ab: the port adds the `fingerprint` target and a
-# header included by src/maximal.cpp alone.
+# campaign/paper-rerun after its restart without `ltlfilt --simplify`
+# (PLAN.md §9 there). The search binary's sources are unchanged from the
+# paper-rerun branch: the port adds the `fingerprint` target and a header
+# included by src/maximal.cpp alone.
 #
 # AuRUS is re-scored so both sides are reduced by one program at one budget.
 # The 2026-09-08 AuRUS maximality pass ran at --compare-timeout 600 where
