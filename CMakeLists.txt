@@ -223,6 +223,11 @@ target_link_libraries(maximal PRIVATE peredur_fitness)
 # does. include/ stays the published surface.
 target_include_directories(maximal PRIVATE src)
 
+add_executable(fingerprint src/fingerprint.cpp)
+target_link_libraries(fingerprint PRIVATE peredur_fitness)
+# fingerprint reaches the lasso evaluator, src/fingerprint/lasso.hpp.
+target_include_directories(fingerprint PRIVATE src)
+
 add_custom_target(ganak_binary ALL DEPENDS "${GANAK_EXECUTABLE}")
 add_custom_target(black_binary ALL DEPENDS "${BLACK_EXECUTABLE}")
 if(DEFINED BLACK_EXTERNAL_TARGET)
@@ -250,7 +255,7 @@ include(cmake/format.cmake)
 include(cmake/lint.cmake)
 include(cmake/githooks.cmake)
 
-foreach(peredur_target peredur_core peredur_fitness peredur compare realize ltl maximal)
+foreach(peredur_target peredur_core peredur_fitness peredur compare realize ltl maximal fingerprint)
     if(MSVC)
         target_compile_options(${peredur_target} PRIVATE /W4 /permissive-)
     else()

@@ -61,6 +61,8 @@ REPO_ROOT = Path(__file__).parent.parent
 BIN_DIR = Path(os.environ.get("PEREDUR_BIN_DIR", REPO_ROOT / "build-release"))
 MAXIMAL_BIN = Path(os.environ.get("MAXIMAL_BIN", BIN_DIR / "maximal"))
 COMPARE_BIN = Path(os.environ.get("COMPARE_BIN", BIN_DIR / "compare"))
+FINGERPRINT_BIN = Path(os.environ.get("FINGERPRINT_BIN",
+                                      BIN_DIR / "fingerprint"))
 
 # The scorer, as a command line rather than an import: one subprocess per run
 # is what the outer wall cap and the core pinning attach to. PEREDUR_SCORE_CURVES_CMD
@@ -77,6 +79,16 @@ DEFAULTS = {
     "maximal_timeout": 900,
     "compare_timeout": 600,
     "deadline_s": 4500,
+    # Both stages are declared rather than implied, so a phase says which
+    # curves it is for. The maximality sweep is solver-bound and the epsilon
+    # one is not, so a pass that wants only the second should not pay for the
+    # first: the 2026-09-07 maximality pass cost 311.7 worker-hours where an
+    # epsilon pass over the same 3000 runs is minutes.
+    "maximality": "on",
+    "ideals": "on",
+    "epsilon": "",
+    "fingerprint_words": 256,
+    "fingerprint_seed": 0,
 }
 # The outer `timeout` sits this far past score_curves.py's own deadline: the
 # deadline stops new cuts being started, and one cut's maximal call may still
@@ -153,9 +165,21 @@ def is_scored(path: Path) -> bool:
         return False
 
 
-def read_versions() -> dict:
-    return {"maximal": R.binary_version(MAXIMAL_BIN),
-            "compare": R.binary_version(COMPARE_BIN)}
+def read_versions(args) -> dict:
+    """The binaries this pass will actually run, and no others.
+
+    A stage that is off contributes no binary: gating on `maximal` for an
+    epsilon-only pass would refuse to start over a binary nothing calls, and
+    would name a commit in the manifest that decided none of the rows.
+    """
+    versions = {}
+    if args.ideals == "on":
+        versions["compare"] = R.binary_version(COMPARE_BIN)
+    if args.maximality == "on":
+        versions["maximal"] = R.binary_version(MAXIMAL_BIN)
+    if args.epsilon:
+        versions["fingerprint"] = R.binary_version(FINGERPRINT_BIN)
+    return versions
 
 
 def enforce_freshness(versions: dict, head, allow_stale: bool) -> None:
@@ -190,12 +214,21 @@ def pin_prefix(slot: int, cores: int, pinned: bool) -> list:
 
 
 def scorer_args(args, part: str, run_dir: str) -> list:
-    return [*shlex.split(SCORE_CURVES_CMD), "--maximality",
-            "--cuts", str(args.cuts), "--jobs", str(args.cores),
-            "--deadline-s", str(args.deadline_s),
-            "--maximal-timeout", str(args.maximal_timeout),
-            "--compare-timeout", str(args.compare_timeout),
-            "--out", part, run_dir]
+    command = [*shlex.split(SCORE_CURVES_CMD)]
+    if args.maximality == "on":
+        command += ["--maximality"]
+    if args.ideals == "off":
+        command += ["--skip-ideals"]
+    if args.epsilon:
+        command += ["--epsilon", args.epsilon,
+                    "--fingerprint-words", str(args.fingerprint_words),
+                    "--fingerprint-seed", str(args.fingerprint_seed)]
+    return command + [
+        "--cuts", str(args.cuts), "--jobs", str(args.cores),
+        "--deadline-s", str(args.deadline_s),
+        "--maximal-timeout", str(args.maximal_timeout),
+        "--compare-timeout", str(args.compare_timeout),
+        "--out", part, run_dir]
 
 
 def invocation_template(args) -> str:
@@ -375,8 +408,15 @@ def build_manifest(args, results: Path, out: Path, versions: dict, head,
         "wall_cap_s": args.wall_cap_s,
         "invocation": invocation_template(args),
         "binaries": {
-            "maximal": {"path": str(MAXIMAL_BIN), **versions["maximal"]},
-            "compare": {"path": str(COMPARE_BIN), **versions["compare"]},
+            **({"maximal": {"path": str(MAXIMAL_BIN),
+                            **versions["maximal"]}}
+               if "maximal" in versions else {}),
+            **({"compare": {"path": str(COMPARE_BIN),
+                            **versions["compare"]}}
+               if "compare" in versions else {}),
+            **({"fingerprint": {"path": str(FINGERPRINT_BIN),
+                                **versions["fingerprint"]}}
+               if "fingerprint" in versions else {}),
         },
         "git": {"branch": R.git_branch(), "head": head or R.LEGACY_COMMIT},
         "allow_stale_binary": bool(args.allow_stale_binary),
@@ -430,6 +470,26 @@ def parse_args(argv=None) -> argparse.Namespace:
                         default=DEFAULTS["compare_timeout"],
                         help=f"seconds for the compare call (default: "
                              f"{DEFAULTS['compare_timeout']})")
+    parser.add_argument("--maximality", choices=("on", "off"),
+                        default=DEFAULTS["maximality"],
+                        help="run the implication sweep over time cuts "
+                             f"(default: {DEFAULTS['maximality']})")
+    parser.add_argument("--ideals", choices=("on", "off"),
+                        default=DEFAULTS["ideals"],
+                        help="label candidates against the family's ideals "
+                             f"with compare (default: {DEFAULTS['ideals']})")
+    parser.add_argument("--epsilon", default=DEFAULTS["epsilon"],
+                        help="comma-separated separation thresholds for the "
+                             "behavioural-fingerprint curves; empty runs none "
+                             "(default: none)")
+    parser.add_argument("--fingerprint-words", type=int,
+                        default=DEFAULTS["fingerprint_words"],
+                        help="lasso words sampled per family for --epsilon "
+                             f"(default: {DEFAULTS['fingerprint_words']})")
+    parser.add_argument("--fingerprint-seed", type=int,
+                        default=DEFAULTS["fingerprint_seed"],
+                        help="word-sampling seed for --epsilon "
+                             f"(default: {DEFAULTS['fingerprint_seed']})")
     parser.add_argument("--deadline-s", type=int,
                         default=DEFAULTS["deadline_s"],
                         help=f"score_curves.py stops adding cuts after this "
@@ -486,7 +546,7 @@ def main(argv=None) -> int:
         return 2
     already = [r for r in runs if is_scored(csv_path(out, r))]
     todo = [r for r in runs if not is_scored(csv_path(out, r))]
-    versions = read_versions()
+    versions = read_versions(args)
     head = R.working_tree_head()
     pinned = shutil.which("taskset") is not None
     timeout_bin = shutil.which("timeout")
@@ -507,7 +567,8 @@ def main(argv=None) -> int:
     print(f"    budgets:  maximal {args.maximal_timeout}s, compare "
           f"{args.compare_timeout}s, deadline {args.deadline_s}s, wall cap "
           f"{args.wall_cap_s}s")
-    print(f"    binaries: {label('maximal')}, {label('compare')}")
+    print("    binaries: "
+          + ", ".join(label(name) for name in sorted(versions)))
     print(f"    command:  {invocation_template(args)}")
 
     if args.dry_run:
@@ -533,6 +594,7 @@ def main(argv=None) -> int:
     child_env = dict(os.environ)
     child_env.setdefault("MAXIMAL_BIN", str(MAXIMAL_BIN))
     child_env.setdefault("COMPARE_BIN", str(COMPARE_BIN))
+    child_env.setdefault("FINGERPRINT_BIN", str(FINGERPRINT_BIN))
     ledger = Ledger(out)
     run_pool(todo, args, out, ledger, pinned, timeout_bin, child_env)
 

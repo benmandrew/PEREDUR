@@ -11,6 +11,9 @@ them scalars:
     ideal_solutions         -- of those, ones at least as strong as an ideal
     maximal_solutions       -- the maximal antichain of the set found by time t
     maximal_ideal_solutions -- of those survivors, the ideal-implying ones
+    eps_solutions_<e>       -- of the candidates found by time t, the largest
+                               greedy subset no two of which agree on more
+                               than 1 - e of the sampled behaviours
     time_to_first_repair       (scalar)
     time_to_first_ideal_repair (scalar)
 
@@ -28,6 +31,16 @@ which is the collapse `run_experiments.parse_compare_output` applies to derive
 invocation covers the whole accumulated directory, its per-repair lines joining
 back to the index by file name -- `compare` is quadratic in repairs x ideals,
 so one call per file would cost the run over again.
+
+The epsilon half is behind --epsilon and is off by default. It reads the
+`fingerprint` binary's bit per sampled lasso word, so its distance between two
+candidates estimates the measure of their symmetric difference, and separates
+a set of near-duplicates from a set of genuinely different repairs -- which
+maximality cannot, an antichain being defined by an implication test that no
+two of its members pass. It runs over every accumulated candidate rather than
+over the maximal set, so it costs one `fingerprint` call a run and no solver
+call at all, and both tools' candidates are measured by the same sampling
+rather than through implication checks whose timeouts differ between them.
 
 The maximality half is a separate stage behind --maximality, off by default. It
 is computed offline, after and apart from the timed run, and must never be read
@@ -71,6 +84,8 @@ from run_experiments import (  # noqa: E402
 # release build can point at another checkout's.
 MAXIMAL_BIN = Path(os.environ.get("MAXIMAL_BIN",
                                   REPO_ROOT / "build-release" / "maximal"))
+FINGERPRINT_BIN = Path(os.environ.get(
+    "FINGERPRINT_BIN", REPO_ROOT / "build-release" / "fingerprint"))
 
 ACCUMULATED_DIR = "accumulated"
 INDEX_NAME = "index.tsv"
@@ -415,6 +430,96 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
     return rows
 
 
+def comma_separated_fractions(text: str) -> list[float]:
+    """Parse `--epsilon 0.05,0.2` into a sorted list of fractions in [0, 1)."""
+    values = []
+    for piece in text.split(","):
+        try:
+            value = float(piece)
+        except ValueError as error:
+            raise argparse.ArgumentTypeError(
+                f"not a number: {piece}") from error
+        if not 0.0 <= value < 1.0:
+            raise argparse.ArgumentTypeError(
+                f"epsilon must be in [0, 1): {piece}")
+        values.append(value)
+    return sorted(set(values))
+
+
+def fingerprints_of(accumulated: Path, spec: str, n_words: int,
+                    seed: int) -> dict[str, int] | None:
+    """Return each accumulated candidate's fingerprint as an integer bit set.
+
+    The words are drawn over the family's *original* specification rather than
+    over each candidate's own signal list, so every candidate of a family --
+    and every candidate of the other tool's runs on that family -- is measured
+    against one word set. `fingerprint` derives the words from that file, the
+    count and the seed alone, so nothing has to travel between the hosts that
+    score the two sides.
+    """
+    signals = EXAMPLES_DIR / spec / "spec.tlsf"
+    if not signals.is_file():
+        print(f"WARN: no specification at {signals}", file=sys.stderr)
+        return None
+    command = [str(FINGERPRINT_BIN), "--signals", str(signals),
+               "--words", str(n_words), "--seed", str(seed), str(accumulated)]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True,
+                                check=False)
+    except OSError as error:
+        print(f"WARN: {FINGERPRINT_BIN}: {error}", file=sys.stderr)
+        return None
+    prints: dict[str, int] = {}
+    for line in result.stdout.splitlines():
+        name, _, digits = line.partition("\t")
+        if digits:
+            prints[name] = int(digits, 16)
+    # A non-zero status means some file failed, and the rows for the rest are
+    # still on stdout: a run keeps the curve its readable candidates support
+    # rather than losing it to one bad file, which is what the maximality
+    # stage does with a failed cut.
+    if result.returncode != 0:
+        print(f"WARN: fingerprint reported {result.returncode} on "
+              f"{accumulated}: {result.stderr.strip()}", file=sys.stderr)
+    return prints or None
+
+
+def separated_count(prints: list[int], threshold: int) -> int:
+    """The greedy epsilon-net over `prints`, in the order given.
+
+    Greedy rather than a maximum independent set, which is NP-hard and would
+    be a different number at every cut for no gain in what the curve says.
+    Discovery order makes the count non-decreasing as the prefix grows -- an
+    earlier candidate's admission never depends on a later one -- which is
+    what an anytime curve has to be.
+    """
+    kept: list[int] = []
+    for value in prints:
+        if all(bin(value ^ other).count("1") > threshold for other in kept):
+            kept.append(value)
+    return len(kept)
+
+
+def epsilon_rows(base: dict, index: list[tuple[str, int, float]],
+                 prints: dict[str, int], epsilons: list[float],
+                 n_words: int, n_cuts: int, end_s) -> list[dict]:
+    """One curve per epsilon, at the cuts the other curves use."""
+    by_time = sorted(index, key=lambda row: row[2])
+    ordered = [(row[2], prints[row[0]]) for row in by_time
+               if row[0] in prints]
+    rows: list[dict] = []
+    for epsilon in epsilons:
+        # Strictly greater than the threshold, so epsilon = 0 keeps one
+        # representative of each distinct fingerprint rather than all of them.
+        threshold = int(epsilon * n_words)
+        points: list[tuple[float, int]] = []
+        for cut in time_cuts([moment for moment, _ in ordered], n_cuts):
+            prefix = [value for moment, value in ordered if moment <= cut]
+            points.append((cut, separated_count(prefix, threshold)))
+        rows += curve_rows(base, f"eps_solutions_{epsilon:g}", points, end_s)
+    return rows
+
+
 def score_run(run_dir: Path, args, deadline: float | None = None) -> list[dict]:
     """Return every long-format row for one run directory."""
     manifest = read_manifest(run_dir)
@@ -425,7 +530,16 @@ def score_run(run_dir: Path, args, deadline: float | None = None) -> list[dict]:
 
     ideals = Path(args.ideals) if args.ideals else EXAMPLES_DIR / spec / "fixes"
     implying: set[str] | None = None
-    if index and ideals.is_dir():
+    if getattr(args, "skip_ideals", False):
+        # Left unknown rather than empty, which is the same distinction the
+        # missing-ideals branch below draws: no candidate was found not to
+        # imply an ideal, the question was not asked. `compare` is quadratic
+        # in candidates times ideals and is 99% of an epsilon-only pass -- 7.2s
+        # of 7.3s on a 421-candidate run -- so a pass that wants the
+        # separation curves alone should not pay for a relation the
+        # maximality pass already recorded.
+        pass
+    elif index and ideals.is_dir():
         relations = compare_relations(accumulated, ideals, args.compare_timeout)
         if relations is not None:
             implying = {name for name, relation in relations.items()
@@ -456,6 +570,17 @@ def score_run(run_dir: Path, args, deadline: float | None = None) -> list[dict]:
         rows += maximality_rows(base, index, accumulated, implying,
                                 args.cuts, args.jobs, args.maximal_timeout,
                                 deadline)
+    # getattr rather than a plain attribute: score_run is called with an
+    # argument namespace of the caller's own making in the script tests, and a
+    # curve stage added later must not break one built before it existed.
+    epsilons = getattr(args, "epsilon", None)
+    if epsilons and index:
+        n_words = getattr(args, "fingerprint_words", 256)
+        prints = fingerprints_of(accumulated, spec, n_words,
+                                 getattr(args, "fingerprint_seed", 0))
+        if prints is not None:
+            rows += epsilon_rows(base, index, prints, epsilons, n_words,
+                                 args.cuts, end_s)
     return rows
 
 
@@ -493,12 +618,25 @@ def main() -> int:
                         help="one row per run instead of the long format")
     parser.add_argument("--maximality", action="store_true",
                         help="also run the implication filter over time cuts")
+    parser.add_argument("--epsilon", type=comma_separated_fractions,
+                        default=[],
+                        help="comma-separated separation thresholds; each "
+                             "adds an eps_solutions_<e> curve over the "
+                             "accumulated candidates (default: none)")
+    parser.add_argument("--fingerprint-words", type=int, default=256,
+                        help="lasso words sampled per family for --epsilon "
+                             "(default: 256)")
+    parser.add_argument("--fingerprint-seed", type=int, default=0,
+                        help="word-sampling seed for --epsilon (default: 0)")
     parser.add_argument("--cuts", type=int, default=20,
                         help="time cuts for --maximality (default: 20)")
     parser.add_argument("--jobs", type=int, default=0,
                         help="solver calls in flight for maximal")
     parser.add_argument("--spec", help="override the family name and ideals")
     parser.add_argument("--ideals", help="override the ideals directory")
+    parser.add_argument("--skip-ideals", action="store_true",
+                        help="do not run compare; the ideal-implying metrics "
+                             "are written as unknown")
     parser.add_argument("--deadline-s", type=int, default=0,
                         help="stop adding maximality cuts after this many "
                              "seconds and write what was computed (0: no "
@@ -515,6 +653,8 @@ def main() -> int:
 
     if args.cuts < 1:
         parser.error("--cuts expects a positive integer")
+    if args.epsilon and args.fingerprint_words < 1:
+        parser.error("--fingerprint-words expects a positive integer")
 
     # The deadline is per run directory, not per invocation: the launcher
     # feeds one directory at a time, and a budget shared across many would

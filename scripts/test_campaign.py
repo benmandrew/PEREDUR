@@ -1202,7 +1202,9 @@ hosts = { av2 = "0-4" }
     check(score["name"], "curves-tlsf", "named after its output by default")
     check({k: score[k] for k in C.SCORE_BUDGET_KEYS},
           {"workers": 8, "cores": 4, "cuts": 20, "maximal_timeout": 900,
-           "compare_timeout": 600, "deadline_s": 4500, "wall_cap_s": 5400},
+           "compare_timeout": 600, "deadline_s": 4500, "wall_cap_s": 5400,
+           "maximality": "on", "ideals": "on", "epsilon": "",
+           "fingerprint_words": 256, "fingerprint_seed": 0},
           "every budget defaults to the scorer's own value, and the wall cap "
           "sits 900s past the deadline")
     check(C.score_defaults(),
@@ -1214,7 +1216,9 @@ hosts = { av2 = "0-4" }
           "an explicit results and out are carried through")
     check({k: old[k] for k in C.SCORE_BUDGET_KEYS},
           {"workers": 2, "cores": 8, "cuts": 5, "maximal_timeout": 60,
-           "compare_timeout": 30, "deadline_s": 100, "wall_cap_s": 1000},
+           "compare_timeout": 30, "deadline_s": 100, "wall_cap_s": 1000,
+           "maximality": "on", "ideals": "on", "epsilon": "",
+           "fingerprint_words": 256, "fingerprint_seed": 0},
           "and so is every budget it states")
     check(old["hosts"], {"av2": list(range(5))},
           "a score phase narrows the split exactly as a run phase does")
@@ -1263,13 +1267,23 @@ phases = [ { kind = "score", results = "experiments/results-rematch" } ]
         ('phases = [ { kind = "score", results = "x", workers = 0 } ]',
          "workers must be a positive integer", "zero workers"),
         ('phases = [ { kind = "score", results = "x", cores = true } ]',
-         "cores must be a positive integer", "a boolean core count"),
+         "cores must be an integer", "a boolean core count"),
         ('phases = [ { kind = "score", results = "x", deadline_s = "1" } ]',
-         "deadline_s must be a positive integer", "a string deadline"),
+         "deadline_s must be an integer", "a string deadline"),
         ('phases = [ { kind = "score", results = "" } ]',
          "results must be a non-empty string", "an empty results"),
         ('phases = [ { kind = "score", results = "x", out = 3 } ]',
          "out must be a non-empty string", "a numeric out"),
+        ('phases = [ { kind = "score", results = "x", maximality = "yes" } ]',
+         "maximality must be one of", "a maximality that is not on or off"),
+        ('phases = [ { kind = "score", results = "x", epsilon = 3 } ]',
+         "epsilon must be a string", "a numeric epsilon"),
+        ('phases = [ { kind = "score", results = "x", '
+         'fingerprint_seed = -1 } ]',
+         "fingerprint_seed must be a non-negative integer",
+         "a negative fingerprint seed"),
+        ('phases = [ { kind = "score", results = "x", maximality = "off" } ]',
+         "would score nothing", "a phase with both stages off"),
     ):
         got = declaration_error(decl_root, "badscore", f"""
 name = "badscore"
@@ -1300,18 +1314,24 @@ check_true(C.phase_command(phase, [0, 1]).startswith(C.RUNNER_CMD + " "),
 score_phase = {"name": "curves", "kind": "score", "profile": None,
                "results": "experiments/results-x", "out": "experiments/curves-x",
                "workers": 3, "cores": 2, "cuts": 5, "maximal_timeout": 60,
-               "compare_timeout": 30, "deadline_s": 100, "wall_cap_s": 1000}
+               "compare_timeout": 30, "deadline_s": 100, "wall_cap_s": 1000,
+               "maximality": "on", "ideals": "on", "epsilon": "",
+           "fingerprint_words": 256, "fingerprint_seed": 0}
 check(C.phase_args(score_phase, [0, 1]),
       ["--results", "experiments/results-x", "--out", "experiments/curves-x",
        "--workers", "3", "--cores", "2", "--cuts", "5",
        "--maximal-timeout", "60", "--compare-timeout", "30",
-       "--deadline-s", "100", "--wall-cap-s", "1000", "--seeds", "0", "1"],
+       "--deadline-s", "100", "--wall-cap-s", "1000",
+       "--maximality", "on", "--ideals", "on", "--epsilon", "",
+       "--fingerprint-words", "256", "--fingerprint-seed", "0",
+       "--seeds", "0", "1"],
       "a score phase becomes scorer arguments, every budget stated, seeds last")
 check(C.phase_command(score_phase, [0, 1]),
       C.SCORER_CMD + " --results experiments/results-x --out "
       "experiments/curves-x --workers 3 --cores 2 --cuts 5 "
       "--maximal-timeout 60 --compare-timeout 30 --deadline-s 100 "
-      "--wall-cap-s 1000 --seeds 0 1",
+      "--wall-cap-s 1000 --maximality on --ideals on --epsilon '' "
+      "--fingerprint-words 256 --fingerprint-seed 0 --seeds 0 1",
       "and its command is the scorer's, not the runner's")
 check(C.phase_launcher({"profile": "tlsf"}), C.RUNNER_CMD,
       "a phase record with no kind at all launches the runner")
@@ -2785,7 +2805,9 @@ try:
     check_true(f"would run: {C.SCORER_CMD} --results experiments/results "
                f"--out experiments/curves --workers 2 --cores 1 --cuts 20 "
                f"--maximal-timeout 900 --compare-timeout 600 --deadline-s 10 "
-               f"--wall-cap-s 910 --seeds 6 7" in printed,
+               f"--wall-cap-s 910 --maximality on --ideals on --epsilon '' "
+               f"--fingerprint-words 256 --fingerprint-seed 0 "
+               f"--seeds 6 7" in printed,
                f"printing the scorer command it would run: {printed!r}")
     check_true("blocked: no results directory" in printed,
                "and the missing results directory that blocks it")
@@ -2817,7 +2839,8 @@ try:
           "--results experiments/results --out experiments/curves "
           "--workers 2 --cores 1 --cuts 20 --maximal-timeout 900 "
           "--compare-timeout 600 --deadline-s 10 --wall-cap-s 910 "
-          "--seeds 6 7",
+          "--maximality on --ideals on --epsilon  --fingerprint-words 256 "
+          "--fingerprint-seed 0 --seeds 6 7",
           "the scorer got every budget and this host's seeds, and nothing "
           "from the runner's vocabulary")
     check(calls.read_text().count("\n"), 1,

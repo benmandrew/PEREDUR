@@ -65,7 +65,7 @@ target_link_libraries(peredur_tests PRIVATE peredur_fitness)
 # where they landed. Every driver is built into the same directory, so one
 # generator expression covers all of them.
 add_dependencies(peredur_tests
-    peredur compare lint-ideals ltl maximal mucs realize signal_tracer)
+    peredur compare fingerprint lint-ideals ltl maximal mucs realize signal_tracer)
 target_compile_definitions(peredur_tests PRIVATE
     PEREDUR_DRIVER_DIR="$<TARGET_FILE_DIR:peredur>")
 
@@ -148,6 +148,8 @@ add_test(NAME peredur_tests.driver_ltl COMMAND peredur_tests driver_ltl)
 add_test(NAME peredur_tests.driver_mucs COMMAND peredur_tests driver_mucs)
 add_test(NAME peredur_tests.driver_compare COMMAND peredur_tests driver_compare)
 add_test(NAME peredur_tests.driver_maximal COMMAND peredur_tests driver_maximal)
+add_test(NAME peredur_tests.driver_fingerprint
+         COMMAND peredur_tests driver_fingerprint)
 add_test(NAME peredur_tests.driver_lint_ideals
          COMMAND peredur_tests driver_lint_ideals)
 add_test(NAME peredur_tests.driver_signal_tracer

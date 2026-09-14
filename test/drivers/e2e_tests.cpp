@@ -654,6 +654,62 @@ void test_maximal_reports_both_formats() {
            "maximal: the refusal says which extension it wanted");
 }
 
+void test_fingerprint_separates_two_specifications() {
+    const TempDir dir("fingerprint");
+    const std::string unrealizable =
+        write_file(dir.path() / "spec.tlsf", k_unrealizable).string();
+    const std::string realizable =
+        write_file(dir.path() / "fixed.tlsf", k_realizable).string();
+
+    const DriverRun run = run_driver(
+        "fingerprint",
+        {"--signals", unrealizable, "--words", "32", unrealizable, realizable});
+    expect(run.m_exit_code == 0, "fingerprint: both inputs exit zero");
+    expect(contains(run.m_output, "spec.tlsf\t"),
+           "fingerprint: each row names its file");
+    expect(contains(run.m_output, "fixed.tlsf\t"),
+           "fingerprint: each input gets a row");
+
+    // 32 words is 8 hex digits, and the weakening admits behaviour the
+    // original forbids, so the two rows must differ. Equal rows would mean
+    // the tool is reporting something other than the lowering.
+    std::vector<std::string> prints;
+    std::istringstream lines(run.m_output);
+    std::string line;
+    while (std::getline(lines, line)) {
+        const std::size_t tab = line.find('\t');
+        if (tab != std::string::npos) {
+            prints.push_back(line.substr(tab + 1));
+        }
+    }
+    expect(prints.size() == 2, "fingerprint: one row per input");
+    expect(prints[0].size() == 8 && prints[1].size() == 8,
+           "fingerprint: 32 words render as 8 hex digits");
+    expect(prints[0] != prints[1],
+           "fingerprint: a weakening prints the same fingerprint as its "
+           "original");
+
+    // The same call again, because a fingerprint is only comparable across
+    // invocations if the words are a function of the arguments alone.
+    const DriverRun again = run_driver(
+        "fingerprint",
+        {"--signals", unrealizable, "--words", "32", unrealizable, realizable});
+    expect(again.m_output == run.m_output,
+           "fingerprint: a repeated call drew different words");
+
+    const DriverRun no_signals = run_driver("fingerprint", {unrealizable});
+    expect(no_signals.m_exit_code != 0, "fingerprint: --signals is required");
+    const DriverRun unknown =
+        run_driver("fingerprint",
+                   {"--signals", unrealizable, "--wordz", "8", unrealizable});
+    expect(unknown.m_exit_code != 0,
+           "fingerprint: an unknown argument is refused");
+    const DriverRun absent = run_driver(
+        "fingerprint",
+        {"--signals", unrealizable, (dir.path() / "absent.tlsf").string()});
+    expect(absent.m_exit_code != 0, "fingerprint: an unreadable input fails");
+}
+
 }  // namespace
 
 void run_peredur_driver_tests() {
@@ -686,6 +742,11 @@ void run_compare_driver_tests() {
 void run_maximal_driver_tests() {
     test_maximal_reports_both_formats();
     expect_reports_version("maximal");
+}
+
+void run_fingerprint_driver_tests() {
+    test_fingerprint_separates_two_specifications();
+    expect_reports_version("fingerprint");
 }
 
 void run_lint_ideals_driver_tests() {
