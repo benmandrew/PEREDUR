@@ -59,3 +59,15 @@ No decision rule is registered. This campaign re-measures reported figures and t
 | AuRUS arm | none |
 
 Whether these figures belong to the shipped engine rests on one diff of the search sources.
+
+## 9. Amendment of 2026-09-14: restarted without `ltlfilt --simplify`
+
+The first launch, at `93936ab`, was stopped during calibration on the evening of 2026-09-14. It had written 16 calibration rows on av2 and 19 on av3, and `main` had not started. Those rows are moved aside with a `.superseded-93936ab` suffix and take no part in any figure.
+
+A scope profile of `full-arbiter-aurus` seed 0, in the aurus arm with `nsga2-apportion` at 400 individuals, put the search checker's `ltlfilt --simplify` pass at 299.2 s of a 343.6 s run. The `--satisfiable` call that decides each query took 28.0 s. Over the 32 calibration runs paired with the rematch, ltlfilt was 55% of wall time.
+
+`194d56b` removes the pass from `SatisfiabilityChecker` on every path, and its second cache key with it. The search, final filters, `maximal` and `compare` now ask SPOT the formula as written. At 250 individuals the profiled run fell from 339.5 s to 66.9 s, with all 12 repair files byte-identical. That is one run on the local box, not an interleaved A/B.
+
+Verdicts move where the pass used to decide a query that SPOT cannot decide unsimplified within its budget. Deep nested-X implications between related formulae are the known case: at an X-chain depth of 20, `ltlfilt --satisfiable` runs past 120 s on a query `--simplify` folds to "0" in 10 ms. Such a query now reads as undecided, so the implication filter keeps both sides.
+
+The campaign restarts from the merge `2d4e6dd` on `campaign/paper-rerun`, with the design of §3 unchanged. On collection, read calibration's kill rate and `implies_ideal` against the rematch's before reading cost.

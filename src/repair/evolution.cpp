@@ -363,19 +363,14 @@ filter_maximal_specifications(
     // between whole specifications, which is not the shape the search's
     // checker is tuned for, and the FRETISH path was left on the search's
     // settings only because its per-requirement queries had not been measured.
-    // Measured at 40 generations of 1000: the `ltlfilt --simplify` pass is
-    // 59-61% of every ltlfilt exec a run makes -- 37,171 of 61,100 on fsm,
-    // 28,573 of 48,093 on takeoff -- and on takeoff 122 of those calls spent
-    // the whole 10s ltlfilt budget and returned the formula unchanged, at
-    // least 1,220s of that run's 2,523s of ltlfilt CPU. The 500ms SPOT budget
-    // costs output as well as time: takeoff declined 109 escalations, each an
+    // The 500ms SPOT budget costs output as well as time, measured at 40
+    // generations of 1000: takeoff declined 109 escalations, each an
     // ExpectUnsat query left undecided and so read as "does not imply", each
     // keeping a repair the filter had grounds to drop. It starts cold, but
     // these queries are between survivors rather than about one requirement,
     // so there is nothing in the search's cache to inherit.
     SatisfiabilityChecker final_checker;
     final_checker.set_timeout(cfg.black_timeout);
-    final_checker.set_simplify(false);
     final_checker.set_spot_budget(cfg.black_timeout);
     const std::vector<FilterFunction> filters = get_final_filter_functions(
         cfg, original, final_checker, on_impl_progress);

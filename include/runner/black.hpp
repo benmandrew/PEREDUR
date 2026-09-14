@@ -87,13 +87,6 @@ class SatisfiabilityChecker {
 
     void set_timeout(std::chrono::milliseconds timeout) { m_timeout = timeout; }
 
-    /// Whether a cache miss is first run through `ltlfilt --simplify`. On for
-    /// the search, whose queries are single requirements; off for `maximal`,
-    /// whose queries are whole TLSF specifications, where the pass was
-    /// measured at 95.6% of solver wall time and settled nothing the
-    /// satisfiability call could not.
-    void set_simplify(bool enabled) { m_simplify = enabled; }
-
     /// SPOT's own per-query budget, before any escalation to black. 500ms is
     /// tuned for the search loop; an offline implication sweep wants the same
     /// budget it gives black, since an `ExpectUnsat` query SPOT leaves
@@ -105,7 +98,6 @@ class SatisfiabilityChecker {
    private:
     std::chrono::milliseconds m_timeout{1000};
     std::chrono::milliseconds m_spot_budget{500};
-    bool m_simplify{true};
     /// Cache lookups (the common case once the population converges) take a
     /// shared lock so concurrent hits don't serialise on one another; only an
     /// actual insert needs the exclusive lock.

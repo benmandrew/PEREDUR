@@ -79,7 +79,6 @@ class StreamingMaximalFilter {
         // them). Set before the coordinator starts, which is the only other
         // thread to read the checker.
         m_checker.set_timeout(cfg.black_timeout);
-        m_checker.set_simplify(false);
         m_checker.set_spot_budget(cfg.black_timeout);
         antichain::reset_stats();
         m_coordinator = std::thread([this] { run(); });

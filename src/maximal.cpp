@@ -626,15 +626,15 @@ SatisfiabilityChecker& configure_checker(const Args& args) {
     Config cfg;
     cfg.parallel = args.jobs;
     cfg.black_timeout = std::chrono::milliseconds{args.timeout_s * 1000};
-    // Reached through check_satisfiability's simplification step, which decides
-    // the query outright whenever it folds to a constant. compare.cpp sizes it
-    // at 300 s off amba and documents why anything smaller silently changes the
-    // verdict rather than merely losing a simplification.
+    // Bounds the `--remove-wm` rewrite check_satisfiability runs before black.
+    // compare.cpp sized it at 300 s off amba.
     cfg.ltlfilt_timeout = std::chrono::milliseconds{300'000};
     apply_tool_timeouts(cfg);
     set_thread_pool_size(cfg.parallel);
     SatisfiabilityChecker& checker = global_sat_checker();
-    checker.set_simplify(false);
+    // An undecided `ExpectUnsat` query keeps both sides, so SPOT takes black's
+    // budget rather than the 500ms tuned for the search: that restored
+    // agreement on 264 of 264 cut-values across a 10-run sample.
     checker.set_spot_budget(cfg.black_timeout);
     return checker;
 }

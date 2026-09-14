@@ -115,52 +115,15 @@ std::string black_executable_path() {
 
 std::optional<bool> SatisfiabilityChecker::check_satisfiability(
     const std::string& ltl_formula, QueryPolarity polarity) {
-    // Two keys into one map, tagged apart so a SPOT spelling can never be
-    // read as a canonical one.
+    // Satisfiability is invariant under a bijection on the atoms, so every
+    // spelling and every naming of one query meets at its canonical renamed
+    // form.
     //
-    // The first is the caller's own formula in canonical renamed form:
-    // satisfiability is invariant under a bijection on the atoms, so every
-    // spelling and every naming of one query meets there, and a hit on it
-    // skips the ltlfilt exec that computing the second key costs. The second
-    // is `normalised`, which is what this cache used alone. Both are kept
-    // because neither contains the other: ltlfilt simplifies, which the
-    // canonical form deliberately does not, and the canonical form renames,
-    // which ltlfilt does not. Keying on the first alone was measured on rg2 at
-    // 2,773 execs against 2,211 for the second alone -- ltlfilt's collapse is
-    // the larger of the two and must not be given up to gain the renaming.
-    const std::string spelling_key =
-        "r\x1f" + formula_key::renamed(ltl_formula);
-    {
-        std::shared_lock lock(m_cache_mutex);
-        const auto found = m_cache.find(spelling_key);
-        if (found != m_cache.end()) {
-            n_cache_hits++;
-            return found->second;
-        }
-    }
-    // --simplify is kept on this path, unlike the ltl2tgba and ltlsynt ones
-    // that dropped it: black's inputs are single requirement formulae and
-    // implication checks, not the deep nested-X conjunctions that make ltlfilt
-    // --simplify blow up super-exponentially.
-    // Except on the implication sweep `maximal` runs, whose whole-spec
-    // queries are exactly those conjunctions, and where the pass was measured
-    // at 21.8x the cost of the decision it precedes.
-    const std::string normalised =
-        m_simplify ? simplify_ltl(ltl_formula) : ltl_formula;
-    // A formula that SPOT reduces to a boolean constant is already decided:
-    // "0" is unsatisfiable, "1" is valid and therefore satisfiable. The
-    // genetic algorithm generates these constantly — mostly implication checks
-    // that reduce away entirely — and they are the bulk of what black would
-    // otherwise time out on, so answering here skips the subprocess. This is
-    // an optimisation only: to_black_constants keeps black correct on these
-    // formulae by itself if the folding does not fire.
-    if (const std::optional<bool> decided = constant_answer(normalised)) {
-        n_constant_folded++;
-        std::scoped_lock lock(m_cache_mutex);
-        m_cache.emplace(spelling_key, decided);
-        return decided;
-    }
-    const std::string cache_key = "n\x1f" + normalised;
+    // No `ltlfilt --simplify` pass runs before the decision. It once supplied
+    // a second key and folded formulae to constants, but on the search's own
+    // queries it cost 8x the `--satisfiable` call it preceded: 299.2 s against
+    // 28.0 s, 87% of a 343.6 s full-arbiter-aurus run.
+    const std::string cache_key = formula_key::renamed(ltl_formula);
     {
         std::shared_lock lock(m_cache_mutex);
         const auto found = m_cache.find(cache_key);
@@ -169,13 +132,17 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
             return found->second;
         }
     }
+    // A formula that is already a boolean constant is decided: "0" is
+    // unsatisfiable, "1" is valid and therefore satisfiable. This is an
+    // optimisation only: to_black_constants keeps black correct on these
+    // formulae by itself.
+    if (const std::optional<bool> decided = constant_answer(ltl_formula)) {
+        n_constant_folded++;
+        std::scoped_lock lock(m_cache_mutex);
+        m_cache.emplace(cache_key, decided);
+        return decided;
+    }
     n_cache_misses++;
-    // Every verdict is written under both keys, so the next arrival by either
-    // route finds it.
-    const auto remember = [this,
-                           &spelling_key](const std::optional<bool>& verdict) {
-        m_cache.emplace(spelling_key, verdict);
-    };
     // SPOT first, on every query. It decides by automaton emptiness, so its
     // cost tracks the automaton's size rather than the verdict, and it settles
     // in tens of milliseconds the deep nested-X implications that black cannot
@@ -183,9 +150,6 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
     // of 5,579 with a 10ms median, against black's 27ms, and at an X-chain
     // depth of 640 it answers in 30ms where black exceeds 60s.
     //
-    // The formula handed over is the --simplify output rather than the
-    // original. It is SPOT's own spelling, so SPOT reads it back, and it is
-    // the smaller of the two whenever simplification fired at all.
     // Bounded by the caller's own budget as well as by m_spot_budget, so a
     // configured timeout still bounds the whole query rather than the black
     // stage alone -- otherwise a 1000ms setting would admit a 1500ms query. A
@@ -196,11 +160,10 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
         m_timeout.count() == 0 ? m_spot_budget
                                : std::min(m_timeout, m_spot_budget);
     if (const std::optional<bool> decided =
-            spot_satisfiable(normalised, spot_budget)) {
+            spot_satisfiable(ltl_formula, spot_budget)) {
         n_spot_decided++;
         std::scoped_lock lock(m_cache_mutex);
         m_cache.emplace(cache_key, decided);
-        remember(decided);
         return decided;
     }
     // SPOT's own blowup case is a large automaton, which happens on satisfiable
@@ -213,7 +176,6 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
         n_escalations_declined++;
         std::scoped_lock lock(m_cache_mutex);
         m_cache.emplace(cache_key, std::nullopt);
-        remember(std::nullopt);
         return std::nullopt;
     }
     const std::string black = black_executable_path();
@@ -232,12 +194,9 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
     // configuration sets zero.
     const auto timeout_s =
         std::chrono::ceil<std::chrono::seconds>(m_timeout).count();
-    // Pass ltl_formula (not normalised) to black. black does parse SPOT's
-    // compact operator notation ("GFa"), but not every token SPOT can emit:
-    // "0"/"1" are a syntax error and "xor" is unsupported. The original
-    // formula is always otherwise black-compatible because it comes from
-    // requirement_to_ltl / implication check construction. The normalised form
-    // is the cache key.
+    // The formula is black-compatible because it comes from requirement_to_ltl
+    // or implication check construction, never from SPOT's printer: black
+    // rejects "0"/"1" and does not support "xor".
     //
     // Weak until is the exception, and it is a soundness problem rather than a
     // parsing one. black reads "a W b" as weak until, exactly as SPOT writes
@@ -270,23 +229,16 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
             n_weak_operator_unresolved++;
             std::scoped_lock lock(m_cache_mutex);
             m_cache.emplace(cache_key, std::nullopt);
-            remember(std::nullopt);
             return std::nullopt;
         }
         query = *rewritten;
-        // The guard above tested the --simplify output, which is not the same
-        // formula: simplify_ltl returns its input unchanged when ltlfilt is
-        // missing, errors or times out, and --simplify is the pass that blows
-        // up super-exponentially on deep nested-X conjunctions. --remove-wm is
-        // far cheaper and does not, so it routinely folds to a constant a
-        // formula the guard above saw unfolded. Cache it: the answer cost an
-        // ltlfilt exec, and it is the same answer for every query sharing the
-        // key.
+        // --remove-wm routinely folds to a constant a formula the guard above
+        // saw unfolded. Cache it: the answer cost an ltlfilt exec, and it is
+        // the same answer for every query sharing the key.
         if (const std::optional<bool> decided = constant_answer(query)) {
             n_constant_folded++;
             std::scoped_lock lock(m_cache_mutex);
             m_cache.emplace(cache_key, decided);
-            remember(decided);
             return decided;
         }
     }
@@ -305,7 +257,6 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
     if (result.m_timed_out) {
         n_timeouts++;
         m_cache.emplace(cache_key, std::nullopt);
-        remember(std::nullopt);
         return std::nullopt;
     }
     // Check UNSAT before SAT: the former contains the latter as a substring.
@@ -320,7 +271,6 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
         // indeterminate, same as a process-level timeout.
         n_timeouts++;
         m_cache.emplace(cache_key, std::nullopt);
-        remember(std::nullopt);
         return std::nullopt;
     } else {
         // black's output crossed a process boundary and didn't match any
@@ -331,6 +281,5 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
                                  result.m_output);
     }
     m_cache.emplace(cache_key, sat);
-    remember(sat);
     return sat;
 }
