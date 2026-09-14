@@ -21,7 +21,7 @@ if(_black_candidate)
 endif()
 
 set(BLACK_VERSION "25.09.0")
-set(BLACK_ROOT_DIR "${CMAKE_BINARY_DIR}/third_party/black")
+set(BLACK_ROOT_DIR "${COUNTER_THIRD_PARTY_DIR}/black")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # Prebuilt debs require Ubuntu 24.04 (noble) glibc/libstdc++.  On older

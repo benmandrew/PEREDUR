@@ -14,6 +14,15 @@ if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
   endif()
 endif()
 
+# Spot, black and ganak are spawned as subprocesses and nothing links against
+# them, so their trees carry none of a preset's flags -- every preset builds a
+# byte-equivalent copy. Hoisting the location behind a variable lets a caller
+# point every preset at one tree; CI does, so its four matrix legs share a
+# single cached copy rather than building Spot four times under four keys. The
+# default keeps each build directory self-contained.
+set(COUNTER_THIRD_PARTY_DIR "${CMAKE_BINARY_DIR}/third_party" CACHE PATH
+    "Directory holding the built Spot, black and ganak trees")
+
 include(cmake/ganak.cmake)
 include(cmake/spot.cmake)
 include(cmake/black.cmake)

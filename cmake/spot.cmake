@@ -3,8 +3,8 @@ include(ExternalProject)
 set(SPOT_VERSION "2.15.1")
 set(SPOT_DOWNLOAD_URL
     "https://www.lre.epita.fr/dload/spot/spot-${SPOT_VERSION}.tar.gz")
-set(SPOT_PREFIX "${CMAKE_BINARY_DIR}/third_party/spot_src")
-set(SPOT_INSTALL_DIR "${CMAKE_BINARY_DIR}/third_party/spot")
+set(SPOT_PREFIX "${COUNTER_THIRD_PARTY_DIR}/spot_src")
+set(SPOT_INSTALL_DIR "${COUNTER_THIRD_PARTY_DIR}/spot")
 set(SPOT_BIN_DIR "${SPOT_INSTALL_DIR}/bin")
 set(SPOT_STAMP_DIR "${SPOT_PREFIX}/src/spot_project-stamp")
 

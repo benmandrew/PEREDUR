@@ -27,6 +27,13 @@ if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
     endif()
 endif()
 
+# Mirrors the root CMakeLists again. The fetch modules resolve their install
+# locations against this, and this project includes one of them directly rather
+# than through the root, so without the declaration here Spot would install into
+# /spot and the stage would fail on a path the Dockerfile never copies.
+set(COUNTER_THIRD_PARTY_DIR "${CMAKE_BINARY_DIR}/third_party" CACHE PATH
+    "Directory holding the built Spot, black and ganak trees")
+
 if(NOT COUNTER_TOOL_MODULE)
     message(FATAL_ERROR
         "-DCOUNTER_TOOL_MODULE=<module>.cmake is required "

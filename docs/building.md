@@ -138,18 +138,19 @@ python scripts/coverage_badge.py --check   # fail if the committed badge is stal
 
 It configures, builds, runs `ctest --preset coverage`, merges the raw profiles with `llvm-profdata`, exports a summary with `llvm-cov export --summary-only` over `src/` and `include/`, and writes `docs/coverage.svg`. Stale profiles are deleted first, because they accumulate and an old one credits lines this build may not even contain. A failing suite refuses to write the badge. `--json <file>` reuses an llvm-cov export already made, and `--no-run` re-exports the profiles already on disk.
 
-The badge is a committed file rather than a call out to a badge service, so the README renders on a fork with no secrets and in an offline clone. That holds only while the file is regenerated when the number moves, which is what `--check` is for. It runs as the tail of the `coverage` entry in the build matrix of [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), on every push and pull request, with `--no-run` so that it reads the profiles that entry's own `ctest` wrote rather than measuring the tree a second time.
+The badge is a committed file rather than a call out to a badge service, so the README renders on a fork with no secrets and in an offline clone. That holds only while the file is regenerated when the number moves, which is what `--check` is for. It runs as the tail of the `coverage` entry in the build matrix of [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), on pushes to `main`, with `--no-run` so that it reads the profiles that entry's own `ctest` wrote rather than measuring the tree a second time. A pull request never runs that entry, so a commit that moves the figure and leaves `docs/coverage.svg` where it was fails after the merge rather than on the branch. Regenerate the badge before merging.
 
 The measurement covers every instrumented binary rather than the test binary alone: `counter`, `compare`, `lint-ideals`, `ltl`, `mucs`, `realize`, `signal_tracer` and `test/counter_tests`. Over `counter_tests` by itself the figure is 89.3%, and over all eight it is 83.6%. Every file in `src/` and `include/` now has non-zero coverage, and what remains uncovered is error and terminal branches — `include/status_line.hpp` at 54.8% for its tty-only paths, and the per-driver argument-error paths that not every suite exercises. A new binary goes into `BINARIES` in the script, which fails loudly when a name it holds is not built.
 
 `llvm-profdata` and `llvm-cov` must come from the same LLVM release as the clang that built the tree. The profile format is versioned, so an older tool reports a current profile as malformed. The Nix dev shell carries `llvmPackages.llvm` for this; on a host with several LLVMs installed, `LLVM_COV` and `LLVM_PROFDATA` override the lookup.
 
-Without help, the first coverage configure rebuilds Spot, black and Ganak into `build-coverage/third_party`, and Spot alone is a 30-minute build. Linking the debug tree's copies in beforehand avoids that, since `cmake/spot.cmake` skips the external project when its done-stamp is already there:
+Without help, the first coverage configure rebuilds Spot, black and Ganak into `build-coverage/third_party`, and Spot alone is a 30-minute build. `COUNTER_THIRD_PARTY_DIR` points a preset at a tree that already exists, and `cmake/spot.cmake` skips the external project when its done-stamp is there:
 
 ```sh
-mkdir -p build-coverage
-ln -s ../build/third_party build-coverage/third_party
+cmake --preset coverage -DCOUNTER_THIRD_PARTY_DIR="$PWD/build/third_party"
 ```
+
+It is a cache variable, so a later `cmake --preset coverage` with no arguments keeps it, which is what `scripts/coverage_badge.py` runs. CI sets the same variable across its matrix, pointing every leg at one directory so that Spot is built once rather than once per preset.
 
 The figure moves by up to two tenths of a percentage point between runs of one binary — 83.60% to 83.80% over five runs — because the suite spawns real tools and branches on their timings and peak resident set. The badge prints a whole number, so that jitter matters only near a rounding boundary, and the current figure sits a tenth of a point above one. `--check` therefore carries `CHECK_SLACK`, a quarter of a point of tolerance beyond the committed number's rounding band: a run that lands the other side of the boundary passes, and a real drop of a third of a point or more still fails. Regenerating the badge and committing it is what a genuine move calls for.
 

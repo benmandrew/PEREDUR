@@ -184,8 +184,8 @@ jobs:
           emit build "$build"
           emit heavy "$heavy"
 
-          # Pull requests run debug, release, tsan and coverage; a push to main
-          # runs gcc alone.
+          # Pull requests run debug, release and tsan; a push to main runs gcc
+          # and coverage.
           #
           # tsan is on pull requests because the failures it finds are invisible
           # to everything else: a data race passes ctest and returns the right
@@ -194,35 +194,44 @@ jobs:
           # a branch nobody is looking at any more.
           #
           # It costs runner minutes and no wall clock: the matrix runs
-          # concurrently and tsan finishes inside debug's time (167s against
-          # 194s on the last full run), so a pull request waits as long as it
-          # did.
+          # concurrently and tsan finishes inside debug's time (182s against
+          # 186s on the last warm-cache run), so a pull request waits as long as
+          # it did.
           #
-          # The coverage entry is here rather than in a job of its own so that
-          # the badge check reuses this one's work: its build is the
-          # instrumented one and its ctest run is what writes the profiles,
-          # leaving the check itself an export and a byte comparison.
+          # A push to main runs gcc and coverage. actions/checkout resolves a
+          # pull_request event to refs/pull/N/merge, so the pull request already
+          # built and tested the clang configurations over this exact merge
+          # result; re-deriving them here was 18% of this repository's runner
+          # minutes. gcc is the one configuration a pull request never sees, and
+          # the goldens are pinned under clang, so it stays.
+          #
+          # coverage is on the push rather than the pull request for two
+          # reasons. It is a second full build and test of a tree the other legs
+          # have already tested, spent to re-measure a number that moves on a
+          # minority of commits; and it is the only clang leg main runs, so its
+          # third-party cache entry is the one every pull-request branch
+          # inherits (see the cache step below). The cost is that a commit
+          # moving coverage without regenerating docs/coverage.svg now fails on
+          # main rather than on its own pull request -- run
+          # `python scripts/coverage_badge.py` before merging anything that
+          # moves the number. The entry stays inside this matrix rather than
+          # taking a job of its own so the badge check reuses the work: its
+          # build is the instrumented one and its ctest run is what writes the
+          # profiles, leaving the check itself an export and a byte comparison.
           # Instrumenting the debug preset instead would have cost no CI job at
           # all, and was rejected because that preset is the one everybody
           # builds locally -- it would slow the daily loop and drop a .profraw
           # in whatever directory a binary was run from.
-          #
-          # A push to main runs gcc alone. actions/checkout resolves a
-          # pull_request event to refs/pull/N/merge, so the pull request already
-          # built and tested the other four configurations over this exact
-          # merge result; re-deriving them here was 18% of this repository's
-          # runner minutes. gcc is the one configuration a pull request never
-          # sees, and the goldens are pinned under clang, so it stays.
           debug='{"preset":"debug","build_dir":"build"}'
           release='{"preset":"release","build_dir":"build-release"}'
           gcc='{"preset":"debug","build_dir":"build","compiler":"gcc","cmake_args":"-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++"}'
           tsan='{"preset":"tsan","build_dir":"build-tsan"}'
           coverage='{"preset":"coverage","build_dir":"build-coverage"}'
           case "$EVENT" in
-            push) include="$gcc" ;;
+            push) include="$gcc,$coverage" ;;
             # The manual trigger is the escape hatch, so it runs everything.
             workflow_dispatch) include="$debug,$gcc,$release,$tsan,$coverage" ;;
-            *) include="$debug,$release,$tsan,$coverage" ;;
+            *) include="$debug,$release,$tsan" ;;
           esac
           emit matrix "{\"include\":[$include]}"
 
@@ -359,40 +368,70 @@ jobs:
       - name: Set up sccache
         uses: mozilla-actions/sccache-action@v0.0.10
 
-      # Only the *installed* halves of the third-party trees are cached, never
-      # the source and object trees ExternalProject leaves beside them. Each
-      # module here guards its whole ExternalProject_Add behind an
-      # `if(EXISTS <name>-stamp/<name>-done)`, so a restored tree that carries
-      # the stamp and the install prefix is never rebuilt and never reads the
-      # objects that produced it -- 3.2GB of build tree for 530MB of output, in
-      # a repository whose 10GB Actions cache the arm64 Docker matrix already
-      # shares. Storing both halves put the store 25% over that limit, and the
-      # eviction that followed cost these entries and nothing else: they are
-      # the largest objects in it and, being written at the end of a job and
-      # read at the start of the next, always the coldest. Every one of them
-      # was evicted before it was ever read back, so all five presets rebuilt
-      # Spot from source on every run (307 sccache compile requests to 916, and
-      # a debug build job from 180s to 420s). The downloaded archives stay:
-      # ganak.cmake and black.cmake guard their downloads on the archive file
-      # rather than on a stamp, so dropping those buys 230MB and re-fetches
-      # them every run.
+      # Spot, black and ganak are spawned as subprocesses and nothing links
+      # against them, so their trees carry none of a preset's flags: every leg
+      # of this matrix built a byte-equivalent copy and saved it under a key of
+      # its own. COUNTER_THIRD_PARTY_DIR (see the root CMakeLists) points them
+      # all at one directory outside any build tree, so the key drops the preset
+      # and the four legs share one entry. Only the compiler stays in it --
+      # Spot's ./configure is handed CXX= and nothing else.
       #
-      # `-v2` is in the key because the eviction fix has to write a new entry
-      # rather than restore a fat one under the old key, whose inputs have not
-      # moved.
-      - name: Cache third-party dependencies
+      # That is what makes a pull request's *first* run fast. Actions caches are
+      # branch-scoped with a fallback to the default branch, and a push to main
+      # runs gcc and coverage, so main warms exactly one clang entry and every
+      # branch inherits it. Measured cold against warm on one branch: the four
+      # legs went 1859s to 595s of runner time and 528s to 186s of wall clock,
+      # all of it the ~181s each leg spent downloading, configuring and building
+      # Spot.
+      #
+      # Only the *installed* halves are cached, never the source and object
+      # trees ExternalProject leaves beside them. Each module guards its whole
+      # ExternalProject_Add behind an `if(EXISTS <name>-stamp/<name>-done)`, so
+      # a restored tree that carries the stamp and the install prefix is never
+      # rebuilt and never reads the objects that produced it -- 3.2GB of build
+      # tree for 530MB of output, in a repository whose 10GB Actions cache the
+      # arm64 Docker matrix already shares. Storing both halves put the store
+      # 25% over that limit, and the eviction that followed cost these entries
+      # and nothing else: they are the largest objects in it and, being written
+      # at the end of a job and read at the start of the next, always the
+      # coldest. The downloaded archives stay: ganak.cmake and black.cmake guard
+      # their downloads on the archive file rather than on a stamp, so dropping
+      # those buys 230MB and re-fetches them every run.
+      #
+      # The static archives go too. Nothing links libspot.a -- cmake/install.cmake
+      # excludes it from the image for the same reason -- and it dwarfs the
+      # shared library beside it: 212MB to 137MB compressed over spot and ganak.
+      #
+      # `-v3` is in the key because the path list and the payload both moved,
+      # and a restore has to miss rather than pull back a per-preset entry.
+      - name: Cache third-party tools
         uses: actions/cache@v5
         with:
           path: |
-            ${{ matrix.build_dir }}/third_party
-            !${{ matrix.build_dir }}/third_party/**/*_project
-            !${{ matrix.build_dir }}/third_party/**/*_project/**
-            !${{ matrix.build_dir }}/third_party/**/*_project-build
-            !${{ matrix.build_dir }}/third_party/**/*_project-build/**
-            ${{ matrix.build_dir }}/_deps
-          key: ${{ runner.os }}-${{ matrix.preset }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v2-${{ hashFiles('cmake/spot.cmake', 'cmake/ganak.cmake', 'cmake/black.cmake', 'cmake/dependencies.cmake') }}
+            third-party
+            !third-party/**/*_project
+            !third-party/**/*_project/**
+            !third-party/**/*_project-build
+            !third-party/**/*_project-build/**
+            !third-party/**/*.a
+            !third-party/**/*.la
+          key: ${{ runner.os }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v3-${{ hashFiles('cmake/spot.cmake', 'cmake/ganak.cmake', 'cmake/black.cmake') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.preset }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v2-
+            ${{ runner.os }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v3-
+
+      # FetchContent's trees are compiled with the preset's own flags -- Eigen
+      # and cpptrace go into the binaries -- so unlike the tools above these
+      # cannot be shared and the key keeps the preset. The generator is part of
+      # it too: FetchContent subbuild caches bake in the generator, so a
+      # Makefiles-era cache cannot be restored into a Ninja configure
+      # ("generator does not match").
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v5
+        with:
+          path: ${{ matrix.build_dir }}/_deps
+          key: ${{ runner.os }}-${{ matrix.preset }}-${{ matrix.compiler || 'clang' }}-deps-ninja-v3-${{ hashFiles('cmake/dependencies.cmake') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.preset }}-${{ matrix.compiler || 'clang' }}-deps-ninja-v3-
 
       # Configure + build + test share one dev shell to amortise Nix flake
       # evaluation across the three phases.
@@ -403,7 +442,8 @@ jobs:
         run: |
           nix develop --command bash -euo pipefail -c '
             echo "::group::Configure"
-            cmake --preset ${{ matrix.preset }} ${{ matrix.cmake_args }}
+            cmake --preset ${{ matrix.preset }} ${{ matrix.cmake_args }} \
+              -DCOUNTER_THIRD_PARTY_DIR="$GITHUB_WORKSPACE/third-party"
             echo "::endgroup::"
 
             echo "::group::Build"
