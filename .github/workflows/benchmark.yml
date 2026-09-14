@@ -67,7 +67,7 @@ jobs:
         with:
           # The installed halves only -- see the same step in ci.yml for why
           # the ExternalProject source and object trees are excluded and why
-          # the key carries a version segment.
+          # the key carries a version segment and the repository name.
           path: |
             build-bench/third_party
             !build-bench/third_party/**/*_project
@@ -75,9 +75,9 @@ jobs:
             !build-bench/third_party/**/*_project-build
             !build-bench/third_party/**/*_project-build/**
             build-bench/_deps
-          key: ${{ runner.os }}-bench-ninja-v2-${{ hashFiles('cmake/spot.cmake', 'cmake/ganak.cmake', 'cmake/black.cmake', 'bench/CMakeLists.txt', 'cmake/dependencies.cmake') }}
+          key: ${{ runner.os }}-${{ github.event.repository.name }}-bench-ninja-v2-${{ hashFiles('cmake/spot.cmake', 'cmake/ganak.cmake', 'cmake/black.cmake', 'bench/CMakeLists.txt', 'cmake/dependencies.cmake') }}
           restore-keys: |
-            ${{ runner.os }}-bench-ninja-v2-
+            ${{ runner.os }}-${{ github.event.repository.name }}-bench-ninja-v2-
 
       - name: Configure and build
         if: steps.gate.outputs.run == 'true'

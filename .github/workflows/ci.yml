@@ -263,9 +263,13 @@ jobs:
           # The generator is part of the key: FetchContent subbuild caches bake
           # in the generator, so a Makefiles-era cache can't be restored into a
           # Ninja configure ("generator does not match").
-          key: ${{ runner.os }}-check-deps-ninja-${{ hashFiles('cmake/dependencies.cmake') }}
+          # The repository name is in the key as well. These trees record the
+          # absolute workspace path, which is named after the repository, so after
+          # a rename a restore has to miss rather than hand CMake a subbuild cache
+          # from another directory. Every cache step below carries it too.
+          key: ${{ runner.os }}-${{ github.event.repository.name }}-check-deps-ninja-${{ hashFiles('cmake/dependencies.cmake') }}
           restore-keys: |
-            ${{ runner.os }}-check-deps-ninja-
+            ${{ runner.os }}-${{ github.event.repository.name }}-check-deps-ninja-
 
       # clang-tidy result cache (ctcache): keyed on each TU's preprocessed
       # content + the .clang-tidy config, so unchanged translation units skip
@@ -415,9 +419,9 @@ jobs:
             !third-party/**/*_project-build/**
             !third-party/**/*.a
             !third-party/**/*.la
-          key: ${{ runner.os }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v3-${{ hashFiles('cmake/spot.cmake', 'cmake/ganak.cmake', 'cmake/black.cmake') }}
+          key: ${{ runner.os }}-${{ github.event.repository.name }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v3-${{ hashFiles('cmake/spot.cmake', 'cmake/ganak.cmake', 'cmake/black.cmake') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v3-
+            ${{ runner.os }}-${{ github.event.repository.name }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v3-
 
       # FetchContent's trees are compiled with the preset's own flags -- Eigen
       # and cpptrace go into the binaries -- so unlike the tools above these
@@ -429,9 +433,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ matrix.build_dir }}/_deps
-          key: ${{ runner.os }}-${{ matrix.preset }}-${{ matrix.compiler || 'clang' }}-deps-ninja-v3-${{ hashFiles('cmake/dependencies.cmake') }}
+          key: ${{ runner.os }}-${{ github.event.repository.name }}-${{ matrix.preset }}-${{ matrix.compiler || 'clang' }}-deps-ninja-v3-${{ hashFiles('cmake/dependencies.cmake') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.preset }}-${{ matrix.compiler || 'clang' }}-deps-ninja-v3-
+            ${{ runner.os }}-${{ github.event.repository.name }}-${{ matrix.preset }}-${{ matrix.compiler || 'clang' }}-deps-ninja-v3-
 
       # Configure + build + test share one dev shell to amortise Nix flake
       # evaluation across the three phases.
