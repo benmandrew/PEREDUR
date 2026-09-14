@@ -62,6 +62,8 @@ Words are drawn from the *original* specification's signal list (`--signals`), t
 
 `score_curves.py --epsilon` turns this into an anytime curve: `eps_solutions_<e>` is the greedy net over the candidates accumulated by time t, in discovery order, keeping one only where it differs from every kept one on more than a fraction e of the words. Discovery order rather than fitness order makes the count non-decreasing, which an anytime curve has to be. It runs over every gate-passing candidate rather than over the maximal set, so it costs no solver call and removes an asymmetry the maximality curves carry: a timed-out implication reads as non-implication, and two tools' passes may run at different `compare` budgets.
 
+Under `--maximality` the same net runs over the antichain as `eps_maximal_solutions_<e>`, counting repairs that are both maximal and distinct. It is computed where the maximality stage holds membership, in admission order, and the membership is written beside the curve (see "Scoring phases" in `docs/dev/campaigns.md`), so a later epsilon falls out of the sidecars with no solver call: over one `lily11` run all 45 `eps_maximal_solutions` rows reproduce from them alone.
+
 ## Tool subprocesses
 
 Every pipe a runner opens must be created with `pipe2(..., O_CLOEXEC)`, as `execute_and_capture` (`src/runner/process.cpp`) and the formaliser (`src/runner/formaliser.cpp`) do. Runners are called from many threads, so a fork on one thread would inherit other calls' pipes past its exec, and their readers would never see end of file. `pipe` followed by `fcntl` races a concurrent fork. `dup2` clears the flag on the child's standard descriptors.

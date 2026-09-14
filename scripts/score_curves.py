@@ -14,6 +14,9 @@ them scalars:
     eps_solutions_<e>       -- of the candidates found by time t, the largest
                                greedy subset no two of which agree on more
                                than 1 - e of the sampled behaviours
+    eps_maximal_solutions_<e> -- the same net over the maximal antichain
+                               rather than over every candidate, so it counts
+                               repairs that are both maximal and distinct
     time_to_first_repair       (scalar)
     time_to_first_ideal_repair (scalar)
 
@@ -41,6 +44,17 @@ two of its members pass. It runs over every accumulated candidate rather than
 over the maximal set, so it costs one `fingerprint` call a run and no solver
 call at all, and both tools' candidates are measured by the same sampling
 rather than through implication checks whose timeouts differ between them.
+
+Membership is written, not just counted. `<out>` names a CSV of the curve
+counts; beside it go `<stem>.members.tsv`, one row per (cut, surviving file),
+and `<stem>.fingerprints.tsv`, one row per candidate and its bit vector. The
+counts alone answer one question and no other: which repairs were maximal at
+60 s, whether the antichain churns or accretes, and the net at an epsilon
+nobody chose in advance all need the sweep run again, which cost 311.7
+worker-hours over this campaign in 2026-09-07. The two sidecars are a third
+the size of the curve file that replaced them -- the long format repeats eight
+run-identifying columns on every row, where a member is a name -- and they
+make every one of those questions arithmetic.
 
 The maximality half is a separate stage behind --maximality, off by default. It
 is computed offline, after and apart from the timed run, and must never be read
@@ -359,7 +373,12 @@ def scalar_row(base: dict, metric: str, moment: float | None,
 def maximality_rows(base: dict, index: list[tuple[str, int, float]],
                     accumulated: Path, implying: set[str] | None,
                     n_cuts: int, jobs: int | None,
-                    timeout_s: int, deadline: float | None) -> list[dict]:
+                    timeout_s: int, deadline: float | None,
+                    prints: dict[str, int] | None = None,
+                    epsilons: list[float] | None = None,
+                    n_words: int = 0,
+                    members: list[tuple[float, str]] | None = None
+                    ) -> list[dict]:
     """Run `maximal` over prefixes of the accumulated set at bounded cuts.
 
     Each cut is given the previous cut's survivors plus the candidates that
@@ -389,6 +408,8 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
     individual implications behind it.
     """
     rows: list[dict] = []
+    epsilons = epsilons or []
+    prints = prints or {}
     by_time = sorted(index, key=lambda row: row[2])
     survivors: set[str] = set()
     seen_prefix = -1
@@ -418,6 +439,12 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
             break
         survivors = found
         consumed = len(prefix)
+        if members is not None:
+            # Recorded in the order the survivors arrived, which is the order
+            # every reader of this file needs and the one `maximal` does not
+            # print in.
+            members += [(cut, name) for name, _, _ in by_time
+                        if name in survivors]
         rows.append({**base, "metric": "maximal_solutions",
                      "elapsed_s": f"{cut:.6f}", "value": len(survivors),
                      "censored": 0})
@@ -427,6 +454,21 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
             "value": "" if implying is None else len(survivors & implying),
             "censored": "" if implying is None else 0,
         })
+        # The net over the survivors, in discovery order so the choice of
+        # representatives does not depend on the order `maximal` happened to
+        # print them in. It runs here rather than in a pass of its own because
+        # this is the only place the antichain's membership exists: the rows
+        # carry counts, and re-deriving membership means re-running the sweep.
+        if prints:
+            ordered = [prints[name] for name, _, _ in by_time
+                       if name in survivors and name in prints]
+            for epsilon in epsilons:
+                rows.append({
+                    **base, "metric": f"eps_maximal_solutions_{epsilon:g}",
+                    "elapsed_s": f"{cut:.6f}",
+                    "value": separated_count(ordered,
+                                             int(epsilon * n_words)),
+                    "censored": 0})
     return rows
 
 
@@ -520,8 +562,13 @@ def epsilon_rows(base: dict, index: list[tuple[str, int, float]],
     return rows
 
 
-def score_run(run_dir: Path, args, deadline: float | None = None) -> list[dict]:
-    """Return every long-format row for one run directory."""
+def score_run(run_dir: Path, args, deadline: float | None = None,
+              sidecars: dict | None = None) -> list[dict]:
+    """Return every long-format row for one run directory.
+
+    `sidecars`, when given, is filled with the membership and fingerprint
+    tables the caller writes beside the CSV.
+    """
     manifest = read_manifest(run_dir)
     spec = spec_of(manifest, args.spec, run_dir)
     base = run_columns(manifest, spec, run_dir)
@@ -566,21 +613,28 @@ def score_run(run_dir: Path, args, deadline: float | None = None) -> list[dict]:
     rows.append(scalar_row(base, "time_to_first_ideal_repair",
                            min(ideal_times) if ideal_times else None,
                            implying is not None))
-    if args.maximality and index:
-        rows += maximality_rows(base, index, accumulated, implying,
-                                args.cuts, args.jobs, args.maximal_timeout,
-                                deadline)
     # getattr rather than a plain attribute: score_run is called with an
     # argument namespace of the caller's own making in the script tests, and a
     # curve stage added later must not break one built before it existed.
     epsilons = getattr(args, "epsilon", None)
+    n_words = getattr(args, "fingerprint_words", 256)
+    prints: dict[str, int] | None = None
     if epsilons and index:
-        n_words = getattr(args, "fingerprint_words", 256)
         prints = fingerprints_of(accumulated, spec, n_words,
                                  getattr(args, "fingerprint_seed", 0))
-        if prints is not None:
-            rows += epsilon_rows(base, index, prints, epsilons, n_words,
-                                 args.cuts, end_s)
+    members: list[tuple[float, str]] = []
+    if args.maximality and index:
+        rows += maximality_rows(base, index, accumulated, implying,
+                                args.cuts, args.jobs, args.maximal_timeout,
+                                deadline, prints, epsilons or [], n_words,
+                                members)
+    if sidecars is not None:
+        sidecars["members"] = members
+        sidecars["fingerprints"] = prints or {}
+        sidecars["n_words"] = n_words
+    if epsilons and index and prints is not None:
+        rows += epsilon_rows(base, index, prints, epsilons, n_words,
+                             args.cuts, end_s)
     return rows
 
 
@@ -600,6 +654,44 @@ def summarise(rows: list[dict]) -> dict:
         tail = by_metric.get(metric, [])
         summary[f"{metric}_final"] = tail[-1]["value"] if tail else ""
     return summary
+
+
+def sidecar_paths(out: Path) -> tuple[Path, Path]:
+    """The two membership files beside the curve CSV at @p out.
+
+    `.part` is stripped before the stem is taken, so a scorer writing
+    `<run>.csv.part` produces `<run>.members.tsv` rather than
+    `<run>.csv.members.tsv`; score_campaign.py renames all three together.
+    """
+    stem = out.name
+    for suffix in (".part", ".csv"):
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+    return (out.parent / f"{stem}.members.tsv",
+            out.parent / f"{stem}.fingerprints.tsv")
+
+
+def write_sidecars(out: Path, sidecars: dict) -> None:
+    """Write membership and fingerprints beside the curve CSV.
+
+    Written whenever the maximality stage ran and `--out` names a file, with
+    no flag of its own. A flag is how the last one went missing: the 2026-09-07
+    pass held every survivor set in memory and wrote only their sizes, so the
+    2026-09-09 question about them cost the whole pass again.
+    """
+    members_path, prints_path = sidecar_paths(out)
+    with open(members_path, "w", newline="") as handle:
+        handle.write("cut_s\tfile\n")
+        for cut, name in sidecars.get("members", []):
+            handle.write(f"{cut:.6f}\t{name}\n")
+    prints = sidecars.get("fingerprints") or {}
+    if not prints:
+        return
+    digits = max(1, (sidecars.get("n_words", 0) + 3) // 4)
+    with open(prints_path, "w", newline="") as handle:
+        handle.write("file\tfingerprint\n")
+        for name in sorted(prints):
+            handle.write(f"{name}\t{prints[name]:0{digits}x}\n")
 
 
 def write_csv(handle, fieldnames: list[str], rows: list[dict]) -> None:
@@ -667,9 +759,16 @@ def main() -> int:
             continue
         deadline = (time.monotonic() + args.deadline_s
                     if args.deadline_s > 0 else None)
-        rows = score_run(run_dir, args, deadline)
+        sidecars: dict = {}
+        rows = score_run(run_dir, args, deadline, sidecars)
         long_rows += rows
         summaries.append(summarise(rows))
+        # One run directory per invocation is what the scorer does, so writing
+        # here rather than after the loop keeps a sidecar named for the run it
+        # describes. A multi-directory invocation writes the last one's, which
+        # is why score_campaign.py passes one at a time.
+        if args.out and args.maximality and sidecars.get("members"):
+            write_sidecars(args.out, sidecars)
 
     fields = SUMMARY_FIELDS if args.summary else CURVE_FIELDS
     rows = summaries if args.summary else long_rows

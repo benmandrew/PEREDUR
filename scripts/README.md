@@ -635,6 +635,9 @@ A curve is written to `<out>/<run>.csv.part` and moved into place on a zero
 exit with a non-empty file; a failed attempt lands as `rc run` in
 `<out>/failures.txt`, every attempt appends its budgets and elapsed time to
 `<out>/timings.txt`, and every scorer's output goes to `<out>/warnings.log`.
+Beside each curve go `<run>.members.tsv`, one row per (cut, surviving file),
+and `<run>.fingerprints.tsv`, one row per candidate and its hex fingerprint; a
+failed attempt removes them with its `.part`.
 `<out>/score-manifest-<host>.json` records the seeds, the budgets, the
 invocation template, both scoring binaries' commits and the counts, and is
 what an archive's `maximality_pass` block is assembled from.

@@ -152,6 +152,19 @@ def csv_path(out: Path, run_dir: Path) -> Path:
     return out / f"{run_dir.name}.csv"
 
 
+def sidecar_paths(out: Path, run_dir: Path) -> list:
+    """The membership files score_curves.py writes beside a run's curve.
+
+    They are written under their final names, since score_curves.py strips
+    `.csv.part` before taking the stem, so only a failed attempt has anything
+    to do: it removes them with the `.part` it leaves behind, and a reader
+    listing the output directory never sees a sidecar whose curve was thrown
+    away.
+    """
+    return [out / f"{run_dir.name}{suffix}"
+            for suffix in (".members.tsv", ".fingerprints.tsv")]
+
+
 def is_scored(path: Path) -> bool:
     """A curve is present once its CSV exists and holds something.
 
@@ -331,6 +344,8 @@ def score_one(run_dir: Path, slot: int, args, out: Path, ledger: Ledger,
         print(f"[{index}/{total}] {run_dir.name}: scored in {elapsed}s")
     else:
         part.unlink(missing_ok=True)
+        for sidecar in sidecar_paths(out, run_dir):
+            sidecar.unlink(missing_ok=True)
         ledger.append(FAILURES_NAME, f"{rc} {run_dir}")
         with ledger.lock:
             ledger.failed += 1
