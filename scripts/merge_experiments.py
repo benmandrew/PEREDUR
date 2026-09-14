@@ -134,6 +134,8 @@ PROFILE_CSVS: dict[str, str] = {
     "seldefault-tlsf": "results-seldefault-tlsf.csv",
     "seldefault-tlsf-cm": "results-seldefault-tlsf.csv",
     "matched": "results-matched.csv",
+    "rematch": "results-rematch.csv",
+    "rematch-calib": "results-rematch-calib.csv",
 }
 
 # Per-run output directory each profile writes under experiments/. Most profiles
@@ -180,6 +182,8 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
     "seldefault-tlsf": "results-seldefault-tlsf",
     "seldefault-tlsf-cm": "results-seldefault-tlsf",
     "matched": "results-matched",
+    "rematch": "results-rematch",
+    "rematch-calib": "results-rematch-calib",
 }
 
 # Natural key of a results row: one run per (sweep, level_name, selection,
