@@ -91,8 +91,8 @@ DEFAULTS = {
     "fingerprint_seed": 0,
 }
 # The outer `timeout` sits this far past score_curves.py's own deadline: the
-# deadline stops new cuts being started, and one cut's maximal call may still
-# be inside its --maximal-timeout when it lands.
+# deadline bounds the antichain walk, and the compare and fingerprint calls
+# around it still need time to land.
 WALL_CAP_MARGIN_S = 900
 
 SEED_SUFFIX = re.compile(r"_seed(\d+)$")
@@ -479,7 +479,8 @@ def parse_args(argv=None) -> argparse.Namespace:
                              f"{DEFAULTS['cuts']})")
     parser.add_argument("--maximal-timeout", type=int,
                         default=DEFAULTS["maximal_timeout"],
-                        help=f"seconds per maximal call, per cut (default: "
+                        help=f"seconds for the antichain walk where no deadline "
+                             f"bounds it (default: "
                              f"{DEFAULTS['maximal_timeout']})")
     parser.add_argument("--compare-timeout", type=int,
                         default=DEFAULTS["compare_timeout"],
@@ -507,7 +508,7 @@ def parse_args(argv=None) -> argparse.Namespace:
                              f"(default: {DEFAULTS['fingerprint_seed']})")
     parser.add_argument("--deadline-s", type=int,
                         default=DEFAULTS["deadline_s"],
-                        help=f"score_curves.py stops adding cuts after this "
+                        help=f"the antichain walk's budget in score_curves.py "
                              f"(default: {DEFAULTS['deadline_s']})")
     parser.add_argument("--wall-cap-s", type=int, default=None,
                         help=f"outer timeout on one scorer (default: "

@@ -523,9 +523,9 @@ out = "experiments/curves-rematch"        # default: curves-<stem>, beside it
 workers = 8            # scorers in flight, each pinned to `cores` cores
 cores = 4              # cores per scorer, also score_curves.py --jobs
 cuts = 20
-maximal_timeout = 900  # seconds per maximal call, per cut
+maximal_timeout = 900  # seconds for the antichain walk, absent a deadline
 compare_timeout = 600  # seconds for the compare call
-deadline_s = 4500      # score_curves.py stops adding cuts after this
+deadline_s = 4500      # the walk's real budget wherever it is set
 wall_cap_s = 5400      # outer timeout on one scorer; default deadline_s + 900
 maximality = "on"      # run the implication sweep over the time cuts
 ideals = "on"          # label candidates against the family's ideals
@@ -533,6 +533,13 @@ epsilon = ""           # separation thresholds, e.g. "0.05,0.2,0.5"; none if emp
 fingerprint_words = 256
 fingerprint_seed = 0
 ```
+
+`maximal_timeout` bounds one `maximal --curve` walk a run, and
+`deadline_s` overrides it wherever it is set. It was a per-cut bound until
+the maximality pass became one walk rather than a process per cut, so
+applying it unchanged to a whole walk would have tightened it fivefold.
+The walk streams its event log, so a budget that fires keeps the rows
+already written and the curve covers the cuts up to them.
 
 The last five choose which curves a phase writes. `maximality = "off"`
 with a non-empty `epsilon` is the behavioural-separation pass, which makes

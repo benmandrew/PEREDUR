@@ -69,9 +69,9 @@ kind = "score"          # scores the run phase's results directory
 workers = 8             # scorers in flight, each pinned to `cores` cores
 cores = 4               # cores per scorer, also score_curves.py --jobs
 cuts = 20
-maximal_timeout = 900   # seconds per maximal call, per cut
+maximal_timeout = 900   # seconds for the antichain walk, absent a deadline
 compare_timeout = 600   # seconds for the compare call
-deadline_s = 4500       # score_curves.py stops adding cuts after this
+deadline_s = 4500       # the walk's real budget wherever it is set
 wall_cap_s = 5400       # the outer timeout on one scorer; default deadline_s + 900
 maximality = "on"       # run the implication sweep over the time cuts
 ideals = "on"           # label candidates against the family's ideals
@@ -79,6 +79,8 @@ epsilon = ""            # separation thresholds, e.g. "0.05,0.2,0.5"; none if em
 fingerprint_words = 256
 fingerprint_seed = 0
 ```
+
+The maximality stage is one `maximal --curve` walk a run (see "Running antichain" in `docs/dev/performance.md`), so `maximal_timeout` bounds the whole walk and `deadline_s` replaces it wherever set. It was a per-cut bound until the walk replaced one process per cut, and applying it unchanged would have tightened it fivefold. The walk streams its event log, so a budget that fires keeps the rows already written and the curve covers the cuts up to them.
 
 The last five choose which curves a phase writes. `maximality = "off"` with a non-empty `epsilon` is the behavioural-separation pass (see "Behavioural fingerprints" in `docs/dev/performance.md`): it makes no solver call, where the maximality sweep over the 3000 rematch runs cost 311.7 worker-hours. `ideals = "off"` drops the `compare` call behind `ideal_solutions`, which is 7.2 s of a 7.3 s epsilon-only run on a 421-candidate directory. A phase with `maximality = "off"` and no `epsilon` is refused, having nothing to score. The word count and seed must match across any two phases whose curves are compared. The manifest records which stages a phase ran and which binaries decided them, so an epsilon-only pass names `fingerprint` and neither `maximal` nor `compare`.
 

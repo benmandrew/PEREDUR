@@ -652,6 +652,49 @@ void test_maximal_reports_both_formats() {
            "maximal: a directory holding no specifications is refused");
     expect(contains(nothing.m_output, ".json"),
            "maximal: the refusal says which extension it wanted");
+
+    // The curve mode is what scripts/score_curves.py runs, one walk a run in
+    // place of one sweep per time cut, so its output format is a contract.
+    // The unrealizable specification implies its weakening, so the second
+    // arrival evicts the first.
+    const std::filesystem::path accumulated = dir.path() / "accumulated";
+    write_file(accumulated / "gen01_0000.tlsf", k_realizable);
+    write_file(accumulated / "gen01_0001.tlsf", k_unrealizable);
+    const std::string index = write_file(accumulated / "index.tsv",
+                                         "file\tgeneration\telapsed_s\n"
+                                         "gen01_0000.tlsf\t1\t1.000000\n"
+                                         "gen01_0001.tlsf\t1\t2.000000\n")
+                                  .string();
+
+    const DriverRun curve =
+        run_driver("maximal", {"--curve", index, "--jobs", "2"});
+    expect(curve.m_exit_code == 0, "maximal: the curve mode exits zero");
+    expect(contains(curve.m_output, "elapsed_s\tfile\tevent\tn_maximal"),
+           "maximal: the curve mode writes its header");
+    expect(contains(curve.m_output, "gen01_0000.tlsf\tadmit\t1"),
+           "maximal: the first arrival is admitted");
+    expect(contains(curve.m_output, "gen01_0000.tlsf\tremove\t0"),
+           "maximal: the dominating arrival evicts the earlier member");
+    expect(contains(curve.m_output, "gen01_0001.tlsf\tadmit\t1"),
+           "maximal: the dominating arrival is admitted after the eviction");
+
+    // The driver picks the default wave size, which the unit suite never
+    // exercises, so a serial walk is crossed against it here too.
+    const DriverRun serial =
+        run_driver("maximal", {"--curve", index, "--jobs", "2", "--wave", "1"});
+    expect(serial.m_exit_code == 0 &&
+               contains(serial.m_output, "gen01_0000.tlsf\tremove\t0"),
+           "maximal: a serial walk reaches the same log");
+
+    const DriverRun both =
+        run_driver("maximal", {accumulated.string(), "--curve", index});
+    expect(both.m_exit_code != 0,
+           "maximal: --curve with a positional argument is refused");
+    const DriverRun neither = run_driver("maximal", {"--jobs", "2"});
+    expect(neither.m_exit_code != 0, "maximal: an input is required");
+    const DriverRun absent =
+        run_driver("maximal", {"--curve", (dir.path() / "gone.tsv").string()});
+    expect(absent.m_exit_code != 0, "maximal: an unreadable index fails");
 }
 
 void test_fingerprint_separates_two_specifications() {

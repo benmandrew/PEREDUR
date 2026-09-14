@@ -64,6 +64,10 @@ bool run_filter_suite(std::string_view suite_name) {
         run_implication_filter_tests();
         return true;
     }
+    if (suite_name == "running_antichain") {
+        run_running_antichain_tests();
+        return true;
+    }
     if (suite_name == "vacuity_filter") {
         run_vacuity_filter_tests();
         return true;
@@ -346,6 +350,7 @@ int main(int argc, const char* const argv[]) {
             run_status_tests();
             run_correctness_tests();
             run_implication_filter_tests();
+            run_running_antichain_tests();
             run_vacuity_filter_tests();
             run_well_separation_filter_tests();
             run_requirement_tests();

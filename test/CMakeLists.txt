@@ -7,6 +7,7 @@ add_executable(peredur_tests
     runner/spot_tests.cpp
     filter/correctness_tests.cpp
     filter/implication_tests.cpp
+    filter/running_antichain_tests.cpp
     filter/vacuity_tests.cpp
     filter/well_separation_tests.cpp
     genetic/accumulator_tests.cpp
@@ -121,6 +122,7 @@ add_test(NAME peredur_tests.fitness_function COMMAND peredur_tests fitness_funct
 add_test(NAME peredur_tests.status COMMAND peredur_tests status)
 add_test(NAME peredur_tests.correctness COMMAND peredur_tests correctness)
 add_test(NAME peredur_tests.implication_filter COMMAND peredur_tests implication_filter)
+add_test(NAME peredur_tests.running_antichain COMMAND peredur_tests running_antichain)
 add_test(NAME peredur_tests.vacuity_filter COMMAND peredur_tests vacuity_filter)
 add_test(NAME peredur_tests.well_separation_filter COMMAND peredur_tests well_separation_filter)
 add_test(NAME peredur_tests.requirement COMMAND peredur_tests requirement)
