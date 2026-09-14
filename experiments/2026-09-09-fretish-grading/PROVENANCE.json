@@ -1,0 +1,348 @@
+{
+  "campaign": "2026-09-09-fretish-grading",
+  "attribution": "recorded",
+  "generated_on": "2026-09-14",
+  "status": "closed",
+  "kind": "search",
+  "kind_note": "A 2x2 search campaign run through the campaign.py queue on av2 (entry 023-2026-09-09-fretish-grading.toml). Its maximality curves are a separate score campaign, 2026-09-09-fretish-maximal-curve (entry 024), which read this campaign's run directories after it finished; figures that need the curves are cited from that archive.",
+  "question": "Does 2026-08-28-selection-grading replicate on the FRETISH path? That campaign crossed selection_scheme (nsga2-apportion against weighted) with fitness.status_grading (mrs against aurus) over the TLSF corpus. This one runs the same cross over the five FRETISH families at gen10/pop200.",
+  "endpoint": "None pre-registered. campaign.toml's description names found_repair, implies_ideal, n_repairs and wall_s, read per cell; the two factor contrasts below are paired on the (spec, seed) cell.",
+  "decision_rule_firing": "None registered and none taken. No PLAN.md was written before launch, so every p-value in this file is post-hoc: it describes this sample and tests no hypothesis.",
+  "arms": {
+    "nsga2-apportion/mrs": "selection_scheme = nsga2-apportion, status_grading = mrs",
+    "nsga2-apportion/aurus": "selection_scheme = nsga2-apportion, status_grading = aurus",
+    "weighted/mrs": "selection_scheme = weighted, status_grading = mrs",
+    "weighted/aurus": "selection_scheme = weighted, status_grading = aurus",
+    "shared": "generations 10, population_size 200, genetic.max_wall_s 1800, fitness weights 0.1/0.2/0.7 (read by the weighted scheme alone), metric log, accumulate_repairs and run_implication on (so the streaming maximality filter runs), --pin-vintage. FRETISH sweep K carries the grading factor."
+  },
+  "corpus": {
+    "families": [
+      "fsm",
+      "fsm-combined",
+      "fsm-timing",
+      "mode-arbiter",
+      "takeoff"
+    ],
+    "seeds": "0-29",
+    "runs": 600
+  },
+  "profile_commit": {
+    "sha": "c365aa51dd99c7e07feb58f4bf20e0177abb0387",
+    "branch": "campaign/fretish-selection-grading",
+    "subject": "docs(experiments): size the fretish grading campaign off a measured probe",
+    "note": "38a8a38 declares the campaign and the gradsel-fret profile, dbf284b moves it to gen10/pop200, and c365aa5 re-sizes it off the 2026-09-12 probe and moves every seed to av2. The host ran c365aa5: the launch manifest's git.head, both binaries in it, and the commit column of all 600 rows name it.",
+    "reachable_from_main": "expected after the close merges; see held_by_tag",
+    "held_by_tag": "provenance/fretish-grading",
+    "held_by_tag_note": "The annotated tag is cut at c365aa5 on 2026-09-14, before the close commit was written. The branch is expected to merge into main through a pull request, which keeps every sha here reachable on its own; the tag covers the case where the branch is rebased or split first. Never delete it."
+  },
+  "binary_commit": {
+    "sha": "c365aa51dd99c7e07feb58f4bf20e0177abb0387",
+    "short": "c365aa5",
+    "dirty": false,
+    "source": "results-gradsel-fret-m-manifest-avlab12.json (counter and compare at c365aa5, dirty 0), the commit and dirty columns of all 600 rows, and commit_short and dirty in all 600 run.json files.",
+    "note": "git diff 5c94d66 c365aa5 over src, include, cmake, CMakeLists.txt, schemas, example-config.toml and test is empty, so the C++ tree is main's at 5c94d66 (PR #184, streaming maximality). The branch adds only the gradsel-fret profile to scripts/."
+  },
+  "hosts": {
+    "av2": {
+      "machine": "avlab12",
+      "seeds": "0-29",
+      "rows": 600,
+      "jobs": 4,
+      "launch_manifest_started": "2026-09-12T02:45:04+0100",
+      "first_run_started_utc": "2026-09-12T01:45:04Z",
+      "last_run_finished_utc": "2026-09-12T02:05:07Z",
+      "wall_min": 20.1,
+      "queue_entry_finished": "2026-09-12T03:05:08",
+      "summed_run_wall_h": 1.24
+    },
+    "note": "All 30 seeds ran on av2. Both factors are crossed inside the host, so a host difference cannot fall between two arms of a cell. The first and last run stamps are derived from each run.json's finished_utc less its wall_s; the queue log reads \"Done. 600 runs (600 rows) in 20.1 min, 0 errors.\""
+  },
+  "history": {
+    "cancelled_launch": "The campaign was first declared at gen40/pop1000 with a 7200 s max_wall_s, over av2 seeds 0-14 and av3 seeds 15-29, and queued as entry 021 on each host at 7eb3a53. The 2026-09-11 cost audit read the first 94 manifests at a median of 884.4 s a run, and both 021 entries were cancelled while running at 14:25 that day (\"cost audit: weighted arm and gen40/pop1000 to be re-declared\"). The two 022 entries for the curve campaign, at 30ad56c, were cancelled while still queued.",
+    "relaunch": "The branch was rebased onto main on 2026-09-12 and re-declared at gen10/pop200 under a new results stem, results-gradsel-fret-m. av3 had no route to host at the relaunch and the measured cost put all 600 runs on one host in about 23 minutes, so every seed moved to av2.",
+    "cancelled_output": "The cancelled launch left 45 rows and 49 run directories under results-gradsel-fret on av2, and 67 rows and 71 run directories under the same path on av3. They are from another operating point and another binary, and were neither collected nor merged. The rebase left 7eb3a53 unreachable from any branch; the annotated tag provenance/fretish-grading-prerebase, cut on 2026-09-12, holds it so those manifests still resolve."
+  },
+  "rows": {
+    "merged_total": 600,
+    "planned_total": 600,
+    "per_host": {
+      "av2": 600
+    },
+    "runs_per_arm": {
+      "nsga2-apportion/mrs": 150,
+      "nsga2-apportion/aurus": 150,
+      "weighted/mrs": 150,
+      "weighted/aurus": 150
+    },
+    "seeds": "0-29 on all four arms",
+    "duplicates": 0,
+    "collected_with": "campaign.py collect --host av2 --csv results-gradsel-fret-m.csv --results-dir results-gradsel-fret-m on 2026-09-14; gradsel-fret exists only on the campaign branch and so has no merge_experiments.PROFILE_CSVS entry on main."
+  },
+  "calibration": {
+    "probe": "20 runs on av2 on 2026-09-12 against dbf284b, both factors crossed over all five families at seed 0, four concurrent. Mean 7.3 s, worst 37.0 s; per family fsm 3.6 s, fsm-timing 5.3 s, takeoff 6.6 s, fsm-combined 7.3 s, mode-arbiter 13.5 s. The prefilter refuted 122,945 of 135,578 ordered directions (90.7%) and 3 implication queries timed out.",
+    "predicted": "600 runs at 1.2 core-hours, about 18 minutes of wall at jobs 4 and about 23 with the 27% saturation margin.",
+    "measured": "Mean 7.43 s a run over the four arms, 1.24 core-hours summed, 20.1 minutes of wall."
+  },
+  "verification": {
+    "stopped_by": "generations on all 600 manifests. The longest run took 102.12 s against the 1800 s max_wall_s and the 4050 s external cap, so neither bound any run and no run is censored.",
+    "binaries": "c365aa5 with dirty false on all 600 run.json files.",
+    "input_screen": "null on all 600, so every input passed every correctness check.",
+    "errors": "0, per the queue log; every row has a run.json."
+  },
+  "results": {
+    "per_arm": {
+      "nsga2-apportion/mrs": {
+        "found_repair": 150,
+        "implies_ideal": 88,
+        "wall_s": {
+          "mean": 3.55,
+          "median": 3.13,
+          "max": 23.15,
+          "sum_h": 0.148
+        },
+        "n_repairs": {
+          "mean": 26.81,
+          "median": 25
+        },
+        "accumulated_set": {
+          "mean": 93.49,
+          "median": 102,
+          "max": 145,
+          "distinct_documents": "13,776 of 14,024"
+        },
+        "n_accumulated_repairs_mean": 40.3,
+        "n_implies_mean": 1.98,
+        "best_relation": {
+          "strictly stronger": 61,
+          "incomparable": 34,
+          "strictly weaker": 28,
+          "equivalent": 27
+        },
+        "implication": {
+          "timeouts": 70,
+          "fingerprint_refuted": 516693,
+          "comparisons": 46552
+        }
+      },
+      "nsga2-apportion/aurus": {
+        "found_repair": 150,
+        "implies_ideal": 85,
+        "wall_s": {
+          "mean": 10.46,
+          "median": 4.9,
+          "max": 59.59,
+          "sum_h": 0.436
+        },
+        "n_repairs": {
+          "mean": 25.95,
+          "median": 25.5
+        },
+        "accumulated_set": {
+          "mean": 88.27,
+          "median": 103,
+          "max": 134,
+          "distinct_documents": "13,007 of 13,240"
+        },
+        "n_accumulated_repairs_mean": 41.2,
+        "n_implies_mean": 2.03,
+        "best_relation": {
+          "strictly stronger": 61,
+          "incomparable": 41,
+          "strictly weaker": 24,
+          "equivalent": 24
+        },
+        "implication": {
+          "timeouts": 71,
+          "fingerprint_refuted": 472777,
+          "comparisons": 50835
+        }
+      },
+      "weighted/mrs": {
+        "found_repair": 150,
+        "implies_ideal": 84,
+        "wall_s": {
+          "mean": 4.77,
+          "median": 3.98,
+          "max": 14.07,
+          "sum_h": 0.199
+        },
+        "n_repairs": {
+          "mean": 41.34,
+          "median": 38.5
+        },
+        "accumulated_set": {
+          "mean": 185.47,
+          "median": 200.5,
+          "max": 257,
+          "distinct_documents": "26,939 of 27,821"
+        },
+        "n_accumulated_repairs_mean": 143.6,
+        "n_implies_mean": 2.31,
+        "best_relation": {
+          "strictly stronger": 71,
+          "incomparable": 49,
+          "strictly weaker": 17,
+          "equivalent": 13
+        },
+        "implication": {
+          "timeouts": 127,
+          "fingerprint_refuted": 2028223,
+          "comparisons": 123909
+        }
+      },
+      "weighted/aurus": {
+        "found_repair": 149,
+        "implies_ideal": 82,
+        "wall_s": {
+          "mean": 10.95,
+          "median": 7.18,
+          "max": 102.12,
+          "sum_h": 0.456
+        },
+        "n_repairs": {
+          "mean": 35.63,
+          "median": 32
+        },
+        "accumulated_set": {
+          "mean": 169.83,
+          "median": 195.5,
+          "max": 272,
+          "distinct_documents": "24,587 of 25,474"
+        },
+        "n_accumulated_repairs_mean": 135.4,
+        "n_implies_mean": 2.37,
+        "best_relation": {
+          "strictly stronger": 66,
+          "incomparable": 50,
+          "strictly weaker": 17,
+          "equivalent": 16,
+          "none": 1
+        },
+        "implication": {
+          "timeouts": 158,
+          "fingerprint_refuted": 1741199,
+          "comparisons": 121598
+        }
+      },
+      "field_notes": "accumulated_set is the line count of accumulated/index.tsv less its header, one line per arrival, and is what score_curves.py counts as solutions. n_accumulated_repairs in run.json is AccumulatorStats::n_contributed, the accumulated specifications the final population did not already hold, and is not the size of the set. distinct_documents counts byte-distinct repair files: tombstoned guarantees are omitted from a repair's JSON, so two arrivals distinct as search state can be one document."
+    },
+    "no_repair_run": "weighted/aurus fsm-combined seed 19, 10.31 s, with no accumulated/ index at all. It is the only run of 600 without a repair.",
+    "selection_contrast": {
+      "levels": "nsga2-apportion first, weighted second",
+      "pairs": 300,
+      "found_repair": "1 to 0, exact McNemar p = 1.0000",
+      "implies_ideal": "15 to 8, p = 0.2100",
+      "implies_ideal_within_mrs": "7 to 3, p = 0.3438",
+      "implies_ideal_within_aurus": "8 to 5, p = 0.5811",
+      "wall": "weighted/apportion median ratio 1.177; apportion faster on 203 pairs, slower on 95, tied on 2; exact sign test p = 3.69e-10",
+      "n_repairs_median": "25 against 35",
+      "accumulated_set_ratio": "weighted holds 1.98x apportion's arrivals within mrs and 1.92x within aurus",
+      "per_family_implies_ideal_discordant_and_wall_ratio": {
+        "fsm": "13 to 6, 1.019",
+        "fsm-combined": "2 to 2, 1.124",
+        "fsm-timing": "0 to 0, 1.414",
+        "mode-arbiter": "0 to 0, 0.969",
+        "takeoff": "0 to 0, 2.040"
+      }
+    },
+    "grading_contrast": {
+      "levels": "mrs first, aurus second",
+      "pairs": 300,
+      "found_repair": "1 to 0, exact McNemar p = 1.0000",
+      "implies_ideal": "12 to 7, p = 0.3593",
+      "implies_ideal_within_nsga2-apportion": "6 to 3, p = 0.5078",
+      "implies_ideal_within_weighted": "6 to 4, p = 0.7539",
+      "wall": "aurus/mrs median ratio 1.464; mrs faster on 278 pairs, slower on 21, tied on 1; exact sign test p = 1.97e-58",
+      "n_repairs_median": "30 against 28",
+      "per_family_implies_ideal_discordant_and_wall_ratio": {
+        "fsm": "10 to 5, 1.220",
+        "fsm-combined": "2 to 2, 2.559",
+        "fsm-timing": "0 to 0, 1.234",
+        "mode-arbiter": "0 to 0, 3.645",
+        "takeoff": "0 to 0, 1.258"
+      }
+    },
+    "discriminating_families": "Every discordant implies_ideal pair in both contrasts falls on fsm or fsm-combined. Restricted to those two families, 120 pairs a contrast, the counts and p-values equal the full 300's. fsm-timing and takeoff read 30/30 on every arm, and mode-arbiter reads 0/30 on every arm with all 120 of its best_relation values incomparable.",
+    "per_family": {
+      "columns": "implies_ideal/found (median wall s); accumulated set mean; implication timeouts (runs with one), in arm order nsga2-apportion/mrs, nsga2-apportion/aurus, weighted/mrs, weighted/aurus",
+      "fsm": [
+        "28/30 (2.6); 100.8; 0",
+        "23/30 (3.2); 87.7; 0",
+        "22/30 (2.7); 186.6; 0",
+        "22/30 (3.4); 172.1; 0"
+      ],
+      "fsm-combined": [
+        "0/30 (4.2); 35.6; 39 (6)",
+        "2/30 (10.7); 20.3; 17 (4)",
+        "2/30 (4.7); 95.1; 41 (7)",
+        "0/29 (13.3); 36.4; 15 (5)"
+      ],
+      "fsm-timing": [
+        "30/30 (3.2); 120.5; 23 (3)",
+        "30/30 (4.0); 115.8; 51 (4)",
+        "30/30 (4.6); 222.7; 69 (3)",
+        "30/30 (5.5); 221.2; 86 (4)"
+      ],
+      "mode-arbiter": [
+        "0/30 (2.9); 116.4; 5 (1)",
+        "0/30 (11.5); 105.0; 0",
+        "0/30 (3.1); 208.1; 0",
+        "0/30 (9.8); 189.5; 0"
+      ],
+      "takeoff": [
+        "30/30 (3.1); 94.0; 3 (1)",
+        "30/30 (4.3); 112.4; 3 (1)",
+        "30/30 (6.6); 214.8; 17 (2)",
+        "30/30 (7.9); 230.0; 57 (2)"
+      ]
+    },
+    "headline": "Both factors are null on found_repair and implies_ideal, pooled and within each level of the other factor. They separate on cost: aurus grading is slower on 278 of 300 pairs at a median 1.46x, and weighted selection on 203 of 300 at 1.18x while holding about twice the accumulated set and a larger final antichain (n_repairs median 35 against 25)."
+  },
+  "against_the_tlsf_twin": {
+    "twin": "2026-08-28-selection-grading: 25 TLSF families at 6 seeds, generations 500 under a 400 s max_wall_s, 3600 s external cap.",
+    "censoring": "The twin lost 245 of 600 manifests to the external cap, 214 of them on weighted pairs, and its recorded endpoint read 145 to 5 for nsga2-apportion. This campaign lost none: every run stopped on its generation count.",
+    "accumulator_reading": "The twin's 2026-09-03 addendum re-read both factors from the accumulator and found them null, selection 14 to 18 (p = 0.5966) and grading 15 to 7 (p = 0.1338). Here the recorded endpoint is itself null, and the curve campaign's maximal_ideal_solutions agrees with implies_ideal on 600 of 600 runs, so the recorded and accumulator readings coincide.",
+    "accumulation": "weighted/mrs held 10.6x nsga2-apportion/mrs's solutions by 400 s on the twin, and 1.98x at run end here.",
+    "reading": "The FRETISH result matches the twin's corrected reading: neither factor changes what the search reaches. At gen10/pop200 with the streaming maximality filter, the quadratic post-deadline cost that censored the twin's weighted arms does not arise."
+  },
+  "caveats": [
+    "Post-hoc throughout. No endpoint, alpha or decision rule was registered.",
+    "Three of the five families carry no information about either factor (two saturated at 30/30, one flat at 0/30), so the effective sample for implies_ideal is the 120 fsm and fsm-combined pairs a contrast, and those hold 23 and 19 discordant pairs.",
+    "Wall ratios are from a jobs = 4 campaign on a shared host with the arms not interleaved per case. The sign tests (278 to 21, 203 to 95) are far from the noise; the ratio magnitudes carry host-load drift of unknown size.",
+    "n_repairs and n_implies follow the 2026-09-11 whole-specification implication check and do not compare with FRETISH archives closed before it.",
+    "The weights 0.1/0.2/0.7 are AuRUS's published triple and also the binary default since 2026-09-11; only the weighted scheme reads them, so the selection factor is NSGA-II against that scalarisation rather than against weighting in general, as on the twin.",
+    "A timed-out implication check reads as non-implication. The search's implication filter timed out 426 times over 43 runs (70, 71, 127 and 158 per arm in arm order), all on fsm-combined, fsm-timing, takeoff and one mode-arbiter run. On 10 of those runs, 9 of fsm-combined and 1 of fsm-timing, with 1 to 46 timeouts each and 139 in all, n_repairs exceeds the offline maximal count by 1 or 2; on the other 33 it equals the offline count. See 2026-09-09-fretish-maximal-curve cross_checks.",
+    "campaign.toml's comments call gen10/pop200 the TLSF twin's operating point and quote a twin median of 30.1 s a run. The twin ran generations = 500 under a 400 s max_wall_s, so both statements are wrong, and the 30.1 s figure has no traceable source. The declaration is left as the host read it; the operating point is a choice of this campaign alone."
+  ],
+  "vendored_scripts": {
+    "note": "Verbatim copies, each verified with git hash-object. The four that ran the campaign are as they stood at c365aa5, the commit the host ran. analyse_fretish_grading.py was written at close and exists only in this archive and in 2026-09-09-fretish-maximal-curve, byte-identical in both; it reads that campaign's curves CSV as well as this one's results, and needs the Python standard library alone.",
+    "ran_the_campaign": {
+      "source_commit": "c365aa51dd99c7e07feb58f4bf20e0177abb0387",
+      "gen_configs.py": "aec8081e15830474382eb7d8ea41beb7bc379b5e",
+      "run_experiments.py": "59c28e9d9ea4fc364bc89dc660466cb386d7f4b4",
+      "merge_experiments.py": "af3d771adef930d630799c86d26001c2b387a4af",
+      "campaign.py": "b226e350f642d4a62fad3901b4096d38b270210d"
+    },
+    "analysed_it": {
+      "source_commit": null,
+      "analyse_fretish_grading.py": "55e8a0e6a0afe366d8e54dd6cb47736df66e9bdd"
+    }
+  },
+  "config_vintage": "No entry is owed. The configs were generated with --pin-vintage, which writes the defaults moved on 2026-09-11 into every config, and no C++ default moved between the run and the close: c365aa5's C++ tree equals 5c94d66's, and git diff --stat 5c94d66 main over src, include, schemas, example-config.toml and scripts is empty at close.",
+  "owed": [
+    "More seeds on fsm and fsm-combined, the two families where either factor can move implies_ideal. At about 7 s a run, 120 further seeds a family cost under an hour of wall on one host.",
+    "An interleaved wall-time measurement, if the 1.46x cost of aurus grading on FRETISH is to be quoted as a ratio rather than as a direction."
+  ],
+  "files": {
+    "results-gradsel-fret-m.csv": "Merged results, 600 rows, the source for every per-run figure here. Untracked.",
+    "results-gradsel-fret-m/": "The 600 run directories, 410 MB, each holding config.toml, run.json, run.log, the repair_N.json output and accumulated/. Untracked.",
+    "results-gradsel-fret-m-manifest-avlab12.json": "av2's launch manifest. Untracked.",
+    "configs-gradsel-fret-m/": "Left on av2 and not collected; every run directory carries its own config.toml copy.",
+    "campaign.toml": "The declaration the host read, with the probe figures and the reasons for the operating point.",
+    "REPORT.md": "The write-up, closed 2026-09-14.",
+    "scripts/": "The five vendored scripts, with blob shas above.",
+    "analysis-output.txt": "The output of python3 scripts/analyse_fretish_grading.py experiments at close. Untracked."
+  },
+  "reproduce": "Check out c365aa5 and build the release preset. Generate the configs with this directory's scripts/gen_configs.py using the configs command campaign.toml carries, then run scripts/run_experiments.py --profile gradsel-fret over seeds 0-29 at jobs 4, as campaign.toml declares. The figures come from python3 scripts/analyse_fretish_grading.py experiments, run from the repository root with both this campaign's results and 2026-09-09-fretish-maximal-curve's curves-gradsel-fret-m/ in place.",
+  "closed_on": "2026-09-14"
+}
