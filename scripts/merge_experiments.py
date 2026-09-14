@@ -148,6 +148,11 @@ PROFILE_CSVS: dict[str, str] = {
     # corpus and the path all differ, and neither the corpus nor the path is in
     # the key.
     "gradsel-fret": "results-gradsel-fret-m.csv",
+    # The 2026-09-14 paper re-run. Its own CSVs, never rematch's: the design
+    # and key fields are identical and only the commit differs, which is not
+    # in the key, so a shared CSV would keep one row of each pair.
+    "paper-rerun": "results-paper-rerun.csv",
+    "paper-rerun-calib": "results-paper-rerun-calib.csv",
 }
 
 # Per-run output directory each profile writes under experiments/. Most profiles
@@ -197,6 +202,8 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
     "rematch": "results-rematch",
     "rematch-calib": "results-rematch-calib",
     "gradsel-fret": "results-gradsel-fret-m",
+    "paper-rerun": "results-paper-rerun",
+    "paper-rerun-calib": "results-paper-rerun-calib",
 }
 
 # Natural key of a results row: one run per (sweep, level_name, selection,
