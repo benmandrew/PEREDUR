@@ -430,29 +430,19 @@ int main(int argc, const char* const argv[]) {
     Config cfg;
     cfg.parallel = args.jobs;
     cfg.black_timeout = std::chrono::milliseconds{args.timeout_s * 1000};
-    // Reached through check_satisfiability's simplification step, which decides
-    // the query outright whenever it folds to a constant. compare.cpp sizes it
-    // at 300 s off amba and documents why anything smaller silently changes the
-    // verdict rather than merely losing a simplification.
+    // Bounds the `--remove-wm` rewrite check_satisfiability runs before black.
+    // compare.cpp sized it at 300 s off amba.
     cfg.ltlfilt_timeout = std::chrono::milliseconds{300'000};
     apply_tool_timeouts(cfg);
     set_thread_pool_size(cfg.parallel);
     SatisfiabilityChecker& checker = global_sat_checker();
-    // Both measured over this tool's own queries, whole-spec implications of
-    // 1000-1600 characters. `ltlfilt --simplify` took 95.6% of solver wall
-    // time (1153.7s against 52.9s for the decision itself) and a 40-file batch
-    // went from 304s to 30s without it, with the same survivors; without the
-    // pass the unsimplified query runs about 2x longer, so the 500ms SPOT
-    // budget tuned for the search tips over under load and an undecided
-    // `ExpectUnsat` query keeps both sides. Giving SPOT black's budget instead
-    // restored agreement on 264 of 264 cut-values across a 10-run sample. The
-    // FRETISH path takes the same two settings, which is what its own final
-    // filters run under (src/repair/evolution.cpp). Its queries were per
-    // requirement rather than whole-spec until ed5413f, and measured at 40
-    // generations of 1000 the simplify pass was 59-61% of every ltlfilt exec a
-    // run made even at that shape; it now asks the whole-spec query this
-    // paragraph measures.
-    checker.set_simplify(false);
+    // Measured over this tool's own queries, whole-spec implications of
+    // 1000-1600 characters: an unsimplified query runs about 2x longer than a
+    // simplified one, so the 500ms SPOT budget tuned for the search tips over
+    // under load and an undecided `ExpectUnsat` query keeps both sides. Giving
+    // SPOT black's budget instead restored agreement on 264 of 264 cut-values
+    // across a 10-run sample. The FRETISH path takes the same setting, which
+    // is what its own final filters run under (src/repair/evolution.cpp).
     checker.set_spot_budget(cfg.black_timeout);
 
     return wants_tlsf(args.paths) ? run<tlsf::Specification>(args, checker)

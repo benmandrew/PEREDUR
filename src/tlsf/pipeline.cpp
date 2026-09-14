@@ -49,18 +49,13 @@ void apply_final_filters(std::vector<Scored<Specification>>& survivors,
                          const Specification& original, const Config& cfg) {
     // The final filter asks whole-specification implications, `(A) & !(B)`
     // over the lowered specifications, which the search's checker is not
-    // tuned for. Measured on humanoid-531 at 6 generations of 100: this stage
-    // was 264s of a 312s run, and 96.7% of its solver time (4955s of 5122s
-    // aggregate) was the `ltlfilt --simplify` pass, which settled nothing the
-    // `--satisfiable` decision could not; 316 further calls hit the search's
-    // ltlfilt budget. SPOT's 500ms budget is sized for single-requirement
+    // tuned for. SPOT's 500ms budget is sized for single-requirement
     // queries, and an `ExpectUnsat` query it leaves undecided is never
     // escalated, so it reads as "keep both". A checker of the stage's own
     // keeps the search path byte-identical. It starts cold, but no query it
     // is asked was asked during the search, so there is nothing to inherit.
     SatisfiabilityChecker final_checker;
     final_checker.set_timeout(cfg.black_timeout);
-    final_checker.set_simplify(false);
     final_checker.set_spot_budget(cfg.black_timeout);
     if (cfg.run_implication_filter && survivors.size() > 1) {
         survivors =

@@ -48,9 +48,9 @@ void test_unsatisfiable_ltl(const std::chrono::milliseconds& timeout) {
 // This codebase spells its boolean constants as atoms named "true"/"false",
 // which black parses as free variables — invoked directly on any case below it
 // answers SAT, including the four that are unsatisfiable. check_satisfiability
-// gets them right two ways over: ltlfilt folds most to a constant before black
-// is consulted, and anything reaching black has its constants rewritten to the
-// "True"/"False" spelling black reads as constants.
+// gets them right two ways over: SPOT reads them as constants and decides most
+// before black is consulted, and anything reaching black has its constants
+// rewritten to the "True"/"False" spelling black reads as constants.
 void test_boolean_constants(const std::chrono::milliseconds& timeout) {
     struct Case {
         const char* formula;
@@ -64,9 +64,8 @@ void test_boolean_constants(const std::chrono::milliseconds& timeout) {
         {"true", true},
         {"G(true)", true},
         {"p | true", true},
-        // SPOT's own spellings. These reach check_satisfiability whenever a
-        // query has been through ltlfilt, which prints constants as 0/1 rather
-        // than as the atoms this codebase writes. black rejects them as a
+        // SPOT's own spellings, which ltlfilt prints for constants rather
+        // than the atoms this codebase writes. black rejects them as a
         // syntax error rather than misreading them, so before they were
         // handled a folded query aborted the whole run.
         {"0", false},
@@ -157,10 +156,7 @@ void test_weak_until_validity(const std::chrono::milliseconds& timeout) {
     const std::array<Case, 5> cases{{
         // The three below are guarantees the 2026-08-07 elitism campaign
         // actually wrote out as repairs: each is valid, so each says nothing,
-        // and the vacuity screen should have caught all three. ltlfilt's
-        // --simplify does not fold any of them to a constant, so they reach
-        // black and pin the rewrite rather than the constant-folding path in
-        // front of it.
+        // and the vacuity screen should have caught all three.
         {"!(F((r_1) W (X(!(r_1)))))", false},
         {"!(G(F((g1) W (X(!(g1))))))", false},
         {"!(F(((g_1) W (!(F(r_1)))) | (!(X(X(g_1))))))", false},
@@ -168,10 +164,7 @@ void test_weak_until_validity(const std::chrono::milliseconds& timeout) {
         // has to preserve the answer, not force every weak-until query to
         // UNSAT.
         {"!((a) W (b))", true},
-        // G a entails a W b, the weak operator's defining case. ltlfilt folds
-        // this one to a constant before black is consulted, so it pins the
-        // first line of defence rather than the rewrite -- kept for the same
-        // reason test_boolean_constants keeps its folded cases.
+        // G a entails a W b, the weak operator's defining case.
         {"!((G(a)) -> ((a) W (b)))", false},
     }};
     SatisfiabilityChecker checker;
@@ -241,11 +234,17 @@ void test_spot_satisfiable_decides_both_ways() {
 }
 
 // The case the routing exists for. black cannot decide this within any budget
-// the engine gives it -- at an X-chain depth of 40 it takes seconds, and the
-// depth grows with every generation the search runs -- while SPOT answers by
-// automaton emptiness in milliseconds regardless of depth. Before SPOT took
-// the first stage this returned nullopt, and the implication filter kept every
-// candidate it could not judge.
+// the engine gives it at an X-chain depth of 40, while SPOT answers by
+// automaton emptiness in milliseconds. Before SPOT took the first stage this
+// returned nullopt, and the implication filter kept every candidate it could
+// not judge.
+//
+// Depth 10 because SPOT now reads the formula unsimplified: there it answers
+// in 40 ms, but at depth 20 `ltlfilt --satisfiable` runs past 120 s where
+// `--simplify` folds the query to "0" in 10 ms. Such a query now reads as
+// undecided. The pass was dropped anyway because it cost 8x the decision on
+// the search's own queries, and a 250-individual full-arbiter-aurus run went
+// from 339.5 s to 66.9 s with byte-identical repairs.
 void test_deep_nested_x_implication_is_decided(
     const std::chrono::milliseconds& timeout) {
     const auto x_chain = [](int depth) {
@@ -257,8 +256,8 @@ void test_deep_nested_x_implication_is_decided(
         }
         return chain;
     };
-    const std::string chain = x_chain(60);
-    const std::string wider = x_chain(61);
+    const std::string chain = x_chain(10);
+    const std::string wider = x_chain(11);
     SatisfiabilityChecker checker;
     checker.set_timeout(timeout);
     // "within 60" implies "within 61", so the implication holds and the query
