@@ -1335,6 +1335,57 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-rematch-calib.csv",
         "default_jobs": 16,
     },
+    # The 2026-09-04-aurus-rematch design re-run at the engine `main` carries
+    # on 2026-09-14, for the paper's RQ1, RQ3 and RQ4. Same generator line
+    # into its own directory, same corpus, seeds, cells and caps. Its own
+    # results directory and CSV rather than rematch's: the resume key carries
+    # no commit, so pointing at rematch's CSV would skip all 3000 runs as done.
+    # bdbec4c moved the TLSF draw stream, so nothing here pairs against the
+    # rematch row by row.
+    #
+    #   python scripts/gen_configs.py --tlsf \
+    #       --schemes nsga2-apportion weighted --sweeps G --levels mrs,aurus \
+    #       --metric log --weakening off --weights 0.1 0.2 0.7 \
+    #       --termination individuals --max-individuals 1000 \
+    #       --generations 500 --population-size 100 --parallel 1 \
+    #       --out-dir experiments/configs-paper-rerun --pin-vintage
+    "paper-rerun": {
+        "schemes": ["nsga2-apportion", "weighted"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["G"],
+        "levels": {"G": ["mrs", "aurus"]},
+        "specs": H2H_TLSF_READY,
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in H2H_TLSF_READY},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-paper-rerun",
+        "results_dir": EXPERIMENTS_DIR / "results-paper-rerun",
+        "results_csv": EXPERIMENTS_DIR / "results-paper-rerun.csv",
+        "default_jobs": 16,
+    },
+    # rematch-calib's six families at the new engine, so the realised cost and
+    # the humanoid-742 cap rate read against that calibration directly.
+    "paper-rerun-calib": {
+        "schemes": ["nsga2-apportion", "weighted"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["G"],
+        "levels": {"G": ["mrs", "aurus"]},
+        "specs": ["humanoid-742", "humanoid-531", "pcar-v2-888",
+                  "full-arbiter-aurus", "minepump", "rg2"],
+        "seeds": list(range(2)),
+        "timeout_caps": {s: 7200 for s in H2H_TLSF_READY},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-paper-rerun",
+        "results_dir": EXPERIMENTS_DIR / "results-paper-rerun-calib",
+        "results_csv": EXPERIMENTS_DIR / "results-paper-rerun-calib.csv",
+        "default_jobs": 16,
+    },
     # nsga2 vs nsga2-replicate on FRETISH, at the gen40/pop1000 operating point
     # the cj-large and metric campaigns used — so the control arm is checkable
     # against their rows rather than being taken on trust. Three arms:

@@ -136,6 +136,11 @@ PROFILE_CSVS: dict[str, str] = {
     "matched": "results-matched.csv",
     "rematch": "results-rematch.csv",
     "rematch-calib": "results-rematch-calib.csv",
+    # The 2026-09-14 paper re-run. Its own CSVs, never rematch's: the design
+    # and key fields are identical and only the commit differs, which is not
+    # in the key, so a shared CSV would keep one row of each pair.
+    "paper-rerun": "results-paper-rerun.csv",
+    "paper-rerun-calib": "results-paper-rerun-calib.csv",
 }
 
 # Per-run output directory each profile writes under experiments/. Most profiles
@@ -184,6 +189,8 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
     "matched": "results-matched",
     "rematch": "results-rematch",
     "rematch-calib": "results-rematch-calib",
+    "paper-rerun": "results-paper-rerun",
+    "paper-rerun-calib": "results-paper-rerun-calib",
 }
 
 # Natural key of a results row: one run per (sweep, level_name, selection,
