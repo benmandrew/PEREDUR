@@ -54,7 +54,7 @@ class AccumulatedRepairWriter {
     /// Renders one specification as the document to write. Pass the path's own
     /// serialiser -- `to_json` or `tlsf::write` -- so an accumulated file reads
     /// exactly like a repair of the same specification, tombstoned guarantees
-    /// omitted (see "Removable guarantees" in CLAUDE.md).
+    /// omitted (see "Removable guarantees" in docs/dev/operators.md).
     using Serialiser = std::function<std::string(const Spec&)>;
 
     /// A default-constructed writer writes nothing, for the callers that

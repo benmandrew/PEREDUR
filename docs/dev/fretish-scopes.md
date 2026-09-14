@@ -1,0 +1,37 @@
+# FRETISH scopes
+
+The scope field of a FRETISH requirement: its lowering, its validation against the FRET formaliser, and the mutation arms and similarity terms that act on it.
+
+## FRETISH scopes
+
+`Requirement::m_scope` (`include/requirement.hpp`) is FRET's fifth field, the interval over which a requirement is enforced relative to when a *mode* holds. `ScopeKind` has eight values, every scope FRETISH text can reach: Global (the default), In, NotIn, Before, After, OnlyIn, OnlyBefore and OnlyAfter. The spellings are `in m` (also `during`, `while`), `except in m` (also `unless in`, `when not in`), `before m`, `after m`, `only in m`, `only before m` and `only after m`. A bare `not in` is a parse error, as is a formula mode such as `in (a & b)`.
+
+The lowering is in `src/requirement.cpp`. Each scope adds an outer wrapper and a boundary marker `B` that discharges a bounded obligation early: `EoM = (m & X!m)` for In and OnlyAfter, `SoM = (!m & Xm)` for NotIn, Before and OnlyIn, and none for Global, After and OnlyBefore. Under `B`, `G r` becomes `B R r`, `F r` becomes `!B U r`, `X r` becomes `B | X r`, `F[0,n] r` becomes `F[0,n] r | F[0,n-1] B`, and `G[0,n] r` becomes `G[0,n] r | (B R r)`. The continual wrapper `G(c -> body)` becomes `B R (c -> body)`, and the trigger wrapper also conjoins `!B` into its rising edge. The three `only` scopes apply the dual scope's wrapper to the De Morgan dual of the body.
+
+**The Global path is byte-identical to the pre-scope lowering.** Archived runs, memoisation keys and the determinism goldens all depend on those strings. `test_global_scope_lowering_is_unchanged` in `test/scope_tests.cpp` pins it, and `build/ltl` over all 23 FRETISH examples matched the pre-change binary.
+
+**Validation is against the vendored formaliser, on equivalence rather than on string equality.** `test_scope_agrees_with_formaliser` checks 8 scopes x 2 condition types x 7 timings with `ltl_equivalent`, since FRET special-cases rows such as `in m ... always`. A 312-row development check found no semantic disagreement; its 21 unchecked rows are the zero-tick `within` under a bounded scope, where FRET emits an unparsable `F[0,-1] ...` and the obligation is not relaxed, which `test_scope_zero_ticks_is_unrelaxed` pins by hand.
+
+**Modes are their own namespace.** `Specification::m_modes` is disjoint from `m_in_atoms` and `m_out_atoms`, checked at load, and joins ltlsynt's *input* side through `environment_signals()`. As outputs, modes would let the system gut any scoped guarantee, since `G !mode` implies an `In`-scoped one. An undeclared mode is rejected, because ltlsynt, passed only `--ins`, would silently make it an output.
+
+**A mode is an atom of the lowered formula that sits in no `Formula` field, and the counting path had to be told.** `count_joint_atoms` (`src/fitness/transfer_matrix.cpp`) once left the mode out of `n_total_atoms`, so `free_count` in `count_guard_models` wrapped on `std::size_t` and `mul_pow2` hit the overflow assertion. It is asserted rather than clamped, since a wrong free count is a wrong trace count nothing else catches. Any future field carrying an atom outside `m_condition`/`m_response` meets the same trap.
+
+**No mode axiom is generated.** FRET keeps mode exclusivity in variable definitions the `formalize` path never sees, so it is written as an ordinary non-weakenable requirement, as in `examples/fsm-combined/spec.json`.
+
+**Two directional mutation arms, both defaulting to 0.15.** `[mutation] p_condition_type` and `[mutation] p_scope` moved from 0 on 2026-09-11 without a measuring campaign, as the "Config vintage" note records. Each reads its probability before touching the `RandomSource`, so at 0 neither costs a draw; `golden_config()` pins both at 0, and `test_new_arms_cost_no_draw_at_zero` checks that each draws when on.
+
+**Condition type carries a universal order.** Continual implies Trigger for every scope and timing, a condition's rising edges being a subset of the points where it holds, so Continual strengthens and the arm needs no table. The two coincide in 10 of the 80 scope-by-timing cells, at `always` under the five plain scopes and `eventually` under the three `only` scopes; `test_condition_type_order_is_pinned` asserts the order and those coincidences.
+
+**The scope order is thin and depends on the timing.** Measured with `ltlfilt --implied-by`, and independent of tick count: continual at any timing but `eventually`, and trigger at `always`, give `global => in`, `global => notin`, `global => before`, `global => after` and `notin => before`; trigger at the other non-`eventually` timings keeps `global => before` and `notin => before`; at `eventually`, continual gives `global => after` and `notin => before`, and trigger `notin => before` alone. It varies because a boundary *relaxes* a bounded obligation and *tightens* an unbounded one. The `only` scopes are an antichain in every cell, so they cannot move on this field. `test_scope_order_is_pinned` re-derives every cell, non-edges included.
+
+**A mode travels with a non-Global move.** `notin m` implies `before m` and nothing about `before m'`, so only a move off Global draws from `Specification::m_modes`.
+
+**Syntactic similarity averages five terms.** They are condition, response, timing, scope and condition type, in both overloads in `src/fitness/syntactic_similarity.cpp`. The last three pair by index (`average_timing_similarity`, `average_scope_similarity`, `average_condition_type_similarity`), because slot *i* of a candidate descends from slot *i* of the original. Timing and condition type are *Jaccard* overlaps of downward closures in the field's implication order, so neither carries a chosen penalty.
+
+**The scope term is the exception and does not use that order**, which depends on the timing. Relative to one mode a trace has four regions: the prefix before the mode first holds, the points where it holds, the gaps between mode intervals, and the suffix after it last holds. The term averages the Jaccard overlap of the two scopes' region sets with whether they name the same mode. An `only` scope's regions are tagged apart, so `except in m` and `only in m`, opposite claims about the same timepoints, earn no region credit.
+
+**The invariance argument this section used to carry is wrong.** Each per-index term divides by the *larger* requirement count, so even over an all-Global corpus a candidate that gained an assumption or tombstoned a guarantee scores below 1 where every matched pair agrees.
+
+**The change was measured rather than argued.** Against the three-term mean from `9133035`, 15 seeded runs over `fsm`, `fsm-timing` and `fsm-combined` returned different repairs on 12, one more repair on two and fewer on none, which shows the search moves rather than improves. Unscoped, both new terms reduce to the shape signal already in the timing term's denominator, weighting it more heavily.
+
+**The scope arm is dead on most of the corpus.** Every other specification under `examples/` is global-scoped with no modes; `examples/mode-arbiter` is the one scoped subject, with one ideal (`fixes/guard-maintenance.json`). `p_condition_type` reaches every FRETISH specification, and neither arm has had its owed campaign.

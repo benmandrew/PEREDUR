@@ -511,7 +511,7 @@ struct Config {
     /// `experiments/2026-08-26-assumption-reach` measured them, at five keys:
     /// a fifth, `tlsf.mutation.p_union_assumption`, was removed rather than
     /// kept at its no-op, because it cannot reach what it was written for.
-    /// See the "Assumption construction" section of CLAUDE.md. The two that
+    /// See "Assumption construction" in docs/dev/operators.md. The two that
     /// remain stay at their no-op defaults, that campaign's registered
     /// primary having read null; p_remove_assumption and p_burst_continue
     /// were removed with their operators.

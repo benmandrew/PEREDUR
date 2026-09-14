@@ -261,7 +261,7 @@ H2H_PENDING_IMPORT: list[str] = []
 # contribute a guaranteed zero to the counter arm while costing a full seed
 # sweep to produce it.
 #
-# Note this is not the FRETISH input-screen case in the root CLAUDE.md, where
+# Note this is not the FRETISH input-screen case in docs/dev/algorithm.md, where
 # an ill-separated input is warned about rather than rejected because a
 # descendant may fix the property. On the TLSF assumption side no descendant
 # can. A semantically sound repair does exist -- dropping the `G(!next_head)`
@@ -1006,7 +1006,7 @@ PROFILES: dict[str, dict] = {
     # came from a different commit under a 7200 s cap, and this profile caps far
     # tighter, so their censoring differs from this one's -- and a control
     # inherited across a commit boundary is what the stale-binary and
-    # cost-vintage notes in the root CLAUDE.md exist about. The archived rows
+    # cost-vintage notes in docs/dev/config-and-provenance.md exist about. The archived rows
     # are a validity check on the fresh nsga2 arm instead, which is free.
     #
     # Sweep T at `monoon` alone, rather than sweep N or a bare C level: `monoon`

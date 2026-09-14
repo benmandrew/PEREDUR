@@ -8,7 +8,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 
 | Script | Role |
 |---|---|
-| `campaign.py` | The operating surface for a campaign: `stage`, `start`, `enqueue`, `tick`, `status`, `queue`, `collect`, `describe`. Everything that acts on a campaign goes through it. See `CLAUDE.md` for the state each verb leaves behind. |
+| `campaign.py` | The operating surface for a campaign: `stage`, `start`, `enqueue`, `tick`, `status`, `queue`, `collect`, `describe`. Everything that acts on a campaign goes through it. See `docs/dev/campaigns.md` for the state each verb leaves behind. |
 | `run_experiments.py` | Runs one phase of a sweep on one host and appends rows to the results CSV. Vendored into every campaign archive. |
 | `score_campaign.py` | The runner's scoring twin: one `score_curves.py --maximality` per run directory over one host's seeds, under a pinned worker pool, with a manifest of the budgets and binaries. What a `kind = "score"` phase runs. |
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
@@ -469,7 +469,7 @@ the fully qualified domain name (FQDN) in `merge_experiments.REMOTES` — that
 form falls through to password auth under `BatchMode=yes`, and a status poll
 cannot answer a prompt.
 
-`scripts/CLAUDE.md` is the operating manual for the same tool: which verb to
+`docs/dev/campaigns.md` is the operating manual for the same tool: which verb to
 reach for, what each state means, and how a campaign is closed. This section is
 the command surface.
 

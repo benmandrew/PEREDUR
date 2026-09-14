@@ -4514,7 +4514,7 @@ def build_parser() -> argparse.ArgumentParser:
     cron.add_argument("--host", choices=[*HOSTS, LOCAL], required=True)
     # Deliberately a no-op: cmd_cron prints whether or not it is passed, and
     # nothing reads print_only. It stays accepted because `cron --print` is the
-    # invocation this module's own docstring, scripts/CLAUDE.md and
+    # invocation this module's own docstring, docs/dev/campaigns.md and
     # scripts/README.md all document, and dropping the flag would make the
     # documented line -- and anybody's shell history -- exit 2 instead.
     cron.add_argument("--print", dest="print_only", action="store_true",
