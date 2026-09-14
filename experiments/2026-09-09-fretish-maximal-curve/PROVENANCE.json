@@ -1,0 +1,141 @@
+{
+  "campaign": "2026-09-09-fretish-maximal-curve",
+  "attribution": "recorded",
+  "generated_on": "2026-09-14",
+  "status": "closed",
+  "kind": "score",
+  "kind_note": "An offline maximality pass run through campaign.py's kind = \"score\" phase on av2 (queue entry 024-2026-09-09-fretish-maximal-curve.toml). It ran no search. It read the 600 run directories 2026-09-09-fretish-grading (entry 023) wrote under results-gradsel-fret-m and scored each one's accumulator into anytime curves. The search, its arms and its endpoints are recorded in that archive.",
+  "question": "How do the four arms of 2026-09-09-fretish-grading build their accumulated sets over time, counted raw, restricted to the implication antichain, and restricted to candidates implying a known ideal? And do the offline antichain and ideal readings agree with what each run reported?",
+  "endpoint": "None pre-registered. The curves are the output: solutions, maximal_solutions, ideal_solutions and maximal_ideal_solutions at 20 log-spaced cuts a run, with time_to_first_repair and time_to_first_ideal_repair.",
+  "decision_rule_firing": "None registered and none taken; a measurement pass, whose output is the curves. No PLAN.md was written.",
+  "source_campaign": {
+    "name": "2026-09-09-fretish-grading",
+    "results": "experiments/results-gradsel-fret-m",
+    "runs": 600,
+    "binary_commit": "c365aa5",
+    "arms": ["nsga2-apportion/mrs", "nsga2-apportion/aurus", "weighted/mrs", "weighted/aurus"],
+    "families": ["fsm", "fsm-combined", "fsm-timing", "mode-arbiter", "takeoff"],
+    "seeds": "0-29"
+  },
+  "profile_commit": {
+    "sha": "336838aaf8d9b8b8b4734b51d96de022c82f8030",
+    "branch": "campaign/fretish-maximal-curve",
+    "subject": "docs(experiments): size the fretish curve campaign off a measured pass",
+    "note": "bd8a583 declares the campaign, f0062d0 points it at the gen10/pop200 results stem, and 336838a re-sizes it off a measured pass and moves every seed to av2. All three sit on 5c94d66. The first declaration was queued at 30ad56c on 2026-09-09 and cancelled while still queued on 2026-09-11, so no row depends on that sha.",
+    "reachable_from_main": "expected after the close merges; see held_by_tag",
+    "held_by_tag": "provenance/fretish-maximal-curve",
+    "held_by_tag_note": "The annotated tag is cut at 336838a on 2026-09-14, before the close commit was written. The branch is expected to merge into main through a pull request, which keeps every sha here reachable on its own; the tag covers the case where the branch is rebased or split first. Never delete it."
+  },
+  "scoring_binaries": {
+    "maximal": { "commit": "336838a", "dirty": false },
+    "compare": { "commit": "336838a", "dirty": false },
+    "source": "score-manifest-avlab12.json.",
+    "note": "The C++ tree at 336838a equals 5c94d66's, as does c365aa5's, so the scorer and the search ran the same implication check. allow_stale_binary is false in the manifest."
+  },
+  "hosts": {
+    "av2": {
+      "machine": "avlab12",
+      "seeds": "0-29",
+      "curves": 600
+    },
+    "note": "One host, the same one that ran the search, so the pass read the run directories in place."
+  },
+  "maximality_pass": {
+    "invocation": "python3 scripts/score_curves.py --maximality --cuts 20 --jobs 4 --deadline-s 4500 --maximal-timeout 900 --compare-timeout 600 --out <out>/<run>.csv.part <run-dir>, one per run under score_campaign.py",
+    "mechanism": "One maximal process per cut, given the previous cut's survivors plus the candidates that arrived since, and a cut whose prefix equals the previous cut's is skipped. The running-antichain walk, one pass over the arrival order, is not on this branch. Workers 8, 4 cores each, pinned with taskset, each run under coreutils timeout at 5400 s.",
+    "curves": 600,
+    "failed": 0,
+    "partial_curves": 0,
+    "warnings": "warnings.log carries no WARN line. failures.txt is empty.",
+    "started": { "av2": "2026-09-12T03:10:04+0100" },
+    "finished": { "av2": "2026-09-12T03:25:34+0100" },
+    "wall_min": 15.5,
+    "worker_hours": {
+      "av2": 1.906,
+      "note": "Summed from timings.txt, 600 lines, all rc 0: mean 11.44 s a run, median 5.0 s, maximum 311 s. The accumulated set a scored run held averages 134.3 and reaches 272. fsm-timing is the dearest family, 12.4 s to 29.8 s mean per arm with the 311 s maximum, and fsm the cheapest at 1.3 s to 2.8 s."
+    },
+    "budgets": {
+      "maximal_timeout_s": 900,
+      "compare_timeout_s": 600,
+      "deadline_s": 4500,
+      "wall_cap_s": 5400,
+      "note": "All 600 timings lines record 900/600/4500. No run approached any of them: the longest took 311 s."
+    },
+    "counts": "Queued 600, already scored 0, scored 600, failed 0. The queue log reads \"Done: 600 scored, 0 failed, 0 already there; 600/600 curves present.\""
+  },
+  "calibration": {
+    "declared": "campaign.toml priced a run at a mean of 3.5 s and the pass at about 35 core-minutes, measured on a probe with accumulated sets averaging 137 and reaching 273.",
+    "measured": "11.44 s a run and 1.906 worker-hours, 3.3x the declaration. The probe's set sizes match the campaign's (134.3 and 272), so set size does not account for the gap. The probe was 20 runs at seed 0, scored at jobs 4 on the same host, and what accounts for the gap was not determined at close."
+  },
+  "rows": {
+    "merged_total": 98809,
+    "per_host": { "av2": 98809 },
+    "runs": 600,
+    "per_run_csvs": 600,
+    "duplicates": 0,
+    "collected_with": "campaign.py collect --host av2 --curves curves-gradsel-fret-m on 2026-09-14, into curves-gradsel-fret-m.csv."
+  },
+  "results": {
+    "run_end_means": {
+      "columns": "solutions / maximal_solutions / ideal_solutions / maximal_ideal_solutions",
+      "nsga2-apportion/mrs": "93.49 / 26.78 / 4.46 / 1.98",
+      "nsga2-apportion/aurus": "88.27 / 25.94 / 4.93 / 2.03",
+      "weighted/mrs": "185.47 / 41.31 / 6.84 / 2.31",
+      "weighted/aurus": "169.83 / 35.61 / 7.08 / 2.37"
+    },
+    "deflation": "The antichain keeps 28.6% of nsga2-apportion/mrs's raw set, 29.4% of nsga2-apportion/aurus's, 22.3% of weighted/mrs's and 21.0% of weighted/aurus's. weighted holds 1.98x apportion's raw count under mrs and 1.92x under aurus, which falls to 1.54x and 1.37x on the antichain.",
+    "curve_means_at_fixed_times": {
+      "columns": "solutions / maximal_solutions / maximal_ideal_solutions, arm order nsga2-apportion/mrs, nsga2-apportion/aurus, weighted/mrs, weighted/aurus",
+      "0.5 s": ["13.71 / 5.38 / 0.89", "8.79 / 3.87 / 0.76", "11.29 / 5.05 / 0.82", "8.11 / 3.65 / 0.81"],
+      "1 s": ["37.20 / 12.83 / 1.24", "25.18 / 9.66 / 1.19", "40.80 / 13.01 / 1.25", "23.63 / 8.71 / 1.13"],
+      "2 s": ["71.57 / 21.34 / 1.74", "48.54 / 15.77 / 1.60", "114.52 / 26.76 / 1.77", "64.18 / 16.96 / 1.53"],
+      "5 s": ["92.86 / 26.67 / 1.98", "75.15 / 22.53 / 2.00", "183.96 / 41.15 / 2.31", "140.56 / 30.13 / 2.27"],
+      "10 s": ["93.28 / 26.75 / 1.98", "83.06 / 24.65 / 2.01", "184.48 / 41.22 / 2.31", "157.11 / 32.95 / 2.29"],
+      "note": "The two arms sharing a grading level track each other until about 1 s, after which weighted pulls ahead on raw and maximal counts. maximal_ideal_solutions spans at most 0.33 across the four arms at any time shown."
+    },
+    "time_to_first_repair": "Median 0.26 s, 0.34 s, 0.27 s and 0.38 s in arm order, reached on 150, 150, 150 and 149 runs. One row is censored, the no-repair run.",
+    "time_to_first_ideal_repair": "Median 0.25 s, 0.30 s, 0.27 s and 0.30 s, reached on 88, 85, 84 and 82 runs. 261 rows are censored.",
+    "cuts_per_run": {
+      "distribution": { "0": 1, "1": 1, "2": 1, "3": 1, "4": 1, "5": 3, "6": 6, "7": 20, "8": 24, "9": 58, "10": 225, "11": 182, "12": 43, "13": 15, "14": 8, "15": 5, "17": 2, "18": 1, "20": 3 },
+      "note": "Counted on maximal_solutions rows. score_curves.py draws 20 log-spaced cut times and writes a row only for a cut that adds arrivals, skipping a cut whose prefix equals the previous one's. A gen10 run accumulates in a few bursts, so most runs keep 9 to 11 of their 20. The run with 0 is weighted/aurus fsm-combined seed 19, which accumulated nothing."
+    }
+  },
+  "cross_checks": {
+    "ideal_reach": "maximal_ideal_solutions > 0 at run end agrees with the search's implies_ideal on 600 of 600 runs.",
+    "antichain_size": "maximal_solutions at run end equals the search's n_repairs on 590 of 600 runs. On the other 10 the offline count is lower by 1 or 2, and every one of them logged implication timeouts inside the search (1 to 46, 139 in all): nsga2-apportion/mrs fsm-combined seeds 5, 7 and 24, nsga2-apportion/aurus fsm-combined seed 9, weighted/mrs fsm-combined seeds 12, 16 and 20, weighted/mrs fsm-timing seed 20 (104 against 105), and weighted/aurus fsm-combined seeds 17 and 21. A timed-out check keeps both sides in the search, and the offline pass, under a 900 s budget, decided the pair.",
+    "reading": "The offline antichain never exceeds the reported one, and it falls short only where the search could not decide a pair. That is the direction a correct pass must take."
+  },
+  "caveats": [
+    "Post-hoc throughout. No PLAN.md was written, so no curve comparison here tests a hypothesis.",
+    "ideal_solutions counts candidates implying one of the ideals under examples/*/fixes at 336838a. mode-arbiter's single ideal is implied by no candidate on any arm, and fsm-timing and takeoff reach an ideal on every run, so the ideal curves discriminate on fsm and fsm-combined alone.",
+    "The pass invokes maximal once per non-empty cut. At these set sizes that cost 1.906 worker-hours, and nothing here measures the running-antichain walk.",
+    "Wall and worker-hour figures are from one pass on a shared host at 8 workers, not interleaved with anything."
+  ],
+  "vendored_scripts": {
+    "note": "Verbatim copies, each verified with git hash-object. The three that ran the pass are as they stood at 336838a, the commit the host ran. analyse_fretish_grading.py was written at close, is byte-identical to the copy in 2026-09-09-fretish-grading/scripts/, and needs the Python standard library alone.",
+    "scored_the_campaign": {
+      "source_commit": "336838aaf8d9b8b8b4734b51d96de022c82f8030",
+      "campaign.py": "b226e350f642d4a62fad3901b4096d38b270210d",
+      "score_campaign.py": "575876589a239684896e7dbed54f4e01aa61a408",
+      "score_curves.py": "1b3ce696cb6f810ca86233b0f08c14bff64e0683"
+    },
+    "analysed_it": {
+      "source_commit": null,
+      "analyse_fretish_grading.py": "55e8a0e6a0afe366d8e54dd6cb47736df66e9bdd"
+    }
+  },
+  "config_vintage": "Not applicable. A score pass reads no config, and the scorer's C++ tree equals 5c94d66's, which is also main's at close over src, include, schemas, example-config.toml and scripts.",
+  "owed": [
+    "A cost figure for the running-antichain walk against this pass, over these same 600 run directories, once that walk is on main. The directories are small enough that the comparison costs under two worker-hours."
+  ],
+  "files": {
+    "curves-gradsel-fret-m.csv": "Merged curves, 98,809 rows over 600 runs, the source for every curve figure here. Untracked.",
+    "curves-gradsel-fret-m/av2/": "600 per-run CSVs with score-manifest-avlab12.json, timings.txt, failures.txt (empty) and warnings.log. Untracked.",
+    "campaign.toml": "The declaration the host read, with the probe figures behind the budgets.",
+    "REPORT.md": "The write-up, closed 2026-09-14.",
+    "scripts/": "The four vendored scripts, with blob shas above.",
+    "analysis-output.txt": "The output of python3 scripts/analyse_fretish_grading.py experiments at close, shared with 2026-09-09-fretish-grading. Untracked."
+  },
+  "reproduce": "With 2026-09-09-fretish-grading's results-gradsel-fret-m/ in place, check out 336838a, build the release preset, and run this directory's scripts/score_curves.py over each run directory with the invocation under maximality_pass, or let scripts/score_campaign.py drive it as campaign.toml declares. Merge the per-run CSVs with campaign.py collect --curves. The figures come from python3 scripts/analyse_fretish_grading.py experiments, run from the repository root.",
+  "closed_on": "2026-09-14"
+}
