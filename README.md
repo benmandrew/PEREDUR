@@ -27,7 +27,7 @@ Done in 4.12s
 
 That writes the 3 maximal repairs to `out/`, each `repair_N.tlsf` paired with a `repair_N.fitness.json` holding its score. Expect a few seconds on 20 threads; the seed fixes the repairs, not the runtime, which swings with how the external solvers get scheduled.
 
-The [container image](docs/docker.md) is the alternative to `nix develop`: it carries the binaries, the solvers and these examples, so `docker run --rm counter:<tag> realize /opt/counter/share/counter/examples/lily02/spec.tlsf` needs no toolchain on the host.
+The [container image](docs/docker.md) is the alternative to `nix develop`: it carries the binaries, the solvers and these examples, so `docker run --rm benmandrew/peredur:latest realize /opt/counter/share/counter/examples/lily02/spec.tlsf` needs no toolchain on the host.
 
 The example is a grant arbiter that must answer every request within three ticks, never grant twice in a row, and withhold grants after a `cancel` until a `go` arrives. Nothing forces `go` to ever arrive, so a cancelled request can be neither granted nor refused — and the specification cannot be implemented. All three repairs rewrite that third guarantee, which is also the one `mucs` identifies as the minimal unrealisable core. The [TLSF guide](https://benmandrew.com/docs/counter/tlsf.html) walks through this run in full.
 

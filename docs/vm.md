@@ -4,12 +4,12 @@ A VirtualBox *appliance* can be built from the counter Docker image, for a user 
 
 ## Building the appliance
 
-The image has to exist locally first. Publishing to Docker Hub is not live yet, so the path is a local build as described in [Building the image](docker.md#building-the-image), tagged with the short commit sha:
+The image has to exist locally first. `docker pull benmandrew/peredur:<sha>` fetches a published one, and a local build as described in [Building the image](docker.md#building-the-image) works the same way when tagged with the short commit sha:
 
 ```console
 $ docker build --build-arg COUNTER_GIT_COMMIT="$(git rev-parse HEAD)" \
-      -t counter:$(git rev-parse --short HEAD) .
-$ scripts/build_vm_image.sh counter:$(git rev-parse --short HEAD)
+      -t benmandrew/peredur:$(git rev-parse --short HEAD) .
+$ scripts/build_vm_image.sh benmandrew/peredur:$(git rev-parse --short HEAD)
 ```
 
 The script takes the image as its first argument and an output directory as an optional second, defaulting to `build-vm/`. That directory is gitignored with the rest of the build trees. The script writes `counter.vdi` there, the VirtualBox Disk Image (VDI), and `counter.ova`, the appliance packaged as an Open Virtualization Format (OVF) archive.
@@ -45,7 +45,7 @@ The disk is *dynamically allocated*, so `VM_DISK_SIZE` is a ceiling rather than 
 
 ```console
 $ UBUNTU_MIRROR=http://mirrors.ukfast.co.uk/sites/archive.ubuntu.com \
-      scripts/build_vm_image.sh counter:$(git rev-parse --short HEAD)
+      scripts/build_vm_image.sh benmandrew/peredur:$(git rev-parse --short HEAD)
 ```
 
 The knob exists because of one build machine's network. On 2026-09-11 Canonical's archive served a small file to that machine at 13 KB/s and then timed out, and `security.ubuntu.com` timed out at 30 s. d2vm's kernel install sat in apt for 36 minutes without finishing. From the same machine, `http://mirrors.ukfast.co.uk/sites/archive.ubuntu.com` served 1.8 MB at 12 MB/s.

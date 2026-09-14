@@ -4,10 +4,10 @@ The image carries the eight counter binaries, the solvers they spawn, the dashbo
 
 ## Running a command
 
-An entrypoint dispatches the first argument over the installed binaries, so an invocation reads like the command table in [`README.md`](../README.md):
+The image is published on Docker Hub as `benmandrew/peredur`, tagged with each commit's short sha, with `latest` for `main` and a `v*` tag under its own name; a local build carries whatever tag it was given. An entrypoint dispatches the first argument over the installed binaries, so an invocation reads like the command table in [`README.md`](../README.md):
 
 ```console
-$ docker run --rm -v "$PWD:/work" counter:<tag> realize spec.tlsf
+$ docker run --rm -v "$PWD:/work" benmandrew/peredur:<tag> realize spec.tlsf
 UNREALIZABLE
 ```
 
@@ -19,7 +19,7 @@ A full repair run. `counter` requires its output directory to exist already, as 
 $ mkdir -p out
 $ docker run --rm --init --cpus=8 --memory=8g \
       --user "$(id -u):$(id -g)" -v "$PWD:/work" \
-      counter:<tag> counter --input examples/lily02/spec.tlsf --output-dir out --seed 42
+      benmandrew/peredur:<tag> counter --input examples/lily02/spec.tlsf --output-dir out --seed 42
 ```
 
 Three of those flags earn their place.
@@ -39,7 +39,7 @@ Everything counter writes is relative to the working directory: the repairs and 
 The image installs `examples/` at `/opt/counter/share/counter/examples`, so it demonstrates a repair with no files supplied at all. `$COUNTER_EXAMPLES` names that directory inside the container, which means a command using it has to be quoted and re-entered by a shell there (`sh -c 'realize $COUNTER_EXAMPLES/lily02/spec.tlsf'`); the path is written out in full below.
 
 ```console
-$ docker run --rm counter:<tag> realize /opt/counter/share/counter/examples/lily02/spec.tlsf
+$ docker run --rm benmandrew/peredur:<tag> realize /opt/counter/share/counter/examples/lily02/spec.tlsf
 UNREALIZABLE
 ```
 
@@ -53,7 +53,7 @@ The dashboard needs three things together: `--dashboard` on the command, a publi
 
 ```console
 $ docker build --build-arg COUNTER_GIT_COMMIT="$(git rev-parse HEAD)" \
-      -t counter:$(git rev-parse --short HEAD) .
+      -t benmandrew/peredur:$(git rev-parse --short HEAD) .
 ```
 
 It is required rather than optional because the build cannot answer the question itself. `.dockerignore` keeps `.git` out of the *build context*, so the history never lands in a layer and the context hash stops changing on every commit. That leaves no repository for `cmake/version.cmake` to read, and every binary answers `--version` with a `commit=` line naming what it was built from. Without the argument that line reads `commit=unknown`, and `scripts/run_experiments.py` refuses to launch a campaign against a binary that cannot say what it was built from.
@@ -92,11 +92,11 @@ The two architectures genuinely differ in one place. Upstream publishes exactly 
 Pulling a tagged image needs no architecture flag, Docker resolving the manifest list to the puller's own:
 
 ```console
-$ docker pull benmandrew/counter:latest
-$ docker buildx imagetools inspect benmandrew/counter:latest
+$ docker pull benmandrew/peredur:latest
+$ docker buildx imagetools inspect benmandrew/peredur:latest
 ```
 
-The second command lists both entries of the list, with the platform each was built for. `benmandrew/counter` is the name the workflow publishes under; the registry credentials it pushes with are not configured yet, so that is a description of the workflow rather than of what sits on Docker Hub today.
+The second command lists both entries of the list, with the platform each was built for. The workflow publishes to `benmandrew/peredur` on Docker Hub. Images published before 2026-09-14 sit under `benmandrew/counter`, the repository's earlier name, because Docker Hub cannot rename a repository.
 
 ## Layer structure
 
@@ -120,6 +120,6 @@ They are left unstripped even so. A release build still emits a symbol table, an
 
 Only three of Spot's sixteen binaries are ever spawned — `ltlsynt`, `ltl2tgba` and `ltlfilt` — so [`cmake/install.cmake`](../cmake/install.cmake) names those three one at a time and the other thirteen never reach the runtime stage. The static archives are excluded on the same argument, nothing in the image linking against anything, and `libspot.a` is far larger than the shared library a run actually loads.
 
-No figure for the built image is written down here, because a Spot or Ganak version bump moves it and nothing in the repository re-checks it. `docker images counter:<tag>` reports the size of whatever was built, on the version pins in force at the time.
+No figure for the built image is written down here, because a Spot or Ganak version bump moves it and nothing in the repository re-checks it. `docker images benmandrew/peredur:<tag>` reports the size of whatever was built, on the version pins in force at the time.
 
 The stripping and the per-tool selection both fall out of one observation: what the image needs at run time is a handful of executables and two shared libraries, and everything else in a Spot install tree is there to build against. Packaging is mostly the work of deciding what to leave behind.

@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY_IMAGE: benmandrew/counter
+  REGISTRY_IMAGE: benmandrew/peredur
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
