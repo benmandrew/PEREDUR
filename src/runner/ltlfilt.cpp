@@ -61,7 +61,7 @@ struct OneShotSimplify {
 // and leaves the formula unsimplified.
 OneShotSimplify one_shot_simplify(const std::string& binary,
                                   const std::string& formula) {
-    COUNTER_PROFILE_SCOPE("ltlfilt/one-shot-exec");
+    PEREDUR_PROFILE_SCOPE("ltlfilt/one-shot-exec");
     const ProcessResult result = execute_and_capture(
         {binary, "--simplify", "-f", formula}, ltlfilt_timeout());
     OneShotSimplify out{formula, result.m_cpu_s, result.m_timed_out};
@@ -83,7 +83,7 @@ void set_ltlfilt_timeout(std::chrono::milliseconds timeout) {
 std::string ltlfilt_path() { return spot_bin_dir() + "/ltlfilt"; }
 
 std::string simplify_ltl(const std::string& formula) {
-    COUNTER_PROFILE_SCOPE("ltlfilt/simplify_ltl");
+    PEREDUR_PROFILE_SCOPE("ltlfilt/simplify_ltl");
     // Keyed on the canonical form rather than on the caller's spelling, so
     // that operand order and association -- which vary freely in what the
     // search builds and change nothing about the answer -- stop buying an
@@ -99,7 +99,7 @@ std::string simplify_ltl(const std::string& formula) {
     static std::unordered_map<std::string, std::string> answers;
     const std::string& key = formula_key::canonical(formula);
     {
-        COUNTER_PROFILE_SCOPE("ltlfilt/simplify_ltl:cache-lookup");
+        PEREDUR_PROFILE_SCOPE("ltlfilt/simplify_ltl:cache-lookup");
         std::scoped_lock lock(g_ltlfilt_mutex);
         const auto found = answers.find(key);
         if (found != answers.end()) {
@@ -155,7 +155,7 @@ bool has_weak_operator(const std::string& formula) {
 }
 
 std::optional<std::string> rewrite_weak_operators(const std::string& formula) {
-    COUNTER_PROFILE_SCOPE("ltlfilt/rewrite_weak_operators");
+    PEREDUR_PROFILE_SCOPE("ltlfilt/rewrite_weak_operators");
     static std::unordered_map<std::string, std::optional<std::string>> cache;
     // The canonical key, for the reason simplify_ltl gives: this value is a
     // formula, so it must come back over the caller's own atom names.
@@ -213,7 +213,7 @@ std::optional<std::string> rewrite_weak_operators(const std::string& formula) {
 
 std::optional<bool> spot_satisfiable(const std::string& formula,
                                      std::chrono::milliseconds timeout) {
-    COUNTER_PROFILE_SCOPE("ltlfilt/spot_satisfiable");
+    PEREDUR_PROFILE_SCOPE("ltlfilt/spot_satisfiable");
     const std::string binary = ltlfilt_path();
     if (access(binary.c_str(), F_OK) != 0) {
         return std::nullopt;

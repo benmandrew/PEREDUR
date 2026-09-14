@@ -1,18 +1,18 @@
 # Virtual machine
 
-A VirtualBox *appliance* can be built from the counter Docker image, for a user who wants a virtual machine (VM) rather than a container. It boots the same `/opt/counter` tree the image carries, with the same binaries, solvers and bundled examples. On top of that it adds what a machine someone logs into needs: a kernel, systemd and a Secure Shell (SSH) server. The container itself is covered in [`docker.md`](docker.md), and everything below starts from an image built there.
+A VirtualBox *appliance* can be built from the PEREDUR Docker image, for a user who wants a virtual machine (VM) rather than a container. It boots the same `/opt/peredur` tree the image carries, with the same binaries, solvers and bundled examples. On top of that it adds what a machine someone logs into needs: a kernel, systemd and a Secure Shell (SSH) server. The container itself is covered in [`docker.md`](docker.md), and everything below starts from an image built there.
 
 ## Building the appliance
 
 The image has to exist locally first. `docker pull benmandrew/peredur:<sha>` fetches a published one, and a local build as described in [Building the image](docker.md#building-the-image) works the same way when tagged with the short commit sha:
 
 ```console
-$ docker build --build-arg COUNTER_GIT_COMMIT="$(git rev-parse HEAD)" \
+$ docker build --build-arg PEREDUR_GIT_COMMIT="$(git rev-parse HEAD)" \
       -t benmandrew/peredur:$(git rev-parse --short HEAD) .
 $ scripts/build_vm_image.sh benmandrew/peredur:$(git rev-parse --short HEAD)
 ```
 
-The script takes the image as its first argument and an output directory as an optional second, defaulting to `build-vm/`. That directory is gitignored with the rest of the build trees. The script writes `counter.vdi` there, the VirtualBox Disk Image (VDI), and `counter.ova`, the appliance packaged as an Open Virtualization Format (OVF) archive.
+The script takes the image as its first argument and an output directory as an optional second, defaulting to `build-vm/`. That directory is gitignored with the rest of the build trees. The script writes `peredur.vdi` there, the VirtualBox Disk Image (VDI), and `peredur.ova`, the appliance packaged as an Open Virtualization Format (OVF) archive.
 
 The build host needs Docker and VirtualBox's `VBoxManage` on `PATH`. It builds for amd64 only. Whoever imports the resulting `.ova` needs VirtualBox alone.
 
@@ -22,7 +22,7 @@ The pipeline has three steps, and the script runs them in order.
 
 **Layering.** [`docker/vm/Dockerfile`](../docker/vm/Dockerfile) builds a layer over the runtime image. It installs `openssh-server`, `sudo`, `less`, `nano` and `libpam-systemd`, sets up the login, and writes the image's environment out to a file. It also stops sshd accepting a client's locale variables and sets `RESUME=none` for initramfs-tools. [Inside the VM](#inside-the-vm) covers what each of those is for.
 
-**Conversion.** [d2vm](https://github.com/linka-cloud/d2vm) converts that image into a bootable disk. It adds a kernel (`linux-image-virtual`), systemd, the syslinux bootloader for a basic input/output system (BIOS), and netplan networking configured by the Dynamic Host Configuration Protocol (DHCP). It runs as a container rather than an installed tool, with `--privileged` and the host's Docker socket mounted in. The socket lets it drive the host's daemon, and the privilege gives it the *loop devices* it partitions the disk through. It writes as root, so the script hands the disk back to the invoking user afterwards. The script also passes d2vm `--add-host counter:127.0.1.1`, because Docker replaces the image's `/etc/hosts` with its own and a hosts entry written in the Dockerfile does not survive. Without it `sudo` printed "unable to resolve host counter".
+**Conversion.** [d2vm](https://github.com/linka-cloud/d2vm) converts that image into a bootable disk. It adds a kernel (`linux-image-virtual`), systemd, the syslinux bootloader for a basic input/output system (BIOS), and netplan networking configured by the Dynamic Host Configuration Protocol (DHCP). It runs as a container rather than an installed tool, with `--privileged` and the host's Docker socket mounted in. The socket lets it drive the host's daemon, and the privilege gives it the *loop devices* it partitions the disk through. It writes as root, so the script hands the disk back to the invoking user afterwards. The script also passes d2vm `--add-host peredur:127.0.1.1`, because Docker replaces the image's `/etc/hosts` with its own and a hosts entry written in the Dockerfile does not survive. Without it `sudo` printed "unable to resolve host peredur".
 
 **Packaging.** `VBoxManage` registers a throwaway VM around the disk and exports it as the appliance. The appliance gets 8192 MB of memory, 4 central processing units (CPUs) and BIOS firmware. Its disk hangs off a Serial AT Attachment (SATA) controller in Advanced Host Controller Interface (AHCI) mode. Its one network adapter uses network address translation (NAT), with a *port forward* from 127.0.0.1:2222 on the host to port 22 in the guest. The registration is removed when the script exits, whether or not the export succeeded.
 
@@ -55,25 +55,25 @@ The knob exists because of one build machine's network. On 2026-09-11 Canonical'
 VirtualBox imports the `.ova` through File → Import Appliance, or from the command line:
 
 ```console
-$ VBoxManage import build-vm/counter.ova
+$ VBoxManage import build-vm/peredur.ova
 ```
 
 Memory and CPU count can be changed in the VM's settings before starting it. That resizes one VM without rebuilding the appliance under different `VM_MEMORY_MB` or `VM_CPUS` values.
 
 ## Inside the VM
 
-The user is `counter`, password `counter`, in the `sudo` group with bash as its shell. The console on tty1 logs in automatically, and `/etc/motd` prints example commands at login. `passwd` changes the password. `libpam-systemd` registers each login as a `systemd-logind` session.
+The user is `peredur`, password `peredur`, in the `sudo` group with bash as its shell. The console on tty1 logs in automatically, and `/etc/motd` prints example commands at login. `passwd` changes the password. `libpam-systemd` registers each login as a `systemd-logind` session.
 
 sshd ignores the client's `LANG` and `LC_*` variables. The guest has no locales generated beyond C.UTF-8, so a client's `en_GB.UTF-8` made every command warn "cannot change locale". `RESUME=none` fixes a boot delay: initramfs-tools recorded the swap of d2vm's build host as the resume device, and the guest waited 30 s at every boot for it. With the setting, boot takes 2.9 s by `systemd-analyze`.
 
-The binaries are on `PATH` and the `COUNTER_*` variables are set. Image `ENV` is container configuration rather than a file, so it does not survive the conversion to a disk. The layering step therefore writes it into `/etc/environment`, which `pam_env` reads for console and SSH sessions alike. That includes a non-interactive `ssh ... counter --version`, which a login-shell profile script would miss.
+The binaries are on `PATH` and the `PEREDUR_*` variables are set. Image `ENV` is container configuration rather than a file, so it does not survive the conversion to a disk. The layering step therefore writes it into `/etc/environment`, which `pam_env` reads for console and SSH sessions alike. That includes a non-interactive `ssh ... peredur --version`, which a login-shell profile script would miss.
 
-In the VM `$COUNTER_EXAMPLES` works directly, unlike the container, where a command using it has to be re-entered through `sh -c`. `counter` still requires its `--output-dir` to exist:
+In the VM `$PEREDUR_EXAMPLES` works directly, unlike the container, where a command using it has to be re-entered through `sh -c`. `peredur` still requires its `--output-dir` to exist:
 
 ```console
-$ realize $COUNTER_EXAMPLES/lily02/spec.tlsf
+$ realize $PEREDUR_EXAMPLES/lily02/spec.tlsf
 UNREALIZABLE
-$ mkdir -p out && counter --input $COUNTER_EXAMPLES/lily02/spec.tlsf --output-dir out --seed 42
+$ mkdir -p out && peredur --input $PEREDUR_EXAMPLES/lily02/spec.tlsf --output-dir out --seed 42
 ```
 
 ## Getting output out
@@ -81,8 +81,8 @@ $ mkdir -p out && counter --input $COUNTER_EXAMPLES/lily02/spec.tlsf --output-di
 SSH is how output leaves the VM, over the forwarded port:
 
 ```console
-$ ssh -p 2222 counter@127.0.0.1
-$ scp -P 2222 -r counter@127.0.0.1:out .
+$ ssh -p 2222 peredur@127.0.0.1
+$ scp -P 2222 -r peredur@127.0.0.1:out .
 ```
 
 The container gets the same result from a bind mount. The VM's equivalent would be VirtualBox *shared folders*, which need *guest additions*, and those build a kernel module inside the guest. An SSH server is one package.
@@ -97,9 +97,9 @@ The disk was tested on 2026-09-11. It was booted under QEMU (Quick Emulator) wit
 
 - SSH answered 5 s after power-on.
 - The tty1 autologin was active.
-- `/etc/environment` supplied `PATH` and the `COUNTER_*` variables to a non-interactive `ssh` command.
-- `counter --version` ran, and `realize $COUNTER_EXAMPLES/lily02/spec.tlsf` printed `UNREALIZABLE`.
-- A two-generation `counter` run wrote `run.json`, and `scp` copied it out.
+- `/etc/environment` supplied `PATH` and the `PEREDUR_*` variables to a non-interactive `ssh` command.
+- `peredur --version` ran, and `realize $PEREDUR_EXAMPLES/lily02/spec.tlsf` printed `UNREALIZABLE`.
+- A two-generation `peredur` run wrote `run.json`, and `scp` copied it out.
 - `sudo` worked.
 - The SSH host keys and `/etc/machine-id` were generated at first boot.
 - The apt sources named the mirror.

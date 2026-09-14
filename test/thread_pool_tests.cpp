@@ -4,7 +4,7 @@
 //
 // global_thread_pool() is a function-local static, built on first use and never
 // resized, so whichever of those a process exercises it can only exercise once.
-// That is why the suite branches on COUNTER_TEST_POOL_SIZE rather than testing
+// That is why the suite branches on PEREDUR_TEST_POOL_SIZE rather than testing
 // both in sequence, and why CMake registers it twice -- one process per case --
 // the same shape as the profile suite's two registrations.
 
@@ -31,7 +31,7 @@ namespace {
 // Returns 0 when the variable is unset or does not parse as a positive count,
 // which is the "no size was requested" case rather than a request for zero.
 std::size_t requested_pool_size() {
-    const char* const value = std::getenv("COUNTER_TEST_POOL_SIZE");
+    const char* const value = std::getenv("PEREDUR_TEST_POOL_SIZE");
     if (value == nullptr) {
         return 0;
     }

@@ -1,6 +1,6 @@
 # Docker
 
-The image carries the eight counter binaries, the solvers they spawn, the dashboard page and the bundled examples under `/opt/counter`. It runs as a non-root user with `/work` as its working directory, and it is built from the repository root with the commit it was built from passed in as a build argument. Nothing about the algorithm changes inside it; the container is a way of getting Spot, black and Ganak without building them. [`vm.md`](vm.md) covers a VirtualBox appliance built from this image, for a user who wants a virtual machine rather than a container.
+The image carries the eight PEREDUR binaries, the solvers they spawn, the dashboard page and the bundled examples under `/opt/peredur`. It runs as a non-root user with `/work` as its working directory, and it is built from the repository root with the commit it was built from passed in as a build argument. Nothing about the algorithm changes inside it; the container is a way of getting Spot, black and Ganak without building them. [`vm.md`](vm.md) covers a VirtualBox appliance built from this image, for a user who wants a virtual machine rather than a container.
 
 ## Running a command
 
@@ -11,35 +11,35 @@ $ docker run --rm -v "$PWD:/work" benmandrew/peredur:<tag> realize spec.tlsf
 UNREALIZABLE
 ```
 
-A bare `--help`, or no arguments at all, prints the image's own usage and the command list. An argument beginning with `-` goes to `counter`, so `docker run <image> --input spec.tlsf --output-dir out` works without naming the command twice. Any other argument runs as it stands, which is what makes `bash` reach a shell.
+A bare `--help`, or no arguments at all, prints the image's own usage and the command list. An argument beginning with `-` goes to `peredur`, so `docker run <image> --input spec.tlsf --output-dir out` works without naming the command twice. Any other argument runs as it stands, which is what makes `bash` reach a shell.
 
-A full repair run. `counter` requires its output directory to exist already, as it does outside a container, so create it on the host side of the mount first:
+A full repair run. `peredur` requires its output directory to exist already, as it does outside a container, so create it on the host side of the mount first:
 
 ```console
 $ mkdir -p out
 $ docker run --rm --init --cpus=8 --memory=8g \
       --user "$(id -u):$(id -g)" -v "$PWD:/work" \
-      benmandrew/peredur:<tag> counter --input examples/lily02/spec.tlsf --output-dir out --seed 42
+      benmandrew/peredur:<tag> peredur --input examples/lily02/spec.tlsf --output-dir out --seed 42
 ```
 
 Three of those flags earn their place.
 
-**`--init`.** Untimed `ltl2tgba` calls have leaked orphaned processes over long runs, several gigabytes of them across hours. Inside a container counter is process 1 and inherits every orphan the run produces, and it does not reap them. `--init` puts a real init process at PID 1 instead.
+**`--init`.** Untimed `ltl2tgba` calls have leaked orphaned processes over long runs, several gigabytes of them across hours. Inside a container PEREDUR is process 1 and inherits every orphan the run produces, and it does not reap them. `--init` puts a real init process at PID 1 instead.
 
-**`--memory`.** `ltlfilt` has been measured peaking near 3.4GB and `maximal` has taken 19GB on a maximality sweep. A cap turns a blowup that would otherwise take the machine down into a killed child, which counter's `execute_and_capture` reports as a failed tool call and carries on from.
+**`--memory`.** `ltlfilt` has been measured peaking near 3.4GB and `maximal` has taken 19GB on a maximality sweep. A cap turns a blowup that would otherwise take the machine down into a killed child, which PEREDUR's `execute_and_capture` reports as a failed tool call and carries on from.
 
 **`--cpus`.** The scoring pool sizes itself from the *control group* (cgroup) CPU quota as well as the hardware concurrency, so this flag actually bounds the run rather than being ignored. Without it the pool is sized from the host's online CPU count, whatever the daemon was told.
 
 ## Output and the working directory
 
-Everything counter writes is relative to the working directory: the repairs and `run.json` under `--output-dir`, and the crash handler's `crashes/` directory. The image sets that directory to `/work`. Without a *bind mount* there, the output dies with the container. `--user "$(id -u):$(id -g)"` makes what lands on the mount owned by the invoking user; the default user inside the image is uid 1000, which is what an unqualified mount is most often owned by.
+Everything PEREDUR writes is relative to the working directory: the repairs and `run.json` under `--output-dir`, and the crash handler's `crashes/` directory. The image sets that directory to `/work`. Without a *bind mount* there, the output dies with the container. `--user "$(id -u):$(id -g)"` makes what lands on the mount owned by the invoking user; the default user inside the image is uid 1000, which is what an unqualified mount is most often owned by.
 
 ## The bundled examples
 
-The image installs `examples/` at `/opt/counter/share/counter/examples`, so it demonstrates a repair with no files supplied at all. `$COUNTER_EXAMPLES` names that directory inside the container, which means a command using it has to be quoted and re-entered by a shell there (`sh -c 'realize $COUNTER_EXAMPLES/lily02/spec.tlsf'`); the path is written out in full below.
+The image installs `examples/` at `/opt/peredur/share/peredur/examples`, so it demonstrates a repair with no files supplied at all. `$PEREDUR_EXAMPLES` names that directory inside the container, which means a command using it has to be quoted and re-entered by a shell there (`sh -c 'realize $PEREDUR_EXAMPLES/lily02/spec.tlsf'`); the path is written out in full below.
 
 ```console
-$ docker run --rm benmandrew/peredur:<tag> realize /opt/counter/share/counter/examples/lily02/spec.tlsf
+$ docker run --rm benmandrew/peredur:<tag> realize /opt/peredur/share/peredur/examples/lily02/spec.tlsf
 UNREALIZABLE
 ```
 
@@ -49,22 +49,22 @@ The dashboard needs three things together: `--dashboard` on the command, a publi
 
 ## Building the image
 
-`COUNTER_GIT_COMMIT` is a required build argument and must be a full 40-character lowercase hex sha:
+`PEREDUR_GIT_COMMIT` is a required build argument and must be a full 40-character lowercase hex sha:
 
 ```console
-$ docker build --build-arg COUNTER_GIT_COMMIT="$(git rev-parse HEAD)" \
+$ docker build --build-arg PEREDUR_GIT_COMMIT="$(git rev-parse HEAD)" \
       -t benmandrew/peredur:$(git rev-parse --short HEAD) .
 ```
 
 It is required rather than optional because the build cannot answer the question itself. `.dockerignore` keeps `.git` out of the *build context*, so the history never lands in a layer and the context hash stops changing on every commit. That leaves no repository for `cmake/version.cmake` to read, and every binary answers `--version` with a `commit=` line naming what it was built from. Without the argument that line reads `commit=unknown`, and `scripts/run_experiments.py` refuses to launch a campaign against a binary that cannot say what it was built from.
 
-Two optional companions go with it. `COUNTER_GIT_COMMIT_SHORT` sets the abbreviation, defaulting to the first 7 characters of the sha. `COUNTER_GIT_DIRTY=true` marks a build whose source is not a clean checkout of the commit it names. Both are rejected on their own, a short sha and a dirty flag meaning nothing without the commit they qualify.
+Two optional companions go with it. `PEREDUR_GIT_COMMIT_SHORT` sets the abbreviation, defaulting to the first 7 characters of the sha. `PEREDUR_GIT_DIRTY=true` marks a build whose source is not a clean checkout of the commit it names. Both are rejected on their own, a short sha and a dirty flag meaning nothing without the commit they qualify.
 
 | Build argument | Effect |
 |---|---|
-| `COUNTER_GIT_COMMIT` | required; the full 40-character sha the binaries report |
-| `COUNTER_GIT_COMMIT_SHORT` | the abbreviation, default the first 7 characters |
-| `COUNTER_GIT_DIRTY` | `true` for a source tree that is not a clean checkout |
+| `PEREDUR_GIT_COMMIT` | required; the full 40-character sha the binaries report |
+| `PEREDUR_GIT_COMMIT_SHORT` | the abbreviation, default the first 7 characters |
+| `PEREDUR_GIT_DIRTY` | `true` for a source tree that is not a clean checkout |
 | `BUILD_JOBS` | caps every compile in the build; unset means one job per core |
 | `WITH_NODE` | `1` adds Node.js to the runtime image; the default `0` leaves it out |
 | `BASE_IMAGE` | default `ubuntu:24.04` |
@@ -114,7 +114,7 @@ Spot's autotools build dominates the other three by orders of magnitude. They ru
 
 Almost all of the fetched tools' weight is *debug information*, and the builder strips it out of the install tree. That is the single largest reduction the image gets, and it holds for any version of Spot, black or Ganak, the debug tables scaling with the code they describe rather than with a release number.
 
-The `release` preset has nothing to do with it. `CMAKE_BUILD_TYPE` governs what CMake compiles, and CMake compiles only counter; Spot's own `configure` chooses its flags and they include `-g`, and Ganak arrives as an unstripped upstream release binary. counter's binaries carry no debug information at all, having been built without `-g`.
+The `release` preset has nothing to do with it. `CMAKE_BUILD_TYPE` governs what CMake compiles, and CMake compiles only PEREDUR; Spot's own `configure` chooses its flags and they include `-g`, and Ganak arrives as an unstripped upstream release binary. PEREDUR's binaries carry no debug information at all, having been built without `-g`.
 
 They are left unstripped even so. A release build still emits a symbol table, and cpptrace resolves the crash handler's frames through it, so stripping `bin/` would trade a small saving for crash reports that are addresses and nothing else — in the one environment where re-running under a debugger is hardest. The strip step therefore covers `libexec/`, where the tools are, and stops there.
 

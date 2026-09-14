@@ -1,4 +1,4 @@
-add_executable(counter_tests
+add_executable(peredur_tests
     runner/black_tests.cpp
     runner/formaliser_tests.cpp
     runner/ganak_tests.cpp
@@ -55,103 +55,103 @@ add_executable(counter_tests
 # src/ as well as test/, so suites can reach the private headers next to the
 # implementation they cover (driver_support.hpp and the like). Those are
 # deliberately not in include/, which is the published API surface.
-target_include_directories(counter_tests PRIVATE
+target_include_directories(peredur_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(counter_tests PRIVATE counter_fitness)
+target_link_libraries(peredur_tests PRIVATE peredur_fitness)
 
 # The end-to-end suites spawn the drivers rather than calling into the library,
 # so the binaries have to exist before ctest runs and the suite has to know
 # where they landed. Every driver is built into the same directory, so one
 # generator expression covers all of them.
-add_dependencies(counter_tests
-    counter compare lint-ideals ltl maximal mucs realize signal_tracer)
-target_compile_definitions(counter_tests PRIVATE
-    COUNTER_DRIVER_DIR="$<TARGET_FILE_DIR:counter>")
+add_dependencies(peredur_tests
+    peredur compare lint-ideals ltl maximal mucs realize signal_tracer)
+target_compile_definitions(peredur_tests PRIVATE
+    PEREDUR_DRIVER_DIR="$<TARGET_FILE_DIR:peredur>")
 
 if(MSVC)
-    target_compile_options(counter_tests PRIVATE /W4 /permissive-)
+    target_compile_options(peredur_tests PRIVATE /W4 /permissive-)
 else()
-    target_compile_options(counter_tests PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(peredur_tests PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-add_test(NAME counter_tests.profile COMMAND counter_tests profile)
+add_test(NAME peredur_tests.profile COMMAND peredur_tests profile)
 # Again with the profiler switched on. The suite branches on
 # profile::enabled(), so registering it only once means every assertion about
 # actually recording anything is skipped -- the suite would pass by testing that
 # a disabled profiler does nothing, which is the half that cannot regress.
-add_test(NAME counter_tests.profile_enabled COMMAND counter_tests profile)
-set_tests_properties(counter_tests.profile_enabled PROPERTIES
-    ENVIRONMENT "COUNTER_PROFILE=1")
-add_test(NAME counter_tests.thread_pool_default COMMAND counter_tests thread_pool)
+add_test(NAME peredur_tests.profile_enabled COMMAND peredur_tests profile)
+set_tests_properties(peredur_tests.profile_enabled PROPERTIES
+    ENVIRONMENT "PEREDUR_PROFILE=1")
+add_test(NAME peredur_tests.thread_pool_default COMMAND peredur_tests thread_pool)
 # And again with a size requested. The global pool is built once per process and
 # never resized, so the default and the requested width cannot both be observed
 # in one run -- each case needs a process of its own, which is what two
 # registrations buy. For the same reason the suite is not in the no-argument
 # run-everything path in main.cpp.
-add_test(NAME counter_tests.thread_pool_sized COMMAND counter_tests thread_pool)
-set_tests_properties(counter_tests.thread_pool_sized PROPERTIES
-    ENVIRONMENT "COUNTER_TEST_POOL_SIZE=3")
-add_test(NAME counter_tests.transfer_matrix COMMAND counter_tests transfer_matrix)
-add_test(NAME counter_tests.black_runner COMMAND counter_tests black_runner)
-add_test(NAME counter_tests.formaliser_runner COMMAND counter_tests formaliser_runner)
-add_test(NAME counter_tests.ganak_runner COMMAND counter_tests ganak_runner)
-add_test(NAME counter_tests.ltlfilt_runner COMMAND counter_tests ltlfilt_runner)
-add_test(NAME counter_tests.process_runner COMMAND counter_tests process_runner)
-add_test(NAME counter_tests.spot_runner COMMAND counter_tests spot_runner)
-add_test(NAME counter_tests.accumulator COMMAND counter_tests accumulator)
-add_test(NAME counter_tests.crossover COMMAND counter_tests crossover)
-add_test(NAME counter_tests.generation COMMAND counter_tests generation)
-add_test(NAME counter_tests.determinism COMMAND counter_tests determinism)
-add_test(NAME counter_tests.pipeline COMMAND counter_tests pipeline)
-add_test(NAME counter_tests.termination COMMAND counter_tests termination)
-add_test(NAME counter_tests.nsga2 COMMAND counter_tests nsga2)
-add_test(NAME counter_tests.mutation COMMAND counter_tests mutation)
-add_test(NAME counter_tests.fretish_monotone COMMAND counter_tests fretish_monotone)
-add_test(NAME counter_tests.prop_formula_ast COMMAND counter_tests prop_formula_ast)
-add_test(NAME counter_tests.prop_formula_canonical COMMAND counter_tests prop_formula_canonical)
-add_test(NAME counter_tests.prop_formula_cnf COMMAND counter_tests prop_formula_cnf)
-add_test(NAME counter_tests.prop_formula_rewrite COMMAND counter_tests prop_formula_rewrite)
-add_test(NAME counter_tests.prop_formula_similarity COMMAND counter_tests prop_formula_similarity)
-add_test(NAME counter_tests.prop_formula_temporal COMMAND counter_tests prop_formula_temporal)
-add_test(NAME counter_tests.fingerprint_lasso COMMAND counter_tests fingerprint_lasso)
-add_test(NAME counter_tests.semantic_similarity COMMAND counter_tests semantic_similarity)
-add_test(NAME counter_tests.syntactic_similarity COMMAND counter_tests syntactic_similarity)
-add_test(NAME counter_tests.fitness_function COMMAND counter_tests fitness_function)
-add_test(NAME counter_tests.status COMMAND counter_tests status)
-add_test(NAME counter_tests.correctness COMMAND counter_tests correctness)
-add_test(NAME counter_tests.implication_filter COMMAND counter_tests implication_filter)
-add_test(NAME counter_tests.vacuity_filter COMMAND counter_tests vacuity_filter)
-add_test(NAME counter_tests.well_separation_filter COMMAND counter_tests well_separation_filter)
-add_test(NAME counter_tests.requirement COMMAND counter_tests requirement)
-add_test(NAME counter_tests.scope COMMAND counter_tests scope)
-add_test(NAME counter_tests.serialisation COMMAND counter_tests serialisation)
-add_test(NAME counter_tests.config_io COMMAND counter_tests config_io)
-add_test(NAME counter_tests.dashboard COMMAND counter_tests dashboard)
-add_test(NAME counter_tests.driver_support COMMAND counter_tests driver_support)
-add_test(NAME counter_tests.tlsf_parser COMMAND counter_tests tlsf_parser)
-add_test(NAME counter_tests.tlsf_writer COMMAND counter_tests tlsf_writer)
-add_test(NAME counter_tests.tlsf_filter COMMAND counter_tests tlsf_filter)
-add_test(NAME counter_tests.tlsf_fitness COMMAND counter_tests tlsf_fitness)
-add_test(NAME counter_tests.tlsf_mucs COMMAND counter_tests tlsf_mucs)
-add_test(NAME counter_tests.tlsf_genetic COMMAND counter_tests tlsf_genetic)
-add_test(NAME counter_tests.tlsf_monotone COMMAND counter_tests tlsf_monotone)
-add_test(NAME counter_tests.tlsf_assumption COMMAND counter_tests tlsf_assumption)
-add_test(NAME counter_tests.tlsf_pipeline COMMAND counter_tests tlsf_pipeline)
+add_test(NAME peredur_tests.thread_pool_sized COMMAND peredur_tests thread_pool)
+set_tests_properties(peredur_tests.thread_pool_sized PROPERTIES
+    ENVIRONMENT "PEREDUR_TEST_POOL_SIZE=3")
+add_test(NAME peredur_tests.transfer_matrix COMMAND peredur_tests transfer_matrix)
+add_test(NAME peredur_tests.black_runner COMMAND peredur_tests black_runner)
+add_test(NAME peredur_tests.formaliser_runner COMMAND peredur_tests formaliser_runner)
+add_test(NAME peredur_tests.ganak_runner COMMAND peredur_tests ganak_runner)
+add_test(NAME peredur_tests.ltlfilt_runner COMMAND peredur_tests ltlfilt_runner)
+add_test(NAME peredur_tests.process_runner COMMAND peredur_tests process_runner)
+add_test(NAME peredur_tests.spot_runner COMMAND peredur_tests spot_runner)
+add_test(NAME peredur_tests.accumulator COMMAND peredur_tests accumulator)
+add_test(NAME peredur_tests.crossover COMMAND peredur_tests crossover)
+add_test(NAME peredur_tests.generation COMMAND peredur_tests generation)
+add_test(NAME peredur_tests.determinism COMMAND peredur_tests determinism)
+add_test(NAME peredur_tests.pipeline COMMAND peredur_tests pipeline)
+add_test(NAME peredur_tests.termination COMMAND peredur_tests termination)
+add_test(NAME peredur_tests.nsga2 COMMAND peredur_tests nsga2)
+add_test(NAME peredur_tests.mutation COMMAND peredur_tests mutation)
+add_test(NAME peredur_tests.fretish_monotone COMMAND peredur_tests fretish_monotone)
+add_test(NAME peredur_tests.prop_formula_ast COMMAND peredur_tests prop_formula_ast)
+add_test(NAME peredur_tests.prop_formula_canonical COMMAND peredur_tests prop_formula_canonical)
+add_test(NAME peredur_tests.prop_formula_cnf COMMAND peredur_tests prop_formula_cnf)
+add_test(NAME peredur_tests.prop_formula_rewrite COMMAND peredur_tests prop_formula_rewrite)
+add_test(NAME peredur_tests.prop_formula_similarity COMMAND peredur_tests prop_formula_similarity)
+add_test(NAME peredur_tests.prop_formula_temporal COMMAND peredur_tests prop_formula_temporal)
+add_test(NAME peredur_tests.fingerprint_lasso COMMAND peredur_tests fingerprint_lasso)
+add_test(NAME peredur_tests.semantic_similarity COMMAND peredur_tests semantic_similarity)
+add_test(NAME peredur_tests.syntactic_similarity COMMAND peredur_tests syntactic_similarity)
+add_test(NAME peredur_tests.fitness_function COMMAND peredur_tests fitness_function)
+add_test(NAME peredur_tests.status COMMAND peredur_tests status)
+add_test(NAME peredur_tests.correctness COMMAND peredur_tests correctness)
+add_test(NAME peredur_tests.implication_filter COMMAND peredur_tests implication_filter)
+add_test(NAME peredur_tests.vacuity_filter COMMAND peredur_tests vacuity_filter)
+add_test(NAME peredur_tests.well_separation_filter COMMAND peredur_tests well_separation_filter)
+add_test(NAME peredur_tests.requirement COMMAND peredur_tests requirement)
+add_test(NAME peredur_tests.scope COMMAND peredur_tests scope)
+add_test(NAME peredur_tests.serialisation COMMAND peredur_tests serialisation)
+add_test(NAME peredur_tests.config_io COMMAND peredur_tests config_io)
+add_test(NAME peredur_tests.dashboard COMMAND peredur_tests dashboard)
+add_test(NAME peredur_tests.driver_support COMMAND peredur_tests driver_support)
+add_test(NAME peredur_tests.tlsf_parser COMMAND peredur_tests tlsf_parser)
+add_test(NAME peredur_tests.tlsf_writer COMMAND peredur_tests tlsf_writer)
+add_test(NAME peredur_tests.tlsf_filter COMMAND peredur_tests tlsf_filter)
+add_test(NAME peredur_tests.tlsf_fitness COMMAND peredur_tests tlsf_fitness)
+add_test(NAME peredur_tests.tlsf_mucs COMMAND peredur_tests tlsf_mucs)
+add_test(NAME peredur_tests.tlsf_genetic COMMAND peredur_tests tlsf_genetic)
+add_test(NAME peredur_tests.tlsf_monotone COMMAND peredur_tests tlsf_monotone)
+add_test(NAME peredur_tests.tlsf_assumption COMMAND peredur_tests tlsf_assumption)
+add_test(NAME peredur_tests.tlsf_pipeline COMMAND peredur_tests tlsf_pipeline)
 
 # One end-to-end entry per built driver, each running the binary the way a user
 # would. They are registered separately so a failure names the driver rather
 # than a suite covering eight of them.
-add_test(NAME counter_tests.driver_counter COMMAND counter_tests driver_counter)
-add_test(NAME counter_tests.driver_realize COMMAND counter_tests driver_realize)
-add_test(NAME counter_tests.driver_ltl COMMAND counter_tests driver_ltl)
-add_test(NAME counter_tests.driver_mucs COMMAND counter_tests driver_mucs)
-add_test(NAME counter_tests.driver_compare COMMAND counter_tests driver_compare)
-add_test(NAME counter_tests.driver_maximal COMMAND counter_tests driver_maximal)
-add_test(NAME counter_tests.driver_lint_ideals
-         COMMAND counter_tests driver_lint_ideals)
-add_test(NAME counter_tests.driver_signal_tracer
-         COMMAND counter_tests driver_signal_tracer)
+add_test(NAME peredur_tests.driver_peredur COMMAND peredur_tests driver_peredur)
+add_test(NAME peredur_tests.driver_realize COMMAND peredur_tests driver_realize)
+add_test(NAME peredur_tests.driver_ltl COMMAND peredur_tests driver_ltl)
+add_test(NAME peredur_tests.driver_mucs COMMAND peredur_tests driver_mucs)
+add_test(NAME peredur_tests.driver_compare COMMAND peredur_tests driver_compare)
+add_test(NAME peredur_tests.driver_maximal COMMAND peredur_tests driver_maximal)
+add_test(NAME peredur_tests.driver_lint_ideals
+         COMMAND peredur_tests driver_lint_ideals)
+add_test(NAME peredur_tests.driver_signal_tracer
+         COMMAND peredur_tests driver_signal_tracer)
 
 # The dashboard page ships as one self-contained HTML file, so its script is
 # tested by extracting it from the page and running it under node -- the same
@@ -169,7 +169,7 @@ endif()
 
 add_custom_target(tests
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-    DEPENDS counter_tests
+    DEPENDS peredur_tests
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Building and running all tests"
     VERBATIM

@@ -1,5 +1,5 @@
 #:schema ./schemas/config-schema.json
-# counter configuration file
+# PEREDUR configuration file
 #
 # Every section and key is optional; absent keys use the built-in defaults. Every
 # value below IS that default, so copying this file whole changes nothing.
@@ -40,7 +40,7 @@ selection_scheme = "nsga2-apportion"
 # Free on the FRETISH path, one gate sweep per generation on the TLSF one;
 # inert under [tlsf] repair_mode = "muc".
 accumulate_repairs = true
-# What ends the search. "generations" is counter's own budget: the rounds above,
+# What ends the search. "generations" is PEREDUR's own budget: the rounds above,
 # whatever they cost. "individuals" is AuRUS's, for a head-to-head where both
 # tools get the same number of offspring rather than the same wall clock; it
 # stops once max_individuals offspring have been bred, counted per offspring

@@ -4,8 +4,8 @@
 # by d2vm (scripts/build_vm_image.sh). d2vm adds the kernel, systemd and a
 # bootloader itself; this layer adds only what a machine someone logs into
 # needs and a container does not.
-ARG COUNTER_IMAGE=counter:local
-FROM ${COUNTER_IMAGE}
+ARG PEREDUR_IMAGE=peredur:local
+FROM ${PEREDUR_IMAGE}
 
 USER root
 
@@ -43,17 +43,17 @@ RUN mkdir -p /etc/initramfs-tools/conf.d \
 # conversion. RUN sees it as its own environment, so writing it out here keeps
 # the runtime stage's ENV block the one place these paths are set. pam_env
 # reads /etc/environment for console and ssh sessions alike, including a
-# non-interactive `ssh vm counter ...`, which a profile.d script would miss.
-RUN env | grep -E '^(PATH|COUNTER_[A-Z_]+)=' > /etc/environment
+# non-interactive `ssh vm peredur ...`, which a profile.d script would miss.
+RUN env | grep -E '^(PATH|PEREDUR_[A-Z_]+)=' > /etc/environment
 
 # The password is public by design, being written in docs/vm.md; the forwarded
 # ssh port binds to the host's loopback only.
-RUN usermod --shell /bin/bash --append --groups sudo counter \
-    && echo 'counter:counter' | chpasswd
+RUN usermod --shell /bin/bash --append --groups sudo peredur \
+    && echo 'peredur:peredur' | chpasswd
 
 RUN mkdir -p /etc/systemd/system/getty@tty1.service.d \
     && printf '%s\n' '[Service]' 'ExecStart=' \
-        'ExecStart=-/sbin/agetty --autologin counter --noclear %I $TERM' \
+        'ExecStart=-/sbin/agetty --autologin peredur --noclear %I $TERM' \
         > /etc/systemd/system/getty@tty1.service.d/autologin.conf
 
 # Host keys generated at package install would be shared by every VM imported

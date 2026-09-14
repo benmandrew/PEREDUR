@@ -14,7 +14,7 @@
 #include "test_support.hpp"
 
 void test_ganak_runner_on_trivial_cnf() {
-    std::string dimacs_path = "/tmp/counter-ganak-test-XXXXXX";
+    std::string dimacs_path = "/tmp/peredur-ganak-test-XXXXXX";
     const int file_descriptor = mkstemp(dimacs_path.data());
     expect(file_descriptor >= 0,
            "ganak-runner: failed to create temporary DIMACS file");

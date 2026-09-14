@@ -13,7 +13,7 @@ IDEALS_DIR=examples/fsm-timing/fixes
 
 cmake --build --parallel "$NPROC" --preset release
 
-./build-release/counter \
+./build-release/peredur \
     --input "$INPUT" \
     --output-dir results \
     --config example-config.toml

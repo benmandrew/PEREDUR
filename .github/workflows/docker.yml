@@ -92,8 +92,8 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           build-args: |
-            COUNTER_GIT_COMMIT=${{ github.sha }}
-            COUNTER_GIT_DIRTY=false
+            PEREDUR_GIT_COMMIT=${{ github.sha }}
+            PEREDUR_GIT_DIRTY=false
           cache-from: type=gha,scope=${{ steps.platform.outputs.pair }}
           cache-to: ${{ env.PUSH == 'true'
             && format('type=gha,mode=max,scope={0}', steps.platform.outputs.pair)

@@ -283,7 +283,7 @@ class TempDir {
    public:
     TempDir()
         : m_path(std::filesystem::temp_directory_path() /
-                 "counter_streaming_maximal_tests") {
+                 "peredur_streaming_maximal_tests") {
         std::filesystem::remove_all(m_path);
         std::filesystem::create_directories(m_path);
     }

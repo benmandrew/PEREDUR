@@ -67,7 +67,7 @@ ARG BUILD_DIR
 ARG BUILD_JOBS
 COPY cmake/spot.cmake cmake/
 RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
-        -DCOUNTER_TOOL_MODULE=spot.cmake \
+        -DPEREDUR_TOOL_MODULE=spot.cmake \
         ${BUILD_JOBS:+-DCMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS}} \
     && cmake --build "${BUILD_DIR}" ${BUILD_JOBS:+--parallel ${BUILD_JOBS}}
 
@@ -76,7 +76,7 @@ ARG BUILD_DIR
 ARG BUILD_JOBS
 COPY cmake/black.cmake cmake/
 RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
-        -DCOUNTER_TOOL_MODULE=black.cmake \
+        -DPEREDUR_TOOL_MODULE=black.cmake \
         ${BUILD_JOBS:+-DCMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS}} \
     && cmake --build "${BUILD_DIR}" ${BUILD_JOBS:+--parallel ${BUILD_JOBS}}
 
@@ -85,7 +85,7 @@ ARG BUILD_DIR
 ARG BUILD_JOBS
 COPY cmake/ganak.cmake cmake/
 RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
-        -DCOUNTER_TOOL_MODULE=ganak.cmake \
+        -DPEREDUR_TOOL_MODULE=ganak.cmake \
         ${BUILD_JOBS:+-DCMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS}} \
     && cmake --build "${BUILD_DIR}" ${BUILD_JOBS:+--parallel ${BUILD_JOBS}}
 
@@ -97,7 +97,7 @@ FROM toolchain AS deps
 ARG BUILD_DIR
 COPY cmake/dependencies.cmake cmake/
 RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
-        -DCOUNTER_TOOL_MODULE=dependencies.cmake
+        -DPEREDUR_TOOL_MODULE=dependencies.cmake
 
 
 # --- tools -------------------------------------------------------------------
@@ -126,42 +126,42 @@ ARG BUILD_JOBS
 
 # --version must name the commit the binary was built from, and .dockerignore
 # keeps .git out of the context so the history does not land in a layer and
-# invalidate it on every commit. -DCOUNTER_GIT_COMMIT supplies what git cannot
+# invalidate it on every commit. -DPEREDUR_GIT_COMMIT supplies what git cannot
 # answer here; without it the binary reports commit=unknown, and
 # scripts/run_experiments.py refuses to launch a campaign against a binary that
 # cannot say what it was built from.
 #
 # Checked before the sources are copied so a missing argument fails in a second
 # rather than after the context transfer.
-ARG COUNTER_GIT_COMMIT
-ARG COUNTER_GIT_DIRTY=false
-RUN test -n "${COUNTER_GIT_COMMIT}" || { \
-        echo "build-arg COUNTER_GIT_COMMIT is required (full 40-char sha)" >&2; \
+ARG PEREDUR_GIT_COMMIT
+ARG PEREDUR_GIT_DIRTY=false
+RUN test -n "${PEREDUR_GIT_COMMIT}" || { \
+        echo "build-arg PEREDUR_GIT_COMMIT is required (full 40-char sha)" >&2; \
         exit 1; \
     }
 
 COPY . .
 
 RUN cmake --preset release \
-        -DCOUNTER_GIT_COMMIT="${COUNTER_GIT_COMMIT}" \
-        -DCOUNTER_GIT_DIRTY="${COUNTER_GIT_DIRTY}" \
+        -DPEREDUR_GIT_COMMIT="${PEREDUR_GIT_COMMIT}" \
+        -DPEREDUR_GIT_DIRTY="${PEREDUR_GIT_DIRTY}" \
     && cmake --build "${BUILD_DIR}" ${BUILD_JOBS:+--parallel ${BUILD_JOBS}} \
-    && cmake --install "${BUILD_DIR}" --prefix /opt/counter --component counter
+    && cmake --install "${BUILD_DIR}" --prefix /opt/peredur --component peredur
 
 # The fetched tools alone, and almost all of their weight is debug information:
 # Spot's configure chooses its own CXXFLAGS and they include -g, and Ganak ships
 # as an unstripped upstream release binary. CMAKE_BUILD_TYPE never reached
 # either of them — it governs what cmake compiles, and cmake compiles only
-# counter. Nothing in the image reads those tables, counter symbolising its own
+# PEREDUR. Nothing in the image reads those tables, PEREDUR symbolising its own
 # crashes rather than a child's.
 #
-# counter's own binaries under bin/ are deliberately left alone. The release
+# PEREDUR's own binaries under bin/ are deliberately left alone. The release
 # preset builds without -g, so they carry no debug information to begin with,
 # but they do carry a symbol table and cpptrace resolves the crash handler's
 # frames through it. Stripping that would trade a small saving for crash reports
 # that are addresses and nothing else, in the one place where re-running under a
 # debugger is hardest.
-RUN find /opt/counter/libexec -type f -exec sh -c \
+RUN find /opt/peredur/libexec -type f -exec sh -c \
         'file -b "$1" | grep -q "ELF .*not stripped" && strip --strip-unneeded "$1"' _ {} \; \
         2>/dev/null || true
 
@@ -187,20 +187,20 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     fi \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /opt/counter /opt/counter
-COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/counter-entrypoint
+COPY --from=builder /opt/peredur /opt/peredur
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/peredur-entrypoint
 
-# The same values cmake writes into share/counter/counter-env.sh, set as ENV
+# The same values cmake writes into share/peredur/peredur-env.sh, set as ENV
 # because there is no shell to source that file from. Each overrides a path
 # compiled into the binary that points into the builder stage's build tree,
 # which this image does not carry.
-ENV PATH=/opt/counter/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-    COUNTER_SPOT_BIN_DIR=/opt/counter/libexec/counter/spot/bin \
-    COUNTER_GANAK_PATH=/opt/counter/libexec/counter/ganak \
-    COUNTER_BLACK_PATH=/opt/counter/libexec/counter/black/bin/black \
-    COUNTER_FORMALISER_SCRIPT=/opt/counter/share/counter/fretCLI.main.js \
-    COUNTER_DASHBOARD_PAGE=/opt/counter/share/counter/dashboard.html \
-    COUNTER_EXAMPLES=/opt/counter/share/counter/examples
+ENV PATH=/opt/peredur/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    PEREDUR_SPOT_BIN_DIR=/opt/peredur/libexec/peredur/spot/bin \
+    PEREDUR_GANAK_PATH=/opt/peredur/libexec/peredur/ganak \
+    PEREDUR_BLACK_PATH=/opt/peredur/libexec/peredur/black/bin/black \
+    PEREDUR_FORMALISER_SCRIPT=/opt/peredur/share/peredur/fretCLI.main.js \
+    PEREDUR_DASHBOARD_PAGE=/opt/peredur/share/peredur/dashboard.html \
+    PEREDUR_EXAMPLES=/opt/peredur/share/peredur/examples
 
 # Repairs, run.json and the crash handler's crashes/ directory are all written
 # relative to the working directory, so this is the one path that has to be a
@@ -213,9 +213,9 @@ WORKDIR /work
 # without --user. Every installed file is world readable and executable, so any
 # other uid can run the image too.
 RUN userdel --remove ubuntu \
-    && useradd --create-home --uid 1000 --shell /bin/sh counter \
-    && chown counter:counter /work
-USER counter
+    && useradd --create-home --uid 1000 --shell /bin/sh peredur \
+    && chown peredur:peredur /work
+USER peredur
 
-ENTRYPOINT ["counter-entrypoint"]
+ENTRYPOINT ["peredur-entrypoint"]
 CMD ["--help"]

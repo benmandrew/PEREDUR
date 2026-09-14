@@ -208,7 +208,7 @@ void run_bounded_async(std::size_t n_items, std::size_t max_in_flight,
     };
 
     auto collect_one = [&queue, &on_complete] {
-        COUNTER_PROFILE_SCOPE("dispatch/collect-one-ready");
+        PEREDUR_PROFILE_SCOPE("dispatch/collect-one-ready");
         typename Queue::Entry entry = queue->pop();
         if (entry.m_error) {
             std::rethrow_exception(entry.m_error);

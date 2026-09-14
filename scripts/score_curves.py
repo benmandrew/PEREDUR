@@ -158,7 +158,7 @@ def spec_from_dir_name(run_dir: Path) -> str:
 
     A censored run has no manifest to read the input path out of, and those are
     not the runs to drop: they hold 17.2% of the accumulated candidates and are
-    concentrated in the families counter finds hardest. Matching against the
+    concentrated in the families PEREDUR finds hardest. Matching against the
     example directories rather than splitting on "_" keeps a family name that
     contains a separator readable, and reports nothing rather than a wrong
     family when no name matches.

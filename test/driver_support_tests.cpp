@@ -63,19 +63,19 @@ void test_parse_seed_rejects_malformed_values() {
 }
 
 void test_has_flag_matches_whole_arguments() {
-    const std::array<const char* const, 4> argv = {"counter", "--dashboard",
+    const std::array<const char* const, 4> argv = {"peredur", "--dashboard",
                                                    "--seed", "7"};
     const int argc = static_cast<int>(argv.size());
     expect(has_flag(argc, argv.data(), "--dashboard"),
            "expected --dashboard found");
     expect(!has_flag(argc, argv.data(), "--dash"),
            "expected a prefix of a flag not to match");
-    expect(!has_flag(argc, argv.data(), "counter"),
+    expect(!has_flag(argc, argv.data(), "peredur"),
            "expected argv[0] to be skipped");
 }
 
 void test_parse_string_arg_reads_the_following_argument() {
-    const std::array<const char* const, 4> argv = {"counter", "--seed", "7",
+    const std::array<const char* const, 4> argv = {"peredur", "--seed", "7",
                                                    "--trailing"};
     const int argc = static_cast<int>(argv.size());
     const std::optional<std::string> seed =

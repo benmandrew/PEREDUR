@@ -165,7 +165,7 @@ std::pair<std::string, bool> read_until(
     // The child's own runtime: the parent sits in poll()/read() until the tool
     // closes its stdout. Wall greatly exceeding CPU here is expected and
     // healthy -- it means the parent is blocked, not spinning.
-    COUNTER_PROFILE_SCOPE("proc/read");
+    PEREDUR_PROFILE_SCOPE("proc/read");
     std::string output;
     std::array<char, 4096> read_buf{};
     while (true) {
@@ -320,8 +320,8 @@ int make_cloexec_pipe(std::array<int, 2>& fds) {
 #ifdef __APPLE__
 // Parent death, macOS side.
 //
-// A tool child must not outlive the counter process: a campaign harness
-// enforcing a wall or RAM budget, the OOM killer and Ctrl-C all kill counter
+// A tool child must not outlive the PEREDUR process: a campaign harness
+// enforcing a wall or RAM budget, the OOM killer and Ctrl-C all kill PEREDUR
 // outright, and a stranded ltl2tgba then holds multiple gigabytes past the run
 // that started it (PR #47). Linux hands that to the kernel -- PR_SET_PDEATHSIG
 // survives the exec and needs nothing of ours running in the child.
@@ -329,14 +329,14 @@ int make_cloexec_pipe(std::array<int, 2>& fds) {
 // macOS has no mechanism that survives exec, so the enforcement moves into a
 // process of our own. That is a **weaker guarantee** and should be read as
 // one: it holds only while the reaper is alive and schedulable, where the
-// Linux guarantee holds even with every thread of counter wedged.
+// Linux guarantee holds even with every thread of PEREDUR wedged.
 //
 // The reaper is forked once, on the first spawn that asks for containment, and
 // holds the read end of a registration pipe whose write end lives here. Each
 // child writes its own process group to that pipe after setpgid and before
 // exec -- the same point prctl sits at on Linux, and it closes the same
 // window, since a parent that dies before the registration lands has not let
-// anything escape yet. When counter dies, every copy of the write end closes,
+// anything escape yet. When PEREDUR dies, every copy of the write end closes,
 // the reaper reads end of file and kills every group still registered.
 constexpr std::size_t k_max_tracked_groups = 4096;
 
@@ -357,11 +357,11 @@ std::atomic<int> g_reaper_write_fd{-1};
         // parent across the fork in start_reaper_once. It has no meaning on
         // this side of that fork: the child holds a copy no thread of its own
         // will ever take or release, and blocking here forever is precisely
-        // the design -- the read returns when counter dies and not before.
+        // the design -- the read returns when PEREDUR dies and not before.
         // NOLINTNEXTLINE(clang-analyzer-unix.BlockInCriticalSection)
         const ssize_t got = read(read_fd, &message, sizeof(message));
         if (got == 0) {
-            // Every write end is closed: counter is gone.
+            // Every write end is closed: PEREDUR is gone.
             break;
         }
         if (got < 0) {
@@ -477,7 +477,7 @@ void start_reaper_once() {
 }
 
 // Drops a reaped group from the table. A registration left behind would be
-// killpg'd on counter's death, which is harmless against an exited group
+// killpg'd on PEREDUR's death, which is harmless against an exited group
 // (ESRCH) right up until the kernel has recycled that pid, so this is not
 // merely tidiness.
 void unregister_from_reaper(pid_t group) {
@@ -506,7 +506,7 @@ int reap(pid_t pid, const std::optional<Clock::time_point>& deadline,
     // here means tools are lingering after their last write rather than
     // exiting -- which is the failure the deadline on this loop exists to
     // bound.
-    COUNTER_PROFILE_SCOPE("proc/wait");
+    PEREDUR_PROFILE_SCOPE("proc/wait");
     int wait_status = 0;
     struct rusage child_usage{};
     // Unwrapped once here rather than dereferenced in the loop: the polling
@@ -564,7 +564,7 @@ PipedChild spawn_piped_child(const std::vector<std::string>& arguments,
                              ParentDeathPolicy policy,
                              ExecutableLookup lookup) {
     assert(!arguments.empty());
-    COUNTER_PROFILE_SCOPE("proc/fork+exec");
+    PEREDUR_PROFILE_SCOPE("proc/fork+exec");
     // Built before forking: heap allocation inside the child between fork() and
     // exec() can deadlock if another thread held the allocator lock at the
     // moment of the fork (e.g. under ASAN's allocator).
@@ -652,7 +652,7 @@ void harden_child_after_fork(ParentDeathPolicy policy, pid_t parent_pid) {
     if (policy == ParentDeathPolicy::SurviveParentThread) {
         return;
     }
-    // Never outlive the parent: if the counter process is killed (a campaign
+    // Never outlive the parent: if the PEREDUR process is killed (a campaign
     // harness enforcing a wall/RAM budget, the OOM killer, Ctrl-C) while this
     // subprocess is mid-run, deliver SIGKILL rather than leave the tool
     // running unattended.
@@ -682,7 +682,7 @@ void harden_child_after_fork(ParentDeathPolicy policy, pid_t parent_pid) {
     //
     // Compared against the pid the parent read before forking, never against
     // 1. Reparenting to init is the *symptom* of a dead parent rather than the
-    // condition, and the two part company exactly when counter is itself PID 1
+    // condition, and the two part company exactly when PEREDUR is itself PID 1
     // — which a container makes routine, ENTRYPOINT being exec'd as pid 1. Read
     // as "getppid() == 1", every tool subprocess in the image exited 127 before
     // its exec, and every query came back with empty output and no timeout.
@@ -743,7 +743,7 @@ ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
         // proc/read it should show CPU close to its wall time. The child's own
         // runtime is not in here: the parent leaves this scope as soon as fork
         // returns.
-        COUNTER_PROFILE_SCOPE("proc/fork+exec");
+        PEREDUR_PROFILE_SCOPE("proc/fork+exec");
         // Close-on-exec, because these runners are called from many
         // scoring-pool threads at once. Without it a fork here inherits every
         // pipe another call has open, and holds the write end past its own

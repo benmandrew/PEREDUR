@@ -1,7 +1,7 @@
 TLSF specifications
 ===================
 
-Alongside FRETISH, counter repairs basic *Temporal Logic Synthesis Format* (TLSF) specifications directly — the interchange format used by the reactive-synthesis community. A ``.tlsf`` input is auto-detected from the file extension, or forced with ``--format tlsf``.
+Alongside FRETISH, PEREDUR repairs basic *Temporal Logic Synthesis Format* (TLSF) specifications directly — the interchange format used by the reactive-synthesis community. A ``.tlsf`` input is auto-detected from the file extension, or forced with ``--format tlsf``.
 
 In TLSF mode the same genetic machinery evolves the six specification sections — ``INITIALLY``, ``PRESET``, ``REQUIRE``, ``ASSUME``, ``ASSERT`` and ``GUARANTEE`` — rather than FRETISH requirements. The fitness function mirrors the FRETISH one (semantic similarity, realisability status, and syntactic similarity) but scores whole TLSF formulae. See :doc:`configuration` for the weights.
 
@@ -35,7 +35,7 @@ What the search finds
 
 .. code-block:: sh
 
-   counter --input examples/lily02/spec.tlsf --output-dir out --seed 42
+   peredur --input examples/lily02/spec.tlsf --output-dir out --seed 42
 
 That run reports ``Realizable specifications: 11 (3 maximal)`` and writes the three maximal repairs, in a few seconds on 20 threads. The seed fixes which repairs come out, not how long they take — that swings with how the external solvers get scheduled.
 

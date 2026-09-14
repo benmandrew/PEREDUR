@@ -207,7 +207,7 @@ for dropped in ("codesample-un1", "codesample-un2"):
 assert "amba" not in R.H2H_TLSF_SPECS_2026_07 \
     and "amba" not in R.H2H_TLSF_SPECS, \
     "amba is a row in neither head-to-head corpus"
-# counter's own arbiter, detector, full-arbiter and the rest are different
+# PEREDUR's own arbiter, detector, full-arbiter and the rest are different
 # parameter instances from AuRUS's, which is why the imports carry an -aurus
 # suffix. The bare names must never appear, or the corpus would assert a
 # correspondence that does not hold.
@@ -218,7 +218,7 @@ for excluded in ("arbiter", "takeoff-tlsf", "arbiter-handshake",
     assert excluded not in R.H2H_TLSF_SPECS, \
         f"{excluded} must not be in the head-to-head corpus"
 
-# The declared scope partitions exactly into what counter can run, what is
+# The declared scope partitions exactly into what PEREDUR can run, what is
 # still to be imported, and what is imported but can never be scored. A family
 # imported without being struck off H2H_PENDING_IMPORT fails here rather than
 # silently staying out of the arm, and a holdout dropped from every list fails
@@ -230,10 +230,10 @@ assert not set(R.H2H_TLSF_READY) & set(R.H2H_PENDING_IMPORT), \
     "a family cannot be both ready and pending import"
 for spec in R.H2H_PENDING_IMPORT:
     assert spec not in R.TLSF_SPECS, \
-        f"{spec} has a counter family now; strike it off H2H_PENDING_IMPORT"
+        f"{spec} has a PEREDUR family now; strike it off H2H_PENDING_IMPORT"
 
 # aurus_campaign runs AuRUS on the whole declared corpus, keyed by the name
-# each row carries so the eleven with counter families join the h2h rows.
+# each row carries so the eleven with PEREDUR families join the h2h rows.
 import aurus_campaign as A  # noqa: E402
 check(sorted(A.SPEC_TLSF), sorted(R.H2H_TLSF_SPECS),
       "aurus_campaign covers the head-to-head corpus")
@@ -272,7 +272,7 @@ assert not any("removeG" in f for f in A.flags_for("arbiter-aurus")), \
 # family it scores must exist and hold .tlsf ideals — a missing or empty fixes
 # dir silently records "unknown" for the whole family rather than erroring. The
 # scorable set is H2H_TLSF_READY, not the whole corpus: AuRUS runs all 26 and
-# the pending imports have no counter family to score against yet, which is
+# the pending imports have no PEREDUR family to score against yet, which is
 # what H2H_PENDING_IMPORT records. And the compare parsing must stay the shared
 # run_experiments function (imported, not copied), or implies_genuine drifts
 # from implies_ideal.
@@ -337,7 +337,7 @@ for name, prof in P.items():
 
 # ── Commit provenance ────────────────────────────────────────────────────────
 
-# The output format of `counter --version` (src/version.cpp). Parsing must
+# The output format of `peredur --version` (src/version.cpp). Parsing must
 # survive a line that is not a key=value pair, so a future banner cannot break
 # a campaign launch.
 check(R.parse_version_output(
@@ -347,13 +347,13 @@ check(R.parse_version_output(
       {"commit": "c38f582109c1c3ea7fa9b935a9a37f40f0fbba99",
        "commit_short": "c38f582", "dirty": "0"},
       "parse_version_output on the shipped format")
-check(R.parse_version_output("counter 0.1.0\ncommit=abc\n"),
+check(R.parse_version_output("peredur 0.1.0\ncommit=abc\n"),
       {"commit": "abc"}, "parse_version_output ignores non-key=value lines")
 
 # A binary that predates --version exits non-zero rather than printing; so does
 # a path that is not a binary at all. Both must read as LEGACY_COMMIT rather
 # than raising, since the staleness check is what turns that into a refusal.
-missing = R.binary_version(Path("/nonexistent/counter"))
+missing = R.binary_version(Path("/nonexistent/peredur"))
 check(missing["commit"], R.LEGACY_COMMIT, "absent binary reads as unknown")
 
 # The provenance columns are recorded but never keyed on. `commit` in
@@ -464,21 +464,21 @@ check(M.fill_defaults(legacy_row, new_header)["dirty"], "",
 HEAD = "c38f582109c1c3ea7fa9b935a9a37f40f0fbba99"
 FRESH = {"commit": HEAD, "commit_short": "c38f582", "dirty": "0"}
 
-check(R.staleness_problems({"counter": FRESH}, HEAD), [],
+check(R.staleness_problems({"peredur": FRESH}, HEAD), [],
       "a clean binary at HEAD is not stale")
-check(len(R.staleness_problems({"counter": {**FRESH, "dirty": "1"}}, HEAD)), 1,
+check(len(R.staleness_problems({"peredur": {**FRESH, "dirty": "1"}}, HEAD)), 1,
       "a dirty binary is stale")
 check(len(R.staleness_problems(
-          {"counter": {"commit": "0" * 40, "commit_short": "0000000",
+          {"peredur": {"commit": "0" * 40, "commit_short": "0000000",
                        "dirty": "0"}}, HEAD)), 1,
       "a binary built from another commit is stale")
 check(len(R.staleness_problems(
-          {"counter": {"commit": R.LEGACY_COMMIT,
+          {"peredur": {"commit": R.LEGACY_COMMIT,
                        "commit_short": R.LEGACY_COMMIT, "dirty": ""}}, HEAD)),
       1, "a binary that cannot report a commit is stale")
 # Outside a git work tree there is nothing to compare against, so only the
 # binary's own dirty/unknown state can condemn it.
-check(R.staleness_problems({"counter": FRESH}, None), [],
+check(R.staleness_problems({"peredur": FRESH}, None), [],
       "no working-tree HEAD means no mismatch to report")
 
 # The manifest is per host: campaigns run on av2 and av3 at once and merge into

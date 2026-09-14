@@ -123,8 +123,8 @@ bool run_tlsf_suite(std::string_view suite_name) {
 // that cover src/main.cpp, src/repair/ and the standalone tools' own argument
 // handling. Split out of run_suite for the same reason as run_tlsf_suite above.
 bool run_driver_suite(std::string_view suite_name) {
-    if (suite_name == "driver_counter") {
-        run_counter_driver_tests();
+    if (suite_name == "driver_peredur") {
+        run_peredur_driver_tests();
         return true;
     }
     if (suite_name == "driver_realize") {
@@ -361,7 +361,7 @@ int main(int argc, const char* const argv[]) {
             run_tlsf_monotone_tests();
             run_tlsf_assumption_tests();
             run_tlsf_pipeline_tests();
-            run_counter_driver_tests();
+            run_peredur_driver_tests();
             run_realize_driver_tests();
             run_ltl_driver_tests();
             run_mucs_driver_tests();
@@ -373,7 +373,7 @@ int main(int argc, const char* const argv[]) {
             // global pool, which is a function-local static built on first use
             // and never resized, so running it here would pin the width of the
             // pool every later suite scores in. It runs as its own ctest
-            // process instead: `counter_tests thread_pool`.
+            // process instead: `peredur_tests thread_pool`.
             return 0;
         }
         if (argc != 2) {

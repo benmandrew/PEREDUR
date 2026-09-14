@@ -14,7 +14,7 @@
 #include <unordered_map>
 #include <vector>
 
-/// Returns the filesystem path to fretCLI.main.js: `COUNTER_FORMALISER_SCRIPT`
+/// Returns the filesystem path to fretCLI.main.js: `PEREDUR_FORMALISER_SCRIPT`
 /// when that environment variable is set and non-empty, and otherwise the
 /// FORMALISER_SCRIPT_PATH preprocessor definition baked in at build time. The
 /// environment is read once, on first use.

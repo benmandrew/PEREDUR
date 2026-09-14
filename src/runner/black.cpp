@@ -105,7 +105,7 @@ SatisfiabilityChecker& global_sat_checker() {
 std::string black_executable_path() {
 #ifdef BLACK_EXECUTABLE_PATH
     static const ToolPath k_path =
-        tool_path_from_env("COUNTER_BLACK_PATH", BLACK_EXECUTABLE_PATH);
+        tool_path_from_env("PEREDUR_BLACK_PATH", BLACK_EXECUTABLE_PATH);
     return k_path.m_path;
 #else
     assert(false);

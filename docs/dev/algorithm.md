@@ -1,8 +1,8 @@
 # Search pipeline
 
-How a `counter` run proceeds from input to `run.json`, and the design record behind its search budget, output and dashboard.
+How a `peredur` run proceeds from input to `run.json`, and the design record behind its search budget, output and dashboard.
 
-## Algorithm flow (`counter`)
+## Algorithm flow (`peredur`)
 
 1. Load `Specification` from `--input` JSON.
 2. Build `AggregateWeightedFitnessFunction` (syntactic + semantic + status) and the per-generation `FilterFunction` list from the original spec. Correctness stages come from a shared table, `correctness_checks` (`include/filter/correctness.hpp`) and its TLSF twin `tlsf_correctness_checks` (`include/tlsf/filter.hpp`), with one stage per row whose `per_generation` bool is set: true for `vacuity`, false for `not-well-separated`. No correctness stage can be switched off from a config. The same table screens the input once at load time and warns rather than rejects, because an ill-separated FRETISH input is realizable outright and rejecting it would foreclose a *descendant* that fixes the property; the verdict is `input_screen` in `run.json` (null when every check passed). The `status` objective scores on the three-point scale in `include/fitness/status.hpp`: 0 for a component unsatisfiable on its own, `k_status_realizable` (1.0) for realizable *and* well-separated, `k_status_unrealizable` (0.5) for everything between, with the well-separation query asked only behind the realizability one. A candidate realizable only by defeating its own assumptions scores level with an unrealizable one, because an intermediate tier would rank cheating above failing and, ill-separation being cheap to reach and expensive to leave, would become a plateau. `status_grading = "tiered"` and `"mrs"` both do this; `"aurus"` reproduces AuRUS's six-level ladder (0, 0.05, 0.1, 0.2, 0.5, 1.0) value for value and folds in no well-separation query, since AuRUS asks none in its search. Grading changes the search's scoring alone; the step-5 gate asks every correctness row regardless.
@@ -18,7 +18,7 @@ How a `counter` run proceeds from input to `run.json`, and the design record beh
 
 ## Termination modes
 
-Three keys give counter and AuRUS the same search budget: `[genetic] termination` (`"generations"`, the default, or `"individuals"`), `max_individuals` (0) and `max_wall_s` (0), all no-ops at those values. AuRUS's `GeneticAlgorithm.java` stops mid-generation once `numberOfVisitedIndividuals` reaches `GA_MAX_NUM_INDIVIDUALS` (1000), counting once per new mutant and once per crossover offspring. That is 1000 *bred individuals*, never 1000 solutions: the counts sit inside the breeding loops, and none of 600 archived `2026-08-14-aurus-h2h` runs reached 1000 solutions. The GECCO '23 paper does not say how an individual is counted, so `SearchBudget` is a code-level match and should be described as one.
+Three keys give PEREDUR and AuRUS the same search budget: `[genetic] termination` (`"generations"`, the default, or `"individuals"`), `max_individuals` (0) and `max_wall_s` (0), all no-ops at those values. AuRUS's `GeneticAlgorithm.java` stops mid-generation once `numberOfVisitedIndividuals` reaches `GA_MAX_NUM_INDIVIDUALS` (1000), counting once per new mutant and once per crossover offspring. That is 1000 *bred individuals*, never 1000 solutions: the counts sit inside the breeding loops, and none of 600 archived `2026-08-14-aurus-h2h` runs reached 1000 solutions. The GECCO '23 paper does not say how an individual is counted, so `SearchBudget` is a code-level match and should be described as one.
 
 An offspring counts only where it differs from its parent, as in AuRUS. The budget is checked inside `breed_offspring` (`include/genetic/pipeline.hpp`) between slots and at the head of each driver's generation loop, because a boundary check alone would overshoot by up to 20% of a 1000-individual cap at population 200. `SearchBudget` is owned by the driver and passed by reference through `run_evolution` (FRETISH) and `tlsf::run_repair` → `run_monolithic`/`run_muc` → `evolve_population` (TLSF). It must belong to the run rather than the core, because `run_muc` restarts its generation count per core and a per-core budget would multiply the cap by `muc_max_iterations`.
 
@@ -36,11 +36,11 @@ Anything that moves the cursor must go through `stdout_is_tty()` (`include/statu
 
 Report "best fitness" as the population maximum, never `population[0]`/`front()`. NSGA-II orders the population by front rank and crowding distance, so the leading individual need not have the highest weighted scalar and the printed best would fall while the search improves (`src/repair/evolution.cpp`, `src/tlsf/evolve.cpp`).
 
-`counter` rejects unknown arguments (`find_unknown_arg`), so a new flag must be added to the table in `src/main.cpp`.
+`peredur` rejects unknown arguments (`find_unknown_arg`), so a new flag must be added to the table in `src/main.cpp`.
 
 ## Live dashboard
 
-Opt-in, via `counter --dashboard` or `[runtime] dashboard = true`, so campaigns do not pay for it. When on, both drivers stream to `<output-dir>/progress.jsonl` and copy `web/dashboard.html` there as `index.html`; watch with `python3 -m http.server -d <output-dir> 8000`. The page polls once a second, overridden by `?poll=<seconds>` (`?poll=0` loads once).
+Opt-in, via `peredur --dashboard` or `[runtime] dashboard = true`, so campaigns do not pay for it. When on, both drivers stream to `<output-dir>/progress.jsonl` and copy `web/dashboard.html` there as `index.html`; watch with `python3 -m http.server -d <output-dir> 8000`. The page polls once a second, overridden by `?poll=<seconds>` (`?poll=0` loads once).
 
 Each `stage` record carries `distinct`, the number of distinct specifications among the survivors, which measures whether a selection scheme keeps diversity. Computing it hashes the population, so `run_generation_pipeline` does so only when an observer is attached.
 
@@ -52,7 +52,7 @@ Two calls that both draw from the `RandomSource` must never be arguments of the 
 
 ## TLSF repair modes
 
-Binaries: `counter` (genetic repair), `realize`, `compare`, `ltl`, `mucs`, `maximal`; run each with `--help` for flags.
+Binaries: `peredur` (genetic repair), `realize`, `compare`, `ltl`, `mucs`, `maximal`; run each with `--help` for flags.
 
 `mucs` prints a *minimal unrealizable core* (MUC): the smallest subset of the guarantee-side sections (PRESET, ASSERT, GUARANTEE) that stays unrealizable against the full environment side (INITIALLY, REQUIRE, ASSUME). It uses QuickXplain over `ltlsynt`, prints `REALIZABLE (no core)` for a realizable input, and is TLSF-only.
 

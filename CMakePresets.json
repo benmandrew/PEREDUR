@@ -64,7 +64,7 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_CXX_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer -fno-sanitize-recover=all",
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread",
-        "COUNTER_TSAN": "ON"
+        "PEREDUR_TSAN": "ON"
       }
     },
     {
@@ -75,7 +75,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_CXX_FLAGS": "-Wall -Werror",
-        "COUNTER_BENCH": "ON"
+        "PEREDUR_BENCH": "ON"
       }
     }
   ],

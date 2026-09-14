@@ -21,7 +21,7 @@ if(_black_candidate)
 endif()
 
 set(BLACK_VERSION "25.09.0")
-set(BLACK_ROOT_DIR "${COUNTER_THIRD_PARTY_DIR}/black")
+set(BLACK_ROOT_DIR "${PEREDUR_THIRD_PARTY_DIR}/black")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # Prebuilt debs require Ubuntu 24.04 (noble) glibc/libstdc++.  On older
@@ -87,7 +87,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         # Baked in directly (rather than read from the shell's ambient
         # LD_LIBRARY_PATH) so the dev shell doesn't need to export it
         # shell-wide, which would leak into unrelated child processes.
-        set(_black_fmt9_lib_dir "$ENV{COUNTER_FMT9_LIB_DIR}")
+        set(_black_fmt9_lib_dir "$ENV{PEREDUR_FMT9_LIB_DIR}")
         file(WRITE "${BLACK_WRAPPER}"
             "#!/bin/sh\nexport LD_LIBRARY_PATH=\"${BLACK_LIB_DIR}:${_black_fmt9_lib_dir}:\${LD_LIBRARY_PATH}\"\nexec \"${BLACK_BIN}\" \"$@\"\n")
         file(CHMOD "${BLACK_WRAPPER}"

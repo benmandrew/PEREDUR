@@ -115,7 +115,7 @@ namespace {
 //
 // 24 added "aurus" to the values fitness.status_grading can take. It exists to
 // be ablated against rather than to be run: it reproduces AuRUS's own ladder so
-// a campaign can cross counter's grading against the design counter derives
+// a campaign can cross PEREDUR's grading against the design PEREDUR derives
 // from, and it is the one scale that does not cap a candidate gaming its own
 // assumptions. A reader keying on that field against an older manifest can
 // assume it names one of two scales that do; from this version it may name a
@@ -437,7 +437,7 @@ void write_run_manifest(const std::string& output_dir,
     const std::filesystem::path dir(output_dir);
     const nlohmann::json manifest{
         {"schema_version", k_schema_version},
-        {"tool", "counter"},
+        {"tool", "peredur"},
         {"commit", version::commit()},
         {"commit_short", version::commit_short()},
         {"dirty", version::dirty()},

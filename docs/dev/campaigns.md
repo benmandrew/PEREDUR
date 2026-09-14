@@ -41,9 +41,9 @@ python scripts/campaign.py stage arbiter-probe --dry-run   # probe only
 python scripts/campaign.py stage arbiter-probe
 ```
 
-`stage` pushes the branch, then on each host fetches it, checks out the pushed commit, builds, runs `configs`, checks the configs directory of every phase's profile, and confirms `build-release/counter --version` names that commit with `dirty=0`. A failing host is reported and nothing launches. The configs check runs even with no `configs` key, because `run_experiments.py` exits 1 on a directory holding no `.toml` and a queued campaign would spend its attempts discovering that one tick at a time.
+`stage` pushes the branch, then on each host fetches it, checks out the pushed commit, builds, runs `configs`, checks the configs directory of every phase's profile, and confirms `build-release/peredur --version` names that commit with `dirty=0`. A failing host is reported and nothing launches. The configs check runs even with no `configs` key, because `run_experiments.py` exits 1 on a directory holding no `.toml` and a queued campaign would spend its attempts discovering that one tick at a time.
 
-Staging *refuses by default* the three ways to destroy work that cannot be recovered from this side: a dirty checkout, a live `counter` or `run_experiments.py`, and a checkout on another branch. All three are reported at once. Hosts normally sit on somebody's in-flight branch, so `--force` is the expected answer, and it must be a deliberate one: it prints the modified files, branch and head, then requires the host name typed back at a terminal, and refuses outright without one, so no script can reset a machine.
+Staging *refuses by default* the three ways to destroy work that cannot be recovered from this side: a dirty checkout, a live `peredur` or `run_experiments.py`, and a checkout on another branch. All three are reported at once. Hosts normally sit on somebody's in-flight branch, so `--force` is the expected answer, and it must be a deliberate one: it prints the modified files, branch and head, then requires the host name typed back at a terminal, and refuses outright without one, so no script can reset a machine.
 
 `git clean` is never run, since a host's untracked files are its results; `checkout -f` discards tracked modifications alone. An unforced stage also refuses a checkout ahead of the pushed commit rather than dropping those commits. That check needs the fetch, so it runs on the host rather than in the probe, which is why `--force` asks for confirmation whenever it is passed; gating the prompt on the probe made the flag inert for exactly that host. Rebasing a campaign's branch puts every staged machine in that state at once.
 
@@ -95,10 +95,10 @@ STATE is one of four:
 
 - `done` — the runner's plan reports every row done.
 - `running` — a runner names this profile *and* the newest `run.log` is under three hours old.
-- `stuck` — the runner is there but the log is older. Three hours is the harness's bound on one run's silence (3600s `counter` plus 1800s `compare`, doubled for `--jobs 1`), so investigate rather than wait.
+- `stuck` — the runner is there but the log is older. Three hours is the harness's bound on one run's silence (3600s `peredur` plus 1800s `compare`, doubled for `--jobs 1`), so investigate rather than wait.
 - `stalled` — no runner names this profile; a finished-but-incomplete campaign and a rebooted host look the same, so the row keeps its counts.
 
-Tables are coloured only on a terminal, since `tick` logs to `$HOME/.counter-queue.log` and `status` is often piped. `NO_COLOR` and `--no-color` disable colour, `CLICOLOR_FORCE=1` forces it for `less -R`, and `--json` is never coloured.
+Tables are coloured only on a terminal, since `tick` logs to `$HOME/.peredur-queue.log` and `status` is often piped. `NO_COLOR` and `--no-color` disable colour, `CLICOLOR_FORCE=1` forces it for `less -R`, and `--json` is never coloured.
 
 A `~` before ROWS means the whole CSV was counted because the runner returned no plan, which overstates progress. A `!` after BRANCH means the checkout has left the manifest's branch, so a resume would produce rows from other code. A `*` after BINARY means the launch used `--allow-stale-binary`, so its rows name a commit they did not come from.
 
@@ -115,12 +115,14 @@ A score phase appears as `score:<out>`, read from `score-manifest-<host>.json`: 
 Entries live at `experiments/queue/NNN-<name>.toml` on their host, numbered from 001, and are untracked so state rewrites never dirty the checkout.
 
 ```
-*/5 * * * * cd /home/benandrew/projects/counter && python3 scripts/campaign.py tick --host av2 >> $HOME/.counter-queue.log 2>&1
+*/5 * * * * cd /home/benandrew/projects/counter && python3 scripts/campaign.py tick --host av2 >> $HOME/.peredur-queue.log 2>&1
 ```
 
 `campaign.py cron --host av2 --print` only prints that line, since installing it would edit somebody else's crontab from a script.
 
-A tick takes the lock, recovers any `running` entry, and runs the lowest-numbered queued entry's next phase in the foreground, holding the lock throughout so a hand-typed tick cannot race the cron one into a second runner. Never wrap the tick in `flock` on that lock file: a flock lock attaches to the open file description, so the inherited descriptor denies `acquire_lock`, both exit 0, and until 2026-08-13 no phase ever ran.
+A host set up before the rename to PEREDUR has a crontab that logs to `$HOME/.counter-queue.log`, and holds its lock at `~/.counter-queue.lock`. Migrate it while no tick is running: replace the crontab line with the one above, move the old log to `~/.peredur-queue.log`, and delete the old lock file. The checkout directory keeps its name, so the `cd` in the line does not change.
+
+A tick takes the lock at `~/.peredur-queue.lock`, recovers any `running` entry, and runs the lowest-numbered queued entry's next phase in the foreground, holding the lock throughout so a hand-typed tick cannot race the cron one into a second runner. Never wrap the tick in `flock` on that lock file: a flock lock attaches to the open file description, so the inherited descriptor denies `acquire_lock`, both exit 0, and until 2026-08-13 no phase ever ran.
 
 | From | To | On |
 | --- | --- | --- |
@@ -135,21 +137,21 @@ A tick takes the lock, recovers any `running` entry, and runs the lowest-numbere
 | `running` | `cancelled` | the same, having killed the tick holding it |
 | `cancelled` | `queued` | `campaign.py requeue --host av2 001-name.toml` |
 
-`dequeue` stops a campaign by setting `cancelled`. For a running entry it lists the child processes, kills the tick, then kills the runner and `counter`. The tick dies first because it would otherwise overwrite the cancellation from its in-memory copy at phase end; the children are listed first because they reparent to init once it dies, and killed after because the runner outlives its tick. Entries are tombstoned so their numbers are never reused, `requeue` puts one back, and `--dry-run` only names the processes it would kill. Never edit queue TOML by hand.
+`dequeue` stops a campaign by setting `cancelled`. For a running entry it lists the child processes, kills the tick, then kills the runner and `peredur`. The tick dies first because it would otherwise overwrite the cancellation from its in-memory copy at phase end; the children are listed first because they reparent to init once it dies, and killed after because the runner outlives its tick. Entries are tombstoned so their numbers are never reused, `requeue` puts one back, and `--dry-run` only names the processes it would kill. Never edit queue TOML by hand.
 
 `running` without a lock holder means an interrupted tick. Recovery costs one attempt and resumes from the CSV. After the attempt cap (three by default, `--max-attempts`), the entry stops with `last_error` until `requeue`, after `experiments/queue/NNN-<name>.log` has been read.
 
 ## A tick stages its own branch
 
-With nobody at a terminal to confirm `--force`, a tick on the wrong branch stages itself: it fetches the entry's commit, checks it out, builds, and reads `build-release/counter --version` before the phase.
+With nobody at a terminal to confirm `--force`, a tick on the wrong branch stages itself: it fetches the entry's commit, checks it out, builds, and reads `build-release/peredur --version` before the phase.
 
 It stages for the branch alone and still refuses, spending an attempt with the reason in `last_error`:
 
 - **A dirty checkout.** Uncommitted edits cannot be fetched back.
-- **A live `counter` or `run_experiments.py`.** A checkout would rebuild the binary its remaining rows name.
+- **A live `peredur` or `run_experiments.py`.** A checkout would rebuild the binary its remaining rows name.
 - **A HEAD no remote branch contains.** An unpushed commit cannot be reconstructed.
 
-When staging moves `scripts/`, the tick re-execs once, since the old `campaign.py` would misread a newer declaration as a bad one. It passes the queue lock descriptor to the new process, spends no attempt, and sets `COUNTER_TICK_RESTARTED` to prevent loops. The check diffs the two commits under `scripts/`, so a branch on the same scripts runs in the tick that staged it.
+When staging moves `scripts/`, the tick re-execs once, since the old `campaign.py` would misread a newer declaration as a bad one. It passes the queue lock descriptor to the new process, spends no attempt, and sets `PEREDUR_TICK_RESTARTED` to prevent loops. The check diffs the two commits under `scripts/`, so a branch on the same scripts runs in the tick that staged it.
 
 `stage --force` is the only way past the refusals. `tick --no-stage` restores manual staging for a host driven by hand.
 
@@ -203,6 +205,6 @@ The output is not runnable, naming retired profiles (`wellsep-timing`) and rejec
 python3 scripts/test_campaign.py
 ```
 
-A plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. It never touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `COUNTER_RUNNER_CMD` and `COUNTER_SCORER_CMD` stubs that record their arguments. `score_campaign.py` uses a fake results tree, a `COUNTER_SCORE_CURVES_CMD` stub, and stub binaries under `COUNTER_BIN_DIR`. New launch-path code must be tested the same way.
+A plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. It never touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `PEREDUR_RUNNER_CMD` and `PEREDUR_SCORER_CMD` stubs that record their arguments. `score_campaign.py` uses a fake results tree, a `PEREDUR_SCORE_CURVES_CMD` stub, and stub binaries under `PEREDUR_BIN_DIR`. New launch-path code must be tested the same way.
 
 `campaign.py` parses TOML itself because av2 and av3 run python3 3.10.12 with neither `tomllib` nor `tomli`. Its subset is checked against `tomllib` on every fixture wherever that exists. Remote shell scripts never use bare globs, since zsh's `NOMATCH` aborts on an unmatched pattern and every later section vanishes in silence.

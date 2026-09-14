@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Pre-registered analysis for the 2026-08-14 counter-against-AuRUS campaign.
+"""Pre-registered analysis for the 2026-08-14 PEREDUR-against-AuRUS campaign.
 
 Runs the decision rule of `experiments/2026-08-14-aurus-h2h/PLAN.md` §5 as
 amended by §10.1 and §10.2:
 
-  primary    per-family repair-quality rate, counter's implies_ideal over its
+  primary    per-family repair-quality rate, PEREDUR's implies_ideal over its
              20 seeds against AuRUS's implies_genuine over its 30 repeats,
              two-sided Wilcoxon signed-rank over families at alpha 0.05
   clustered  the same test over the 10 independent problem types of §7.10,
@@ -14,7 +14,7 @@ amended by §10.1 and §10.2:
 
 §10.1 is what makes the two rates comparable: AuRUS's is over the repairs that
 are both realizable under `realize` and well-separated under
-`check_well_separated`, because counter's output gate rejects an ill-separated
+`check_well_separated`, because PEREDUR's output gate rejects an ill-separated
 survivor unconditionally and its rate is over well-separated repairs by
 construction. The unfiltered rate rides along as implies_genuine_all and is
 reported beside it, never in place of it.
@@ -117,7 +117,7 @@ def power_floor(n, unit):
 
 # -- load ----------------------------------------------------------------------
 
-counter_rows = load_rows(DIR / "results-aurus-h2h.csv")
+peredur_rows = load_rows(DIR / "results-aurus-h2h.csv")
 
 aurus_rows = []
 for host in ("av2", "av3"):
@@ -131,18 +131,18 @@ for host in ("av2", "av3"):
 print("=" * 78)
 print("INTEGRITY")
 print("=" * 78)
-commits = sorted({r["commit"] for r in counter_rows})
-print(f"counter rows      {len(counter_rows)}   commits {commits}   "
-      f"dirty {sorted({r['dirty'] for r in counter_rows})}")
+commits = sorted({r["commit"] for r in peredur_rows})
+print(f"PEREDUR rows      {len(peredur_rows)}   commits {commits}   "
+      f"dirty {sorted({r['dirty'] for r in peredur_rows})}")
 print(f"AuRUS repeat rows {len(aurus_rows)}")
 
-c_fams = {r["spec"] for r in counter_rows}
+c_fams = {r["spec"] for r in peredur_rows}
 a_fams = {r["spec"] for r in aurus_rows}
 both = sorted(c_fams & a_fams)
-print(f"families: counter {len(c_fams)}, AuRUS {len(a_fams)}, "
+print(f"families: PEREDUR {len(c_fams)}, AuRUS {len(a_fams)}, "
       f"scored by both {len(both)}")
 if c_fams - a_fams:
-    print(f"  counter only: {sorted(c_fams - a_fams)}")
+    print(f"  PEREDUR only: {sorted(c_fams - a_fams)}")
 if a_fams - c_fams:
     print(f"  AuRUS only:   {sorted(a_fams - c_fams)}")
 
@@ -156,7 +156,7 @@ if set(flat) != set(both):
 
 c_hit = defaultdict(int)
 c_n = defaultdict(int)
-for r in counter_rows:
+for r in peredur_rows:
     c_n[r["spec"]] += 1
     c_hit[r["spec"]] += truth(r["implies_ideal"])
 
@@ -172,7 +172,7 @@ print()
 print("=" * 78)
 print("PRIMARY -- per-family repair-quality rate (PLAN §5, §10.1)")
 print("=" * 78)
-print(f"{'family':28s} {'counter':>14s} {'AuRUS':>14s} {'diff':>8s}  "
+print(f"{'family':28s} {'PEREDUR':>14s} {'AuRUS':>14s} {'diff':>8s}  "
       f"{'AuRUS unfilt':>13s}")
 
 c_rate, a_rate, a_rate_all = {}, {}, {}
@@ -181,7 +181,7 @@ for f in both:
     a_rate[f] = a_hit[f] / a_n[f]
     a_rate_all[f] = a_hit_all[f] / a_n[f]
     d = c_rate[f] - a_rate[f]
-    mark = "  <- counter" if d > 0 else ("  <- AuRUS" if d < 0 else "")
+    mark = "  <- PEREDUR" if d > 0 else ("  <- AuRUS" if d < 0 else "")
     print(f"{f:28s} {c_hit[f]:3d}/{c_n[f]:<3d} {c_rate[f]:6.3f} "
           f"{a_hit[f]:3d}/{a_n[f]:<3d} {a_rate[f]:6.3f} "
           f"{d:+8.3f}  {a_rate_all[f]:13.3f}{mark}")
@@ -193,10 +193,10 @@ ties = sum(1 for d in diffs if d == 0)
 p, w, n = wilcoxon_p(diffs)
 
 print()
-print(f"  counter mean rate {statistics.mean(c_rate.values()):.3f}   "
+print(f"  PEREDUR mean rate {statistics.mean(c_rate.values()):.3f}   "
       f"AuRUS mean rate {statistics.mean(a_rate.values()):.3f}   "
       f"(unfiltered {statistics.mean(a_rate_all.values()):.3f})")
-print(f"  families: counter higher {wins}, AuRUS higher {losses}, tied {ties}")
+print(f"  families: PEREDUR higher {wins}, AuRUS higher {losses}, tied {ties}")
 print(f"  Wilcoxon signed-rank over {n} non-tied families: W+ = {w:g}, "
       f"p = {p:.4f}")
 
@@ -209,7 +209,7 @@ print("=" * 78)
 print("Where this disagrees with the per-family test, this is the one the")
 print("conclusion rests on.")
 print()
-print(f"{'cluster':16s} {'n':>2s} {'counter':>8s} {'AuRUS':>8s} {'diff':>8s}")
+print(f"{'cluster':16s} {'n':>2s} {'PEREDUR':>8s} {'AuRUS':>8s} {'diff':>8s}")
 
 cl_diffs, cl_c, cl_a = [], {}, {}
 for name, fams in CLUSTERS.items():
@@ -220,7 +220,7 @@ for name, fams in CLUSTERS.items():
     cl_a[name] = statistics.mean(a_rate[f] for f in present)
     d = cl_c[name] - cl_a[name]
     cl_diffs.append(d)
-    mark = "  <- counter" if d > 0 else ("  <- AuRUS" if d < 0 else "")
+    mark = "  <- PEREDUR" if d > 0 else ("  <- AuRUS" if d < 0 else "")
     print(f"{name:16s} {len(present):2d} {cl_c[name]:8.3f} "
           f"{cl_a[name]:8.3f} {d:+8.3f}{mark}")
 
@@ -228,7 +228,7 @@ cp, cw, cn = wilcoxon_p(cl_diffs)
 cwins = sum(1 for d in cl_diffs if d > 0)
 closses = sum(1 for d in cl_diffs if d < 0)
 print()
-print(f"  clusters: counter higher {cwins}, AuRUS higher {closses}, "
+print(f"  clusters: PEREDUR higher {cwins}, AuRUS higher {closses}, "
       f"tied {len(cl_diffs) - cwins - closses}")
 print(f"  Wilcoxon signed-rank over {cn} non-tied clusters: W+ = {cw:g}, "
       f"p = {cp:.4f}")
@@ -248,7 +248,7 @@ def verdict(p_val, n_val, higher, lower, unit):
         return (f"outcome 3 -- no separation (p = {p_val:.4f}). The two tools "
                 f"are not distinguished by this design on this corpus.")
     if higher > lower:
-        return (f"outcome 1 -- counter higher (p = {p_val:.4f}), on this "
+        return (f"outcome 1 -- PEREDUR higher (p = {p_val:.4f}), on this "
                 f"corpus at this operating point, qualified by every threat "
                 f"in §7.")
     return (f"outcome 2 -- AuRUS higher (p = {p_val:.4f}), reported as "
@@ -265,21 +265,21 @@ print("=" * 78)
 print("SECONDARY (PLAN §6) -- reported, not gating")
 print("=" * 78)
 
-c_yield = sum(truth(r["found_repair"]) for r in counter_rows)
-print(f"counter yield              {c_yield}/{len(counter_rows)} "
-      f"({pct(c_yield, len(counter_rows))})")
+c_yield = sum(truth(r["found_repair"]) for r in peredur_rows)
+print(f"PEREDUR yield              {c_yield}/{len(peredur_rows)} "
+      f"({pct(c_yield, len(peredur_rows))})")
 
-c_reps = [num_or_nan(r["n_repairs"]) for r in counter_rows if truth(r["found_repair"])]
+c_reps = [num_or_nan(r["n_repairs"]) for r in peredur_rows if truth(r["found_repair"])]
 a_claimed = [num_or_nan(r["n_claimed"]) for r in aurus_rows]
 a_scored = [num_or_nan(r["n_scored"]) for r in aurus_rows]
-print(f"solutions per run          counter median "
+print(f"solutions per run          PEREDUR median "
       f"{med(c_reps)} maximal repairs, "
       f"AuRUS median {med(a_claimed)} claimed "
       f"({med(a_scored)} after the §10.1 filter)")
 
-c_to = sum(truth(r["timed_out"]) for r in counter_rows)
-print(f"counter timeout rate       {c_to}/{len(counter_rows)} "
-      f"({pct(c_to, len(counter_rows))}) at the 7200 s cap")
+c_to = sum(truth(r["timed_out"]) for r in peredur_rows)
+print(f"PEREDUR timeout rate       {c_to}/{len(peredur_rows)} "
+      f"({pct(c_to, len(peredur_rows))}) at the 7200 s cap")
 
 tot_claimed = sum(int(num_or_zero(r["n_claimed"])) for r in aurus_rows)
 tot_ok = sum(int(num_or_zero(r["n_realize_ok"])) for r in aurus_rows)
@@ -307,5 +307,5 @@ print()
 print("Zero-output families (assumption-free, PLAN §6):")
 for f in both:
     if a_hit[f] == 0 or c_hit[f] == 0:
-        print(f"    {f:28s} counter {c_hit[f]:2d}/{c_n[f]:<3d}  "
+        print(f"    {f:28s} PEREDUR {c_hit[f]:2d}/{c_n[f]:<3d}  "
               f"AuRUS {a_hit[f]:2d}/{a_n[f]:<3d}")

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-// Argument handling shared by the CLI drivers (counter, compare, realize, ltl
+// Argument handling shared by the CLI drivers (peredur, compare, realize, ltl
 // and mucs). Each driver still owns its own usage text and its own flags; only
 // the pieces every one of them needs identically live here.
 

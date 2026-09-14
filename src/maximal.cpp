@@ -31,15 +31,15 @@
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
 
-// Runs counter's maximality filter over a directory of specifications that
-// counter did not produce, so a foreign tool's output can be measured for
-// semantic diversity on the same definition counter applies to its own. Both
+// Runs PEREDUR's maximality filter over a directory of specifications that
+// PEREDUR did not produce, so a foreign tool's output can be measured for
+// semantic diversity on the same definition PEREDUR applies to its own. Both
 // front ends are here: basic-TLSF text and FRETISH JSON, selected by extension
 // the way `compare` selects, since a maximality curve over a FRETISH campaign
 // reads the same accumulated candidates a TLSF one does.
 //
 // Two numbers, because they answer different questions and AuRUS's own
-// MaximalSolutions filter conflates them. "maximal" is the filter counter runs:
+// MaximalSolutions filter conflates them. "maximal" is the filter PEREDUR runs:
 // keep every spec no other spec strictly dominates, so a whole equivalence
 // class survives together. "classes" quotients those survivors by mutual
 // implication, which is the count of genuinely distinct strongest repairs. A

@@ -64,7 +64,7 @@ export function generation(gen, extra = {}) {
   };
 }
 
-/** A log captured from a real `counter --dashboard` run, trimmed to its first
+/** A log captured from a real `peredur --dashboard` run, trimmed to its first
  *  two generations. Guards the page against a change to the writer's schema. */
 export function realRun() {
   return readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures",

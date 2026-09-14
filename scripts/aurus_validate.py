@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Validate AuRUS's claimed repairs with counter's own checkers.
+"""Validate AuRUS's claimed repairs with PEREDUR's own checkers.
 
 Post-processing for the AuRUS baseline campaign (scripts/aurus_campaign.py):
-AuRUS checks realizability with Strix, counter with ltlsynt, so every repair
+AuRUS checks realizability with Strix, PEREDUR with ltlsynt, so every repair
 AuRUS emits (spec0.tlsf, spec1.tlsf, ... per <out-root>/<spec>/<repeat-nn>/)
 is (a) re-checked with `realize` and any disagreement recorded, and (b) scored
 against the family's genuine fixes (examples/<spec>/fixes/) with `compare`,
 under the same assume-guarantee implication order — and the same output
 parsing (run_experiments.parse_compare_output, imported, not copied) — as the
-implies_ideal column of counter's own runs, so implies_genuine is directly
+implies_ideal column of PEREDUR's own runs, so implies_genuine is directly
 comparable.
 
 AuRUS appends //fitness trailer comment lines to each repair TLSF. No
-stripping is needed: counter's TLSF lexer skips // line comments (and /* */
+stripping is needed: PEREDUR's TLSF lexer skips // line comments (and /* */
 blocks), verified against real AuRUS output files — `realize` and `compare`
 both consume them as-is, and `compare --repairs <repeat dir>` is safe because
 only the spec*.tlsf files in a repeat dir carry the .tlsf extension.
@@ -20,11 +20,11 @@ only the spec*.tlsf files in a repeat dir carry the .tlsf extension.
 Every repair that survives (a) is then asked whether it is well-separated —
 whether the system can force the spec's own assumptions to fail. AuRUS ran
 with -addA, so it may add assumptions freely, and a repair that reaches
-realizability by adding assumptions it then defeats is the cheat counter's
+realizability by adding assumptions it then defeats is the cheat PEREDUR's
 status objective was rewritten to stop paying for. Without this column a
 claimed repair count says nothing about how many of the repairs mean
 anything. The query goes through check_well_separated.check_one (imported,
-not copied) rather than a counter binary: counter's in-run checker caches a
+not copied) rather than a PEREDUR binary: PEREDUR's in-run checker caches a
 realizability timeout as "unrealizable", which for this query reads as
 "well-separated", so a verdict taken from it would silently launder the
 timeouts. Unrealizable repairs are not asked — there is no strategy to
@@ -101,7 +101,7 @@ def separation_verdict(tlsf: Path, ltlsynt: Path, timeout: int) -> str:
     """Well-separated / not-well-separated / undecided for one repair.
 
     Delegates to check_well_separated.check_one rather than asking `realize`,
-    for the reason that script's docstring gives: counter's in-run checker
+    for the reason that script's docstring gives: PEREDUR's in-run checker
     maps a realizability timeout to "unrealizable" and caches it, which for
     this query reads as "well-separated". A CLI built on the same cache would
     inherit the collapse. check_one shells to ltlsynt directly and reports a
@@ -276,7 +276,7 @@ def main() -> None:
 
         # The scored set is the repairs that are realizable AND well-separated.
         # An ill-separated repair is one the system satisfies by defeating its
-        # own assumptions, and counter's output gate rejects those
+        # own assumptions, and PEREDUR's output gate rejects those
         # unconditionally, so crediting AuRUS for one would score the two arms
         # by different standards. The unfiltered rate is kept alongside as
         # implies_genuine_all because it is what PLAN.md pre-registered before

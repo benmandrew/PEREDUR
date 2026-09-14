@@ -3,7 +3,7 @@
 
 Re-runs `compare` against the repair JSONs already on disk and rewrites only
 best_relation / implies_ideal / n_implies for each row — best_fitness,
-n_repairs, wall_time_s, etc. are left untouched. No `counter` re-runs.
+n_repairs, wall_time_s, etc. are left untouched. No `peredur` re-runs.
 
 This fixes rows whose comparison was recorded as `unknown` because compare
 failed at collection time (e.g. the pre-`--ideals` interface, or a compare

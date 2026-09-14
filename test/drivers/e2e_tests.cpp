@@ -19,8 +19,8 @@
 // Where the driver binaries land, from CMake. These suites are the only place
 // the test binary reaches for another target's output, so the path arrives as
 // a definition rather than being reconstructed from argv[0].
-#ifndef COUNTER_DRIVER_DIR
-#error "COUNTER_DRIVER_DIR must be defined by the build"
+#ifndef PEREDUR_DRIVER_DIR
+#error "PEREDUR_DRIVER_DIR must be defined by the build"
 #endif
 
 namespace {
@@ -77,7 +77,7 @@ MAIN {
 }
 )";
 
-// The FRETISH half, so that `counter` is exercised on both front ends: the
+// The FRETISH half, so that `peredur` is exercised on both front ends: the
 // TLSF specification above never reaches src/repair/, and the two paths share
 // only the CLI.
 const char* const k_fretish = R"({
@@ -139,7 +139,7 @@ class TempDir {
    public:
     explicit TempDir(const std::string& name)
         : m_path(std::filesystem::temp_directory_path() /
-                 ("counter_e2e_" + name + "_" + std::to_string(getpid()))) {
+                 ("peredur_e2e_" + name + "_" + std::to_string(getpid()))) {
         std::filesystem::remove_all(m_path);
         std::filesystem::create_directories(m_path);
     }
@@ -184,7 +184,7 @@ struct DriverRun {
 
 DriverRun run_driver(const std::string& name,
                      const std::vector<std::string>& arguments) {
-    std::vector<std::string> argv{std::string(COUNTER_DRIVER_DIR) + "/" + name};
+    std::vector<std::string> argv{std::string(PEREDUR_DRIVER_DIR) + "/" + name};
     argv.insert(argv.end(), arguments.begin(), arguments.end());
     const ProcessResult result = execute_and_capture(argv, k_deadline);
     expect(!result.m_timed_out, name + ": answered within its deadline");
@@ -296,8 +296,8 @@ nlohmann::json expect_run_manifest(const std::filesystem::path& dir,
     return manifest;
 }
 
-void test_counter_repairs_tlsf() {
-    const TempDir dir("counter_tlsf");
+void test_peredur_repairs_tlsf() {
+    const TempDir dir("peredur_tlsf");
     const std::string input =
         write_file(dir.path() / "spec.tlsf", k_unrealizable).string();
     const std::string config =
@@ -308,39 +308,39 @@ void test_counter_repairs_tlsf() {
     std::filesystem::create_directories(second);
 
     const DriverRun run =
-        run_driver("counter", {"--input", input, "--output-dir", first.string(),
+        run_driver("peredur", {"--input", input, "--output-dir", first.string(),
                                "--config", config, "--seed", "2"});
-    expect(run.m_exit_code == 0, "counter: a TLSF run exits zero");
+    expect(run.m_exit_code == 0, "peredur: a TLSF run exits zero");
     expect(contains(run.m_output, "Seed: 2"),
-           "counter: the run prints the seed it was given");
+           "peredur: the run prints the seed it was given");
     expect(contains(run.m_output, "Filter report:"),
-           "counter: the run prints the filter report");
+           "peredur: the run prints the filter report");
     expect(contains(run.m_output, "Done in"),
-           "counter: the run prints its closing line");
-    expect_run_manifest(first, input, 2, "counter/tlsf");
+           "peredur: the run prints its closing line");
+    expect_run_manifest(first, input, 2, "peredur/tlsf");
 
     // The same seed twice, which is the whole claim --seed makes. Compared over
     // the repairs rather than run.json, whose timings are wall-clock.
     const DriverRun again = run_driver(
-        "counter", {"--input", input, "--output-dir", second.string(),
+        "peredur", {"--input", input, "--output-dir", second.string(),
                     "--config", config, "--seed", "2"});
-    expect(again.m_exit_code == 0, "counter: the repeat run exits zero");
+    expect(again.m_exit_code == 0, "peredur: the repeat run exits zero");
     const std::vector<std::filesystem::path> first_repairs =
         repair_files(first);
     const std::vector<std::filesystem::path> second_repairs =
         repair_files(second);
     expect(first_repairs.size() == second_repairs.size(),
-           "counter: one seed writes the same number of repairs twice");
+           "peredur: one seed writes the same number of repairs twice");
     for (std::size_t i = 0; i < first_repairs.size(); ++i) {
         expect(first_repairs[i].filename() == second_repairs[i].filename(),
-               "counter: the repairs are named the same way twice");
+               "peredur: the repairs are named the same way twice");
         expect(read_file(first_repairs[i]) == read_file(second_repairs[i]),
-               "counter: one seed writes byte-identical repairs twice");
+               "peredur: one seed writes byte-identical repairs twice");
     }
 }
 
-void test_counter_repairs_fretish() {
-    const TempDir dir("counter_fretish");
+void test_peredur_repairs_fretish() {
+    const TempDir dir("peredur_fretish");
     const std::string input =
         write_file(dir.path() / "spec.json", k_fretish).string();
     const std::string config =
@@ -349,42 +349,42 @@ void test_counter_repairs_fretish() {
     std::filesystem::create_directories(out);
 
     const DriverRun run =
-        run_driver("counter", {"--input", input, "--output-dir", out.string(),
+        run_driver("peredur", {"--input", input, "--output-dir", out.string(),
                                "--config", config, "--seed", "5"});
-    expect(run.m_exit_code == 0, "counter: a FRETISH run exits zero");
+    expect(run.m_exit_code == 0, "peredur: a FRETISH run exits zero");
     expect(contains(run.m_output, "Done in"),
-           "counter: the FRETISH run prints its closing line");
-    expect_run_manifest(out, input, 5, "counter/fretish");
+           "peredur: the FRETISH run prints its closing line");
+    expect_run_manifest(out, input, 5, "peredur/fretish");
     for (const auto& repair : repair_files(out)) {
         expect(repair.extension() == ".json",
-               "counter: a FRETISH run writes FRETISH repairs");
+               "peredur: a FRETISH run writes FRETISH repairs");
         expect(nlohmann::json::parse(read_file(repair)).contains("guarantees"),
-               "counter: each repair parses as a specification");
+               "peredur: each repair parses as a specification");
     }
 }
 
-void test_counter_rejects_bad_arguments() {
-    const TempDir dir("counter_args");
+void test_peredur_rejects_bad_arguments() {
+    const TempDir dir("peredur_args");
     const std::string input =
         write_file(dir.path() / "spec.tlsf", k_unrealizable).string();
 
     // An unknown flag is refused rather than ignored, which is what stops a
     // campaign silently running without the knob it thought it set.
     const DriverRun unknown = run_driver(
-        "counter", {"--input", input, "--output-dir", dir.string(), "--bogus"});
-    expect(unknown.m_exit_code != 0, "counter: an unknown flag is refused");
+        "peredur", {"--input", input, "--output-dir", dir.string(), "--bogus"});
+    expect(unknown.m_exit_code != 0, "peredur: an unknown flag is refused");
     expect(contains(unknown.m_output, "--bogus"),
-           "counter: the refusal names the flag it did not accept");
+           "peredur: the refusal names the flag it did not accept");
 
-    const DriverRun no_output = run_driver("counter", {"--input", input});
+    const DriverRun no_output = run_driver("peredur", {"--input", input});
     expect(no_output.m_exit_code != 0,
-           "counter: a run without --output-dir is refused");
+           "peredur: a run without --output-dir is refused");
 
     const DriverRun missing =
-        run_driver("counter", {"--input", (dir.path() / "absent.tlsf").string(),
+        run_driver("peredur", {"--input", (dir.path() / "absent.tlsf").string(),
                                "--output-dir", dir.string()});
     expect(missing.m_exit_code != 0,
-           "counter: an input that is not there is refused");
+           "peredur: an input that is not there is refused");
 }
 
 void test_realize_decides_both_ways() {
@@ -550,7 +550,7 @@ void test_lint_ideals_checks_a_subject() {
 // a trace of no frames, which is the deterministic half of a crash report. The
 // frames are the part that depends on where the crash happened.
 std::string run_signal_tracer(const std::vector<std::string>& arguments) {
-    std::vector<std::string> argv{std::string(COUNTER_DRIVER_DIR) +
+    std::vector<std::string> argv{std::string(PEREDUR_DRIVER_DIR) +
                                   "/signal_tracer"};
     argv.insert(argv.end(), arguments.begin(), arguments.end());
     const PipedChild child =
@@ -656,11 +656,11 @@ void test_maximal_reports_both_formats() {
 
 }  // namespace
 
-void run_counter_driver_tests() {
-    test_counter_repairs_tlsf();
-    test_counter_repairs_fretish();
-    test_counter_rejects_bad_arguments();
-    expect_reports_version("counter");
+void run_peredur_driver_tests() {
+    test_peredur_repairs_tlsf();
+    test_peredur_repairs_fretish();
+    test_peredur_rejects_bad_arguments();
+    expect_reports_version("peredur");
 }
 
 void run_realize_driver_tests() {

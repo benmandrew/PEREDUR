@@ -1,6 +1,6 @@
-# counter
+# PEREDUR
 
-C++17 genetic algorithm for repairing unrealizable FRETISH and TLSF specifications, using bounded model counting (SPOT + Ganak) for semantic similarity. Binaries: `counter`, `realize`, `compare`, `ltl`, `mucs`, `maximal`, `lint-ideals` (run each with `--help`).
+C++17 genetic algorithm for repairing unrealizable FRETISH and TLSF specifications, using bounded model counting (SPOT + Ganak) for semantic similarity. Binaries: `peredur`, `realize`, `compare`, `ltl`, `mucs`, `maximal`, `lint-ideals` (run each with `--help`).
 
 A run loads a spec, breeds offspring, filters them (dedup, bloat cap, vacuity), scores the survivors (syntactic + semantic + status), selects under NSGA-II, re-checks realizability at the output gate, applies final filters (dedup, implication), and writes `repair_N.json` plus `run.json`.
 
@@ -60,7 +60,7 @@ Tests use `expect`/`fail` from `test/test_support.hpp`, with each suite a free f
 - A new TOML key touches `apply_*` and `config_key_spec()` in `src/config_io.cpp`, `config_json()` in `src/repair/manifest.cpp`, `schemas/config-schema.json`, `example-config.toml` (whose values must equal the built-in defaults), and `DEFAULT_FIELDS` or `GEN_CONFIGS_FIELDS` in `scripts/check_config_schema.py`. `lint` checks them against each other.
 - Moving a C++ default changes what every archived config means: record it under "Config vintage" in `experiments/README.md`. Removing a key retires the sweeps and runner profiles that emit it.
 - A new `--diagnostics` counter also joins `write_run_manifest` and bumps `k_schema_version`.
-- A new `counter` flag joins the table in `src/main.cpp`, or `find_unknown_arg` rejects it.
+- A new `peredur` flag joins the table in `src/main.cpp`, or `find_unknown_arg` rejects it.
 - Anything that moves the cursor goes through `stdout_is_tty()` (`include/status_line.hpp`). Most runs are redirected to `run.log`.
 - The scoring report's `N individual(s) dropped` line prints unconditionally; `run_experiments.py` parses it.
 - Report best fitness as the population maximum, never `population[0]`.

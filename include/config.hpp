@@ -58,7 +58,7 @@ enum class RepairMode : std::uint8_t { Monolithic, Muc };
 /// every one of them 0.5, where Mrs spreads them over 14 distinct values with a
 /// median of 6 grade levels per specification.
 /// Aurus is AuRUS's own six-level ladder, reproduced value for value (see
-/// @ref status_score_aurus). It exists so an ablation can cross counter's
+/// @ref status_score_aurus). It exists so an ablation can cross PEREDUR's
 /// grading against the design this search derives from, which is why it is
 /// faithful rather than improved: it grades below realizability by which side
 /// of the specification survives on its own, and it is the one scale here that
@@ -79,7 +79,7 @@ enum class MrsAdmissionOrder : std::uint8_t { Spec, Degree };
 
 /// What ends the search (see @ref Config::termination).
 ///
-/// Generations is counter's own budget: `Config::generations` rounds, whatever
+/// Generations is PEREDUR's own budget: `Config::generations` rounds, whatever
 /// they cost. Individuals is AuRUS's, and exists so the two tools can be given
 /// the same budget in the same currency -- its GA stops once
 /// `numberOfVisitedIndividuals` reaches `GA_MAX_NUM_INDIVIDUALS`, counted per
@@ -121,7 +121,7 @@ struct Config {
     std::size_t population_size = 200;
     /// Objective weights for the weighted scalar, matching AuRUS's
     /// `Settings.java`: STATUS_FACTOR 0.7, LOST_MODELS_FACTOR and
-    /// WON_MODELS_FACTOR 0.1 each (0.2 together, counter's one semantic
+    /// WON_MODELS_FACTOR 0.1 each (0.2 together, PEREDUR's one semantic
     /// objective), and SYNTACTIC_FACTOR 0.1. Only the weighted selection scheme
     /// ranks by the scalar; the NSGA-II schemes read the objectives apart.
     double fitness_weight_syntactic = 0.1;
@@ -142,7 +142,7 @@ struct Config {
     StatusGrading status_grading = StatusGrading::Mrs;
 
     /// Which budget ends the search (see TerminationMode). Generations is
-    /// counter's own and the default; Individuals matches AuRUS's, for a
+    /// PEREDUR's own and the default; Individuals matches AuRUS's, for a
     /// head-to-head where both tools get the same number of offspring.
     TerminationMode termination = TerminationMode::Generations;
     /// Which order the MRS walk admits parts in (see MrsAdmissionOrder). Read
@@ -222,14 +222,14 @@ struct Config {
     /// individual.
     std::chrono::milliseconds ltlfilt_timeout{10'000};
     /// When true, print the CPU-attribution report (your code vs. the external
-    /// CLI tools, via getrusage + per-tool wait4). Set by `counter
+    /// CLI tools, via getrusage + per-tool wait4). Set by `peredur
     /// --cpu-report` alone; deliberately not a TOML key, because it asks a
     /// question about one interactive run rather than about the search, exactly
-    /// as COUNTER_PROFILE does for the scope profiler.
+    /// as PEREDUR_PROFILE does for the scope profiler.
     bool report_cpu_timing = false;
     /// When true, print the engine-internal counters at exit: per-tool call and
     /// cache totals, the ltl2tgba tautology substitutions, the constant-folded
-    /// count, and the fitness cache hit rate. Set by `counter --diagnostics`
+    /// count, and the fitness cache hit rate. Set by `peredur --diagnostics`
     /// alone, a flag rather than a TOML key for the same reason
     /// report_cpu_timing is. Off by default because stdout is for watching a
     /// run in progress and none of these say anything about the run's repairs.
@@ -341,7 +341,7 @@ struct Config {
     /// The cost narrowed because accumulate_repairs is on in both arms, so a
     /// repair found in an early generation is kept whether or not an elite
     /// carried it forward. The only measured difference between the two
-    /// settings on the corpus counter is now benchmarked against is that 0
+    /// settings on the corpus PEREDUR is now benchmarked against is that 0
     /// costs 4.0% more wall time, so the default stays at 0.1. Only 0 and 0.1
     /// have ever been measured, so nothing speaks to intermediate rates.
     ///
@@ -455,9 +455,9 @@ struct Config {
     /// `G(guard -> o l)` -- and the assumption-shaped ideals are far larger:
     /// gyro-var2's single ideal is roughly a 29-node assumption, the polarity
     /// mirror of the specification's own third assumption, and over 112
-    /// emitted gyro-var2 repairs counter appended only 6 assumptions, every
+    /// emitted gyro-var2 repairs PEREDUR appended only 6 assumptions, every
     /// one template-shaped. AuRUS reaches a near-duplicate assumption through
-    /// its level-1 crossover, which unions conjunct subsets; counter's
+    /// its level-1 crossover, which unions conjunct subsets; PEREDUR's
     /// crossover draws one conjunct per side and cannot, so the move belongs
     /// to mutation here.
     ///
@@ -476,7 +476,7 @@ struct Config {
     ///
     /// A single literal was all it could draw until 2026-08-25, which put a
     /// class of ideal off the grammar rather than merely far from it. `lift`'s
-    /// ideal is `G F (b1 | b2 | b3)` over its three inputs and counter reached
+    /// ideal is `G F (b1 | b2 | b3)` over its three inputs and PEREDUR reached
     /// it in 0 of 60 runs across the three arms of the 2026-08-23 campaign;
     /// the atom-growth move in `mutate_atom_formula` widens an *existing*
     /// atom, so it can only act after an assumption is in the population, and
@@ -523,7 +523,7 @@ struct Config {
     /// Every appended assumption was G-wrapped until 2026-08-25, which made a
     /// bare eventuality unreachable rather than unlikely. `examples/lily11`'s
     /// whole ideal is `F req`, and `G F req` is strictly stronger, so no
-    /// rewriting of a G-wrapped assumption arrives at it; counter repairs that
+    /// rewriting of a G-wrapped assumption arrives at it; PEREDUR repairs that
     /// family in 19 of 60 runs against AuRUS's 50.
     ///
     /// Drawn rather than substituted, the bare form being the weaker of the

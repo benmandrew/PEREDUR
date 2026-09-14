@@ -39,10 +39,10 @@ class DashboardWriter {
     /// output directory is all the viewer needs. Returns the page's path, or an
     /// empty string in each of the three cases where no page is written: the
     /// writer is disabled, the build carries no dashboard page path
-    /// (COUNTER_DASHBOARD_PAGE_PATH is undefined), or the copy itself failed.
+    /// (PEREDUR_DASHBOARD_PAGE_PATH is undefined), or the copy itself failed.
     ///
-    /// The page is taken from `COUNTER_DASHBOARD_PAGE` when that environment
-    /// variable is set and non-empty, and from COUNTER_DASHBOARD_PAGE_PATH
+    /// The page is taken from `PEREDUR_DASHBOARD_PAGE` when that environment
+    /// variable is set and non-empty, and from PEREDUR_DASHBOARD_PAGE_PATH
     /// otherwise. The environment is read once, on first use. A build without
     /// the compile-time definition writes no page whatever the environment
     /// says, the page being a property of the build.

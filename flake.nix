@@ -1,5 +1,5 @@
 {
-  description = "counter — genetic repair of FRETISH specifications";
+  description = "PEREDUR — genetic repair of FRETISH specifications";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -55,7 +55,7 @@
             cppcheck
             cpplint
 
-            # fuzz/ltl_equivalence_fuzzer (COUNTER_FUZZ): -fsanitize=fuzzer
+            # fuzz/ltl_equivalence_fuzzer (PEREDUR_FUZZ): -fsanitize=fuzzer
             # (libFuzzer) is a clang/compiler-rt feature with no GCC
             # equivalent, so the fuzz target is built with its own clang++
             # invocation (see fuzz/CMakeLists.txt) rather than the project's
@@ -113,7 +113,7 @@
           # programs and crashing them on ABI mismatches. cmake/black.cmake
           # reads this plain var and bakes the path directly into the
           # black-sat wrapper script instead, scoped to just that one exec.
-          COUNTER_FMT9_LIB_DIR =
+          PEREDUR_FMT9_LIB_DIR =
             pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux
               "${pkgs.fmt_9}/lib";
         };

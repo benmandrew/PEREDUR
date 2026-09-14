@@ -55,17 +55,17 @@ REPO_ROOT = Path(__file__).parent.parent
 
 # The binaries the pass runs, and the ones the freshness gate reads. The
 # per-binary overrides are the ones score_curves.py itself honours, so the gate
-# checks the binary the children will actually run; COUNTER_BIN_DIR moves both
+# checks the binary the children will actually run; PEREDUR_BIN_DIR moves both
 # at once, for a worktree pointed at another checkout's build, and is exported
 # to the children as the two per-binary overrides so they cannot diverge.
-BIN_DIR = Path(os.environ.get("COUNTER_BIN_DIR", REPO_ROOT / "build-release"))
+BIN_DIR = Path(os.environ.get("PEREDUR_BIN_DIR", REPO_ROOT / "build-release"))
 MAXIMAL_BIN = Path(os.environ.get("MAXIMAL_BIN", BIN_DIR / "maximal"))
 COMPARE_BIN = Path(os.environ.get("COMPARE_BIN", BIN_DIR / "compare"))
 
 # The scorer, as a command line rather than an import: one subprocess per run
-# is what the outer wall cap and the core pinning attach to. COUNTER_SCORE_CURVES_CMD
+# is what the outer wall cap and the core pinning attach to. PEREDUR_SCORE_CURVES_CMD
 # points it at a stub so the pool can be tested without a solver.
-SCORE_CURVES_CMD = os.environ.get("COUNTER_SCORE_CURVES_CMD",
+SCORE_CURVES_CMD = os.environ.get("PEREDUR_SCORE_CURVES_CMD",
                                   "python3 scripts/score_curves.py")
 
 # The values a score phase takes when campaign.toml omits a key. campaign.py

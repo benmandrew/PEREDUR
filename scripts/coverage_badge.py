@@ -39,14 +39,14 @@ PROFDATA = BUILD / "coverage.profdata"
 # absent code. Naming them explicitly means a new binary that nothing measures
 # fails here rather than quietly leaving its lines out of the denominator.
 BINARIES = (
-    "counter",
+    "peredur",
     "compare",
     "lint-ideals",
     "ltl",
     "mucs",
     "realize",
     "signal_tracer",
-    "test/counter_tests",
+    "test/peredur_tests",
 )
 
 # The measured tree. `include/` is half the code -- the templates and the inline

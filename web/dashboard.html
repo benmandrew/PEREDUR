@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>counter — run progress</title>
+<title>PEREDUR — run progress</title>
 <style>
   /* ---- palette: roles only. Never reference a raw hex below this block. ---- */
   :root {
@@ -350,7 +350,7 @@
 <div class="wrap">
 
   <header class="top">
-    <h1>counter — run progress</h1>
+    <h1>PEREDUR — run progress</h1>
     <span class="spacer"></span>
     <span class="status" id="status" data-state="waiting"><span class="pip"></span><span id="status-text">waiting for data</span></span>
     <button class="theme" id="theme-toggle" type="button" aria-live="polite">Dark</button>
@@ -464,10 +464,10 @@
   var toggle = null;
 
   function storedTheme() {
-    try { return window.localStorage.getItem("counter-dash-theme"); } catch (e) { return null; }
+    try { return window.localStorage.getItem("peredur-dash-theme"); } catch (e) { return null; }
   }
   function storeTheme(v) {
-    try { window.localStorage.setItem("counter-dash-theme", v); } catch (e) { /* ignore */ }
+    try { window.localStorage.setItem("peredur-dash-theme", v); } catch (e) { /* ignore */ }
   }
   function effectiveDark() {
     var t = root.getAttribute("data-theme");

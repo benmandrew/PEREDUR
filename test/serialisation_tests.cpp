@@ -15,7 +15,7 @@
 namespace {
 
 std::string write_temp_spec(const std::string& contents) {
-    std::string path = "/tmp/counter-spec-XXXXXX";
+    std::string path = "/tmp/peredur-spec-XXXXXX";
     const int file_descriptor = mkstemp(path.data());
     expect(file_descriptor >= 0,
            "atom-prefix: failed to create temp spec file");

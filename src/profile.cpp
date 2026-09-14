@@ -56,10 +56,10 @@ std::map<std::string, std::uint64_t>& counter_registry() {
     return *counters;
 }
 
-// COUNTER_PROFILE's value, or nullptr when unset. Captured once: a run that
+// PEREDUR_PROFILE's value, or nullptr when unset. Captured once: a run that
 // re-read the environment per scope would let the answer change mid-run.
 const char* profile_target() {
-    static const char* target = std::getenv("COUNTER_PROFILE");
+    static const char* target = std::getenv("PEREDUR_PROFILE");
     return target;
 }
 
@@ -74,10 +74,10 @@ std::string format_ns(std::uint64_t nanos) {
 
 bool enabled() {
     // Registering the report here rather than asking each main() to call it
-    // means every binary -- compare, realize, mucs, ltl as well as counter --
+    // means every binary -- compare, realize, mucs, ltl as well as peredur --
     // reports without further wiring. Reading the sites at exit is safe because
     // they are deliberately leaked, so nothing has destroyed them by then, and
-    // report_if_enabled is idempotent, so counter's own explicit call at the
+    // report_if_enabled is idempotent, so PEREDUR's own explicit call at the
     // end of its timing report still prints exactly once.
     static const bool is_enabled = [] {
         const bool requested = profile_target() != nullptr;
@@ -222,7 +222,7 @@ void report(std::ostream& out) {
                   return lhs->m_wall_ns.load() > rhs->m_wall_ns.load();
               });
 
-    out << "\nScope profile (COUNTER_PROFILE):\n";
+    out << "\nScope profile (PEREDUR_PROFILE):\n";
     out << std::left << std::setw(34) << "site" << std::right << std::setw(10)
         << "calls" << std::setw(12) << "wall" << std::setw(12) << "cpu"
         << std::setw(9) << "cpu/wall" << std::setw(12) << "wall/call"

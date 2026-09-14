@@ -60,13 +60,13 @@ Every pipe a runner opens must be created with `pipe2(..., O_CLOEXEC)`, as `exec
 
 `spawn_piped_child` (`process.hpp`) is the one fork for any bidirectional child, so a second user differs only in `ParentDeathPolicy` and `ExecutableLookup`. Nothing may fork outside `process.cpp`, because `posix_spawn` has no attribute for `PR_SET_PDEATHSIG`.
 
-A tool's peak resident set size (RSS) cannot be measured below counter's own: `exec` folds the copy-on-write parent's high-water into the child's `maxrss`. `ProcessResult` therefore samples `m_peak_rss_floor_kb` before the fork and reports `m_peak_rss_kb` as zero at or below it. `tool/<name>/rss_*` counts every invocation in `calls` but only floor-clearing ones in `rss_measured`, so a mean is `rss_kb_total / rss_measured`. The `process_runner` suite pins this with a 512MB buffer.
+A tool's peak resident set size (RSS) cannot be measured below PEREDUR's own: `exec` folds the copy-on-write parent's high-water into the child's `maxrss`. `ProcessResult` therefore samples `m_peak_rss_floor_kb` before the fork and reports `m_peak_rss_kb` as zero at or below it. `tool/<name>/rss_*` counts every invocation in `calls` but only floor-clearing ones in `rss_measured`, so a mean is `rss_kb_total / rss_measured`. The `process_runner` suite pins this with a 512MB buffer.
 
 `simplify_ltl` runs one `ltlfilt` exec per cache miss. Coalescing concurrent misses was tried and removed: at `parallel = 8` the mean batch size was 1.012, and wall time rose 37% on 46 of 46 paired examples. Any second attempt must first show a batch size above 1.
 
 ## Profiling
 
-`COUNTER_PROFILE=<path>` enables the *scope profiler* (`include/profile.hpp`): a table on stderr plus JSON at the path, while `COUNTER_PROFILE=1` gives only the table. The report registers with `atexit` on the first scope opened, so every binary reports without extra wiring. The `counter` drivers also call the idempotent `profile::report_if_enabled()` so the profile prints before the manifest and `Done in`.
+`PEREDUR_PROFILE=<path>` enables the *scope profiler* (`include/profile.hpp`): a table on stderr plus JSON at the path, while `PEREDUR_PROFILE=1` gives only the table. The report registers with `atexit` on the first scope opened, so every binary reports without extra wiring. The `peredur` drivers also call the idempotent `profile::report_if_enabled()` so the profile prints before the manifest and `Done in`.
 
 Read wall time against per-thread CPU time. A site with high wall time and near-zero CPU is waiting on a child process, as `proc/read` shows at a cpu/wall ratio of about 0.01.
 

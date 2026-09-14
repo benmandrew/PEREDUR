@@ -88,9 +88,9 @@ ProcessResult execute_and_capture(
 /// for anything longer-lived.
 ///
 /// macOS has no mechanism that survives the exec, so the request is made of a
-/// reaper process of counter's own instead (see src/runner/process.cpp). That
+/// reaper process of PEREDUR's own instead (see src/runner/process.cpp). That
 /// is a weaker guarantee — it depends on the reaper being alive and
-/// schedulable, where the Linux one holds with every thread of counter wedged
+/// schedulable, where the Linux one holds with every thread of PEREDUR wedged
 /// — and it is process-scoped rather than thread-scoped. The distinction below
 /// is preserved regardless, by registering only the first case: collapsing the
 /// two would contain the persistent formaliser child as well, which is the

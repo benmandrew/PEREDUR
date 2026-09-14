@@ -19,12 +19,12 @@
 #include "requirement.hpp"
 
 /// Default weight for WeightedFitnessFunction when not explicitly specified.
-/// Override at compile time with -DCOUNTER_DEFAULT_FITNESS_WEIGHT=<value>.
-#ifndef COUNTER_DEFAULT_FITNESS_WEIGHT
+/// Override at compile time with -DPEREDUR_DEFAULT_FITNESS_WEIGHT=<value>.
+#ifndef PEREDUR_DEFAULT_FITNESS_WEIGHT
 inline constexpr double k_default_fitness_weight = 1.0;
 #else
 inline constexpr double k_default_fitness_weight =
-    COUNTER_DEFAULT_FITNESS_WEIGHT;
+    PEREDUR_DEFAULT_FITNESS_WEIGHT;
 #endif
 
 /// A fitness function scores a specification element, returning a value in
@@ -106,7 +106,7 @@ struct WeightedFitnessFunctionT {
 /// and TLSF ones through `AggregateWeightedFitnessFunctionT<tlsf::-
 /// Specification>`, so every archived TLSF campaign records this cache as
 /// `{hits: 0, misses: 0}` while the matching FRETISH runs record 16,047
-/// against 3,955 -- the top-level cache, on the path counter is now
+/// against 3,955 -- the top-level cache, on the path PEREDUR is now
 /// benchmarked against, reporting nothing at all.
 struct FitnessCacheStats {
     inline static std::size_t n_hits = 0;

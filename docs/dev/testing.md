@@ -9,7 +9,7 @@ ctest --preset debug                  # run all tests
 ctest --preset debug -R syntactic     # run tests matching a regex
 ```
 
-Test binaries land at `build/test/counter_tests`. Tests use `expect(bool, message)` and `fail(message)` from `test/test_support.hpp`, and each suite is a free function declared in `test/test_suite.hpp`.
+Test binaries land at `build/test/peredur_tests`. Tests use `expect(bool, message)` and `fail(message)` from `test/test_support.hpp`, and each suite is a free function declared in `test/test_suite.hpp`.
 
 `test/web/*.test.mjs` (ctest `dashboard_page`) tests the dashboard script under node, evaluating the `<script>` block of the shipped `web/dashboard.html`; CMake skips it without `node`.
 
@@ -19,4 +19,4 @@ Test binaries land at `build/test/counter_tests`. Tests use `expect(bool, messag
 
 `python scripts/coverage_badge.py` builds the clang-only `coverage` preset into `build-coverage/`, runs its ctest, merges and exports the profiles over `src/` and `include/`, and writes `docs/coverage.svg`. Only `ctest --preset coverage` sets `LLVM_PROFILE_FILE`. Stale profiles are deleted first, an old one crediting lines this build may lack, and a failing suite writes no badge. `llvm-profdata` and `llvm-cov` must match the clang release, the profile format being versioned, which is why `llvmPackages.llvm` is in the dev shell.
 
-The committed badge must be regenerated when the number moves. `--check` re-measures as the tail of the CI `coverage` entry, which runs on pushes to `main` only, so run the script before merging a commit that moves the figure. The denominator is all eight instrumented binaries (83.6%, against 89.3% for `counter_tests` alone), and a new binary must join `BINARIES` in the script. The figure moves up to two tenths of a point between runs and 83.6% sits a tenth above a rounding boundary, so `--check` allows `CHECK_SLACK`, a quarter of a point beyond the rounding band, where a byte comparison would fail unrelated commits.
+The committed badge must be regenerated when the number moves. `--check` re-measures as the tail of the CI `coverage` entry, which runs on pushes to `main` only, so run the script before merging a commit that moves the figure. The denominator is all eight instrumented binaries (83.6%, against 89.3% for `peredur_tests` alone), and a new binary must join `BINARIES` in the script. The figure moves up to two tenths of a point between runs and 83.6% sits a tenth above a rounding boundary, so `--check` allows `CHECK_SLACK`, a quarter of a point beyond the rounding band, where a byte comparison would fail unrelated commits.

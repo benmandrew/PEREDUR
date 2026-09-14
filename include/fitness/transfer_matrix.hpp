@@ -40,7 +40,7 @@ static_assert(std::is_floating_point_v<Count>, "Count must be floating-point");
 // the build.
 #if LDBL_MANT_DIG < 64 || LDBL_MAX_EXP < 16384
 #pragma message(                                                      \
-    "counter: long double is narrower than x87 here; model-counting " \
+    "peredur: long double is narrower than x87 here; model-counting " \
     "range is ~16x shallower and scores lose ~3 digits. Supported, "  \
     "but atom-rich deep-horizon specs are bound-limited.")
 #endif

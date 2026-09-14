@@ -446,7 +446,7 @@ double syntactic_similarity(const Requirement& requirement,
 double syntactic_similarity(const Specification& specification,
                             const Specification& other_specification,
                             [[maybe_unused]] const Config& cfg) {
-    COUNTER_PROFILE_SCOPE("fitness/syntactic_similarity_spec");
+    PEREDUR_PROFILE_SCOPE("fitness/syntactic_similarity_spec");
     assert((!specification.m_assumptions.empty() ||
             !specification.m_guarantees.empty()) &&
            (!other_specification.m_assumptions.empty() ||

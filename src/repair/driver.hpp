@@ -6,7 +6,7 @@
 
 #include "config.hpp"
 
-// The two top-level repair runs counter dispatches to, each returning the
+// The two top-level repair runs PEREDUR dispatches to, each returning the
 // process exit status.
 //
 // @p seed is already parsed, so a malformed --seed cannot reach a run: absent

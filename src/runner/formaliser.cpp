@@ -27,7 +27,7 @@ constexpr std::chrono::milliseconds k_shutdown_grace{2000};
 std::string formaliser_script_path() {
 #ifdef FORMALISER_SCRIPT_PATH
     static const ToolPath k_script =
-        tool_path_from_env("COUNTER_FORMALISER_SCRIPT", FORMALISER_SCRIPT_PATH);
+        tool_path_from_env("PEREDUR_FORMALISER_SCRIPT", FORMALISER_SCRIPT_PATH);
     // Checked unconditionally (not assert()) since the resolved path is a
     // machine-local one either way: the compiled-in default can go stale
     // between configure time and a run without CMake ever re-running, an
@@ -39,7 +39,7 @@ std::string formaliser_script_path() {
     if (access(k_script.m_path.c_str(), F_OK) != 0) {
         throw std::runtime_error(
             "formaliser script not found: " + k_script.m_path +
-            (k_script.m_from_env ? " (from COUNTER_FORMALISER_SCRIPT)" : ""));
+            (k_script.m_from_env ? " (from PEREDUR_FORMALISER_SCRIPT)" : ""));
     }
     return k_script.m_path;
 #else
@@ -85,7 +85,7 @@ void PersistentProcess::ensure_spawned() {
     // later caller, and PDEATHSIG would have the kernel kill it the moment that
     // one thread returned. The concurrency test catches exactly that, as a
     // second worker reading a response from a node process that is already
-    // dead. The cost is that an abnormally killed counter leaves this child
+    // dead. The cost is that an abnormally killed PEREDUR leaves this child
     // behind; the destructor covers the normal path.
     //
     // SearchPath, because `node` is a general system interpreter looked up on

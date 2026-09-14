@@ -1,6 +1,6 @@
 ---
 name: docs-build
-description: Build the counter documentation site (Doxygen + Breathe + Sphinx). Use when running the docs target or debugging the docs build.
+description: Build the PEREDUR documentation site (Doxygen + Breathe + Sphinx). Use when running the docs target or debugging the docs build.
 ---
 
 # Docs

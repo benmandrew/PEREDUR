@@ -3,7 +3,7 @@
 #
 # .git: keeping it out means the history does not land in a layer, and the
 # context hash stops changing on every commit. The cost is that the build cannot
-# resolve its own commit, which is what --build-arg COUNTER_GIT_COMMIT supplies.
+# resolve its own commit, which is what --build-arg PEREDUR_GIT_COMMIT supplies.
 #
 # build*/: a host build tree would overwrite the third_party the tools stage
 # copied in, and with it the done-stamps that let the build skip Spot.

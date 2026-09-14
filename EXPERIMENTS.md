@@ -1,6 +1,6 @@
 # Experiments
 
-A dated log of `counter` parameter experiments, newest first. Each entry records **what changed**, **why**, and **what it found**. Raw data lives in the matching gitignored `experiments/YYYY-MM-DD-<campaign>/` subdirectory, alongside a per-campaign `analyse.ipynb`; the subdirectory's `results-*.csv` stem matches its run-dir folder so `scripts/recompare.py --results` resolves it directly. Active campaigns write to the `experiments/` top level and are archived into a dated subdirectory when they close.
+A dated log of `peredur` parameter experiments, newest first. Each entry records **what changed**, **why**, and **what it found**. Raw data lives in the matching gitignored `experiments/YYYY-MM-DD-<campaign>/` subdirectory, alongside a per-campaign `analyse.ipynb`; the subdirectory's `results-*.csv` stem matches its run-dir folder so `scripts/recompare.py --results` resolves it directly. Active campaigns write to the `experiments/` top level and are archived into a dated subdirectory when they close.
 
 The outcome metric throughout is `implies_ideal` — the fraction of runs producing at least one repair *equivalent to* or *stronger than* an ideal.
 
@@ -194,7 +194,7 @@ Profiles `replicate`, `replicate-recap`, `replicate-wkoff` and `replicate-tlsf` 
 
 **What.** Input verification for the AuRUS head-to-head (the ablation-campaign plan's precondition): for each head-to-head family, `examples/<family>/spec.tlsf` was diffed whitespace-insensitively against the AuRUS `case-studies/` TLSF the AuRUS baseline (`scripts/aurus_campaign.py`) will run. The comparison is meaningless if the two tools receive different specifications, so a mismatch here disqualifies the family from the head-to-head rather than being patched over.
 
-| counter family | AuRUS case-studies source | outcome |
+| PEREDUR family | AuRUS case-studies source | outcome |
 |---|---|---|
 | arbiter | `arbiter/arbiter.tlsf` | **MISMATCH** (see below) |
 | codesample-un1 | `codeSampleV3un1/codeSamples_v3un1simple_Forklift_unrealizable.tlsf` | match |
@@ -211,11 +211,11 @@ Profiles `replicate`, `replicate-recap`, `replicate-wkoff` and `replicate-tlsf` 
 | takeoff-tlsf | `takeoff/takeoff.tlsf` | match (imported verbatim this campaign) |
 | arbiter-aurus | `arbiter/arbiter.tlsf` | match (imported verbatim this campaign) |
 
-**arbiter mismatch.** `examples/arbiter/spec.tlsf` is counter's own hand-written GR(1) two-client arbiter (d9ae0ea, originally `arbiter-gr1`): inputs `r0, r1`, outputs `g0, g1`, guarantees `G (g0 -> r0); G (g1 -> r1); G !(g0 & g1); G F g0; G F g1`. AuRUS's `case-studies/arbiter/arbiter.tlsf` is a different specification entirely: inputs `a, r1, r2`, outputs `g1, g2`, guarantees `G (!r1 || F g1); G (!r2 || F g2); G (a || (!g1 && !g2))` — a request-response arbiter gated by a master-enable input, not a mutex. (It also differs from AuRUS's `examples/arbiter.tlsf`, which *is* byte-identical in content to counter's.) The two tools would solve different arbiter problems, so the head-to-head runs the AuRUS formulation on both sides: it is imported verbatim as a separate family `examples/arbiter-aurus/` (spec + the four `genuine/` fixes, one of which the realize gate below excludes), keyed `arbiter-aurus` in `h2h-tlsf` and `aurus_campaign.py`. counter's own `arbiter` is untouched and stays in the ablation corpus only.
+**arbiter mismatch.** `examples/arbiter/spec.tlsf` is PEREDUR's own hand-written GR(1) two-client arbiter (d9ae0ea, originally `arbiter-gr1`): inputs `r0, r1`, outputs `g0, g1`, guarantees `G (g0 -> r0); G (g1 -> r1); G !(g0 & g1); G F g0; G F g1`. AuRUS's `case-studies/arbiter/arbiter.tlsf` is a different specification entirely: inputs `a, r1, r2`, outputs `g1, g2`, guarantees `G (!r1 || F g1); G (!r2 || F g2); G (a || (!g1 && !g2))` — a request-response arbiter gated by a master-enable input, not a mutex. (It also differs from AuRUS's `examples/arbiter.tlsf`, which *is* byte-identical in content to PEREDUR's.) The two tools would solve different arbiter problems, so the head-to-head runs the AuRUS formulation on both sides: it is imported verbatim as a separate family `examples/arbiter-aurus/` (spec + the four `genuine/` fixes, one of which the realize gate below excludes), keyed `arbiter-aurus` in `h2h-tlsf` and `aurus_campaign.py`. PEREDUR's own `arbiter` is untouched and stays in the ablation corpus only.
 
 **Notes.**
 
-- **amba** is not in the head-to-head: it has no AuRUS `case-studies/` entry or `genuine/` solutions. Its `examples/amba/spec.tlsf` matches the AuRUS `examples/amba/amba_ahb_wo_ass_fairness_amba_ahb_1.tlsf` it was imported from (9e5fc08), so its provenance is clean; it simply stays counter-only.
+- **amba** is not in the head-to-head: it has no AuRUS `case-studies/` entry or `genuine/` solutions. Its `examples/amba/spec.tlsf` matches the AuRUS `examples/amba/amba_ahb_wo_ass_fairness_amba_ahb_1.tlsf` it was imported from (9e5fc08), so its provenance is clean; it simply stays PEREDUR-only.
 - **takeoff-tlsf** and **arbiter-aurus** were imported this campaign (spec + `genuine/` fixes, verbatim). Validation results below.
 
 **`realize` validation of the imports** (main-repo `build-release/realize`, 2026-07-22 binary, no engine changes since; 120 s timeout each):
@@ -231,10 +231,10 @@ Profiles `replicate`, `replicate-recap`, `replicate-wkoff` and `replicate-tlsf` 
 | arbiter-aurus/fixes/arbiter_fixed2.tlsf | REALIZABLE |
 | arbiter-aurus/fixes/arbiter_fixed3.tlsf | **UNREALIZABLE** — excluded (deleted) |
 
-- **takeoff-1 excluded.** Its truncated guarantee (`tr && X (tr && X (tr &&))`, dangling `&&`, exactly as upstream) fails counter's TLSF parser (`unexpected token ')'`). Per the import protocol upstream content is not hand-repaired, so the fix is dropped from `examples/takeoff-tlsf/fixes/` rather than patched.
+- **takeoff-1 excluded.** Its truncated guarantee (`tr && X (tr && X (tr &&))`, dangling `&&`, exactly as upstream) fails PEREDUR's TLSF parser (`unexpected token ')'`). Per the import protocol upstream content is not hand-repaired, so the fix is dropped from `examples/takeoff-tlsf/fixes/` rather than patched.
 - **takeoff-2 is UNREALIZABLE — in fact unsatisfiable.** Guarantee 1 forces `tr` at t=0..5 while guarantee 3 (`G (tr -> (!lo && X (!lo && X lo)))`) makes `tr` at t=0 demand `lo` at t=2 and `tr` at t=2 demand `!lo` at t=2; SPOT's `ltlfilt --satisfiable` confirms the conjunction is UNSAT. This is upstream's "genuine" solution as-is, imported byte-identical.
 - **arbiter_fixed3 is UNREALIZABLE.** `G (r1 <-> F g1)` lets the environment play `r1` false at t=0 (forbidding `g1` forever) then `r1` true at t=1 (demanding `F g1`) — the environment wins. Excluded (deleted); arbiter_fixed0–2 remain as the family's ideals.
-- **takeoff is excluded from the head-to-head entirely.** With takeoff-1 truncated and takeoff-2 unsatisfiable, *both* upstream "genuine" fixes are invalid and the family has zero valid ideals — nothing to score `implies_ideal` against on the counter side, and nothing for AuRUS's solutions to be judged genuine by. This is a finding about the upstream corpus, not a workaround: takeoff-tlsf is removed from `H2H_TLSF_SPECS` and from `aurus_campaign.py`'s default mapping, leaving a symmetric 12-family head-to-head (11 matched + arbiter-aurus). `examples/takeoff-tlsf/spec.tlsf` stays as inert imported data.
+- **takeoff is excluded from the head-to-head entirely.** With takeoff-1 truncated and takeoff-2 unsatisfiable, *both* upstream "genuine" fixes are invalid and the family has zero valid ideals — nothing to score `implies_ideal` against on the PEREDUR side, and nothing for AuRUS's solutions to be judged genuine by. This is a finding about the upstream corpus, not a workaround: takeoff-tlsf is removed from `H2H_TLSF_SPECS` and from `aurus_campaign.py`'s default mapping, leaving a symmetric 12-family head-to-head (11 matched + arbiter-aurus). `examples/takeoff-tlsf/spec.tlsf` stays as inert imported data.
 
 ---
 
@@ -365,7 +365,7 @@ python scripts/merge_experiments.py --profile padd av2 av3   # python3 on av2
 
 **What changed.** The first run of the `muc` profile: `tlsf.repair_mode` as a crossed factor (`monolithic` vs `muc`) over the six unrealizable TLSF specs, crossed in turn with a new TLSF assumption/guarantee *mutation split* (sweep M: `p_guarantee` ∈ {0.3, 0.5, 0.7, 0.9}, `p_assumption` its complement). NSGA-II, generations=10 / population_size=200. `repair_mode` is a no-op on the FRETISH specs, so it is crossed only over the TLSF corpus. **Why:** on the prior TLSF sweeps monolithic sat at `implies_ideal`≈0 on five of six specs — finding *a* repair but never one equivalent-or-stronger than the ideal — and never repaired `arbiter` at all, while `humanoid-531` cost ~13 min per run (768 s mean at this operating point). MUC extraction focuses the search and the per-candidate ltlsynt cost on the minimal unrealizable core, so the hypothesis was that it would reach the ideal where the whole-spec search cannot, and cut the runtime on the heavy specs. The two responses — `implies_ideal` and `wall_time_s` — are read co-equally.
 
-**Run.** Launched seed-major across av2 (seeds 0–30) and av3 (31–60), **2,928 runs** (1,488 + 1,440), completed 2026-07-21 after ~67 h — past the 60 h budget, but run to completion, so all 61 seeds are present rather than a truncated design. `jobs=1` per machine (one counter process using the full thread pool, keeping the per-process ltlsynt RAM cap machine-wide). Timeout caps were sized to the *slow* monolithic arm and applied identically to both arms (humanoid 2400 s, lift 600, gyro 300, the rest 120), so the fast arm is never the reason a cell is censored. Data: `experiments/results-muc.csv`. The design is **paired** — monolithic and MUC run at the same seed and the same mutation level — so every comparison below is matched: McNemar's exact test for the binary outcomes, Wilcoxon signed-rank for wall-time.
+**Run.** Launched seed-major across av2 (seeds 0–30) and av3 (31–60), **2,928 runs** (1,488 + 1,440), completed 2026-07-21 after ~67 h — past the 60 h budget, but run to completion, so all 61 seeds are present rather than a truncated design. `jobs=1` per machine (one PEREDUR process using the full thread pool, keeping the per-process ltlsynt RAM cap machine-wide). Timeout caps were sized to the *slow* monolithic arm and applied identically to both arms (humanoid 2400 s, lift 600, gyro 300, the rest 120), so the fast arm is never the reason a cell is censored. Data: `experiments/results-muc.csv`. The design is **paired** — monolithic and MUC run at the same seed and the same mutation level — so every comparison below is matched: McNemar's exact test for the binary outcomes, Wilcoxon signed-rank for wall-time.
 
 ### Result: MUC trades ideal-strength for coverage
 
@@ -515,7 +515,7 @@ Baseline (weakening on) `implies_ideal` rose from 0.030 to 0.372 for `fsm` and f
 
 - **Cost was calibrated under a saturated queue** (32 jobs / 4 workers). A 4-job batch underestimated it by 27%, because short specs finish early and hand their cores to long ones — a bias absent at gen10/pop200, where the specs differ by ~2 s ([[calibration-saturation-bias]]).
 - **Seed-major ordering** turns the deadline kill into a balanced design; the natural config-major order would leave the last levels at zero seeds.
-- **Stale-binary hazard.** `build-release/counter` must be checked against fix-commit mtimes, not its checkout's HEAD; a binary three commits behind faked SIGSEGVs and hung `signal_tracer` processes ([[stale-binary-trap]]).
+- **Stale-binary hazard.** `build-release/peredur` must be checked against fix-commit mtimes, not its checkout's HEAD; a binary three commits behind faked SIGSEGVs and hung `signal_tracer` processes ([[stale-binary-trap]]).
 - **Isolation.** The profile writes its own `results_dir`, `configs_dir` and CSV, and `run_id` includes the weakening state, so the two arms never read each other's `repair_*.json`.
 - **Timeouts are false zeros** (`implies_ideal=0`, `timed_out=1`); filter on `timed_out` before analysing. None fired this run.
 

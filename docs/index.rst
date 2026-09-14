@@ -1,4 +1,4 @@
-Counter
+PEREDUR
 =======
 
 Repairing unrealisable reactive specifications, written either as FRETISH requirements or as TLSF.

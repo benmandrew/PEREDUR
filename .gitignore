@@ -97,7 +97,7 @@ semantics.txt
 # still has to vendor it, or PROVENANCE.json names a blob the tree does not
 # hold (2026-08-07-elitism/scripts/campaign_driver.sh is the first).
 !/experiments/*/scripts/*.sh
-# And one whose analysis needed a new counter binary vendors that binary's
+# And one whose analysis needed a new PEREDUR binary vendors that binary's
 # source, since the reproduction step is a compile rather than an invocation
 # (2026-08-14-aurus-h2h/scripts/maximal.cpp is the first).
 !/experiments/*/scripts/*.cpp

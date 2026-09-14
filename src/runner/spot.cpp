@@ -123,7 +123,7 @@ RealizabilityChecker& global_real_checker() {
 std::string spot_bin_dir() {
 #ifdef SPOT_BIN_DIR
     static const ToolPath k_dir =
-        tool_path_from_env("COUNTER_SPOT_BIN_DIR", SPOT_BIN_DIR);
+        tool_path_from_env("PEREDUR_SPOT_BIN_DIR", SPOT_BIN_DIR);
     return k_dir.m_path;
 #else
     assert(false);
@@ -411,11 +411,11 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
     // reports nullopt rather than picking one for everybody.
     const std::optional<bool> realizable =
         result.m_timed_out ? std::nullopt : parse_realizability_output(result);
-    // Diagnostic hook (off unless COUNTER_LTLSYNT_LOG names a file): append one
+    // Diagnostic hook (off unless PEREDUR_LTLSYNT_LOG names a file): append one
     // "elapsed_s timed_out n_atoms" line per ltlsynt exec, for studying the
     // call-duration distribution and tuning ltlsynt_timeout. Zero cost when the
     // env var is unset.
-    if (const char* log_path = std::getenv("COUNTER_LTLSYNT_LOG")) {
+    if (const char* log_path = std::getenv("PEREDUR_LTLSYNT_LOG")) {
         static std::mutex log_mutex;
         const std::scoped_lock log_lock(log_mutex);
         std::ofstream log_file(log_path, std::ios::app);

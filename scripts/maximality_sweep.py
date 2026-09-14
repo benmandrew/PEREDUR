@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Run counter's TLSF maximality filter over both arms of the head-to-head.
+"""Run PEREDUR's TLSF maximality filter over both arms of the head-to-head.
 
 The comparison this exists for is diversity, not yield. AuRUS emits every
 candidate its search accepted -- a median of 490 per repeat, all syntactically
-distinct -- while counter emits the maximal antichain of its final population,
+distinct -- while PEREDUR emits the maximal antichain of its final population,
 so the raw counts are not measuring the same thing. Putting both arms through
-the same filter makes them comparable, and running it on counter's own output
-is also the idempotence check: counter's pipeline already applied it, so
-`maximal` must equal `distinct` on every counter row.
+the same filter makes them comparable, and running it on PEREDUR's own output
+is also the idempotence check: PEREDUR's pipeline already applied it, so
+`maximal` must equal `distinct` on every PEREDUR row.
 
 Two numbers per directory, because they answer different questions:
 
   maximal  -- specs no other spec strictly dominates. Whole equivalence classes
-              survive together, which is the filter counter runs.
+              survive together, which is the filter PEREDUR runs.
   classes  -- those survivors quotiented by mutual implication. The count of
               genuinely distinct strongest repairs.
 
@@ -30,10 +30,10 @@ import time
 
 SUMMARY = re.compile(r"^(files|distinct|maximal|classes|unparsed)\s+(\d+)$", re.M)
 
-# The counter arm's run directories are named by gen_configs.py's factor cross.
+# The PEREDUR arm's run directories are named by gen_configs.py's factor cross.
 # Only the family and seed matter here; the rest is constant across this
 # campaign and is dropped rather than parsed.
-COUNTER_DIR = re.compile(r"^sweep_C_default_nsga2-apportion_log_(.+)_seed(\d+)$")
+PEREDUR_DIR = re.compile(r"^sweep_C_default_nsga2-apportion_log_(.+)_seed(\d+)$")
 
 FIELDS = ["arm", "spec", "repeat", "files", "distinct", "maximal", "classes",
           "unparsed", "wall_s", "status"]
@@ -65,9 +65,9 @@ def aurus_dirs(root):
                     yield spec.name, f"{host}/{repeat.name}", repeat
 
 
-def counter_dirs(root):
+def peredur_dirs(root):
     for run in sorted(p for p in root.iterdir() if p.is_dir()):
-        match = COUNTER_DIR.match(run.name)
+        match = PEREDUR_DIR.match(run.name)
         if match is None or not any(run.glob("*.tlsf")):
             continue
         yield match.group(1), f"seed{match.group(2)}", run
@@ -78,8 +78,8 @@ def main():
     ap.add_argument("--binary", default="build-release/maximal")
     ap.add_argument("--aurus-raw", type=pathlib.Path,
                     help="raw/ of the AuRUS arm, holding <host>/<spec>/repeat-NN")
-    ap.add_argument("--counter-results", type=pathlib.Path,
-                    help="results-aurus-h2h/ of the counter arm")
+    ap.add_argument("--peredur-results", type=pathlib.Path,
+                    help="results-aurus-h2h/ of the PEREDUR arm")
     ap.add_argument("--out", type=pathlib.Path, required=True)
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--timeout", type=int, default=20,
@@ -96,8 +96,8 @@ def main():
     work = []
     if args.aurus_raw:
         work += [("aurus", *item) for item in aurus_dirs(args.aurus_raw)]
-    if args.counter_results:
-        work += [("counter", *item) for item in counter_dirs(args.counter_results)]
+    if args.peredur_results:
+        work += [("peredur", *item) for item in peredur_dirs(args.peredur_results)]
     if only:
         work = [w for w in work if only.search(w[1])]
     if not work:

@@ -1,10 +1,10 @@
 
-counter: genetic repair of unrealizable specifications
+PEREDUR: genetic repair of unrealizable specifications
 
-  realize $COUNTER_EXAMPLES/lily02/spec.tlsf
-  mkdir -p out && counter --input $COUNTER_EXAMPLES/lily02/spec.tlsf --output-dir out --seed 42
+  realize $PEREDUR_EXAMPLES/lily02/spec.tlsf
+  mkdir -p out && peredur --input $PEREDUR_EXAMPLES/lily02/spec.tlsf --output-dir out --seed 42
 
-Every binary answers --help. The user is `counter`, password `counter`,
+Every binary answers --help. The user is `peredur`, password `peredur`,
 with sudo; change the password with `passwd`. From the host, ssh and scp
 reach this machine on 127.0.0.1 port 2222.
 

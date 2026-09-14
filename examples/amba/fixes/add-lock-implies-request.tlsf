@@ -11,7 +11,7 @@
 // master does: `hlock0` is meaningful only alongside `hbusreq0`.
 //
 // AuRUS's solution (case-studies/syntcomp-unreal/amba/genuine/amba.tlsf) says
-// the same thing but in two places counter's search cannot reach, and one it
+// the same thing but in two places PEREDUR's search cannot reach, and one it
 // must not. It adds a REQUIRE section, and the genetic operators never grow
 // INITIALLY or REQUIRE; it adds `!hlock0` to the INITIALLY conjunct; and it
 // assumes `G F !statea1_0`, which names an OUTPUT, so the system can defeat

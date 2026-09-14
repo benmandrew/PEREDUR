@@ -1,6 +1,6 @@
 find_program(CLANG_FORMAT_EXE NAMES clang-format)
 
-set(COUNTER_FORMAT_GLOBS
+set(PEREDUR_FORMAT_GLOBS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
@@ -17,17 +17,17 @@ set(COUNTER_FORMAT_GLOBS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
 )
 
-file(GLOB_RECURSE COUNTER_FORMAT_FILES CONFIGURE_DEPENDS ${COUNTER_FORMAT_GLOBS})
+file(GLOB_RECURSE PEREDUR_FORMAT_FILES CONFIGURE_DEPENDS ${PEREDUR_FORMAT_GLOBS})
 
 if(CLANG_FORMAT_EXE)
     add_custom_target(format
-        COMMAND ${CLANG_FORMAT_EXE} -i ${COUNTER_FORMAT_FILES}
+        COMMAND ${CLANG_FORMAT_EXE} -i ${PEREDUR_FORMAT_FILES}
         COMMENT "Formatting C++ sources with clang-format"
         VERBATIM
     )
 
     add_custom_target(format-ci
-        COMMAND ${CLANG_FORMAT_EXE} --dry-run --Werror ${COUNTER_FORMAT_FILES}
+        COMMAND ${CLANG_FORMAT_EXE} --dry-run --Werror ${PEREDUR_FORMAT_FILES}
         COMMENT "Checking C++ sources are formatted with clang-format"
         VERBATIM
     )

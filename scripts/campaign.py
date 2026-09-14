@@ -101,7 +101,7 @@ MEASURE_TIMEOUT_S = 600
 # How long a campaign's newest run.log may go untouched before a live process
 # stops corroborating it. Bounded by the harness's own limits rather than
 # guessed: no single run outlasts them, and the largest any profile allows is
-# a 3600s counter timeout (gen40, and the largest timeout_caps entry) plus an
+# a 3600s PEREDUR timeout (gen40, and the largest timeout_caps entry) plus an
 # 1800s compare timeout, so 90 minutes bounds one run's silence. Doubled, for
 # the granularity of the log writes and for a jobs=1 host, where the next
 # run.log only appears once the previous run has finished.
@@ -145,44 +145,44 @@ def render_script(template: str, **subs: str) -> str:
 
 
 # The runner, as a command line rather than an import: tick shells it in the
-# checkout it is standing in, and COUNTER_RUNNER_CMD points it at a stub so the
+# checkout it is standing in, and PEREDUR_RUNNER_CMD points it at a stub so the
 # launch paths can be tested without launching a campaign. REMOTE_PYTHON for
 # the same reason it is used everywhere else -- av2's ssh shell has no `python`.
-RUNNER_CMD = os.environ.get("COUNTER_RUNNER_CMD",
+RUNNER_CMD = os.environ.get("PEREDUR_RUNNER_CMD",
                             f"{REMOTE_PYTHON} scripts/run_experiments.py")
 # The scoring twin, for a `kind = "score"` phase: one score_curves.py per run
 # directory over this host's seeds, driven by scripts/score_campaign.py. The
 # same override pattern, so a tick running a score phase can be tested against
 # a stub exactly as a run phase is.
-SCORER_CMD = os.environ.get("COUNTER_SCORER_CMD",
+SCORER_CMD = os.environ.get("PEREDUR_SCORER_CMD",
                             f"{REMOTE_PYTHON} scripts/score_campaign.py")
 
 # Rebuilt by stage. The lab machines have no Nix, so this is the incremental
 # build against an already-configured preset directory, not a configure step;
 # a campaign whose build differs overrides it with `build` in campaign.toml.
 DEFAULT_BUILD_CMD = "cmake --build build-release"
-COUNTER_BINARY = "build-release/counter"
+PEREDUR_BINARY = "build-release/peredur"
 
 # Queue entries live under the checkout that runs them, not in git: a tick
 # rewrites the entry's state on every transition, and a tracked file doing that
 # would leave the checkout dirty, which is exactly what stage refuses to touch.
 # experiments/ is ignored by content, so the directory needs no .gitignore work.
 QUEUE_DIR = "experiments/queue"
-QUEUE_LOCK = "~/.counter-queue.lock"
+QUEUE_LOCK = "~/.peredur-queue.lock"
 QUEUE_STATES = ("queued", "running", "done", "failed", "cancelled")
 # ensure_staged's third answer, beside None (go on) and an exit code (stop):
 # the checkout moved and took the tick's own sources with it, so the rest of
 # this tick belongs to a process that has read them. See restart_after_stage.
 RESTART = "restart"
-TICK_RESTART_ENV = "COUNTER_TICK_RESTARTED"
-TICK_LOCK_FD_ENV = "COUNTER_TICK_LOCK_FD"
+TICK_RESTART_ENV = "PEREDUR_TICK_RESTARTED"
+TICK_LOCK_FD_ENV = "PEREDUR_TICK_LOCK_FD"
 DEFAULT_MAX_ATTEMPTS = 3
 # Kept in the entry so a state history survives the ticks that wrote it.
 QUEUE_LOG_LINES = 20
 
 
 def source_root(host: str) -> str:
-    """rsync/ssh root of a host's counter checkout.
+    """rsync/ssh root of a host's PEREDUR checkout.
 
     The single place a host name becomes a transfer source, which is what lets
     the tests point collect at a local fixture instead of a lab machine.
@@ -517,7 +517,10 @@ def parse_detail(text: str) -> dict:
 
 # `maximal` is here for the scoring pass, which runs it under score_curves.py
 # beside `compare`; both are engine processes a stage must not reset under.
-ENGINE_COMMS = ("counter", "compare", "maximal", "ltlsynt", "black")
+# `counter` is the engine binary's name before the rename to peredur: a host
+# still running a binary built under that name is as busy as one running
+# `peredur`.
+ENGINE_COMMS = ("peredur", "counter", "compare", "maximal", "ltlsynt", "black")
 
 
 def live_processes(ps_lines: list[str]) -> list[dict]:
@@ -577,18 +580,20 @@ def campaigns_from_manifests(manifests: list[dict]) -> list[dict]:
     for m in manifests:
         sweep = m.get("sweep") or {}
         git = m.get("git") or {}
-        counter = (m.get("binaries") or {}).get("counter") or {}
+        binaries = m.get("binaries") or {}
+        # Manifests written before the rename key the engine as `counter`.
+        binary = binaries.get("peredur") or binaries.get("counter") or {}
         out.append({
             "profile": m.get("profile", "?"),
             "manifest_host": m.get("hostname", "?"),
             "started": m.get("started"),
             "branch": git.get("branch", "?"),
             "head": (git.get("head") or "?")[:7],
-            "binary_commit": counter.get("commit_short", "?"),
+            "binary_commit": binary.get("commit_short", "?"),
             # The runner refuses to launch off a dirty binary without
             # --allow-stale-binary, so a true here says the override was used
             # and the campaign's rows name a commit they did not come from.
-            "dirty_binary": counter.get("dirty") == "1",
+            "dirty_binary": binary.get("dirty") == "1",
             "results_csv": sweep.get("results_csv", ""),
             "results_dir": sweep.get("results_dir", ""),
             "sweeps": sweep.get("sweeps"),
@@ -711,7 +716,7 @@ def annotate(c: dict, host_report: dict) -> None:
 
     A process is attributed to a campaign only when it names that campaign's
     profile. An engine process names none, and matching those against every
-    campaign made one unrelated `counter` on av2 report all six of its archived
+    campaign made one unrelated `peredur` on av2 report all six of its archived
     campaigns as running while idle av3 reported the same six from the same
     data as stalled. Unattributable processes belong in the host's PROCESSES
     column, which is where they still appear.
@@ -822,7 +827,7 @@ def colour_enabled(no_color: bool = False, stream=None, env=None) -> bool:
     """Whether to colour, deciding in the order the conventions are read in.
 
     Off wherever stdout is not a terminal, which is the case that matters
-    here: `tick` runs from cron into $HOME/.counter-queue.log and `status` is
+    here: `tick` runs from cron into $HOME/.peredur-queue.log and `status` is
     routinely piped or captured, and escapes in either are noise nobody can
     read through. It is the failure the C++ side already guards with
     ``stdout_is_tty()`` -- one unguarded status line was 59KB of escapes for
@@ -2730,7 +2735,7 @@ if [ -x @BIN@ ]; then @BIN@ --version 2>/dev/null; fi
 def stage_probe_script(root: str) -> str:
     return render_script(STAGE_PROBE_SCRIPT,
                          ROOT=shlex.quote(root),
-                         BIN=shlex.quote("./" + COUNTER_BINARY),
+                         BIN=shlex.quote("./" + PEREDUR_BINARY),
                          QUEUE=shlex.quote(QUEUE_DIR))
 
 
@@ -2752,7 +2757,7 @@ def parse_sections(text: str) -> dict:
 
 
 def parse_version_lines(lines: list) -> dict:
-    """``counter --version`` output as a dict, ignoring anything unkeyed."""
+    """``peredur --version`` output as a dict, ignoring anything unkeyed."""
     out: dict = {}
     for line in lines:
         key, sep, value = line.strip().partition("=")
@@ -2810,7 +2815,7 @@ class HostProbe:
 def probe_processes(ps_lines: list) -> list:
     """The probe's live-process list. A seam, and the only one here.
 
-    `stage` refuses on any live `counter` or `run_experiments.py` on the
+    `stage` refuses on any live `peredur` or `run_experiments.py` on the
     machine, whether or not it belongs to the checkout being staged, which is
     the right reading on a shared host and stays. The consequence is that the
     verdict depends on the whole machine, so a test pointing the probe at a
@@ -2976,7 +2981,7 @@ def stage_apply_script(root: str, branch: str, sha: str, build: str,
         BRANCH=shlex.quote(branch),
         SHA=shlex.quote(sha),
         BUILD=build,
-        BIN=COUNTER_BINARY,
+        BIN=PEREDUR_BINARY,
         # Never `--` here: `git checkout -- -B x` reads -B as a path.
         CHECKOUT_FLAGS="-f" if force else "",
         FORCE="1" if force else "0")
@@ -3199,7 +3204,7 @@ def start_refusals(probe: HostProbe, campaign: dict, sha: str,
         out.append(f"head is {probe.head[:7]}, campaign is at {sha[:7]} — "
                    f"run stage first")
     if not probe.binary:
-        out.append(f"no {COUNTER_BINARY} that answers --version")
+        out.append(f"no {PEREDUR_BINARY} that answers --version")
     elif probe.binary.get("commit") != sha:
         out.append(f"binary was built from "
                    f"{probe.binary.get('commit_short', '?')}, not {sha[:7]}")
@@ -3742,9 +3747,9 @@ def stage_checkout(root: Path, entry: dict, log_path: Path):
         return f"git checkout -B {branch} {commit[:7]} failed"
     if run_step(root, build, log_path, shell=True):
         return f"the build command failed: {build}"
-    binary = root / COUNTER_BINARY
+    binary = root / PEREDUR_BINARY
     if not binary.is_file():
-        return f"no {COUNTER_BINARY} after the build"
+        return f"no {PEREDUR_BINARY} after the build"
     proc = subprocess.run([str(binary), "--version"], cwd=str(root),
                           capture_output=True, text=True)
     version = parse_version_lines(proc.stdout.splitlines())
@@ -4232,7 +4237,7 @@ echo "@M@END"
 # and the queue then disagrees with the machine. Its descendants are collected
 # before it dies, since a dead parent's children reparent to init and no walk
 # finds them afterwards; they are killed after it, being the runner and the
-# `counter` processes the phase launched, which outlive the tick otherwise and
+# `peredur` processes the phase launched, which outlive the tick otherwise and
 # keep writing rows into a results CSV nothing is waiting for.
 #
 # The tree is a fixpoint over one `ps -eo pid=,ppid=` snapshot rather than a
@@ -4332,7 +4337,7 @@ def cron_line(host: str, root: str) -> str:
     # tick typed by hand against a cron phase already running.
     return (f"*/5 * * * * cd {root} && "
             f"{REMOTE_PYTHON} scripts/campaign.py tick --host {host} "
-            f">> $HOME/.counter-queue.log 2>&1")
+            f">> $HOME/.peredur-queue.log 2>&1")
 
 
 def cmd_cron(args: argparse.Namespace) -> int:

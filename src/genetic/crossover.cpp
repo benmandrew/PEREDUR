@@ -273,7 +273,7 @@ std::vector<std::size_t> crossover_slots(
 // occupy the same position and can never move material between them.
 //
 // AuRUS removes the target conjunct and appends the merged one, which
-// reorders the side and shortens it when the merge fails. Counter writes the
+// reorders the side and shortens it when the merge fails. PEREDUR writes the
 // merge back into the target's own slot instead: slot i of a candidate must
 // keep descending from slot i of the original, since the timing and semantic
 // similarity objectives pair the two by position. Deletion stays mutation's

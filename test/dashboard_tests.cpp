@@ -24,7 +24,7 @@ class TempDir {
    public:
     TempDir()
         : m_path(std::filesystem::temp_directory_path() /
-                 "counter_dashboard_tests") {
+                 "peredur_dashboard_tests") {
         std::filesystem::remove_all(m_path);
         std::filesystem::create_directories(m_path);
     }
@@ -129,7 +129,7 @@ void test_unmeasured_fields_are_omitted_not_defaulted() {
 }
 
 void test_writer_survives_an_unwritable_directory() {
-    DashboardWriter writer("/nonexistent-directory-for-counter-tests", true);
+    DashboardWriter writer("/nonexistent-directory-for-peredur-tests", true);
     expect(!writer.enabled(),
            "dashboard: a writer that cannot open its log should report itself "
            "disabled");

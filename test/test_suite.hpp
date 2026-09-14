@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-void run_counter_driver_tests();
+void run_peredur_driver_tests();
 void run_realize_driver_tests();
 void run_ltl_driver_tests();
 void run_mucs_driver_tests();

@@ -377,7 +377,7 @@ void test_same_seed_reproduces_evolution() {
            "identical population");
 }
 
-// bounded_uniform is the one piece of the draw stream counter owns rather than
+// bounded_uniform is the one piece of the draw stream PEREDUR owns rather than
 // inherits, and the reason it is owned is that std::uniform_int_distribution
 // gave a different answer under libc++ than under libstdc++ -- so a seed
 // reproduced a run only within one standard library, and a macOS run could not

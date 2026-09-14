@@ -58,17 +58,17 @@ from pathlib import Path
 # `examples/` one — so these are root-relative rather than rooted at
 # `case-studies/`, which is what previously made the examples/ rows unnameable.
 #
-# Eleven of the keys are counter examples/ names, so those rows join directly
+# Eleven of the keys are PEREDUR examples/ names, so those rows join directly
 # against run_experiments.py's `aurus-h2h` rows; they are H2H_TLSF_SPECS there
 # and are the only ones a repair-quality statistic can be computed for. The
-# rest run here alone, counter having no family for them yet. Every out.txt is
+# rest run here alone, PEREDUR having no family for them yet. Every out.txt is
 # archived, so an import later re-scores an existing run rather than needing
 # a new one.
 #
-# The six `-aurus` suffixes are deliberate. counter carries families named
+# The six `-aurus` suffixes are deliberate. PEREDUR carries families named
 # `detector`, `full-arbiter`, `load-balancer`, `prioritized-arbiter`,
 # `round-robin-arbiter` and `simple-arbiter`, taken from SYNTCOMP at different
-# parameter instances than these (counter's simple_arbiter_unreal2_3_basic
+# parameter instances than these (PEREDUR's simple_arbiter_unreal2_3_basic
 # against the paper's simple_arbiter_unreal2_2). Reusing the bare names would
 # assert a correspondence that does not hold, which is the same reason AuRUS's
 # arbiter is `arbiter-aurus` rather than `arbiter`.
@@ -151,7 +151,7 @@ SPEC_TLSF: dict[str, str] = {
 #
 # `-k=20` is the model-counter bound. The 2026-07-24 campaign ran 10, which
 # counted traces to half the depth on AuRUS's side of a comparison where
-# counter's own `model_counting.default_bound` is 20; the legacy drivers
+# PEREDUR's own `model_counting.default_bound` is 20; the legacy drivers
 # settle it independently of the paper's prose. `-GATO` is supplied per run
 # from --gato and is 7200 in all three drivers too. `-geneNUM=0` restates the
 # shipped default (GA_GENE_NUM_OF_MUTATIONS), so it is a no-op kept for
@@ -161,9 +161,9 @@ SPEC_TLSF: dict[str, str] = {
 # drivers, which do not agree on it: run-all-together.sh omits it,
 # run-spectra-icse2019.sh passes `0.7,0.1,0.2`, and
 # run-all-sensitivity-syntcomp.sh passes `1,0,0` — status alone, with no
-# similarity pressure whatever. Running the last of those would set counter,
+# similarity pressure whatever. Running the last of those would set PEREDUR,
 # which weights syntactic and semantic similarity, against an AuRUS told to
-# ignore both on a third of the corpus, and would flatter counter on repair
+# ignore both on a third of the corpus, and would flatter PEREDUR on repair
 # quality for a reason unrelated to search.
 #
 # All 26 therefore run at `0.7,0.1,0.2`, which departs from the drivers only
@@ -174,7 +174,7 @@ SPEC_TLSF: dict[str, str] = {
 # records the choice.
 #
 # `-removeGuarantees` appears in none of the drivers and is not passed, so
-# AuRUS never deletes a guarantee. counter does, at p_remove_guarantee 0.05.
+# AuRUS never deletes a guarantee. PEREDUR does, at p_remove_guarantee 0.05.
 # That asymmetry in operator sets is a threat to validity, not a bug.
 BASE_FLAGS = [
     "-Max=1000", "-Gen=1000", "-Pop=100", "-k=20", "-addA", "-geneNUM=0",
@@ -187,7 +187,7 @@ BASE_FLAGS = [
 # the five literature specs and the four SYNTECH15 ones it drives, and neither
 # of the other two drivers passes it. Without it AuRUS may assume over its own
 # outputs and return a repair the system satisfies by defeating its own
-# assumptions — which counter's output gate rejects and AuRUS's does not.
+# assumptions — which PEREDUR's output gate rejects and AuRUS's does not.
 ONLY_INPUTS_A = frozenset({
     "arbiter-aurus", "minepump", "rg1", "rg2", "lift",
     "gyro-var1", "gyro-var2", "humanoid-458", "humanoid-531",
@@ -286,7 +286,7 @@ def main() -> None:
                              "aurus_results.csv")
     parser.add_argument("--specs", nargs="+", choices=list(SPEC_TLSF),
                         default=list(SPEC_TLSF), metavar="SPEC",
-                        help="Specs to run, by counter family name "
+                        help="Specs to run, by PEREDUR family name "
                              "(default: the whole head-to-head set)")
     parser.add_argument("--repeats", type=int, default=30, metavar="N",
                         help="Independent repeats per spec (default: 30); "
@@ -310,7 +310,7 @@ def main() -> None:
                         help="Concurrent AuRUS runs (default: 10)")
     parser.add_argument("--spot-bin", type=Path, default=None, metavar="PATH",
                         help="Directory prepended to PATH so AuRUS finds "
-                             "ltl2tgba/autfilt (e.g. counter's "
+                             "ltl2tgba/autfilt (e.g. PEREDUR's "
                              "build-release/third_party/spot/bin). Omit if "
                              "SPOT is already on PATH")
     args = parser.parse_args()

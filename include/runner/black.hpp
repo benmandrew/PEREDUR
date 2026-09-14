@@ -14,7 +14,7 @@
 #include <string>
 #include <unordered_map>
 
-/// Returns the path to the black binary: `COUNTER_BLACK_PATH` when that
+/// Returns the path to the black binary: `PEREDUR_BLACK_PATH` when that
 /// environment variable is set and non-empty, and otherwise the
 /// BLACK_EXECUTABLE_PATH preprocessor definition baked in at build time. The
 /// environment is read once, on first use.

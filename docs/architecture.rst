@@ -1,7 +1,7 @@
 Architecture
 ============
 
-Counter is a C++17 tool that repairs *unrealisable* reactive specifications with a *genetic algorithm*. A specification is unrealisable when no implementation satisfies it against every environment; ``ltlsynt`` reports that, but not what to change. Counter searches for the edits that make it realisable while staying close to what was written.
+PEREDUR is a C++17 tool that repairs *unrealisable* reactive specifications with a *genetic algorithm*. A specification is unrealisable when no implementation satisfies it against every environment; ``ltlsynt`` reports that, but not what to change. PEREDUR searches for the edits that make it realisable while staying close to what was written.
 
 Two input languages are accepted. `FRET <https://nasa.github.io/fret/>`_ requirements arrive as *JavaScript Object Notation* (JSON), and basic *Temporal Logic Synthesis Format* (TLSF) specifications arrive as ``.tlsf``. The format is taken from the file extension, or forced with ``--format fretish`` / ``--format tlsf``. Both paths share the genetic core: the same pipeline, selection schemes, fitness components and filters. What differs is what a candidate is, and how it is mutated, scored and written back. :doc:`tlsf` covers the TLSF path in detail.
 
@@ -106,7 +106,7 @@ Module layout
      config.hpp          — algorithm parameters and their defaults
      config_io.hpp       — TOML config parsing and key validation
      dashboard.hpp       — progress.jsonl observer for the live dashboard
-     profile.hpp         — scope profiler (COUNTER_PROFILE)
+     profile.hpp         — scope profiler (PEREDUR_PROFILE)
      prop_formula.hpp    — propositional formula AST (Formula)
      requirement.hpp     — Timing, ConditionType, Requirement, Specification
      serialisation.hpp   — JSON serialisation for all core types
@@ -123,7 +123,7 @@ Module layout
 Binaries
 --------
 
-``counter``
+``peredur``
   The repair driver.  Reads a specification, runs the search, and writes the ranked repairs.
 
 ``realize``
@@ -139,7 +139,7 @@ Binaries
   Extracts a minimal unrealisable core from a TLSF specification.  TLSF only.
 
 ``maximal``
-  Reports which specifications in a set are maximal under the implication order, then quotients the survivors by mutual implication.  Takes any directory of specification files, so a foreign tool's output can be measured on the definition ``counter`` applies to its own.  Both front ends, selected by the extension present as ``compare`` selects, since a maximality curve over a FRETISH campaign reads the same accumulated candidates a TLSF one does.  The two oracles ask the same question, each lowering a whole specification to one formula and asking a complete query, so a count from one format is comparable with a count from the other.
+  Reports which specifications in a set are maximal under the implication order, then quotients the survivors by mutual implication.  Takes any directory of specification files, so a foreign tool's output can be measured on the definition ``peredur`` applies to its own.  Both front ends, selected by the extension present as ``compare`` selects, since a maximality curve over a FRETISH campaign reads the same accumulated candidates a TLSF one does.  The two oracles ask the same question, each lowering a whole specification to one formula and asking a complete query, so a count from one format is comparable with a count from the other.
 
 ``signal_tracer`` is an internal helper rather than a user-facing tool: the crash handler runs it out-of-process to symbolise a stack trace, because unwinding in-process from a signal handler is not safe. Run any of the others with ``--help`` for its options, or with ``--version`` for the commit it was built from.
 

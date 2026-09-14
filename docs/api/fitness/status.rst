@@ -21,7 +21,7 @@ The scale was previously five-point, grading the region below realisability by w
 
 Ranking *within* unrealisability needs a measure of how far a candidate is from realisable, which a satisfiability query cannot express.
 
-``status_score_aurus`` is the exception, and is not an improvement on the scale above but a reproduction of AuRUS's own: five levels below realisability, graded by which side of the candidate is satisfiable on its own, so an ablation can cross counter's grading against the design it derives from. It is selected by ``fitness.status_grading = "aurus"``, it has no per-component tier, and it is the one scorer here that does not fold well-separation into its realisability query — AuRUS never asks that question, and an arm that asked it would measure something else.
+``status_score_aurus`` is the exception, and is not an improvement on the scale above but a reproduction of AuRUS's own: five levels below realisability, graded by which side of the candidate is satisfiable on its own, so an ablation can cross PEREDUR's grading against the design it derives from. It is selected by ``fitness.status_grading = "aurus"``, it has no per-component tier, and it is the one scorer here that does not fold well-separation into its realisability query — AuRUS never asks that question, and an arm that asked it would measure something else.
 
 Weighted equally with the semantic similarity component so realisable candidates are strongly preferred throughout evolution.
 

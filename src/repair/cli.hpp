@@ -3,7 +3,7 @@
 #include <optional>
 #include <string>
 
-// counter's command-line surface: the help text and the input-format decision.
+// PEREDUR's command-line surface: the help text and the input-format decision.
 
 void print_help(const char* prog);
 

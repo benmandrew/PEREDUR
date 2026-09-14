@@ -14,7 +14,7 @@ A knob is worth keeping only if some archived config sets it, so count the confi
 
 Every binary answers `--version` with `commit=`, `commit_short=` and `dirty=` lines, resolved at *build* time: `cmake/version.cmake` runs `cmake/write_version_header.cmake` on every build, which rewrites `build/generated/git_version.hpp` only when the commit changed. Configure-time resolution would report a stale HEAD after a new commit. Only `src/version.cpp` includes the header, and `dirty` counts modified *tracked* files only.
 
-`scripts/run_experiments.py` reads `counter --version` once at startup, never `git rev-parse`, and stamps `commit` and `dirty` onto every CSV row and a per-host manifest. It refuses to launch when a binary's commit differs from HEAD, was built dirty, or cannot be read, unless given `--allow-stale-binary`. Neither column may join the resume key in `run_experiments.py` or `KEY_FIELDS` in `merge_experiments.py`: archived rows have no commit, so every finished campaign would re-run.
+`scripts/run_experiments.py` reads `peredur --version` once at startup, never `git rev-parse`, and stamps `commit` and `dirty` onto every CSV row and a per-host manifest. It refuses to launch when a binary's commit differs from HEAD, was built dirty, or cannot be read, unless given `--allow-stale-binary`. Neither column may join the resume key in `run_experiments.py` or `KEY_FIELDS` in `merge_experiments.py`: archived rows have no commit, so every finished campaign would re-run.
 
 Campaigns closed before this existed carry a reconstructed `PROVENANCE.json` (`"attribution": "inferred"`) whose `binary_commit` is `null` and must stay so; `experiments/README.md` documents the method.
 

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "specification.schema.json",
   "title": "Specification",
-  "description": "A FRETISH specification, optionally annotated with fitness metadata produced by the counter repair tool.",
+  "description": "A FRETISH specification, optionally annotated with fitness metadata produced by the PEREDUR repair tool.",
   "type": "object",
   "required": ["assumptions", "guarantees", "in_atoms", "out_atoms"],
   "additionalProperties": false,
@@ -151,7 +151,7 @@
       }
     },
     "FitnessRecord": {
-      "description": "Fitness breakdown produced by the counter repair tool. Present only on output files, never required on input.",
+      "description": "Fitness breakdown produced by the PEREDUR repair tool. Present only on output files, never required on input.",
       "type": "object",
       "required": ["total", "components"],
       "additionalProperties": false,

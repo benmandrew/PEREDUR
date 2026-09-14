@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(counter VERSION 0.1.0 LANGUAGES CXX)
+project(peredur VERSION 0.1.0 LANGUAGES CXX)
 
 enable_testing()
 
@@ -20,7 +20,7 @@ endif()
 # point every preset at one tree; CI does, so its four matrix legs share a
 # single cached copy rather than building Spot four times under four keys. The
 # default keeps each build directory self-contained.
-set(COUNTER_THIRD_PARTY_DIR "${CMAKE_BINARY_DIR}/third_party" CACHE PATH
+set(PEREDUR_THIRD_PARTY_DIR "${CMAKE_BINARY_DIR}/third_party" CACHE PATH
     "Directory holding the built Spot, black and ganak trees")
 
 include(cmake/ganak.cmake)
@@ -33,8 +33,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(COUNTER_TSAN "Build with ThreadSanitizer" OFF)
-if(COUNTER_TSAN)
+option(PEREDUR_TSAN "Build with ThreadSanitizer" OFF)
+if(PEREDUR_TSAN)
     # setarch is util-linux. macOS disables ASLR for a child through the
     # debugger rather than the loader, so there is no equivalent wrapper to
     # substitute here; TSan runs without the shadow-memory guarantee that
@@ -51,8 +51,8 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(counter_core STATIC)
-target_sources(counter_core PRIVATE
+add_library(peredur_core STATIC)
+target_sources(peredur_core PRIVATE
     src/formula_key.cpp
     src/prop_formula/canonical.cpp
     src/prop_formula/cnf.cpp
@@ -73,23 +73,23 @@ target_sources(counter_core PRIVATE
     src/tlsf/writer.cpp
     src/version.cpp
 )
-target_include_directories(counter_core PUBLIC include)
-# src is on the path for counter_core's own sources alone, so an internal
+target_include_directories(peredur_core PUBLIC include)
+# src is on the path for peredur_core's own sources alone, so an internal
 # header can be named from another directory under src/ ("prop_formula/
 # internal.hpp" from src/fingerprint/lasso.cpp resolves relative to src/ without
 # it). include/ stays the published surface; nothing outside this target may
 # reach src/ this way.
-target_include_directories(counter_core PRIVATE src)
+target_include_directories(peredur_core PRIVATE src)
 # Only version.cpp includes the generated header, so a new commit recompiles
 # one translation unit rather than the whole tree.
-target_include_directories(counter_core PRIVATE "${COUNTER_VERSION_HEADER_DIR}")
-add_dependencies(counter_core counter_version_header)
-target_link_libraries(counter_core PUBLIC nlohmann_json::nlohmann_json)
+target_include_directories(peredur_core PRIVATE "${PEREDUR_VERSION_HEADER_DIR}")
+add_dependencies(peredur_core peredur_version_header)
+target_link_libraries(peredur_core PUBLIC nlohmann_json::nlohmann_json)
 # Include nlohmann as a system directory so clang-tidy skips warnings inside it.
-target_include_directories(counter_core SYSTEM PUBLIC ${nlohmann_json_SOURCE_DIR}/include)
+target_include_directories(peredur_core SYSTEM PUBLIC ${nlohmann_json_SOURCE_DIR}/include)
 
-add_library(counter_fitness STATIC)
-target_sources(counter_fitness PRIVATE
+add_library(peredur_fitness STATIC)
+target_sources(peredur_fitness PRIVATE
     src/fitness/function.cpp
     src/runner/black.cpp
     src/runner/formaliser.cpp
@@ -134,22 +134,22 @@ target_sources(counter_fitness PRIVATE
     src/dashboard.cpp
     src/driver_support.cpp
 )
-target_include_directories(counter_fitness PUBLIC include)
-# As counter_core does, and for the same reason: src/tlsf/filter.cpp names
+target_include_directories(peredur_fitness PUBLIC include)
+# As peredur_core does, and for the same reason: src/tlsf/filter.cpp names
 # "fingerprint/lasso.hpp", which lives under src/ because it is not published.
-target_include_directories(counter_fitness PRIVATE src)
-target_link_libraries(counter_fitness PUBLIC counter_core tomlplusplus::tomlplusplus)
-add_dependencies(counter_fitness spot_project)
+target_include_directories(peredur_fitness PRIVATE src)
+target_link_libraries(peredur_fitness PUBLIC peredur_core tomlplusplus::tomlplusplus)
+add_dependencies(peredur_fitness spot_project)
 # Include Eigen as a system directory so clang-tidy skips warnings inside it.
-target_include_directories(counter_fitness SYSTEM PUBLIC ${eigen_SOURCE_DIR})
-target_compile_definitions(counter_fitness PRIVATE
+target_include_directories(peredur_fitness SYSTEM PUBLIC ${eigen_SOURCE_DIR})
+target_compile_definitions(peredur_fitness PRIVATE
     GANAK_EXECUTABLE_PATH="${GANAK_EXECUTABLE}"
     SPOT_BIN_DIR="${SPOT_BIN_DIR}"
     BLACK_EXECUTABLE_PATH="${BLACK_EXECUTABLE}"
 )
-if(DEFINED COUNTER_DEFAULT_FITNESS_WEIGHT)
-    target_compile_definitions(counter_fitness PUBLIC
-        COUNTER_DEFAULT_FITNESS_WEIGHT=${COUNTER_DEFAULT_FITNESS_WEIGHT})
+if(DEFINED PEREDUR_DEFAULT_FITNESS_WEIGHT)
+    target_compile_definitions(peredur_fitness PUBLIC
+        PEREDUR_DEFAULT_FITNESS_WEIGHT=${PEREDUR_DEFAULT_FITNESS_WEIGHT})
 endif()
 
 # Defaults to the vendored copy (vendor/fretCLI.main.js, see vendor/README.md
@@ -170,21 +170,21 @@ if(NOT FORMALISER_SCRIPT_PATH)
         "FORMALISER_SCRIPT_PATH is not set. Configure with "
         "-DFORMALISER_SCRIPT_PATH=/path/to/fretCLI.main.js")
 endif()
-target_compile_definitions(counter_fitness PRIVATE
+target_compile_definitions(peredur_fitness PRIVATE
     FORMALISER_SCRIPT_PATH="${FORMALISER_SCRIPT_PATH}")
 
 # The live dashboard page, copied beside progress.jsonl at run start so that
 # serving the output directory is all a viewer needs. Resolved from the source
 # tree the same way FORMALISER_SCRIPT_PATH is; a run whose page has gone missing
 # still writes the progress log, it just does not drop the viewer next to it.
-if(NOT DEFINED COUNTER_DASHBOARD_PAGE_PATH)
-    set(COUNTER_DASHBOARD_PAGE_PATH "${CMAKE_SOURCE_DIR}/web/dashboard.html"
+if(NOT DEFINED PEREDUR_DASHBOARD_PAGE_PATH)
+    set(PEREDUR_DASHBOARD_PAGE_PATH "${CMAKE_SOURCE_DIR}/web/dashboard.html"
         CACHE FILEPATH "Path to the live dashboard HTML page")
 endif()
-target_compile_definitions(counter_fitness PRIVATE
-    COUNTER_DASHBOARD_PAGE_PATH="${COUNTER_DASHBOARD_PAGE_PATH}")
+target_compile_definitions(peredur_fitness PRIVATE
+    PEREDUR_DASHBOARD_PAGE_PATH="${PEREDUR_DASHBOARD_PAGE_PATH}")
 
-add_executable(counter
+add_executable(peredur
     src/main.cpp
     src/crash/crash_handler.cpp
     src/repair/cli.cpp
@@ -193,31 +193,31 @@ add_executable(counter
     src/repair/manifest.cpp
     src/repair/reports.cpp
 )
-target_link_libraries(counter PRIVATE counter_fitness cpptrace::cpptrace)
+target_link_libraries(peredur PRIVATE peredur_fitness cpptrace::cpptrace)
 # The FRETISH driver reaches src/filter/streaming_maximal.hpp and the
 # fingerprint prefilter behind it, as maximal does below.
-target_include_directories(counter PRIVATE src)
+target_include_directories(peredur PRIVATE src)
 
 add_executable(signal_tracer src/crash/signal_tracer.cpp)
 target_link_libraries(signal_tracer PRIVATE cpptrace::cpptrace)
 
 add_executable(compare src/compare.cpp)
-target_link_libraries(compare PRIVATE counter_fitness)
+target_link_libraries(compare PRIVATE peredur_fitness)
 
 add_executable(lint-ideals src/lint_ideals.cpp)
-target_link_libraries(lint-ideals PRIVATE counter_fitness)
+target_link_libraries(lint-ideals PRIVATE peredur_fitness)
 
 add_executable(realize src/realize.cpp)
-target_link_libraries(realize PRIVATE counter_fitness)
+target_link_libraries(realize PRIVATE peredur_fitness)
 
 add_executable(ltl src/ltl.cpp)
-target_link_libraries(ltl PRIVATE counter_fitness)
+target_link_libraries(ltl PRIVATE peredur_fitness)
 
 add_executable(mucs src/mucs.cpp)
-target_link_libraries(mucs PRIVATE counter_fitness)
+target_link_libraries(mucs PRIVATE peredur_fitness)
 
 add_executable(maximal src/maximal.cpp)
-target_link_libraries(maximal PRIVATE counter_fitness)
+target_link_libraries(maximal PRIVATE peredur_fitness)
 # maximal reaches one internal header, src/fingerprint/prefilter.hpp, so
 # that its equivalence quotient prefilters on the same words the pairwise sweep
 # does. include/ stays the published surface.
@@ -231,15 +231,15 @@ endif()
 
 add_subdirectory(test)
 
-option(COUNTER_BENCH "Build and register benchmark tests" OFF)
-if(COUNTER_BENCH)
+option(PEREDUR_BENCH "Build and register benchmark tests" OFF)
+if(PEREDUR_BENCH)
     add_subdirectory(bench)
 endif()
 
-option(COUNTER_FUZZ
+option(PEREDUR_FUZZ
     "Build the LTL-equivalence libFuzzer target (requires a clang++ with libFuzzer support)"
     OFF)
-if(COUNTER_FUZZ)
+if(PEREDUR_FUZZ)
     add_subdirectory(fuzz)
 endif()
 
@@ -250,11 +250,11 @@ include(cmake/format.cmake)
 include(cmake/lint.cmake)
 include(cmake/githooks.cmake)
 
-foreach(counter_target counter_core counter_fitness counter compare realize ltl maximal)
+foreach(peredur_target peredur_core peredur_fitness peredur compare realize ltl maximal)
     if(MSVC)
-        target_compile_options(${counter_target} PRIVATE /W4 /permissive-)
+        target_compile_options(${peredur_target} PRIVATE /W4 /permissive-)
     else()
-        target_compile_options(${counter_target} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        target_compile_options(${peredur_target} PRIVATE -Wall -Wextra -Wpedantic -Werror)
     endif()
 endforeach()
 

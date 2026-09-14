@@ -68,7 +68,7 @@ std::string mutate_atom_name(const std::string& atom,
 // negated literal cost one draw and guarding a positive one cost three
 // (rename, negate, graft) through intermediates that had to survive selection
 // to reach the third. experiments/2026-08-14-aurus-h2h/REPORT.md §1 measures
-// the consequence: minepump's ideals guard a positive antecedent, and counter
+// the consequence: minepump's ideals guard a positive antecedent, and PEREDUR
 // reached one in 1 of 20 seeds while AuRUS, whose add-disjunct rule has no
 // such gate, reached it in 30 of 30.
 Formula mutate_atom_formula(const Formula& formula,

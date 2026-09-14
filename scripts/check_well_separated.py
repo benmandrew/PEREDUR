@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independently check whether emitted TLSF specifications are well-separated.
 
-This deliberately does not go through `counter`. The in-run filter's verdict is
+This deliberately does not go through `peredur`. The in-run filter's verdict is
 untrustworthy for four separate reasons (issues #72, #73, #74, #77): elites are
 appended after every filter stage and never re-screened, the fallback stage
 re-admits the whole unfiltered offspring set when the chain empties the

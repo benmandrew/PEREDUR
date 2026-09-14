@@ -8,7 +8,7 @@
 ///        aborts to let libFuzzer capture and minimise the repro.
 ///
 /// Build: requires a clang++ with libFuzzer support on PATH (see
-/// fuzz/CMakeLists.txt, gated behind -DCOUNTER_FUZZ=ON). Each input spawns a
+/// fuzz/CMakeLists.txt, gated behind -DPEREDUR_FUZZ=ON). Each input spawns a
 /// ltlfilt subprocess (the formaliser CLI process is reused across inputs
 /// via global_formaliser()), so this runs orders of magnitude slower than a
 /// typical libFuzzer target — that's expected for differential testing

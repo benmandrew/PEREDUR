@@ -15,17 +15,17 @@ labelling has to survive into REPORT.md and PROVENANCE.json.
 Two asymmetries between the tools bound what any of this can say, and neither
 is a defect to be corrected away:
 
-  * The two sides do not mean the same thing by "a solution". counter's curve
+  * The two sides do not mean the same thing by "a solution". PEREDUR's curve
     counts candidates that passed its output gate, flushed by the accumulator
     with sub-second timestamps. AuRUS's counts the running length of
     `ga.solutions` read off its per-iteration log line, which moves only at a
-    generation boundary and is dated to the second. counter's curve therefore
+    generation boundary and is dated to the second. PEREDUR's curve therefore
     has resolution AuRUS's cannot, and a like-for-like reading has to be taken
     at cuts coarse enough for both.
   * A killed run is not symmetric either. AuRUS writes its solution files in
     one batch when the run ends, so a run killed at the cap loses every one of
-    them and can carry no verdict; counter's accumulator flushes as it goes, so
-    a killed counter run keeps every candidate it found. Those rows are marked
+    them and can carry no verdict; PEREDUR's accumulator flushes as it goes, so
+    a killed PEREDUR run keeps every candidate it found. Those rows are marked
     `lost-at-cap` on the AuRUS side and are excluded from any verdict rate,
     which biases that rate towards the runs that finished.
 
@@ -562,7 +562,7 @@ def curve_sections(curves, unknown, truncated):
     if curves is None:
         rule("CURVES -- SKIPPED, no curve CSV")
         return
-    rule("CURVES -- counter, by arm")
+    rule("CURVES -- PEREDUR, by arm")
     print("Mean count per run at each cut, carrying a stopped run's last value")
     print("forward: both tools stop at their own budget, and what a stopped run")
     print("found by time t is what it had when it stopped.")
@@ -595,10 +595,10 @@ def survival(times, censored_flags, horizon):
 def discovery(curves, scalars, aurus_runs):
     rule("DISCOVERY -- time to first repair, and to first ideal repair")
     if scalars is None:
-        print("curve CSV absent; counter's side is skipped")
+        print("curve CSV absent; PEREDUR's side is skipped")
     else:
         for metric in ("time_to_first_repair", "time_to_first_ideal_repair"):
-            sub(f"counter: {metric}")
+            sub(f"PEREDUR: {metric}")
             for arm in ARMS:
                 times, flags = [], []
                 for (key, name), (value, flag) in scalars.items():
@@ -625,7 +625,7 @@ def discovery(curves, scalars, aurus_runs):
     print(f"   reached {len(reached)}/{len(usable)} of the usable runs "
           f"({pct(len(reached), len(usable))})  "
           f"median among reachers {med(reached, 1)}s")
-    print("   Resolution is one iteration, dated to the second; counter's is "
+    print("   Resolution is one iteration, dated to the second; PEREDUR's is "
           "sub-second. Read the two at the coarser one.")
 
 
@@ -635,22 +635,22 @@ def discovery(curves, scalars, aurus_runs):
 def head_to_head(results, aurus_runs, title=None, note=None):
     """Per-family ideal rate, read two ways that bracket the truth.
 
-    A killed run is the whole difficulty. counter's kills score `implies_ideal`
+    A killed run is the whole difficulty. PEREDUR's kills score `implies_ideal`
     as 0, so a family whose runs were all killed reads zero by construction.
     AuRUS's kills lose their solution files and carry no verdict, so a family
     whose runs were all killed drops out of the comparison entirely -- which is
     the same event producing opposite biases, and `humanoid-503` (AuRUS killed
-    30 of 30) against `humanoid-742` (counter killed 120 of 120) is exactly
+    30 of 30) against `humanoid-742` (PEREDUR killed 120 of 120) is exactly
     that pair.
 
     So both readings are printed. `all` scores every run and counts a kill as a
     failure on both sides, which is symmetric and pessimistic. `sc` (scorable)
     drops the kills on both sides, which is symmetric and optimistic. Neither
     is the answer; the accumulator curves are, because they score a killed
-    counter run on what it actually found, and nothing on the AuRUS side can
+    PEREDUR run on what it actually found, and nothing on the AuRUS side can
     do the same.
     """
-    rule(title or "HEAD TO HEAD -- per-family ideal rate, counter against AuRUS")
+    rule(title or "HEAD TO HEAD -- per-family ideal rate, PEREDUR against AuRUS")
     if aurus_runs is None:
         print("AuRUS reference absent; skipped")
         return None
@@ -670,22 +670,22 @@ def head_to_head(results, aurus_runs, title=None, note=None):
         else:
             aurus_scorable[spec].append(hit)
 
-    counter_all = collections.defaultdict(list)
-    counter_scorable = collections.defaultdict(list)
-    counter_killed = collections.Counter()
+    peredur_all = collections.defaultdict(list)
+    peredur_scorable = collections.defaultdict(list)
+    peredur_killed = collections.Counter()
     for row in results:
         hit = 1 if row["implies_ideal"] == "1" else 0
-        counter_all[row["spec"]].append(hit)
+        peredur_all[row["spec"]].append(hit)
         if row["timed_out"] == "1":
-            counter_killed[row["spec"]] += 1
+            peredur_killed[row["spec"]] += 1
         else:
-            counter_scorable[row["spec"]].append(hit)
+            peredur_scorable[row["spec"]].append(hit)
 
-    shared = sorted(set(aurus_all) & set(counter_all))
-    print(f"families counter covers {len(counter_all)}, "
+    shared = sorted(set(aurus_all) & set(peredur_all))
+    print(f"families PEREDUR covers {len(peredur_all)}, "
           f"AuRUS covers {len(aurus_all)}, shared {len(shared)}")
-    for label, missing in (("counter only", set(counter_all) - set(aurus_all)),
-                           ("AuRUS only", set(aurus_all) - set(counter_all))):
+    for label, missing in (("PEREDUR only", set(peredur_all) - set(aurus_all)),
+                           ("AuRUS only", set(aurus_all) - set(peredur_all))):
         if missing:
             print(f"  {label}: {', '.join(sorted(missing))}")
     print("AuRUS rates are UNFILTERED -- the well-separation screen's inputs "
@@ -693,13 +693,13 @@ def head_to_head(results, aurus_runs, title=None, note=None):
     print("`all` counts a killed run as a failure on both sides; `sc` drops "
           "the killed runs on both sides. k is how many were killed.")
 
-    print(f"\n   {'family':30s} {'counter':>8s} {'sc':>7s} {'k':>5s}"
+    print(f"\n   {'family':30s} {'PEREDUR':>8s} {'sc':>7s} {'k':>5s}"
           f"   {'AuRUS':>8s} {'sc':>7s} {'k':>5s}   {'d-all':>7s} {'d-sc':>7s}")
     all_differences, scorable_differences, scorable_families = [], [], []
     for family in shared:
-        c_all = statistics.mean(counter_all[family])
+        c_all = statistics.mean(peredur_all[family])
         a_all = statistics.mean(aurus_all[family])
-        c_sc = counter_scorable.get(family)
+        c_sc = peredur_scorable.get(family)
         a_sc = aurus_scorable.get(family)
         all_differences.append(c_all - a_all)
         if c_sc and a_sc:
@@ -711,7 +711,7 @@ def head_to_head(results, aurus_runs, title=None, note=None):
         d_cell = (f"{statistics.mean(c_sc) - statistics.mean(a_sc):+7.3f}"
                   if c_sc and a_sc else f"{'--':>7s}")
         print(f"   {family:30s} {c_all:8.3f} {c_cell} "
-              f"{counter_killed[family]:5d}   {a_all:8.3f} {a_cell} "
+              f"{peredur_killed[family]:5d}   {a_all:8.3f} {a_cell} "
               f"{aurus_killed[family]:5d}   {c_all - a_all:+7.3f} {d_cell}")
 
     print(f"\n   {note or POSTHOC}")
@@ -724,13 +724,13 @@ def head_to_head(results, aurus_runs, title=None, note=None):
         higher = sum(1 for d in differences if d > 0)
         lower = sum(1 for d in differences if d < 0)
         print(f"\n   {label}: {len(families)} families")
-        print(f"     counter higher on {higher}, lower on {lower}, "
+        print(f"     PEREDUR higher on {higher}, lower on {lower}, "
               f"tied on {len(differences) - higher - lower}")
         p_value = wilcoxon_exact_p(differences)
         reads[label] = (statistics.mean(differences), p_value, higher, lower)
         print(f"     mean difference {statistics.mean(differences):+.3f}, "
               f"exact two-sided Wilcoxon p = {p_value:.4f}")
-    print("\n   The 2026-08-21 ship campaign read this contrast at counter's "
+    print("\n   The 2026-08-21 ship campaign read this contrast at PEREDUR's "
           "own budget as 0.502 against 0.504, Wilcoxon p = 0.7549.")
     print("   This campaign reads it at AuRUS's budget, which is the whole "
           "point of the matched cross.")
@@ -738,7 +738,7 @@ def head_to_head(results, aurus_runs, title=None, note=None):
 
 
 def registered_primary(results, aurus_runs, cell):
-    """PLAN section 4 of the rematch: one named counter cell against AuRUS.
+    """PLAN section 4 of the rematch: one named PEREDUR cell against AuRUS.
 
     The pooled head-to-head above averages four cells, three of which the
     plan names as secondary. The primary is the shipped configuration alone,
@@ -754,23 +754,23 @@ def registered_primary(results, aurus_runs, cell):
         subset, aurus_runs,
         title=f"REGISTERED PRIMARY -- {cell} against AuRUS, PLAN section 4",
         note=f"REGISTERED (PLAN section 5): exact two-sided Wilcoxon over "
-             f"families at alpha 0.05, over {len(subset)} counter runs")
+             f"families at alpha 0.05, over {len(subset)} PEREDUR runs")
     if not reads:
         return
     mean, p_value, higher, lower = reads["all runs, a kill is a failure"]
     if p_value < 0.05 and mean > 0:
-        outcome = "Outcome 1: counter higher on the primary"
+        outcome = "Outcome 1: PEREDUR higher on the primary"
     elif p_value < 0.05 and mean < 0:
         outcome = "Outcome 2: AuRUS higher on the primary"
     else:
         outcome = "Outcome 3: null, reported as parity"
     print(f"\n   DECISION RULE (PLAN section 5): {outcome} "
-          f"(p = {p_value:.4f}, counter higher on {higher}, lower on {lower})")
+          f"(p = {p_value:.4f}, PEREDUR higher on {higher}, lower on {lower})")
     secondary = reads.get("scorable runs only")
     if secondary:
         s_mean, s_p, s_higher, s_lower = secondary
         print(f"   Registered secondary, scorable runs only: mean "
-              f"{s_mean:+.3f}, p = {s_p:.4f}, counter higher on {s_higher}, "
+              f"{s_mean:+.3f}, p = {s_p:.4f}, PEREDUR higher on {s_higher}, "
               f"lower on {s_lower}; reported beside the primary, never "
               f"substituted for it.")
 
@@ -836,7 +836,7 @@ def main():
                         help="per-run directories, for the manifest checks "
                              "and --from-index (default: results-matched)")
     parser.add_argument("--primary", metavar="SELECTION/GRADING",
-                        help="the counter cell registered as the primary "
+                        help="the PEREDUR cell registered as the primary "
                              "endpoint against AuRUS (the rematch's PLAN "
                              "section 4 names nsga2-apportion/mrs); the "
                              "pooled read is then printed as secondary")
@@ -869,9 +869,9 @@ def main():
     if curves is not None and aurus_series is not None:
         families = {spec for spec, _, _ in curves}
         aurus_solutions_table(aurus_series, families)
-        print("   counter's cut is sub-second and AuRUS's moves only at a")
+        print("   PEREDUR's cut is sub-second and AuRUS's moves only at a")
         print("   generation boundary, dated to the second. The two columns")
-        print("   also count different things: counter's gate-passing")
+        print("   also count different things: PEREDUR's gate-passing")
         print("   accumulator against AuRUS's accepted solution set.")
     discovery(curves, scalars, aurus_runs)
     head_to_head(results, aurus_runs,

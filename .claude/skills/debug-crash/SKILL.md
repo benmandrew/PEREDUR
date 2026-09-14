@@ -1,6 +1,6 @@
 ---
 name: debug-crash
-description: Diagnose a counter crash log from crashes/. Use when investigating a SIGSEGV/SIGABRT/SIGFPE, an unsymbolized release stack trace, or reproducing a crash from its --seed.
+description: Diagnose a PEREDUR crash log from crashes/. Use when investigating a SIGSEGV/SIGABRT/SIGFPE, an unsymbolized release stack trace, or reproducing a crash from its --seed.
 ---
 
 # Debugging crashes from `crashes/`
@@ -18,7 +18,7 @@ for those build types), so:
   and the actual root cause as a place where bad data could have been let
   through instead of being caught loudly.
 - `build-release/` has no debug info, so its crash logs only show raw
-  addresses (`at .../counter`, no function/line). Don't try to reverse the
+  addresses (`at .../peredur`, no function/line). Don't try to reverse the
   PIE load offset by hand — rebuild `relwithdebinfo` instead (it keeps
   `-DNDEBUG`, so timing/behavior stays close to release, but adds `-g`):
 
@@ -29,7 +29,7 @@ for those build types), so:
 - Reproduce with the exact seed from the crash log's `Config:` block:
 
   ```sh
-  ./build-relwithdebinfo/counter --seed <seed from log>
+  ./build-relwithdebinfo/peredur --seed <seed from log>
   ```
 
   This is usually deterministic even though the crash often surfaces inside a
@@ -45,7 +45,7 @@ for those build types), so:
 
   ```sh
   gdb -q -batch -ex "run --seed <seed>" -ex "print <expr>" -ex bt \
-      --args ./build-relwithdebinfo/counter --seed <seed>
+      --args ./build-relwithdebinfo/peredur --seed <seed>
   ```
 
   Inspecting the live locals (e.g. an empty `std::vector` where the code

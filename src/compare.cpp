@@ -145,7 +145,7 @@ std::string read_file(const std::string& path) {
     return *contents;
 }
 
-// counter writes each TLSF repair as repair_N.tlsf alongside a
+// PEREDUR writes each TLSF repair as repair_N.tlsf alongside a
 // repair_N.fitness.json carrying its weighted total. The fitness file is
 // optional here: a missing or malformed one just leaves the fitness unset,
 // which sorts the repair as if scored 0 and omits it from the printed line.

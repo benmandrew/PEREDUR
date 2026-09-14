@@ -35,7 +35,7 @@ Formula::Kind pick_unary_kind(const RandomSource& random_source) {
 
 // Replacement binary operator for case (3), o2' ∈ {∨, ∧, →, U, R, W}. Brizzio's
 // fragment is Owl's negation normal form, where `a -> b` is stored as a
-// disjunction and there is no implication to re-emit; counter keeps Implies as
+// disjunction and there is no implication to re-emit; PEREDUR keeps Implies as
 // a first-class node, so excluding it here made a biconditional reachable only
 // to be destroyed. Three subjects are the whole ideal for that one
 // substitution: ltl2dba-r-2's sole ideal is its input with the root `<->`
@@ -178,7 +178,7 @@ Formula mutate_temporal(const Formula& formula,
             // Iff included, which is what makes `<->` → `->` reachable now
             // that pick_binary_kind draws Implies.
             //
-            // Case (d) is counter's own, not Brizzio's. It preserves the
+            // Case (d) is PEREDUR's own, not Brizzio's. It preserves the
             // node's own connective, and without it an implication was
             // reachable only to be destroyed: a guarded implication — the
             // shape of every minimal guarantee weakening — survived no arm.
@@ -444,11 +444,11 @@ tlsf::Specification tlsf_add_assumption(const tlsf::Specification& spec,
     // seven nodes and the assumption-shaped ideals are far larger: gyro-var2's
     // single ideal is roughly a 29-node assumption, the polarity mirror of the
     // specification's own third assumption, and over 112 emitted gyro-var2
-    // repairs counter appended only 6 assumptions, every one template-shaped.
+    // repairs PEREDUR appended only 6 assumptions, every one template-shaped.
     // Appending a copy puts a formula of the right size and vocabulary in the
     // population for ordinary mutation to edit on later generations, which is
     // how AuRUS reaches a near-duplicate assumption -- through its level-1
-    // crossover, which unions conjunct subsets. counter's crossover draws one
+    // crossover, which unions conjunct subsets. PEREDUR's crossover draws one
     // conjunct per side and cannot, so the move is mutation's here.
     //
     // Only ASSUME is drawn from, not the whole assumption side: an INITIALLY
@@ -526,7 +526,7 @@ tlsf::Specification tlsf_add_assumption(const tlsf::Specification& spec,
 
 // Deletes one live ASSUME conjunct, the mirror of tlsf_add_assumption.
 //
-// counter could append an assumption and clone one and never delete one, while
+// PEREDUR could append an assumption and clone one and never delete one, while
 // p_remove_guarantee has done the mirror job on the other side since
 // 2026-08-13. The asymmetry looks unintended rather than argued: five of the
 // corpus's ideals replace an assumption rather than adding beside it, and a
@@ -654,7 +654,7 @@ tlsf::Specification tlsf_mutate(const tlsf::Specification& spec,
         // ideal, and implies_ideal is lost by overshooting as surely as by
         // never arriving. What this arm is for is comparability -- the
         // 2026-08-14 audit read best_relation as incomparable on 47.7% of
-        // counter's runs against AuRUS's 2.6% -- and both directions deliver
+        // PEREDUR's runs against AuRUS's 2.6% -- and both directions deliver
         // that equally, leaving the fitness function to pick between them.
         // AuRUS draws its two monotone visitors with equal probability for
         // the same reason, which is why this arm does not align its direction

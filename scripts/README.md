@@ -16,11 +16,11 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `check_config_schema.py` | Lint, wired into CI and the pre-commit hook. Holds `config_io.cpp`, `config-schema.json`, `example-config.toml` and `gen_configs.DEFAULTS` against `include/config.hpp`. |
 | `coverage_badge.py` | Measures coverage and writes `docs/coverage.svg`. `--check` re-measures and fails on drift; CI runs it. |
 | `recompare.py` | Re-runs `compare` over repairs already on disk and rewrites the relation columns. The standing pass whenever an ideal changes. |
-| `check_well_separated.py` | Standalone `ltlsynt` well-separation check that bypasses counter's cached verdict. Also imported as a library by `aurus_validate.py`. |
+| `check_well_separated.py` | Standalone `ltlsynt` well-separation check that bypasses PEREDUR's cached verdict. Also imported as a library by `aurus_validate.py`. |
 | `aurus_campaign.py` | Drives the AuRUS baseline arm of a head-to-head. |
 | `aurus_validate.py` | Re-checks AuRUS's claimed repairs with `realize` and scores them with `compare`. Run it before any AuRUS analysis. |
 | `analysis_lib.py` | Statistics and CSV helpers shared by the analysers. Read its header before vendoring an analyser — importing it means the analyser is no longer standalone. |
-| `analyse_aurus_h2h.py` | Scores a counter-versus-AuRUS head-to-head, and reads other campaigns against that archived reference. |
+| `analyse_aurus_h2h.py` | Scores a PEREDUR-versus-AuRUS head-to-head, and reads other campaigns against that archived reference. |
 | `analyse_selection_default.py` | Scores the selection-default campaign. Carries a `--self-test` over synthetic rows. |
 | `analyse.ipynb` | Generic notebook over a sweep's `results.csv`; `RESULTS_CSV` overrides the path. |
 | `drop_censored_rows.py` | Deletes timeout-censored rows and their run directories so a resume re-runs them under a looser cap. Used once, on the replicate recap. |
@@ -33,7 +33,7 @@ A campaign's own `experiments/<campaign>/scripts/` holds verbatim copies of the 
 ## Prerequisites
 
 - Python 3.11+, because `check_config_schema.py` imports stdlib `tomllib` with no fallback. `campaign.py` itself runs on 3.10, having its own TOML parser for the lab hosts (see below).
-- The `counter` and `compare` binaries built in release mode (see below)
+- The `peredur` and `compare` binaries built in release mode (see below)
 
 ## 1. Build the project
 
@@ -43,7 +43,7 @@ From the repo root:
 cmake --workflow --preset release
 ```
 
-This produces `build-release/counter` and `build-release/compare`, which the
+This produces `build-release/peredur` and `build-release/compare`, which the
 runner script expects at those exact paths.
 
 ## 2. Set up the Python environment
@@ -229,7 +229,7 @@ dataset whether or not either finishes.
 
 The profile runs at `--jobs 1`, unlike the FRETISH profiles' `--jobs 4`, for two
 reasons. First, `ltlsynt` turns multi-gigabyte resident on these specs, and
-nothing caps its concurrency except the counter process's `runtime.parallel`, so
+nothing caps its concurrency except the PEREDUR process's `runtime.parallel`, so
 one process per machine keeps that the machine-wide limit — on the 128 GB
 av2/av3 grid, 32 cores × ~2.7 GB peaks near 86 GB, and a smaller-RAM box should
 lower `runtime.parallel`. (`runtime.max_concurrent_realizability` and
@@ -258,12 +258,12 @@ fsm-combined` runs that spec alone), and `--sweeps` selects which sweeps run
 ### Parallel runs (`--jobs`)
 
 `--jobs N` runs N experiments concurrently (`full` defaults to 1, so `--jobs 4`
-is worth passing). The `counter` binary parallelises internally with a thread
+is worth passing). The `peredur` binary parallelises internally with a thread
 pool sized to the machine's core count by default, so when jobs > 1 the
 runner caps each run's pool: it writes a derived config
 (`<output-dir>/config.toml` — the level's TOML with
 `parallel = max(1, cores // jobs)` under `[runtime]`) and passes that to
-`counter`. With jobs = 1 the original config file is used unchanged.
+`peredur`. With jobs = 1 the original config file is used unchanged.
 
 ### Baseline aliasing
 
@@ -284,7 +284,7 @@ own, since the two configs differ on `selection_scheme`.
 
 ### The `n_dropped` column
 
-`counter` drops an individual whose fitness scoring throws — in practice an
+`peredur` drops an individual whose fitness scoring throws — in practice an
 external tool failing on one evolved formula — rather than aborting the whole
 run, up to `max_scoring_failure_rate` (5%) of a generation. It prints a scoring
 report naming the count and reasons, and stays silent when nothing was dropped.
@@ -303,8 +303,8 @@ original header and drops the column, so legacy files stay consistent.
 
 ### The `commit` and `dirty` columns
 
-Each row records the git commit the `counter` binary was built from, read once
-at startup from `counter --version` — not from the working tree. The two
+Each row records the git commit the `peredur` binary was built from, read once
+at startup from `peredur --version` — not from the working tree. The two
 diverge every time a fix lands without a rebuild, and the binary is what
 produced the numbers. The column holds the abbreviated hash; the manifest below
 keeps the full one. `dirty` is 1 when that binary was built from a modified
@@ -410,7 +410,7 @@ python scripts/merge_experiments.py av2 av3
 python scripts/merge_experiments.py --dry-run
 
 # Merge another checkout on this machine
-python scripts/merge_experiments.py /path/to/counter
+python scripts/merge_experiments.py /path/to/peredur
 ```
 
 **`--profile` must match the profile the runs used.** Each profile writes its
@@ -571,13 +571,13 @@ python scripts/campaign.py stage arbiter-probe --force     # asks before it does
 
 Pushes the branch, then per host fetches it, checks it out at the pushed commit,
 runs the build command, runs the `configs` command and checks the configs
-directories, and reads `build-release/counter --version` back to confirm the
+directories, and reads `build-release/peredur --version` back to confirm the
 binary carries that commit with `dirty=0`. A score phase's results directory
 is checked the same way, unless an earlier run phase of the campaign writes
 it, in which case the tick checks it when the phase's turn comes.
 
 It refuses by default on three readings, all three reported at once: a dirty
-checkout, a live `counter` or `run_experiments.py` process, and a checkout on
+checkout, a live `peredur` or `run_experiments.py` process, and a checkout on
 another branch. `--force` prints the modified files by name and the branch and
 head it would leave, then requires the host name typed back at a terminal;
 without a terminal it refuses, so no script can stage past a refusal. `git
@@ -632,7 +632,7 @@ only when every queued run has a curve, and a rerun skips the runs that
 already have one, so a requeued phase re-scores only what failed. The three
 budgets and the wall cap are the two campaigns' values: 900 s per `maximal`
 call, 600 s for `compare`, a 4500 s deadline and a cap 900 s past it.
-`COUNTER_SCORE_CURVES_CMD`, `COUNTER_BIN_DIR`, `MAXIMAL_BIN` and
+`PEREDUR_SCORE_CURVES_CMD`, `PEREDUR_BIN_DIR`, `MAXIMAL_BIN` and
 `COMPARE_BIN` override what it runs, for a worktree or a test.
 
 ### The queue
@@ -646,7 +646,7 @@ python scripts/campaign.py requeue --host av2 001-arbiter-probe.toml
 
 An entry is `experiments/queue/NNN-<name>.toml` on the host that runs it,
 untracked because a tick rewrites its state and a tracked file doing that would
-leave the checkout dirty. A tick takes `~/.counter-queue.lock`, recovers any
+leave the checkout dirty. A tick takes `~/.peredur-queue.lock`, recovers any
 entry a killed tick left `running`, and runs the next phase of the
 lowest-numbered queued entry in the foreground, so the lock is held for the
 phase's whole duration and every tick landing during it exits at once. States
@@ -658,9 +658,9 @@ prints the line and installs nothing.
 `enqueue` pushes the campaign's branch to origin and freezes its commit and its
 build command into the entry, beside the seed ranges it already froze. A tick
 whose entry names a branch the checkout is not on fetches that commit, checks it
-out and runs the build, then reads `build-release/counter --version` back before
+out and runs the build, then reads `build-release/peredur --version` back before
 it runs a phase, which is `stage` performed by the tick with no terminal to
-answer to. It stages for the branch alone: a dirty checkout and a live `counter`
+answer to. It stages for the branch alone: a dirty checkout and a live `peredur`
 or `run_experiments.py` each stop it, holding the reason in `last_error`, and so
 does a HEAD no remote branch contains. Those are the cases where the checkout
 carries something no fetch brings back, and `stage --force` — which names what
@@ -698,7 +698,7 @@ are alive. The second is one row per campaign: rows done against rows planned,
 the percentage, the state (done, running, stuck or stalled), STALE — the age
 of the newest `run.log` under that campaign's results directory — a crude ETA,
 the
-branch the campaign was launched from, and the commit of the `counter` binary
+branch the campaign was launched from, and the commit of the `peredur` binary
 producing its rows.
 
 ```
@@ -745,11 +745,11 @@ Process detection matches on `comm`, never on the whole command line. `pgrep
 names it, and report an idle machine as running.
 
 A process is attributed to a campaign only when it names that campaign's
-profile, and a process that names none — a bare `counter` or `ltlsynt` — is
+profile, and a process that names none — a bare `peredur` or `ltlsynt` — is
 attributed to no campaign at all. It still appears in the checkout table's
 PROCESSES column, which is the honest place for something that cannot be tied
 to a campaign. Matching those against every campaign instead had one unrelated
-`counter` on av2 report all six of its archived campaigns as running while
+`peredur` on av2 report all six of its archived campaigns as running while
 idle av3 reported the same six, from the same data, as stalled.
 
 A matched process is then corroborated against the campaign's own output
@@ -757,7 +757,7 @@ before it counts as progress. STATE reads `running` only where the newest
 `run.log` is fresher than three hours; where a runner is alive over an older
 log it reads `stuck`, with a note. The threshold is the harness's own bound on
 how long one run can be silent rather than a guess: the largest per-run
-`counter` timeout any profile allows is 3600s and the largest `compare`
+`peredur` timeout any profile allows is 3600s and the largest `compare`
 timeout is 1800s, so 90 minutes bounds a single run, doubled for the
 granularity of the log writes and for a `--jobs 1` host where the next
 `run.log` only appears once the previous run has finished. `running` beside a
@@ -891,7 +891,7 @@ failure, which is the reason for the difference. It runs against temporary
 fixture checkouts and
 never touches a lab machine: the remote protocol is exercised against captured
 marker output, `collect` against two throwaway checkouts, and the stage and
-queue paths against temporary git repositories with `COUNTER_RUNNER_CMD`
+queue paths against temporary git repositories with `PEREDUR_RUNNER_CMD`
 pointed at a stub that records its arguments instead of running a campaign.
 
 The verification is the half worth having. A merge that quietly drops one

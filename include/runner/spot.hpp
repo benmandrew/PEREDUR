@@ -15,7 +15,7 @@
 
 #include "requirement.hpp"
 
-/// Returns the directory containing SPOT tool binaries: `COUNTER_SPOT_BIN_DIR`
+/// Returns the directory containing SPOT tool binaries: `PEREDUR_SPOT_BIN_DIR`
 /// when that environment variable is set and non-empty, and otherwise the
 /// SPOT_BIN_DIR preprocessor definition baked in at build time. The
 /// environment is read once, on first use, so a relocated build is pointed at

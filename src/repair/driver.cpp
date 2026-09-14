@@ -94,7 +94,7 @@ int run_tlsf_repair(const Config& cfg, const std::string& input_path,
             print_cpu_report(seconds_since(wall_start));
         }
         // The per-tool rows say how long each tool took; the scope profile says
-        // where inside a call that went. No-op unless COUNTER_PROFILE is set,
+        // where inside a call that went. No-op unless PEREDUR_PROFILE is set,
         // so it is not tied to --diagnostics.
         profile::report_if_enabled();
         // After the reports, so the per-tool counts it records are the run's

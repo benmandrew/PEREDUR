@@ -330,7 +330,7 @@ double specification_status(const Specification& specification,
                             ComponentCheck component_check) {
     if (grading == StatusGrading::Aurus) {
         // Sides rather than requirements, and no component tier: the ladder is
-        // AuRUS's whole scale, not a refinement of counter's. See
+        // AuRUS's whole scale, not a refinement of PEREDUR's. See
         // status_score_aurus.
         return status_score_aurus(
             side_conjunction(specification.m_assumptions),

@@ -23,7 +23,7 @@ endif()
 set(GANAK_ARCHIVE_NAME "ganak-${GANAK_OS}-${GANAK_ARCH}.zip")
 set(GANAK_DOWNLOAD_URL
     "https://github.com/meelgroup/ganak/releases/download/release/${GANAK_VERSION}/${GANAK_ARCHIVE_NAME}")
-set(GANAK_ROOT_DIR "${COUNTER_THIRD_PARTY_DIR}/ganak")
+set(GANAK_ROOT_DIR "${PEREDUR_THIRD_PARTY_DIR}/ganak")
 set(GANAK_ARCHIVE_PATH "${GANAK_ROOT_DIR}/${GANAK_ARCHIVE_NAME}")
 set(GANAK_EXTRACT_DIR "${GANAK_ROOT_DIR}/extracted")
 

@@ -15,7 +15,7 @@
 /// is blocked on a child process, not computing: `proc/read` sits at a cpu/wall
 /// ratio of about 0.01 on a real run. That ratio is the diagnostic.
 ///
-/// Off unless the COUNTER_PROFILE environment variable is set (to a file path
+/// Off unless the PEREDUR_PROFILE environment variable is set (to a file path
 /// for JSON output, or to "1"/"-" for the stderr table only). Disabled, a scope
 /// costs one relaxed atomic load and a branch.
 
@@ -49,7 +49,7 @@ struct Site {
     explicit Site(const char* name) : m_name(name) {}
 };
 
-/// True when COUNTER_PROFILE is set. Read once at first use and cached.
+/// True when PEREDUR_PROFILE is set. Read once at first use and cached.
 bool enabled();
 
 /// Registers (or returns) the site named @p name. Intended to be called from a
@@ -91,7 +91,7 @@ void report(std::ostream& out);
 /// reported on stderr rather than raised: profiling must never fail a run.
 void report_json(const std::string& path);
 
-/// Writes the report to wherever COUNTER_PROFILE points, and to stderr. A no-op
+/// Writes the report to wherever PEREDUR_PROFILE points, and to stderr. A no-op
 /// when disabled. Safe to call more than once.
 void report_if_enabled();
 
@@ -140,14 +140,14 @@ class Scope {
 
 }  // namespace profile
 
-#define COUNTER_PROFILE_CONCAT_INNER(a, b) a##b
-#define COUNTER_PROFILE_CONCAT(a, b) COUNTER_PROFILE_CONCAT_INNER(a, b)
+#define PEREDUR_PROFILE_CONCAT_INNER(a, b) a##b
+#define PEREDUR_PROFILE_CONCAT(a, b) PEREDUR_PROFILE_CONCAT_INNER(a, b)
 
 /// Times the enclosing scope under @p name. @p name must be a string literal:
 /// the Site is a function-local static, so registration happens once.
-#define COUNTER_PROFILE_SCOPE(name)                                        \
-    static ::profile::Site& COUNTER_PROFILE_CONCAT(prof_site_, __LINE__) = \
+#define PEREDUR_PROFILE_SCOPE(name)                                        \
+    static ::profile::Site& PEREDUR_PROFILE_CONCAT(prof_site_, __LINE__) = \
         ::profile::site(name);                                             \
-    const ::profile::Scope COUNTER_PROFILE_CONCAT(prof_scope_, __LINE__) { \
-        COUNTER_PROFILE_CONCAT(prof_site_, __LINE__)                       \
+    const ::profile::Scope PEREDUR_PROFILE_CONCAT(prof_scope_, __LINE__) { \
+        PEREDUR_PROFILE_CONCAT(prof_site_, __LINE__)                       \
     }

@@ -127,7 +127,7 @@ generations = 5
 void test_config_io_missing_file_throws() {
     bool threw = false;
     try {
-        config_from_toml("/tmp/counter_test_nonexistent_config.toml");
+        config_from_toml("/tmp/peredur_test_nonexistent_config.toml");
     } catch (const std::exception& exc) {
         threw = true;
         const std::string msg(exc.what());

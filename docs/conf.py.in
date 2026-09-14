@@ -1,4 +1,4 @@
-project = "@PROJECT_NAME@"
+project = "PEREDUR"
 release = "@PROJECT_VERSION@"
 
 extensions = ["breathe", "sphinxcontrib.katex"]

@@ -14,7 +14,7 @@ namespace {
 
 void test_formula_to_dimacs_implies_count() {
     const Formula formula = Formula("P -> Q");
-    std::string dimacs_path = "/tmp/counter-formula-implies-XXXXXX";
+    std::string dimacs_path = "/tmp/peredur-formula-implies-XXXXXX";
     const int file_descriptor = mkstemp(dimacs_path.data());
     expect(file_descriptor >= 0,
            "formula-dimacs: failed to create DIMACS file for implies");
@@ -33,7 +33,7 @@ void test_formula_to_dimacs_implies_count() {
 
 void test_formula_to_dimacs_precedence_count() {
     const Formula formula = Formula("A | B & C");
-    std::string dimacs_path = "/tmp/counter-formula-precedence-XXXXXX";
+    std::string dimacs_path = "/tmp/peredur-formula-precedence-XXXXXX";
     const int file_descriptor = mkstemp(dimacs_path.data());
     expect(file_descriptor >= 0,
            "formula-dimacs: failed to create DIMACS file for precedence");

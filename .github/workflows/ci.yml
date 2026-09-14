@@ -304,7 +304,7 @@ jobs:
             if [ "$FULL_SWEEP" != "true" ]; then
               if [ -n "${CHANGED_FILES// /}" ]; then
                 list=$(echo "$CHANGED_FILES" | xargs | tr " " ";")
-                args+=("-DCOUNTER_LINT_FILES_OVERRIDE=$list")
+                args+=("-DPEREDUR_LINT_FILES_OVERRIDE=$list")
               else
                 run_lint=false
               fi
@@ -371,7 +371,7 @@ jobs:
       # Spot, black and ganak are spawned as subprocesses and nothing links
       # against them, so their trees carry none of a preset's flags: every leg
       # of this matrix built a byte-equivalent copy and saved it under a key of
-      # its own. COUNTER_THIRD_PARTY_DIR (see the root CMakeLists) points them
+      # its own. PEREDUR_THIRD_PARTY_DIR (see the root CMakeLists) points them
       # all at one directory outside any build tree, so the key drops the preset
       # and the four legs share one entry. Only the compiler stays in it --
       # Spot's ./configure is handed CXX= and nothing else.
@@ -443,7 +443,7 @@ jobs:
           nix develop --command bash -euo pipefail -c '
             echo "::group::Configure"
             cmake --preset ${{ matrix.preset }} ${{ matrix.cmake_args }} \
-              -DCOUNTER_THIRD_PARTY_DIR="$GITHUB_WORKSPACE/third-party"
+              -DPEREDUR_THIRD_PARTY_DIR="$GITHUB_WORKSPACE/third-party"
             echo "::endgroup::"
 
             echo "::group::Build"

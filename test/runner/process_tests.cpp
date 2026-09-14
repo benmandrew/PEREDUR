@@ -33,7 +33,7 @@ double elapsed_ms(Clock::time_point start) {
 
 std::string scratch_path(const std::string& name) {
     return (std::filesystem::temp_directory_path() /
-            ("counter_process_test_" + std::to_string(getpid()) + "_" + name))
+            ("peredur_process_test_" + std::to_string(getpid()) + "_" + name))
         .string();
 }
 
@@ -200,7 +200,7 @@ std::uint64_t touch_every_page(std::vector<char>* buffer) {
 // parent's resident set as copy-on-write, and exec folds that into the child's
 // maxrss, so wait4 reports the parent's footprint for any child that stayed
 // under it. Reporting that as the tool's peak would have every cheap tool read
-// back as however large counter happened to be -- which is what the assertion
+// back as however large PEREDUR happened to be -- which is what the assertion
 // below would catch, since /bin/sh cannot really have grown to the size of the
 // buffer this test is holding.
 void test_does_not_report_the_parents_footprint_as_the_childs() {
@@ -249,7 +249,7 @@ int guard_exit_status(ParentDeathPolicy policy, pid_t claimed_parent_pid) {
 // The guard closes the fork/registration race by asking whether the parent is
 // still the one that forked this child, and the only honest test of that is
 // the pid it compares against. Reading it as "getppid() == 1" instead passes
-// every case below except the two mismatches, and is wrong wherever counter is
+// every case below except the two mismatches, and is wrong wherever PEREDUR is
 // itself pid 1 -- the container entrypoint case, where it exited 127 before
 // every tool exec and left each query with empty output and no timeout.
 void test_parent_death_guard_compares_the_recorded_parent_pid() {

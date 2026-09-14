@@ -50,7 +50,7 @@ std::string temp_directory() {
 
 std::string write_temporary_dimacs(const std::string& contents) {
     std::string writable_template =
-        temp_directory() + "/counter-formula-XXXXXX";
+        temp_directory() + "/peredur-formula-XXXXXX";
     std::vector<char> buffer(writable_template.begin(),
                              writable_template.end());
     buffer.push_back('\0');
@@ -97,7 +97,7 @@ Count parse_ganak_exact_count(const std::string& output) {
 std::string ganak_executable_path() {
 #ifdef GANAK_EXECUTABLE_PATH
     static const ToolPath k_path =
-        tool_path_from_env("COUNTER_GANAK_PATH", GANAK_EXECUTABLE_PATH);
+        tool_path_from_env("PEREDUR_GANAK_PATH", GANAK_EXECUTABLE_PATH);
     return k_path.m_path;
 #else
     assert(false);

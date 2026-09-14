@@ -280,7 +280,7 @@ class ScopedEnvVar {
 // cannot distinguish these cases. The helper underneath them is where the
 // logic is, and is tested here rather than through any one caller.
 void test_tool_path_env_wins_over_compiled_default() {
-    constexpr const char* k_var = "COUNTER_TOOL_PATH_TEST";
+    constexpr const char* k_var = "PEREDUR_TOOL_PATH_TEST";
     const ScopedEnvVar env(k_var);
 
     env.set("/override/bin");
@@ -294,7 +294,7 @@ void test_tool_path_env_wins_over_compiled_default() {
 }
 
 void test_tool_path_empty_env_falls_back() {
-    constexpr const char* k_var = "COUNTER_TOOL_PATH_TEST";
+    constexpr const char* k_var = "PEREDUR_TOOL_PATH_TEST";
     const ScopedEnvVar env(k_var);
 
     env.set("");
@@ -308,7 +308,7 @@ void test_tool_path_empty_env_falls_back() {
 }
 
 void test_tool_path_unset_env_falls_back() {
-    constexpr const char* k_var = "COUNTER_TOOL_PATH_TEST";
+    constexpr const char* k_var = "PEREDUR_TOOL_PATH_TEST";
     const ScopedEnvVar env(k_var);
 
     env.clear();

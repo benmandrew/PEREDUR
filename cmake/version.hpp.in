@@ -5,8 +5,8 @@
 
 namespace version::generated {
 
-inline constexpr const char* k_commit = "@COUNTER_GIT_COMMIT@";
-inline constexpr const char* k_commit_short = "@COUNTER_GIT_COMMIT_SHORT@";
-inline constexpr bool k_dirty = @COUNTER_GIT_DIRTY@;
+inline constexpr const char* k_commit = "@PEREDUR_GIT_COMMIT@";
+inline constexpr const char* k_commit_short = "@PEREDUR_GIT_COMMIT_SHORT@";
+inline constexpr bool k_dirty = @PEREDUR_GIT_DIRTY@;
 
 }  // namespace version::generated

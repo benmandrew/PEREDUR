@@ -16,9 +16,9 @@ constexpr const char* k_progress_filename = "progress.jsonl";
 constexpr const char* k_page_filename = "index.html";
 
 std::string page_source_path() {
-#ifdef COUNTER_DASHBOARD_PAGE_PATH
+#ifdef PEREDUR_DASHBOARD_PAGE_PATH
     static const ToolPath k_page = tool_path_from_env(
-        "COUNTER_DASHBOARD_PAGE", COUNTER_DASHBOARD_PAGE_PATH);
+        "PEREDUR_DASHBOARD_PAGE", PEREDUR_DASHBOARD_PAGE_PATH);
     return k_page.m_path;
 #else
     // A build with no page path writes no page, and an override cannot

@@ -58,7 +58,7 @@ void collect_temporal(const Formula& formula, std::vector<Formula>& out) {
 }
 
 // Where AuRUS finds no temporal subformula it abandons the merge and drops the
-// conjunct, which counter cannot do — a slot is positional and deletion is
+// conjunct, which PEREDUR cannot do — a slot is positional and deletion is
 // mutation's move alone. The whole conjunct stands in as the single graft site
 // instead, which degrades the merge to the whole-conjunct swap this operator
 // used to do unconditionally. Without the fallback crossover would be a no-op

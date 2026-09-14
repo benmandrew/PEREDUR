@@ -229,8 +229,8 @@ void test_a_counter_name_survives_the_exit_report() {
     // Nothing in this process can see that. The report it would have to read
     // is not written until after every test has finished, which is why this is
     // a second process reading the first's. The child skips the spawn by
-    // finding COUNTER_PROFILE already set, so it recurses exactly once.
-    const bool is_the_child = std::getenv("COUNTER_PROFILE") != nullptr;
+    // finding PEREDUR_PROFILE already set, so it recurses exactly once.
+    const bool is_the_child = std::getenv("PEREDUR_PROFILE") != nullptr;
     profile::add_count("test/counter-name-survives");
     if (is_the_child) {
         return;
@@ -238,14 +238,14 @@ void test_a_counter_name_survives_the_exit_report() {
 
     const std::filesystem::path report =
         std::filesystem::temp_directory_path() /
-        ("counter-profile-" + std::to_string(getpid()) + ".json");
-    // The parent latched COUNTER_PROFILE as unset when the first scope above
+        ("peredur-profile-" + std::to_string(getpid()) + ".json");
+    // The parent latched PEREDUR_PROFILE as unset when the first scope above
     // ran, so setting it here reaches the child and cannot turn profiling on
     // in this process -- which would have it write over the file being read.
-    setenv("COUNTER_PROFILE", report.c_str(), 1);
+    setenv("PEREDUR_PROFILE", report.c_str(), 1);
     const ProcessResult child = execute_and_capture(
         {this_executable(), "profile"}, std::chrono::seconds(300));
-    unsetenv("COUNTER_PROFILE");
+    unsetenv("PEREDUR_PROFILE");
     expect(child.m_exit_code == 0,
            "profile: the child test run should pass, or the report below says "
            "nothing about the registry");
@@ -269,6 +269,6 @@ void run_profile_tests() {
     test_record_max_is_silent_when_disabled();
     test_clocks_advance_monotonically();
     test_thread_cpu_excludes_other_threads();
-    // Last, so the scopes above have already latched COUNTER_PROFILE as unset.
+    // Last, so the scopes above have already latched PEREDUR_PROFILE as unset.
     test_a_counter_name_survives_the_exit_report();
 }

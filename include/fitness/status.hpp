@@ -101,7 +101,7 @@ inline constexpr double k_status_aurus_assumptions_only = 0.10;
 inline constexpr double k_status_aurus_contradictory = 0.20;
 
 /// Scores a candidate on AuRUS's status ladder, selected by
-/// Config::status_grading. It exists so an ablation can cross counter's own
+/// Config::status_grading. It exists so an ablation can cross PEREDUR's own
 /// grading against the design this search is derived from, which means
 /// reproducing the ladder value for value rather than improving on it:
 /// `getStatusFitness` and `compute_status` in

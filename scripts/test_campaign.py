@@ -20,7 +20,7 @@ overlap, the merge keeps one row per key, and the campaign costs more and
 yields less than it says while every table reads normal.
 
 The stage and queue tests run against throwaway git checkouts under a temporary
-directory, with COUNTER_RUNNER_CMD pointed at a stub that records its arguments
+directory, with PEREDUR_RUNNER_CMD pointed at a stub that records its arguments
 instead of running a campaign. No lab machine is touched and no run is launched.
 """
 
@@ -108,7 +108,7 @@ MANIFEST = """{
   "started": "2026-08-11T12:53:14+0100",
   "git": {"branch": "feat/arbiter-probe", "describe": "x",
           "head": "b093374f0a0d8e83d0a9fe3412e6935bffc5b078"},
-  "binaries": {"counter": {"commit_short": "b093374", "dirty": "0"}},
+  "binaries": {"peredur": {"commit_short": "b093374", "dirty": "0"}},
   "sweep": {"sweeps": ["R"], "specs": ["amba"], "seeds": [20, 21], "jobs": 1,
             "results_csv": "experiments/results-arbiter-probe.csv",
             "results_dir": "experiments/results-arbiter-probe"}
@@ -155,6 +155,13 @@ check(c["profile"], "arbiter-probe", "profile from the manifest")
 check(c["branch"], "feat/arbiter-probe", "launch branch from the manifest")
 check(c["binary_commit"], "b093374", "binary commit from the manifest")
 check(c["results_csv"], "experiments/results-arbiter-probe.csv", "csv path")
+
+legacy = C.campaigns_from_manifests([{
+    **inv["manifests"][0],
+    "binaries": {"counter": {"commit_short": "0129e6c", "dirty": "1"}}}])
+check(legacy[0]["binary_commit"], "0129e6c",
+      "a manifest from before the rename keys the engine as counter")
+check(legacy[0]["dirty_binary"], True, "and its dirty flag reads the same key")
 
 check(C.plan_args(c),
       "--profile arbiter-probe --dry-run --sweeps R --specs amba --seeds 20 21",
@@ -227,11 +234,14 @@ PS = [
     "zsh zsh -c cd /home/benandrew/projects/counter && python3 "
     "scripts/run_experiments.py --profile full --dry-run",
     "python3 python3 scripts/run_experiments.py --profile tlsf --jobs 4",
-    "counter /home/benandrew/projects/counter/build-release/counter --input x",
+    "peredur /home/benandrew/projects/counter/build-release/peredur --input x",
 ]
 procs = C.live_processes(PS)
-check([p["comm"] for p in procs], ["python3", "counter"],
+check([p["comm"] for p in procs], ["python3", "peredur"],
       "only the runner and the engine, never the shell that names them")
+check([p["comm"] for p in C.live_processes([
+    "counter /home/benandrew/projects/counter/build-release/counter --input x"])],
+    ["counter"], "an engine binary built before the rename is still an engine")
 check(procs[0]["profile"], "tlsf", "the runner's profile is read off its args")
 
 check(C.live_processes([
@@ -315,17 +325,17 @@ check(annotated(1, 2, 1786459940, [])["stale_s"], 60,
 other = annotated(1, 2, 1786459940, [{"comm": "python3", "profile": "other"}])
 check(other["state"], "stalled", "a runner on another profile is not this one")
 
-# An unattributable process must match no campaign. One unrelated `counter` on
+# An unattributable process must match no campaign. One unrelated `peredur` on
 # av2 otherwise reported all six of its archived campaigns as running, while
 # idle av3 reported the same six from the same data as stalled -- the same
 # campaign in two states, decided by a process belonging to neither.
-engine = annotated(1, 2, 1786459940, [{"comm": "counter", "profile": None}])
+engine = annotated(1, 2, 1786459940, [{"comm": "peredur", "profile": None}])
 check(engine["state"], "stalled",
       "a process that names no profile must claim no campaign")
 check(engine["running"], False, "and must not read as running")
 
 both_hosts = [annotated(1, 2, 1786459940, procs) for procs in
-              ([], [{"comm": "counter", "profile": None}])]
+              ([], [{"comm": "peredur", "profile": None}])]
 check(both_hosts[0]["state"], both_hosts[1]["state"],
       "an idle host and a host busy on other work must agree about the same "
       "archived campaign")
@@ -406,12 +416,12 @@ check(C.checkout_rows([unreachable])[0][5], "unreachable",
 
 live = {"host": "av3", "reachable": True, "hostname": "av3",
         "branch": "feat/x", "head": "abc1234", "dirty": True, "hidden": 0,
-        "processes": [{"comm": "counter", "profile": None},
-                      {"comm": "counter", "profile": None}],
+        "processes": [{"comm": "peredur", "profile": None},
+                      {"comm": "peredur", "profile": None}],
         "campaigns": [dict(done, branch="feat/other", binary_commit="b093374",
                            dirty_binary=True)]}
 check(C.checkout_rows([live])[0],
-      ["av3", "av3", "feat/x", "abc1234", "dirty", "counter"],
+      ["av3", "av3", "feat/x", "abc1234", "dirty", "peredur"],
       "the checkout table names the branch a resumed run would use")
 check(C.status_rows([live])[0][7], "feat/other!",
       "a campaign launched on a branch the checkout has left is flagged")
@@ -1616,7 +1626,7 @@ b093374f0a0d8e83d0a9fe3412e6935bffc5b078
  M src/main.cpp
 ##PS
 zsh -zsh
-counter /home/benandrew/projects/counter/build-release/counter --input x
+peredur /home/benandrew/projects/counter/build-release/peredur --input x
 ##BIN
 commit=b093374f0a0d8e83d0a9fe3412e6935bffc5b078
 commit_short=b093374
@@ -1632,7 +1642,7 @@ probe = C.parse_stage_probe(PROBE)
 check(probe.branch, "feat/arbiter-probe", "the probe reads the branch")
 check(probe.head[:7], "b093374", "and the full head")
 check(probe.dirty, ["M src/main.cpp"], "and the modified files by name")
-check([p["comm"] for p in probe.processes], ["counter"],
+check([p["comm"] for p in probe.processes], ["peredur"],
       "and the live engine, keyed on comm as everywhere else")
 check(probe.binary["commit_short"], "b093374", "and the binary's commit")
 check(probe.queue[0]["campaign"], "arbiter-probe",
@@ -1670,12 +1680,12 @@ check([k for k, _ in C.stage_refusals(host_probe(dirty=[" M x.cpp"]),
                                       "feat/x")],
       ["dirty"], "a dirty checkout is refused")
 check([k for k, _ in C.stage_refusals(
-    host_probe(processes=[{"comm": "counter", "profile": None}]), "feat/x")],
+    host_probe(processes=[{"comm": "peredur", "profile": None}]), "feat/x")],
     ["busy"], "a live run is refused")
 check([k for k, _ in C.stage_refusals(clean, "feat/other")],
       ["branch"], "a host on another branch is refused")
 check(len(C.stage_refusals(host_probe(dirty=[" M x"], processes=[
-    {"comm": "counter", "profile": None}]), "feat/other")), 3,
+    {"comm": "peredur", "profile": None}]), "feat/other")), 3,
     "and all three are reported at once, not one per attempt")
 
 apply_forced = C.stage_apply_script("/r", "feat/x", "s" * 40, "make",
@@ -1844,7 +1854,7 @@ REAL_PROBE_PROCESSES = C.probe_processes
 # The probe's `ps` is host-wide by design, and stage refuses on any live run
 # whether or not it belongs to the checkout being staged, which is the reading
 # a shared lab machine needs. A fixture pointed at a local checkout therefore
-# inherits this machine's own counter and ltlsynt processes and refuses for
+# inherits this machine's own PEREDUR and ltlsynt processes and refuses for
 # reasons that have nothing to do with the fixture: the suite passed on an idle
 # box and failed on a busy one. The list is supplied here instead, and both
 # directions are asserted below, which makes ambient state a tested input.
@@ -1858,7 +1868,7 @@ hosts = { av2 = "0-1", av3 = "2-3" }
 phases = [ { profile = "full", jobs = 2 } ]
 """
 
-# Stands in for build-release/counter, reporting the commit the checkout is
+# Stands in for build-release/peredur, reporting the commit the checkout is
 # standing on. Untracked, exactly as the real binary is, so it survives the
 # checkout the stage script performs.
 FAKE_BINARY = """#!/bin/sh
@@ -1901,11 +1911,11 @@ try:
     # The other direction, from the same fixture: a run in flight refuses,
     # whether or not it belongs to this checkout. Resetting a shared machine
     # under somebody's run is what the refusal exists to prevent.
-    FIXTURE_PROCESSES = [{"comm": "counter", "profile": None}]
+    FIXTURE_PROCESSES = [{"comm": "peredur", "profile": None}]
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer):
         code = C.cmd_stage(stage_args())
-    check(code, 1, "a host with a live counter is not staged")
+    check(code, 1, "a host with a live PEREDUR is not staged")
     check_true("busy" in buffer.getvalue(), "and busy is the reason given")
     FIXTURE_PROCESSES = []
 
@@ -1960,7 +1970,7 @@ try:
     # checkout is on: push, fetch, checkout, build, and the version read back.
     # The last step is the one that matters -- a campaign whose binary predates
     # its branch produces rows that look valid and name the wrong commit.
-    binary = repo / C.COUNTER_BINARY
+    binary = repo / C.PEREDUR_BINARY
     binary.parent.mkdir(parents=True, exist_ok=True)
     binary.write_text(FAKE_BINARY)
     binary.chmod(0o755)
@@ -2105,7 +2115,7 @@ try:
     with contextlib.redirect_stdout(blocked):
         code = C.cmd_start(start_args())
     check(code, 1, "a host with no binary is not launched on")
-    check_true("no build-release/counter" in blocked.getvalue(),
+    check_true("no build-release/peredur" in blocked.getvalue(),
                "and the missing binary is what it names")
     binary.write_text(FAKE_BINARY)
     binary.chmod(0o755)
@@ -2241,8 +2251,8 @@ try:
     git(repo, "checkout", "-q", "feat/queued")
     # A tick stages before it runs, and staging reads the binary back the way
     # run_experiments.py does. Untracked, so the checkout it performs leaves it
-    # alone, exactly as the real build-release/counter is untracked.
-    binary = repo / C.COUNTER_BINARY
+    # alone, exactly as the real build-release/peredur is untracked.
+    binary = repo / C.PEREDUR_BINARY
     binary.parent.mkdir(parents=True, exist_ok=True)
     binary.write_text(FAKE_BINARY)
     binary.chmod(0o755)
@@ -2360,7 +2370,7 @@ try:
     entry.update({"state": "queued", "phase": 0, "attempts": 0})
     C.write_entry(entry["path"], entry)
 
-    env = dict(os.environ, COUNTER_RUNNER_CMD=f"{sys.executable} {stub}")
+    env = dict(os.environ, PEREDUR_RUNNER_CMD=f"{sys.executable} {stub}")
     child = subprocess.Popen(
         [sys.executable, str(CAMPAIGN_PY), "tick",
          "--root", str(repo), "--lock", str(lock), "--host", "local"],
@@ -2553,7 +2563,7 @@ try:
 
     # Nor under a live run. Swapping the binary mid-campaign would leave every
     # row after it naming a commit it did not come from.
-    FIXTURE_PROCESSES = [{"comm": "counter", "profile": None}]
+    FIXTURE_PROCESSES = [{"comm": "peredur", "profile": None}]
     entry = only_entry()
     entry.update({"state": "queued", "attempts": 0})
     C.write_entry(entry["path"], entry)
@@ -2912,8 +2922,8 @@ try:
 
     def scorer(*extra: str, env_extra: dict | None = None,
                seeds=("1", "2", "3")) -> subprocess.CompletedProcess:
-        env = dict(os.environ, COUNTER_BIN_DIR=str(bins),
-                   COUNTER_SCORE_CURVES_CMD=f"{sys.executable} {stub_curves}",
+        env = dict(os.environ, PEREDUR_BIN_DIR=str(bins),
+                   PEREDUR_SCORE_CURVES_CMD=f"{sys.executable} {stub_curves}",
                    **(env_extra or {}))
         return subprocess.run(
             [sys.executable, str(SCORE_CAMPAIGN_PY), "--results", str(results),
@@ -3199,7 +3209,7 @@ finally:
 #
 # Two failures are worth guarding, and only one of them is visible. Escapes in
 # a redirected stream are the loud one: `tick` runs from cron into
-# $HOME/.counter-queue.log and `status` is piped and captured, and the C++ side
+# $HOME/.peredur-queue.log and `status` is piped and captured, and the C++ side
 # already carries a note about a status line that logged 59KB of escapes for
 # 1.2KB of content. The silent one is alignment -- column widths come from
 # len(cell), so an escape counted into a width shifts every column right of it
@@ -3257,7 +3267,7 @@ check(C.colour_enabled(stream=object(), env={}), False,
 COLOUR_REPORTS = [
     {"host": "av2", "reachable": True, "hostname": "av2", "branch": "feat/x",
      "head": "abc1234", "dirty": False, "hidden": 0,
-     "processes": [{"comm": "counter", "profile": "tlsf"}],
+     "processes": [{"comm": "peredur", "profile": "tlsf"}],
      "campaigns": [dict(done, profile="tlsf", state="running",
                         branch="feat/x", binary_commit="abc1234")],
      "queue": [

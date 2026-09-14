@@ -18,7 +18,7 @@ struct GanakStats {
     inline static double total_cpu_s = 0.0;
 };
 
-/// Returns the path to the ganak binary: `COUNTER_GANAK_PATH` when that
+/// Returns the path to the ganak binary: `PEREDUR_GANAK_PATH` when that
 /// environment variable is set and non-empty, and otherwise the
 /// GANAK_EXECUTABLE_PATH preprocessor definition baked in at build time. The
 /// environment is read once, on first use.

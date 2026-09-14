@@ -28,33 +28,33 @@ endif()
 execute_process(
     COMMAND ${GIT_EXECUTABLE} rev-parse --is-inside-work-tree
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    OUTPUT_VARIABLE COUNTER_INSIDE_WORK_TREE
+    OUTPUT_VARIABLE PEREDUR_INSIDE_WORK_TREE
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET
-    RESULT_VARIABLE COUNTER_GIT_RESULT
+    RESULT_VARIABLE PEREDUR_GIT_RESULT
 )
 
-if(NOT COUNTER_GIT_RESULT EQUAL 0 OR NOT COUNTER_INSIDE_WORK_TREE STREQUAL "true")
+if(NOT PEREDUR_GIT_RESULT EQUAL 0 OR NOT PEREDUR_INSIDE_WORK_TREE STREQUAL "true")
     return()
 endif()
 
 execute_process(
     COMMAND ${GIT_EXECUTABLE} config --local --get core.hooksPath
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    OUTPUT_VARIABLE COUNTER_HOOKS_PATH
+    OUTPUT_VARIABLE PEREDUR_HOOKS_PATH
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET
 )
 
-if(COUNTER_HOOKS_PATH STREQUAL ".githooks")
+if(PEREDUR_HOOKS_PATH STREQUAL ".githooks")
     return()
 endif()
 
 # Someone has pointed this repository elsewhere on purpose. Say so rather than
 # overwriting a deliberate choice.
-if(NOT COUNTER_HOOKS_PATH STREQUAL "")
+if(NOT PEREDUR_HOOKS_PATH STREQUAL "")
     message(STATUS
-        "core.hooksPath is '${COUNTER_HOOKS_PATH}', not '.githooks'; "
+        "core.hooksPath is '${PEREDUR_HOOKS_PATH}', not '.githooks'; "
         "leaving it alone. The tracked hooks will not run.")
     return()
 endif()
@@ -62,11 +62,11 @@ endif()
 execute_process(
     COMMAND ${GIT_EXECUTABLE} config --local core.hooksPath .githooks
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    RESULT_VARIABLE COUNTER_HOOKS_SET_RESULT
+    RESULT_VARIABLE PEREDUR_HOOKS_SET_RESULT
     ERROR_QUIET
 )
 
-if(COUNTER_HOOKS_SET_RESULT EQUAL 0)
+if(PEREDUR_HOOKS_SET_RESULT EQUAL 0)
     message(STATUS "Set core.hooksPath to .githooks (tracked git hooks enabled)")
 else()
     message(STATUS "Could not set core.hooksPath; tracked git hooks are not enabled")

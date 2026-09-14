@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-// counter's end-of-run reports, printed to stdout after the search finishes.
+// PEREDUR's end-of-run reports, printed to stdout after the search finishes.
 
 // One filter's input and output population sizes, summed over every generation
 // it ran in.

@@ -91,18 +91,18 @@ jobs:
             echo "::endgroup::"
 
             echo "::group::Build"
-            cmake --build --preset bench --target counter_bench
+            cmake --build --preset bench --target peredur_bench
             echo "::endgroup::"
           '
 
       - name: Check regression assertions
         if: steps.gate.outputs.run == 'true'
-        run: ./build-bench/bench/counter_bench --check-assertions
+        run: ./build-bench/bench/peredur_bench --check-assertions
 
       - name: Run benchmarks
         if: steps.gate.outputs.run == 'true'
         run: |
-          ./build-bench/bench/counter_bench \
+          ./build-bench/bench/peredur_bench \
             --benchmark_format=json \
             --benchmark_out=bench_results.json \
             --benchmark_time_unit=ns
@@ -111,7 +111,7 @@ jobs:
         if: steps.gate.outputs.run == 'true'
         uses: benchmark-action/github-action-benchmark@v1
         with:
-          name: counter benchmarks
+          name: PEREDUR benchmarks
           tool: googlecpp
           output-file-path: bench_results.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
