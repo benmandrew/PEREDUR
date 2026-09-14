@@ -481,18 +481,9 @@ int main(int argc, const char* const argv[]) {
         dir_has_extension(args.repairs_dir, ".tlsf") ||
         dir_has_extension(args.ideals_dir, ".tlsf");
 
-    // Both paths ask one whole-spec implication query per pair, and maximal.cpp
-    // records the measurement: the simplify pass is 95.6% of solver wall on
-    // that shape and decides nothing the satisfiability call cannot. Over this
-    // campaign's corpus the pass put 205 of 3000 runs past the harness's 600 s
-    // cap, 118 of 120 on humanoid-742, and a timed-out compare reads as no
-    // ideal relation at all. SPOT takes black's budget for the same reason as
-    // there: an undecided ExpectUnsat query is never escalated and classifies
-    // as Timeout. Only the TLSF path took these settings until 2026-09-11, on
-    // the grounds that FRETISH decomposed per requirement and that shape had
-    // not been measured; ed5413f made spec_implies lower the whole
-    // specification, so the premise is gone and the two ask the same question.
-    checker.set_simplify(false);
+    // Both paths ask one whole-spec implication query per pair. SPOT takes
+    // black's budget for the same reason as in maximal.cpp: an undecided
+    // ExpectUnsat query is never escalated and classifies as Timeout.
     checker.set_spot_budget(cfg.black_timeout);
 
     return tlsf ? run_tlsf(args, checker) : run_fretish(args, checker);

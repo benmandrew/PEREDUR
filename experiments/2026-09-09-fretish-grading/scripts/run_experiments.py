@@ -15,8 +15,8 @@ Usage:
     python scripts/run_experiments.py --dry-run          # print plan, no execution
     python scripts/run_experiments.py --no-resume        # ignore existing results
 
-Every row records the commit the PEREDUR binary was built from, read once at
-startup from `peredur --version` rather than from the working tree — the two
+Every row records the commit the counter binary was built from, read once at
+startup from `counter --version` rather than from the working tree — the two
 diverge whenever a fix lands without a rebuild. A launch whose binary does not
 match HEAD, or was built dirty, is refused; --allow-stale-binary downgrades
 that to a warning. A per-host manifest lands beside the results CSV with the
@@ -44,8 +44,8 @@ RESULTS_DIR = EXPERIMENTS_DIR / "results"
 
 # Overridable so a checkout without a release build (e.g. a worktree) can
 # point at another checkout's binaries.
-PEREDUR_BIN = Path(os.environ.get("PEREDUR_BIN",
-                                  REPO_ROOT / "build-release" / "peredur"))
+COUNTER_BIN = Path(os.environ.get("COUNTER_BIN",
+                                  REPO_ROOT / "build-release" / "counter"))
 COMPARE_BIN = Path(os.environ.get("COMPARE_BIN",
                                   REPO_ROOT / "build-release" / "compare"))
 
@@ -88,7 +88,7 @@ FRETISH_SPECS_2026_07: list[str] = [
     "takeoff", "fsm", "fsm-timing", "fsm-combined",
 ]
 
-# Basic-TLSF specs with ideal fixes. PEREDUR infers the TLSF format from the
+# Basic-TLSF specs with ideal fixes. counter infers the TLSF format from the
 # .tlsf extension, and compare reads the .tlsf ideals the same way. The first
 # six are the original mono-vs-muc corpus; the rest were imported from the
 # aurus tree (9e5fc08 and the takeoff-tlsf/arbiter-aurus follow-ups) for the
@@ -126,7 +126,7 @@ TLSF_SPECS: dict[str, dict[str, Path]] = {
     # head-to-head. Its upstream "genuine" repairs are other Acacia+ instances
     # rather than weakenings of it, so the ideal beside it is hand-written.
     "ltl2dba27": _spec("ltl2dba27", "tlsf"),
-    # The full-TLSF half of the AuRUS corpus, imported 2026-08-17. PEREDUR's
+    # The full-TLSF half of the AuRUS corpus, imported 2026-08-17. counter's
     # parser rejects the GLOBAL block these carry, so each spec.tlsf is the
     # `syfco -f basic` lowering of its source rather than a copy of it. Six
     # took their ideal from the upstream genuine/ directory, where the repair
@@ -221,7 +221,7 @@ def scaled_wall_caps(factor: float) -> dict[str, int]:
 
 # The head-to-head corpus IS the AuRUS paper's evaluation set: the 26
 # specifications the paper's tables evaluate. Both arms target all 26, so this
-# is the campaign's declared scope rather than whatever PEREDUR happens to be
+# is the campaign's declared scope rather than whatever counter happens to be
 # able to run today. The paths live in `SPEC_TLSF` in
 # scripts/aurus_campaign.py and the two are held equal by
 # test_experiment_paths.py; that module imports this one, so the names are
@@ -229,7 +229,7 @@ def scaled_wall_caps(factor: float) -> dict[str, int]:
 #
 # amba, codesample-un1 and codesample-un2 were in the 2026-07 corpus and are
 # not rows in the paper's tables, so they leave the head-to-head. They keep
-# their PEREDUR families and ideals for the ablation corpus.
+# their counter families and ideals for the ablation corpus.
 #
 # takeoff-tlsf never entered, on the older ground that both of its upstream
 # "genuine" fixes are invalid (one truncated, one unsatisfiable) — see
@@ -247,9 +247,9 @@ H2H_TLSF_SPECS: list[str] = [
     "humanoid-741", "humanoid-742", "pcar-v2-888",
 ]
 
-# The gap between the declared scope above and what PEREDUR can currently run,
+# The gap between the declared scope above and what counter can currently run,
 # named rather than silently subtracted. A family lands here until it has an
-# `examples/<name>/` with a spec and at least one lint-clean ideal; the PEREDUR
+# `examples/<name>/` with a spec and at least one lint-clean ideal; the counter
 # arm runs `H2H_TLSF_SPECS` minus this list, and `test_experiment_paths.py`
 # asserts the two partition exactly, so importing a family fails that test
 # until it is struck off here.
@@ -257,7 +257,7 @@ H2H_TLSF_SPECS: list[str] = [
 # Two obstacles, neither structural. Seven parse today but have no reference
 # repairs upstream, so each needs a hand-written weakening ideal: lily11,
 # lily15, lily16, humanoid-503, humanoid-741, humanoid-742, pcar-v2-888. The
-# other eight are full-format TLSF that PEREDUR's parser rejects on the GLOBAL
+# other eight are full-format TLSF that counter's parser rejects on the GLOBAL
 # block; `syfco -f basic` lowers them to a form it parses, and AuRUS ships one
 # at lib/syfco. Six of those eight do carry upstream references, though AuRUS
 # references replace rather than weaken as a rule, so each still needs
@@ -267,7 +267,7 @@ H2H_TLSF_SPECS: list[str] = [
 # every out.txt, so an import re-scores runs that already exist.
 H2H_PENDING_IMPORT: list[str] = []
 
-# Imported, but permanently unscoreable, so held out of the PEREDUR arm rather
+# Imported, but permanently unscoreable, so held out of the counter arm rather
 # than left pending as though an import would fix it.
 #
 # humanoid-741's own input is ill-separated: both ASSUME conjuncts constrain
@@ -279,10 +279,10 @@ H2H_PENDING_IMPORT: list[str] = []
 # appending an ASSUME conjunct -- which strengthens the conjunction and can
 # only make it easier to force false. Every descendant is therefore
 # ill-separated too, the output gate rejects all of them, and the family would
-# contribute a guaranteed zero to the PEREDUR arm while costing a full seed
+# contribute a guaranteed zero to the counter arm while costing a full seed
 # sweep to produce it.
 #
-# Note this is not the FRETISH input-screen case in docs/dev/algorithm.md, where
+# Note this is not the FRETISH input-screen case in the root CLAUDE.md, where
 # an ill-separated input is warned about rather than rejected because a
 # descendant may fix the property. On the TLSF assumption side no descendant
 # can. A semantically sound repair does exist -- dropping the `G(!next_head)`
@@ -293,7 +293,7 @@ H2H_PENDING_IMPORT: list[str] = []
 # consistent with the same obstruction rather than with a budget limit.
 H2H_UNSCOREABLE: list[str] = ["humanoid-741"]
 
-# What the PEREDUR arm can run right now.
+# What the counter arm can run right now.
 H2H_TLSF_READY: list[str] = [
     s for s in H2H_TLSF_SPECS
     if s not in H2H_PENDING_IMPORT and s not in H2H_UNSCOREABLE
@@ -383,7 +383,7 @@ N_SEEDS = 30
 # compare runs n_repairs * n_ideals * 2 implication checks, each with compare's
 # own 20s black budget. fsm-timing (bounded-interval operators) is slow: a 29-
 # repair run measured ~141s, and repair counts grow with generations/population.
-# Keep this well above that, in line with the generous peredur_timeout budgets.
+# Keep this well above that, in line with the generous counter_timeout budgets.
 # A profile whose arms differ in repair count should raise it via its own
 # `compare_timeout` key -- see the compare_timed_out column below.
 COMPARE_TIMEOUT_S = 600
@@ -485,8 +485,8 @@ SUMMARY_RE = re.compile(
 PER_REPAIR_RE = re.compile(
     r"^\S.*?\s+:\s+(equivalent|strictly stronger|strictly weaker|incomparable|timeout)"
 )
-# PEREDUR's scoring report (src/repair/reports.cpp print_scoring_report).
-# That report prints unconditionally, unlike the rest of PEREDUR's end-of-run
+# counter's scoring report (src/repair/reports.cpp print_scoring_report).
+# That report prints unconditionally, unlike the rest of counter's end-of-run
 # counters, precisely because this regex reads it out of the log. Individuals
 # whose fitness scoring throws are dropped from their generation rather than
 # aborting the run, up to Config::max_scoring_failure_rate. The report is
@@ -543,7 +543,7 @@ TLSF_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
 # hold back a sweep until asked). `levels` restricts a sweep to named levels;
 # sweeps absent from the map keep every level found in `configs_dir`.
 # `timeout_caps` is a flat per-spec cap in seconds; None means the
-# peredur_timeout() formula.
+# counter_timeout() formula.
 #
 # `configs_dir` and `results_dir` are per-profile because run_id names collide
 # across profiles: the same (sweep, level, scheme, spec, seed) is one directory
@@ -655,7 +655,7 @@ PROFILES: dict[str, dict] = {
         "configs_dir": EXPERIMENTS_DIR / "configs-muc",
         "results_dir": EXPERIMENTS_DIR / "results-muc",
         "results_csv": EXPERIMENTS_DIR / "results-muc.csv",
-        # jobs=1: one PEREDUR process per machine using its full 32-worker pool.
+        # jobs=1: one counter process per machine using its full 32-worker pool.
         # ltlsynt is multi-GB resident per call, so jobs>1 would multiply peak
         # RAM and risk OOM.
         "default_jobs": 1,
@@ -729,9 +729,9 @@ PROFILES: dict[str, dict] = {
         "configs_dir": EXPERIMENTS_DIR / "configs-tlsf",
         "results_dir": EXPERIMENTS_DIR / "results-tlsf",
         "results_csv": EXPERIMENTS_DIR / "results-tlsf.csv",
-        # jobs=1: one PEREDUR process per machine, using its full internal
+        # jobs=1: one counter process per machine, using its full internal
         # thread pool. ltlsynt is multi-GB resident per call on these specs, so
-        # running several PEREDUR processes at once (jobs>1) would multiply
+        # running several counter processes at once (jobs>1) would multiply
         # peak RAM by jobs and risk an OOM.
         "default_jobs": 1,
     },
@@ -839,7 +839,7 @@ PROFILES: dict[str, dict] = {
         "results_dir": EXPERIMENTS_DIR / "results-status-grading",
         "results_csv": EXPERIMENTS_DIR / "results-status-grading.csv",
         # jobs=1 for the same RAM reason as the other TLSF profiles: ltlsynt is
-        # multi-GB per call on these specs and the cap is per PEREDUR process.
+        # multi-GB per call on these specs and the cap is per counter process.
         "default_jobs": 1,
     },
     "ablate-tlsf": {
@@ -863,13 +863,13 @@ PROFILES: dict[str, dict] = {
         "results_dir": EXPERIMENTS_DIR / "results-ablate-tlsf",
         "results_csv": EXPERIMENTS_DIR / "results-ablate-tlsf.csv",
         # jobs=1 for the same RAM reason as the tlsf profile: ltlsynt is
-        # multi-GB resident and its concurrency cap is per PEREDUR process.
+        # multi-GB resident and its concurrency cap is per counter process.
         "default_jobs": 1,
     },
     # Head-to-head top-up against the AuRUS baseline (scripts/aurus_campaign.py):
     # the control cell only (nsga2 / log metric / C-default weights), extended
     # to seeds 0-19 and to the H2H_TLSF_SPECS corpus, so every family AuRUS
-    # runs has 20 PEREDUR control runs to compare against. Dedup with
+    # runs has 20 counter control runs to compare against. Dedup with
     # ablate-tlsf is by construction: this profile shares ablate-tlsf's
     # configs dir, results dir, and results CSV, and the resume key (sweep,
     # level, selection, weakening, metric, repair_mode, spec, seed) fully
@@ -905,13 +905,13 @@ PROFILES: dict[str, dict] = {
     # merge keep whichever arrived first.
     #
     # 7200s matches AuRUS's `--gato 7200`, the published 2 h budget. The July
-    # campaign ran PEREDUR at 600s against AuRUS at 3600s and reported the 6x
+    # campaign ran counter at 600s against AuRUS at 3600s and reported the 6x
     # asymmetry as favouring the baseline; this one removes the asymmetry
     # instead, so neither tool's figure needs that caveat and neither compares
     # to July's on cost.
     "aurus-h2h": {
         # Both of these track the built-in defaults rather than pinning an
-        # arm, because a head-to-head has to run PEREDUR as it ships: a
+        # arm, because a head-to-head has to run counter as it ships: a
         # baseline comparison against a configuration no user gets by
         # default measures the wrong thing. nsga2-apportion became the
         # default in c71ecf0 and this profile followed it; `log` has been
@@ -924,7 +924,7 @@ PROFILES: dict[str, dict] = {
         "sweeps": ["C"],
         "levels": {"C": ["default"]},
         # H2H_TLSF_READY, not H2H_TLSF_SPECS: the campaign's declared scope is
-        # all 26, and the PEREDUR arm runs the subset already imported. The
+        # all 26, and the counter arm runs the subset already imported. The
         # remainder is named in H2H_PENDING_IMPORT rather than subtracted
         # silently, and topping up as families land is a resume rather than a
         # re-run, (spec, seed) being in the key.
@@ -937,8 +937,8 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-aurus-h2h.csv",
         "default_jobs": 1,
     },
-    # The same corpus and cap at the configuration PEREDUR ships on 2026-08-21,
-    # plus the accumulator. `experiments/2026-08-14-aurus-h2h` measured a PEREDUR
+    # The same corpus and cap at the configuration counter ships on 2026-08-21,
+    # plus the accumulator. `experiments/2026-08-14-aurus-h2h` measured a counter
     # that had none of the three changes since made permanent, and
     # `experiments/2026-08-20-ops-weakening/REPORT.md` could only read them
     # against the 10 families that campaign's corpus shares with this one --
@@ -1017,7 +1017,7 @@ PROFILES: dict[str, dict] = {
         "default_jobs": 8,
     },
     # WeightedAverage against the shipped nsga2-apportion, at the configuration
-    # PEREDUR ships on 2026-08-26 and with the selection scheme as the only key
+    # counter ships on 2026-08-26 and with the selection scheme as the only key
     # that differs between the arms. A smoke test: 2 h per host, so it is sized
     # to answer whether the scheme still trades the way the 2026-07-24 ablation
     # measured it, not to close the question.
@@ -1027,7 +1027,7 @@ PROFILES: dict[str, dict] = {
     # came from a different commit under a 7200 s cap, and this profile caps far
     # tighter, so their censoring differs from this one's -- and a control
     # inherited across a commit boundary is what the stale-binary and
-    # cost-vintage notes in docs/dev/config-and-provenance.md exist about. The archived rows
+    # cost-vintage notes in the root CLAUDE.md exist about. The archived rows
     # are a validity check on the fresh nsga2 arm instead, which is free.
     #
     # Sweep T at `monoon` alone, rather than sweep N or a bare C level: `monoon`
@@ -1109,7 +1109,7 @@ PROFILES: dict[str, dict] = {
     #
     # A 2x2 ablation on TLSF, measuring repair discovery over time rather than
     # at a fixed generation count: selection_scheme (nsga2-apportion against
-    # weighted) crossed with fitness.status_grading (mrs, PEREDUR's own, against
+    # weighted) crossed with fitness.status_grading (mrs, counter's own, against
     # aurus, AuRUS's six-level ladder). Two schemes x two sweep-G levels is the
     # whole cross -- the schemes are config directories and the grading arm
     # rides in level_name, so both are already key columns and nothing here
@@ -1118,7 +1118,7 @@ PROFILES: dict[str, dict] = {
     # What makes it a curve rather than a point is genetic.max_wall_s: every arm
     # runs generations = 500, far more than any of these families reaches, so
     # the deadline is what ends every run and each arm gets the same wall clock
-    # instead of the same number of generations. PEREDUR stops itself at the
+    # instead of the same number of generations. counter stops itself at the
     # next generation boundary past the deadline and writes run.json and its
     # repairs normally, so a run that hits the budget is measured rather than
     # censored -- which is exactly what the harness's own timeout_caps kill
@@ -1181,7 +1181,7 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-curves-calib.csv",
         # 16 rather than the 1 the other TLSF profiles use. That 1 is a RAM
         # argument -- ltlsynt is multi-GB resident per call and its concurrency
-        # cap is per PEREDUR process, so N jobs multiply the cap by N -- but it
+        # cap is per counter process, so N jobs multiply the cap by N -- but it
         # was sized for runs whose own thread pool was hardware concurrency.
         # These runs are single-threaded (parallel = 1), so each holds one
         # ltlsynt at a time and 16 jobs is 16 concurrent calls on a 32-core,
@@ -1230,7 +1230,7 @@ PROFILES: dict[str, dict] = {
     # the median being 486 and the maximum 741.
     #
     # `curves` measured the same four arms at a 400 s deadline, which is the
-    # wrong currency for this question in PEREDUR's favour -- its manifests read
+    # wrong currency for this question in counter's favour -- its manifests read
     # a median 81 generations at population 200 inside that deadline, about
     # 16,200 offspring, or 16x what AuRUS is allowed. Here the budget is fixed
     # and wall time becomes the measured outcome.
@@ -1354,57 +1354,6 @@ PROFILES: dict[str, dict] = {
         "configs_dir": EXPERIMENTS_DIR / "configs-rematch",
         "results_dir": EXPERIMENTS_DIR / "results-rematch-calib",
         "results_csv": EXPERIMENTS_DIR / "results-rematch-calib.csv",
-        "default_jobs": 16,
-    },
-    # The 2026-09-04-aurus-rematch design re-run at the engine `main` carries
-    # on 2026-09-14, for the paper's RQ1, RQ3 and RQ4. Same generator line
-    # into its own directory, same corpus, seeds, cells and caps. Its own
-    # results directory and CSV rather than rematch's: the resume key carries
-    # no commit, so pointing at rematch's CSV would skip all 3000 runs as done.
-    # bdbec4c moved the TLSF draw stream, so nothing here pairs against the
-    # rematch row by row.
-    #
-    #   python scripts/gen_configs.py --tlsf \
-    #       --schemes nsga2-apportion weighted --sweeps G --levels mrs,aurus \
-    #       --metric log --weakening off --weights 0.1 0.2 0.7 \
-    #       --termination individuals --max-individuals 1000 \
-    #       --generations 500 --population-size 100 --parallel 1 \
-    #       --out-dir experiments/configs-paper-rerun --pin-vintage
-    "paper-rerun": {
-        "schemes": ["nsga2-apportion", "weighted"],
-        "weakenings": ["wkoff"],
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["G"],
-        "levels": {"G": ["mrs", "aurus"]},
-        "specs": H2H_TLSF_READY,
-        "seeds": list(range(30)),
-        "timeout_caps": {s: 7200 for s in H2H_TLSF_READY},
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-paper-rerun",
-        "results_dir": EXPERIMENTS_DIR / "results-paper-rerun",
-        "results_csv": EXPERIMENTS_DIR / "results-paper-rerun.csv",
-        "default_jobs": 16,
-    },
-    # rematch-calib's six families at the new engine, so the realised cost and
-    # the humanoid-742 cap rate read against that calibration directly.
-    "paper-rerun-calib": {
-        "schemes": ["nsga2-apportion", "weighted"],
-        "weakenings": ["wkoff"],
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["G"],
-        "levels": {"G": ["mrs", "aurus"]},
-        "specs": ["humanoid-742", "humanoid-531", "pcar-v2-888",
-                  "full-arbiter-aurus", "minepump", "rg2"],
-        "seeds": list(range(2)),
-        "timeout_caps": {s: 7200 for s in H2H_TLSF_READY},
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-paper-rerun",
-        "results_dir": EXPERIMENTS_DIR / "results-paper-rerun-calib",
-        "results_csv": EXPERIMENTS_DIR / "results-paper-rerun-calib.csv",
         "default_jobs": 16,
     },
     # nsga2 vs nsga2-replicate on FRETISH, at the gen40/pop1000 operating point
@@ -1784,7 +1733,7 @@ PROFILES: dict[str, dict] = {
     #
     # The FRETISH replication of experiments/2026-08-28-selection-grading:
     # selection_scheme (nsga2-apportion against weighted) crossed with
-    # fitness.status_grading (mrs, PEREDUR's own, against aurus, AuRUS's
+    # fitness.status_grading (mrs, counter's own, against aurus, AuRUS's
     # six-level ladder). Two schemes x two sweep-K levels is the whole cross;
     # the schemes are config directories and the grading arm rides in
     # level_name, so both are already key columns and neither needs a new one.
@@ -1956,7 +1905,7 @@ def extract_metadata(config_path: Path) -> tuple:
     return parts[1], parts[2], level_value_of(parts[2])
 
 
-def peredur_timeout(level_name: str, level_value) -> int:
+def counter_timeout(level_name: str, level_value) -> int:
     """Return a generous per-run timeout in seconds (full profile)."""
     if isinstance(level_value, int) and level_name.startswith("gen"):
         return max(120, level_value * 90)
@@ -2005,7 +1954,7 @@ def parse_repair_files(output_dir: Path) -> tuple[int, float]:
 
 
 def parse_dropped(log_path: Path) -> int:
-    """Individuals PEREDUR dropped after a fitness function threw (0 if none)."""
+    """Individuals counter dropped after a fitness function threw (0 if none)."""
     try:
         text = log_path.read_text(errors="replace")
     except OSError:
@@ -2017,7 +1966,7 @@ def parse_dropped(log_path: Path) -> int:
 def tail_line(log_path: Path) -> str:
     """Return the last non-blank line of a log, for console error context.
 
-    PEREDUR draws progress with carriage returns, so a raw line may pack many
+    counter draws progress with carriage returns, so a raw line may pack many
     updates; keep only the final segment after the last '\\r'.
     """
     try:
@@ -2198,7 +2147,7 @@ def write_manifest(path: Path, profile_name: str, profile: dict,
         },
         "binaries": {
             name: {"path": str(bin_path), **versions[name]}
-            for name, bin_path in (("peredur", PEREDUR_BIN),
+            for name, bin_path in (("counter", COUNTER_BIN),
                                    ("compare", COMPARE_BIN))
         },
         "sweep": {
@@ -2274,8 +2223,8 @@ def append_row(csv_path: Path, row: dict, fieldnames: list) -> None:
 def derive_config(config_path: Path, output_dir: Path, parallel_k: int) -> Path:
     """Write a copy of the level's TOML with `parallel = k` under [runtime].
 
-    Caps PEREDUR's internal thread pool so that --jobs concurrent runs do not
-    oversubscribe the machine (PEREDUR defaults to hardware_concurrency).
+    Caps counter's internal thread pool so that --jobs concurrent runs do not
+    oversubscribe the machine (counter defaults to hardware_concurrency).
 
     A config that already states `parallel` is copied through unchanged. The cap
     exists to fill in for a config that says nothing, so that jobs * parallel
@@ -2306,7 +2255,7 @@ def run_one(config_path: Path, sweep: str, level_name: str, spec_name: str,
             seed: int, timeout: int, results_dir: Path, parallel_k=None,
             run_id: str | None = None,
             compare_timeout: int = COMPARE_TIMEOUT_S) -> dict | None:
-    """Execute PEREDUR (+ compare) once; return the metric columns.
+    """Execute counter (+ compare) once; return the metric columns.
 
     The returned dict carries spec/seed and all metric fields but no
     sweep/level/selection columns — the caller stamps those per emitted
@@ -2332,7 +2281,7 @@ def run_one(config_path: Path, sweep: str, level_name: str, spec_name: str,
         effective_config = derive_config(config_path, output_dir, parallel_k)
 
     cmd = [
-        str(PEREDUR_BIN),
+        str(COUNTER_BIN),
         "--input", str(spec["input"]),
         "--output-dir", str(output_dir),
         "--config", str(effective_config),
@@ -2355,7 +2304,7 @@ def run_one(config_path: Path, sweep: str, level_name: str, spec_name: str,
         except subprocess.CalledProcessError as e:
             log_file.flush()
             ctx = tail_line(log_path)
-            print(f"    [{run_id}] ERROR: PEREDUR exited {e.returncode}"
+            print(f"    [{run_id}] ERROR: counter exited {e.returncode}"
                   f"  (see {log_path})" + (f"\n           {ctx}" if ctx else ""))
             return None
     wall = round(time.monotonic() - t_start, 2)
@@ -2443,10 +2392,10 @@ def main() -> None:
     head = working_tree_head()
     unknown_version = {"commit": LEGACY_COMMIT, "commit_short": LEGACY_COMMIT,
                        "dirty": ""}
-    versions = {"peredur": dict(unknown_version),
+    versions = {"counter": dict(unknown_version),
                 "compare": dict(unknown_version)}
     if not args.dry_run:
-        for bin_path in [PEREDUR_BIN, COMPARE_BIN]:
+        for bin_path in [COUNTER_BIN, COMPARE_BIN]:
             if not bin_path.exists():
                 sys.exit(
                     f"Binary not found: {bin_path}\n"
@@ -2454,7 +2403,7 @@ def main() -> None:
                 )
         # Once, at startup: every run of this campaign uses these binaries, so
         # asking per run would cost thousands of subprocesses to learn one fact.
-        versions = {"peredur": binary_version(PEREDUR_BIN),
+        versions = {"counter": binary_version(COUNTER_BIN),
                     "compare": binary_version(COMPARE_BIN)}
 
     def version_label(name: str) -> str:
@@ -2470,7 +2419,7 @@ def main() -> None:
     print(f"    configs: {configs_dir}")
     print(f"    runs:    {results_dir}")
     print(f"    results: {results_csv}")
-    print(f"    binary:  {version_label('peredur')}, "
+    print(f"    binary:  {version_label('counter')}, "
           f"{version_label('compare')}")
     print("=" * 64)
 
@@ -2661,7 +2610,7 @@ def main() -> None:
     # Cap each run's internal thread pool so jobs * parallel ≈ core count.
     parallel_k = max(1, (os.cpu_count() or 1) // jobs) if jobs > 1 else None
     if parallel_k is not None:
-        print(f"Per-run PEREDUR thread pool capped at parallel = {parallel_k}")
+        print(f"Per-run counter thread pool capped at parallel = {parallel_k}")
 
     lock = threading.Lock()
     state = {"completed": 0, "errors": 0, "rows_written": 0}
@@ -2675,7 +2624,7 @@ def main() -> None:
             (scheme, weakening, metric, repair, c_sweep, c_level)]
         caps = profile["timeout_caps"]
         timeout = (caps[spec_name] if caps
-                   else peredur_timeout(c_level, level_value_of(c_level)))
+                   else counter_timeout(c_level, level_value_of(c_level)))
         # A factor state joins run_id only where the profile crosses it: adding
         # it unconditionally would rename every existing run directory of the
         # profiles that predate the factor, orphaning their results.
@@ -2710,8 +2659,8 @@ def main() -> None:
                        "metric": metric, "repair_mode": repair,
                        # The abbreviated hash, since this is a column a human
                        # reads; the manifest beside the CSV keeps the full one.
-                       "commit": versions["peredur"]["commit_short"],
-                       "dirty": versions["peredur"].get("dirty", "")}
+                       "commit": versions["counter"]["commit_short"],
+                       "dirty": versions["counter"].get("dirty", "")}
                 append_row(results_csv, row, fieldnames)
                 done.add(row_key(key, sweep, level_name))
                 state["rows_written"] += 1
