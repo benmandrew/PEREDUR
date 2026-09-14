@@ -1,0 +1,92 @@
+# The scoring passes over 2026-09-14-paper-rerun, and a re-score of AuRUS's
+# archived candidates with the same binaries at the same budgets.
+#
+# No search runs here. The PEREDUR runs are the paper-rerun campaign's, under
+# experiments/results-paper-rerun on each host; AuRUS's 780 archived runs are
+# under ~/aurus-h2h-out, and `configs` is the adapter that materialises them as
+# run directories (candidate files are symlinks). The adapter at this commit
+# differs from the one that built the hosts' existing results-aurus-curves in
+# comment wording alone.
+#
+# The scorers come from this branch, feat/separation-scorer merged with
+# campaign/paper-rerun. The search binary's sources are unchanged from the
+# paper-rerun commit 93936ab: the port adds the `fingerprint` target and a
+# header included by src/maximal.cpp alone.
+#
+# AuRUS is re-scored so both sides are reduced by one program at one budget.
+# The 2026-09-08 AuRUS maximality pass ran at --compare-timeout 600 where
+# 2353 of the rematch's 3000 runs ran at 3000, and the paper carried that
+# asymmetry as a caveat.
+name = "2026-09-14-paper-rerun-curves"
+branch = "campaign/paper-rerun-curves"
+configs = "python3 scripts/aurus_adapt.py --root ~/aurus-h2h-out --out experiments/results-aurus-curves"
+
+# The paper-rerun split, which is also the AuRUS repeat split: each host holds
+# only the runs it wrote.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+# Separation first, since it makes no solver call and costs minutes. The word
+# count, seed and epsilon list are the 2026-09-09 separation-curves pass's and
+# must agree between the two arms: a fingerprint compares only against one
+# drawn from an identical sampling.
+
+[[phases]]
+name = "separation-peredur"
+kind = "score"
+results = "experiments/results-paper-rerun"
+out = "experiments/separation-paper-rerun"
+workers = 8
+cores = 1
+maximality = "off"
+ideals = "off"
+epsilon = "0.05,0.2,0.5"
+fingerprint_words = 256
+fingerprint_seed = 0
+cuts = 20
+compare_timeout = 600
+deadline_s = 900
+wall_cap_s = 1200
+
+[[phases]]
+name = "separation-aurus"
+kind = "score"
+results = "experiments/results-aurus-curves"
+out = "experiments/separation-aurus-rerun"
+workers = 8
+cores = 1
+maximality = "off"
+ideals = "off"
+epsilon = "0.05,0.2,0.5"
+fingerprint_words = 256
+fingerprint_seed = 0
+cuts = 20
+compare_timeout = 600
+deadline_s = 900
+wall_cap_s = 1200
+
+# Maximality with ideals, at the raised budget the rematch pass gave 2353 of
+# its runs, on both arms.
+
+[[phases]]
+name = "maximality-peredur"
+kind = "score"
+results = "experiments/results-paper-rerun"
+out = "experiments/curves-paper-rerun"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 3000
+deadline_s = 7500
+
+[[phases]]
+name = "maximality-aurus"
+kind = "score"
+results = "experiments/results-aurus-curves"
+out = "experiments/curves-aurus-rerun"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 3000
+deadline_s = 7500
