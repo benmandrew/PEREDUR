@@ -8,7 +8,7 @@ Every *memoisation* cache in front of an external tool is keyed on a rendered fo
 
 The key a cache may take depends on what it stores, and a wrong choice is silent. A verdict or a count is invariant under renaming atoms, so the satisfiability cache, `cached_count_traces` and `run_ganak_on_formula` take `renamed()`. A stored formula or automaton would need renaming back inside a tool's output, where SPOT prints `F` over an atom `fk1` as `Ffk1`, so `run_ltl2tgba_for_counting`, `simplify_ltl` and `rewrite_weak_operators` take `canonical()`. `RealizabilityChecker` takes `formula_key::realizability()`, a partition-preserving renaming plus the count of declared signals left unmentioned, those being part of the alphabet ltlsynt plays over.
 
-The satisfiability cache keeps two keys in one map, tagged apart, because neither collapse contains the other: ltlfilt simplifies and the canonical form renames. Replacing the `normalised` key with the canonical one cost 2,773 execs against 2,211 on `rg2`. The raw-formula key is consulted first, which also skips the ltlfilt exec that `normalised` costs.
+The satisfiability cache keys on `renamed()` alone. It once kept a second key, the `ltlfilt --simplify` spelling, which collapsed more queries than the renaming did (2,211 execs against 2,773 on `rg2`), but the pass that computed it cost 8x the `--satisfiable` call it preceded, so both were dropped.
 
 Keys must reparse, so the parser reads temporal operators. A letter operator counts only when the next character cannot continue an identifier, or `Grant` lexes as `G` over `rant`. External strings go through `Formula::try_parse`, since the constructor only asserts.
 

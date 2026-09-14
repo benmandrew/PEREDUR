@@ -150,7 +150,7 @@ External tools
   From the SPOT library.  Built from source via ``cmake/spot.cmake``; located via the ``SPOT_BIN_DIR`` compile macro.  Used for automaton construction and LTL realisability checking.
 
 ``ltlfilt``
-  Also from SPOT.  Simplifies and canonicalises LTL formulae behind ``simplify_ltl``, one exec per cache miss.
+  Also from SPOT.  Decides satisfiability (``spot_satisfiable``), rewrites weak operators away for ``black`` (``rewrite_weak_operators``) and checks equivalence (``ltl_equivalent``).
 
 ``black``
   LTL satisfiability checker (``black-sat``).  Found on ``PATH`` or downloaded via ``cmake/black.cmake``; path passed as ``BLACK_EXECUTABLE_PATH``.  Used for the status fitness component and the implication-based filters.

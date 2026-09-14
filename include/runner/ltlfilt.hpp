@@ -1,9 +1,8 @@
 #pragma once
 
 /// @file ltlfilt.hpp
-/// @brief Wrapper for ltlfilt (SPOT) that simplifies LTL formulae to a
-///        canonical form, improving cache hit rates across tool invocations
-///        and deciding formulae that reduce to a boolean constant outright.
+/// @brief Wrapper for ltlfilt (SPOT): satisfiability, the weak-operator
+///        rewrite black needs, equivalence, and simplification.
 
 #include <chrono>
 #include <cstddef>

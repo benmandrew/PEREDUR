@@ -57,8 +57,8 @@ std::optional<tlsf::Specification> load_tlsf_or_report(const std::string& path);
 // queries specifications a search or a person has already stretched, and runs
 // rarely, so every budget is generous next to a run's.
 //
-// @p whole_spec_queries drops the ltlfilt --simplify pass and gives SPOT
-// @p black_timeout, for drivers that ask whole-specification implications.
+// @p whole_spec_queries gives SPOT @p black_timeout, for drivers that ask
+// whole-specification implications.
 SatisfiabilityChecker& configure_offline_checkers(
     std::chrono::milliseconds black_timeout, bool whole_spec_queries);
 

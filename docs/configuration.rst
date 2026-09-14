@@ -324,7 +324,7 @@ Each external tool has a per-call wall-clock budget in milliseconds. A budget of
      - The satisfiability query is undecided.
    * - ``runtime.ltlfilt_timeout_ms``
      - 10000
-     - The formula goes unsimplified.
+     - The weak-operator rewrite is abandoned, and the query it serves is undecided.
    * - ``runtime.ltlsynt_timeout_ms``
      - 500
      - The realisability query is undecided.
@@ -332,7 +332,7 @@ Each external tool has a per-call wall-clock budget in milliseconds. A budget of
      - 60000
      - The individual is dropped.
 
-What decides whether a budget defaults on is the cost of abandoning a call weighed against the cost of not doing so. ``black`` has its own internal timeout, so bounding it is routine. ``ltlfilt`` is bounded because ``--simplify`` is super-exponential on the deep nested-``X`` conjunctions the search builds, and an abandoned call there costs only a missed simplification, never a candidate.
+What decides whether a budget defaults on is the cost of abandoning a call weighed against the cost of not doing so. ``black`` has its own internal timeout, so bounding it is routine. ``ltlfilt`` is bounded because its passes can blow up on the deep nested-``X`` conjunctions the search builds, and an abandoned call there costs one undecided query, never a candidate.
 
 ``ltlsynt`` and ``ltl2tgba`` are bounded despite an abandoned call costing a candidate, because an unbounded one can cost the whole run: ``ltlsynt`` occasionally runs for minutes with no upper limit, and ``ltl2tgba``'s deterministic construction has the same super-exponential blowup as ``ltlfilt``, running for hours and leaking orphaned multi-gigabyte processes over a long campaign. Losing one candidate out of a population is the noise ``max_scoring_failure_rate`` already exists to absorb; losing the run at generation 23 of 40 is not. Both defaults are what every archived TLSF campaign set explicitly, which is the other half of the argument — the shipped default should be the configuration real runs use.
 

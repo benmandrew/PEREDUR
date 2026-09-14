@@ -149,43 +149,26 @@ SatisfiabilityChecker& configure_offline_checkers(
     cfg.ltl2tgba_timeout = std::chrono::milliseconds{60'000};
     // ltlfilt's default is 10 s, and config.hpp justifies it by "an abandoned
     // call costs only a missed simplification, never an individual". That
-    // premise holds inside a run and fails here. check_satisfiability answers
-    // from a simplification of "0" or "1" before black is spawned, so on this
-    // path the fold IS the verdict: losing it hands the query to a solver
-    // black.cpp:155 records as unsound on W under negation, and the driver
-    // prints whatever comes back as the relation. That is not hypothetical --
-    // at 10 s, compare reported examples/amba as incomparable with itself
-    // minus three GUARANTEES, with 0 timeouts.
-    //
-    // Sized off amba, the only subject big enough to cross the old default at
-    // 44 requirements and 16 atomic propositions. Its four spec-against-ideal
-    // queries need 80 s, 83 s, 90 s and 145 s; the two that fold to "0" decide
-    // there, and black clears the two satisfiable ones in 0.02 s once the fold
-    // has ruled out the cheap answer. 300 s leaves headroom over the 145 s
-    // worst case. A pair can now cost minutes, which is affordable offline and
-    // would not be inside a run.
+    // premise fails here. It bounds the `--remove-wm` rewrite
+    // check_satisfiability runs before black, whose fold to "0" or "1" is the
+    // verdict: losing it hands the query to a solver black.cpp records as
+    // unsound on W under negation, and the driver prints whatever comes back
+    // as the relation. Sized at 300 s off amba, whose spec-against-ideal
+    // queries needed up to 145 s under the `--simplify` pass this path once
+    // ran. A pair can cost minutes, which is affordable offline and would not
+    // be inside a run.
     cfg.ltlfilt_timeout = std::chrono::milliseconds{300'000};
     apply_tool_timeouts(cfg);
     SatisfiabilityChecker& checker = global_sat_checker();
     if (whole_spec_queries) {
-        // Both measured over maximal's own queries, whole-spec implications of
-        // 1000-1600 characters. `ltlfilt --simplify` took 95.6% of solver wall
-        // time (1153.7s against 52.9s for the decision itself) and a 40-file
-        // batch went from 304s to 30s without it, with the same survivors;
-        // without the pass the unsimplified query runs about 2x longer, so the
-        // 500ms SPOT budget tuned for the search tips over under load and an
-        // undecided `ExpectUnsat` query keeps both sides. Giving SPOT black's
-        // budget instead restored agreement on 264 of 264 cut-values across a
-        // 10-run sample. The FRETISH path takes the same two settings, which is
-        // what its own final filters run under (src/repair/evolution.cpp). Its
-        // queries were per requirement rather than whole-spec until ed5413f,
-        // and measured at 40 generations of 1000 the simplify pass was 59-61%
-        // of every ltlfilt exec a run made even at that shape; it now asks the
-        // whole-spec query this paragraph measures. On compare the pass put 205
-        // of 3000 runs past the harness's 600 s cap, 118 of 120 on
-        // humanoid-742, and a timed-out compare reads as no ideal relation at
-        // all.
-        checker.set_simplify(false);
+        // Measured over maximal's own queries, whole-spec implications of
+        // 1000-1600 characters: an unsimplified query runs about 2x longer
+        // than a simplified one, so the 500ms SPOT budget tuned for the search
+        // tips over under load and an undecided `ExpectUnsat` query keeps both
+        // sides. Giving SPOT black's budget instead restored agreement on 264
+        // of 264 cut-values across a 10-run sample. The FRETISH path takes the
+        // same setting, which is what its own final filters run under
+        // (src/repair/evolution.cpp).
         checker.set_spot_budget(black_timeout);
     }
     return checker;
