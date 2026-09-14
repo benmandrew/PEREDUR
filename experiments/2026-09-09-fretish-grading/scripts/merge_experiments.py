@@ -18,8 +18,8 @@ Configure the remote machines in REMOTES below, then:
     python scripts/merge_experiments.py --dry-run        # show rsync plan, no writes
     python scripts/merge_experiments.py /path/to/copy    # merge an already-rsynced dir
 
-A source may be a remote (``host:/path/to/peredur``) or a local path to another
-PEREDUR checkout. Bare hostnames use REMOTE_ROOT as the repo path.
+A source may be a remote (``host:/path/to/counter``) or a local path to another
+counter checkout. Bare hostnames use REMOTE_ROOT as the repo path.
 """
 
 import argparse
@@ -32,13 +32,13 @@ REPO_ROOT = Path(__file__).parent.parent
 
 # ── Configure your machines here ──────────────────────────────────────────────
 # Each entry is an ssh destination as accepted by ssh/rsync. A bare host uses
-# REMOTE_ROOT as the repo path; append ":/custom/path/to/peredur" to override.
+# REMOTE_ROOT as the repo path; append ":/custom/path/to/counter" to override.
 REMOTES: dict[str, str] = {
     "av2": "benandrew@av2.cs.man.ac.uk",
     "av3": "benandrew@av3.cs.man.ac.uk",
 }
 
-# Path to the PEREDUR checkout on a remote when only a host is given.
+# Path to the counter checkout on a remote when only a host is given.
 REMOTE_ROOT = "/home/benandrew/projects/counter"
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -247,7 +247,7 @@ def resolve_source(name: str) -> tuple[str, str]:
     """Map a CLI argument to (label, rsync_root).
 
     ``name`` may be a key in REMOTES, a raw ``host:/path`` / ``host`` spec, or a
-    local filesystem path to another PEREDUR checkout. A ``host`` with no path
+    local filesystem path to another counter checkout. A ``host`` with no path
     component gets REMOTE_ROOT appended.
     """
     if name in REMOTES:

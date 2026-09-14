@@ -696,7 +696,7 @@ TLSF_SWEEP_R: list[tuple[str, dict]] = list(SWEEP_R)
 # rows name those two, so the pair keeps the positions it was generated under.
 # AuRUS's own six-level scale (0, 0.05, 0.1, 0.2, 0.5, 1.0) grades by which side
 # of the specification is satisfiable on its own and never folds well-separation
-# into its realizability query, so crossing it against "mrs" ablates PEREDUR's
+# into its realizability query, so crossing it against "mrs" ablates counter's
 # status objective against the design it derives from. It carries no trailing
 # number either, so it records a null level value like the other two.
 TLSF_SWEEP_G: list[tuple[str, dict]] = [
@@ -705,12 +705,12 @@ TLSF_SWEEP_G: list[tuple[str, dict]] = [
     ("aurus",  {"status_grading": "aurus"}),
 ]
 
-# TLSF sweep N: the cross-generation accumulator, off against on. PEREDUR
+# TLSF sweep N: the cross-generation accumulator, off against on. counter
 # otherwise reports the maximal antichain of its *final* population, so a
 # candidate that passed the output gate in generation 3 and was not selected
 # into generation 4 is a repair the search found and discarded. The AuRUS
 # baseline keeps them all, which is most of why the 2026-08-14 head-to-head
-# recorded it emitting a median of 448 solutions against PEREDUR's 4. Repair
+# recorded it emitting a median of 448 solutions against counter's 4. Repair
 # quality is judged existentially, so a larger emitted set cannot lower
 # implies_ideal; the question is how much it raises it, and what the extra gate
 # sweep per generation costs on this path.
