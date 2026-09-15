@@ -70,6 +70,8 @@ std::size_t timing_horizon(const Timing& timing) {
                 // in which it must not hold.
                 return value.m_ticks + 2;
             } else {
+                static_assert(std::is_same_v<T, timing::Eventually> ||
+                              std::is_same_v<T, timing::Always>);
                 return 0;
             }
         },

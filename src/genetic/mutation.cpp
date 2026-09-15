@@ -308,6 +308,10 @@ std::vector<Timing> donated_candidates(const std::vector<Timing>& timing_pool) {
                     candidates.push_back(timing::immediately());
                 } else if constexpr (std::is_same_v<T, timing::NextTimepoint>) {
                     candidates.push_back(timing::next_timepoint());
+                } else {
+                    // The extremes themselves lend nothing.
+                    static_assert(std::is_same_v<T, timing::Eventually> ||
+                                  std::is_same_v<T, timing::Always>);
                 }
             },
             donor);
@@ -355,8 +359,7 @@ Timing strengthen_timing(const Timing& timing,
             return move_off_extreme(timing::eventually(), timing_pool,
                                     random_source);
         } else {
-            assert(false);
-            __builtin_unreachable();
+            static_assert(timing::k_unhandled_timing<T>);
         }
     };
     return std::visit(mutation_function, timing);
@@ -382,8 +385,7 @@ Timing weaken_timing(const Timing& timing,
         } else if constexpr (std::is_same_v<T, timing::Eventually>) {
             return timing::eventually();
         } else {
-            assert(false);
-            __builtin_unreachable();
+            static_assert(timing::k_unhandled_timing<T>);
         }
     };
     return std::visit(mutation_function, timing);

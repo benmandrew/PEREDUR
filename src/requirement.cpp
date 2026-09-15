@@ -186,9 +186,11 @@ std::string timing_body(const Timing& timing, const std::string& response,
             } else if constexpr (std::is_same_v<T, timing::Eventually>) {
                 return bounded ? "((!" + boundary + ") U " + response + ")"
                                : "F" + response;
-            } else {
+            } else if constexpr (std::is_same_v<T, timing::Always>) {
                 return bounded ? "(" + boundary + " R " + response + ")"
                                : "G" + response;
+            } else {
+                static_assert(timing::k_unhandled_timing<T>);
             }
         },
         timing);
@@ -210,6 +212,9 @@ Timing dual_timing(const Timing& timing) {
             } else if constexpr (std::is_same_v<T, timing::Always>) {
                 return timing::eventually();
             } else {
+                static_assert(std::is_same_v<T, timing::Immediately> ||
+                              std::is_same_v<T, timing::NextTimepoint> ||
+                              std::is_same_v<T, timing::AfterTicks>);
                 return variant;
             }
         },
@@ -303,8 +308,13 @@ bool operator<(const Timing& lhs, const Timing& rhs) {
                               std::is_same_v<T, timing::ForTicks> ||
                               std::is_same_v<T, timing::AfterTicks>) {
                     return val.m_ticks;
+                } else {
+                    static_assert(std::is_same_v<T, timing::Immediately> ||
+                                  std::is_same_v<T, timing::NextTimepoint> ||
+                                  std::is_same_v<T, timing::Eventually> ||
+                                  std::is_same_v<T, timing::Always>);
+                    return 0;
                 }
-                return 0;
             },
             tim);
     };
@@ -566,8 +576,10 @@ std::string to_string(const Timing& timing) {
                 return "after " + std::to_string(value.m_ticks) + " ticks";
             } else if constexpr (std::is_same_v<T, timing::Eventually>) {
                 return "eventually";
-            } else {
+            } else if constexpr (std::is_same_v<T, timing::Always>) {
                 return "always";
+            } else {
+                static_assert(timing::k_unhandled_timing<T>);
             }
         },
         timing);

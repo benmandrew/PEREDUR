@@ -42,6 +42,8 @@ inline void to_json(nlohmann::json& jobj, const Timing& tim) {
                 jobj = {{"type", "Eventually"}};
             } else if constexpr (std::is_same_v<T, Always>) {
                 jobj = {{"type", "Always"}};
+            } else {
+                static_assert(k_unhandled_timing<T>);
             }
         },
         tim);

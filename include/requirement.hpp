@@ -63,6 +63,12 @@ inline Timing after_ticks(std::size_t ticks) { return AfterTicks{ticks}; }
 inline Timing eventually() { return Eventually{}; }
 inline Timing always() { return Always{}; }
 
+/// Always false, but dependent on `T`: the final `else` of an `if constexpr`
+/// chain over a timing alternative asserts on it, so an alternative the chain
+/// does not name fails to compile instead of taking another timing's branch.
+template <typename T>
+inline constexpr bool k_unhandled_timing = false;
+
 }  // namespace timing
 
 using Timing = timing::Timing;
@@ -320,6 +326,10 @@ struct hash<Timing> {
                     return hash_combine(idx,
                                         std::hash<std::size_t>{}(val.m_ticks));
                 } else {
+                    static_assert(std::is_same_v<T, timing::Immediately> ||
+                                  std::is_same_v<T, timing::NextTimepoint> ||
+                                  std::is_same_v<T, timing::Eventually> ||
+                                  std::is_same_v<T, timing::Always>);
                     return idx;
                 }
             },
