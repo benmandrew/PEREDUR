@@ -578,6 +578,27 @@ std::optional<MonotoneDirection> condition_direction(
     return monotone_of(direction, true);
 }
 
+// The same for a stop. It occurs positively in `until`'s body and negatively
+// in `before`'s, and an "only" scope lowers the dual timing over the negated
+// obligation, which swaps the two. Both condition wrappers place the body
+// positively, so the condition type does not enter.
+MonotoneDirection stop_direction(const Requirement& requirement,
+                                 Direction direction) {
+    const bool is_before =
+        std::holds_alternative<timing::Before>(requirement.m_timing);
+    return monotone_of(direction,
+                       is_before != is_only_scope(requirement.m_scope.m_kind));
+}
+
+// @p timing with its stop replaced by @p stop, keeping its kind.
+Timing with_stop(const Timing& timing, Formula stop) {
+    assert(timing_stop(timing) != nullptr);
+    if (std::holds_alternative<timing::Before>(timing)) {
+        return timing::before(std::move(stop));
+    }
+    return timing::until(std::move(stop));
+}
+
 // The monotone arm, offered ahead of the general rewrite. cfg.p_monotone is
 // read before the RandomSource is touched, so at 0 the arm costs no draw and
 // the breeding stream is what it was before it existed.
@@ -651,6 +672,17 @@ Requirement mutate_requirement(const Requirement& requirement,
     if (random_source.next_real() < cfg.p_timing) {
         mutated.m_timing = mutate_timing(requirement.m_timing, direction,
                                          timing_pool, random_source);
+    }
+    // Read off the mutated timing, which the arm above may have just moved onto
+    // or off a stop. A requirement without one returns before the draw, so no
+    // current specification's breeding stream moves at any value of the key.
+    const Formula* stop = timing_stop(mutated.m_timing);
+    if (cfg.p_stop > 0.0 && stop != nullptr &&
+        random_source.next_real() < cfg.p_stop) {
+        mutated.m_timing = with_stop(
+            mutated.m_timing, rewrite_field(*stop, condition_atoms,
+                                            stop_direction(mutated, direction),
+                                            cfg, random_source));
     }
     // Both arms test their probability before touching the RandomSource, so at
     // the default of 0 neither costs a draw and the breeding stream is what it

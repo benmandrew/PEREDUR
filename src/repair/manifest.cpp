@@ -158,7 +158,11 @@ namespace {
 // the stream deduplicating before its sweep sees anything. No key selects
 // between the two routes, so a manifest at 28 or above carries the streamed
 // figures whenever accumulate_repairs and filters.run_implication are both on.
-constexpr int k_schema_version = 28;
+//
+// 29 added mutation.p_stop, the FRETISH arm rewriting the stop condition of an
+// `until` or `before` timing. It draws nothing on a specification without one,
+// so an earlier run's search is what it would have been at any value.
+constexpr int k_schema_version = 29;
 
 // The inverse of the spellings config_io.cpp parses. It has no table to
 // borrow -- it only ever goes string to enum -- so these must be kept in step
@@ -303,6 +307,7 @@ nlohmann::json config_json(const Config& cfg) {
               {"p_timing", cfg.p_timing},
               {"p_condition_type", cfg.p_condition_type},
               {"p_scope", cfg.p_scope},
+              {"p_stop", cfg.p_stop},
               {"p_monotone", cfg.p_monotone},
               {"p_add_assumption", cfg.p_add_assumption},
               {"p_remove_guarantee", cfg.p_remove_guarantee},

@@ -82,6 +82,9 @@ p_timing   = 0.15
 # 2026-09-11, when both defaulted off.
 p_condition_type = 0.15
 p_scope          = 0.15
+# FRETISH only: rewrites the stop condition of an `until` or `before` timing,
+# and draws nothing on a requirement without one.
+p_stop           = 0.15
 # Both modes: the share of rewrites that take the monotone form, moving a
 # formula along the implication order rather than rewriting it freely. On the
 # FRETISH path it is offered inside the condition and response rewrites, on the

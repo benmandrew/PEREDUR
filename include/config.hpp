@@ -374,6 +374,14 @@ struct Config {
     /// examples/ but mode-arbiter -- the arm can only reach Global. Defaults to
     /// 0.15 on the same terms as p_condition_type.
     double p_scope = 0.15;
+    /// FRETISH only: per-requirement probability of rewriting the stop
+    /// condition of an `until` or `before` timing. The stop occurs positively
+    /// in `until` and negatively in `before`, so a directional rewrite moves it
+    /// the opposite way under `before`. The arm is read only on a requirement
+    /// holding a stop timing, before the RandomSource is touched, so it costs
+    /// no draw on a specification without one at any value. Defaults to 0.15,
+    /// matching p_timing, since the stop belongs to the timing.
+    double p_stop = 0.15;
     /// Probability that a rewrite is a *monotone* one (monotone_rewrite,
     /// include/genetic/monotone.hpp), whose result is comparable to the formula
     /// it replaces under implication. Shared by both paths since 2026-09-11,

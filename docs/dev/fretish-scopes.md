@@ -18,7 +18,7 @@ The lowering is in `src/requirement.cpp`. Each scope adds an outer wrapper and a
 
 **No mode axiom is generated.** FRET keeps mode exclusivity in variable definitions the `formalize` path never sees, so it is written as an ordinary non-weakenable requirement, as in `examples/fsm-combined/spec.json`.
 
-**Two directional mutation arms, both defaulting to 0.15.** `[mutation] p_condition_type` and `[mutation] p_scope` moved from 0 on 2026-09-11 without a measuring campaign, as the "Config vintage" note records. Each reads its probability before touching the `RandomSource`, so at 0 neither costs a draw; `golden_config()` pins both at 0, and `test_new_arms_cost_no_draw_at_zero` checks that each draws when on.
+**Two directional mutation arms, both defaulting to 0.15.** `[mutation] p_condition_type` and `[mutation] p_scope` moved from 0 on 2026-09-11 without a measuring campaign, as the "Config vintage" note records. Each reads its probability before touching the `RandomSource`, so at 0 neither costs a draw; `golden_config()` pins both at 0, and `test_new_arms_cost_no_draw_at_zero` checks that each draws when on. `[mutation] p_stop` (0.15) is gated on the requirement holding a stop timing as well, so `golden_config()` pins it at its default and the same test checks it draws nothing without a stop.
 
 **Condition type carries a universal order.** Continual implies Trigger for every scope and timing, a condition's rising edges being a subset of the points where it holds, so Continual strengthens and the arm needs no table. The two coincide in 10 of the 80 scope-by-timing cells, at `always` under the five plain scopes and `eventually` under the three `only` scopes; `test_condition_type_order_is_pinned` asserts the order and those coincidences.
 

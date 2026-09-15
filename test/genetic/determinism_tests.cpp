@@ -138,6 +138,10 @@ Config golden_config() {
     // returns to mutate_formula without drawing, so the goldens hold what they
     // held before the arm existed.
     cfg.p_monotone = 0.0;
+    // At its default: no golden specification carries a stop timing, so the
+    // arm returns before the RandomSource at any value. Pinned so a golden that
+    // gains one fails here rather than re-recording.
+    cfg.p_stop = 0.15;
     cfg.parallel = 1;
     return cfg;
 }
@@ -290,6 +294,7 @@ void test_new_arms_cost_no_draw_at_zero() {
     off.p_timing = 0.0;
     off.p_condition_type = 0.0;
     off.p_scope = 0.0;
+    off.p_stop = 0.0;
     off.p_monotone = 0.0;
     const std::size_t baseline = count_draws(off);
 
@@ -308,6 +313,30 @@ void test_new_arms_cost_no_draw_at_zero() {
            "got " +
                std::to_string(count_draws(scope_on)) + " against " +
                std::to_string(baseline));
+
+    // The stop arm is gated on the requirement holding a stop as well, so on
+    // this one it costs nothing even when certain to fire.
+    Config stop_on = off;
+    stop_on.p_stop = 1.0;
+    expect(count_draws(stop_on) == baseline,
+           "p_stop: the arm must cost no draw on a requirement without a stop, "
+           "got " +
+               std::to_string(count_draws(stop_on)) + " against " +
+               std::to_string(baseline));
+    const Requirement stopped(Formula("a"), Formula("x"),
+                              timing::until(Formula("a")),
+                              ConditionType::Trigger);
+    const auto count_stop_draws = [&](const Config& cfg) {
+        auto trace = std::make_shared<DrawTrace>();
+        const RandomSource source = make_recording_source(k_seed, trace);
+        mutate_requirement(stopped, atoms, atoms, Direction::Weaken, timings,
+                           modes, source, cfg);
+        return trace->draws.size();
+    };
+    expect(count_stop_draws(off) == baseline &&
+               count_stop_draws(stop_on) > baseline,
+           "p_stop: the arm must draw on a requirement with a stop when on, "
+           "and not at 0");
 
     // The monotone arm is checked on the rendered stream rather than on a
     // draw count. It sits *inside* the response arm rather than beside it, so
