@@ -1,0 +1,654 @@
+{
+  "assumptions": [
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "wind_ge_10 & !wind_ge_20",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "wind_ge_m20 & !wind_ge_30",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "wind_ge_m20",
+      "condition-type": "continual",
+      "response": "wind_ge_m30",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "wind_ge_m10",
+      "condition-type": "continual",
+      "response": "wind_ge_m20",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "wind_ge_0",
+      "condition-type": "continual",
+      "response": "wind_ge_m10",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "wind_ge_10",
+      "condition-type": "continual",
+      "response": "wind_ge_0",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "wind_ge_20",
+      "condition-type": "continual",
+      "response": "wind_ge_10",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "wind_ge_30",
+      "condition-type": "continual",
+      "response": "wind_ge_20",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "wind_ge_40",
+      "condition-type": "continual",
+      "response": "wind_ge_30",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!wind_ge_m30",
+      "condition-type": "continual",
+      "response": "!wind_ge_m20",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!wind_ge_m20",
+      "condition-type": "continual",
+      "response": "!wind_ge_m10",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!wind_ge_m10",
+      "condition-type": "continual",
+      "response": "!wind_ge_0",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!wind_ge_0",
+      "condition-type": "continual",
+      "response": "!wind_ge_10",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!wind_ge_10",
+      "condition-type": "continual",
+      "response": "!wind_ge_20",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!wind_ge_20",
+      "condition-type": "continual",
+      "response": "!wind_ge_30",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!wind_ge_30",
+      "condition-type": "continual",
+      "response": "!wind_ge_40",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "(wind_ge_m20 -> wind_ge_m30) & (wind_ge_m10 -> wind_ge_m20) & (wind_ge_0 -> wind_ge_m10) & (wind_ge_10 -> wind_ge_0) & (wind_ge_20 -> wind_ge_10) & (wind_ge_30 -> wind_ge_20) & (wind_ge_40 -> wind_ge_30)",
+      "timing": {
+        "type": "Always"
+      },
+      "weakenable": false
+    }
+  ],
+  "guarantees": [
+    {
+      "condition": "!cr & kias_ge_90",
+      "condition-type": "continual",
+      "response": "!cr",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "cr & !kias_ge_110",
+      "condition-type": "continual",
+      "response": "cr",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "cr & kias_ge_110",
+      "condition-type": "trigger",
+      "response": "!cr",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!cr & !kias_ge_90",
+      "condition-type": "trigger",
+      "response": "cr",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!dr & kias_ge_60",
+      "condition-type": "continual",
+      "response": "!dr",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "dr & !kias_ge_80",
+      "condition-type": "continual",
+      "response": "dr",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "dr & kias_ge_80",
+      "condition-type": "trigger",
+      "response": "!dr",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!dr & !kias_ge_60",
+      "condition-type": "trigger",
+      "response": "dr",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!fcs & !kias_ge_50",
+      "condition-type": "continual",
+      "response": "!fcs",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "fcs & kias_ge_30",
+      "condition-type": "continual",
+      "response": "fcs",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "fcs & !kias_ge_30",
+      "condition-type": "trigger",
+      "response": "!fcs",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!fcs & kias_ge_50",
+      "condition-type": "trigger",
+      "response": "fcs",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "cr <-> !kias_ge_90",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "dr <-> !kias_ge_60",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "fcs <-> kias_ge_50",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "hc <-> !kgs_ge_20",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "kias_ge_120",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "lm_wb <-> kias_ge_90",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "kias_ge_0",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "kias_ge_10",
+      "condition-type": "continual",
+      "response": "kias_ge_0",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "kias_ge_20",
+      "condition-type": "continual",
+      "response": "kias_ge_10",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "kias_ge_30",
+      "condition-type": "continual",
+      "response": "kias_ge_20",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "kias_ge_40",
+      "condition-type": "continual",
+      "response": "kias_ge_30",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "kias_ge_50",
+      "condition-type": "continual",
+      "response": "kias_ge_40",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "kias_ge_60",
+      "condition-type": "continual",
+      "response": "kias_ge_50",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "kias_ge_70",
+      "condition-type": "continual",
+      "response": "kias_ge_60",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "kias_ge_80",
+      "condition-type": "continual",
+      "response": "kias_ge_70",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "kias_ge_90",
+      "condition-type": "continual",
+      "response": "kias_ge_80",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "kias_ge_100",
+      "condition-type": "continual",
+      "response": "kias_ge_90",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "kias_ge_110",
+      "condition-type": "continual",
+      "response": "kias_ge_100",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "kias_ge_120",
+      "condition-type": "continual",
+      "response": "kias_ge_110",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_0",
+      "condition-type": "continual",
+      "response": "!kias_ge_10",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_10",
+      "condition-type": "continual",
+      "response": "!kias_ge_20",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_20",
+      "condition-type": "continual",
+      "response": "!kias_ge_30",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_30",
+      "condition-type": "continual",
+      "response": "!kias_ge_40",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_40",
+      "condition-type": "continual",
+      "response": "!kias_ge_50",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_50",
+      "condition-type": "continual",
+      "response": "!kias_ge_60",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_60",
+      "condition-type": "continual",
+      "response": "!kias_ge_70",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_70",
+      "condition-type": "continual",
+      "response": "!kias_ge_80",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_80",
+      "condition-type": "continual",
+      "response": "!kias_ge_90",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_90",
+      "condition-type": "continual",
+      "response": "!kias_ge_100",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_100",
+      "condition-type": "continual",
+      "response": "!kias_ge_110",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "!kias_ge_110",
+      "condition-type": "continual",
+      "response": "!kias_ge_120",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "(kgs_ge_20 <-> ((kias_ge_60) | (wind_ge_m30 & kias_ge_50) | (wind_ge_m20 & kias_ge_40) | (wind_ge_m10 & kias_ge_30) | (wind_ge_0 & kias_ge_20) | (wind_ge_10 & kias_ge_10) | (wind_ge_20 & kias_ge_0) | (wind_ge_30) | (wind_ge_40))) & (kgs_ge_30 <-> ((kias_ge_70) | (wind_ge_m30 & kias_ge_60) | (wind_ge_m20 & kias_ge_50) | (wind_ge_m10 & kias_ge_40) | (wind_ge_0 & kias_ge_30) | (wind_ge_10 & kias_ge_20) | (wind_ge_20 & kias_ge_10) | (wind_ge_30 & kias_ge_0) | (wind_ge_40)))",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "lm_tb | lm_stb | lm_swb | lm_wb",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "lm_tb",
+      "timing": {
+        "type": "WithinTicks",
+        "ticks": 16
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "!(rearprop <-> hc)",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "lm_stb & !kias_ge_50 & (kgs_ge_30 | !hc)",
+      "condition-type": "continual",
+      "response": "lm_stb",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "lm_stb & kias_ge_50",
+      "condition-type": "trigger",
+      "response": "lm_swb",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "lm_stb & hc & !kgs_ge_30",
+      "condition-type": "trigger",
+      "response": "lm_tb",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "lm_swb & !kias_ge_110 & kias_ge_40",
+      "condition-type": "continual",
+      "response": "lm_swb",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "lm_swb & !kias_ge_40",
+      "condition-type": "trigger",
+      "response": "lm_stb",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "lm_swb & kias_ge_110",
+      "condition-type": "trigger",
+      "response": "lm_wb",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "lm_tb & !kgs_ge_30 & hc",
+      "condition-type": "continual",
+      "response": "lm_tb",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "lm_tb & (!hc | kgs_ge_30)",
+      "condition-type": "trigger",
+      "response": "lm_stb",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "lm_wb & kias_ge_100",
+      "condition-type": "continual",
+      "response": "lm_wb",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "lm_wb & !kias_ge_100",
+      "condition-type": "trigger",
+      "response": "lm_swb",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "!(lm_tb & lm_stb) & !(lm_tb & lm_swb) & !(lm_tb & lm_wb) & !(lm_stb & lm_swb) & !(lm_stb & lm_wb) & !(lm_swb & lm_wb)",
+      "timing": {
+        "type": "Always"
+      },
+      "weakenable": false
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "(kias_ge_10 -> kias_ge_0) & (kias_ge_20 -> kias_ge_10) & (kias_ge_30 -> kias_ge_20) & (kias_ge_40 -> kias_ge_30) & (kias_ge_50 -> kias_ge_40) & (kias_ge_60 -> kias_ge_50) & (kias_ge_70 -> kias_ge_60) & (kias_ge_80 -> kias_ge_70) & (kias_ge_90 -> kias_ge_80) & (kias_ge_100 -> kias_ge_90) & (kias_ge_110 -> kias_ge_100) & (kias_ge_120 -> kias_ge_110)",
+      "timing": {
+        "type": "Always"
+      },
+      "weakenable": false
+    }
+  ],
+  "in_atoms": [
+    "wind_ge_m30",
+    "wind_ge_m20",
+    "wind_ge_m10",
+    "wind_ge_0",
+    "wind_ge_10",
+    "wind_ge_20",
+    "wind_ge_30",
+    "wind_ge_40"
+  ],
+  "out_atoms": [
+    "lm_tb",
+    "lm_stb",
+    "lm_swb",
+    "lm_wb",
+    "hc",
+    "rearprop",
+    "cr",
+    "dr",
+    "fcs",
+    "kgs_ge_20",
+    "kgs_ge_30",
+    "kias_ge_0",
+    "kias_ge_10",
+    "kias_ge_20",
+    "kias_ge_30",
+    "kias_ge_40",
+    "kias_ge_50",
+    "kias_ge_60",
+    "kias_ge_70",
+    "kias_ge_80",
+    "kias_ge_90",
+    "kias_ge_100",
+    "kias_ge_110",
+    "kias_ge_120"
+  ]
+}
