@@ -1,0 +1,172 @@
+{
+  "assumptions": [
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "(state_transition | state_nominal | state_maneuver | state_standby) & !(state_transition & state_nominal) & !(state_transition & state_maneuver) & !(state_transition & state_standby) & !(state_nominal & state_maneuver) & !(state_nominal & state_standby) & !(state_maneuver & state_standby)",
+      "timing": {
+        "type": "Always"
+      },
+      "weakenable": false
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "(senstate_nominal | senstate_transition | senstate_fault) & !(senstate_nominal & senstate_transition) & !(senstate_nominal & senstate_fault) & !(senstate_transition & senstate_fault)",
+      "timing": {
+        "type": "Always"
+      },
+      "weakenable": false
+    }
+  ],
+  "guarantees": [
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(limits & !standby & !apfail & supported) -> pullup",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(standby & state_transition) -> STATE_STANDBY",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(state_transition & good & supported & !standby) -> STATE_NOMINAL",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(!good & state_nominal & !standby) -> STATE_MANEUVER",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(state_nominal & standby) -> STATE_STANDBY",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(state_maneuver & standby & good) -> STATE_STANDBY",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(state_maneuver & supported & good & !standby) -> STATE_TRANSITION",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(state_standby & !standby & !apfail) -> STATE_TRANSITION",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(state_standby & apfail) -> STATE_MANEUVER",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(senstate_nominal & limits) -> SENSTATE_FAULT",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(senstate_nominal & !request & !limits) -> SENSTATE_TRANSITION",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(senstate_fault & !request & !limits) -> SENSTATE_TRANSITION",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(senstate_transition & request & mode) -> SENSTATE_NOMINAL",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "(STATE_TRANSITION | STATE_NOMINAL | STATE_MANEUVER | STATE_STANDBY) & !(STATE_TRANSITION & STATE_NOMINAL) & !(STATE_TRANSITION & STATE_MANEUVER) & !(STATE_TRANSITION & STATE_STANDBY) & !(STATE_NOMINAL & STATE_MANEUVER) & !(STATE_NOMINAL & STATE_STANDBY) & !(STATE_MANEUVER & STATE_STANDBY)",
+      "timing": {
+        "type": "Always"
+      },
+      "weakenable": false
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "(SENSTATE_NOMINAL | SENSTATE_TRANSITION | SENSTATE_FAULT) & !(SENSTATE_NOMINAL & SENSTATE_TRANSITION) & !(SENSTATE_NOMINAL & SENSTATE_FAULT) & !(SENSTATE_TRANSITION & SENSTATE_FAULT)",
+      "timing": {
+        "type": "Always"
+      },
+      "weakenable": false
+    }
+  ],
+  "in_atoms": [
+    "standby",
+    "apfail",
+    "supported",
+    "limits",
+    "good",
+    "request",
+    "mode",
+    "state_transition",
+    "state_nominal",
+    "state_maneuver",
+    "state_standby",
+    "senstate_nominal",
+    "senstate_transition",
+    "senstate_fault"
+  ],
+  "out_atoms": [
+    "pullup",
+    "STATE_TRANSITION",
+    "STATE_NOMINAL",
+    "STATE_MANEUVER",
+    "STATE_STANDBY",
+    "SENSTATE_NOMINAL",
+    "SENSTATE_TRANSITION",
+    "SENSTATE_FAULT"
+  ]
+}
