@@ -70,8 +70,10 @@ std::size_t timing_horizon(const Timing& timing) {
                 // in which it must not hold.
                 return value.m_ticks + 2;
             } else {
+                // A stop condition bounds no tick count either.
                 static_assert(std::is_same_v<T, timing::Eventually> ||
-                              std::is_same_v<T, timing::Always>);
+                              std::is_same_v<T, timing::Always> ||
+                              timing::k_carries_stop<T>);
                 return 0;
             }
         },

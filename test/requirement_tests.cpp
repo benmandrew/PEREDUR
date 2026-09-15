@@ -235,10 +235,15 @@ void test_specification_has_false_condition_false_for_normal_spec() {
 void test_to_string_is_valid_fretish_for_all_timings_and_condition_types() {
     RequirementFormaliser formaliser(formaliser_command());
     const std::vector<Timing> timings = {
-        timing::immediately(),   timing::next_timepoint(),
-        timing::within_ticks(3), timing::for_ticks(2),
-        timing::after_ticks(1),  timing::eventually(),
+        timing::immediately(),
+        timing::next_timepoint(),
+        timing::within_ticks(3),
+        timing::for_ticks(2),
+        timing::after_ticks(1),
+        timing::eventually(),
         timing::always(),
+        timing::until(Formula("stop")),
+        timing::before(Formula("stop & other")),
     };
     for (const Timing& tim : timings) {
         expect_valid_fretish(formaliser,

@@ -15,7 +15,7 @@ namespace {
 
 Requirement make_req(const std::string& trigger, const std::string& response,
                      Timing timing, std::string spec) {
-    Requirement req{Formula(trigger), Formula(response), timing};
+    Requirement req{Formula(trigger), Formula(response), std::move(timing)};
     req.m_ltl = std::move(spec);
     return req;
 }

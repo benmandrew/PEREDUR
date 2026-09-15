@@ -99,7 +99,8 @@ const std::vector<std::string> k_out_atoms = {"x", "y"};
 
 Requirement make_req(const std::string& condition, const std::string& response,
                      Timing timing) {
-    return Requirement{Formula(condition), Formula(response), timing};
+    return Requirement{Formula(condition), Formula(response),
+                       std::move(timing)};
 }
 
 /// Pins every Config field the breeding path reads, so the goldens below track

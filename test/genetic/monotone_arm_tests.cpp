@@ -82,9 +82,13 @@ void check_direction(const Requirement& original, Direction direction,
 }
 
 void test_response_arm_moves_the_requirement() {
-    const std::vector<Timing> timings = {
-        timing::immediately(), timing::next_timepoint(), timing::always(),
-        timing::eventually(), timing::within_ticks(2)};
+    const std::vector<Timing> timings = {timing::immediately(),
+                                         timing::next_timepoint(),
+                                         timing::always(),
+                                         timing::eventually(),
+                                         timing::within_ticks(2),
+                                         timing::until(Formula("b")),
+                                         timing::before(Formula("b"))};
     const Config cfg = response_only();
     std::size_t answered = 0;
     for (const Timing& timing : timings) {
@@ -116,7 +120,9 @@ void test_only_scope_flips_the_response() {
     const Scope only_in{ScopeKind::OnlyIn, "m"};
     const Config cfg = response_only();
     std::size_t answered = 0;
-    for (const Timing& timing : {timing::always(), timing::eventually()}) {
+    for (const Timing& timing :
+         {timing::always(), timing::eventually(), timing::until(Formula("b")),
+          timing::before(Formula("b"))}) {
         const Requirement original =
             subject(timing, ConditionType::Continual, only_in);
         check_direction(original, Direction::Weaken, cfg,

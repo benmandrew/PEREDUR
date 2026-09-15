@@ -66,7 +66,8 @@ int min_within_index(const Timing& tim) {
                 return static_cast<int>(val.m_ticks) + 1;
             } else {
                 static_assert(std::is_same_v<T, timing::Eventually> ||
-                              std::is_same_v<T, timing::Always>);
+                              std::is_same_v<T, timing::Always> ||
+                              timing::k_carries_stop<T>);
                 return 0;  // no WithinTicks in ↓tim
             }
         },

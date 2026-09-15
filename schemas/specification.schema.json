@@ -111,21 +111,37 @@
             "ForTicks",
             "AfterTicks",
             "Eventually",
-            "Always"
+            "Always",
+            "Until",
+            "Before"
           ]
         },
         "ticks": {
           "description": "Tick bound; required for WithinTicks, ForTicks, and AfterTicks.",
           "type": "integer",
           "minimum": 0
+        },
+        "stop": {
+          "description": "Propositional stop condition; required for Until and Before.",
+          "type": "string"
         }
       },
-      "if": {
-        "properties": {
-          "type": { "enum": ["WithinTicks", "ForTicks", "AfterTicks"] }
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": { "enum": ["WithinTicks", "ForTicks", "AfterTicks"] }
+            }
+          },
+          "then": { "required": ["ticks"] }
+        },
+        {
+          "if": {
+            "properties": { "type": { "enum": ["Until", "Before"] } }
+          },
+          "then": { "required": ["stop"] }
         }
-      },
-      "then": { "required": ["ticks"] }
+      ]
     },
     "ComponentScore": {
       "description": "Score and weight for one fitness component.",

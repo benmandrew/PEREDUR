@@ -309,9 +309,12 @@ std::vector<Timing> donated_candidates(const std::vector<Timing>& timing_pool) {
                 } else if constexpr (std::is_same_v<T, timing::NextTimepoint>) {
                     candidates.push_back(timing::next_timepoint());
                 } else {
-                    // The extremes themselves lend nothing.
+                    // The extremes themselves lend nothing. A stop timing lies
+                    // below Always but not above Eventually, so it cannot join
+                    // a set the two extremes share.
                     static_assert(std::is_same_v<T, timing::Eventually> ||
-                                  std::is_same_v<T, timing::Always>);
+                                  std::is_same_v<T, timing::Always> ||
+                                  timing::k_carries_stop<T>);
                 }
             },
             donor);
@@ -358,6 +361,8 @@ Timing strengthen_timing(const Timing& timing,
         } else if constexpr (std::is_same_v<T, timing::Eventually>) {
             return move_off_extreme(timing::eventually(), timing_pool,
                                     random_source);
+        } else if constexpr (timing::k_carries_stop<T>) {
+            return value;
         } else {
             static_assert(timing::k_unhandled_timing<T>);
         }
@@ -384,6 +389,8 @@ Timing weaken_timing(const Timing& timing,
             return weaken_within_timing(value, random_source);
         } else if constexpr (std::is_same_v<T, timing::Eventually>) {
             return timing::eventually();
+        } else if constexpr (timing::k_carries_stop<T>) {
+            return value;
         } else {
             static_assert(timing::k_unhandled_timing<T>);
         }
@@ -419,7 +426,9 @@ ConditionType mutate_condition_type(Direction direction) {
 // `in m ... eventually r` demands the response arrive before the mode ends,
 // which global scope does not, so `global => in` holds at `always` and fails at
 // `eventually`. Measured tick counts 2 and 4 give identical orders, so the
-// table is independent of n.
+// table is independent of n. `until` and `before`, measured at an atom stop and
+// at a conjunction, fall in the same cells as the tick-bounded timings, so it
+// is independent of the stop too.
 //
 // `notin => before` is the one edge holding in every cell: the interval
 // strictly before the first entry into the mode is contained in the set of

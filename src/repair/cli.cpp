@@ -73,7 +73,9 @@ void print_help(const char* prog) {
         << "Timing types: Immediately, NextTimepoint, Eventually, Always,\n"
         << "              WithinTicks {\"ticks\": n}, ForTicks {\"ticks\": "
            "n},\n"
-        << "              AfterTicks  {\"ticks\": n}\n";
+        << "              AfterTicks  {\"ticks\": n},\n"
+        << "              Until {\"stop\": \"<formula>\"}, Before {\"stop\": "
+           "\"<formula>\"}\n";
 }
 
 std::optional<bool> resolve_is_tlsf(

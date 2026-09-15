@@ -37,11 +37,15 @@ const std::vector<ScopeCase>& scope_cases() {
 // cross-checked against the CLI at all; test_scope_zero_ticks_is_unrelaxed
 // pins them directly instead.
 const std::vector<Timing>& timing_cases() {
-    static const std::vector<Timing> timings = {
-        timing::immediately(),   timing::next_timepoint(),
-        timing::within_ticks(2), timing::for_ticks(2),
-        timing::after_ticks(2),  timing::eventually(),
-        timing::always()};
+    static const std::vector<Timing> timings = {timing::immediately(),
+                                                timing::next_timepoint(),
+                                                timing::within_ticks(2),
+                                                timing::for_ticks(2),
+                                                timing::after_ticks(2),
+                                                timing::eventually(),
+                                                timing::always(),
+                                                timing::until(Formula("s")),
+                                                timing::before(Formula("s"))};
     return timings;
 }
 
@@ -148,6 +152,10 @@ void test_global_scope_lowering_is_unchanged() {
          "G((c) -> (!(r) & X((r))))"},
         {timing::always(), ConditionType::Trigger,
          "G((!(c) & X(c)) -> X(G(r))) & ((c) -> G(r))"},
+        {timing::until(Formula("s")), ConditionType::Continual,
+         "G((c) -> ((r) W (s)))"},
+        {timing::before(Formula("s")), ConditionType::Continual,
+         "G((c) -> ((r) R (!(s))))"},
     };
     for (const Row& row : rows) {
         const Requirement req = scoped(Scope{}, row.m_timing, row.m_type);
@@ -238,9 +246,14 @@ void check_order_cell(const Timing& tim, ConditionType ctype) {
 }
 
 void test_scope_order_is_pinned() {
+    // A conjunction stop alongside timing_cases()' atom, since scope_order
+    // reads only the timing's kind and so claims its cells for every stop.
+    std::vector<Timing> timings = timing_cases();
+    timings.push_back(timing::until(Formula("s & t")));
+    timings.push_back(timing::before(Formula("s & t")));
     for (const ConditionType ctype :
          {ConditionType::Trigger, ConditionType::Continual}) {
-        for (const Timing& tim : timing_cases()) {
+        for (const Timing& tim : timings) {
             check_order_cell(tim, ctype);
         }
     }

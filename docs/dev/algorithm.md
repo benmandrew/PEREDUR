@@ -60,7 +60,7 @@ Binaries: `peredur` (genetic repair), `realize`, `compare`, `ltl`, `mucs`, `maxi
 
 ## Key types
 
-- `Timing` — `std::variant<Immediately, NextTimepoint, WithinTicks, ForTicks, AfterTicks, Eventually, Always>` (see `requirement.hpp`).
+- `Timing` — `std::variant<Immediately, NextTimepoint, WithinTicks, ForTicks, AfterTicks, Eventually, Always, Until, Before>` (see `requirement.hpp`). `Until` and `Before` hold a propositional stop condition `s`.
 - `ConditionType` — `enum class { Trigger, Continual }`: the condition activates a `Requirement` on its rising edge (Trigger) or wherever it holds (Continual).
 - `Requirement` — holds `m_condition`, `m_response`, `m_timing`, `m_condition_type`, the derived `m_ltl` string, and `m_weakenable`. A requirement with `m_weakenable` false is locked: never mutated, used as a crossover source, or simplified. The flag is part of `Requirement`'s identity (`operator<`/`==`/`hash`) and serialises as the optional JSON key `weakenable`, emitted only when `false`. `m_removed` is the removal tombstone (see "Removable guarantees").
 - `Formula` — propositional AST with `syntactic_similarity`, `rewrite_post_order`, `n_subformulae`.

@@ -17,12 +17,13 @@ namespace {
 
 Requirement make_req(const std::string& trigger, const std::string& response,
                      Timing timing = timing::immediately()) {
-    return Requirement{Formula(trigger), Formula(response), timing};
+    return Requirement{Formula(trigger), Formula(response), std::move(timing)};
 }
 
 Specification make_spec(const std::string& trigger, const std::string& response,
                         Timing timing = timing::immediately()) {
-    return Specification({}, {make_req(trigger, response, timing)}, {}, {});
+    return Specification({}, {make_req(trigger, response, std::move(timing))},
+                         {}, {});
 }
 
 RandomSource make_source(std::vector<std::size_t> values,
