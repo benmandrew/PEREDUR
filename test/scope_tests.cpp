@@ -259,6 +259,51 @@ void test_scope_order_is_pinned() {
     }
 }
 
+// Where the stop timings sit in the timing order, which the timing arm and the
+// timing similarity term both rely on. Over the Global continual lowering,
+// `until s` has one edge into the other kinds, from Always above it, and
+// `before s` has none. Each moves only along its stop, positively in `until`
+// and negatively in `before`, and FRET's pairing of the two is not an order
+// between them.
+void test_stop_timing_order_is_pinned() {
+    const auto ltl = [](const Timing& tim) {
+        return scoped(Scope{}, tim, ConditionType::Continual).m_ltl;
+    };
+    const Timing until_s = timing::until(Formula("s"));
+    const Timing before_s = timing::before(Formula("s"));
+    for (const Timing& tim : timing_cases()) {
+        if (timing_stop(tim) != nullptr) {
+            continue;
+        }
+        const std::string where = to_string(tim);
+        const bool is_always = std::holds_alternative<timing::Always>(tim);
+        expect(ltl_implies(ltl(tim), ltl(until_s)) == is_always,
+               "stop order: " + where + (is_always ? " must" : " must not") +
+                   " imply until s");
+        expect(!ltl_implies(ltl(until_s), ltl(tim)),
+               "stop order: until s must not imply " + where);
+        expect(!ltl_implies(ltl(tim), ltl(before_s)) &&
+                   !ltl_implies(ltl(before_s), ltl(tim)),
+               "stop order: before s must be incomparable with " + where);
+    }
+    const Timing until_either = timing::until(Formula("s | t"));
+    const Timing before_either = timing::before(Formula("s | t"));
+    expect(ltl_implies(ltl(until_s), ltl(until_either)) &&
+               !ltl_implies(ltl(until_either), ltl(until_s)),
+           "stop order: until must weaken strictly as its stop weakens");
+    expect(ltl_implies(ltl(before_either), ltl(before_s)) &&
+               !ltl_implies(ltl(before_s), ltl(before_either)),
+           "stop order: before must strengthen strictly as its stop weakens");
+    expect(!ltl_implies(ltl(until_s), ltl(before_s)) &&
+               !ltl_implies(ltl(before_s), ltl(until_s)),
+           "stop order: until s and before s must be incomparable");
+    expect(ltl_equivalent(ltl(timing::until(Formula("false"))),
+                          ltl(timing::always())),
+           "stop order: until false must be equivalent to always");
+    expect(ltl_equivalent(ltl(timing::before(Formula("false"))), "true"),
+           "stop order: before false must be valid");
+}
+
 // Continual implies Trigger everywhere, which is what makes the condition-type
 // arm directional. The converse holds only where the two coincide: at `always`
 // under a plain scope, and at `eventually` under an `only` scope, whose
@@ -350,4 +395,5 @@ void run_scope_tests() {
     test_scope_agrees_with_formaliser();
     test_condition_type_order_is_pinned();
     test_scope_order_is_pinned();
+    test_stop_timing_order_is_pinned();
 }

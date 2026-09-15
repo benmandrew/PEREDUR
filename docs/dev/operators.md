@@ -82,6 +82,8 @@ The extremes of the FRETISH timing order move only into a timing the specificati
 
 Everything in the set lies strictly between Always and Eventually, so the same candidates strengthen one and weaken the other through the shared `move_off_extreme`. A donor's kind is never taken: `within n` respells one count and `after n` is not comparable to Always.
 
+Always also takes a second list, `donated_to_always`: `until s` for every stop `s` that a live `until` or `before` timing carries. Always implies `until s` for any `s`, but `until s` does not imply Eventually, so these candidates stay out of the shared set. They are appended after it, and `until` sorts after every other kind, so a specification with no stop timing builds the same list as before and a draw lands on the same element. In the other direction `until s` strengthens to Always, the one kind above it, and `before s` is incomparable with every kind; both weaken only through their stop.
+
 No invented constant: a hard-coded `for 10 ticks` weakening of Always produced a degenerate `fsm` repair, and freezing Always (`f4968ab`) left the timing of every Always guarantee immobile, 7 of the 9 across the three FRETISH input specs.
 
 A weaker guarantee timing helps realizability and costs nothing on similarity, so under NSGA-II a gutted timing sits on the front; that wants a campaign.
