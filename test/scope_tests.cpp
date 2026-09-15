@@ -114,7 +114,7 @@ void test_scope_agrees_with_formaliser() {
 // has no room to be pre-empted by the boundary, so it is not relaxed. FRET
 // agrees but prints the empty range as `F[0,-1] ...`, which SPOT rejects, so
 // this is the one family the formaliser cannot arbitrate and it is pinned by
-// hand.
+// hand. The fuzzer folds the empty range to false and compares these rows.
 void test_scope_zero_ticks_is_unrelaxed() {
     const Requirement within =
         scoped(Scope{ScopeKind::In, "m"}, timing::within_ticks(0),
