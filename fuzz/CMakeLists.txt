@@ -33,4 +33,6 @@ add_custom_command(
     COMMENT "Building ltl_equivalence_fuzzer with ${PEREDUR_FUZZ_CLANGXX} (libFuzzer)"
     VERBATIM
 )
-add_custom_target(ltl_equivalence_fuzzer ALL DEPENDS "${PEREDUR_FUZZ_BINARY}")
+# Named apart from the binary: Ninja would otherwise emit a phony
+# fuzz/ltl_equivalence_fuzzer that collides with the output file.
+add_custom_target(fuzz_ltl_equivalence ALL DEPENDS "${PEREDUR_FUZZ_BINARY}")

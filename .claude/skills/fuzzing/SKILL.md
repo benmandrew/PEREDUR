@@ -11,7 +11,7 @@ Requires a clang++ with libFuzzer support on `PATH` (declared in `flake.nix`'s d
 
 ```sh
 cmake --preset debug -DPEREDUR_FUZZ=ON
-cmake --build build --target ltl_equivalence_fuzzer
+cmake --build build --target fuzz_ltl_equivalence
 ./build/fuzz/ltl_equivalence_fuzzer -max_total_time=60 corpus_dir/   # fuzz for 60s
 ./build/fuzz/ltl_equivalence_fuzzer crash-<hash>                    # replay a repro
 ```
