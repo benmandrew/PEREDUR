@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -200,11 +201,20 @@ inline Requirement requirement_from_json(const nlohmann::json& jobj) {
     const ConditionType ctype = ctype_str == "trigger"
                                     ? ConditionType::Trigger
                                     : ConditionType::Continual;
+    Formula response(jobj.at("response").get<std::string>());
+    const nlohmann::json& timing_json = jobj.at("timing");
+    // FRET's `never r` is `always !r`. It loads as that respelling rather than
+    // as a kind of its own, which would split the cache keys of one obligation
+    // and double the mutation grammar for it, so a repair prints `always !r`.
+    Timing timing = timing::always();
+    if (timing_json.at("type").get<std::string>() == "Never") {
+        response = Formula::make_unary(Formula::Kind::Not, response);
+    } else {
+        timing = timing_json.get<Timing>();
+    }
     return Requirement(
-        Formula(jobj.at("condition").get<std::string>()),
-        Formula(jobj.at("response").get<std::string>()),
-        jobj.at("timing").get<Timing>(), ctype, jobj.value("weakenable", true),
-        false,
+        Formula(jobj.at("condition").get<std::string>()), std::move(response),
+        std::move(timing), ctype, jobj.value("weakenable", true), false,
         jobj.contains("scope") ? jobj.at("scope").get<Scope>() : Scope{});
 }
 
@@ -304,7 +314,7 @@ inline std::optional<std::string> validate_timing_json(
     if (ttype != "Immediately" && ttype != "NextTimepoint" &&
         ttype != "WithinTicks" && ttype != "ForTicks" &&
         ttype != "AfterTicks" && ttype != "Eventually" && ttype != "Always" &&
-        ttype != "Until" && ttype != "Before") {
+        ttype != "Until" && ttype != "Before" && ttype != "Never") {
         return path + ".type: unknown value '" + ttype + "'";
     }
     if (ttype == "Until" || ttype == "Before") {

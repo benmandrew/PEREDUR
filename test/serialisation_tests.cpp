@@ -490,6 +490,27 @@ void test_stop_timing_without_stop_is_rejected() {
     }
 }
 
+// FRET's `never r` loads as `always !r`, so it validates like any timing and
+// reaches the engine as a kind the grammar already has.
+void test_never_loads_as_always_over_a_negated_response() {
+    const nlohmann::json req_json = {{"condition", "a"},
+                                     {"condition-type", "continual"},
+                                     {"response", "b & c"},
+                                     {"timing", {{"type", "Never"}}}};
+    const Requirement req = serialisation::requirement_from_json(req_json);
+    expect(std::holds_alternative<timing::Always>(req.m_timing),
+           "requirement_from_json: never should load as always");
+    expect(req.m_response ==
+               Formula::make_unary(Formula::Kind::Not, Formula("b & c")),
+           "requirement_from_json: never should negate the response");
+    const nlohmann::json jobj = {{"assumptions", nlohmann::json::array()},
+                                 {"guarantees", {req_json}},
+                                 {"in_atoms", {"a"}},
+                                 {"out_atoms", {"b", "c"}}};
+    expect(!validate_specification_json(jobj).has_value(),
+           "validate_specification_json: a Never timing must be accepted");
+}
+
 void test_mode_shared_with_an_atom_is_rejected() {
     const nlohmann::json jobj = {{"assumptions", nlohmann::json::array()},
                                  {"guarantees", nlohmann::json::array()},
@@ -569,6 +590,7 @@ void run_serialisation_tests() {
     test_modes_round_trip();
     test_undeclared_mode_is_rejected();
     test_stop_timing_without_stop_is_rejected();
+    test_never_loads_as_always_over_a_negated_response();
     test_mode_shared_with_an_atom_is_rejected();
     test_global_scope_with_a_mode_is_rejected();
     test_scoped_requirement_needs_a_mode();

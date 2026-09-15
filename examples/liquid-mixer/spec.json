@@ -1,0 +1,120 @@
+{
+  "assumptions": [],
+  "guarantees": [
+    {
+      "condition": "start_button",
+      "condition-type": "trigger",
+      "response": "!liquid_level_1 -> valve_0",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "liquid_level_1",
+      "condition-type": "trigger",
+      "response": "!valve_0",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "liquid_level_1",
+      "condition-type": "trigger",
+      "response": "!liquid_level_2 -> valve_1",
+      "timing": {
+        "type": "Until",
+        "stop": "emergency_button"
+      }
+    },
+    {
+      "condition": "liquid_level_2",
+      "condition-type": "trigger",
+      "response": "!valve_1",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "liquid_level_2",
+      "condition-type": "trigger",
+      "response": "timer_60sec_start",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "liquid_level_2",
+      "condition-type": "trigger",
+      "response": "stirring_motor",
+      "timing": {
+        "type": "Until",
+        "stop": "timer_60sec_expire | emergency_button"
+      }
+    },
+    {
+      "condition": "timer_60sec_expire",
+      "condition-type": "trigger",
+      "response": "timer_120sec_start",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "timer_60sec_expire",
+      "condition-type": "trigger",
+      "response": "valve_2",
+      "timing": {
+        "type": "Until",
+        "stop": "timer_120sec_expire | emergency_button"
+      }
+    },
+    {
+      "condition": "emergency_button",
+      "condition-type": "trigger",
+      "response": "!valve_0",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "emergency_button",
+      "condition-type": "trigger",
+      "response": "!valve_1",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "emergency_button",
+      "condition-type": "trigger",
+      "response": "!valve_2",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "emergency_button",
+      "condition-type": "trigger",
+      "response": "!stirring_motor",
+      "timing": {
+        "type": "Immediately"
+      }
+    }
+  ],
+  "in_atoms": [
+    "start_button",
+    "emergency_button",
+    "liquid_level_1",
+    "liquid_level_2",
+    "timer_60sec_expire",
+    "timer_120sec_expire"
+  ],
+  "out_atoms": [
+    "valve_0",
+    "valve_1",
+    "valve_2",
+    "stirring_motor",
+    "timer_60sec_start",
+    "timer_120sec_start"
+  ]
+}

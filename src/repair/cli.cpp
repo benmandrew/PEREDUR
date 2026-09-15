@@ -75,7 +75,8 @@ void print_help(const char* prog) {
            "n},\n"
         << "              AfterTicks  {\"ticks\": n},\n"
         << "              Until {\"stop\": \"<formula>\"}, Before {\"stop\": "
-           "\"<formula>\"}\n";
+           "\"<formula>\"},\n"
+        << "              Never (loaded as Always over the negated response)\n";
 }
 
 std::optional<bool> resolve_is_tlsf(

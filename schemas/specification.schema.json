@@ -113,7 +113,8 @@
             "Eventually",
             "Always",
             "Until",
-            "Before"
+            "Before",
+            "Never"
           ]
         },
         "ticks": {
