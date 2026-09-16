@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789461551555,
+  "lastUpdate": 1789547373511,
   "repoUrl": "https://github.com/benmandrew/PEREDUR",
   "entries": {
     "counter benchmarks": [
@@ -6804,6 +6804,100 @@ window.BENCHMARK_DATA = {
             "value": 3453.383430546601,
             "unit": "ns/iter",
             "extra": "iterations: 202819\ncpu: 3452.9128237492514 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "benmandrew",
+            "username": "benmandrew",
+            "email": "benmandrew@gmail.com"
+          },
+          "committer": {
+            "name": "benmandrew",
+            "username": "benmandrew",
+            "email": "benmandrew@gmail.com"
+          },
+          "id": "80c307937d5a0f9e0a5615010f956c09facc5aa1",
+          "message": "feat(examples): import the Lift-Plus-Cruise requirements\n\nAdds examples/lift-plus-cruise-mini/ and examples/lift-plus-cruise-full/,\nthe aircraft requirements from Pressburger, Katis, Dutle and Mavridou,\n\"Authoring, Analyzing, and Monitoring Requirements for a\nLift-Plus-Cruise Aircraft\" (REFSQ 2023), and its companion NASA\ntechnical report, \"Using FRET to Create, Analyze and Monitor\nRequirements for a Lift Plus Cruise Case Study\" (appendix tables 8.1\nand 8.2). Both transcribe the four state machines (lift mode, CR, DR,\nFCS): \"Upon\" transitions become trigger + NextTimepoint, and \"always if\npreBool(false, c) then r\" stays in the _pre form as continual +\nNextTimepoint. `within N ticks` lowers to F[0,N] unchanged, and xor is\nwritten !(a <-> b).\n\nkias and kgs are real-valued in the paper; here kias is threshold atoms\nkias_ge_N on a 10-knot grid, since every guard in the paper is a\nmultiple of 10 and the paper's witness traces land on the grid.\nKIAS_DERIVATIVE (|delta kias| <= 10 per tick) becomes one continual\nNextTimepoint requirement per level in each direction, and the\nlift_mode integer is four one-hot atoms lm_* with two non-weakenable\nguarantees for mutual exclusion and threshold monotonicity.\n\nlift-plus-cruise-mini is the REFSQ paper's section 4.2 set: 48\nguarantees, 20 outputs, no inputs, REACH_HOVER at 10 ticks, with kias\nfrom 30 to 120 knots and one band below. realize finds it\nUNREALIZABLE, matching the paper.\nfixes/paper-reach-hover-11.json raises REACH_HOVER to 11 ticks, the\npaper's own boundary, and realize confirms REALIZABLE.\n\nlift-plus-cruise-full is the technical report's complete set in the\nwind scenario of section 4.3: all six INIT_* guarantees, KIAS_0,\nKIAS_KGS_WIND_SPEED in place of KIAS_KGS, REACH_HOVER_16, and\nassumptions INIT_WIND_SPEED, WIND_SPEED_30, WIND_SPEED_DERIV (17\nassumptions, 59 guarantees, 8 inputs, 24 outputs). wind_speed is an\ninput on the same grid; kias reaches down to 0 with one band below;\nkgs = kias + wind_speed becomes outputs kgs_ge_20 and kgs_ge_30, each\na disjunction over wind levels, both needed because INIT_HOVER_MODE\ncompares kgs < 20 while the lift-mode guards use kgs <= 20.\nREACH_NOT_FCS_* and the _until stay forms are left out: the former is\nnever discussed in the text, and this grammar has no until timing (the\nreport calls the _until form equivalent). realize reproduces every\nclaim in section 4.3: |wind| <= 30 at 16 ticks UNREALIZABLE, the same\nwithout KIAS_0 REALIZABLE (backwards flight), |wind| <= 20 REALIZABLE\nat 13 ticks and UNREALIZABLE at 12. fixes/paper-wind-20.json is the\nreport's fix, tightening the wind assumption to |wind| <= 20 with 16\nticks kept.\n\nlint-ideals passes both ideals on all five checks. Neither example is\nregistered in scripts/run_experiments.py.",
+          "timestamp": "2026-09-15T14:36:49Z",
+          "url": "https://github.com/benmandrew/PEREDUR/commit/80c307937d5a0f9e0a5615010f956c09facc5aa1"
+        },
+        "date": 1789547372107,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "Copy formula - 8 variables",
+            "value": 4.044651371970208,
+            "unit": "ns/iter",
+            "extra": "iterations: 180021053\ncpu: 4.0444807141529155 ns\nthreads: 1"
+          },
+          {
+            "name": "Copy specification - 3-guarantee takeoff spec",
+            "value": 64.32575664796047,
+            "unit": "ns/iter",
+            "extra": "iterations: 9471776\ncpu: 64.31969199862836 ns\nthreads: 1"
+          },
+          {
+            "name": "Hash specification - 3-guarantee takeoff spec",
+            "value": 77.27184088750276,
+            "unit": "ns/iter",
+            "extra": "iterations: 8916911\ncpu: 77.26748422183424 ns\nthreads: 1"
+          },
+          {
+            "name": "Compare specifications - equal, distinct arenas",
+            "value": 39.888493649056194,
+            "unit": "ns/iter",
+            "extra": "iterations: 18542047\ncpu: 39.86979700784926 ns\nthreads: 1"
+          },
+          {
+            "name": "Syntactic similarity - small formulas (3 variables)",
+            "value": 275.10077537283837,
+            "unit": "ns/iter",
+            "extra": "iterations: 2554771\ncpu: 274.9787546515909 ns\nthreads: 1"
+          },
+          {
+            "name": "Syntactic similarity - large formulas (11 variables, O(n*m) shared_subformulae)",
+            "value": 1171.5283593317974,
+            "unit": "ns/iter",
+            "extra": "iterations: 592856\ncpu: 1171.4396109679249 ns\nthreads: 1"
+          },
+          {
+            "name": "Spec implication check - warm black cache",
+            "value": 324.15942401865595,
+            "unit": "ns/iter",
+            "extra": "iterations: 2118263\ncpu: 324.01116197563766 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:5",
+            "value": 111.7517562259578,
+            "unit": "ns/iter",
+            "extra": "iterations: 6261011\ncpu: 111.74288321806176 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:10",
+            "value": 124.30786913828386,
+            "unit": "ns/iter",
+            "extra": "iterations: 5566823\ncpu: 124.29897986697266 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:20",
+            "value": 140.03561628744163,
+            "unit": "ns/iter",
+            "extra": "iterations: 5119259\ncpu: 139.98402366436233 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:50",
+            "value": 168.50158756421803,
+            "unit": "ns/iter",
+            "extra": "iterations: 4158257\ncpu: 168.48071150965427 ns\nthreads: 1"
+          },
+          {
+            "name": "Mutate specification - 3-guarantee takeoff spec",
+            "value": 1797.2218505753442,
+            "unit": "ns/iter",
+            "extra": "iterations: 383578\ncpu: 1797.084796312616 ns\nthreads: 1"
           }
         ]
       }
