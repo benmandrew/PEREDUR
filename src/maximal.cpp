@@ -1,9 +1,12 @@
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <optional>
 #include <stdexcept>
@@ -19,6 +22,7 @@
 #include "driver_support.hpp"
 #include "filter/implication.hpp"
 #include "filter/implication_check.hpp"
+#include "filter/running_antichain.hpp"
 #include "fingerprint/lasso.hpp"
 #include "fingerprint/prefilter.hpp"
 #include "genetic/generation.hpp"
@@ -57,13 +61,17 @@ namespace {
 
 struct Args {
     std::vector<std::string> paths;
+    std::string curve_index;
     std::size_t jobs{0};
+    std::size_t wave{0};
     std::int64_t timeout_s{20};
 };
 
 void print_usage(const char* prog) {
     std::cerr
         << "Usage: " << prog << " <dir-or-file>... [--jobs N] [--timeout S]\n"
+        << "       " << prog
+        << " --curve F [--jobs N] [--wave W] [--timeout S]\n"
         << "\n"
         << "Reports the maximal subset of a set of specifications under the\n"
         << "implication order (A dominates B when A implies B and B does not\n"
@@ -73,10 +81,53 @@ void print_usage(const char* prog) {
         << "Directory arguments contribute every file of the chosen\n"
         << "extension in them, non-recursively.\n"
         << "\n"
+        << "  --curve F    Walk the accumulator index F in timestamp order\n"
+           "               and print the antichain's event log instead, one\n"
+           "               row per admission, drop and removal. Files\n"
+           "               resolve against F's own directory.\n"
         << "  --jobs N     Solver calls in flight (default: hardware "
            "concurrency).\n"
+        << "  --wave W     Arrivals scanned concurrently under --curve\n"
+           "               (default: twice the pool; 1 walks serially).\n"
         << "  --timeout S  Per-black-call budget in seconds (default: 20).\n"
         << "  --version    Print the git commit this binary was built from.\n";
+}
+
+enum class FlagStatus : std::uint8_t { NotAFlag, Consumed, Bad };
+
+// Consumes the value of a flag that takes one, or reports that @p arg is not
+// such a flag. Split out of parse_args, which the cognitive-complexity check
+// rejects once the flag table grows past a couple of entries.
+FlagStatus take_valued_flag(const std::string& arg, int& index, int argc,
+                            const char* const* argv, Args& args) {
+    static const std::array<const char*, 4> k_valued = {"--jobs", "--timeout",
+                                                        "--wave", "--curve"};
+    if (std::none_of(k_valued.begin(), k_valued.end(),
+                     [&arg](const char* name) { return arg == name; })) {
+        return FlagStatus::NotAFlag;
+    }
+    if (index + 1 >= argc || argv[index + 1] == nullptr) {
+        std::cerr << arg << " expects a value\n";
+        return FlagStatus::Bad;
+    }
+    const std::string value(argv[++index]);
+    if (arg == "--curve") {
+        args.curve_index = value;
+        return FlagStatus::Consumed;
+    }
+    const std::optional<std::size_t> count = parse_seed(value);
+    if (!count.has_value() || *count == 0) {
+        std::cerr << arg << " expects a positive integer\n";
+        return FlagStatus::Bad;
+    }
+    if (arg == "--jobs") {
+        args.jobs = *count;
+    } else if (arg == "--wave") {
+        args.wave = *count;
+    } else {
+        args.timeout_s = static_cast<std::int64_t>(*count);
+    }
+    return FlagStatus::Consumed;
 }
 
 // Hand-rolled rather than through find_unknown_arg and collect_argument_paths,
@@ -91,22 +142,11 @@ std::optional<Args> parse_args(int argc, const char* const* argv) {
             continue;
         }
         const std::string arg(argv[i]);
-        const bool is_jobs = arg == "--jobs";
-        if (is_jobs || arg == "--timeout") {
-            if (i + 1 >= argc || argv[i + 1] == nullptr) {
-                std::cerr << arg << " expects a value\n";
-                return std::nullopt;
-            }
-            const std::optional<std::size_t> value = parse_seed(argv[++i]);
-            if (!value.has_value() || *value == 0) {
-                std::cerr << arg << " expects a positive integer\n";
-                return std::nullopt;
-            }
-            if (is_jobs) {
-                args.jobs = *value;
-            } else {
-                args.timeout_s = static_cast<std::int64_t>(*value);
-            }
+        const FlagStatus status = take_valued_flag(arg, i, argc, argv, args);
+        if (status == FlagStatus::Bad) {
+            return std::nullopt;
+        }
+        if (status == FlagStatus::Consumed) {
             continue;
         }
         if (arg.rfind("--", 0) == 0) {
@@ -115,7 +155,13 @@ std::optional<Args> parse_args(int argc, const char* const* argv) {
         }
         args.paths.push_back(arg);
     }
-    if (args.paths.empty()) {
+    // Curve mode takes its files from the index, so a positional there names a
+    // set nothing reads; the batch mode has nothing to read without one.
+    if (args.curve_index.empty() == args.paths.empty()) {
+        std::cerr << (args.curve_index.empty()
+                          ? "expected a directory or file, or --curve\n"
+                          : "--curve takes its files from the index; drop the "
+                            "positional argument\n");
         return std::nullopt;
     }
     return args;
@@ -410,6 +456,189 @@ int run(const Args& args, SatisfiabilityChecker& checker) {
     return 0;
 }
 
+// One row of the accumulator's index.tsv: which file, and how many seconds into
+// the search the run passed it through the output gate. The generation column
+// sits between them and is not read here, the walk being over time.
+using IndexRow = std::pair<std::string, double>;
+
+std::optional<std::vector<IndexRow>> read_index(const std::string& path) {
+    std::ifstream index(path);
+    if (!index) {
+        std::cerr << path << ": cannot read index\n";
+        return std::nullopt;
+    }
+    std::vector<IndexRow> rows;
+    std::string line;
+    while (std::getline(index, line)) {
+        const std::size_t first = line.find('\t');
+        if (first == std::string::npos) {
+            continue;
+        }
+        const std::size_t second = line.find('\t', first + 1);
+        if (second == std::string::npos) {
+            // A run killed mid-append leaves a partial last row. Dropping it
+            // costs one candidate and keeps every row already flushed, which
+            // is the reason the index is written a row at a time.
+            continue;
+        }
+        double elapsed = 0.0;
+        try {
+            elapsed = std::stod(line.substr(second + 1));
+        } catch (const std::exception&) {
+            continue;  // The header, and any row whose time did not land.
+        }
+        rows.emplace_back(line.substr(0, first), elapsed);
+    }
+    return rows;
+}
+
+// The index names files the accumulator wrote, so their extension is the
+// format, as a directory's contents are for the batch mode.
+bool index_wants_tlsf(const std::vector<IndexRow>& rows) {
+    return std::any_of(rows.begin(), rows.end(), [](const IndexRow& row) {
+        return std::filesystem::path(row.first).extension() == ".tlsf";
+    });
+}
+
+const char* event_name(antichain::AntichainEvent event) {
+    switch (event) {
+        case antichain::AntichainEvent::Admit:
+            return "admit";
+        case antichain::AntichainEvent::Drop:
+            return "drop";
+        case antichain::AntichainEvent::Remove:
+            break;
+    }
+    return "remove";
+}
+
+// Walks the index in timestamp order and prints the antichain's event log.
+//
+// Every prefix's maximal set is recoverable from it: an admission adds, a
+// removal takes away, and both are permanent, so membership at an instant is
+// the admissions up to it less the removals up to it. That is what replaces
+// one batch sweep per time cut, each re-deciding pairs the previous cut had
+// already decided, in a fresh process with a cold solver cache.
+template <typename Spec>
+int run_curve(const Args& args, const std::vector<IndexRow>& index,
+              SatisfiabilityChecker& checker) {
+    const std::filesystem::path directory =
+        std::filesystem::path(args.curve_index).parent_path();
+    std::vector<antichain::Arrival<Spec>> arrivals;
+    arrivals.reserve(index.size());
+    std::size_t parse_failures = 0;
+    for (const auto& [name, elapsed] : index) {
+        const std::optional<std::string> contents =
+            read_file_contents((directory / name).string());
+        if (!contents.has_value()) {
+            std::cerr << name << ": cannot read file\n";
+            ++parse_failures;
+            continue;
+        }
+        try {
+            arrivals.push_back(
+                {name, elapsed, SpecOps<Spec>::parse(*contents)});
+        } catch (const std::exception& exc) {
+            std::cerr << name << ": " << exc.what() << "\n";
+            ++parse_failures;
+        }
+    }
+    if (arrivals.empty()) {
+        std::cerr << "no specifications parsed\n";
+        return 1;
+    }
+    // Stable, so candidates sharing a timestamp keep the order the run found
+    // them in and the walk stays a function of the index alone.
+    std::stable_sort(arrivals.begin(), arrivals.end(),
+                     [](const antichain::Arrival<Spec>& left,
+                        const antichain::Arrival<Spec>& right) {
+                         return left.m_elapsed_s < right.m_elapsed_s;
+                     });
+
+    // Written as the walk produces it rather than at the end, so a caller that
+    // kills this on a deadline keeps the prefix: the early cuts of a log-spaced
+    // curve are where its information is, and a hard run should yield a short
+    // curve rather than none.
+    antichain::AntichainStats stats;
+    std::cout << "elapsed_s\tfile\tevent\tn_maximal\n";
+    const std::vector<antichain::AntichainRow> rows =
+        antichain::running_antichain(
+            arrivals,
+            [&checker](const Spec& from, const Spec& dest) {
+                return SpecOps<Spec>::implies(from, dest, checker)
+                    .value_or(false);
+            },
+            args.wave,
+            [](std::size_t done, std::size_t total) {
+                std::cerr << "\r  arrivals " << done << "/" << total
+                          << std::flush;
+                std::cout << std::flush;
+            },
+            [](const antichain::AntichainRow& row) {
+                std::cout << std::fixed << std::setprecision(6)
+                          << row.m_elapsed_s << "\t" << row.m_name << "\t"
+                          << event_name(row.m_event) << "\t" << row.m_size
+                          << "\n";
+            },
+            &stats);
+    std::cout << std::flush;
+    std::cerr << "\n"
+              << "arrivals   " << arrivals.size() << "\n"
+              << "maximal    "
+              << antichain::members_at(rows, arrivals.back().m_elapsed_s).size()
+              << "\n"
+              << "queries    " << stats.m_solver_queries << "\n"
+              << "refuted    " << stats.m_refuted_directions << "\n"
+              << "shortcut   " << stats.m_short_circuited << "\n"
+              << "reconciled " << stats.m_reconciled_pairs << "\n";
+    if (parse_failures > 0) {
+        std::cerr << "unparsed   " << parse_failures << "\n";
+    }
+    return 0;
+}
+
+int run_curve(const Args& args, SatisfiabilityChecker& checker) {
+    const std::optional<std::vector<IndexRow>> index =
+        read_index(args.curve_index);
+    if (!index.has_value()) {
+        return 1;
+    }
+    return index_wants_tlsf(*index)
+               ? run_curve<tlsf::Specification>(args, *index, checker)
+               : run_curve<Specification>(args, *index, checker);
+}
+
+// Both settings are measured over this tool's own queries, whole-spec
+// implications of 1000-1600 characters. `ltlfilt --simplify` took 95.6% of
+// solver wall time (1153.7s against 52.9s for the decision itself) and a
+// 40-file batch went from 304s to 30s without it, with the same survivors;
+// without the pass the unsimplified query runs about 2x longer, so the 500ms
+// SPOT budget tuned for the search tips over under load and an undecided
+// `ExpectUnsat` query keeps both sides. Giving SPOT black's budget instead
+// restored agreement on 264 of 264 cut-values across a 10-run sample. The
+// FRETISH path takes the same two settings, which is what its own final
+// filters run under (src/repair/evolution.cpp). Its queries were per
+// requirement rather than whole-spec until ed5413f, and measured at 40
+// generations of 1000 the simplify pass was 59-61% of every ltlfilt exec a run
+// made even at that shape; it now asks the whole-spec query this paragraph
+// measures.
+SatisfiabilityChecker& configure_checker(const Args& args) {
+    Config cfg;
+    cfg.parallel = args.jobs;
+    cfg.black_timeout = std::chrono::milliseconds{args.timeout_s * 1000};
+    // Reached through check_satisfiability's simplification step, which decides
+    // the query outright whenever it folds to a constant. compare.cpp sizes it
+    // at 300 s off amba and documents why anything smaller silently changes the
+    // verdict rather than merely losing a simplification.
+    cfg.ltlfilt_timeout = std::chrono::milliseconds{300'000};
+    apply_tool_timeouts(cfg);
+    set_thread_pool_size(cfg.parallel);
+    SatisfiabilityChecker& checker = global_sat_checker();
+    checker.set_simplify(false);
+    checker.set_spot_budget(cfg.black_timeout);
+    return checker;
+}
+
 }  // namespace
 
 int main(int argc, const char* const argv[]) {
@@ -426,35 +655,10 @@ int main(int argc, const char* const argv[]) {
         return 1;
     }
     const Args& args = *maybe_args;
-
-    Config cfg;
-    cfg.parallel = args.jobs;
-    cfg.black_timeout = std::chrono::milliseconds{args.timeout_s * 1000};
-    // Reached through check_satisfiability's simplification step, which decides
-    // the query outright whenever it folds to a constant. compare.cpp sizes it
-    // at 300 s off amba and documents why anything smaller silently changes the
-    // verdict rather than merely losing a simplification.
-    cfg.ltlfilt_timeout = std::chrono::milliseconds{300'000};
-    apply_tool_timeouts(cfg);
-    set_thread_pool_size(cfg.parallel);
-    SatisfiabilityChecker& checker = global_sat_checker();
-    // Both measured over this tool's own queries, whole-spec implications of
-    // 1000-1600 characters. `ltlfilt --simplify` took 95.6% of solver wall
-    // time (1153.7s against 52.9s for the decision itself) and a 40-file batch
-    // went from 304s to 30s without it, with the same survivors; without the
-    // pass the unsimplified query runs about 2x longer, so the 500ms SPOT
-    // budget tuned for the search tips over under load and an undecided
-    // `ExpectUnsat` query keeps both sides. Giving SPOT black's budget instead
-    // restored agreement on 264 of 264 cut-values across a 10-run sample. The
-    // FRETISH path takes the same two settings, which is what its own final
-    // filters run under (src/repair/evolution.cpp). Its queries were per
-    // requirement rather than whole-spec until ed5413f, and measured at 40
-    // generations of 1000 the simplify pass was 59-61% of every ltlfilt exec a
-    // run made even at that shape; it now asks the whole-spec query this
-    // paragraph measures.
-    checker.set_simplify(false);
-    checker.set_spot_budget(cfg.black_timeout);
-
+    SatisfiabilityChecker& checker = configure_checker(args);
+    if (!args.curve_index.empty()) {
+        return run_curve(args, checker);
+    }
     return wants_tlsf(args.paths) ? run<tlsf::Specification>(args, checker)
                                   : run<Specification>(args, checker);
 }

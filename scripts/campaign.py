@@ -1892,7 +1892,19 @@ CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
 PHASE_KINDS = ("run", "score")
 RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts"}
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
-                     "compare_timeout", "deadline_s", "wall_cap_s")
+                     "compare_timeout", "deadline_s", "wall_cap_s",
+                     "maximality", "ideals", "epsilon",
+                     "fingerprint_words", "fingerprint_seed")
+# The two of those that are not counts. `maximality` says whether the
+# solver-bound implication sweep runs at all and `epsilon` is the list of
+# separation thresholds, empty for none; both reach the scorer as strings and
+# are checked against what it accepts rather than as positive integers.
+SCORE_CHOICE_KEYS = {"maximality": ("on", "off"), "ideals": ("on", "off")}
+SCORE_STRING_KEYS = ("epsilon",)
+# Zero is a seed like any other, so this one is bounded below at zero rather
+# than at one. Every other count here is a budget, where zero means nothing
+# runs.
+SCORE_NONNEGATIVE_KEYS = ("fingerprint_seed",)
 SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
                     *SCORE_BUDGET_KEYS}
 PHASE_KEYS = RUN_PHASE_KEYS | SCORE_PHASE_KEYS
@@ -2206,9 +2218,25 @@ def normalise_score_phase(phase: dict, where: str, profile,
         value = phase.get(key)
         if value is None:
             continue
-        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-            raise CampaignError(f"{where}: {key} must be a positive integer")
+        if key in SCORE_CHOICE_KEYS:
+            allowed = SCORE_CHOICE_KEYS[key]
+            if value not in allowed:
+                raise CampaignError(f"{where}: {key} must be one of "
+                                    f"{', '.join(allowed)}")
+        elif key in SCORE_STRING_KEYS:
+            if not isinstance(value, str):
+                raise CampaignError(f"{where}: {key} must be a string")
+        elif isinstance(value, bool) or not isinstance(value, int):
+            raise CampaignError(f"{where}: {key} must be an integer")
+        elif value < (0 if key in SCORE_NONNEGATIVE_KEYS else 1):
+            raise CampaignError(
+                f"{where}: {key} must be a "
+                f"{'non-negative' if key in SCORE_NONNEGATIVE_KEYS else 'positive'}"
+                f" integer")
         budgets[key] = value
+    if budgets["maximality"] == "off" and not budgets["epsilon"]:
+        raise CampaignError(f"{where}: maximality is off and epsilon is "
+                            f"empty, so this phase would score nothing")
     if "wall_cap_s" not in budgets:
         import score_campaign  # noqa: PLC0415
         budgets["wall_cap_s"] = score_campaign.wall_cap_default(
@@ -2325,8 +2353,16 @@ def score_phase_args(phase: dict, seeds: list) -> list:
     writes on the host records the declaration's values.
     """
     args = ["--results", phase["results"], "--out", phase["out"]]
+    # A phase record built before a budget key existed carries none, so each
+    # falls back to the scorer's own default rather than raising: the archived
+    # declarations predate every key added since, and a resumed queue entry is
+    # one of those records.
+    defaults = score_defaults()
     for key in SCORE_BUDGET_KEYS:
-        args += [f"--{key.replace('_', '-')}", str(phase[key])]
+        value = phase.get(key, defaults.get(key))
+        if value is None:
+            continue
+        args += [f"--{key.replace('_', '-')}", str(value)]
     return args + ["--seeds", *[str(s) for s in seeds]]
 
 

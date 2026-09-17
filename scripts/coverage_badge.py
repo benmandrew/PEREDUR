@@ -41,6 +41,7 @@ PROFDATA = BUILD / "coverage.profdata"
 BINARIES = (
     "peredur",
     "compare",
+    "fingerprint",
     "lint-ideals",
     "ltl",
     "mucs",

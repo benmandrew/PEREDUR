@@ -11,6 +11,12 @@ them scalars:
     ideal_solutions         -- of those, ones at least as strong as an ideal
     maximal_solutions       -- the maximal antichain of the set found by time t
     maximal_ideal_solutions -- of those survivors, the ideal-implying ones
+    eps_solutions_<e>       -- of the candidates found by time t, the largest
+                               greedy subset no two of which agree on more
+                               than 1 - e of the sampled behaviours
+    eps_maximal_solutions_<e> -- the same net over the maximal antichain
+                               rather than over every candidate, so it counts
+                               repairs that are both maximal and distinct
     time_to_first_repair       (scalar)
     time_to_first_ideal_repair (scalar)
 
@@ -29,11 +35,35 @@ invocation covers the whole accumulated directory, its per-repair lines joining
 back to the index by file name -- `compare` is quadratic in repairs x ideals,
 so one call per file would cost the run over again.
 
+The epsilon half is behind --epsilon and is off by default. It reads the
+`fingerprint` binary's bit per sampled lasso word, so its distance between two
+candidates estimates the measure of their symmetric difference, and separates
+a set of near-duplicates from a set of genuinely different repairs -- which
+maximality cannot, an antichain being defined by an implication test that no
+two of its members pass. It runs over every accumulated candidate rather than
+over the maximal set, so it costs one `fingerprint` call a run and no solver
+call at all, and both tools' candidates are measured by the same sampling
+rather than through implication checks whose timeouts differ between them.
+
+Membership is written, not just counted. `<out>` names a CSV of the curve
+counts; beside it go `<stem>.members.tsv`, one row per (cut, surviving file),
+and `<stem>.fingerprints.tsv`, one row per candidate and its bit vector. The
+counts alone answer one question and no other: which repairs were maximal at
+60 s, whether the antichain churns or accretes, and the net at an epsilon
+nobody chose in advance all need the sweep run again, which cost 311.7
+worker-hours over this campaign in 2026-09-07. The two sidecars are a third
+the size of the curve file that replaced them -- the long format repeats eight
+run-identifying columns on every row, where a member is a name -- and they
+make every one of those questions arithmetic.
+
 The maximality half is a separate stage behind --maximality, off by default. It
 is computed offline, after and apart from the timed run, and must never be read
-as part of it. Its cost is why: `maximal` is a pairwise implication sweep that
-has taken 19 GB on this corpus, so it runs at a bounded number of time cuts
-(default 20, log-spaced) rather than at every candidate.
+as part of it. It is one `maximal --curve` walk a run: the binary keeps a
+running maximal antichain over the index in timestamp order and prints an event
+log, and every cut's membership is replayed from that log rather than costing a
+sweep of its own. The rows are still reported at a bounded number of time cuts
+(default 20, log-spaced), the curve file being long-format and one row per
+candidate being 20x the rows for a shape the cuts already carry.
 
 Usage:
     python scripts/score_curves.py <run-dir>...              # long CSV
@@ -49,6 +79,7 @@ being silently read as an instantaneous one.
 """
 
 import argparse
+import bisect
 import csv
 import json
 import math
@@ -71,6 +102,8 @@ from run_experiments import (  # noqa: E402
 # release build can point at another checkout's.
 MAXIMAL_BIN = Path(os.environ.get("MAXIMAL_BIN",
                                   REPO_ROOT / "build-release" / "maximal"))
+FINGERPRINT_BIN = Path(os.environ.get(
+    "FINGERPRINT_BIN", REPO_ROOT / "build-release" / "fingerprint"))
 
 ACCUMULATED_DIR = "accumulated"
 INDEX_NAME = "index.tsv"
@@ -86,8 +119,6 @@ RELATION_LINE = re.compile(
     r"^(\S+)\s+:\s+"
     r"(equivalent|strictly stronger|strictly weaker|incomparable|timeout)"
 )
-MAXIMAL_SURVIVOR_LINE = re.compile(r"^class\s+\d+\s+(.+?)(?:\s+\(\+\d+ identical\))?$")
-
 CURVE_METRICS = ("solutions", "ideal_solutions",
                  "maximal_solutions", "maximal_ideal_solutions")
 SCALAR_METRICS = ("time_to_first_repair", "time_to_first_ideal_repair")
@@ -238,48 +269,6 @@ def compare_relations(repairs_dir: Path, ideals_dir: Path,
     return relations
 
 
-def maximal_over(files: list[Path], jobs: int | None,
-                 timeout_s: int) -> set[str] | None:
-    """Return the file names surviving the implication filter over `files`.
-
-    `maximal` collapses structural duplicates and prints one line per survivor
-    naming the first file of each, so the survivors are distinct specifications
-    — which is what both maximality metrics count.
-
-    The wall bound is what `compare_relations` beside it always had and this
-    did not. `maximal` bounds each black call at 20 seconds of its own accord,
-    but a batch of 169 files is 14,196 pairs decided in both directions, so
-    28,392 calls at that budget leave 39 hours of headroom on four jobs and
-    nothing capped the total. One humanoid-531 batch ran for 17.6 hours and
-    eight workers a host returned nothing in thirteen. Abandoning the cut
-    instead costs that cut alone: the caller keeps the survivors and the
-    consumed index from the last cut that succeeded, so the run goes on and
-    yields the cuts it can decide.
-    """
-    if not files:
-        return set()
-    command = [str(MAXIMAL_BIN)] + [str(path) for path in files]
-    if jobs:
-        command += ["--jobs", str(jobs)]
-    try:
-        result = subprocess.run(command, check=True, timeout=timeout_s,
-                                capture_output=True, text=True)
-    except subprocess.TimeoutExpired:
-        print(f"WARN: maximal exceeded {timeout_s}s over {len(files)} file(s); "
-              f"this cut is skipped", file=sys.stderr)
-        return None
-    except (OSError, subprocess.CalledProcessError) as exc:
-        print(f"WARN: maximal failed over {len(files)} file(s) — {exc}",
-              file=sys.stderr)
-        return None
-    survivors = set()
-    for line in result.stdout.splitlines():
-        match = MAXIMAL_SURVIVOR_LINE.match(line.strip())
-        if match:
-            survivors.add(Path(match.group(1)).name)
-    return survivors
-
-
 def time_cuts(times: list[float], n_cuts: int) -> list[float]:
     """Return at most `n_cuts` log-spaced cut times covering `times`.
 
@@ -341,82 +330,262 @@ def scalar_row(base: dict, metric: str, moment: float | None,
             "censored": "" if not known else int(moment is None)}
 
 
+def antichain_walk(accumulated: Path, jobs: int | None,
+                   timeout_s: int) -> list[tuple[float, str, str]] | None:
+    """Return `maximal --curve`'s event log over the accumulator index.
+
+    Each row is (elapsed_s, file, event) with event one of admit, drop and
+    remove. The walk keeps a running maximal antichain and compares each
+    arrival against that antichain alone, so it is O(n * |antichain|) rather
+    than O(n * |prefix|), and one process answers every cut rather than one
+    process per cut re-deciding pairs its predecessor had already decided from
+    a cold solver cache.
+
+    A timeout keeps whatever the walk had already printed. The binary flushes
+    per wave for exactly that reason, and the log is a prefix of the walk, so
+    the cuts it covers are the early ones -- which is where an anytime curve
+    carries its information.
+    """
+    index = accumulated / INDEX_NAME
+    command = [str(MAXIMAL_BIN), "--curve", str(index)]
+    if jobs:
+        command += ["--jobs", str(jobs)]
+    text = ""
+    try:
+        text = subprocess.run(command, check=True, timeout=timeout_s,
+                              capture_output=True, text=True).stdout
+    except subprocess.TimeoutExpired as exc:
+        text = (exc.stdout or b"").decode() if isinstance(exc.stdout, bytes) \
+            else (exc.stdout or "")
+        print(f"WARN: the antichain walk exceeded {timeout_s}s; keeping the "
+              f"{len(text.splitlines())} row(s) it had written",
+              file=sys.stderr)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"WARN: the antichain walk failed — {exc}", file=sys.stderr)
+        return None
+    rows: list[tuple[float, str, str]] = []
+    for line in text.splitlines():
+        fields = line.split("\t")
+        if len(fields) != 4 or fields[0] == "elapsed_s":
+            continue
+        try:
+            rows.append((float(fields[0]), fields[1], fields[2]))
+        except ValueError:
+            continue
+    return rows
+
+
+def membership_at_cuts(log: list[tuple[float, str, str]],
+                       cuts: list[float]) -> list[list[str]]:
+    """The antichain's members at each of `cuts`, in admission order.
+
+    One pass over the log for all the cuts, which the log's ordering allows: it
+    is non-decreasing in time, and an admission and a removal are both
+    permanent. A specification some member dominates stays dominated by
+    whatever later dominates that member, implication being transitive, so
+    membership at an instant is the admissions up to it less the removals up to
+    it and nothing has to be re-derived.
+    """
+    admitted: list[str] = []
+    present: set[str] = set()
+    out: list[list[str]] = []
+    position = 0
+    for cut in cuts:
+        while position < len(log) and log[position][0] <= cut:
+            _, name, event = log[position]
+            if event == "admit":
+                admitted.append(name)
+                present.add(name)
+            elif event == "remove":
+                present.discard(name)
+            position += 1
+        out.append([name for name in admitted if name in present])
+    return out
+
+
 def maximality_rows(base: dict, index: list[tuple[str, int, float]],
                     accumulated: Path, implying: set[str] | None,
                     n_cuts: int, jobs: int | None,
-                    timeout_s: int, deadline: float | None) -> list[dict]:
-    """Run `maximal` over prefixes of the accumulated set at bounded cuts.
+                    timeout_s: int, deadline: float | None,
+                    prints: dict[str, int] | None = None,
+                    epsilons: list[float] | None = None,
+                    n_words: int = 0,
+                    members: list[tuple[float, str]] | None = None
+                    ) -> list[dict]:
+    """Report the maximal antichain over prefixes of the accumulated set.
 
-    Each cut is given the previous cut's survivors plus the candidates that
-    arrived since, rather than the whole prefix again. That is sound because
-    domination is monotone under adding elements: if A was dominated by B in
-    the prefix at one cut, B is still present at the next, so A can never
-    re-enter the antichain. The maximal set of the whole prefix therefore
-    equals the maximal set of (previous survivors + new arrivals). Measured
-    over this campaign's 546,282 candidates it takes the pairwise sweep from
-    272.7M comparisons to 60.1M, 4.5x fewer, because a prefix of 186 is
-    replaced by a batch of about 40 survivors and the handful that are new.
+    One `maximal --curve` walk answers every cut. What it replaced was a
+    `maximal` process per cut over the previous cut's survivors plus the new
+    arrivals -- sound, because domination is monotone under adding elements,
+    and 4.5x cheaper than re-running the whole prefix, but still quadratic in
+    the surviving set at every cut and still starting each one with an empty
+    solver cache. The walk is quadratic in nothing: an arrival meets the
+    running antichain and no more of the prefix than that.
 
-    `maximal` quotients its survivors by mutual implication and names one
-    representative per class, so carrying representatives forward keeps the
-    class count. It cannot change the ideal count either: every member of a
-    class implies exactly the same ideals as its representative, implication
-    being transitive through the equivalence.
-
-    Cuts landing on the same prefix are skipped rather than recomputed, which
-    removes 29% of the invocations over this campaign for no change in output.
-
-    The cheaper algorithm this is still not: walk the set in timestamp order
-    keeping a running maximal antichain and compare each arrival against that
-    antichain alone, which is O(n * |antichain|). It needs a pairwise
-    implication oracle over two specification files, and no binary exposes one
-    -- `maximal` takes a whole set and reports its filter's verdict, not the
-    individual implications behind it.
+    The cuts are what they were, so the rows are what they were. Only their
+    derivation moved.
     """
     rows: list[dict] = []
+    epsilons = epsilons or []
+    prints = prints or {}
     by_time = sorted(index, key=lambda row: row[2])
-    survivors: set[str] = set()
+    cuts = time_cuts([row[2] for row in by_time], n_cuts)
+    # The deadline governs where there is one. `maximal_timeout` bounded one
+    # cut of twenty, so applying it to the whole walk would be a fivefold
+    # tightening of a budget nobody moved -- and the walk is the cheaper
+    # algorithm, so it would cut off runs the per-cut pass finished.
+    budget = timeout_s
+    if deadline is not None:
+        budget = max(1, int(deadline - time.monotonic()))
+    log = antichain_walk(accumulated, jobs, budget)
+    if log is None:
+        return rows
+    # A walk cut short covers the cuts up to its last row and no further, so
+    # the later ones are dropped rather than reported off a truncated log --
+    # which would read as an antichain that stopped growing.
+    covered = log[-1][0] if log else -1.0
+    cuts = [cut for cut in cuts if cut <= covered]
+    # A cut that adds no candidate to the prefix has the antichain the previous
+    # cut reported, so it carries no information and is not reported -- which is
+    # what the per-cut pass did, there by skipping an invocation and here by
+    # skipping a row. Emitting it instead would change the row set of every
+    # archived curve file for a value already in it.
+    ordered = [row[2] for row in by_time]
+    distinct: list[float] = []
     seen_prefix = -1
-    consumed = 0
-    for cut in time_cuts([row[2] for row in by_time], n_cuts):
-        # Stop adding cuts rather than being killed from outside holding
-        # nothing. The cuts are log-spaced, so the ones already computed are
-        # the early ones, which is where an anytime curve carries its
-        # information; a hard run yields a short curve instead of no curve.
-        if deadline is not None and time.monotonic() > deadline:
-            print(f"WARN: deadline reached after {len(rows) // 2} cut(s); "
-                  f"writing a partial curve", file=sys.stderr)
-            break
-        prefix = [row for row in by_time if row[2] <= cut]
-        if len(prefix) == seen_prefix:
+    for cut in cuts:
+        n_prefix = bisect.bisect_right(ordered, cut)
+        if n_prefix == seen_prefix:
             continue
-        seen_prefix = len(prefix)
-        batch = sorted(survivors) + [row[0] for row in prefix[consumed:]]
-        found = maximal_over([accumulated / name for name in batch],
-                             jobs, timeout_s)
-        if found is None:
-            # Stop, rather than try the next cut: nothing was consumed, so
-            # the next batch is this one plus more and cannot do better in
-            # the same budget. Continuing burned the whole deadline on cuts
-            # that all failed -- 752 of them over the matched campaign, 48%
-            # of its worker-hours, yielding no row.
-            break
-        survivors = found
-        consumed = len(prefix)
+        seen_prefix = n_prefix
+        distinct.append(cut)
+    cuts = distinct
+    for cut, survivors in zip(cuts, membership_at_cuts(log, cuts)):
+        present = set(survivors)
+        if members is not None:
+            members += [(cut, name) for name in survivors]
         rows.append({**base, "metric": "maximal_solutions",
                      "elapsed_s": f"{cut:.6f}", "value": len(survivors),
                      "censored": 0})
         rows.append({
             **base, "metric": "maximal_ideal_solutions",
             "elapsed_s": f"{cut:.6f}",
-            "value": "" if implying is None else len(survivors & implying),
+            "value": "" if implying is None else len(present & implying),
             "censored": "" if implying is None else 0,
         })
+        # The net over the survivors, in admission order -- which is discovery
+        # order among them -- so the representatives the greedy net keeps do
+        # not depend on the order anything happened to print them in.
+        if prints:
+            survivor_prints = [prints[name] for name in survivors
+                               if name in prints]
+            for epsilon in epsilons:
+                rows.append({
+                    **base, "metric": f"eps_maximal_solutions_{epsilon:g}",
+                    "elapsed_s": f"{cut:.6f}",
+                    "value": separated_count(survivor_prints,
+                                             int(epsilon * n_words)),
+                    "censored": 0})
     return rows
 
 
-def score_run(run_dir: Path, args, deadline: float | None = None) -> list[dict]:
-    """Return every long-format row for one run directory."""
+def comma_separated_fractions(text: str) -> list[float]:
+    """Parse `--epsilon 0.05,0.2` into a sorted list of fractions in [0, 1)."""
+    values = []
+    for piece in text.split(","):
+        try:
+            value = float(piece)
+        except ValueError as error:
+            raise argparse.ArgumentTypeError(
+                f"not a number: {piece}") from error
+        if not 0.0 <= value < 1.0:
+            raise argparse.ArgumentTypeError(
+                f"epsilon must be in [0, 1): {piece}")
+        values.append(value)
+    return sorted(set(values))
+
+
+def fingerprints_of(accumulated: Path, spec: str, n_words: int,
+                    seed: int) -> dict[str, int] | None:
+    """Return each accumulated candidate's fingerprint as an integer bit set.
+
+    The words are drawn over the family's *original* specification rather than
+    over each candidate's own signal list, so every candidate of a family --
+    and every candidate of the other tool's runs on that family -- is measured
+    against one word set. `fingerprint` derives the words from that file, the
+    count and the seed alone, so nothing has to travel between the hosts that
+    score the two sides.
+    """
+    signals = EXAMPLES_DIR / spec / "spec.tlsf"
+    if not signals.is_file():
+        print(f"WARN: no specification at {signals}", file=sys.stderr)
+        return None
+    command = [str(FINGERPRINT_BIN), "--signals", str(signals),
+               "--words", str(n_words), "--seed", str(seed), str(accumulated)]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True,
+                                check=False)
+    except OSError as error:
+        print(f"WARN: {FINGERPRINT_BIN}: {error}", file=sys.stderr)
+        return None
+    prints: dict[str, int] = {}
+    for line in result.stdout.splitlines():
+        name, _, digits = line.partition("\t")
+        if digits:
+            prints[name] = int(digits, 16)
+    # A non-zero status means some file failed, and the rows for the rest are
+    # still on stdout: a run keeps the curve its readable candidates support
+    # rather than losing it to one bad file, which is what the maximality
+    # stage does with a failed cut.
+    if result.returncode != 0:
+        print(f"WARN: fingerprint reported {result.returncode} on "
+              f"{accumulated}: {result.stderr.strip()}", file=sys.stderr)
+    return prints or None
+
+
+def separated_count(prints: list[int], threshold: int) -> int:
+    """The greedy epsilon-net over `prints`, in the order given.
+
+    Greedy rather than a maximum independent set, which is NP-hard and would
+    be a different number at every cut for no gain in what the curve says.
+    Discovery order makes the count non-decreasing as the prefix grows -- an
+    earlier candidate's admission never depends on a later one -- which is
+    what an anytime curve has to be.
+    """
+    kept: list[int] = []
+    for value in prints:
+        if all(bin(value ^ other).count("1") > threshold for other in kept):
+            kept.append(value)
+    return len(kept)
+
+
+def epsilon_rows(base: dict, index: list[tuple[str, int, float]],
+                 prints: dict[str, int], epsilons: list[float],
+                 n_words: int, n_cuts: int, end_s) -> list[dict]:
+    """One curve per epsilon, at the cuts the other curves use."""
+    by_time = sorted(index, key=lambda row: row[2])
+    ordered = [(row[2], prints[row[0]]) for row in by_time
+               if row[0] in prints]
+    rows: list[dict] = []
+    for epsilon in epsilons:
+        # Strictly greater than the threshold, so epsilon = 0 keeps one
+        # representative of each distinct fingerprint rather than all of them.
+        threshold = int(epsilon * n_words)
+        points: list[tuple[float, int]] = []
+        for cut in time_cuts([moment for moment, _ in ordered], n_cuts):
+            prefix = [value for moment, value in ordered if moment <= cut]
+            points.append((cut, separated_count(prefix, threshold)))
+        rows += curve_rows(base, f"eps_solutions_{epsilon:g}", points, end_s)
+    return rows
+
+
+def score_run(run_dir: Path, args, deadline: float | None = None,
+              sidecars: dict | None = None) -> list[dict]:
+    """Return every long-format row for one run directory.
+
+    `sidecars`, when given, is filled with the membership and fingerprint
+    tables the caller writes beside the CSV.
+    """
     manifest = read_manifest(run_dir)
     spec = spec_of(manifest, args.spec, run_dir)
     base = run_columns(manifest, spec, run_dir)
@@ -425,7 +594,16 @@ def score_run(run_dir: Path, args, deadline: float | None = None) -> list[dict]:
 
     ideals = Path(args.ideals) if args.ideals else EXAMPLES_DIR / spec / "fixes"
     implying: set[str] | None = None
-    if index and ideals.is_dir():
+    if getattr(args, "skip_ideals", False):
+        # Left unknown rather than empty, which is the same distinction the
+        # missing-ideals branch below draws: no candidate was found not to
+        # imply an ideal, the question was not asked. `compare` is quadratic
+        # in candidates times ideals and is 99% of an epsilon-only pass -- 7.2s
+        # of 7.3s on a 421-candidate run -- so a pass that wants the
+        # separation curves alone should not pay for a relation the
+        # maximality pass already recorded.
+        pass
+    elif index and ideals.is_dir():
         relations = compare_relations(accumulated, ideals, args.compare_timeout)
         if relations is not None:
             implying = {name for name, relation in relations.items()
@@ -452,10 +630,28 @@ def score_run(run_dir: Path, args, deadline: float | None = None) -> list[dict]:
     rows.append(scalar_row(base, "time_to_first_ideal_repair",
                            min(ideal_times) if ideal_times else None,
                            implying is not None))
+    # getattr rather than a plain attribute: score_run is called with an
+    # argument namespace of the caller's own making in the script tests, and a
+    # curve stage added later must not break one built before it existed.
+    epsilons = getattr(args, "epsilon", None)
+    n_words = getattr(args, "fingerprint_words", 256)
+    prints: dict[str, int] | None = None
+    if epsilons and index:
+        prints = fingerprints_of(accumulated, spec, n_words,
+                                 getattr(args, "fingerprint_seed", 0))
+    members: list[tuple[float, str]] = []
     if args.maximality and index:
         rows += maximality_rows(base, index, accumulated, implying,
                                 args.cuts, args.jobs, args.maximal_timeout,
-                                deadline)
+                                deadline, prints, epsilons or [], n_words,
+                                members)
+    if sidecars is not None:
+        sidecars["members"] = members
+        sidecars["fingerprints"] = prints or {}
+        sidecars["n_words"] = n_words
+    if epsilons and index and prints is not None:
+        rows += epsilon_rows(base, index, prints, epsilons, n_words,
+                             args.cuts, end_s)
     return rows
 
 
@@ -477,6 +673,44 @@ def summarise(rows: list[dict]) -> dict:
     return summary
 
 
+def sidecar_paths(out: Path) -> tuple[Path, Path]:
+    """The two membership files beside the curve CSV at @p out.
+
+    `.part` is stripped before the stem is taken, so a scorer writing
+    `<run>.csv.part` produces `<run>.members.tsv` rather than
+    `<run>.csv.members.tsv`; score_campaign.py renames all three together.
+    """
+    stem = out.name
+    for suffix in (".part", ".csv"):
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+    return (out.parent / f"{stem}.members.tsv",
+            out.parent / f"{stem}.fingerprints.tsv")
+
+
+def write_sidecars(out: Path, sidecars: dict) -> None:
+    """Write membership and fingerprints beside the curve CSV.
+
+    Written whenever the maximality stage ran and `--out` names a file, with
+    no flag of its own. A flag is how the last one went missing: the 2026-09-07
+    pass held every survivor set in memory and wrote only their sizes, so the
+    2026-09-09 question about them cost the whole pass again.
+    """
+    members_path, prints_path = sidecar_paths(out)
+    with open(members_path, "w", newline="") as handle:
+        handle.write("cut_s\tfile\n")
+        for cut, name in sidecars.get("members", []):
+            handle.write(f"{cut:.6f}\t{name}\n")
+    prints = sidecars.get("fingerprints") or {}
+    if not prints:
+        return
+    digits = max(1, (sidecars.get("n_words", 0) + 3) // 4)
+    with open(prints_path, "w", newline="") as handle:
+        handle.write("file\tfingerprint\n")
+        for name in sorted(prints):
+            handle.write(f"{name}\t{prints[name]:0{digits}x}\n")
+
+
 def write_csv(handle, fieldnames: list[str], rows: list[dict]) -> None:
     writer = csv.DictWriter(handle, fieldnames=fieldnames)
     writer.writeheader()
@@ -493,19 +727,32 @@ def main() -> int:
                         help="one row per run instead of the long format")
     parser.add_argument("--maximality", action="store_true",
                         help="also run the implication filter over time cuts")
+    parser.add_argument("--epsilon", type=comma_separated_fractions,
+                        default=[],
+                        help="comma-separated separation thresholds; each "
+                             "adds an eps_solutions_<e> curve over the "
+                             "accumulated candidates (default: none)")
+    parser.add_argument("--fingerprint-words", type=int, default=256,
+                        help="lasso words sampled per family for --epsilon "
+                             "(default: 256)")
+    parser.add_argument("--fingerprint-seed", type=int, default=0,
+                        help="word-sampling seed for --epsilon (default: 0)")
     parser.add_argument("--cuts", type=int, default=20,
                         help="time cuts for --maximality (default: 20)")
     parser.add_argument("--jobs", type=int, default=0,
                         help="solver calls in flight for maximal")
     parser.add_argument("--spec", help="override the family name and ideals")
     parser.add_argument("--ideals", help="override the ideals directory")
+    parser.add_argument("--skip-ideals", action="store_true",
+                        help="do not run compare; the ideal-implying metrics "
+                             "are written as unknown")
     parser.add_argument("--deadline-s", type=int, default=0,
-                        help="stop adding maximality cuts after this many "
-                             "seconds and write what was computed (0: no "
-                             "deadline)")
+                        help="budget for the antichain walk in seconds, in "
+                             "place of --maximal-timeout; the cuts the walk "
+                             "covered are written (0: no deadline)")
     parser.add_argument("--maximal-timeout", type=int, default=900,
-                        help="wall budget for one `maximal` call, per cut "
-                             "(default: 900)")
+                        help="wall budget for the antichain walk where no "
+                             "deadline is set (default: 900)")
     parser.add_argument("--compare-timeout", type=int,
                         default=COMPARE_TIMEOUT_S,
                         help="compare budget in seconds "
@@ -515,6 +762,8 @@ def main() -> int:
 
     if args.cuts < 1:
         parser.error("--cuts expects a positive integer")
+    if args.epsilon and args.fingerprint_words < 1:
+        parser.error("--fingerprint-words expects a positive integer")
 
     # The deadline is per run directory, not per invocation: the launcher
     # feeds one directory at a time, and a budget shared across many would
@@ -527,9 +776,16 @@ def main() -> int:
             continue
         deadline = (time.monotonic() + args.deadline_s
                     if args.deadline_s > 0 else None)
-        rows = score_run(run_dir, args, deadline)
+        sidecars: dict = {}
+        rows = score_run(run_dir, args, deadline, sidecars)
         long_rows += rows
         summaries.append(summarise(rows))
+        # One run directory per invocation is what the scorer does, so writing
+        # here rather than after the loop keeps a sidecar named for the run it
+        # describes. A multi-directory invocation writes the last one's, which
+        # is why score_campaign.py passes one at a time.
+        if args.out and args.maximality and sidecars.get("members"):
+            write_sidecars(args.out, sidecars)
 
     fields = SUMMARY_FIELDS if args.summary else CURVE_FIELDS
     rows = summaries if args.summary else long_rows

@@ -64,6 +64,10 @@ bool run_filter_suite(std::string_view suite_name) {
         run_implication_filter_tests();
         return true;
     }
+    if (suite_name == "running_antichain") {
+        run_running_antichain_tests();
+        return true;
+    }
     if (suite_name == "vacuity_filter") {
         run_vacuity_filter_tests();
         return true;
@@ -145,6 +149,10 @@ bool run_driver_suite(std::string_view suite_name) {
     }
     if (suite_name == "driver_maximal") {
         run_maximal_driver_tests();
+        return true;
+    }
+    if (suite_name == "driver_fingerprint") {
+        run_fingerprint_driver_tests();
         return true;
     }
     if (suite_name == "driver_lint_ideals") {
@@ -342,6 +350,7 @@ int main(int argc, const char* const argv[]) {
             run_status_tests();
             run_correctness_tests();
             run_implication_filter_tests();
+            run_running_antichain_tests();
             run_vacuity_filter_tests();
             run_well_separation_filter_tests();
             run_requirement_tests();
@@ -367,6 +376,7 @@ int main(int argc, const char* const argv[]) {
             run_mucs_driver_tests();
             run_compare_driver_tests();
             run_maximal_driver_tests();
+            run_fingerprint_driver_tests();
             run_lint_ideals_driver_tests();
             run_signal_tracer_driver_tests();
             // run_thread_pool_tests() is deliberately absent. It sizes the
