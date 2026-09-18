@@ -10,7 +10,9 @@
 
 #include "config.hpp"
 #include "dashboard.hpp"
+#include "filter/bloat.hpp"
 #include "filter/correctness.hpp"
+#include "filter/implication.hpp"
 #include "filter_report.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
@@ -36,17 +38,18 @@ std::vector<FilterFunctionT<Specification>> build_per_gen_filters(
     const Specification& spec) {
     const std::size_t max_in_flight = dispatch_window();
     std::vector<FilterFunctionT<Specification>> filters;
-    FilterFunctionT<Specification> dedup = tlsf_make_dedup_filter();
+    FilterFunctionT<Specification> dedup = make_dedup_filter<Specification>();
     filters.push_back(std::move(dedup));
-    FilterFunctionT<Specification> bloat = tlsf_make_bloat_cap_filter(spec);
+    FilterFunctionT<Specification> bloat = make_bloat_cap_filter(spec);
     filters.push_back(std::move(bloat));
     // From the shared table, as on the FRETISH path: a property enforced here
     // is enforced by the final gate and the input screen too, because all three
     // read the same rows.
     for (const CorrectnessCheckT<Specification>& check :
-         tlsf_correctness_checks(global_sat_checker(), global_real_checker())) {
+         correctness_checks<Specification>(global_sat_checker(),
+                                           global_real_checker())) {
         if (check.per_generation) {
-            filters.push_back(tlsf_make_predicate_filter(
+            filters.push_back(make_predicate_filter<Specification>(
                 check.name, check.admissible, max_in_flight));
         }
     }

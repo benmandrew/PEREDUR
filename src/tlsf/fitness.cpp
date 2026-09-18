@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "filter/well_separation.hpp"
 #include "fitness/semantic_similarity.hpp"
 #include "fitness/status.hpp"
 #include "guarantee_parts.hpp"
@@ -16,7 +17,6 @@
 #include "prop_formula/atoms.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
-#include "tlsf/filter.hpp"
 #include "tlsf/mucs.hpp"
 
 namespace {
@@ -228,7 +228,7 @@ double tlsf_status(const tlsf::Specification& spec, const Config& cfg,
                                subset.m_outputs,
                                tlsf::specification_sides(subset))
                            .value_or(false) &&
-                       !tlsf_is_not_well_separated(subset, real);
+                       !specification_is_not_well_separated(subset, real);
             },
             admission_order);
     }
@@ -241,7 +241,7 @@ double tlsf_status(const tlsf::Specification& spec, const Config& cfg,
                 .value_or(false);
         // Behind the realizability query, as on the FRETISH path: an
         // unrealizable candidate cannot be realizable for the wrong reason.
-        return realizable && !tlsf_is_not_well_separated(spec, real);
+        return realizable && !specification_is_not_well_separated(spec, real);
     });
 }
 
@@ -284,7 +284,7 @@ std::vector<std::size_t> tlsf_mrs_admission_order(
                            subset.to_ltl(), subset.m_inputs, subset.m_outputs,
                            tlsf::specification_sides(subset))
                        .value_or(false) &&
-                   !tlsf_is_not_well_separated(subset, real);
+                   !specification_is_not_well_separated(subset, real);
         });
 }
 

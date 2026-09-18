@@ -102,8 +102,8 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
     // separate screen -- extraction leaves the environment side untouched, and
     // well-separation reads only that side.
     std::cerr << screen_input(
-        original,
-        tlsf_correctness_checks(global_sat_checker(), global_real_checker()));
+        original, correctness_checks<Specification>(global_sat_checker(),
+                                                    global_real_checker()));
     // After the input screen and before anything is scored: the query is
     // memoised, so this is the call the first scoring pass was about to make
     // anyway, timed.

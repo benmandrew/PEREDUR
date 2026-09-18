@@ -305,7 +305,8 @@ std::size_t lint_tlsf(const std::filesystem::path& dir,
         verdict.weakening = tlsf_spec_implies(spec, ideal, sat);
         verdict.realisable = real.check_realizability_ltl(
             ideal.to_ltl(), ideal.m_inputs, ideal.m_outputs);
-        const bool ill_separated = tlsf_is_not_well_separated(ideal, real);
+        const bool ill_separated =
+            specification_is_not_well_separated(ideal, real);
         verdict.separated = !ill_separated;
         verdict.nontrivial = !tlsf_has_valid_guarantee(ideal, sat);
         check_tlsf_reachable(spec, ideal, verdict);

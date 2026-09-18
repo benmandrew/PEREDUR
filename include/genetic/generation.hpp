@@ -114,23 +114,59 @@ using GenerationProgressCallback =
 /// A specification paired with its aggregated fitness score.
 using ScoredSpecification = Scored<Specification>;
 
-/// Wraps a per-element predicate as a population-level FilterFunction.
+/// Wraps a per-element predicate as a population-level filter, on either front
+/// end: `Spec` defaults to the FRETISH Specification, and a TLSF caller names
+/// tlsf::Specification.
 ///
 /// A predicate that shells out to a solver costs a whole subprocess per
 /// cache-missing candidate, and the miss rate rises with population diversity,
 /// so those filters should pass a max_in_flight above 1. Structural predicates
 /// are cheaper than a thread-pool dispatch and should leave it at the default.
-/// Either way the survivors and their order are identical.
+/// Either way the survivors and their order are identical: verdicts are
+/// collected by index and the survivors rebuilt in population order.
 ///
 /// @param name          Display name used in diagnostic output
 /// @param predicate     A predicate returning true for specifications to keep
 /// @param max_in_flight Concurrent predicate evaluations; 1 evaluates serially
 /// @param kind          Whether the fallback may re-admit this filter's rejects
-/// @return              A FilterFunction that applies the predicate
-/// element-wise
-FilterFunction make_predicate_filter(
-    std::string name, std::function<bool(const Specification&)> predicate,
-    std::size_t max_in_flight = 1, FilterKind kind = FilterKind::Correctness);
+/// @return              A filter that applies the predicate element-wise
+template <typename Spec = Specification, typename Predicate>
+FilterFunctionT<Spec> make_predicate_filter(
+    std::string name, Predicate predicate, std::size_t max_in_flight = 1,
+    FilterKind kind = FilterKind::Correctness) {
+    return {std::move(name),
+            [predicate = std::function<bool(const Spec&)>(std::move(predicate)),
+             max_in_flight](std::vector<Spec> pop) {
+                std::vector<Spec> survivors;
+                survivors.reserve(pop.size());
+                // Predicates draw no randomness, so running them concurrently
+                // leaves seed reproducibility unaffected.
+                std::vector<char> keep(pop.size(), 0);
+                if (max_in_flight <= 1) {
+                    for (std::size_t idx = 0; idx < pop.size(); ++idx) {
+                        keep[idx] = predicate(pop[idx]) ? 1 : 0;
+                    }
+                } else {
+                    run_bounded_async(
+                        pop.size(), max_in_flight,
+                        [&predicate, &pop](std::size_t idx) {
+                            return [&predicate, &spec = pop[idx]] {
+                                return predicate(spec);
+                            };
+                        },
+                        [&keep](std::size_t idx, bool verdict) {
+                            keep[idx] = verdict ? 1 : 0;
+                        });
+                }
+                for (std::size_t idx = 0; idx < pop.size(); ++idx) {
+                    if (keep[idx] != 0) {
+                        survivors.push_back(std::move(pop[idx]));
+                    }
+                }
+                return survivors;
+            },
+            kind};
+}
 
 /// An individual whose fitness scoring throws is dropped from the returned
 /// population rather than aborting the run (see

@@ -162,7 +162,8 @@ struct SpecOps<Specification> {
         // No original specification here -- `maximal` takes a bare directory of
         // repairs -- so an equivalence class collapses on operator< with no
         // similarity to rank it.
-        return make_implication_filter(checker, nullptr, on_progress);
+        return make_implication_filter<Specification>(checker, nullptr,
+                                                      on_progress);
     }
 };
 
@@ -189,7 +190,8 @@ struct SpecOps<tlsf::Specification> {
     static FilterFunctionT<tlsf::Specification> maximality_filter(
         SatisfiabilityChecker& checker,
         const GenerationProgressCallback& on_progress) {
-        return tlsf_make_implication_filter(checker, nullptr, on_progress);
+        return make_implication_filter<tlsf::Specification>(checker, nullptr,
+                                                            on_progress);
     }
 };
 

@@ -10,7 +10,7 @@ which for this query reads as "well-separated" — and the seed population is
 never filtered at all. So this script re-derives the query from the TLSF text
 and calls `ltlsynt` directly, with its own generous timeout and no cache.
 
-The query (mirroring `tlsf_make_well_separation_filter`, src/tlsf/filter.cpp):
+The query (mirroring `specification_is_not_well_separated`, src/filter/well_separation.cpp):
 
     assumption_ltl := conjunction of the non-empty terms
                       conj(INITIALLY), G(conj(REQUIRE)), conj(ASSUME)

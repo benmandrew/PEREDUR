@@ -2,7 +2,7 @@
 
 /// @file correctness.hpp
 /// @brief The correctness properties a written repair must hold, as one list
-///        per front end.
+///        shared by both front ends.
 
 #include <functional>
 #include <optional>
@@ -111,7 +111,12 @@ std::string screen_input(const Spec& spec,
     return {};
 }
 
-/// The FRETISH correctness checks, cheapest first.
+/// The correctness checks, cheapest first, in one order and under one set of
+/// names on both front ends: instantiated for Specification (the default) and
+/// tlsf::Specification, whose vacuity test is tlsf_is_vacuous. The table is
+/// read three ways -- the per-generation chain, the final gate, and the input
+/// screen -- which is why it is the single source rather than three
+/// hand-mirrored lists.
 ///
 /// `vacuity` leads: its syntactic screen costs nothing and its `black` queries
 /// are keyed per requirement, so a candidate bred from a scored parent pays
@@ -124,5 +129,6 @@ std::string screen_input(const Spec& spec,
 /// @param sat  Satisfiability checker (`black`); captured by reference into the
 ///             returned predicates and must outlive them
 /// @param real Realizability checker (`ltlsynt`); likewise
-std::vector<CorrectnessCheck> correctness_checks(SatisfiabilityChecker& sat,
-                                                 RealizabilityChecker& real);
+template <typename Spec = Specification>
+std::vector<CorrectnessCheckT<Spec>> correctness_checks(
+    SatisfiabilityChecker& sat, RealizabilityChecker& real);

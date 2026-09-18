@@ -98,11 +98,12 @@ void test_every_tlsf_correctness_stage_has_a_gate_check() {
            "correctness: the TLSF generation chain should run correctness "
            "stages");
     const std::vector<CorrectnessCheckT<tlsf::Specification>> checks =
-        tlsf_correctness_checks(global_sat_checker(), global_real_checker());
+        correctness_checks<tlsf::Specification>(global_sat_checker(),
+                                                global_real_checker());
     for (const std::string& stage : stages) {
         expect(has_check_named(checks, stage),
                "correctness: TLSF generation stage '" + stage +
-                   "' has no matching check in tlsf_correctness_checks");
+                   "' has no matching check in the TLSF correctness_checks");
     }
 }
 
@@ -113,7 +114,8 @@ void test_both_paths_name_the_same_checks_in_the_same_order() {
     const std::vector<CorrectnessCheck> fretish =
         correctness_checks(global_sat_checker(), global_real_checker());
     const std::vector<CorrectnessCheckT<tlsf::Specification>> tlsf_checks =
-        tlsf_correctness_checks(global_sat_checker(), global_real_checker());
+        correctness_checks<tlsf::Specification>(global_sat_checker(),
+                                                global_real_checker());
     expect(fretish.size() == tlsf_checks.size(),
            "correctness: both paths should carry the same number of checks");
     for (std::size_t idx = 0; idx < fretish.size(); ++idx) {
@@ -162,7 +164,8 @@ void test_gate_rejects_a_not_well_separated_specification() {
         "INPUTS { a; } OUTPUTS { b; } ASSUME { G b; } "
         "GUARANTEE { G (a -> b); }");
     const std::vector<CorrectnessCheckT<tlsf::Specification>> checks =
-        tlsf_correctness_checks(global_sat_checker(), global_real_checker());
+        correctness_checks<tlsf::Specification>(global_sat_checker(),
+                                                global_real_checker());
     const std::optional<std::string> failed = first_failing_check(spec, checks);
     expect(failed.has_value() && *failed == "not-well-separated",
            "correctness: a specification the system can satisfy by forcing its "
@@ -175,7 +178,8 @@ void test_gate_keeps_a_well_separated_specification() {
         "INPUTS { a; } OUTPUTS { b; } ASSUME { G F a; } "
         "GUARANTEE { G (a -> b); }");
     const std::vector<CorrectnessCheckT<tlsf::Specification>> checks =
-        tlsf_correctness_checks(global_sat_checker(), global_real_checker());
+        correctness_checks<tlsf::Specification>(global_sat_checker(),
+                                                global_real_checker());
     expect(!first_failing_check(spec, checks).has_value(),
            "correctness: a specification with an input-only assumption should "
            "pass every gate check");

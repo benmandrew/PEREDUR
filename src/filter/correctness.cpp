@@ -5,6 +5,20 @@
 
 #include "filter/vacuity.hpp"
 #include "filter/well_separation.hpp"
+#include "tlsf/filter.hpp"
+#include "tlsf/specification.hpp"
+
+namespace {
+
+bool is_vacuous(const Specification& spec, SatisfiabilityChecker& sat) {
+    return specification_is_vacuous(spec, sat);
+}
+
+bool is_vacuous(const tlsf::Specification& spec, SatisfiabilityChecker& sat) {
+    return tlsf_is_vacuous(spec, sat);
+}
+
+}  // namespace
 
 std::string input_screen_warning(const std::string& check_name) {
     return "warning: the input specification fails the " + check_name +
@@ -24,19 +38,25 @@ std::string input_screen_error_warning(const std::string& error) {
            "too.\n";
 }
 
-std::vector<CorrectnessCheck> correctness_checks(SatisfiabilityChecker& sat,
-                                                 RealizabilityChecker& real) {
-    std::vector<CorrectnessCheck> checks;
-    checks.push_back({"vacuity",
-                      [&sat](const Specification& spec) {
-                          return !specification_is_vacuous(spec, sat);
-                      },
-                      true});
+template <typename Spec>
+std::vector<CorrectnessCheckT<Spec>> correctness_checks(
+    SatisfiabilityChecker& sat, RealizabilityChecker& real) {
+    std::vector<CorrectnessCheckT<Spec>> checks;
+    checks.push_back(
+        {"vacuity", [&sat](const Spec& spec) { return !is_vacuous(spec, sat); },
+         true});
     checks.push_back({"not-well-separated",
-                      [&real](const Specification& spec) {
+                      [&real](const Spec& spec) {
                           return !specification_is_not_well_separated(spec,
                                                                       real);
                       },
                       false});
     return checks;
 }
+
+template std::vector<CorrectnessCheckT<Specification>>
+correctness_checks<Specification>(SatisfiabilityChecker&,
+                                  RealizabilityChecker&);
+template std::vector<CorrectnessCheckT<tlsf::Specification>>
+correctness_checks<tlsf::Specification>(SatisfiabilityChecker&,
+                                        RealizabilityChecker&);

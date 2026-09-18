@@ -11,6 +11,7 @@
 #include "bounded_async.hpp"
 #include "config.hpp"
 #include "filter/correctness.hpp"
+#include "filter/implication.hpp"
 #include "filter/streaming_maximal.hpp"
 #include "fingerprint/prefilter.hpp"
 #include "fitness/function.hpp"
@@ -32,7 +33,8 @@ namespace {
 // checkers, which outlive every caller.
 const std::vector<CorrectnessCheckT<Specification>>& gate_checks() {
     static const std::vector<CorrectnessCheckT<Specification>> checks =
-        tlsf_correctness_checks(global_sat_checker(), global_real_checker());
+        correctness_checks<Specification>(global_sat_checker(),
+                                          global_real_checker());
     return checks;
 }
 
@@ -182,8 +184,9 @@ std::vector<Scored<Specification>> keep_maximal(
     const Specification& original, const Config& cfg,
     SatisfiabilityChecker& checker) {
     const std::vector<Specification> specs = specifications_of(survivors);
-    const std::vector<Specification> maximal = tlsf_make_implication_filter(
-        checker, tlsf_syntactic_similarity_key(original, cfg))(specs);
+    const std::vector<Specification> maximal =
+        make_implication_filter<Specification>(
+            checker, syntactic_similarity_key(original, cfg))(specs);
     return keep_matching(survivors, maximal);
 }
 
@@ -201,7 +204,7 @@ std::unique_ptr<StreamingMaximalFilter<Specification>> make_maximal_stream(
                        SatisfiabilityChecker& checker) {
         return tlsf_spec_implies(lhs, rhs, checker).value_or(false);
     };
-    rules.similarity = tlsf_syntactic_similarity_key(original, cfg);
+    rules.similarity = syntactic_similarity_key(original, cfg);
     rules.fingerprints = [](const std::vector<Specification>& specs) {
         return fingerprint::prefilter::fingerprints_of(specs);
     };

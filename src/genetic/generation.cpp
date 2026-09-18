@@ -7,7 +7,6 @@
 #include <variant>
 #include <vector>
 
-#include "bounded_async.hpp"
 #include "filter/bloat.hpp"
 #include "filter/correctness.hpp"
 #include "filter/implication.hpp"
@@ -15,45 +14,6 @@
 #include "requirement.hpp"
 #include "runner/spot.hpp"
 #include "thread_pool.hpp"
-
-FilterFunction make_predicate_filter(
-    std::string name, std::function<bool(const Specification&)> predicate,
-    std::size_t max_in_flight, FilterKind kind) {
-    return {std::move(name),
-            [predicate = std::move(predicate),
-             max_in_flight](std::vector<Specification> pop) {
-                std::vector<Specification> survivors;
-                survivors.reserve(pop.size());
-                // Verdicts are collected by index and the survivors rebuilt in
-                // population order, so a parallel filter drops exactly the same
-                // candidates in the same order as a serial one. Predicates draw
-                // no randomness, so seed reproducibility is unaffected.
-                std::vector<char> keep(pop.size(), 0);
-                if (max_in_flight <= 1) {
-                    for (std::size_t idx = 0; idx < pop.size(); ++idx) {
-                        keep[idx] = predicate(pop[idx]) ? 1 : 0;
-                    }
-                } else {
-                    run_bounded_async(
-                        pop.size(), max_in_flight,
-                        [&predicate, &pop](std::size_t idx) {
-                            return [&predicate, &spec = pop[idx]] {
-                                return predicate(spec);
-                            };
-                        },
-                        [&keep](std::size_t idx, bool verdict) {
-                            keep[idx] = verdict ? 1 : 0;
-                        });
-                }
-                for (std::size_t idx = 0; idx < pop.size(); ++idx) {
-                    if (keep[idx] != 0) {
-                        survivors.push_back(std::move(pop[idx]));
-                    }
-                }
-                return survivors;
-            },
-            kind};
-}
 
 namespace {
 
