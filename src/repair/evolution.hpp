@@ -11,10 +11,10 @@
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/filter_report.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/pipeline.hpp"
 #include "genetic/random_source.hpp"
-#include "reports.hpp"
 #include "requirement.hpp"
 
 // The FRETISH search, from the seed population to the specifications written

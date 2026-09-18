@@ -11,9 +11,9 @@
 #include "config.hpp"
 #include "evolve.hpp"
 #include "filter/streaming_maximal.hpp"
-#include "filter_report.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/filter_report.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "runner/spot.hpp"
@@ -105,7 +105,7 @@ std::vector<Scored<Specification>> run_monolithic(
         realizable_survivors(population, cfg, fitness);
     survivors = merge_accumulated_survivors(
         std::move(survivors), accumulator.specifications(), cfg, fitness);
-    print_filter_report(filter_stats);
+    print_filter_report(filter_stats, EmptyFilterReport::Silent);
     return survivors;
 }
 
@@ -209,7 +209,7 @@ std::vector<Scored<Specification>> run_muc(
         current = passed.empty() ? rejoined.front().specification
                                  : passed.front().specification;
     }
-    print_filter_report(aggregate_stats);
+    print_filter_report(aggregate_stats, EmptyFilterReport::Silent);
     if (repairs.empty()) {
         // Nothing passed the gate through a core. An input that was realizable
         // to begin with reaches here, and is the run's answer if it passes.

@@ -13,7 +13,6 @@
 #include "filter/bloat.hpp"
 #include "filter/correctness.hpp"
 #include "filter/implication.hpp"
-#include "filter_report.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
 #include "genetic/generation.hpp"

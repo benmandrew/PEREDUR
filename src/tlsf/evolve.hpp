@@ -9,9 +9,9 @@
 
 #include "config.hpp"
 #include "dashboard.hpp"
-#include "filter_report.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/filter_report.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/pipeline.hpp"
 #include "genetic/random_source.hpp"

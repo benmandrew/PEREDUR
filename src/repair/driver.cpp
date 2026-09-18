@@ -20,6 +20,7 @@
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/filter_report.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/random_source.hpp"
 #include "manifest.hpp"
@@ -238,7 +239,7 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
                           maximal.size(), seconds_since(wall_start));
         filter_stats.insert(filter_stats.end(), final_filter_stats.begin(),
                             final_filter_stats.end());
-        print_filter_report(filter_stats);
+        print_filter_report(filter_stats, EmptyFilterReport::Heading);
         print_scoring_report();
         if (cfg.report_diagnostics) {
             print_diagnostics_report();
