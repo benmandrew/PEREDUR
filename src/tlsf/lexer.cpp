@@ -9,19 +9,11 @@
 #include <utility>
 #include <vector>
 
+#include "prop_formula/identifier.hpp"
+
 namespace tlsf::internal {
 
 namespace {
-
-bool is_ident_start(char character) {
-    return (std::isalpha(static_cast<unsigned char>(character)) != 0) ||
-           character == '_';
-}
-
-bool is_ident_char(char character) {
-    return (std::isalnum(static_cast<unsigned char>(character)) != 0) ||
-           character == '_';
-}
 
 struct SymbolEntry {
     std::string_view m_lexeme;
@@ -128,7 +120,7 @@ class Lexer {
             return {Tok::End, ""};
         }
         const char character = m_text[m_pos];
-        if (is_ident_start(character)) {
+        if (is_identifier_start(character)) {
             return lex_ident();
         }
         if (std::isdigit(static_cast<unsigned char>(character)) != 0) {
@@ -142,7 +134,7 @@ class Lexer {
 
     Token lex_ident() {
         const std::size_t start = m_pos;
-        while (m_pos < m_text.size() && is_ident_char(m_text[m_pos])) {
+        while (m_pos < m_text.size() && is_identifier_char(m_text[m_pos])) {
             ++m_pos;
         }
         return {Tok::Ident, m_text.substr(start, m_pos - start)};

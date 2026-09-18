@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "identifier.hpp"
 #include "internal.hpp"
 
 namespace {
@@ -154,8 +155,7 @@ class Parser {
             return m_nodes.size() - 1;
         }
         const char first = m_text[m_position];
-        if ((std::isalpha(static_cast<unsigned char>(first)) == 0) &&
-            first != '_') {
+        if (!is_identifier_start(first)) {
             m_failed = true;
         }
         std::string name;
@@ -163,8 +163,7 @@ class Parser {
         ++m_position;
         while (!at_end()) {
             const char character = m_text[m_position];
-            if ((std::isalnum(static_cast<unsigned char>(character)) != 0) ||
-                character == '_') {
+            if (is_identifier_char(character)) {
                 name.push_back(character);
                 ++m_position;
                 continue;
@@ -202,8 +201,7 @@ class Parser {
         const std::size_t after = m_position + token.size();
         if (after < m_text.size()) {
             const char next = m_text[after];
-            if ((std::isalnum(static_cast<unsigned char>(next)) != 0) ||
-                next == '_') {
+            if (is_identifier_char(next)) {
                 return false;
             }
         }

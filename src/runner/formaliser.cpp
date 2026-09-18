@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "posix/descriptors.hpp"
 #include "runner/process.hpp"
 #include "tool_paths.hpp"
 
@@ -101,30 +102,13 @@ void PersistentProcess::ensure_spawned() {
     m_spawned = true;
 }
 
-namespace {
-
-void write_all(int write_fd, const std::string& data) {
-    std::size_t written = 0;
-    while (written < data.size()) {
-        const ssize_t bytes_written =
-            write(write_fd, data.data() + written, data.size() - written);
-        if (bytes_written > 0) {
-            written += static_cast<std::size_t>(bytes_written);
-            continue;
-        }
-        if (bytes_written < 0 && errno == EINTR) {
-            continue;
-        }
-        throw std::runtime_error("failed to write to formaliser process stdin");
-    }
-}
-
-}  // namespace
-
 std::string PersistentProcess::request(const std::string& line) {
     assert(line.find('\n') == std::string::npos);
     ensure_spawned();
-    write_all(m_write_fd, line + "\n");
+    const std::string framed = line + "\n";
+    if (!write_all(m_write_fd, framed.data(), framed.size())) {
+        throw std::runtime_error("failed to write to formaliser process stdin");
+    }
 
     // Buffered line read: a single read() may return more or less than one
     // full line, so leftover bytes past the first '\n' are kept for the

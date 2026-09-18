@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
-#include <cctype>
 #include <chrono>
 #include <mutex>
 #include <optional>
@@ -17,15 +16,12 @@
 #include <vector>
 
 #include "formula_key.hpp"
+#include "prop_formula/identifier.hpp"
 #include "runner/ltlfilt.hpp"
 #include "runner/process.hpp"
 #include "tool_paths.hpp"
 
 namespace {
-
-bool is_identifier_char(char chr) {
-    return std::isalnum(static_cast<unsigned char>(chr)) != 0 || chr == '_';
-}
 
 // First-stage budget for the SPOT satisfiability query. Every one of the 5,579
 // queries taken from real runs was decided well inside it -- p99 15ms, max

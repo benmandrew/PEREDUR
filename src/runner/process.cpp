@@ -33,6 +33,7 @@
 #include <utility>
 #include <vector>
 
+#include "posix/descriptors.hpp"
 #include "profile.hpp"
 
 namespace {
@@ -295,27 +296,6 @@ class SpawnGuard {
     SpawnGuard(SpawnGuard&&) = delete;
     SpawnGuard& operator=(SpawnGuard&&) = delete;
 };
-
-// pipe2(O_CLOEXEC) where it exists; pipe plus FD_CLOEXEC where it does not.
-// The caller must hold a SpawnGuard across this and its own fork, which is
-// what makes the second form equivalent to the first.
-int make_cloexec_pipe(std::array<int, 2>& fds) {
-#ifdef __APPLE__
-    if (pipe(fds.data()) != 0) {
-        return -1;
-    }
-    for (const int pipe_fd : fds) {
-        if (fcntl(pipe_fd, F_SETFD, FD_CLOEXEC) != 0) {
-            close(fds[0]);
-            close(fds[1]);
-            return -1;
-        }
-    }
-    return 0;
-#else
-    return pipe2(fds.data(), O_CLOEXEC);
-#endif
-}
 
 #ifdef __APPLE__
 // Parent death, macOS side.

@@ -3,7 +3,6 @@
 #include <unistd.h>
 
 #include <atomic>
-#include <cctype>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -14,6 +13,7 @@
 
 #include "formula_key.hpp"
 #include "profile.hpp"
+#include "prop_formula/identifier.hpp"
 #include "runner/process.hpp"
 #include "runner/spot.hpp"
 
@@ -30,12 +30,6 @@ namespace {
 // degrade gracefully when they get no answer, so a bounded wait costs only the
 // wait itself.
 std::atomic<std::int64_t> g_ltlfilt_timeout_ms{10'000};
-
-// Whether `chr` can sit inside an atom name, and so cannot be an operator
-// boundary. Mirrors the identifier rule the propositional parser uses.
-bool is_identifier_char(char chr) {
-    return (std::isalnum(static_cast<unsigned char>(chr)) != 0) || chr == '_';
-}
 
 // Guards every mutable static in this file: both memo caches below and the
 // LtlfiltStats counters. One lock rather than one per cache, because the
