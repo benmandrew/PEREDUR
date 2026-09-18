@@ -6,14 +6,11 @@
 #include <filesystem>
 #include <iostream>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <system_error>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-#include <nlohmann/json.hpp>
 
 #include "config.hpp"
 #include "driver_support.hpp"
@@ -132,16 +129,8 @@ struct SpecOps<Specification> {
     static constexpr const char* k_extension = ".json";
     static constexpr const char* k_alphabet = "atom alphabets";
 
-    // load_specification reads the file itself, and this driver has already
-    // read it to report an unreadable one uniformly across the two formats, so
-    // the JSON half of that function is repeated here rather than the read.
     static Specification parse(const std::string& text) {
-        const nlohmann::json jobj = nlohmann::json::parse(text);
-        if (const std::optional<std::string> err =
-                validate_specification_json(jobj)) {
-            throw std::invalid_argument(*err);
-        }
-        return add_atom_prefix(jobj.get<Specification>());
+        return parse_specification_json(text);
     }
 
     static bool same_alphabet(const Specification& lhs,

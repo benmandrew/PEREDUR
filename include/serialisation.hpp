@@ -218,6 +218,26 @@ inline Requirement requirement_from_json(const nlohmann::json& jobj) {
         jobj.contains("scope") ? jobj.at("scope").get<Scope>() : Scope{});
 }
 
+}  // namespace serialisation
+
+inline void from_json(const nlohmann::json& jobj, Specification& spc) {
+    auto parse_reqs = [](const nlohmann::json& arr) {
+        std::vector<Requirement> reqs;
+        reqs.reserve(arr.size());
+        for (const auto& req_json : arr) {
+            reqs.push_back(serialisation::requirement_from_json(req_json));
+        }
+        return reqs;
+    };
+    spc = Specification(parse_reqs(jobj.at("assumptions")),
+                        parse_reqs(jobj.at("guarantees")),
+                        jobj.at("in_atoms").get<std::vector<std::string>>(),
+                        jobj.at("out_atoms").get<std::vector<std::string>>(),
+                        jobj.value("modes", std::vector<std::string>{}));
+}
+
+namespace serialisation {
+
 /// Per-component breakdown entry stored alongside a scored specification.
 struct ComponentScore {
     std::string name;
@@ -264,41 +284,13 @@ inline void to_json(nlohmann::json& jobj, const ScoredSpecification& ssc) {
 }
 
 inline void from_json(const nlohmann::json& jobj, ScoredSpecification& ssc) {
-    auto parse_reqs = [](const nlohmann::json& arr) {
-        std::vector<Requirement> reqs;
-        reqs.reserve(arr.size());
-        for (const auto& req_json : arr) {
-            reqs.push_back(requirement_from_json(req_json));
-        }
-        return reqs;
-    };
-    ssc.spec = Specification(
-        parse_reqs(jobj.at("assumptions")), parse_reqs(jobj.at("guarantees")),
-        jobj.at("in_atoms").get<std::vector<std::string>>(),
-        jobj.at("out_atoms").get<std::vector<std::string>>(),
-        jobj.value("modes", std::vector<std::string>{}));
+    ::from_json(jobj, ssc.spec);
     if (jobj.contains("fitness")) {
         ssc.fitness = jobj.at("fitness").get<FitnessRecord>();
     }
 }
 
 }  // namespace serialisation
-
-inline void from_json(const nlohmann::json& jobj, Specification& spc) {
-    auto parse_reqs = [](const nlohmann::json& arr) {
-        std::vector<Requirement> reqs;
-        reqs.reserve(arr.size());
-        for (const auto& req_json : arr) {
-            reqs.push_back(serialisation::requirement_from_json(req_json));
-        }
-        return reqs;
-    };
-    spc = Specification(parse_reqs(jobj.at("assumptions")),
-                        parse_reqs(jobj.at("guarantees")),
-                        jobj.at("in_atoms").get<std::vector<std::string>>(),
-                        jobj.at("out_atoms").get<std::vector<std::string>>(),
-                        jobj.value("modes", std::vector<std::string>{}));
-}
 
 namespace detail {
 
@@ -589,29 +581,21 @@ inline serialisation::ScoredSpecification load_scored_specification(
     }
 }
 
-/// Reads a JSON file at @p path and deserialises it as a Specification.
-/// Throws std::runtime_error on I/O failure, malformed JSON, or schema
-/// violations.
+/// Reads a JSON file at @p path and deserialises it as a Specification,
+/// discarding any fitness record. Throws as load_scored_specification does.
 inline Specification load_specification(const std::string& path) {
-    std::ifstream file(path);
-    if (!file) {
-        throw std::runtime_error("cannot open input file: " + path);
+    return load_scored_specification(path).spec;
+}
+
+/// Parses @p text as a Specification, for a caller that has read the file
+/// itself. Throws nlohmann::json::parse_error on malformed JSON,
+/// std::invalid_argument naming the first schema violation, and
+/// nlohmann::json::exception if deserialisation fails after validation.
+inline Specification parse_specification_json(const std::string& text) {
+    const nlohmann::json jobj = nlohmann::json::parse(text);
+    if (const std::optional<std::string> err =
+            validate_specification_json(jobj)) {
+        throw std::invalid_argument(*err);
     }
-    nlohmann::json json_in;
-    try {
-        file >> json_in;
-    } catch (const nlohmann::json::parse_error& exc) {
-        throw std::runtime_error("JSON parse error in " + path + ": " +
-                                 exc.what());
-    }
-    if (const auto err = validate_specification_json(json_in)) {
-        throw std::runtime_error("invalid specification in " + path + ": " +
-                                 *err);
-    }
-    try {
-        return add_atom_prefix(json_in.get<Specification>());
-    } catch (const nlohmann::json::exception& exc) {
-        throw std::runtime_error("invalid specification in " + path + ": " +
-                                 exc.what());
-    }
+    return add_atom_prefix(jobj.get<Specification>());
 }
