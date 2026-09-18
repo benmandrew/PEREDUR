@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "prop_formula.hpp"
+#include "slots.hpp"
 
 namespace {
 
@@ -136,28 +137,11 @@ Formula combine_subformula(const Formula& into, const Formula& from,
                          Formula::make_binary(kind, lhs, rhs));
 }
 
-// A conjunct crossover may rewrite: its section and its slot in it. Deleted
-// conjuncts are left out on both sides — a deleted conjunct is content its
-// parent has thrown away, so crossover neither breeds from it nor overwrites
-// it, and can therefore neither resurrect one nor delete a live one.
-struct Slot {
-    Section* m_section;
-    std::size_t m_index;
-    std::size_t m_section_index;
-};
-
-std::vector<Slot> live_slots(const std::array<Section*, 3>& sections) {
-    std::vector<Slot> slots;
-    for (std::size_t index = 0; index < sections.size(); ++index) {
-        Section* section = sections[index];
-        for (std::size_t i = 0; i < section->size(); ++i) {
-            if (!(*section)[i].m_removed) {
-                slots.push_back({section, i, index});
-            }
-        }
-    }
-    return slots;
-}
+// Deleted conjuncts are left out on both sides, so crossover neither breeds
+// from one nor overwrites one, and can therefore neither resurrect a deleted
+// conjunct nor delete a live one.
+using tlsf::internal::live_slots;
+using tlsf::internal::Slot;
 
 // Donors are collected per section rather than pooled, so a target can be
 // given the donors its own section admits. Index 0 is the initial-condition
