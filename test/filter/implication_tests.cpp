@@ -318,29 +318,9 @@ TEST(test_batched_merge_matches_one_sweep) {
 
 // --- StreamingMaximalFilter ---
 
-// A directory unique to this suite, removed on scope exit.
-class TempDir {
-   public:
-    TempDir()
-        : m_path(std::filesystem::temp_directory_path() /
-                 "peredur_streaming_maximal_tests") {
-        std::filesystem::remove_all(m_path);
-        std::filesystem::create_directories(m_path);
-    }
-    ~TempDir() { std::filesystem::remove_all(m_path); }
-
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-    TempDir(TempDir&&) = delete;
-    TempDir& operator=(TempDir&&) = delete;
-
-    [[nodiscard]] std::string listing() const {
-        return (m_path / "maximal.tsv").string();
-    }
-
-   private:
-    std::filesystem::path m_path;
-};
+std::string listing(const TempDir& dir) {
+    return (dir.path() / "maximal.tsv").string();
+}
 
 MaximalStreamRules<Specification> fretish_rules() {
     MaximalStreamRules<Specification> rules;
@@ -378,10 +358,10 @@ TEST(test_streaming_matches_batch_filter) {
     const std::vector<Specification> batch =
         make_implication_filter(checker)(specs);
 
-    const TempDir dir;
+    const TempDir dir("streaming_maximal_tests");
     const Config cfg;
     StreamingMaximalFilter<Specification> stream(cfg, fretish_rules(),
-                                                 dir.listing());
+                                                 listing(dir));
     for (std::size_t idx = 0; idx < specs.size(); ++idx) {
         stream.push(specs[idx], "r" + std::to_string(idx) + ".json");
     }
@@ -396,9 +376,9 @@ TEST(test_streaming_matches_batch_filter) {
     const MaximalStreamCounts& counts = stream.counts();
     expect(counts.n_pushed == 7 && counts.n_distinct == 6,
            "streaming_maximal: should count 7 pushed and 6 distinct");
-    expect(read_whole(dir.listing()) == "file\nr3.json\nr5.json\n",
+    expect(read_whole(listing(dir)) == "file\nr3.json\nr5.json\n",
            "streaming_maximal: the listing should name r3 and r5 alone");
-    expect(!std::filesystem::exists(dir.listing() + ".tmp"),
+    expect(!std::filesystem::exists(listing(dir) + ".tmp"),
            "streaming_maximal: no temporary listing should be left behind");
 }
 
@@ -414,13 +394,9 @@ TEST(test_streaming_rethrows_a_failed_check) {
     StreamingMaximalFilter<Specification> stream(cfg, std::move(rules), {});
     stream.push(make_spec({g_req("a")}), {});
     stream.push(make_spec({f_req("a")}), {});
-    bool threw = false;
-    try {
-        static_cast<void>(stream.finish());
-    } catch (const std::runtime_error&) {
-        threw = true;
-    }
-    expect(threw, "streaming_maximal: finish() should rethrow a failed check");
+    expect_throws<std::runtime_error>(
+        [&] { static_cast<void>(stream.finish()); },
+        "streaming_maximal: finish() should rethrow a failed check");
 }
 
 // Unwinding past an unfinished filter must not wait on the solver or hang.

@@ -1,7 +1,4 @@
-#include <unistd.h>
-
-#include <cstdio>
-#include <fstream>
+#include <filesystem>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -18,18 +15,6 @@
 namespace {
 
 constexpr std::string_view k_test_suite = "serialisation";
-
-std::string write_temp_spec(const std::string& contents) {
-    std::string path = "/tmp/peredur-spec-XXXXXX";
-    const int file_descriptor = mkstemp(path.data());
-    expect(file_descriptor >= 0,
-           "atom-prefix: failed to create temp spec file");
-    close(file_descriptor);
-    std::ofstream out(path);
-    expect(out.good(), "atom-prefix: failed to open temp spec file");
-    out << contents;
-    return path;
-}
 
 // out_atom "GF" is the formerly-dangerous case (lexed as G F operators);
 // "STATE_FAULT" is a benign uppercase name that used to only warn.
@@ -365,9 +350,9 @@ TEST(test_scored_specification_with_fitness) {
 }
 
 TEST(test_load_serialise_preserves_original_atom_names) {
-    const std::string path = write_temp_spec(k_atom_spec_json);
-    const Specification spec = load_specification(path);
-    std::remove(path.c_str());
+    const TempDir dir("serialisation");
+    const Specification spec = load_specification(
+        write_text(dir.path() / "spec.json", k_atom_spec_json).string());
     nlohmann::json jobj;
     to_json(jobj, spec);
     expect(jobj.dump().find("iap_") == std::string::npos,
@@ -380,9 +365,9 @@ TEST(test_load_serialise_preserves_original_atom_names) {
 }
 
 TEST(test_load_tags_atoms_internally) {
-    const std::string path = write_temp_spec(k_atom_spec_json);
-    const Specification spec = load_specification(path);
-    std::remove(path.c_str());
+    const TempDir dir("serialisation");
+    const Specification spec = load_specification(
+        write_text(dir.path() / "spec.json", k_atom_spec_json).string());
     expect(spec.m_in_atoms.size() == 1 && spec.m_in_atoms[0] == "iap_c",
            "atom-prefix: in-memory in_atom should carry the internal prefix");
     expect(spec.m_out_atoms.size() == 2 && spec.m_out_atoms[0] == "iap_GF" &&

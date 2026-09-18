@@ -68,16 +68,9 @@ TEST(test_semantics_variants) {
 }
 
 TEST(test_finite_rejected) {
-    bool threw = false;
-    try {
-        tlsf::parse(doc("GUARANTEE { g; }", "Mealy,finite"));
-    } catch (const std::invalid_argument& error) {
-        threw = true;
-        const std::string what = error.what();
-        expect(what.find("finite") != std::string::npos,
-               "semantics: finite rejection mentions finite");
-    }
-    expect(threw, "semantics: finite semantics is rejected");
+    expect_throws<std::invalid_argument>(
+        [&] { tlsf::parse(doc("GUARANTEE { g; }", "Mealy,finite")); },
+        "semantics: finite semantics is rejected", "finite");
 }
 
 TEST(test_all_sections_and_aliases) {
@@ -183,13 +176,8 @@ TEST(test_bounded_expansion) {
     expect(equiv(first("F[0..2] p"), "p | X p | X X p"), "bounded: F[0..2] p");
     expect(equiv(first("G[1..2] p"), "X p & X X p"), "bounded: G[1..2] p");
 
-    bool threw = false;
-    try {
-        first("F[0..65] p");
-    } catch (const std::invalid_argument&) {
-        threw = true;
-    }
-    expect(threw, "bounded: bound over 64 throws");
+    expect_throws<std::invalid_argument>([&] { first("F[0..65] p"); },
+                                         "bounded: bound over 64 throws");
 }
 
 TEST(test_comments_and_multistatement) {
@@ -205,16 +193,8 @@ TEST(test_comments_and_multistatement) {
 
 void expect_reject(const std::string& text, const std::string& mentions,
                    const std::string& msg) {
-    bool threw = false;
-    try {
-        tlsf::parse(text);
-    } catch (const std::invalid_argument& error) {
-        threw = true;
-        const std::string what = error.what();
-        expect(what.find(mentions) != std::string::npos,
-               msg + " (message mentions '" + mentions + "')");
-    }
-    expect(threw, msg);
+    expect_throws<std::invalid_argument>([&] { tlsf::parse(text); }, msg,
+                                         mentions);
 }
 
 TEST(test_error_cases) {
@@ -241,21 +221,13 @@ TEST(test_error_cases) {
                   "INVARIANT", "reject: non-standard singular INVARIANT");
 
     // Genuine syntax errors throw invalid_argument rather than crashing.
-    bool threw_missing_semi = false;
-    try {
-        tlsf::parse(doc("OUTPUTS { g; } GUARANTEE { g }"));
-    } catch (const std::invalid_argument&) {
-        threw_missing_semi = true;
-    }
-    expect(threw_missing_semi, "reject: missing ';' is a syntax error");
+    expect_throws<std::invalid_argument>(
+        [&] { tlsf::parse(doc("OUTPUTS { g; } GUARANTEE { g }")); },
+        "reject: missing ';' is a syntax error");
 
-    bool threw_garbage = false;
-    try {
-        tlsf::parse("not a tlsf file at all");
-    } catch (const std::invalid_argument&) {
-        threw_garbage = true;
-    }
-    expect(threw_garbage, "reject: garbage input throws, never crashes");
+    expect_throws<std::invalid_argument>(
+        [&] { tlsf::parse("not a tlsf file at all"); },
+        "reject: garbage input throws, never crashes");
 }
 
 TEST(test_to_ltl_standard_lowering) {

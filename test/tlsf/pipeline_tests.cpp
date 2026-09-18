@@ -4,7 +4,6 @@
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -80,20 +79,10 @@ TEST(test_arbiter_realizability) {
 // repair. gen5/pop50/bound3 at seed 0 is the smallest budget observed to
 // repair this fixture reliably across seeds.
 TEST(test_muc_repair_end_to_end) {
-    const std::filesystem::path dir =
-        std::filesystem::temp_directory_path() /
-        ("tlsf_muc_test_" +
-         std::to_string(std::hash<std::string>{}(std::string(k_unrealizable))));
-    std::error_code err_code;
-    std::filesystem::remove_all(dir, err_code);
-    expect(std::filesystem::create_directories(dir, err_code),
-           "muc: temp directory is created");
-
-    const std::filesystem::path input_path = dir / "spec.tlsf";
-    {
-        std::ofstream input(input_path);
-        input << k_unrealizable;
-    }
+    const TempDir temp_dir("tlsf_muc_test");
+    const std::filesystem::path& dir = temp_dir.path();
+    const std::filesystem::path input_path =
+        write_text(dir / "spec.tlsf", k_unrealizable);
 
     Config cfg;
     cfg.generations = 5;
@@ -123,25 +112,13 @@ TEST(test_muc_repair_end_to_end) {
         ++n_repairs;
     }
     expect(n_repairs >= 1, "muc: repair produced at least one realizable spec");
-
-    std::filesystem::remove_all(dir, err_code);
 }
 
 TEST(test_run_repair_end_to_end) {
-    const std::filesystem::path dir =
-        std::filesystem::temp_directory_path() /
-        ("tlsf_pipeline_test_" +
-         std::to_string(std::hash<std::string>{}(std::string(k_unrealizable))));
-    std::error_code err_code;
-    std::filesystem::remove_all(dir, err_code);
-    expect(std::filesystem::create_directories(dir, err_code),
-           "pipeline: temp directory is created");
-
-    const std::filesystem::path input_path = dir / "spec.tlsf";
-    {
-        std::ofstream input(input_path);
-        input << k_unrealizable;
-    }
+    const TempDir temp_dir("tlsf_pipeline_test");
+    const std::filesystem::path& dir = temp_dir.path();
+    const std::filesystem::path input_path =
+        write_text(dir / "spec.tlsf", k_unrealizable);
 
     Config cfg;
     cfg.generations = 2;
@@ -195,8 +172,6 @@ TEST(test_run_repair_end_to_end) {
                    "pipeline: each component has name, score, and weight");
         }
     }
-
-    std::filesystem::remove_all(dir, err_code);
 }
 
 }  // namespace

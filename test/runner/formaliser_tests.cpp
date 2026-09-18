@@ -90,15 +90,10 @@ TEST(test_unexpected_eof_throws) {
     // formaliser's write succeeds (the child is still starting up), but the
     // read that follows sees EOF instead of a response line.
     RequirementFormaliser formaliser({"/bin/sh", "-c", "read line; exit 0"});
-    bool threw = false;
-    try {
-        formaliser.formalise("anything");
-    } catch (const std::runtime_error&) {
-        threw = true;
-    }
-    expect(threw,
-           "formaliser: a process that closes stdout before responding "
-           "should surface as a thrown exception, not a hang");
+    expect_throws<std::runtime_error>(
+        [&] { formaliser.formalise("anything"); },
+        "formaliser: a process that closes stdout before responding "
+        "should surface as a thrown exception, not a hang");
 }
 
 }  // namespace

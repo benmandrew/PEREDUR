@@ -694,23 +694,25 @@ TEST(test_eventually_assumption_escapes_using_a_guarantee_tick_count) {
     cfg.p_timing = 1.0;
     cfg.p_add_assumption = 0.0;
     cfg.p_remove_guarantee = 0.0;
-    bool escaped = false;
-    for (std::size_t seed = 0; seed < 200 && !escaped; ++seed) {
-        const Timing mutated =
-            mutate_specification(spec, make_random_source_from_seed(seed), cfg)
-                .m_assumptions[0]
-                .m_timing;
-        const auto* for_ticks = std::get_if<timing::ForTicks>(&mutated);
-        if (for_ticks != nullptr) {
+    expect_some_seed(
+        200,
+        [&](std::size_t seed) {
+            const Timing mutated =
+                mutate_specification(spec, make_random_source_from_seed(seed),
+                                     cfg)
+                    .m_assumptions[0]
+                    .m_timing;
+            const auto* for_ticks = std::get_if<timing::ForTicks>(&mutated);
+            if (for_ticks == nullptr) {
+                return false;
+            }
             expect(
                 for_ticks->m_ticks == 6,
                 "pool: the only tick count in the spec is the guarantee's 6");
-            escaped = true;
-        }
-    }
-    expect(escaped,
-           "pool: an eventually assumption should be able to take the "
-           "guarantee's tick count as 'for 6 ticks'");
+            return true;
+        },
+        "pool: an eventually assumption should be able to take the "
+        "guarantee's tick count as 'for 6 ticks'");
 }
 
 // A specification containing no quantified timing anywhere donates nothing, so
@@ -844,17 +846,19 @@ TEST(test_add_assumption_can_reference_output) {
     Config cfg;
     cfg.p_add_assumption = 1.0;
     cfg.p_conditional_assumption = 0.5;
-    bool saw_output = false;
-    for (std::size_t seed = 0; seed < 200 && !saw_output; ++seed) {
-        const Specification result =
-            mutate_specification(spec, make_random_source_from_seed(seed), cfg);
-        const std::string ltl = result.m_assumptions.front().m_ltl;
-        saw_output = ltl.find('B') != std::string::npos ||
-                     ltl.find('D') != std::string::npos;
-    }
-    expect(saw_output,
-           "add-assumption: an added assumption can reference an output "
-           "atom");
+    expect_some_seed(
+        200,
+        [&](std::size_t seed) {
+            const std::string ltl =
+                mutate_specification(spec, make_random_source_from_seed(seed),
+                                     cfg)
+                    .m_assumptions.front()
+                    .m_ltl;
+            return ltl.find('B') != std::string::npos ||
+                   ltl.find('D') != std::string::npos;
+        },
+        "add-assumption: an added assumption can reference an output "
+        "atom");
 }
 
 // A rewrite draws from the same wider pool as the add, so an existing
@@ -872,17 +876,19 @@ TEST(test_assumption_rewrite_can_reference_output) {
     cfg.p_response = 1.0;
     cfg.p_trigger = 1.0;
     cfg.p_timing = 0.0;
-    bool saw_output = false;
-    for (std::size_t seed = 0; seed < 200 && !saw_output; ++seed) {
-        const Specification result =
-            mutate_specification(spec, make_random_source_from_seed(seed), cfg);
-        const std::string ltl = result.m_assumptions.front().m_ltl;
-        saw_output = ltl.find('B') != std::string::npos ||
-                     ltl.find('D') != std::string::npos;
-    }
-    expect(saw_output,
-           "assumption rewrite: a rewrite of an existing assumption can "
-           "introduce an output atom");
+    expect_some_seed(
+        200,
+        [&](std::size_t seed) {
+            const std::string ltl =
+                mutate_specification(spec, make_random_source_from_seed(seed),
+                                     cfg)
+                    .m_assumptions.front()
+                    .m_ltl;
+            return ltl.find('B') != std::string::npos ||
+                   ltl.find('D') != std::string::npos;
+        },
+        "assumption rewrite: a rewrite of an existing assumption can "
+        "introduce an output atom");
 }
 
 TEST(test_add_assumption_disabled_by_zero_probability) {

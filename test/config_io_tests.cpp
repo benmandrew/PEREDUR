@@ -128,39 +128,21 @@ generations = 5
 }
 
 TEST(test_config_io_missing_file_throws) {
-    bool threw = false;
-    try {
-        config_from_toml("/tmp/peredur_test_nonexistent_config.toml");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("does not exist") != std::string::npos,
-               "config_io: missing file error should mention 'does not exist'");
-    }
-    expect(threw, "config_io: missing file should throw");
+    expect_throws(
+        [&] { config_from_toml("/tmp/peredur_test_nonexistent_config.toml"); },
+        "config_io: missing file should throw", "does not exist");
 }
 
 TEST(test_config_io_invalid_toml_throws) {
-    bool threw = false;
-    try {
-        config_from_toml_string("this is not valid toml ===");
-    } catch (const std::exception&) {
-        threw = true;
-    }
-    expect(threw, "config_io: invalid TOML should throw");
+    expect_throws(
+        [&] { config_from_toml_string("this is not valid toml ==="); },
+        "config_io: invalid TOML should throw");
 }
 
 TEST(test_config_io_out_of_range_probability_throws) {
-    bool threw = false;
-    try {
-        config_from_toml_string("[mutation]\np_trigger = 1.5\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("p_trigger") != std::string::npos,
-               "config_io: out-of-range error should name the field");
-    }
-    expect(threw, "config_io: out-of-range probability should throw");
+    expect_throws(
+        [&] { config_from_toml_string("[mutation]\np_trigger = 1.5\n"); },
+        "config_io: out-of-range probability should throw", "p_trigger");
 }
 
 TEST(test_config_io_elitism_rate_parsed) {
@@ -171,18 +153,13 @@ TEST(test_config_io_elitism_rate_parsed) {
 }
 
 TEST(test_config_io_elitism_not_less_than_selection_throws) {
-    bool threw = false;
-    try {
-        config_from_toml_string(
-            "[genetic]\nselection_rate = 0.3\nelitism_rate = 0.3\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("elitism_rate") != std::string::npos,
-               "config_io: constraint error should name elitism_rate");
-    }
-    expect(threw,
-           "config_io: elitism_rate not less than selection_rate should throw");
+    expect_throws(
+        [&] {
+            config_from_toml_string(
+                "[genetic]\nselection_rate = 0.3\nelitism_rate = 0.3\n");
+        },
+        "config_io: elitism_rate not less than selection_rate should throw",
+        "elitism_rate");
 }
 
 // Pinned because the default is what an archived config inherits wherever it
@@ -229,13 +206,11 @@ TEST(test_config_io_status_grading_aurus_parsed) {
 }
 
 TEST(test_config_io_status_grading_rejects_unknown) {
-    bool threw = false;
-    try {
-        config_from_toml_string("[fitness]\nstatus_grading = \"greedy\"\n");
-    } catch (const std::exception&) {
-        threw = true;
-    }
-    expect(threw, "config_io: an unknown status_grading should be rejected");
+    expect_throws(
+        [&] {
+            config_from_toml_string("[fitness]\nstatus_grading = \"greedy\"\n");
+        },
+        "config_io: an unknown status_grading should be rejected");
 }
 
 TEST(test_config_io_mrs_admission_order_defaults_to_degree) {
@@ -260,15 +235,12 @@ TEST(test_config_io_mrs_admission_order_degree_parsed) {
 }
 
 TEST(test_config_io_mrs_admission_order_rejects_unknown) {
-    bool threw = false;
-    try {
-        config_from_toml_string(
-            "[fitness]\nmrs_admission_order = \"rotate\"\n");
-    } catch (const std::exception&) {
-        threw = true;
-    }
-    expect(threw,
-           "config_io: an unknown mrs_admission_order should be rejected");
+    expect_throws(
+        [&] {
+            config_from_toml_string(
+                "[fitness]\nmrs_admission_order = \"rotate\"\n");
+        },
+        "config_io: an unknown mrs_admission_order should be rejected");
 }
 
 // Pinned because every archived config omits these keys and inherits whatever
@@ -294,41 +266,28 @@ TEST(test_config_io_termination_individuals_parsed) {
 }
 
 TEST(test_config_io_termination_rejects_unknown) {
-    bool threw = false;
-    try {
-        config_from_toml_string("[genetic]\ntermination = \"wall\"\n");
-    } catch (const std::exception&) {
-        threw = true;
-    }
-    expect(threw, "config_io: an unknown termination mode should throw");
+    expect_throws(
+        [&] { config_from_toml_string("[genetic]\ntermination = \"wall\"\n"); },
+        "config_io: an unknown termination mode should throw");
 }
 
 // Rejected rather than read as unlimited: a run with no search budget is what
 // the other mode is for, so a zero here is a typo rather than an intent.
 TEST(test_config_io_individuals_without_a_cap_throws) {
-    bool threw = false;
-    try {
-        config_from_toml_string("[genetic]\ntermination = \"individuals\"\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("max_individuals") != std::string::npos,
-               "config_io: the message should name max_individuals");
-    }
-    expect(threw,
-           "config_io: termination = \"individuals\" with no cap should throw");
+    expect_throws(
+        [&] {
+            config_from_toml_string(
+                "[genetic]\ntermination = \"individuals\"\n");
+        },
+        "config_io: termination = \"individuals\" with no cap should throw",
+        "max_individuals");
 }
 
 TEST(test_config_io_negative_budgets_throw) {
     for (const char* toml : {"[genetic]\nmax_individuals = -1\n",
                              "[genetic]\nmax_wall_s = -1\n"}) {
-        bool threw = false;
-        try {
-            config_from_toml_string(toml);
-        } catch (const std::exception&) {
-            threw = true;
-        }
-        expect(threw, "config_io: a negative budget should throw");
+        expect_throws([&] { config_from_toml_string(toml); },
+                      "config_io: a negative budget should throw");
     }
 }
 
@@ -371,23 +330,18 @@ TEST(test_config_io_selection_scheme_nsga2_apportion_parsed) {
 // name: an archived config that sets one must fail loudly and say what to do,
 // not run silently under a scheme this binary no longer calls by that name.
 void expect_retired_spelling_rejected(const std::string& spelling) {
-    bool threw = false;
-    try {
-        config_from_toml_string("[genetic]\nselection_scheme = \"" + spelling +
-                                "\"\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find(spelling) != std::string::npos,
-               "config_io: the error should quote the retired spelling " +
-                   spelling);
-        expect(msg.find("PROVENANCE.json") != std::string::npos,
-               "config_io: the error should say how to reproduce an archived "
-               "campaign that sets " +
-                   spelling);
-    }
-    expect(threw, "config_io: the retired spelling " + spelling +
-                      " should be rejected, not aliased");
+    const std::string msg = expect_throws(
+        [&] {
+            config_from_toml_string("[genetic]\nselection_scheme = \"" +
+                                    spelling + "\"\n");
+        },
+        "config_io: the retired spelling " + spelling +
+            " should be rejected, not aliased",
+        spelling);
+    expect(msg.find("PROVENANCE.json") != std::string::npos,
+           "config_io: the error should say how to reproduce an archived "
+           "campaign that sets " +
+               spelling);
 }
 
 TEST(test_config_io_selection_scheme_retired_nsga2_rejected) {
@@ -399,17 +353,13 @@ TEST(test_config_io_selection_scheme_retired_replicate_rejected) {
 }
 
 TEST(test_config_io_selection_scheme_invalid_throws) {
-    bool threw = false;
-    try {
-        config_from_toml_string("[genetic]\nselection_scheme = \"pareto\"\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("selection_scheme") != std::string::npos,
-               "config_io: invalid selection_scheme error should name the "
-               "field");
-    }
-    expect(threw, "config_io: an unknown selection_scheme should throw");
+    expect_throws(
+        [&] {
+            config_from_toml_string(
+                "[genetic]\nselection_scheme = \"pareto\"\n");
+        },
+        "config_io: an unknown selection_scheme should throw",
+        "selection_scheme");
 }
 
 TEST(test_config_io_similarity_metric_defaults_to_logarithmic) {
@@ -433,16 +383,12 @@ TEST(test_config_io_similarity_metric_logarithmic_parsed) {
 }
 
 TEST(test_config_io_similarity_metric_invalid_throws) {
-    bool threw = false;
-    try {
-        config_from_toml_string("[model_counting]\nmetric = \"geometric\"\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("metric") != std::string::npos,
-               "config_io: invalid metric error should name the field");
-    }
-    expect(threw, "config_io: an unknown similarity metric should throw");
+    expect_throws(
+        [&] {
+            config_from_toml_string(
+                "[model_counting]\nmetric = \"geometric\"\n");
+        },
+        "config_io: an unknown similarity metric should throw", "metric");
 }
 
 TEST(test_config_io_empty_string_gives_defaults) {
@@ -475,16 +421,11 @@ TEST(test_config_io_repair_mode_monolithic_parsed) {
 }
 
 TEST(test_config_io_repair_mode_invalid_throws) {
-    bool threw = false;
-    try {
-        config_from_toml_string("[tlsf]\nrepair_mode = \"iterative\"\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("repair_mode") != std::string::npos,
-               "config_io: invalid repair_mode error should name the field");
-    }
-    expect(threw, "config_io: an unknown repair_mode should throw");
+    expect_throws(
+        [&] {
+            config_from_toml_string("[tlsf]\nrepair_mode = \"iterative\"\n");
+        },
+        "config_io: an unknown repair_mode should throw", "repair_mode");
 }
 
 TEST(test_config_io_muc_max_iterations_parsed) {
@@ -495,13 +436,9 @@ TEST(test_config_io_muc_max_iterations_parsed) {
 }
 
 TEST(test_config_io_muc_max_iterations_nonpositive_throws) {
-    bool threw = false;
-    try {
-        config_from_toml_string("[tlsf]\nmuc_max_iterations = 0\n");
-    } catch (const std::exception&) {
-        threw = true;
-    }
-    expect(threw, "config_io: muc_max_iterations = 0 should throw");
+    expect_throws(
+        [&] { config_from_toml_string("[tlsf]\nmuc_max_iterations = 0\n"); },
+        "config_io: muc_max_iterations = 0 should throw");
 }
 
 // Every key k_config_keys declares, none of which may warn "unknown key". A

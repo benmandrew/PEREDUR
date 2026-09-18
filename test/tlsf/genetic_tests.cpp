@@ -225,16 +225,16 @@ TEST(test_temporal_mutation_can_emit_an_implication) {
                           Formula::Kind::Implies),
            "implication draw: the input carries no implication to start with");
 
-    bool emitted = false;
-    for (std::size_t seed = 0; seed < 40 && !emitted; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        const tlsf::Specification mutated = tlsf_mutate(original, rng, cfg);
-        emitted = contains_kind(mutated.m_guarantee.front().m_formula,
-                                Formula::Kind::Implies);
-    }
-    expect(emitted,
-           "implication draw: the temporal mutation emits an implication for "
-           "at least one seed");
+    expect_some_seed(
+        40,
+        [&](std::size_t seed) {
+            const RandomSource rng = make_random_source_from_seed(seed);
+            const tlsf::Specification mutated = tlsf_mutate(original, rng, cfg);
+            return contains_kind(mutated.m_guarantee.front().m_formula,
+                                 Formula::Kind::Implies);
+        },
+        "implication draw: the temporal mutation emits an implication for "
+        "at least one seed");
 }
 
 // Case (2d) of mutate_temporal is the arm firing at an atom or a unary node.
@@ -262,19 +262,19 @@ Config connective_config() {
 TEST(test_connective_graft_can_emit_an_implication) {
     const Config cfg = connective_config();
     const tlsf::Specification original = connective_subject();
-    bool grafted = false;
-    for (std::size_t seed = 0; seed < 200 && !grafted; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        const tlsf::Specification mutated = tlsf_mutate(original, rng, cfg);
-        const Formula& formula = mutated.m_guarantee.front().m_formula;
-        const auto children = formula.binary_children();
-        grafted = formula.kind() == Formula::Kind::Implies &&
-                  children.has_value() &&
-                  children->first.kind() == Formula::Kind::Atom;
-    }
-    expect(grafted,
-           "connective draw: the case (2d) graft emits `anchor -> inner` for "
-           "at least one seed");
+    expect_some_seed(
+        200,
+        [&](std::size_t seed) {
+            const RandomSource rng = make_random_source_from_seed(seed);
+            const tlsf::Specification mutated = tlsf_mutate(original, rng, cfg);
+            const Formula& formula = mutated.m_guarantee.front().m_formula;
+            const auto children = formula.binary_children();
+            return formula.kind() == Formula::Kind::Implies &&
+                   children.has_value() &&
+                   children->first.kind() == Formula::Kind::Atom;
+        },
+        "connective draw: the case (2d) graft emits `anchor -> inner` for "
+        "at least one seed");
 }
 
 // An appended assumption is a fairness property `G F <input>`, or, under
@@ -477,18 +477,15 @@ TEST(test_assumption_rewrite_can_reference_output) {
     spec.m_assume = {Formula("a")};
     // No guarantee-side formulae, so every mutation falls to the assumption
     // side, whose atom pool includes the outputs.
-    bool saw_output = false;
-    for (std::size_t seed = 0; seed < 60; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        const tlsf::Specification mutated = tlsf_mutate(spec, rng, cfg);
-        if (mutated.m_assume.front().m_formula.to_string().find("bout") !=
-            std::string::npos) {
-            saw_output = true;
-        }
-    }
-    expect(saw_output,
-           "mutation: an assumption-side rewrite can introduce an output "
-           "atom");
+    expect_some_seed(
+        60,
+        [&](std::size_t seed) {
+            const RandomSource rng = make_random_source_from_seed(seed);
+            const tlsf::Specification mutated = tlsf_mutate(spec, rng, cfg);
+            return mutated.m_assume.front().m_formula.to_string().find(
+                       "bout") != std::string::npos;
+        },
+        "mutation: an assumption-side rewrite can introduce an output atom");
 }
 
 TEST(test_weak_until_over_output_is_reachable) {
@@ -510,24 +507,25 @@ TEST(test_weak_until_over_output_is_reachable) {
     seed_spec.m_assume = {parse("INPUTS { r; } OUTPUTS { g; } "
                                 "ASSUME { G (r -> F g); }")
                               .m_assume.front()};
-    bool reached = false;
-    for (std::size_t seed = 0; seed < 200 && !reached; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        tlsf::Specification current = seed_spec;
-        for (int step = 0; step < 6 && !reached; ++step) {
-            current = tlsf_mutate(current, rng, cfg);
-            for (const tlsf::SectionEntry& entry : current.m_assume) {
-                const std::string text = entry.m_formula.to_string();
-                if (text.find(") W (") != std::string::npos &&
-                    text.find('g') != std::string::npos) {
-                    reached = true;
+    expect_some_seed(
+        200,
+        [&](std::size_t seed) {
+            const RandomSource rng = make_random_source_from_seed(seed);
+            tlsf::Specification current = seed_spec;
+            for (int step = 0; step < 6; ++step) {
+                current = tlsf_mutate(current, rng, cfg);
+                for (const tlsf::SectionEntry& entry : current.m_assume) {
+                    const std::string text = entry.m_formula.to_string();
+                    if (text.find(") W (") != std::string::npos &&
+                        text.find('g') != std::string::npos) {
+                        return true;
+                    }
                 }
             }
-        }
-    }
-    expect(reached,
-           "mutation: a weak-until assumption over an output is reachable by "
-           "temporal mutation of a fairness assumption");
+            return false;
+        },
+        "mutation: a weak-until assumption over an output is reachable by "
+        "temporal mutation of a fairness assumption");
 }
 
 tlsf::Specification globally(const std::vector<std::string>& atoms) {

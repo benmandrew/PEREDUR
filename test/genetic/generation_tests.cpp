@@ -150,14 +150,9 @@ TEST(test_score_population_circuit_breaker_trips) {
                                                    "tool not found");
                                            },
                                            1.0, ""}});
-    bool threw = false;
-    try {
-        score_population(Config{}, pop, fns);
-    } catch (const std::runtime_error&) {
-        threw = true;
-    }
-    expect(threw,
-           "score_population: should abort when the whole generation fails");
+    expect_throws<std::runtime_error>(
+        [&] { score_population(Config{}, pop, fns); },
+        "score_population: should abort when the whole generation fails");
 }
 
 // --- make_predicate_filter / filter_population ---

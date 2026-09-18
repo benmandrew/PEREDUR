@@ -59,34 +59,12 @@ bool holds(const std::vector<Specification>& specs, const Specification& spec) {
         [&spec](const Specification& candidate) { return candidate == spec; });
 }
 
-// A directory unique to this suite, removed on scope exit so a failing test
-// cannot leave the next run reading files an earlier one wrote.
-class TempDir {
-   public:
-    TempDir()
-        : m_path(std::filesystem::temp_directory_path() /
-                 "peredur_accumulator_tests") {
-        std::filesystem::remove_all(m_path);
-        std::filesystem::create_directories(m_path);
-    }
-    ~TempDir() { std::filesystem::remove_all(m_path); }
-
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-    TempDir(TempDir&&) = delete;
-    TempDir& operator=(TempDir&&) = delete;
-
-    [[nodiscard]] std::string string() const { return m_path.string(); }
-    [[nodiscard]] std::filesystem::path accumulated() const {
-        return m_path / "accumulated";
-    }
-
-   private:
-    std::filesystem::path m_path;
-};
-
 // The FRETISH writer as the driver builds it: the serialiser repair_N.json
 // goes through, so a tombstoned guarantee is absent rather than flagged.
+std::filesystem::path accumulated_dir(const TempDir& dir) {
+    return dir.path() / "accumulated";
+}
+
 AccumulatedRepairWriter<Specification> json_writer(const TempDir& dir) {
     return {dir.string(), ".json", [](const Specification& spec) {
                 const nlohmann::json jobj = spec;
@@ -99,11 +77,11 @@ AccumulatedRepairWriter<Specification> json_writer(const TempDir& dir) {
 // too many; it has its own tests.
 std::vector<std::filesystem::path> written_files(const TempDir& dir) {
     std::vector<std::filesystem::path> paths;
-    if (!std::filesystem::exists(dir.accumulated())) {
+    if (!std::filesystem::exists(accumulated_dir(dir))) {
         return paths;
     }
     for (const auto& entry :
-         std::filesystem::directory_iterator(dir.accumulated())) {
+         std::filesystem::directory_iterator(accumulated_dir(dir))) {
         if (entry.path().filename() == "index.tsv") {
             continue;
         }
@@ -115,7 +93,7 @@ std::vector<std::filesystem::path> written_files(const TempDir& dir) {
 
 std::vector<std::string> index_rows(const TempDir& dir) {
     std::vector<std::string> rows;
-    std::ifstream file(dir.accumulated() / "index.tsv");
+    std::ifstream file(accumulated_dir(dir) / "index.tsv");
     for (std::string line; std::getline(file, line);) {
         rows.push_back(line);
     }
@@ -219,11 +197,11 @@ TEST(test_merge_reports_only_what_it_added) {
 // The key off must cost nothing on disk either: no directory, so nothing for a
 // campaign's output tree to grow that its configs never asked for.
 TEST(test_nothing_is_written_with_the_key_off) {
-    const TempDir dir;
+    const TempDir dir("accumulator_tests");
     RepairAccumulator<Specification> accumulator(false, json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
     accumulator.insert(make_spec("y"), 2);
-    expect(!std::filesystem::exists(dir.accumulated()),
+    expect(!std::filesystem::exists(accumulated_dir(dir)),
            "accumulator: the key off creates no accumulated directory");
 }
 
@@ -231,7 +209,7 @@ TEST(test_nothing_is_written_with_the_key_off) {
 // had already accumulated, so each specification is a closed file before the
 // next one is inserted.
 TEST(test_one_file_per_accumulated_specification) {
-    const TempDir dir;
+    const TempDir dir("accumulator_tests");
     RepairAccumulator<Specification> accumulator(true, json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
     expect(written_files(dir).size() == 1,
@@ -249,7 +227,7 @@ TEST(test_one_file_per_accumulated_specification) {
 }
 
 TEST(test_written_files_parse_back_to_what_was_accumulated) {
-    const TempDir dir;
+    const TempDir dir("accumulator_tests");
     RepairAccumulator<Specification> accumulator(true, json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
     accumulator.insert(make_spec("y"), 2);
@@ -269,7 +247,7 @@ TEST(test_written_files_parse_back_to_what_was_accumulated) {
 // "over time" metric reads it rather than the file names, which carry the
 // generation but no clock.
 TEST(test_the_index_carries_a_row_per_specification) {
-    const TempDir dir;
+    const TempDir dir("accumulator_tests");
     RepairAccumulator<Specification> accumulator(true, json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
     accumulator.insert(make_spec("y"), 3);
@@ -292,7 +270,7 @@ TEST(test_the_index_carries_a_row_per_specification) {
 // A writer given no clock still writes its files; the column reads zero rather
 // than the row being absent, so a reader never has to handle a ragged index.
 TEST(test_the_index_reports_zero_without_a_clock) {
-    const TempDir dir;
+    const TempDir dir("accumulator_tests");
     RepairAccumulator<Specification> accumulator(true, json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
     const std::vector<std::string> rows = index_rows(dir);
@@ -305,7 +283,7 @@ TEST(test_the_index_reports_zero_without_a_clock) {
 // written. Whether the seconds are plausible is the driver's business; what
 // this pins is that the writer asks the clock at all.
 TEST(test_the_index_records_the_clock_it_was_given) {
-    const TempDir dir;
+    const TempDir dir("accumulator_tests");
     double now = 0.0;
     AccumulatedRepairWriter<Specification> writer(
         dir.string(), ".json",
@@ -333,7 +311,7 @@ TEST(test_the_index_records_the_clock_it_was_given) {
 // where a specification becomes a document, so a tombstoned guarantee is absent
 // from the file and the text parses back without it.
 TEST(test_the_tlsf_serialiser_round_trips) {
-    const TempDir dir;
+    const TempDir dir("accumulator_tests");
     const tlsf::Specification spec = tlsf::parse(k_tlsf_spec);
     AccumulatedRepairWriter<tlsf::Specification> writer(
         dir.string(), ".tlsf", [](const tlsf::Specification& candidate) {

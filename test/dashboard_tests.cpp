@@ -4,7 +4,6 @@
 // means are labelled by name.
 
 #include <cstddef>
-#include <filesystem>
 #include <fstream>
 #include <string>
 #include <string_view>
@@ -20,29 +19,6 @@
 namespace {
 
 constexpr std::string_view k_test_suite = "dashboard";
-
-// A directory unique to this suite, removed on scope exit so a failing test
-// cannot leave the next run reading a stale log.
-class TempDir {
-   public:
-    TempDir()
-        : m_path(std::filesystem::temp_directory_path() /
-                 "peredur_dashboard_tests") {
-        std::filesystem::remove_all(m_path);
-        std::filesystem::create_directories(m_path);
-    }
-    ~TempDir() { std::filesystem::remove_all(m_path); }
-
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-    TempDir(TempDir&&) = delete;
-    TempDir& operator=(TempDir&&) = delete;
-
-    [[nodiscard]] std::string string() const { return m_path.string(); }
-
-   private:
-    std::filesystem::path m_path;
-};
 
 std::vector<nlohmann::json> read_records(const std::string& path) {
     std::vector<nlohmann::json> records;
@@ -69,7 +45,7 @@ StageObservation observation(const std::string& name, std::size_t n_in,
 }
 
 TEST(test_records_are_one_json_object_per_line) {
-    const TempDir dir;
+    const TempDir dir("dashboard_tests");
     {
         DashboardWriter writer(dir.string(), true);
         expect(writer.enabled(),
@@ -106,7 +82,7 @@ TEST(test_records_are_one_json_object_per_line) {
 }
 
 TEST(test_unmeasured_fields_are_omitted_not_defaulted) {
-    const TempDir dir;
+    const TempDir dir("dashboard_tests");
     {
         DashboardWriter writer(dir.string(), true);
         // The TLSF driver counts realizable survivors only at the end of a run,

@@ -112,13 +112,14 @@ TEST(test_wide_bodies_reach_both_connectives) {
     cfg.p_conditional_assumption = 0.0;
     bool saw_or = false;
     bool saw_and = false;
-    for (std::size_t seed = 0; seed < 200 && !(saw_or && saw_and); ++seed) {
+    first_seed(200, [&](std::size_t seed) {
         const RandomSource rng = make_random_source_from_seed(seed);
         const tlsf::Specification mutated = tlsf_mutate(spec, rng, cfg);
         const Formula& body = mutated.m_assume.front().m_formula;
         saw_or = saw_or || mentions(body, Formula::Kind::Or);
         saw_and = saw_and || mentions(body, Formula::Kind::And);
-    }
+        return saw_or && saw_and;
+    });
     expect(saw_or, "assumption: a wide body reaches a disjunction");
     expect(saw_and, "assumption: a wide body reaches a conjunction");
 }

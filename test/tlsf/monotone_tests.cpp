@@ -114,19 +114,42 @@ TEST(test_monotone_rewrite_holds_in_both_directions) {
     }
 }
 
+// Whether some seed under 200 rewrites `parent` into `target`.
+bool reaches(const Formula& parent, MonotoneDirection direction,
+             const Formula& target) {
+    return first_seed(200,
+                      [&](std::size_t seed) {
+                          const RandomSource rng =
+                              make_random_source_from_seed(seed);
+                          return monotone_rewrite(parent, direction,
+                                                  atom_pool(), rng) == target;
+                      })
+        .has_value();
+}
+
+// Whether some seed under 200 rewrites `parent` into `parent <kind> l`.
+bool grows(const Formula& parent, MonotoneDirection direction,
+           Formula::Kind kind) {
+    return first_seed(200,
+                      [&](std::size_t seed) {
+                          const RandomSource rng =
+                              make_random_source_from_seed(seed);
+                          const Formula child = monotone_rewrite(
+                              parent, direction, atom_pool(), rng);
+                          const auto children = child.binary_children();
+                          return child.kind() == kind && children.has_value() &&
+                                 children->first == parent;
+                      })
+        .has_value();
+}
+
 // Weakening a biconditional to one of its implications is what puts
 // ltl2dba-r-2's sole ideal in reach in a single move, where the temporal
 // rewrite reaches it only by regenerating both children as well.
 TEST(test_monotone_rewrite_reaches_the_biconditional_weakening) {
     const Formula parent = formula_of("G (c <-> a);");
     const Formula target = formula_of("G (c -> a);");
-    bool reached = false;
-    for (std::size_t seed = 0; seed < 200 && !reached; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        reached = monotone_rewrite(parent, MonotoneDirection::Weaken,
-                                   atom_pool(), rng) == target;
-    }
-    expect(reached,
+    expect(reaches(parent, MonotoneDirection::Weaken, target),
            "monotone: `<->` weakens to `->` with both children untouched");
 }
 
@@ -137,34 +160,10 @@ TEST(test_monotone_rewrite_reaches_the_biconditional_weakening) {
 // only where a disjunction already stood.
 TEST(test_monotone_rewrite_grows_an_atom) {
     const Formula parent = formula_of("a;");
-    bool weakened = false;
-    bool strengthened = false;
-    for (std::size_t seed = 0; seed < 200; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        const Formula child = monotone_rewrite(
-            parent, MonotoneDirection::Weaken, atom_pool(), rng);
-        if (child.kind() == Formula::Kind::Or) {
-            const auto children = child.binary_children();
-            weakened = children.has_value() && children->first == parent;
-            if (weakened) {
-                break;
-            }
-        }
-    }
-    for (std::size_t seed = 0; seed < 200; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        const Formula child = monotone_rewrite(
-            parent, MonotoneDirection::Strengthen, atom_pool(), rng);
-        if (child.kind() == Formula::Kind::And) {
-            const auto children = child.binary_children();
-            strengthened = children.has_value() && children->first == parent;
-            if (strengthened) {
-                break;
-            }
-        }
-    }
-    expect(weakened, "monotone: an atom weakens to `a | l`");
-    expect(strengthened, "monotone: an atom strengthens to `a & l`");
+    expect(grows(parent, MonotoneDirection::Weaken, Formula::Kind::Or),
+           "monotone: an atom weakens to `a | l`");
+    expect(grows(parent, MonotoneDirection::Strengthen, Formula::Kind::And),
+           "monotone: an atom strengthens to `a & l`");
 }
 
 // AddOperand takes its connective from the direction, not from the node it
@@ -173,29 +172,8 @@ TEST(test_monotone_rewrite_grows_an_atom) {
 // an And node being weakened, they disagree.
 TEST(test_add_operand_follows_the_direction_not_the_node) {
     const Formula parent = formula_of("(a & b);");
-    bool disjoined = false;
-    for (std::size_t seed = 0; seed < 200 && !disjoined; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        const Formula child = monotone_rewrite(
-            parent, MonotoneDirection::Weaken, atom_pool(), rng);
-        const auto children = child.binary_children();
-        disjoined = child.kind() == Formula::Kind::Or && children.has_value() &&
-                    children->first == parent;
-    }
-    expect(disjoined,
+    expect(grows(parent, MonotoneDirection::Weaken, Formula::Kind::Or),
            "monotone: weakening a conjunction adds a disjunct, not a conjunct");
-}
-
-// Whether some seed under 200 rewrites `parent` into `target`.
-bool reaches(const Formula& parent, MonotoneDirection direction,
-             const Formula& target) {
-    for (std::size_t seed = 0; seed < 200; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        if (monotone_rewrite(parent, direction, atom_pool(), rng) == target) {
-            return true;
-        }
-    }
-    return false;
 }
 
 // Release carried no monotone rule at all while its duals U and W each carry
@@ -276,14 +254,15 @@ TEST(test_non_zero_probability_changes_offspring) {
     off.p_monotone = 0.0;
     Config armed_cfg = off;
     armed_cfg.p_monotone = 1.0;
-    bool differ = false;
-    for (std::size_t seed = 0; seed < 40 && !differ; ++seed) {
-        const RandomSource baseline = make_random_source_from_seed(seed);
-        const RandomSource armed = make_random_source_from_seed(seed);
-        differ = !(tlsf_mutate(original, baseline, off) ==
-                   tlsf_mutate(original, armed, armed_cfg));
-    }
-    expect(differ, "monotone: a non-zero probability does change offspring");
+    expect_some_seed(
+        40,
+        [&](std::size_t seed) {
+            const RandomSource baseline = make_random_source_from_seed(seed);
+            const RandomSource armed = make_random_source_from_seed(seed);
+            return !(tlsf_mutate(original, baseline, off) ==
+                     tlsf_mutate(original, armed, armed_cfg));
+        },
+        "monotone: a non-zero probability does change offspring");
 }
 
 }  // namespace
