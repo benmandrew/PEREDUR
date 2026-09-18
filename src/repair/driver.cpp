@@ -26,6 +26,7 @@
 #include "profile.hpp"
 #include "reports.hpp"
 #include "requirement.hpp"
+#include "runner/atom_names.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
 #include "serialisation.hpp"
@@ -122,6 +123,14 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
         original_spec = load_specification(input_path);
     } catch (const std::exception& exc) {
         std::cerr << exc.what() << "\n";
+        return 1;
+    }
+    // Before the screens, because an unsafe name makes every realizability
+    // verdict below meaningless rather than merely suspect.
+    if (const std::optional<std::string> unsafe =
+            runner::first_unsafe_atom_name(environment_signals(original_spec),
+                                           original_spec.m_out_atoms)) {
+        std::cerr << "fatal: " << input_path << ": " << *unsafe << "\n";
         return 1;
     }
     // Screened before anything is built from it. The seed population is

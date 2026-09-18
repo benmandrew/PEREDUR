@@ -8,6 +8,7 @@
 #include <string>
 
 #include "driver_support.hpp"
+#include "runner/atom_names.hpp"
 #include "runner/spot.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
@@ -62,6 +63,14 @@ int main(int argc, const char* const argv[]) {
         spec = tlsf::parse(*contents);
     } catch (const std::exception& exc) {
         std::cerr << path << ": " << exc.what() << "\n";
+        return 1;
+    }
+
+    // Before the first query: ltlsynt reads an unmatched --ins as an output,
+    // so an unsafe name here would answer about a different specification.
+    if (const std::optional<std::string> unsafe =
+            runner::first_unsafe_atom_name(spec.m_inputs, spec.m_outputs)) {
+        std::cerr << path << ": " << *unsafe << "\n";
         return 1;
     }
 
