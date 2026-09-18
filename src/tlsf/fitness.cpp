@@ -3,13 +3,13 @@
 #include <algorithm>
 #include <cstddef>
 #include <functional>
-#include <memory>
 #include <string>
 #include <unordered_set>
-#include <utility>
 #include <vector>
 
 #include "filter/well_separation.hpp"
+#include "fitness/factory.hpp"
+#include "fitness/mean_or_perfect.hpp"
 #include "fitness/semantic_similarity.hpp"
 #include "fitness/status.hpp"
 #include "guarantee_parts.hpp"
@@ -136,19 +136,6 @@ std::vector<std::function<double()>> tlsf_semantic_similarity_terms(
     return terms;
 }
 
-/// The fold both part-wise similarity objectives share: the mean of the terms,
-/// an empty set of terms meaning nothing differed and scoring a perfect match.
-double mean_or_perfect(const std::vector<double>& values) {
-    if (values.empty()) {
-        return 1.0;
-    }
-    double total = 0.0;
-    for (const double value : values) {
-        total += value;
-    }
-    return total / static_cast<double>(values.size());
-}
-
 }  // namespace
 
 double tlsf_semantic_similarity(const tlsf::Specification& spec,
@@ -156,14 +143,12 @@ double tlsf_semantic_similarity(const tlsf::Specification& spec,
                                 const Config& cfg) {
     const std::vector<std::function<double()>> terms =
         tlsf_semantic_similarity_terms(spec, original, cfg);
-    if (terms.empty()) {
-        return 1.0;
-    }
-    double total = 0.0;
+    std::vector<double> values;
+    values.reserve(terms.size());
     for (const std::function<double()>& term : terms) {
-        total += term();
+        values.push_back(term());
     }
-    return total / static_cast<double>(terms.size());
+    return mean_or_perfect(values);
 }
 
 std::vector<std::string> tlsf_status_components(
@@ -247,152 +232,72 @@ double tlsf_status(const tlsf::Specification& spec, const Config& cfg,
 
 namespace {
 
-// The admission order for the whole run, computed here rather than at a call
-// site because this is the one place that sees the specification being evolved
-// and is entered once, before anything is scored -- including once per core
-// under repair_mode = "muc", where the sub-specification is what gets walked.
-// Under MrsAdmissionOrder::Spec it costs nothing and returns empty, which the
-// walk reads as index order.
-/// The state a decomposed objective needs, held once for the run.
-struct SimilarityContext {
-    tlsf::Specification original;
-    Config cfg;
-};
-
-struct StatusContext {
-    Config cfg;
-    std::vector<std::size_t> order;
-};
-
-std::vector<std::size_t> tlsf_mrs_admission_order(
-    const tlsf::Specification& original, const Config& cfg) {
-    if (cfg.status_grading != StatusGrading::Mrs ||
-        cfg.mrs_admission_order != MrsAdmissionOrder::Degree) {
-        return {};
+struct TlsfScorers {
+    static double syntactic(const tlsf::Specification& spec,
+                            const tlsf::Specification& original,
+                            const Config& cfg) {
+        return tlsf_syntactic_similarity(spec, original, cfg);
     }
-    const std::vector<tlsf::CoreFormula> parts =
-        tlsf::split_guarantee_parts(original);
-    RealizabilityChecker& real = global_real_checker();
-    return conflict_degree_order(
-        parts.size(),
-        [&original, &parts, &real](const std::vector<std::size_t>& indices) {
-            const tlsf::Specification subset =
-                tlsf::build_part_subset(original, parts, indices);
-            // The same oracle tlsf_status walks with, undecided resolving as
-            // unrealizable in the same direction.
-            return real.check_realizability_ltl(
-                           subset.to_ltl(), subset.m_inputs, subset.m_outputs,
-                           tlsf::specification_sides(subset))
-                       .value_or(false) &&
-                   !specification_is_not_well_separated(subset, real);
-        });
-}
+
+    static double semantic(const tlsf::Specification& spec,
+                           const tlsf::Specification& original,
+                           const Config& cfg) {
+        return tlsf_semantic_similarity(spec, original, cfg);
+    }
+
+    static std::vector<std::function<double()>> semantic_terms(
+        const tlsf::Specification& spec, const tlsf::Specification& original,
+        const Config& cfg) {
+        return tlsf_semantic_similarity_terms(spec, original, cfg);
+    }
+
+    static double status(const tlsf::Specification& spec, const Config& cfg,
+                         const std::vector<std::size_t>& order,
+                         ComponentCheck component_check) {
+        return tlsf_status(spec, cfg, order, component_check);
+    }
+
+    static std::vector<std::string> status_components(
+        const tlsf::Specification& spec) {
+        return tlsf_status_components(spec);
+    }
+
+    // One synthesis query per live guarantee conjunct, the greedy walk's worst
+    // case.
+    static double status_walk_cost(const tlsf::Specification& spec) {
+        return k_part_cost_synthesis *
+               static_cast<double>(tlsf::count_live_guarantees(spec));
+    }
+
+    // Built on the specification being evolved, which under repair_mode = "muc"
+    // is each core's sub-specification in turn.
+    static std::vector<std::size_t> admission_order(
+        const tlsf::Specification& original) {
+        const std::vector<tlsf::CoreFormula> parts =
+            tlsf::split_guarantee_parts(original);
+        RealizabilityChecker& real = global_real_checker();
+        return conflict_degree_order(
+            parts.size(), [&original, &parts,
+                           &real](const std::vector<std::size_t>& indices) {
+                const tlsf::Specification subset =
+                    tlsf::build_part_subset(original, parts, indices);
+                // The same oracle tlsf_status walks with, undecided resolving
+                // as unrealizable in the same direction.
+                return real.check_realizability_ltl(
+                               subset.to_ltl(), subset.m_inputs,
+                               subset.m_outputs,
+                               tlsf::specification_sides(subset))
+                           .value_or(false) &&
+                       !specification_is_not_well_separated(subset, real);
+            });
+    }
+};
 
 }  // namespace
 
 AggregateWeightedFitnessFunctionT<tlsf::Specification>
 tlsf_get_fitness_function(const tlsf::Specification& original,
                           const Config& cfg) {
-    std::vector<WeightedFitnessFunctionT<tlsf::Specification>> functions;
-    // Held once for the run rather than copied into every part: the original is
-    // a whole Specification and Config is large, and a scoring region builds
-    // parts for every candidate in the population.
-    const auto ctx = std::make_shared<const SimilarityContext>(
-        SimilarityContext{original, cfg});
-    if (cfg.fitness_weight_syntactic > 0.0) {
-        auto synsim = [ctx](const tlsf::Specification& spec) {
-            return tlsf_syntactic_similarity(spec, ctx->original, ctx->cfg);
-        };
-        // One part, and the cheapest kind there is: this objective never leaves
-        // the process, so splitting its arithmetic across workers would cost
-        // more in dispatch than it could save. It is still declared rather than
-        // left undecomposed, so the launch order knows it is free.
-        auto split = [synsim](const tlsf::Specification& spec) {
-            ObjectiveWork work;
-            work.parts.push_back({[synsim, &spec] { return synsim(spec); },
-                                  k_part_cost_in_process});
-            work.combine = [](const std::vector<double>& values) {
-                return values.front();
-            };
-            return work;
-        };
-        functions.push_back(
-            {synsim, cfg.fitness_weight_syntactic, "syntactic", split});
-    }
-    if (cfg.fitness_weight_semantic > 0.0) {
-        auto semsim = [ctx](const tlsf::Specification& spec) {
-            return tlsf_semantic_similarity(spec, ctx->original, ctx->cfg);
-        };
-        // One part per changed section slot, each three bounded model counts
-        // over a formula pair independent of every other slot's.
-        auto split = [ctx](const tlsf::Specification& spec) {
-            ObjectiveWork work;
-            for (std::function<double()>& term : tlsf_semantic_similarity_terms(
-                     spec, ctx->original, ctx->cfg)) {
-                work.parts.push_back(
-                    {std::move(term), k_part_cost_model_count});
-            }
-            work.combine = mean_or_perfect;
-            return work;
-        };
-        functions.push_back(
-            {semsim, cfg.fitness_weight_semantic, "semantic", split});
-    }
-    if (cfg.fitness_weight_status > 0.0) {
-        const auto status_ctx = std::make_shared<const StatusContext>(
-            StatusContext{cfg, tlsf_mrs_admission_order(original, cfg)});
-        auto status = [status_ctx](const tlsf::Specification& spec) {
-            return tlsf_status(spec, status_ctx->cfg, status_ctx->order);
-        };
-        // One part per component satisfiability query, plus the realizability
-        // walk. The walk is handed ComponentCheck::Skipped and the fold applies
-        // the component tier from those parts, so no query is asked twice.
-        //
-        // What that gives up is the walk's short circuit: a candidate with an
-        // unsatisfiable component now pays its synthesis queries rather than
-        // being graded before they start. The guard cannot be kept without
-        // either duplicating every component query or serialising the walk
-        // behind them, and the queries it would have saved are the ones
-        // RealizabilityChecker memoises most heavily.
-        auto split = [status_ctx](const tlsf::Specification& spec) {
-            ObjectiveWork work;
-            std::vector<std::string> components = tlsf_status_components(spec);
-            const std::size_t n_components = components.size();
-            for (std::string& component : components) {
-                work.parts.push_back(
-                    {[formula = std::move(component)] {
-                         return global_sat_checker()
-                                        .check_satisfiability(formula)
-                                        .value_or(false)
-                                    ? 1.0
-                                    : k_status_component_unsatisfiable;
-                     },
-                     k_part_cost_satisfiability});
-            }
-            // One synthesis query per live guarantee conjunct, the greedy
-            // walk's worst case. Only the order this induces is read, so an
-            // upper bound is the right shape of estimate.
-            work.parts.push_back(
-                {[status_ctx, &spec] {
-                     return tlsf_status(spec, status_ctx->cfg,
-                                        status_ctx->order,
-                                        ComponentCheck::Skipped);
-                 },
-                 k_part_cost_synthesis *
-                     static_cast<double>(tlsf::count_live_guarantees(spec))});
-            work.combine = [n_components](const std::vector<double>& values) {
-                for (std::size_t i = 0; i < n_components; ++i) {
-                    if (values[i] == k_status_component_unsatisfiable) {
-                        return k_status_component_unsatisfiable;
-                    }
-                }
-                return values.back();
-            };
-            return work;
-        };
-        functions.push_back(
-            {status, cfg.fitness_weight_status, "status", split});
-    }
-    return AggregateWeightedFitnessFunctionT<tlsf::Specification>(
-        std::move(functions));
+    return make_fitness_function<tlsf::Specification, TlsfScorers>(original,
+                                                                   cfg);
 }
