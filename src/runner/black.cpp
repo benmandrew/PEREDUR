@@ -19,6 +19,7 @@
 #include "prop_formula/identifier.hpp"
 #include "runner/ltlfilt.hpp"
 #include "runner/process.hpp"
+#include "runner/tool_stats.hpp"
 #include "tool_paths.hpp"
 
 namespace {
@@ -289,17 +290,11 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
     const std::vector<std::string> command = {black, "solve",
                                               "-t",  std::to_string(timeout_s),
                                               "-f",  to_black_constants(query)};
-    const auto start = std::chrono::steady_clock::now();
     n_black_calls++;
     const ProcessResult result = execute_and_capture(command, m_timeout);
-    const double elapsed =
-        std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
-            .count();
     std::scoped_lock lock(m_cache_mutex);
-    total_time_s += elapsed;
-    total_cpu_s += result.m_cpu_s;
+    record_exec<SatisfiabilityChecker>(result);
     if (result.m_timed_out) {
-        n_timeouts++;
         m_cache.emplace(cache_key, std::nullopt);
         remember(std::nullopt);
         return std::nullopt;

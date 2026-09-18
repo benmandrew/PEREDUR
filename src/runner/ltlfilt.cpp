@@ -10,12 +10,14 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 #include "formula_key.hpp"
 #include "profile.hpp"
 #include "prop_formula/identifier.hpp"
 #include "runner/process.hpp"
 #include "runner/spot.hpp"
+#include "runner/tool_stats.hpp"
 
 namespace {
 
@@ -44,28 +46,23 @@ std::chrono::milliseconds ltlfilt_timeout() {
     return std::chrono::milliseconds(g_ltlfilt_timeout_ms.load());
 }
 
-struct OneShotSimplify {
-    std::string m_formula;
-    double m_cpu_s = 0.0;
-    bool m_timed_out = false;
-};
-
-// The formula-at-a-time exec behind every simplification. A killed child exits
+// The formula-at-a-time exec behind every simplification, returning the
+// simplified formula beside the exec it came from. A killed child exits
 // non-zero, so a timeout lands on the same branch as any other ltlfilt failure
 // and leaves the formula unsimplified.
-OneShotSimplify one_shot_simplify(const std::string& binary,
-                                  const std::string& formula) {
+std::pair<std::string, ProcessResult> one_shot_simplify(
+    const std::string& binary, const std::string& formula) {
     PEREDUR_PROFILE_SCOPE("ltlfilt/one-shot-exec");
-    const ProcessResult result = execute_and_capture(
+    ProcessResult result = execute_and_capture(
         {binary, "--simplify", "-f", formula}, ltlfilt_timeout());
-    OneShotSimplify out{formula, result.m_cpu_s, result.m_timed_out};
+    std::string simplified = formula;
     if (result.m_exit_code == 0 && !result.m_output.empty()) {
-        out.m_formula = result.m_output;
-        while (!out.m_formula.empty() && out.m_formula.back() == '\n') {
-            out.m_formula.pop_back();
+        simplified = result.m_output;
+        while (!simplified.empty() && simplified.back() == '\n') {
+            simplified.pop_back();
         }
     }
-    return out;
+    return {std::move(simplified), std::move(result)};
 }
 
 }  // namespace
@@ -108,22 +105,11 @@ std::string simplify_ltl(const std::string& formula) {
         answers.emplace(key, formula);
         return formula;
     }
-    const auto start = std::chrono::steady_clock::now();
     // The canonical form is what the subprocess is asked about, so that one
     // answer serves every spelling that reaches this key.
-    const OneShotSimplify one_shot = one_shot_simplify(binary, key);
-    const std::string simplified = one_shot.m_formula;
-    const double child_cpu_s = one_shot.m_cpu_s;
-    const bool timed_out = one_shot.m_timed_out;
-    const double elapsed =
-        std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
-            .count();
+    const auto [simplified, result] = one_shot_simplify(binary, key);
     std::scoped_lock lock(g_ltlfilt_mutex);
-    LtlfiltStats::total_time_s += elapsed;
-    LtlfiltStats::total_cpu_s += child_cpu_s;
-    if (timed_out) {
-        LtlfiltStats::n_timeouts++;
-    }
+    record_exec<LtlfiltStats>(result);
     // The unsimplified fallback is cached like any other result, including
     // after a timeout: a formula that blew the budget once will blow it every
     // time, and re-paying the wait per occurrence is the stall this timeout
@@ -175,19 +161,11 @@ std::optional<std::string> rewrite_weak_operators(const std::string& formula) {
     if (access(binary.c_str(), F_OK) != 0) {
         return remember(std::nullopt);
     }
-    const auto start = std::chrono::steady_clock::now();
     const ProcessResult result = execute_and_capture(
         {binary, "--remove-wm", "-p", "-f", key}, ltlfilt_timeout());
-    const double elapsed =
-        std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
-            .count();
     {
         std::scoped_lock lock(g_ltlfilt_mutex);
-        LtlfiltStats::total_time_s += elapsed;
-        LtlfiltStats::total_cpu_s += result.m_cpu_s;
-        if (result.m_timed_out) {
-            LtlfiltStats::n_timeouts++;
-        }
+        record_exec<LtlfiltStats>(result);
     }
     if (result.m_exit_code != 0 || result.m_output.empty()) {
         return remember(std::nullopt);
@@ -216,19 +194,11 @@ std::optional<bool> spot_satisfiable(const std::string& formula,
         std::scoped_lock lock(g_ltlfilt_mutex);
         LtlfiltStats::n_satisfiable_execs++;
     }
-    const auto start = std::chrono::steady_clock::now();
     const ProcessResult result =
         execute_and_capture({binary, "--satisfiable", "-f", formula}, timeout);
-    const double elapsed =
-        std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
-            .count();
     {
         std::scoped_lock lock(g_ltlfilt_mutex);
-        LtlfiltStats::total_time_s += elapsed;
-        LtlfiltStats::total_cpu_s += result.m_cpu_s;
-        if (result.m_timed_out) {
-            LtlfiltStats::n_timeouts++;
-        }
+        record_exec<LtlfiltStats>(result);
     }
     // Tested before the exit code: the SIGKILL that ends a timed-out call
     // leaves a status this would otherwise read as a verdict.

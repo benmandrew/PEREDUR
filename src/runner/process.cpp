@@ -725,6 +725,7 @@ ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
                                   std::chrono::milliseconds timeout,
                                   ExecutableLookup lookup) {
     assert(!arguments.empty());
+    const Clock::time_point start = Clock::now();
     const std::vector<char*> argv = exec_argv(arguments);
     std::array<int, 2> pipe_fds = {-1, -1};
     pid_t child_pid = -1;
@@ -792,6 +793,8 @@ ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
     const int exit_code = reap(child_pid, timed_out ? std::nullopt : deadline,
                                rss_floor_kb, cpu_s, peak_rss_kb, timed_out);
     record_tool_peak_rss(arguments[0], peak_rss_kb);
-    return {exit_code,   std::move(output), cpu_s,
+    const double wall_s =
+        std::chrono::duration<double>(Clock::now() - start).count();
+    return {exit_code,   std::move(output), cpu_s,    wall_s,
             peak_rss_kb, rss_floor_kb,      timed_out};
 }

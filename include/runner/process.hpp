@@ -22,6 +22,8 @@ struct ProcessResult {
     std::string m_output;
     /// The child's user+sys CPU seconds, from wait4's rusage.
     double m_cpu_s = 0.0;
+    /// Wall seconds from the start of the call to the reap.
+    double m_wall_s = 0.0;
     /// The child's peak resident set in kilobytes, from wait4's ru_maxrss
     /// (which the runner normalises: that field is kilobytes on Linux and
     /// bytes on macOS), or

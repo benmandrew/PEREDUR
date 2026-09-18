@@ -24,6 +24,7 @@
 #include "requirement.hpp"
 #include "runner/ltlfilt.hpp"
 #include "runner/process.hpp"
+#include "runner/tool_stats.hpp"
 #include "tool_paths.hpp"
 
 namespace {
@@ -181,14 +182,10 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
     }
     const std::string binary = ltl2tgba_path();
     assert(access(binary.c_str(), F_OK) == 0);
-    const auto start = std::chrono::steady_clock::now();
     const auto timeout =
         std::chrono::milliseconds(g_ltl2tgba_timeout_ms.load());
     const ProcessResult result =
         execute_and_capture({binary, "-D", "-S", "-H", "-f", key}, timeout);
-    const double elapsed =
-        std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
-            .count();
     if (result.m_timed_out) {
         // The determinization did not finish within budget; drop the individual
         // (counted against max_scoring_failure_rate) rather than caching a
@@ -196,8 +193,7 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
         // SIGKILLed and reaped the child, so no process is left behind.
         {
             std::scoped_lock lock(cache_mutex);
-            Ltl2tgbaStats::record_time(elapsed, result.m_cpu_s);
-            Ltl2tgbaStats::n_timeouts++;
+            record_exec<Ltl2tgbaStats>(result);
             timed_out.insert(key);
         }
         throw std::runtime_error("ltl2tgba timed out for formula: " + formula);
@@ -209,7 +205,7 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
         // genuinely-true formula from counting against the run's
         // max_scoring_failure_rate tolerance.
         std::scoped_lock lock(cache_mutex);
-        Ltl2tgbaStats::record_time(elapsed, result.m_cpu_s);
+        record_exec<Ltl2tgbaStats>(result);
         Ltl2tgbaStats::n_tautology_substitutions++;
         cache.emplace(key, k_universal_hoa);
         return k_universal_hoa;
@@ -222,7 +218,7 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
                                  " for formula: " + formula);
     }
     std::scoped_lock lock(cache_mutex);
-    Ltl2tgbaStats::record_time(elapsed, result.m_cpu_s);
+    record_exec<Ltl2tgbaStats>(result);
     cache.emplace(key, result.m_output);
     return result.m_output;
 }
@@ -399,11 +395,7 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
         command.push_back("--outs=" + join_comma(outputs));
     }
     const auto timeout = std::chrono::milliseconds(g_ltlsynt_timeout_ms.load());
-    const auto start = std::chrono::steady_clock::now();
     const ProcessResult result = execute_and_capture(command, timeout);
-    const double elapsed =
-        std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
-            .count();
     // A timed-out query is undecided, not unrealizable. Which of the two is
     // the safe reading depends on the question being asked -- admitting a
     // repair wants "unrealizable", the well-separation check wants
@@ -419,15 +411,12 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
         static std::mutex log_mutex;
         const std::scoped_lock log_lock(log_mutex);
         std::ofstream log_file(log_path, std::ios::app);
-        log_file << elapsed << ' ' << (result.m_timed_out ? 1 : 0) << ' '
-                 << (inputs.size() + outputs.size()) << '\n';
+        log_file << result.m_wall_s << ' ' << (result.m_timed_out ? 1 : 0)
+                 << ' ' << (inputs.size() + outputs.size()) << '\n';
     }
     std::scoped_lock lock(m_cache_mutex);
-    total_time_s += elapsed;
-    total_cpu_s += result.m_cpu_s;
-    if (result.m_timed_out) {
-        n_timeouts++;
-    } else if (!realizable.has_value()) {
+    record_exec<RealizabilityChecker>(result);
+    if (!result.m_timed_out && !realizable.has_value()) {
         n_capability_errors++;
     }
     // Undecided is memoised like any other outcome, for the reason the ltlfilt
