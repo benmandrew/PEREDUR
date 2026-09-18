@@ -58,8 +58,9 @@ def _spec(name: str, ext: str) -> dict[str, Path]:
 
 
 # FRETISH (JSON) specs: the original repair benchmark. repair_mode is TLSF-only
-# and does not affect these, so the mono-vs-muc factor is never crossed over
-# them — the "muc" profile uses the TLSF specs below.
+# and a FRETISH run carrying a non-default value exits 1, so the mono-vs-muc
+# factor is never crossed over them — the "muc" profile uses the TLSF specs
+# below.
 # mode-arbiter is the one scoped family, and the only run that exercises the
 # scope machinery at all: every other example here is global-scoped and declares
 # no modes. Its single ideal, fixes/guard-maintenance.json, is out of reach of
@@ -617,8 +618,8 @@ PROFILES: dict[str, dict] = {
     },
     # Monolithic vs MUC-guided repair (tlsf.repair_mode) crossed with the TLSF
     # assumption/guarantee mutation split (sweep M), on the TLSF spec corpus —
-    # repair_mode is a no-op on the FRETISH specs, so crossing it over them would
-    # compare two identical arms. The split interacts with repair_mode: muc keeps
+    # the FRETISH path rejects repair_mode outright, so crossing it over them
+    # would fail every muc run rather than compare two arms. The split interacts with repair_mode: muc keeps
     # the environment side at full size while shrinking the guarantee side to the
     # minimal core, so at a fixed p_assumption it spends a larger share of its
     # guarantee mutations on the culprit formulae (verified: the assumption side

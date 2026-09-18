@@ -150,7 +150,7 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
     std::vector<Scored<Specification>> survivors =
         cfg.repair_mode == RepairMode::Muc
             ? internal::run_muc(original, cfg, random_source, fitness, progress,
-                                budget)
+                                output_dir, budget, stream.get())
             : internal::run_monolithic(original, cfg, random_source, fitness,
                                        progress, output_dir, budget,
                                        stream.get());

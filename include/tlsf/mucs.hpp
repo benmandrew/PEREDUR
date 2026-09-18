@@ -38,9 +38,16 @@ struct CoreFormula {
 /// The result of MUC extraction: the minimal culprit formulae, and a rebuilt
 /// Specification holding the full environment side plus exactly those formulae
 /// (unrealizable, and minimal — dropping any one member makes it realizable).
+///
+/// `n_undecided` counts the probes the oracle could not decide. QuickXplain
+/// reads an undecided probe as a conflict, which keeps it shrinking, so a core
+/// extracted over one was never confirmed unrealizable: at a 10s probe budget
+/// on a large specification that is the difference between a core and a guess.
+/// Non-zero means the result is provisional, and callers say so.
 struct MinimalUnrealizableCore {
     std::vector<CoreFormula> formulae;
     Specification spec;
+    std::size_t n_undecided = 0;
 };
 
 /// Realizability oracle: returns true iff `spec` is realizable. Matches the
@@ -54,6 +61,20 @@ using RealizabilityOracle = std::function<bool(const Specification&)>;
 /// guarantee-side formulae the core is empty.
 MinimalUnrealizableCore extract_muc(const Specification& spec,
                                     const RealizabilityOracle& is_realizable);
+
+/// As above, screening the single-formula subsets @p max_in_flight at a time
+/// before the walk. A formula that is a conflict on its own is a minimal core,
+/// returned without walking to it; the rest leave their verdicts in the
+/// oracle's own caches, which the serial walk then reads. QuickXplain itself
+/// stays serial — each of its probes chooses the next — so this is the only
+/// concurrency the extraction has.
+///
+/// @p max_in_flight <= 1 screens nothing and calls the oracle only from this
+/// thread. Above 1 the oracle is called concurrently and must be thread-safe.
+/// The result does not depend on which probe answered first.
+MinimalUnrealizableCore extract_muc(const Specification& spec,
+                                    const RealizabilityOracle& is_realizable,
+                                    std::size_t max_in_flight);
 
 /// As above, using the process-wide RealizabilityChecker (ltlsynt) as oracle.
 MinimalUnrealizableCore extract_muc(const Specification& spec);

@@ -1,10 +1,14 @@
 #include "tlsf/mucs.hpp"
 
+#include <atomic>
 #include <cassert>
 #include <cstddef>
+#include <optional>
 #include <vector>
 
+#include "bounded_async.hpp"
 #include "runner/spot.hpp"
+#include "thread_pool.hpp"
 #include "tlsf/specification.hpp"
 
 namespace tlsf {
@@ -115,10 +119,50 @@ std::vector<CoreFormula> quickxplain(const Specification& base,
     return concat(left_core, right_core);
 }
 
+// Screens every single-formula subset concurrently, returning the lowest index
+// that is a conflict on its own. QuickXplain would reach such a formula only
+// after log(n) halving rounds of serial probes; here the whole sweep is one
+// concurrent region. Nothing is discarded when no singleton conflicts: the
+// verdicts stay in the oracle's caches, so the walk that follows reads them
+// instead of spawning a solver.
+//
+// Lowest index rather than first to answer, so concurrency cannot change which
+// core comes back.
+std::optional<std::size_t> screen_singletons(
+    const Specification& base, const std::vector<CoreFormula>& candidates,
+    const RealizabilityOracle& is_realizable, std::size_t max_in_flight) {
+    if (max_in_flight <= 1 || candidates.size() < 2) {
+        return std::nullopt;
+    }
+    std::vector<char> conflicting(candidates.size(), 0);
+    run_bounded_async(
+        candidates.size(), max_in_flight,
+        [&base, &candidates, &is_realizable](std::size_t idx) {
+            return [&base, &candidates, &is_realizable, idx] {
+                return is_conflict(base, {candidates[idx]}, is_realizable);
+            };
+        },
+        [&conflicting](std::size_t idx, bool conflicts) {
+            conflicting[idx] = conflicts ? 1 : 0;
+        });
+    for (std::size_t idx = 0; idx < conflicting.size(); ++idx) {
+        if (conflicting[idx] != 0) {
+            return idx;
+        }
+    }
+    return std::nullopt;
+}
+
 }  // namespace
 
 MinimalUnrealizableCore extract_muc(const Specification& spec,
                                     const RealizabilityOracle& is_realizable) {
+    return extract_muc(spec, is_realizable, /*max_in_flight=*/1);
+}
+
+MinimalUnrealizableCore extract_muc(const Specification& spec,
+                                    const RealizabilityOracle& is_realizable,
+                                    std::size_t max_in_flight) {
     assert(!is_realizable(spec) &&
            "extract_muc precondition: spec must be unrealizable");
     const std::vector<CoreFormula> candidates = guarantee_side_candidates(spec);
@@ -127,24 +171,44 @@ MinimalUnrealizableCore extract_muc(const Specification& spec,
         result.spec = build_candidate_spec(spec, {});
         return result;
     }
-    result.formulae =
-        quickxplain(spec, /*background=*/{},
-                    /*background_grew=*/false, candidates, is_realizable);
+    if (const std::optional<std::size_t> single =
+            screen_singletons(spec, candidates, is_realizable, max_in_flight)) {
+        // A one-formula conflict is already minimal: no subset of it is a
+        // conflict, because the only proper subset is empty.
+        result.formulae = {candidates[*single]};
+    } else {
+        result.formulae =
+            quickxplain(spec, /*background=*/{},
+                        /*background_grew=*/false, candidates, is_realizable);
+    }
     result.spec = build_candidate_spec(spec, result.formulae);
     return result;
 }
 
 MinimalUnrealizableCore extract_muc(const Specification& spec) {
     RealizabilityChecker& checker = global_real_checker();
-    return extract_muc(spec, [&checker](const Specification& candidate) {
-        // Undecided reads as unrealizable, which keeps QuickXplain shrinking
-        // the candidate set rather than reporting a core it never confirmed.
-        return checker
-            .check_realizability_ltl(candidate.to_ltl(), candidate.m_inputs,
-                                     candidate.m_outputs,
-                                     tlsf::specification_sides(candidate))
-            .value_or(false);
-    });
+    // Counted across the concurrent screen as well as the walk, so it is
+    // atomic rather than a plain member.
+    std::atomic<std::size_t> n_undecided{0};
+    const RealizabilityOracle oracle =
+        [&checker, &n_undecided](const Specification& candidate) {
+            const std::optional<bool> verdict = checker.check_realizability_ltl(
+                candidate.to_ltl(), candidate.m_inputs, candidate.m_outputs,
+                tlsf::specification_sides(candidate));
+            if (!verdict.has_value()) {
+                n_undecided.fetch_add(1, std::memory_order_relaxed);
+            }
+            // Undecided reads as unrealizable, which keeps QuickXplain
+            // shrinking the candidate set. What that costs -- a core resting on
+            // a probe that never finished -- travels back in n_undecided rather
+            // than being lost here, because at this budget on a large
+            // specification it is the difference between a core and a guess.
+            return verdict.value_or(false);
+        };
+    MinimalUnrealizableCore result =
+        extract_muc(spec, oracle, dispatch_window());
+    result.n_undecided = n_undecided.load(std::memory_order_relaxed);
+    return result;
 }
 
 std::vector<CoreFormula> non_core_formulae(

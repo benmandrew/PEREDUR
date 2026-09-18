@@ -190,8 +190,10 @@ std::vector<Scored<Specification>> keep_maximal(
 std::unique_ptr<StreamingMaximalFilter<Specification>> make_maximal_stream(
     const Specification& original, const Config& cfg,
     const std::string& output_dir) {
-    if (!implication_streams(cfg) ||
-        cfg.repair_mode != RepairMode::Monolithic) {
+    // Both repair modes stream: run_muc reintegrates every gate-passing core
+    // repair into a whole specification and gates it as one, so what reaches
+    // the filter is the same kind of object the monolithic path pushes.
+    if (!implication_streams(cfg)) {
         return nullptr;
     }
     MaximalStreamRules<Specification> rules;
