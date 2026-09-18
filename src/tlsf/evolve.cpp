@@ -16,12 +16,12 @@
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
 #include "genetic/generation.hpp"
+#include "genetic/output_gate.hpp"
 #include "genetic/pipeline.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
-#include "survivors.hpp"
 #include "thread_pool.hpp"
 #include "tlsf/filter.hpp"
 #include "tlsf/operators.hpp"
@@ -54,30 +54,6 @@ std::vector<FilterFunctionT<Specification>> build_per_gen_filters(
     }
     return filters;
 }
-
-namespace {
-
-// Not free: nothing else asks the gate per generation, so this sweep is work
-// the run would not otherwise do. The status query behind it is memoised from
-// scoring, leaving the correctness rows as the real cost. Hence the early
-// return rather than a caller-side branch. The FRETISH twin
-// (`accumulate_gate_passing`, src/repair/evolution.cpp) was unconditional
-// until 2026-09-09 and is now gated the same way.
-void accumulate_gate_passing(
-    const std::vector<Scored<Specification>>& population, const Config& cfg,
-    std::size_t generation, RepairAccumulator<Specification>& accumulator) {
-    if (!accumulator.enabled()) {
-        return;
-    }
-    const std::vector<char> keep = gate_verdicts(population, cfg);
-    for (std::size_t idx = 0; idx < population.size(); ++idx) {
-        if (keep[idx] != 0) {
-            accumulator.insert(population[idx].specification, generation);
-        }
-    }
-}
-
-}  // namespace
 
 std::vector<Scored<Specification>> evolve_population(
     const Specification& spec, const Config& cfg,

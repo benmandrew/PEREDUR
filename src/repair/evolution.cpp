@@ -3,11 +3,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
-#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -18,79 +16,14 @@
 
 #include <nlohmann/json.hpp>
 
-#include "bounded_async.hpp"
-#include "filter/correctness.hpp"
-#include "filter/implication.hpp"
 #include "filter/implication_check.hpp"
-#include "fingerprint/prefilter.hpp"
-#include "fitness/status.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/output_gate.hpp"
 #include "runner/black.hpp"
-#include "runner/spot.hpp"
 #include "serialisation.hpp"
 #include "status_line.hpp"
-#include "thread_pool.hpp"
 
 namespace {
-
-// The correctness checks, built once. Their predicates capture the global
-// checkers, which outlive every caller.
-const std::vector<CorrectnessCheck>& gate_checks() {
-    static const std::vector<CorrectnessCheck> checks =
-        correctness_checks(global_sat_checker(), global_real_checker());
-    return checks;
-}
-
-// A specification counts as a realizable repair only if it is realizable and
-// passes every correctness check. Elites and the seed population reach this
-// unscreened, and the per-generation flags can turn any of those checks off
-// outright, so both the live "real" counter and the final collection apply the
-// whole table here, unconditionally.
-//
-// The grading is the run's, as it is on the TLSF path (is_tlsf_repair forwards
-// cfg to tlsf_status): hard-coding Tiered here made a run configured
-// `status_grading = "aurus"` score its search on the six-level ladder and then
-// judge its output on the three-point one. The admitted set is the same either
-// way, gate_checks() below applying the whole table whatever the scale folded
-// in, so what the mismatch cost was a cold well-separation query per survivor
-// under a grading whose search never asked one. No admission order is passed,
-// again matching the TLSF gate: the order changes which queries the MRS walk
-// memoises, never whether the top tier is reached.
-//
-// Status leads. Most of the final population is unrealizable -- that is why the
-// collection drops most of it -- and status is a scored objective, so its
-// verdict is already memoised for anything the last generation scored, whereas
-// the checks behind it are only warm where their per-generation stage ran.
-// Asking the warm question first short-circuits the common case for free.
-bool is_realizable_repair(const Specification& spec, const Config& cfg) {
-    return specification_status(spec, global_sat_checker(),
-                                global_real_checker(),
-                                cfg.status_grading) == 1.0 &&
-           !first_failing_check(spec, gate_checks()).has_value();
-}
-
-// The gate asked of every candidate in the population, run only where there
-// is somewhere to put what it admits. Nothing else in a FRETISH generation
-// asks the gate, so with the accumulator off this sweep is a solver call per
-// candidate that the run would not otherwise make; the status line's "real"
-// column was the whole argument for paying it. The TLSF twin
-// (`accumulate_gate_passing`, src/tlsf/evolve.cpp) has been gated this way
-// since it gained the accumulator. Empty where it did not run.
-std::optional<std::size_t> accumulate_gate_passing(
-    const std::vector<ScoredSpecification>& population, const Config& cfg,
-    std::size_t generation, RepairAccumulator<Specification>& accumulator) {
-    if (!accumulator.enabled()) {
-        return std::nullopt;
-    }
-    std::size_t n_gate_passing = 0;
-    for (const ScoredSpecification& cand : population) {
-        if (is_realizable_repair(cand.specification, cfg)) {
-            ++n_gate_passing;
-            accumulator.insert(cand.specification, generation);
-        }
-    }
-    return n_gate_passing;
-}
 
 // The committed line of the implication filter, the same on both routes to it
 // so a log reads alike whichever ran. @p elapsed is the time the run waited on
@@ -292,35 +225,11 @@ EvolutionResult run_evolution(
 
 std::vector<Specification> collect_realizable_specifications(
     const Config& cfg, const std::vector<ScoredSpecification>& population) {
-    // Each check is a `black` and an `ltlsynt` query, and the whole final
-    // population is checked, so a serial sweep here costs a subprocess per
-    // distinct candidate -- the more diverse the population, the worse. Results
-    // are collected by index and the survivors rebuilt in population order, so
-    // the output matches a serial sweep exactly.
-    const std::size_t max_in_flight = dispatch_window();
-    std::vector<char> keep(population.size(), 0);
     // The per-generation filter only screens offspring during evolution, so a
     // vacuous result from the final generation would otherwise never be
     // re-screened before being reported here. Elites bypass the offspring
     // filters entirely, so one can reach the output unscreened either way.
-    if (max_in_flight <= 1) {
-        for (std::size_t idx = 0; idx < population.size(); ++idx) {
-            keep[idx] = is_realizable_repair(population[idx].specification, cfg)
-                            ? 1
-                            : 0;
-        }
-    } else {
-        run_bounded_async(
-            population.size(), max_in_flight,
-            [&population, &cfg](std::size_t idx) {
-                return [&spec = population[idx].specification, &cfg] {
-                    return is_realizable_repair(spec, cfg);
-                };
-            },
-            [&keep](std::size_t idx, bool realizable) {
-                keep[idx] = realizable ? 1 : 0;
-            });
-    }
+    const std::vector<char> keep = gate_verdicts(population, cfg);
     std::vector<Specification> realizable_vec;
     for (std::size_t idx = 0; idx < population.size(); ++idx) {
         if (keep[idx] != 0) {
@@ -396,28 +305,6 @@ filter_maximal_specifications(
                 .count());
     }
     return {result, std::move(stats)};
-}
-
-std::unique_ptr<StreamingMaximalFilter<Specification>> make_maximal_stream(
-    const Config& cfg, const Specification& original,
-    const std::string& output_dir) {
-    if (!implication_streams(cfg)) {
-        return nullptr;
-    }
-    MaximalStreamRules<Specification> rules;
-    rules.implies = [](const Specification& lhs, const Specification& rhs,
-                       SatisfiabilityChecker& checker) {
-        return spec_implies(lhs, rhs, checker).value_or(false);
-    };
-    rules.similarity = syntactic_similarity_key(original, cfg);
-    rules.fingerprints = [](const std::vector<Specification>& specs) {
-        return fingerprint::prefilter::fingerprints_of(specs);
-    };
-    return std::make_unique<StreamingMaximalFilter<Specification>>(
-        cfg, std::move(rules),
-        (std::filesystem::path(output_dir) /
-         AccumulatedRepairWriter<Specification>::k_subdirectory / "maximal.tsv")
-            .string());
 }
 
 std::pair<std::vector<Specification>, std::vector<FilterRunStats>>

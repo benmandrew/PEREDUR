@@ -2,56 +2,23 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <filesystem>
-#include <memory>
-#include <string>
 #include <utility>
 #include <vector>
 
-#include "bounded_async.hpp"
 #include "config.hpp"
-#include "filter/correctness.hpp"
 #include "filter/implication.hpp"
 #include "filter/streaming_maximal.hpp"
-#include "fingerprint/prefilter.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/output_gate.hpp"
 #include "genetic/pipeline.hpp"
 #include "genetic/scored.hpp"
 #include "runner/black.hpp"
-#include "runner/spot.hpp"
-#include "thread_pool.hpp"
-#include "tlsf/filter.hpp"
-#include "tlsf/fitness.hpp"
 #include "tlsf/specification.hpp"
 
 namespace tlsf::internal {
 
 namespace {
-
-// The correctness checks, built once. Their predicates capture the global
-// checkers, which outlive every caller.
-const std::vector<CorrectnessCheckT<Specification>>& gate_checks() {
-    static const std::vector<CorrectnessCheckT<Specification>> checks =
-        correctness_checks<Specification>(global_sat_checker(),
-                                          global_real_checker());
-    return checks;
-}
-
-// A candidate counts as a repair only when it is realizable and passes every
-// correctness check. Elites and the seed population reach this collection
-// without having passed the per-generation chain, and any of those checks can
-// be turned off outright, so the whole table is re-applied here -- mirroring
-// the FRETISH path's is_realizable_repair. Unconditional on both paths: the
-// per-generation flags tune search pressure, never output correctness.
-//
-// Status leads, as it does on the FRETISH path: it is a scored objective, so
-// its verdict is memoised for everything the last generation scored, while a
-// check whose per-generation stage was off has nothing warming its queries.
-bool is_tlsf_repair(const Specification& spec, const Config& cfg) {
-    return tlsf_status(spec, cfg) == 1.0 &&
-           !first_failing_check(spec, gate_checks()).has_value();
-}
 
 // Serial on purpose wherever this is called: the specifications reaching it
 // were scored during the search, so the fitness cache is warm and each rescore
@@ -107,33 +74,6 @@ std::vector<Scored<Specification>> keep_matching(
 
 }  // namespace
 
-std::vector<char> gate_verdicts(
-    const std::vector<Scored<Specification>>& population, const Config& cfg) {
-    // Each status check is an `ltlsynt` query and the whole population is
-    // checked, so a serial sweep here costs a subprocess per distinct
-    // candidate.
-    const std::size_t max_in_flight = dispatch_window();
-    std::vector<char> keep(population.size(), 0);
-    if (max_in_flight <= 1) {
-        for (std::size_t idx = 0; idx < population.size(); ++idx) {
-            keep[idx] =
-                is_tlsf_repair(population[idx].specification, cfg) ? 1 : 0;
-        }
-    } else {
-        run_bounded_async(
-            population.size(), max_in_flight,
-            [&population, &cfg](std::size_t idx) {
-                return [&spec = population[idx].specification, &cfg] {
-                    return is_tlsf_repair(spec, cfg);
-                };
-            },
-            [&keep](std::size_t idx, bool realizable) {
-                keep[idx] = realizable ? 1 : 0;
-            });
-    }
-    return keep;
-}
-
 std::vector<Scored<Specification>> realizable_survivors(
     const std::vector<Scored<Specification>>& population, const Config& cfg,
     const AggregateWeightedFitnessFunctionT<Specification>& fitness) {
@@ -188,31 +128,6 @@ std::vector<Scored<Specification>> keep_maximal(
         make_implication_filter<Specification>(
             checker, syntactic_similarity_key(original, cfg))(specs);
     return keep_matching(survivors, maximal);
-}
-
-std::unique_ptr<StreamingMaximalFilter<Specification>> make_maximal_stream(
-    const Specification& original, const Config& cfg,
-    const std::string& output_dir) {
-    // Both repair modes stream: run_muc reintegrates every gate-passing core
-    // repair into a whole specification and gates it as one, so what reaches
-    // the filter is the same kind of object the monolithic path pushes.
-    if (!implication_streams(cfg)) {
-        return nullptr;
-    }
-    MaximalStreamRules<Specification> rules;
-    rules.implies = [](const Specification& lhs, const Specification& rhs,
-                       SatisfiabilityChecker& checker) {
-        return tlsf_spec_implies(lhs, rhs, checker).value_or(false);
-    };
-    rules.similarity = syntactic_similarity_key(original, cfg);
-    rules.fingerprints = [](const std::vector<Specification>& specs) {
-        return fingerprint::prefilter::fingerprints_of(specs);
-    };
-    return std::make_unique<StreamingMaximalFilter<Specification>>(
-        cfg, std::move(rules),
-        (std::filesystem::path(output_dir) /
-         AccumulatedRepairWriter<Specification>::k_subdirectory / "maximal.tsv")
-            .string());
 }
 
 std::vector<Scored<Specification>> finish_maximal_stream(

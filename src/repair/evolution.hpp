@@ -52,12 +52,6 @@ EvolutionResult run_evolution(
     const std::string& output_dir, SearchBudget& budget,
     RepairAccumulator<Specification>::Sink sink = {});
 
-// The final screen runs during the search, fed from the accumulator, or null
-// where implication_streams(cfg) is false.
-std::unique_ptr<StreamingMaximalFilter<Specification>> make_maximal_stream(
-    const Config& cfg, const Specification& original,
-    const std::string& output_dir);
-
 // The gate. @p cfg supplies the status grading, which is the run's rather than
 // a fixed one, so the output is judged on the scale the search scored on.
 std::vector<Specification> collect_realizable_specifications(

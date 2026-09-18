@@ -18,6 +18,7 @@
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
 #include "genetic/generation.hpp"
+#include "genetic/output_gate.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "repair_modes.hpp"
@@ -146,7 +147,7 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
     // Null unless the key is on, and then the final screens run while the
     // search does; destroyed unfinished if anything below throws.
     const std::unique_ptr<StreamingMaximalFilter<Specification>> stream =
-        internal::make_maximal_stream(original, cfg, output_dir);
+        make_maximal_stream(original, cfg, output_dir);
     std::vector<Scored<Specification>> survivors =
         cfg.repair_mode == RepairMode::Muc
             ? internal::run_muc(original, cfg, random_source, fitness, progress,
