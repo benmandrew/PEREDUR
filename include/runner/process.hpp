@@ -165,17 +165,6 @@ std::pair<std::string, bool> read_until_eof(int read_fd,
 /// then kills the child.
 void harden_child_after_fork(ParentDeathPolicy policy, pid_t parent_pid);
 
-/// The parent half of the same policy, called immediately after fork(): repeats
-/// the child's setpgid so the group exists no matter which side is scheduled
-/// first. Without it a timeout firing before the child was scheduled would
-/// killpg a group that does not exist yet, and the tool would survive.
-void adopt_child_process_group(pid_t child_pid);
-
-/// SIGKILLs the process group led by `pid`, then `pid` itself. Must be called
-/// before the child is reaped, while the group still has a member and the pid
-/// cannot have been reused.
-void kill_process_tree(pid_t pid);
-
 /// Reaps `pid`, giving it `grace` to exit on its own before killing its process
 /// group. Returns the child's user+sys CPU seconds. For a child that is asked
 /// to shut down cleanly first, such as the formaliser on stdin EOF.
