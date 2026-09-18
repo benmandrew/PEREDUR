@@ -41,6 +41,10 @@ std::size_t count_requirement_atoms(const Requirement& req) {
     std::set<std::string> atoms = collect_formula_atoms(req.m_condition);
     const std::set<std::string> resp = collect_formula_atoms(req.m_response);
     atoms.insert(resp.begin(), resp.end());
+    if (const Formula* stop = timing_stop(req.m_timing)) {
+        const std::set<std::string> stop_atoms = collect_formula_atoms(*stop);
+        atoms.insert(stop_atoms.begin(), stop_atoms.end());
+    }
     return atoms.size();
 }
 
@@ -56,6 +60,13 @@ std::size_t count_joint_atoms(const Requirement& req1,
     ins(req1.m_response);
     ins(req2.m_condition);
     ins(req2.m_response);
+    // A stop condition's atoms reach the lowered formula from the timing, the
+    // same way a mode's do from the scope below.
+    for (const Requirement* req : {&req1, &req2}) {
+        if (const Formula* stop = timing_stop(req->m_timing)) {
+            ins(*stop);
+        }
+    }
     // A scope's mode is an atom of the lowered formula but sits in no Formula
     // field, so it has to be added by hand. Leaving it out is not a rounding
     // error in the count: the mode still reaches the automaton's atomic

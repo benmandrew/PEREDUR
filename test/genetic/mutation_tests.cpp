@@ -397,12 +397,18 @@ void test_timing_strengthen_after_ticks_is_unchanged() {
 // donor pool exercises every branch of both directions, the two extremes moving
 // only when the pool has something to lend them.
 void test_timing_mutation_directions_are_monotone() {
-    const std::vector<Timing> starts = {
-        timing::immediately(),   timing::next_timepoint(),
-        timing::always(),        timing::eventually(),
-        timing::for_ticks(1),    timing::for_ticks(4),
-        timing::within_ticks(1), timing::within_ticks(4),
-        timing::after_ticks(1),  timing::after_ticks(4)};
+    const std::vector<Timing> starts = {timing::immediately(),
+                                        timing::next_timepoint(),
+                                        timing::always(),
+                                        timing::eventually(),
+                                        timing::for_ticks(1),
+                                        timing::for_ticks(4),
+                                        timing::within_ticks(1),
+                                        timing::within_ticks(4),
+                                        timing::after_ticks(1),
+                                        timing::after_ticks(4),
+                                        timing::until(Formula("s")),
+                                        timing::before(Formula("t"))};
     const std::vector<std::vector<Timing>> pools = {{}, starts};
     for (const std::vector<Timing>& pool : pools) {
         for (const Timing& start : starts) {
@@ -413,6 +419,10 @@ void test_timing_mutation_directions_are_monotone() {
                            std::holds_alternative<timing::Eventually>(start),
                        "strengthen: no branch may fall to the bottom of the "
                        "order");
+                expect(!std::holds_alternative<timing::Eventually>(start) ||
+                           timing_stop(stronger) == nullptr,
+                       "strengthen: eventually must not move to a stop timing, "
+                       "which does not imply it");
                 const Timing weaker = mutate_timing(
                     start, Direction::Weaken, pool, make_source({}, draw));
                 expect(!std::holds_alternative<timing::Always>(weaker) ||
@@ -420,6 +430,43 @@ void test_timing_mutation_directions_are_monotone() {
                        "weaken: no branch may rise to the top of the order");
             }
         }
+    }
+}
+
+// `until s` strengthens to Always, the one kind above it, and weakens only
+// through its stop; `before s` is incomparable with every kind. Always weakens
+// into `until s` for any stop the pool carries, after the candidates a
+// stop-free pool already lends, so the index a draw lands on is unchanged for
+// those.
+void test_timing_stop_edges() {
+    const Timing until_s = timing::until(Formula("s"));
+    const Timing before_t = timing::before(Formula("t"));
+    for (std::size_t draw = 0; draw < 4; ++draw) {
+        expect(std::holds_alternative<timing::Always>(mutate_timing(
+                   until_s, Direction::Strengthen, {}, make_source({}, draw))),
+               "strengthen: until s should move to always");
+        expect(mutate_timing(until_s, Direction::Weaken, {until_s},
+                             make_source({}, draw)) == until_s,
+               "weaken: until s has no weaker kind and should be unchanged");
+        for (const Direction direction :
+             {Direction::Strengthen, Direction::Weaken}) {
+            expect(mutate_timing(before_t, direction, {before_t},
+                                 make_source({}, draw)) == before_t,
+                   "timing: before t is incomparable with every kind and "
+                   "should be unchanged");
+        }
+    }
+    const std::vector<Timing> pool = {until_s, before_t, timing::for_ticks(2)};
+    const std::vector<Timing> expected = {timing::for_ticks(2), until_s,
+                                          timing::until(Formula("t"))};
+    for (std::size_t draw = 0; draw < expected.size(); ++draw) {
+        expect(mutate_timing(timing::always(), Direction::Weaken, pool,
+                             make_source({draw}, 0)) == expected[draw],
+               "weaken: always should draw from for 2, then until s and until "
+               "t, in that order");
+        expect(mutate_timing(timing::eventually(), Direction::Strengthen, pool,
+                             make_source({draw}, 0)) == timing::for_ticks(2),
+               "strengthen: eventually should draw only the stop-free for 2");
     }
 }
 
@@ -875,6 +922,7 @@ void run_mutation_tests() {
     test_timing_strengthen_within_ticks_branches();
     test_timing_strengthen_after_ticks_is_unchanged();
     test_timing_mutation_directions_are_monotone();
+    test_timing_stop_edges();
     test_remove_guarantee_tombstones_in_place();
     test_remove_guarantee_keeps_the_last_live_one();
     test_remove_guarantee_may_take_the_only_weakenable_one();

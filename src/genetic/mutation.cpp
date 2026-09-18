@@ -308,6 +308,13 @@ std::vector<Timing> donated_candidates(const std::vector<Timing>& timing_pool) {
                     candidates.push_back(timing::immediately());
                 } else if constexpr (std::is_same_v<T, timing::NextTimepoint>) {
                     candidates.push_back(timing::next_timepoint());
+                } else {
+                    // The extremes themselves lend nothing. A stop timing lies
+                    // below Always but not above Eventually, so it cannot join
+                    // a set the two extremes share.
+                    static_assert(std::is_same_v<T, timing::Eventually> ||
+                                  std::is_same_v<T, timing::Always> ||
+                                  timing::k_carries_stop<T>);
                 }
             },
             donor);
@@ -316,13 +323,31 @@ std::vector<Timing> donated_candidates(const std::vector<Timing>& timing_pool) {
     return candidates;
 }
 
-// Moves an extreme of the order inwards, into a timing the pool donates. With
-// nothing to donate it returns @p extreme unchanged, and costs no draw, so a
-// specification with no interior timing anywhere cannot acquire one.
+// The timings a donor pool lends to Always alone: `until s` for every stop a
+// live Until or Before carries. Always implies `until s` whatever s is, so any
+// stop is sound, but `until s` does not imply Eventually, so these stay out of
+// the set donated_candidates shares between the two extremes. Until sorts after
+// every other kind, so appending these keeps a stop-free pool's candidate list,
+// and the index a draw lands on, exactly as it was.
+std::vector<Timing> donated_to_always(const std::vector<Timing>& timing_pool) {
+    std::vector<Timing> candidates = donated_candidates(timing_pool);
+    std::vector<Timing> stops;
+    for (const Timing& donor : timing_pool) {
+        if (const Formula* stop = timing_stop(donor)) {
+            stops.push_back(timing::until(*stop));
+        }
+    }
+    sort_unique_timings(stops);
+    candidates.insert(candidates.end(), stops.begin(), stops.end());
+    return candidates;
+}
+
+// Moves an extreme of the order inwards, into one of the @p candidates its pool
+// donates. With nothing to donate it returns @p extreme unchanged, and costs no
+// draw, so a specification with no interior timing anywhere cannot acquire one.
 Timing move_off_extreme(const Timing& extreme,
-                        const std::vector<Timing>& timing_pool,
+                        const std::vector<Timing>& candidates,
                         const RandomSource& random_source) {
-    const std::vector<Timing> candidates = donated_candidates(timing_pool);
     if (candidates.empty()) {
         return extreme;
     }
@@ -334,11 +359,15 @@ Timing strengthen_timing(const Timing& timing,
                          const RandomSource& random_source) {
     const auto mutation_function = [&](const auto& value) -> Timing {
         using T = std::decay_t<decltype(value)>;
+        // Always is the top of the order and has no strengthening. It is also
+        // `until false`, the strongest stop, and the one kind above `until s`.
+        constexpr bool strengthens_to_always =
+            std::is_same_v<T, timing::Always> ||
+            std::is_same_v<T, timing::Until>;
         if constexpr (std::is_same_v<T, timing::Immediately> ||
                       std::is_same_v<T, timing::NextTimepoint>) {
             return timing::for_ticks(1);
-        } else if constexpr (std::is_same_v<T, timing::Always>) {
-            // Always is the top of the order and has no strengthening.
+        } else if constexpr (strengthens_to_always) {
             return timing::always();
         } else if constexpr (std::is_same_v<T, timing::ForTicks>) {
             return strengthen_for_timing(value, random_source);
@@ -352,11 +381,14 @@ Timing strengthen_timing(const Timing& timing,
         } else if constexpr (std::is_same_v<T, timing::WithinTicks>) {
             return strengthen_within_timing(value, random_source);
         } else if constexpr (std::is_same_v<T, timing::Eventually>) {
-            return move_off_extreme(timing::eventually(), timing_pool,
+            return move_off_extreme(timing::eventually(),
+                                    donated_candidates(timing_pool),
                                     random_source);
+        } else if constexpr (std::is_same_v<T, timing::Before>) {
+            // `before s` is incomparable with every other kind.
+            return value;
         } else {
-            assert(false);
-            __builtin_unreachable();
+            static_assert(timing::k_unhandled_timing<T>);
         }
     };
     return std::visit(mutation_function, timing);
@@ -371,7 +403,8 @@ Timing weaken_timing(const Timing& timing,
                       std::is_same_v<T, timing::NextTimepoint>) {
             return timing::within_ticks(1);
         } else if constexpr (std::is_same_v<T, timing::Always>) {
-            return move_off_extreme(timing::always(), timing_pool,
+            return move_off_extreme(timing::always(),
+                                    donated_to_always(timing_pool),
                                     random_source);
         } else if constexpr (std::is_same_v<T, timing::ForTicks>) {
             return weaken_for_timing(value, random_source);
@@ -381,9 +414,12 @@ Timing weaken_timing(const Timing& timing,
             return weaken_within_timing(value, random_source);
         } else if constexpr (std::is_same_v<T, timing::Eventually>) {
             return timing::eventually();
+        } else if constexpr (timing::k_carries_stop<T>) {
+            // No kind lies below `until s`, and `before s` is incomparable with
+            // every kind, so both weaken only through their stop.
+            return value;
         } else {
-            assert(false);
-            __builtin_unreachable();
+            static_assert(timing::k_unhandled_timing<T>);
         }
     };
     return std::visit(mutation_function, timing);
@@ -417,7 +453,9 @@ ConditionType mutate_condition_type(Direction direction) {
 // `in m ... eventually r` demands the response arrive before the mode ends,
 // which global scope does not, so `global => in` holds at `always` and fails at
 // `eventually`. Measured tick counts 2 and 4 give identical orders, so the
-// table is independent of n.
+// table is independent of n. `until` and `before`, measured at an atom stop and
+// at a conjunction, fall in the same cells as the tick-bounded timings, so it
+// is independent of the stop too.
 //
 // `notin => before` is the one edge holding in every cell: the interval
 // strictly before the first entry into the mode is contained in the set of
@@ -540,6 +578,27 @@ std::optional<MonotoneDirection> condition_direction(
     return monotone_of(direction, true);
 }
 
+// The same for a stop. It occurs positively in `until`'s body and negatively
+// in `before`'s, and an "only" scope lowers the dual timing over the negated
+// obligation, which swaps the two. Both condition wrappers place the body
+// positively, so the condition type does not enter.
+MonotoneDirection stop_direction(const Requirement& requirement,
+                                 Direction direction) {
+    const bool is_before =
+        std::holds_alternative<timing::Before>(requirement.m_timing);
+    return monotone_of(direction,
+                       is_before != is_only_scope(requirement.m_scope.m_kind));
+}
+
+// @p timing with its stop replaced by @p stop, keeping its kind.
+Timing with_stop(const Timing& timing, Formula stop) {
+    assert(timing_stop(timing) != nullptr);
+    if (std::holds_alternative<timing::Before>(timing)) {
+        return timing::before(std::move(stop));
+    }
+    return timing::until(std::move(stop));
+}
+
 // The monotone arm, offered ahead of the general rewrite. cfg.p_monotone is
 // read before the RandomSource is touched, so at 0 the arm costs no draw and
 // the breeding stream is what it was before it existed.
@@ -613,6 +672,17 @@ Requirement mutate_requirement(const Requirement& requirement,
     if (random_source.next_real() < cfg.p_timing) {
         mutated.m_timing = mutate_timing(requirement.m_timing, direction,
                                          timing_pool, random_source);
+    }
+    // Read off the mutated timing, which the arm above may have just moved onto
+    // or off a stop. A requirement without one returns before the draw, so no
+    // current specification's breeding stream moves at any value of the key.
+    const Formula* stop = timing_stop(mutated.m_timing);
+    if (cfg.p_stop > 0.0 && stop != nullptr &&
+        random_source.next_real() < cfg.p_stop) {
+        mutated.m_timing = with_stop(
+            mutated.m_timing, rewrite_field(*stop, condition_atoms,
+                                            stop_direction(mutated, direction),
+                                            cfg, random_source));
     }
     // Both arms test their probability before touching the RandomSource, so at
     // the default of 0 neither costs a draw and the breeding stream is what it

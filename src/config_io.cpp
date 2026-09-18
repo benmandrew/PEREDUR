@@ -101,7 +101,7 @@ const KeySpec& config_key_spec() {
                    "status_grading", "mrs_admission_order"})},
          {"mutation",
           section({"p_trigger", "p_response", "p_timing", "p_condition_type",
-                   "p_scope", "p_monotone", "p_add_assumption",
+                   "p_scope", "p_stop", "p_monotone", "p_add_assumption",
                    "p_remove_guarantee", "p_conditional_assumption"})},
          {"tlsf",
           section({"repair_mode", "muc_max_iterations"},
@@ -345,6 +345,10 @@ void apply_mutation(const toml::table& tbl, Config& cfg) {
     if (auto val = tbl["p_scope"].value<double>()) {
         require_probability(*val, "mutation.p_scope");
         cfg.p_scope = *val;
+    }
+    if (auto val = tbl["p_stop"].value<double>()) {
+        require_probability(*val, "mutation.p_stop");
+        cfg.p_stop = *val;
     }
     if (auto val = tbl["p_monotone"].value<double>()) {
         require_probability(*val, "mutation.p_monotone");

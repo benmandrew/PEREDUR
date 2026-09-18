@@ -145,6 +145,11 @@ DEFAULTS: dict = {
     # sweep crosses them yet.
     "p_condition_type": 0.15,
     "p_scope": 0.15,
+    # FRETISH only: probability a mutation rewrites the stop of an until or
+    # before timing. New on 2026-09-15 at p_timing's rate; no archived
+    # specification carries a stop timing, so the arm draws nothing on any of
+    # them. Emitted into [mutation] only when a sweep overrides it.
+    "p_stop": 0.15,
     # Probability a mutation appends a new environment (fairness) assumption
     # rather than rewriting an existing requirement/section. Emitted into
     # [mutation] only when a sweep overrides it (see make_toml), so the standard
@@ -322,6 +327,8 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
          if "p_condition_type" in overrides else []) + (
         [f"p_scope = {_fmt(d['p_scope'])}"]
         if "p_scope" in overrides else []) + (
+        [f"p_stop = {_fmt(d['p_stop'])}"]
+        if "p_stop" in overrides else []) + (
         [f"p_monotone = {_fmt(d['p_monotone'])}"]
         if "p_monotone" in overrides else []) + (
         [f"p_add_assumption = {_fmt(d['p_add_assumption'])}"]

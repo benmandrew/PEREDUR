@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "config.hpp"
@@ -17,12 +18,13 @@ namespace {
 
 Requirement make_req(const std::string& trigger, const std::string& response,
                      Timing timing = timing::immediately()) {
-    return Requirement{Formula(trigger), Formula(response), timing};
+    return Requirement{Formula(trigger), Formula(response), std::move(timing)};
 }
 
 Specification make_spec(const std::string& trigger, const std::string& response,
                         Timing timing = timing::immediately()) {
-    return Specification({}, {make_req(trigger, response, timing)}, {}, {});
+    return Specification({}, {make_req(trigger, response, std::move(timing))},
+                         {}, {});
 }
 
 RandomSource make_source(std::vector<std::size_t> values,
@@ -41,6 +43,29 @@ RandomSource make_source(std::vector<std::size_t> values,
 
 std::string first_condition(const Specification& spec) {
     return spec.m_guarantees.begin()->m_condition.to_string();
+}
+
+// --- simplification ---
+
+// The stop is simplified with the condition and response. `until false` is
+// Always spelt another way and folds into it, so the two do not split a cache
+// key; `before false` keeps its kind, being valid rather than a respelling.
+void test_simplify_folds_until_false_into_always() {
+    const auto simplified_timing = [](const Timing& timing) {
+        return fretish_operators()
+            .simplify(make_spec("a", "b", timing))
+            .m_guarantees.front()
+            .m_timing;
+    };
+    expect(std::holds_alternative<timing::Always>(
+               simplified_timing(timing::until(Formula("false & a")))),
+           "simplify: until false should fold into always");
+    expect(simplified_timing(timing::until(Formula("a | false"))) ==
+               timing::until(Formula("a")),
+           "simplify: an until stop should be simplified in place");
+    expect(simplified_timing(timing::before(Formula("false & a"))) ==
+               timing::before(Formula("false")),
+           "simplify: before false should keep its kind");
 }
 
 // --- score_population ---
@@ -673,6 +698,7 @@ void test_evolve_generation_nsga2_apportion_is_deterministic() {
 }  // namespace
 
 void run_generation_tests() {
+    test_simplify_folds_until_false_into_always();
     test_score_population_single_function();
     test_score_population_weighted_aggregation();
     test_score_population_equal_weights_give_average();

@@ -275,6 +275,43 @@ void test_timing_always_vs_eventually() {
            "component");
 }
 
+// Only the timing differs, so the score is (4 + t) / 5 for a timing similarity
+// of t.
+double timing_term(const Timing& lhs, const Timing& rhs) {
+    const Requirement left{Formula("p"), Formula("q"), lhs};
+    const Requirement right{Formula("p"), Formula("q"), rhs};
+    return (5.0 * syntactic_similarity(left, right, Config{})) - 4.0;
+}
+
+// A stop timing is scored outside the downset measure, so no stop-free pair
+// moves. `until s` lies below Always alone, sharing one element of weight 0.01
+// with ↓Always: 0.01 / (2.04 + 0.01). `before s` lies nowhere in the order.
+// Within one stop kind the term averages the kind match with the stops'
+// similarity.
+void test_timing_stop_timings() {
+    const Timing until_s = timing::until(Formula("s"));
+    const Timing before_s = timing::before(Formula("s"));
+    expect(std::fabs(timing_term(until_s, until_s) - 1.0) < 1e-12,
+           "timing-sim: until s should score 1.0 against itself");
+    const double below_always = 0.01 / 2.05;
+    expect(std::fabs(timing_term(timing::always(), until_s) - below_always) <
+                   1e-9 &&
+               std::fabs(timing_term(until_s, timing::always()) -
+                         below_always) < 1e-9,
+           "timing-sim: always vs until s should share one element, both ways");
+    expect(std::fabs(timing_term(timing::eventually(), until_s)) < 1e-9,
+           "timing-sim: until s shares nothing with eventually");
+    expect(std::fabs(timing_term(timing::always(), before_s)) < 1e-9,
+           "timing-sim: before s shares nothing with always");
+    expect(std::fabs(timing_term(until_s, before_s)) < 1e-9,
+           "timing-sim: until s and before s share nothing");
+    const double stops = Formula("s").syntactic_similarity(Formula("t"));
+    expect(std::fabs(timing_term(until_s, timing::until(Formula("t"))) -
+                     ((1.0 + stops) / 2.0)) < 1e-9,
+           "timing-sim: two untils should average the kind match with the "
+           "stops' similarity");
+}
+
 // --- scope ---
 
 // Only the scope differs, so the other four components read 1.0 and the score
@@ -452,6 +489,7 @@ void run_syntactic_similarity_tests() {
     test_timing_immediately_vs_next_timepoint();
     test_timing_identical_always();
     test_timing_always_vs_eventually();
+    test_timing_stop_timings();
     test_scope_identical_is_one();
     test_scope_global_versus_in();
     test_scope_notin_versus_before();

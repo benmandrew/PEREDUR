@@ -19,6 +19,9 @@ std::size_t max_formula_size(const Specification& spec) {
             }
             max = std::max(max, req.m_condition.n_subformulae());
             max = std::max(max, req.m_response.n_subformulae());
+            if (const Formula* stop = timing_stop(req.m_timing)) {
+                max = std::max(max, stop->n_subformulae());
+            }
         }
     };
     scan(spec.m_assumptions);
@@ -28,8 +31,11 @@ std::size_t max_formula_size(const Specification& spec) {
 
 bool any_formula_exceeds(const Specification& spec, std::size_t cap) {
     auto req_exceeds = [cap](const Requirement& req) {
-        return !req.m_removed && (req.m_condition.n_subformulae() > cap ||
-                                  req.m_response.n_subformulae() > cap);
+        const Formula* stop = timing_stop(req.m_timing);
+        return !req.m_removed &&
+               (req.m_condition.n_subformulae() > cap ||
+                req.m_response.n_subformulae() > cap ||
+                (stop != nullptr && stop->n_subformulae() > cap));
     };
     return std::any_of(spec.m_assumptions.begin(), spec.m_assumptions.end(),
                        req_exceeds) ||

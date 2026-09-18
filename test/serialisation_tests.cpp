@@ -2,7 +2,9 @@
 
 #include <cstdio>
 #include <fstream>
+#include <functional>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -146,6 +148,43 @@ void test_timing_always() {
            "to_json(Timing): Always should serialise with type key");
     expect(jobj.get<Timing>() == tim,
            "from_json(Timing): Always round-trip should match");
+}
+
+void test_timing_until_and_before() {
+    for (const Timing& tim :
+         {timing::until(Formula("s & t")), timing::before(Formula("s"))}) {
+        nlohmann::json jobj;
+        timing::to_json(jobj, tim);
+        const std::string type =
+            std::holds_alternative<timing::Until>(tim) ? "Until" : "Before";
+        expect(jobj.at("type") == type,
+               "to_json(Timing): " + type + " should serialise with type key");
+        expect(jobj.at("stop") == timing_stop(tim)->to_string(),
+               "to_json(Timing): " + type + " should serialise its stop");
+        expect(jobj.get<Timing>() == tim,
+               "from_json(Timing): " + type + " round-trip should match");
+    }
+    expect(!(timing::until(Formula("s")) == timing::until(Formula("t"))),
+           "Timing: two untils over different stops must not be equal");
+    expect(!(timing::until(Formula("s")) == timing::before(Formula("s"))),
+           "Timing: until and before over one stop must not be equal");
+    expect(std::hash<Timing>{}(timing::until(Formula("s"))) !=
+               std::hash<Timing>{}(timing::until(Formula("t"))),
+           "hash<Timing>: the stop must reach the hash");
+}
+
+// The stop is tagged with the atom prefix like the condition, and stripped
+// again on the way out, or a stop atom named like an operator would mis-lex.
+void test_stop_atoms_round_trip_through_the_prefix() {
+    const Requirement req(Formula("c"), Formula("r"),
+                          timing::until(Formula("Grant")),
+                          ConditionType::Continual);
+    const Requirement tagged = add_atom_prefix(req);
+    expect(!(*timing_stop(tagged.m_timing) == Formula("Grant")),
+           "add_atom_prefix: a stop atom must be tagged");
+    const nlohmann::json jobj = tagged;
+    expect(jobj.at("timing").at("stop") == "Grant",
+           "to_json(Requirement): a stop atom must be written untagged");
 }
 
 void test_requirement_round_trip() {
@@ -435,6 +474,43 @@ void test_undeclared_mode_is_rejected() {
            "be rejected");
 }
 
+void test_stop_timing_without_stop_is_rejected() {
+    for (const char* type : {"Until", "Before"}) {
+        const nlohmann::json jobj = {{"assumptions", nlohmann::json::array()},
+                                     {"guarantees",
+                                      {{{"condition", "a"},
+                                        {"condition-type", "continual"},
+                                        {"response", "b"},
+                                        {"timing", {{"type", type}}}}}},
+                                     {"in_atoms", {"a"}},
+                                     {"out_atoms", {"b"}}};
+        expect(validate_specification_json(jobj).has_value(),
+               std::string("validate_specification_json: ") + type +
+                   " with no stop must be rejected");
+    }
+}
+
+// FRET's `never r` loads as `always !r`, so it validates like any timing and
+// reaches the engine as a kind the grammar already has.
+void test_never_loads_as_always_over_a_negated_response() {
+    const nlohmann::json req_json = {{"condition", "a"},
+                                     {"condition-type", "continual"},
+                                     {"response", "b & c"},
+                                     {"timing", {{"type", "Never"}}}};
+    const Requirement req = serialisation::requirement_from_json(req_json);
+    expect(std::holds_alternative<timing::Always>(req.m_timing),
+           "requirement_from_json: never should load as always");
+    expect(req.m_response ==
+               Formula::make_unary(Formula::Kind::Not, Formula("b & c")),
+           "requirement_from_json: never should negate the response");
+    const nlohmann::json jobj = {{"assumptions", nlohmann::json::array()},
+                                 {"guarantees", {req_json}},
+                                 {"in_atoms", {"a"}},
+                                 {"out_atoms", {"b", "c"}}};
+    expect(!validate_specification_json(jobj).has_value(),
+           "validate_specification_json: a Never timing must be accepted");
+}
+
 void test_mode_shared_with_an_atom_is_rejected() {
     const nlohmann::json jobj = {{"assumptions", nlohmann::json::array()},
                                  {"guarantees", nlohmann::json::array()},
@@ -491,6 +567,8 @@ void run_serialisation_tests() {
     test_timing_after_ticks();
     test_timing_eventually();
     test_timing_always();
+    test_timing_until_and_before();
+    test_stop_atoms_round_trip_through_the_prefix();
     test_requirement_round_trip();
     test_requirement_json_keys();
     test_requirement_json_keys_trigger();
@@ -511,6 +589,8 @@ void run_serialisation_tests() {
     test_modes_omitted_when_empty();
     test_modes_round_trip();
     test_undeclared_mode_is_rejected();
+    test_stop_timing_without_stop_is_rejected();
+    test_never_loads_as_always_over_a_negated_response();
     test_mode_shared_with_an_atom_is_rejected();
     test_global_scope_with_a_mode_is_rejected();
     test_scoped_requirement_needs_a_mode();

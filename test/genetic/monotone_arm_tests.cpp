@@ -42,7 +42,16 @@ Config response_only() {
     cfg.p_timing = 0.0;
     cfg.p_condition_type = 0.0;
     cfg.p_scope = 0.0;
+    cfg.p_stop = 0.0;
     cfg.p_monotone = 1.0;
+    return cfg;
+}
+
+// The same isolation for the stop arm.
+Config stop_only() {
+    Config cfg = response_only();
+    cfg.p_response = 0.0;
+    cfg.p_stop = 1.0;
     return cfg;
 }
 
@@ -82,9 +91,13 @@ void check_direction(const Requirement& original, Direction direction,
 }
 
 void test_response_arm_moves_the_requirement() {
-    const std::vector<Timing> timings = {
-        timing::immediately(), timing::next_timepoint(), timing::always(),
-        timing::eventually(), timing::within_ticks(2)};
+    const std::vector<Timing> timings = {timing::immediately(),
+                                         timing::next_timepoint(),
+                                         timing::always(),
+                                         timing::eventually(),
+                                         timing::within_ticks(2),
+                                         timing::until(Formula("b")),
+                                         timing::before(Formula("b"))};
     const Config cfg = response_only();
     std::size_t answered = 0;
     for (const Timing& timing : timings) {
@@ -108,6 +121,36 @@ void test_response_arm_moves_the_requirement() {
                std::to_string(answered));
 }
 
+// The stop occurs positively in `until` and negatively in `before`, and an
+// "only" scope swaps the two, so the stop arm's direction depends on both. A
+// sign error in either is silent in the same way as the response's.
+void test_stop_arm_moves_the_requirement() {
+    const Config cfg = stop_only();
+    std::size_t answered = 0;
+    for (const Scope& scope : {global_scope(), Scope{ScopeKind::OnlyIn, "m"}}) {
+        for (const Timing& timing :
+             {timing::until(Formula("a")), timing::before(Formula("a"))}) {
+            for (const ConditionType condition_type :
+                 {ConditionType::Continual, ConditionType::Trigger}) {
+                const Requirement original =
+                    subject(timing, condition_type, scope);
+                check_direction(original, Direction::Weaken, cfg,
+                                "stop arm: the original requirement must imply "
+                                "its weakened rewrite",
+                                answered);
+                check_direction(original, Direction::Strengthen, cfg,
+                                "stop arm: the strengthened rewrite must imply "
+                                "the original requirement",
+                                answered);
+            }
+        }
+    }
+    expect(answered > 10,
+           "stop arm: the implication oracle settled too few of the queries "
+           "to have asserted anything, got " +
+               std::to_string(answered));
+}
+
 // The response sits under a negation in an "only" scope, so the direction the
 // rewrite takes has to flip with it. Getting this backwards is silent: the
 // rewrite still runs and still returns a comparable formula, pointing the
@@ -116,7 +159,9 @@ void test_only_scope_flips_the_response() {
     const Scope only_in{ScopeKind::OnlyIn, "m"};
     const Config cfg = response_only();
     std::size_t answered = 0;
-    for (const Timing& timing : {timing::always(), timing::eventually()}) {
+    for (const Timing& timing :
+         {timing::always(), timing::eventually(), timing::until(Formula("b")),
+          timing::before(Formula("b"))}) {
         const Requirement original =
             subject(timing, ConditionType::Continual, only_in);
         check_direction(original, Direction::Weaken, cfg,
@@ -185,6 +230,7 @@ void test_trigger_condition_declines_the_arm() {
 void run_fretish_monotone_tests() {
     test_response_arm_moves_the_requirement();
     test_only_scope_flips_the_response();
+    test_stop_arm_moves_the_requirement();
     test_after_ticks_declines_the_arm();
     test_trigger_condition_declines_the_arm();
 }

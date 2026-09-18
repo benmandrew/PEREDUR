@@ -242,6 +242,8 @@ An eleventh change removes a key that 12,323 archived configs set. `mutation.all
 
 A twelfth change removes `runtime.max_concurrent_realizability` in the same commit, with the gate behind it and `gen_configs.py --max-realizability`. Four archived configs set it, all to `4`: `none.toml` and `loose.toml` under both `2026-08-03-libspot-soak/repro-lift-20260819/configs/` and `2026-08-03-libspot-soak/repro-lift-20260824/configs/`. On a current binary those run with `ltlsynt` concurrency bounded only by `runtime.parallel`, which raises peak RAM and can change which queries hit their timeouts, so the two reproduction runs match their originals only at their own commits. The cap defaulted to unlimited, so no config that omits it is affected.
 
+`mutation.p_stop` arrived on 2026-09-15 at `0.15`, from a standing start like `p_remove_guarantee`, and exposes nothing. It rewrites the stop condition of an `until` or `before` timing, and it tests whether the requirement holds one before it reads its probability or draws, so on a requirement without a stop timing it costs no draw at any value. No specification any archived campaign ran carries one, those timings having entered the grammar the same day, so every archive here reproduces seed-for-seed with the key omitted.
+
 ## Commit attribution
 
 Every campaign directory carries a `PROVENANCE.json`. For campaigns closed

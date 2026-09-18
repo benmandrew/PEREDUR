@@ -155,6 +155,28 @@ std::string for_body(const std::string& response, std::size_t ticks,
     return "(" + base + " | (" + boundary + " R " + response + "))";
 }
 
+// FRET's untilTiming: a stop that never arrives leaves the response owed to the
+// end of the interval, which the bounded disjunct discharges at the boundary.
+std::string until_body(const std::string& response, const Formula& stop,
+                       const std::string& boundary) {
+    std::string weak_until = "(" + response + " W (" + stop.to_string() + "))";
+    if (boundary.empty()) {
+        return weak_until;
+    }
+    return "(" + weak_until + " | (" + boundary + " R " + response + "))";
+}
+
+// FRET's beforeTiming: the stop stays false up to and including the response,
+// or the boundary, whichever comes first.
+std::string before_body(const std::string& response, const Formula& stop,
+                        const std::string& boundary) {
+    const std::string not_stop = "(!(" + stop.to_string() + "))";
+    if (boundary.empty()) {
+        return "(" + response + " R " + not_stop + ")";
+    }
+    return "((" + response + " | " + boundary + ") R " + not_stop + ")";
+}
+
 // The timing obligation over @p response, discharged early at @p boundary.
 std::string timing_body(const Timing& timing, const std::string& response,
                         const std::string& boundary) {
@@ -186,9 +208,15 @@ std::string timing_body(const Timing& timing, const std::string& response,
             } else if constexpr (std::is_same_v<T, timing::Eventually>) {
                 return bounded ? "((!" + boundary + ") U " + response + ")"
                                : "F" + response;
-            } else {
+            } else if constexpr (std::is_same_v<T, timing::Always>) {
                 return bounded ? "(" + boundary + " R " + response + ")"
                                : "G" + response;
+            } else if constexpr (std::is_same_v<T, timing::Until>) {
+                return until_body(response, variant.m_stop, boundary);
+            } else if constexpr (std::is_same_v<T, timing::Before>) {
+                return before_body(response, variant.m_stop, boundary);
+            } else {
+                static_assert(timing::k_unhandled_timing<T>);
             }
         },
         timing);
@@ -209,7 +237,19 @@ Timing dual_timing(const Timing& timing) {
                 return timing::always();
             } else if constexpr (std::is_same_v<T, timing::Always>) {
                 return timing::eventually();
+            } else if constexpr (std::is_same_v<T, timing::Until>) {
+                // FRET pairs until and before as each other's negation over
+                // the same stop (notUntilTiming, notBeforeTiming). They are
+                // not complements on an unbounded interval, where
+                // `!(r W s)` and `(!r) R (!s)` differ, but the lowering
+                // follows FRET rather than the logic.
+                return timing::before(variant.m_stop);
+            } else if constexpr (std::is_same_v<T, timing::Before>) {
+                return timing::until(variant.m_stop);
             } else {
+                static_assert(std::is_same_v<T, timing::Immediately> ||
+                              std::is_same_v<T, timing::NextTimepoint> ||
+                              std::is_same_v<T, timing::AfterTicks>);
                 return variant;
             }
         },
@@ -295,6 +335,10 @@ bool operator<(const Timing& lhs, const Timing& rhs) {
     if (lhs.index() != rhs.index()) {
         return lhs.index() < rhs.index();
     }
+    // The indices are equal, so both carry a stop or neither does.
+    if (const Formula* lhs_stop = timing_stop(lhs)) {
+        return *lhs_stop < *timing_stop(rhs);
+    }
     const auto get_ticks = [](const Timing& tim) -> std::size_t {
         return std::visit(
             [](const auto& val) -> std::size_t {
@@ -303,8 +347,16 @@ bool operator<(const Timing& lhs, const Timing& rhs) {
                               std::is_same_v<T, timing::ForTicks> ||
                               std::is_same_v<T, timing::AfterTicks>) {
                     return val.m_ticks;
+                } else {
+                    // A stop timing is ordered by its stop before this runs,
+                    // but the lambda is still instantiated for it.
+                    static_assert(std::is_same_v<T, timing::Immediately> ||
+                                  std::is_same_v<T, timing::NextTimepoint> ||
+                                  std::is_same_v<T, timing::Eventually> ||
+                                  std::is_same_v<T, timing::Always> ||
+                                  timing::k_carries_stop<T>);
+                    return 0;
                 }
-                return 0;
             },
             tim);
     };
@@ -313,6 +365,26 @@ bool operator<(const Timing& lhs, const Timing& rhs) {
 
 bool operator==(const Timing& lhs, const Timing& rhs) {
     return !(lhs < rhs) && !(rhs < lhs);
+}
+
+const Formula* timing_stop(const Timing& timing) {
+    return std::visit(
+        [](const auto& variant) -> const Formula* {
+            using T = std::decay_t<decltype(variant)>;
+            if constexpr (timing::k_carries_stop<T>) {
+                return &variant.m_stop;
+            } else {
+                static_assert(std::is_same_v<T, timing::Immediately> ||
+                              std::is_same_v<T, timing::NextTimepoint> ||
+                              std::is_same_v<T, timing::WithinTicks> ||
+                              std::is_same_v<T, timing::ForTicks> ||
+                              std::is_same_v<T, timing::AfterTicks> ||
+                              std::is_same_v<T, timing::Eventually> ||
+                              std::is_same_v<T, timing::Always>);
+                return nullptr;
+            }
+        },
+        timing);
 }
 
 bool operator<(const Scope& lhs, const Scope& rhs) {
@@ -331,12 +403,12 @@ bool is_only_scope(ScopeKind kind) {
            kind == ScopeKind::OnlyAfter;
 }
 
-Requirement::Requirement(Formula condition, Formula response,
-                         const Timing& timing, ConditionType condition_type,
-                         bool weakenable, bool removed, Scope scope)
+Requirement::Requirement(Formula condition, Formula response, Timing timing,
+                         ConditionType condition_type, bool weakenable,
+                         bool removed, Scope scope)
     : m_condition(std::move(condition)),
       m_response(std::move(response)),
-      m_timing(timing),
+      m_timing(std::move(timing)),
       m_condition_type(condition_type),
       // Ahead of m_ltl in the member order, and it has to stay there:
       // requirement_to_ltl reads the scope off *this.
@@ -488,19 +560,41 @@ Scope rewrite_scope_mode(
     return Scope{scope.m_kind, transform(scope.m_mode)};
 }
 
+// A stop condition is a formula over the specification's atoms, tagged like the
+// condition it is drawn alongside.
+Timing rewrite_timing_atoms(
+    const Timing& timing,
+    const std::function<std::string(const std::string&)>& transform) {
+    return std::visit(
+        [&transform](const auto& variant) -> Timing {
+            using T = std::decay_t<decltype(variant)>;
+            if constexpr (std::is_same_v<T, timing::Until>) {
+                return timing::until(
+                    rewrite_atom_names(variant.m_stop, transform));
+            } else if constexpr (std::is_same_v<T, timing::Before>) {
+                return timing::before(
+                    rewrite_atom_names(variant.m_stop, transform));
+            } else {
+                static_assert(!timing::k_carries_stop<T>);
+                return variant;
+            }
+        },
+        timing);
+}
+
 Requirement add_atom_prefix(const Requirement& req) {
     return Requirement(rewrite_atom_names(req.m_condition, prefix_atom_name),
                        rewrite_atom_names(req.m_response, prefix_atom_name),
-                       req.m_timing, req.m_condition_type, req.m_weakenable,
-                       req.m_removed,
+                       rewrite_timing_atoms(req.m_timing, prefix_atom_name),
+                       req.m_condition_type, req.m_weakenable, req.m_removed,
                        rewrite_scope_mode(req.m_scope, prefix_atom_name));
 }
 
 Requirement strip_atom_prefix(const Requirement& req) {
     return Requirement(rewrite_atom_names(req.m_condition, unprefix_atom_name),
                        rewrite_atom_names(req.m_response, unprefix_atom_name),
-                       req.m_timing, req.m_condition_type, req.m_weakenable,
-                       req.m_removed,
+                       rewrite_timing_atoms(req.m_timing, unprefix_atom_name),
+                       req.m_condition_type, req.m_weakenable, req.m_removed,
                        rewrite_scope_mode(req.m_scope, unprefix_atom_name));
 }
 
@@ -566,8 +660,14 @@ std::string to_string(const Timing& timing) {
                 return "after " + std::to_string(value.m_ticks) + " ticks";
             } else if constexpr (std::is_same_v<T, timing::Eventually>) {
                 return "eventually";
-            } else {
+            } else if constexpr (std::is_same_v<T, timing::Always>) {
                 return "always";
+            } else if constexpr (std::is_same_v<T, timing::Until>) {
+                return "until " + value.m_stop.to_string();
+            } else if constexpr (std::is_same_v<T, timing::Before>) {
+                return "before " + value.m_stop.to_string();
+            } else {
+                static_assert(timing::k_unhandled_timing<T>);
             }
         },
         timing);
@@ -673,6 +773,8 @@ std::string requirement_to_ltl(const Requirement& requirement) {
     // malformed LTL, so guard the invariant here.
     assert(requirement.m_condition.is_propositional());
     assert(requirement.m_response.is_propositional());
+    assert(timing_stop(requirement.m_timing) == nullptr ||
+           timing_stop(requirement.m_timing)->is_propositional());
     const std::string condition_str =
         "(" + requirement.m_condition.to_string() + ")";
     const std::string response_str =

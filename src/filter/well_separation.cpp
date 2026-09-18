@@ -60,6 +60,9 @@ bool assumptions_reference_output(const Specification& specification) {
         std::unordered_set<std::string> atoms;
         collect_atoms(req.m_condition, atoms);
         collect_atoms(req.m_response, atoms);
+        if (const Formula* stop = timing_stop(req.m_timing)) {
+            collect_atoms(*stop, atoms);
+        }
         for (const std::string& atom : atoms) {
             if (outputs.count(atom) != 0) {
                 return true;

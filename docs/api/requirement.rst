@@ -4,7 +4,7 @@ requirement.hpp
 Defines the core domain types used throughout the tool:
 
 ``Timing``
-  A ``std::variant`` over seven timing modalities (``Immediately``, ``NextTimepoint``, ``WithinTicks``, ``ForTicks``, ``AfterTicks``, ``Eventually``, ``Always``) that encode FRETISH temporal operators as algebraic types.
+  A ``std::variant`` over nine timing modalities (``Immediately``, ``NextTimepoint``, ``WithinTicks``, ``ForTicks``, ``AfterTicks``, ``Eventually``, ``Always``, ``Until``, ``Before``) that encode FRETISH temporal operators as algebraic types. ``Until`` and ``Before`` carry a propositional stop condition.
 
 ``ConditionType``
   Controls whether a requirement's condition is evaluated as a rising-edge trigger (``Trigger``) or at every timepoint it holds (``Continual``).

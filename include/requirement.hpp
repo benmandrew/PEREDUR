@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -51,9 +52,25 @@ struct Eventually {};
 /// Response must hold at all timepoints from the condition onward.
 struct Always {};
 
-/// Algebraic data type for requirement timing.
+/// Response must hold from the condition up to, but not including, the first
+/// timepoint at which `m_stop` holds, and throughout if it never does. FRET's
+/// `until` timing, `r W s` at Global scope.
+struct Until {
+    Formula m_stop;
+};
+
+/// Response must hold at some timepoint before the first at which `m_stop`
+/// holds, which demands nothing if it never does. FRET's `before` timing,
+/// `r R !s` at Global scope.
+struct Before {
+    Formula m_stop;
+};
+
+/// Algebraic data type for requirement timing. Until and Before are appended,
+/// so every earlier alternative keeps its index, and with it its ordering and
+/// hash.
 using Timing = std::variant<Immediately, NextTimepoint, WithinTicks, ForTicks,
-                            AfterTicks, Eventually, Always>;
+                            AfterTicks, Eventually, Always, Until, Before>;
 
 inline Timing immediately() { return Immediately{}; }
 inline Timing next_timepoint() { return NextTimepoint{}; }
@@ -62,6 +79,19 @@ inline Timing for_ticks(std::size_t ticks) { return ForTicks{ticks}; }
 inline Timing after_ticks(std::size_t ticks) { return AfterTicks{ticks}; }
 inline Timing eventually() { return Eventually{}; }
 inline Timing always() { return Always{}; }
+inline Timing until(Formula stop) { return Until{std::move(stop)}; }
+inline Timing before(Formula stop) { return Before{std::move(stop)}; }
+
+/// True for the alternatives carrying a stop condition.
+template <typename T>
+inline constexpr bool k_carries_stop =
+    std::is_same_v<T, Until> || std::is_same_v<T, Before>;
+
+/// Always false, but dependent on `T`: the final `else` of an `if constexpr`
+/// chain over a timing alternative asserts on it, so an alternative the chain
+/// does not name fails to compile instead of taking another timing's branch.
+template <typename T>
+inline constexpr bool k_unhandled_timing = false;
 
 }  // namespace timing
 
@@ -69,6 +99,10 @@ using Timing = timing::Timing;
 
 bool operator<(const Timing& lhs, const Timing& rhs);
 bool operator==(const Timing& lhs, const Timing& rhs);
+
+/// The stop condition of an `until` or `before` timing, or null for a timing
+/// that carries none.
+const Formula* timing_stop(const Timing& timing);
 
 /// Distinguishes how the condition field activates the requirement.
 /// - Trigger: requirement fires on a rising edge of the condition (false→true),
@@ -155,7 +189,7 @@ struct Requirement {
     friend bool operator==(const Requirement& lhs, const Requirement& rhs);
 
     explicit Requirement(
-        Formula condition, Formula response, const Timing& timing,
+        Formula condition, Formula response, Timing timing,
         ConditionType condition_type = ConditionType::Continual,
         bool weakenable = true, bool removed = false, Scope scope = Scope{});
 
@@ -319,7 +353,13 @@ struct hash<Timing> {
                               std::is_same_v<T, timing::AfterTicks>) {
                     return hash_combine(idx,
                                         std::hash<std::size_t>{}(val.m_ticks));
+                } else if constexpr (timing::k_carries_stop<T>) {
+                    return hash_combine(idx, std::hash<Formula>{}(val.m_stop));
                 } else {
+                    static_assert(std::is_same_v<T, timing::Immediately> ||
+                                  std::is_same_v<T, timing::NextTimepoint> ||
+                                  std::is_same_v<T, timing::Eventually> ||
+                                  std::is_same_v<T, timing::Always>);
                     return idx;
                 }
             },

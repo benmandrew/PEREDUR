@@ -65,7 +65,10 @@ int min_within_index(const Timing& tim) {
             } else if constexpr (std::is_same_v<T, timing::AfterTicks>) {
                 return static_cast<int>(val.m_ticks) + 1;
             } else {
-                return 0;  // Eventually: no WithinTicks in ↓tim
+                static_assert(std::is_same_v<T, timing::Eventually> ||
+                              std::is_same_v<T, timing::Always> ||
+                              timing::k_carries_stop<T>);
+                return 0;  // no WithinTicks in ↓tim
             }
         },
         tim);
@@ -167,9 +170,37 @@ double mu_intersection(const Timing& tim1, const Timing& tim2) {
     return result;
 }
 
+// A pair in which at least one timing carries a stop. The measure above has no
+// stop elements, so a stop timing is scored outside it and every stop-free pair
+// keeps its value. `until s` lies below Always and nowhere else in the order,
+// and `before s` lies nowhere, so across kinds the only overlap is `until s`
+// inside ↓Always: one element of weight w against μ(↓Always) + w. Within one
+// stop kind the score averages the kind match with the similarity of the two
+// stops, as the scope term averages regions with the mode.
+double stop_timing_similarity(const Timing& tim, const Timing& tim_other) {
+    const Formula* stop = timing_stop(tim);
+    const Formula* stop_other = timing_stop(tim_other);
+    if (stop != nullptr && stop_other != nullptr) {
+        if (tim.index() != tim_other.index()) {
+            return 0.0;
+        }
+        return (1.0 + stop->syntactic_similarity(*stop_other)) / 2.0;
+    }
+    const Timing& plain = stop == nullptr ? tim : tim_other;
+    const Timing& stopped = stop == nullptr ? tim_other : tim;
+    if (is_always(plain) && std::holds_alternative<timing::Until>(stopped)) {
+        return k_timing_discrete_weight /
+               (mu_downset_always() + k_timing_discrete_weight);
+    }
+    return 0.0;
+}
+
 // Jaccard similarity on downward closures:
 //   synSim_time(tim, tim') = μ(↓tim ∩ ↓tim') / μ(↓tim ∪ ↓tim')
 double timing_syntactic_similarity(const Timing& tim, const Timing& tim_other) {
+    if (timing_stop(tim) != nullptr || timing_stop(tim_other) != nullptr) {
+        return stop_timing_similarity(tim, tim_other);
+    }
     const double mu_tim = mu_downset(tim);
     const double mu_other = mu_downset(tim_other);
     const double mu_inter = mu_intersection(tim, tim_other);

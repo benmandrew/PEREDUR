@@ -37,11 +37,15 @@ const std::vector<ScopeCase>& scope_cases() {
 // cross-checked against the CLI at all; test_scope_zero_ticks_is_unrelaxed
 // pins them directly instead.
 const std::vector<Timing>& timing_cases() {
-    static const std::vector<Timing> timings = {
-        timing::immediately(),   timing::next_timepoint(),
-        timing::within_ticks(2), timing::for_ticks(2),
-        timing::after_ticks(2),  timing::eventually(),
-        timing::always()};
+    static const std::vector<Timing> timings = {timing::immediately(),
+                                                timing::next_timepoint(),
+                                                timing::within_ticks(2),
+                                                timing::for_ticks(2),
+                                                timing::after_ticks(2),
+                                                timing::eventually(),
+                                                timing::always(),
+                                                timing::until(Formula("s")),
+                                                timing::before(Formula("s"))};
     return timings;
 }
 
@@ -110,7 +114,7 @@ void test_scope_agrees_with_formaliser() {
 // has no room to be pre-empted by the boundary, so it is not relaxed. FRET
 // agrees but prints the empty range as `F[0,-1] ...`, which SPOT rejects, so
 // this is the one family the formaliser cannot arbitrate and it is pinned by
-// hand.
+// hand. The fuzzer folds the empty range to false and compares these rows.
 void test_scope_zero_ticks_is_unrelaxed() {
     const Requirement within =
         scoped(Scope{ScopeKind::In, "m"}, timing::within_ticks(0),
@@ -148,6 +152,10 @@ void test_global_scope_lowering_is_unchanged() {
          "G((c) -> (!(r) & X((r))))"},
         {timing::always(), ConditionType::Trigger,
          "G((!(c) & X(c)) -> X(G(r))) & ((c) -> G(r))"},
+        {timing::until(Formula("s")), ConditionType::Continual,
+         "G((c) -> ((r) W (s)))"},
+        {timing::before(Formula("s")), ConditionType::Continual,
+         "G((c) -> ((r) R (!(s))))"},
     };
     for (const Row& row : rows) {
         const Requirement req = scoped(Scope{}, row.m_timing, row.m_type);
@@ -238,12 +246,62 @@ void check_order_cell(const Timing& tim, ConditionType ctype) {
 }
 
 void test_scope_order_is_pinned() {
+    // A conjunction stop alongside timing_cases()' atom, since scope_order
+    // reads only the timing's kind and so claims its cells for every stop.
+    std::vector<Timing> timings = timing_cases();
+    timings.push_back(timing::until(Formula("s & t")));
+    timings.push_back(timing::before(Formula("s & t")));
     for (const ConditionType ctype :
          {ConditionType::Trigger, ConditionType::Continual}) {
-        for (const Timing& tim : timing_cases()) {
+        for (const Timing& tim : timings) {
             check_order_cell(tim, ctype);
         }
     }
+}
+
+// Where the stop timings sit in the timing order, which the timing arm and the
+// timing similarity term both rely on. Over the Global continual lowering,
+// `until s` has one edge into the other kinds, from Always above it, and
+// `before s` has none. Each moves only along its stop, positively in `until`
+// and negatively in `before`, and FRET's pairing of the two is not an order
+// between them.
+void test_stop_timing_order_is_pinned() {
+    const auto ltl = [](const Timing& tim) {
+        return scoped(Scope{}, tim, ConditionType::Continual).m_ltl;
+    };
+    const Timing until_s = timing::until(Formula("s"));
+    const Timing before_s = timing::before(Formula("s"));
+    for (const Timing& tim : timing_cases()) {
+        if (timing_stop(tim) != nullptr) {
+            continue;
+        }
+        const std::string where = to_string(tim);
+        const bool is_always = std::holds_alternative<timing::Always>(tim);
+        expect(ltl_implies(ltl(tim), ltl(until_s)) == is_always,
+               "stop order: " + where + (is_always ? " must" : " must not") +
+                   " imply until s");
+        expect(!ltl_implies(ltl(until_s), ltl(tim)),
+               "stop order: until s must not imply " + where);
+        expect(!ltl_implies(ltl(tim), ltl(before_s)) &&
+                   !ltl_implies(ltl(before_s), ltl(tim)),
+               "stop order: before s must be incomparable with " + where);
+    }
+    const Timing until_either = timing::until(Formula("s | t"));
+    const Timing before_either = timing::before(Formula("s | t"));
+    expect(ltl_implies(ltl(until_s), ltl(until_either)) &&
+               !ltl_implies(ltl(until_either), ltl(until_s)),
+           "stop order: until must weaken strictly as its stop weakens");
+    expect(ltl_implies(ltl(before_either), ltl(before_s)) &&
+               !ltl_implies(ltl(before_s), ltl(before_either)),
+           "stop order: before must strengthen strictly as its stop weakens");
+    expect(!ltl_implies(ltl(until_s), ltl(before_s)) &&
+               !ltl_implies(ltl(before_s), ltl(until_s)),
+           "stop order: until s and before s must be incomparable");
+    expect(ltl_equivalent(ltl(timing::until(Formula("false"))),
+                          ltl(timing::always())),
+           "stop order: until false must be equivalent to always");
+    expect(ltl_equivalent(ltl(timing::before(Formula("false"))), "true"),
+           "stop order: before false must be valid");
 }
 
 // Continual implies Trigger everywhere, which is what makes the condition-type
@@ -337,4 +395,5 @@ void run_scope_tests() {
     test_scope_agrees_with_formaliser();
     test_condition_type_order_is_pinned();
     test_scope_order_is_pinned();
+    test_stop_timing_order_is_pinned();
 }

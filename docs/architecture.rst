@@ -71,7 +71,7 @@ Key types
 ---------
 
 ``Timing``
-  ``std::variant<Immediately, NextTimepoint, WithinTicks, ForTicks, AfterTicks, Eventually, Always>``.  Encodes FRETISH temporal operators.  Defined in ``requirement.hpp``; constructors live in the ``timing::`` namespace so *argument-dependent lookup* (ADL) finds them for variant visitors.
+  ``std::variant<Immediately, NextTimepoint, WithinTicks, ForTicks, AfterTicks, Eventually, Always, Until, Before>``.  Encodes FRETISH temporal operators; ``Until`` and ``Before`` carry a propositional stop condition.  Defined in ``requirement.hpp``; constructors live in the ``timing::`` namespace so *argument-dependent lookup* (ADL) finds them for variant visitors.
 
 ``ConditionType``
   ``enum class { Trigger, Continual }``.  Controls whether a :class:`Requirement` fires on a rising edge of its condition (``Trigger``) or at every timepoint where the condition holds (``Continual``).
