@@ -6,14 +6,17 @@
 #include <cstdint>
 #include <iostream>
 #include <map>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #define TOML_EXCEPTIONS 1
 #include <toml++/toml.hpp>
 
+#include "config/enum_names.hpp"
 #include "runner/black.hpp"
 #include "runner/ltlfilt.hpp"
 #include "runner/spot.hpp"
@@ -22,10 +25,10 @@ namespace {
 
 /// Names the replacement for a selection_scheme spelling retired by the
 /// 2026-08-06 rename, as a clause to fold into the error, or "" for any other
-/// value. The retired spellings are matched here rather than as another
-/// `*val == "..."` arm of the chain below, where both a reader and
-/// scripts/check_config_schema.py take a comparison to mean the parser accepts
-/// the value -- these are rejected, and the schema's enum must not list them.
+/// value. The retired spellings are matched here rather than listed in
+/// EnumNames<SelectionScheme>, which both a reader and
+/// scripts/check_config_schema.py take to be the values the parser accepts --
+/// these are rejected, and the schema's enum must not list them.
 ///
 /// Rejected rather than aliased: every archived campaign config pins one of
 /// them, so each fails against a current binary, deliberately. Reproduce those
@@ -67,6 +70,30 @@ void require_nonnegative(double value, const char* name) {
         throw std::runtime_error(std::string("config: ") + name +
                                  " must be >= 0");
     }
+}
+
+/// Reads the string at `key` into `out` when it is set, rejecting any spelling
+/// EnumNames does not list.
+template <typename Enum>
+void read_enum(const toml::table& tbl, const char* key, Enum& out,
+               const char* path) {
+    const auto val = tbl[key].value<std::string>();
+    if (!val) {
+        return;
+    }
+    const std::optional<Enum> parsed = enum_from_name<Enum>(*val);
+    if (!parsed) {
+        if constexpr (std::is_same_v<Enum, SelectionScheme>) {
+            throw std::runtime_error(
+                "config: genetic.selection_scheme " +
+                retired_scheme_hint(*val) +
+                "must be \"weighted\", \"nsga2-truncate\", or "
+                "\"nsga2-apportion\"");
+        }
+        throw std::runtime_error(std::string("config: ") + path + " must be " +
+                                 enum_alternatives<Enum>());
+    }
+    out = *parsed;
 }
 
 // Mirrors the keys the apply_* functions below read, so that a typo in a
@@ -208,17 +235,7 @@ void apply_termination(const toml::table& tbl, Config& cfg) {
     if (auto val = tbl["max_wall_s"].value<int64_t>()) {
         cfg.max_wall_s = require_count(*val, "genetic.max_wall_s");
     }
-    if (auto val = tbl["termination"].value<std::string>()) {
-        if (*val == "generations") {
-            cfg.termination = TerminationMode::Generations;
-        } else if (*val == "individuals") {
-            cfg.termination = TerminationMode::Individuals;
-        } else {
-            throw std::runtime_error(
-                "config: genetic.termination must be \"generations\" or "
-                "\"individuals\"");
-        }
-    }
+    read_enum(tbl, "termination", cfg.termination, "genetic.termination");
     // Rejected rather than read as unlimited: a run with no search budget is
     // what the other mode is for, and silently treating zero as unbounded
     // would turn a typo into a run that ends only on its deadline. Checked
@@ -261,21 +278,8 @@ void apply_genetic(const toml::table& tbl, Config& cfg) {
         cfg.accumulate_repairs = *val;
     }
     apply_termination(tbl, cfg);
-    if (auto val = tbl["selection_scheme"].value<std::string>()) {
-        if (*val == "weighted") {
-            cfg.selection_scheme = SelectionScheme::WeightedAverage;
-        } else if (*val == "nsga2-truncate") {
-            cfg.selection_scheme = SelectionScheme::Nsga2Truncate;
-        } else if (*val == "nsga2-apportion") {
-            cfg.selection_scheme = SelectionScheme::Nsga2Apportion;
-        } else {
-            throw std::runtime_error(
-                "config: genetic.selection_scheme " +
-                retired_scheme_hint(*val) +
-                "must be \"weighted\", \"nsga2-truncate\", or "
-                "\"nsga2-apportion\"");
-        }
-    }
+    read_enum(tbl, "selection_scheme", cfg.selection_scheme,
+              "genetic.selection_scheme");
     // Elites are a subset of the selected parents, so elitism must be strictly
     // smaller than selection. Checked against the final values (either may come
     // from the TOML or fall back to its default).
@@ -299,30 +303,10 @@ void apply_fitness(const toml::table& tbl, Config& cfg) {
         require_nonnegative(*val, "fitness.weight_status");
         cfg.fitness_weight_status = *val;
     }
-    if (auto val = tbl["status_grading"].value<std::string>()) {
-        if (*val == "tiered") {
-            cfg.status_grading = StatusGrading::Tiered;
-        } else if (*val == "mrs") {
-            cfg.status_grading = StatusGrading::Mrs;
-        } else if (*val == "aurus") {
-            cfg.status_grading = StatusGrading::Aurus;
-        } else {
-            throw std::runtime_error(
-                R"(config: fitness.status_grading must be "tiered", "mrs" or )"
-                R"("aurus")");
-        }
-    }
-    if (auto val = tbl["mrs_admission_order"].value<std::string>()) {
-        if (*val == "spec") {
-            cfg.mrs_admission_order = MrsAdmissionOrder::Spec;
-        } else if (*val == "degree") {
-            cfg.mrs_admission_order = MrsAdmissionOrder::Degree;
-        } else {
-            throw std::runtime_error(
-                R"(config: fitness.mrs_admission_order must be "spec" or )"
-                R"("degree")");
-        }
-    }
+    read_enum(tbl, "status_grading", cfg.status_grading,
+              "fitness.status_grading");
+    read_enum(tbl, "mrs_admission_order", cfg.mrs_admission_order,
+              "fitness.mrs_admission_order");
 }
 
 void apply_mutation(const toml::table& tbl, Config& cfg) {
@@ -403,16 +387,7 @@ void apply_tlsf(const toml::table& tbl, Config& cfg) {
     if (const auto* mutation = tbl["mutation"].as_table()) {
         apply_tlsf_mutation(*mutation, cfg);
     }
-    if (auto val = tbl["repair_mode"].value<std::string>()) {
-        if (*val == "monolithic") {
-            cfg.repair_mode = RepairMode::Monolithic;
-        } else if (*val == "muc") {
-            cfg.repair_mode = RepairMode::Muc;
-        } else {
-            throw std::runtime_error(
-                R"(config: tlsf.repair_mode must be "monolithic" or "muc")");
-        }
-    }
+    read_enum(tbl, "repair_mode", cfg.repair_mode, "tlsf.repair_mode");
     if (auto val = tbl["muc_max_iterations"].value<int64_t>()) {
         cfg.muc_max_iterations = static_cast<std::size_t>(
             require_positive(*val, "tlsf.muc_max_iterations"));
@@ -424,17 +399,7 @@ void apply_model_counting(const toml::table& tbl, Config& cfg) {
         cfg.default_model_counting_bound = static_cast<std::size_t>(
             require_positive(*val, "model_counting.default_bound"));
     }
-    if (auto val = tbl["metric"].value<std::string>()) {
-        if (*val == "direct") {
-            cfg.similarity_metric = SimilarityMetric::Direct;
-        } else if (*val == "logarithmic") {
-            cfg.similarity_metric = SimilarityMetric::Logarithmic;
-        } else {
-            throw std::runtime_error(
-                "config: model_counting.metric must be \"direct\" or "
-                "\"logarithmic\"");
-        }
-    }
+    read_enum(tbl, "metric", cfg.similarity_metric, "model_counting.metric");
 }
 
 void apply_filters(const toml::table& tbl, Config& cfg) {

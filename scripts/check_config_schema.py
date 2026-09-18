@@ -128,16 +128,30 @@ def parser_keys(source):
     return flatten(SpecParser(tokenise(body)).parse_section())
 
 
-def parser_enums(source):
-    """Accepted string values per key, read from the *val == "..." chains."""
+def enum_spellings(source):
+    """Spellings per enum type, from the EnumNames specialisations."""
     found = {}
-    for match in re.finditer(r'tbl\["(\w+)"\]\.value<std::string>\(\)', source):
-        key = match.group(1)
-        rest = source[match.end() :]
-        # The chain ends at the next key lookup, or at the end of the file.
-        stop = re.search(r'tbl\["\w+"\]', rest)
-        block = rest[: stop.start()] if stop else rest
-        found[key] = set(re.findall(r'\*val == "([^"]+)"', block))
+    for match in re.finditer(r"struct EnumNames<(\w+)> \{(.*?)\n\};", source, re.S):
+        found[match.group(1)] = set(re.findall(r'"([^"]+)"', match.group(2)))
+    return found
+
+
+def member_types(hpp_source):
+    """Declared type per Config member, for the members read as enums."""
+    body = hpp_source[hpp_source.index("struct Config {") :]
+    return dict(
+        (name, kind) for kind, name in re.findall(r"^\s*(\w+) (\w+) = ", body, re.M)
+    )
+
+
+def parser_enums(source, names_source, hpp_source):
+    """Accepted string values per key: each read_enum call's Config member,
+    through its declared type, to that type's EnumNames spellings."""
+    spellings = enum_spellings(names_source)
+    types = member_types(hpp_source)
+    found = {}
+    for key, member in re.findall(r'read_enum\(\s*tbl,\s*"(\w+)",\s*cfg\.(\w+)', source):
+        found[key] = spellings.get(types.get(member), set())
     return found
 
 
@@ -492,6 +506,7 @@ def main():
     cpp = root / "src" / "config_io.cpp"
     manifest_cpp = root / "src" / "repair" / "manifest.cpp"
     hpp = root / "include" / "config.hpp"
+    names_hpp = root / "src" / "config" / "enum_names.hpp"
     schema_path = root / "schemas" / "config-schema.json"
     example_path = root / "example-config.toml"
 
@@ -508,6 +523,7 @@ def main():
     cpp_source, cpp_error = load(cpp, lambda text: text)
     manifest_source, manifest_error = load(manifest_cpp, lambda text: text)
     hpp_source, hpp_error = load(hpp, lambda text: text)
+    names_source, names_error = load(names_hpp, lambda text: text)
     schema, schema_error = load(schema_path, json.loads)
     example, example_error = load(example_path, tomllib.loads)
 
@@ -534,8 +550,9 @@ def main():
 
     fatal = [
         e
-        for e in (cpp_error, hpp_error, schema_error, example_error, spec_error,
-                  manifest_error, manifest_parse_error, gen_error)
+        for e in (cpp_error, hpp_error, names_error, schema_error,
+                  example_error, spec_error, manifest_error,
+                  manifest_parse_error, gen_error)
         if e
     ]
     if fatal:
@@ -546,6 +563,7 @@ def main():
 
     assert cpp_source is not None and schema is not None and example is not None
     assert from_parser is not None and hpp_source is not None
+    assert names_source is not None
     assert from_manifest is not None
     assert gen_defaults is not None
 
@@ -677,7 +695,7 @@ def main():
 
     # Closed-value keys: the parser's accepted strings must match the enum.
     nodes = schema_nodes(schema["properties"])
-    enums = parser_enums(cpp_source)
+    enums = parser_enums(cpp_source, names_source, hpp_source)
     for key in ENUM_KEYS:
         accepted = enums.get(key)
         if accepted is None:

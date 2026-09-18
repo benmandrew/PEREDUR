@@ -9,9 +9,11 @@
 #include <iostream>
 #include <set>
 #include <string>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
+#include "config/enum_names.hpp"
 #include "filter/correctness.hpp"
 #include "filter/implication.hpp"
 #include "filter/well_separation.hpp"
@@ -23,6 +25,14 @@
 #include "runner/ltlfilt.hpp"
 #include "runner/spot.hpp"
 #include "version.hpp"
+
+template <>
+struct EnumNames<StopReason> {
+    static constexpr std::array<std::pair<StopReason, const char*>, 3> k_names{
+        {{StopReason::Generations, "generations"},
+         {StopReason::Individuals, "individuals"},
+         {StopReason::Deadline, "deadline"}}};
+};
 
 namespace {
 
@@ -164,86 +174,6 @@ namespace {
 // so an earlier run's search is what it would have been at any value.
 constexpr int k_schema_version = 29;
 
-// The inverse of the spellings config_io.cpp parses. It has no table to
-// borrow -- it only ever goes string to enum -- so these must be kept in step
-// with it by hand. Getting one wrong writes a manifest that no longer round
-// trips into the config it describes.
-const char* scheme_name(SelectionScheme scheme) {
-    switch (scheme) {
-        case SelectionScheme::WeightedAverage:
-            return "weighted";
-        case SelectionScheme::Nsga2Truncate:
-            return "nsga2-truncate";
-        case SelectionScheme::Nsga2Apportion:
-            return "nsga2-apportion";
-    }
-    return "unknown";
-}
-
-const char* metric_name(SimilarityMetric metric) {
-    switch (metric) {
-        case SimilarityMetric::Direct:
-            return "direct";
-        case SimilarityMetric::Logarithmic:
-            return "logarithmic";
-    }
-    return "unknown";
-}
-
-const char* status_grading_name(StatusGrading grading) {
-    switch (grading) {
-        case StatusGrading::Tiered:
-            return "tiered";
-        case StatusGrading::Mrs:
-            return "mrs";
-        case StatusGrading::Aurus:
-            return "aurus";
-    }
-    return "unknown";
-}
-
-const char* mrs_admission_order_name(MrsAdmissionOrder order) {
-    switch (order) {
-        case MrsAdmissionOrder::Spec:
-            return "spec";
-        case MrsAdmissionOrder::Degree:
-            return "degree";
-    }
-    return "unknown";
-}
-
-const char* termination_name(TerminationMode mode) {
-    switch (mode) {
-        case TerminationMode::Generations:
-            return "generations";
-        case TerminationMode::Individuals:
-            return "individuals";
-    }
-    return "unknown";
-}
-
-const char* stop_reason_name(StopReason reason) {
-    switch (reason) {
-        case StopReason::Generations:
-            return "generations";
-        case StopReason::Individuals:
-            return "individuals";
-        case StopReason::Deadline:
-            return "deadline";
-    }
-    return "unknown";
-}
-
-const char* repair_mode_name(RepairMode mode) {
-    switch (mode) {
-        case RepairMode::Monolithic:
-            return "monolithic";
-        case RepairMode::Muc:
-            return "muc";
-    }
-    return "unknown";
-}
-
 std::string utc_timestamp() {
     const std::time_t now =
         std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -289,8 +219,8 @@ nlohmann::json config_json(const Config& cfg) {
               {"elitism_rate", cfg.elitism_rate},
               {"crossover_rate", cfg.crossover_rate},
               {"mutation_rate", cfg.mutation_rate},
-              {"selection_scheme", scheme_name(cfg.selection_scheme)},
-              {"termination", termination_name(cfg.termination)},
+              {"selection_scheme", enum_name(cfg.selection_scheme)},
+              {"termination", enum_name(cfg.termination)},
               {"max_individuals", cfg.max_individuals},
               {"max_wall_s", cfg.max_wall_s},
               {"accumulate_repairs", cfg.accumulate_repairs}}},
@@ -298,9 +228,8 @@ nlohmann::json config_json(const Config& cfg) {
              {{"weight_syntactic", cfg.fitness_weight_syntactic},
               {"weight_semantic", cfg.fitness_weight_semantic},
               {"weight_status", cfg.fitness_weight_status},
-              {"status_grading", status_grading_name(cfg.status_grading)},
-              {"mrs_admission_order",
-               mrs_admission_order_name(cfg.mrs_admission_order)}}},
+              {"status_grading", enum_name(cfg.status_grading)},
+              {"mrs_admission_order", enum_name(cfg.mrs_admission_order)}}},
             {"mutation",
              {{"p_trigger", cfg.p_trigger},
               {"p_response", cfg.p_response},
@@ -313,7 +242,7 @@ nlohmann::json config_json(const Config& cfg) {
               {"p_remove_guarantee", cfg.p_remove_guarantee},
               {"p_conditional_assumption", cfg.p_conditional_assumption}}},
             {"tlsf",
-             {{"repair_mode", repair_mode_name(cfg.repair_mode)},
+             {{"repair_mode", enum_name(cfg.repair_mode)},
               {"muc_max_iterations", cfg.muc_max_iterations},
               // Every key of [tlsf.mutation], not the two this block reported
               // until 2026-08-26. A campaign reads its arms out of run.json,
@@ -327,7 +256,7 @@ nlohmann::json config_json(const Config& cfg) {
                 {"p_bare_assumption", cfg.tlsf_p_bare_assumption}}}}},
             {"model_counting",
              {{"default_bound", cfg.default_model_counting_bound},
-              {"metric", metric_name(cfg.similarity_metric)}}},
+              {"metric", enum_name(cfg.similarity_metric)}}},
             {"filters", {{"run_implication", cfg.run_implication_filter}}},
             {"runtime",
              {{"black_timeout_ms", cfg.black_timeout.count()},
@@ -454,8 +383,7 @@ void write_run_manifest(const std::string& output_dir,
         // against the parent it was bred from, which an unbudgeted run does not
         // pay for, so a zero here would read as a fact rather than as an
         // absence.
-        {"stopped_by",
-         stop_reason_name(budget.reason(StopReason::Generations))},
+        {"stopped_by", enum_name(budget.reason(StopReason::Generations))},
         {"generations_run", budget.generations()},
         {"individuals_bred", budget.active() ? nlohmann::json(budget.bred())
                                              : nlohmann::json(nullptr)},
