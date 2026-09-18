@@ -1,16 +1,19 @@
 #include <chrono>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "filter/well_separation.hpp"
 #include "requirement.hpp"
 #include "runner/spot.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "well_separation_filter";
 
 // Restores the process-global ltlsynt timeout, which expect() would otherwise
 // leave set when it throws.
@@ -45,7 +48,7 @@ Specification with_assumptions(std::vector<Requirement> assumptions) {
                          {"grant"});
 }
 
-void test_no_assumptions_is_well_separated() {
+TEST(test_no_assumptions_is_well_separated) {
     RealizabilityChecker checker;
     const Specification spec = with_assumptions({});
     expect(!specification_is_not_well_separated(spec, checker),
@@ -54,7 +57,7 @@ void test_no_assumptions_is_well_separated() {
 
 // `G req` over the input atom req: the environment can keep req true forever,
 // so the system cannot force it to fail. `(G req) -> false` is unrealizable.
-void test_assumption_over_input_is_well_separated() {
+TEST(test_assumption_over_input_is_well_separated) {
     RealizabilityChecker checker;
     const Specification spec =
         with_assumptions({continual("req", timing::always())});
@@ -66,7 +69,7 @@ void test_assumption_over_input_is_well_separated() {
 // `G grant` over the output atom grant: the system controls grant, so it can
 // simply never assert it. `(G grant) -> false` is realizable, so the spec is
 // vacuously satisfiable and not well-separated.
-void test_assumption_over_output_is_not_well_separated() {
+TEST(test_assumption_over_output_is_not_well_separated) {
     RealizabilityChecker checker;
     const Specification spec =
         with_assumptions({continual("grant", timing::always())});
@@ -79,7 +82,7 @@ void test_assumption_over_output_is_not_well_separated() {
 // conjunction is not well-separated because the system can force `G grant` to
 // fail on its own. Exercises the multi-assumption conjunction path the single-
 // assumption cases never reach.
-void test_conjunction_with_a_forcible_conjunct_is_not_well_separated() {
+TEST(test_conjunction_with_a_forcible_conjunct_is_not_well_separated) {
     RealizabilityChecker checker;
     const Specification spec =
         with_assumptions({continual("req", timing::always()),
@@ -94,7 +97,7 @@ void test_conjunction_with_a_forcible_conjunct_is_not_well_separated() {
 // environment controls and can hold false forever. Well-separation is a game
 // property, not atom membership -- an assumption referencing an output atom is
 // not automatically droppable.
-void test_output_atom_the_system_cannot_force_is_well_separated() {
+TEST(test_output_atom_the_system_cannot_force_is_well_separated) {
     RealizabilityChecker checker;
     const Specification spec = with_assumptions(
         {continual_when("req", "grant", timing::immediately())});
@@ -114,7 +117,7 @@ Specification with_arbiter_assumptions(std::vector<Requirement> assumptions) {
 
 // `G F g0` (grant liveness) over the output g0: the system controls g0, so it
 // can simply never grant, making `F G !g0` realizable. Not well-separated.
-void test_grant_liveness_assumption_is_not_well_separated() {
+TEST(test_grant_liveness_assumption_is_not_well_separated) {
     RealizabilityChecker checker;
     const Specification spec =
         with_arbiter_assumptions({continual("g0", timing::eventually())});
@@ -127,7 +130,7 @@ void test_grant_liveness_assumption_is_not_well_separated() {
 // which the environment can withhold forever. Well-separated despite the output
 // reference -- exercises the output-atom fast path taking the solver route and
 // still returning well-separated.
-void test_request_response_assumption_is_well_separated() {
+TEST(test_request_response_assumption_is_well_separated) {
     RealizabilityChecker checker;
     const Specification spec = with_arbiter_assumptions(
         {continual_when("r0", "g0", timing::eventually())});
@@ -137,7 +140,7 @@ void test_request_response_assumption_is_well_separated() {
         "it needs an input the environment controls");
 }
 
-void test_filter_drops_only_the_non_well_separated_spec() {
+TEST(test_filter_drops_only_the_non_well_separated_spec) {
     RealizabilityChecker checker;
     FilterFunction filter = make_well_separation_filter(checker);
     const Specification good =
@@ -159,7 +162,7 @@ void test_filter_drops_only_the_non_well_separated_spec() {
 // and the filter's own ltlsynt load is what makes timeouts likely. G(req ->
 // grant) is genuinely well-separated (see above) and reaches the solver, so a
 // budget too short to decide it must flip the verdict to not-well-separated.
-void test_undecided_query_reads_as_not_well_separated() {
+TEST(test_undecided_query_reads_as_not_well_separated) {
     RealizabilityChecker checker;
     const Specification spec = with_assumptions(
         {continual_when("req", "grant", timing::immediately())});
@@ -187,7 +190,7 @@ void test_undecided_query_reads_as_not_well_separated() {
 // than cost one candidate. The throw is provoked here by handing ltlsynt an
 // LTL string it cannot parse: the same unreadable output on the same code
 // path, without the minutes of synthesis the acceptance-set abort costs.
-void test_raising_query_reads_as_not_well_separated() {
+TEST(test_raising_query_reads_as_not_well_separated) {
     RealizabilityChecker checker;
     Requirement assumption = continual("grant", timing::always());
     assumption.m_ltl = "grant &";
@@ -202,16 +205,3 @@ void test_raising_query_reads_as_not_well_separated() {
 }
 
 }  // namespace
-
-void run_well_separation_filter_tests() {
-    test_no_assumptions_is_well_separated();
-    test_assumption_over_input_is_well_separated();
-    test_assumption_over_output_is_not_well_separated();
-    test_conjunction_with_a_forcible_conjunct_is_not_well_separated();
-    test_output_atom_the_system_cannot_force_is_well_separated();
-    test_grant_liveness_assumption_is_not_well_separated();
-    test_request_response_assumption_is_well_separated();
-    test_filter_drops_only_the_non_well_separated_spec();
-    test_undecided_query_reads_as_not_well_separated();
-    test_raising_query_reads_as_not_well_separated();
-}

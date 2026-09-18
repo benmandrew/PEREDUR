@@ -1,9 +1,10 @@
 #include <cmath>
 #include <string>
+#include <string_view>
 
 #include "config.hpp"
 #include "fitness/status.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/fitness.hpp"
 #include "tlsf/parser.hpp"
@@ -11,13 +12,15 @@
 
 namespace {
 
+constexpr std::string_view k_test_suite = "tlsf_fitness";
+
 tlsf::Specification parse(const std::string& main_body,
                           const std::string& semantics = "Mealy") {
     return tlsf::parse("INFO { SEMANTICS: " + semantics + "; }\nMAIN {\n" +
                        main_body + "\n}\n");
 }
 
-void test_syntactic_self_similarity_is_one() {
+TEST(test_syntactic_self_similarity_is_one) {
     const Config cfg;
     const tlsf::Specification spec =
         parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> F g); }");
@@ -25,7 +28,7 @@ void test_syntactic_self_similarity_is_one() {
            "syntactic: a spec is syntactically identical to itself");
 }
 
-void test_semantic_self_similarity_is_one() {
+TEST(test_semantic_self_similarity_is_one) {
     Config cfg;
     cfg.default_model_counting_bound = 4;
     const tlsf::Specification spec =
@@ -40,7 +43,7 @@ void test_semantic_self_similarity_is_one() {
 // differently under the two metrics, so their cross-scores must diverge -- were
 // the config ignored, the TLSF path would stay on direct and the two would be
 // identical.
-void test_semantic_similarity_honours_configured_metric() {
+TEST(test_semantic_similarity_honours_configured_metric) {
     Config cfg;
     cfg.default_model_counting_bound = 4;
     const tlsf::Specification original =
@@ -62,7 +65,7 @@ void test_semantic_similarity_honours_configured_metric() {
            "direct and logarithmic scores diverge for a non-equivalent pair");
 }
 
-void test_status_realizable_is_one() {
+TEST(test_status_realizable_is_one) {
     const Config cfg;
     const tlsf::Specification spec =
         parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> r); }");
@@ -70,7 +73,7 @@ void test_status_realizable_is_one() {
            "status: a realizable spec scores 1.0");
 }
 
-void test_status_individually_unsatisfiable_formula_is_zero() {
+TEST(test_status_individually_unsatisfiable_formula_is_zero) {
     // One section formula that cannot hold on its own: the component tier.
     const Config cfg;
     const tlsf::Specification spec =
@@ -80,7 +83,7 @@ void test_status_individually_unsatisfiable_formula_is_zero() {
            "component tier");
 }
 
-void test_status_jointly_unsatisfiable_guarantees_are_unrealizable() {
+TEST(test_status_jointly_unsatisfiable_guarantees_are_unrealizable) {
     // `g` and `!g` are each satisfiable alone, so no component tier fires.
     // Their conjunction is not realizable, which the realizability query
     // reports -- the guarantee-side satisfiability tier this used to occupy
@@ -98,7 +101,7 @@ void test_status_jointly_unsatisfiable_guarantees_are_unrealizable() {
 // assumption_ltl() against guarantee_ltl(), which are AuRUS's own environment
 // and system formulae, so a side is unsatisfiable exactly where its own
 // conjuncts contradict.
-void test_status_aurus_grades_by_which_side_survives() {
+TEST(test_status_aurus_grades_by_which_side_survives) {
     Config cfg;
     cfg.status_grading = StatusGrading::Aurus;
     const std::string atoms = "INPUTS { r; } OUTPUTS { g; } ";
@@ -124,7 +127,7 @@ void test_status_aurus_grades_by_which_side_survives() {
 // output, so the system defeats it by never asserting g. The shared scale caps
 // that at the unrealizable tier; the AuRUS ladder does not ask the question,
 // because AuRUS does not.
-void test_status_aurus_does_not_penalise_an_ill_separated_spec() {
+TEST(test_status_aurus_does_not_penalise_an_ill_separated_spec) {
     Config cfg;
     const tlsf::Specification spec = parse(
         "INPUTS { r; } OUTPUTS { g; } ASSUME { G F g; } "
@@ -138,7 +141,7 @@ void test_status_aurus_does_not_penalise_an_ill_separated_spec() {
            "spec 1.0");
 }
 
-void test_aggregate_scores_in_unit_interval() {
+TEST(test_aggregate_scores_in_unit_interval) {
     Config cfg;
     cfg.default_model_counting_bound = 4;
     const tlsf::Specification spec =
@@ -152,15 +155,3 @@ void test_aggregate_scores_in_unit_interval() {
 }
 
 }  // namespace
-
-void run_tlsf_fitness_tests() {
-    test_syntactic_self_similarity_is_one();
-    test_semantic_self_similarity_is_one();
-    test_semantic_similarity_honours_configured_metric();
-    test_status_realizable_is_one();
-    test_status_individually_unsatisfiable_formula_is_zero();
-    test_status_jointly_unsatisfiable_guarantees_are_unrealizable();
-    test_status_aurus_grades_by_which_side_survives();
-    test_status_aurus_does_not_penalise_an_ill_separated_spec();
-    test_aggregate_scores_in_unit_interval();
-}

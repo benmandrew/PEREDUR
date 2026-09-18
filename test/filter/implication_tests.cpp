@@ -7,6 +7,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -19,11 +20,13 @@
 #include "fingerprint/prefilter.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 #include "thread_pool.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "implication_filter";
 
 // "G a": a holds at every timepoint.
 Requirement g_req(const std::string& atom) {
@@ -43,7 +46,7 @@ Specification make_spec(std::vector<Requirement> reqs) {
 
 // --- make_implication_filter ---
 
-void test_single_spec_returned_unchanged() {
+TEST(test_single_spec_returned_unchanged) {
     SatisfiabilityChecker checker;
     FilterFunction filter = make_implication_filter(checker);
     const auto pop = filter({make_spec({g_req("a")})});
@@ -51,7 +54,7 @@ void test_single_spec_returned_unchanged() {
            "implication_filter: single spec should be returned unchanged");
 }
 
-void test_independent_specs_both_kept() {
+TEST(test_independent_specs_both_kept) {
     // G a and G b are incomparable: neither implies the other.
     SatisfiabilityChecker checker;
     FilterFunction filter = make_implication_filter(checker);
@@ -60,7 +63,7 @@ void test_independent_specs_both_kept() {
            "implication_filter: incomparable specs should both be retained");
 }
 
-void test_dominated_spec_removed() {
+TEST(test_dominated_spec_removed) {
     // G a -> GF a (if a holds always, it holds infinitely often), but not
     // vice versa. So G a strictly dominates GF a, and GF a must be removed.
     SatisfiabilityChecker checker;
@@ -74,7 +77,7 @@ void test_dominated_spec_removed() {
            "implication_filter: the stronger spec (G a) should survive");
 }
 
-void test_equivalent_specs_collapse_to_one() {
+TEST(test_equivalent_specs_collapse_to_one) {
     // Two specs with identical LTL strings imply each other. They are one
     // repair written twice, so exactly one survives.
     SatisfiabilityChecker checker;
@@ -84,7 +87,7 @@ void test_equivalent_specs_collapse_to_one() {
            "implication_filter: equivalent specs should collapse to one");
 }
 
-void test_equivalence_tie_break_prefers_similar() {
+TEST(test_equivalence_tie_break_prefers_similar) {
     // "G(true -> a & a)" and "G(true -> a)" are logically equivalent and
     // structurally distinct, so the survivor is decided by the tie-break
     // rather than by duplicate collapsing. The original is "G(true -> a)", so
@@ -109,7 +112,7 @@ void test_equivalence_tie_break_prefers_similar() {
     }
 }
 
-void test_equivalence_without_key_still_collapses() {
+TEST(test_equivalence_without_key_still_collapses) {
     // With no similarity key the tie-break falls through to operator<, which
     // is what the `maximal` tool relies on: it has no original to rank
     // against, and must still not report one repair twice.
@@ -122,7 +125,7 @@ void test_equivalence_without_key_still_collapses() {
            "similarity key");
 }
 
-void test_chain_keeps_only_strongest() {
+TEST(test_chain_keeps_only_strongest) {
     // G a & G b  =>  G a  =>  GF a  (strict chain)
     // Only the spec with both G a and G b is maximal.
     SatisfiabilityChecker checker;
@@ -138,7 +141,7 @@ void test_chain_keeps_only_strongest() {
            "requirements");
 }
 
-void test_mixed_population() {
+TEST(test_mixed_population) {
     // A (G a & G b) strictly dominates B (G a) and C (GF a).
     // A also strictly dominates D (G b): (G a & G b) & !(G b) is UNSAT, but
     // (G b) & !(G a & G b) is SAT (b always true, a not), so D does not
@@ -157,6 +160,43 @@ void test_mixed_population() {
            "implication_filter: surviving spec should have two requirements");
 }
 
+TEST(test_weakening_response_implies) {
+    // A weaker (dropped-conjunct) response on the same condition/timing
+    // must be recognised as implied by the original: the propositional shortcut
+    // should confirm that (!a & b) -> b without needing a temporal LTL check.
+    SatisfiabilityChecker checker;
+    const Specification original(
+        {},
+        {Requirement(Formula("true"), Formula("!a & b"),
+                     timing::within_ticks(5))},
+        {}, {});
+    const Specification candidate(
+        {},
+        {Requirement(Formula("true"), Formula("b"), timing::within_ticks(5))},
+        {}, {});
+    expect(spec_implies(original, candidate, checker).value_or(false),
+           "spec_implies: weaker response (b) implied by (!a & b)");
+    expect(!spec_implies(candidate, original, checker).value_or(true),
+           "spec_implies: stronger response (!a & b) not implied by (b)");
+}
+
+TEST(test_independent_responses_not_implied) {
+    // Two requirements with unrelated responses: neither implies the other.
+    SatisfiabilityChecker checker;
+    const Specification spec_a(
+        {},
+        {Requirement(Formula("true"), Formula("a"), timing::within_ticks(5))},
+        {}, {});
+    const Specification spec_b(
+        {},
+        {Requirement(Formula("true"), Formula("b"), timing::within_ticks(5))},
+        {}, {});
+    expect(!spec_implies(spec_a, spec_b, checker).value_or(true),
+           "spec_implies: unrelated responses should not imply each other (a)");
+    expect(!spec_implies(spec_b, spec_a, checker).value_or(true),
+           "spec_implies: unrelated responses should not imply each other (b)");
+}
+
 // --- fingerprint prefilter ---
 
 // A sampled word may refute an implication and may never confirm one, so the
@@ -167,7 +207,7 @@ void test_mixed_population() {
 // `prop_formula_internal::try_parse_formula` reads it back -- and a silent
 // misparse would fingerprint a formula other than the one queried, which
 // nothing downstream would catch.
-void test_fretish_prefilter_refutes_only_non_implications() {
+TEST(test_fretish_prefilter_refutes_only_non_implications) {
     const std::vector<std::string> ins{"a", "b"};
     const std::vector<std::string> outs{"c"};
     const std::vector<std::string> modes{"m"};
@@ -228,7 +268,7 @@ std::vector<Specification> sorted(std::vector<Specification> specs) {
 // the merge meets both cases: a settled spec dominated by a later arrival
 // (G a, displaced by G a & G b), and an arrival dominated by a settled spec
 // (G b & GF a, below G a & G b).
-void test_batched_merge_matches_one_sweep() {
+TEST(test_batched_merge_matches_one_sweep) {
     SatisfiabilityChecker checker;
     const auto implies = [&checker](const Specification& lhs,
                                     const Specification& rhs) {
@@ -325,7 +365,7 @@ std::string read_whole(const std::string& path) {
 // with a name each and G a pushed twice. The result has to match the batch
 // filter whatever batches the coordinator happened to form, and the listing
 // has to name the maximal members in push order and nothing else.
-void test_streaming_matches_batch_filter() {
+TEST(test_streaming_matches_batch_filter) {
     const std::vector<Specification> specs{
         make_spec({g_req("a")}),
         make_spec({f_req("a")}),
@@ -364,7 +404,7 @@ void test_streaming_matches_batch_filter() {
 
 // A failed check must reach the caller rather than leave a smaller set that
 // reads as a result.
-void test_streaming_rethrows_a_failed_check() {
+TEST(test_streaming_rethrows_a_failed_check) {
     MaximalStreamRules<Specification> rules;
     rules.implies = [](const Specification&, const Specification&,
                        SatisfiabilityChecker&) -> bool {
@@ -384,7 +424,7 @@ void test_streaming_rethrows_a_failed_check() {
 }
 
 // Unwinding past an unfinished filter must not wait on the solver or hang.
-void test_streaming_destroyed_unfinished() {
+TEST(test_streaming_destroyed_unfinished) {
     const Config cfg;
     {
         StreamingMaximalFilter<Specification> stream(cfg, fretish_rules(), {});
@@ -400,58 +440,3 @@ void test_streaming_destroyed_unfinished() {
 // when two requirements share the same condition, timing, and condition_type,
 // implication reduces to a propositional check on the responses alone, avoiding
 // the expensive temporal LTL check that can time out under concurrent load.
-
-void test_weakening_response_implies() {
-    // A weaker (dropped-conjunct) response on the same condition/timing
-    // must be recognised as implied by the original: the propositional shortcut
-    // should confirm that (!a & b) -> b without needing a temporal LTL check.
-    SatisfiabilityChecker checker;
-    const Specification original(
-        {},
-        {Requirement(Formula("true"), Formula("!a & b"),
-                     timing::within_ticks(5))},
-        {}, {});
-    const Specification candidate(
-        {},
-        {Requirement(Formula("true"), Formula("b"), timing::within_ticks(5))},
-        {}, {});
-    expect(spec_implies(original, candidate, checker).value_or(false),
-           "spec_implies: weaker response (b) implied by (!a & b)");
-    expect(!spec_implies(candidate, original, checker).value_or(true),
-           "spec_implies: stronger response (!a & b) not implied by (b)");
-}
-
-void test_independent_responses_not_implied() {
-    // Two requirements with unrelated responses: neither implies the other.
-    SatisfiabilityChecker checker;
-    const Specification spec_a(
-        {},
-        {Requirement(Formula("true"), Formula("a"), timing::within_ticks(5))},
-        {}, {});
-    const Specification spec_b(
-        {},
-        {Requirement(Formula("true"), Formula("b"), timing::within_ticks(5))},
-        {}, {});
-    expect(!spec_implies(spec_a, spec_b, checker).value_or(true),
-           "spec_implies: unrelated responses should not imply each other (a)");
-    expect(!spec_implies(spec_b, spec_a, checker).value_or(true),
-           "spec_implies: unrelated responses should not imply each other (b)");
-}
-
-void run_implication_filter_tests() {
-    test_single_spec_returned_unchanged();
-    test_independent_specs_both_kept();
-    test_dominated_spec_removed();
-    test_equivalent_specs_collapse_to_one();
-    test_equivalence_tie_break_prefers_similar();
-    test_equivalence_without_key_still_collapses();
-    test_chain_keeps_only_strongest();
-    test_mixed_population();
-    test_weakening_response_implies();
-    test_independent_responses_not_implied();
-    test_fretish_prefilter_refutes_only_non_implications();
-    test_batched_merge_matches_one_sweep();
-    test_streaming_matches_batch_filter();
-    test_streaming_rethrows_a_failed_check();
-    test_streaming_destroyed_unfinished();
-}

@@ -2,43 +2,45 @@
 #include <chrono>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "runner/black.hpp"
 #include "runner/ltlfilt.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-void test_satisfiable_simple(const std::chrono::milliseconds& timeout) {
+constexpr std::string_view k_test_suite = "black_runner";
+
+TEST(test_satisfiable_simple) {
     SatisfiabilityChecker checker;
-    checker.set_timeout(timeout);
+    checker.set_timeout(k_test_black_timeout);
     const std::optional<bool> result = checker.check_satisfiability("F p");
     expect(result.has_value() && *result,
            "black-runner: F p should be satisfiable");
 }
 
-void test_unsatisfiable_contradiction(
-    const std::chrono::milliseconds& timeout) {
+TEST(test_unsatisfiable_contradiction) {
     SatisfiabilityChecker checker;
-    checker.set_timeout(timeout);
+    checker.set_timeout(k_test_black_timeout);
     const std::optional<bool> result = checker.check_satisfiability("p & !p");
     expect(result.has_value() && !*result,
            "black-runner: p & !p should be unsatisfiable");
 }
 
-void test_satisfiable_ltl(const std::chrono::milliseconds& timeout) {
+TEST(test_satisfiable_ltl) {
     SatisfiabilityChecker checker;
-    checker.set_timeout(timeout);
+    checker.set_timeout(k_test_black_timeout);
     const std::optional<bool> result = checker.check_satisfiability("G F p");
     expect(result.has_value() && *result,
            "black-runner: G F p should be satisfiable");
 }
 
-void test_unsatisfiable_ltl(const std::chrono::milliseconds& timeout) {
+TEST(test_unsatisfiable_ltl) {
     SatisfiabilityChecker checker;
-    checker.set_timeout(timeout);
+    checker.set_timeout(k_test_black_timeout);
     const std::optional<bool> result =
         checker.check_satisfiability("G !p & F p");
     expect(result.has_value() && !*result,
@@ -51,7 +53,7 @@ void test_unsatisfiable_ltl(const std::chrono::milliseconds& timeout) {
 // gets them right two ways over: ltlfilt folds most to a constant before black
 // is consulted, and anything reaching black has its constants rewritten to the
 // "True"/"False" spelling black reads as constants.
-void test_boolean_constants(const std::chrono::milliseconds& timeout) {
+TEST(test_boolean_constants) {
     struct Case {
         const char* formula;
         bool satisfiable;
@@ -75,7 +77,7 @@ void test_boolean_constants(const std::chrono::milliseconds& timeout) {
         {"p | 1", true},
     }};
     SatisfiabilityChecker checker;
-    checker.set_timeout(timeout);
+    checker.set_timeout(k_test_black_timeout);
     for (const Case& test_case : cases) {
         const std::optional<bool> result =
             checker.check_satisfiability(test_case.formula);
@@ -94,10 +96,9 @@ void test_boolean_constants(const std::chrono::milliseconds& timeout) {
 // atoms that merely contain or abut them must survive untouched. Reading
 // "true_count" as "True_count" would silently rename the variable; reading its
 // prefix as a constant would corrupt the formula outright.
-void test_constant_rewrite_respects_token_boundaries(
-    const std::chrono::milliseconds& timeout) {
+TEST(test_constant_rewrite_respects_token_boundaries) {
     SatisfiabilityChecker checker;
-    checker.set_timeout(timeout);
+    checker.set_timeout(k_test_black_timeout);
     // "true_count" and "True_count" are distinct atoms, so asserting one and
     // negating the other is satisfiable. A substring replacement would rewrite
     // the former into the latter, collide them, and report UNSAT.
@@ -130,10 +131,9 @@ void test_constant_rewrite_respects_token_boundaries(
 // constantly with a vacuous G(true) conjunct. Here dest is from plus G(true),
 // so from implies dest and the conjunction is unsatisfiable. Asked directly,
 // black reads G(true) as a constraint on a free variable and reports SAT.
-void test_implication_check_with_vacuous_conjunct(
-    const std::chrono::milliseconds& timeout) {
+TEST(test_implication_check_with_vacuous_conjunct) {
     SatisfiabilityChecker checker;
-    checker.set_timeout(timeout);
+    checker.set_timeout(k_test_black_timeout);
     const std::optional<bool> result = checker.check_satisfiability(
         "((G(a)) & (G(b))) & !(((G(a)) & (G(b))) & (G(true)))");
     expect(result.has_value() && !*result,
@@ -149,7 +149,7 @@ void test_implication_check_with_vacuous_conjunct(
 // wrong. check_satisfiability rewrites W and M away first, so these are the
 // cases that pin the rewrite -- each is a validity check, the shape that puts
 // a W under exactly one negation.
-void test_weak_until_validity(const std::chrono::milliseconds& timeout) {
+TEST(test_weak_until_validity) {
     struct Case {
         const char* formula;
         bool satisfiable;
@@ -175,7 +175,7 @@ void test_weak_until_validity(const std::chrono::milliseconds& timeout) {
         {"!((G(a)) -> ((a) W (b)))", false},
     }};
     SatisfiabilityChecker checker;
-    checker.set_timeout(timeout);
+    checker.set_timeout(k_test_black_timeout);
     for (const Case& test_case : cases) {
         const std::optional<bool> result =
             checker.check_satisfiability(test_case.formula);
@@ -193,7 +193,7 @@ void test_weak_until_validity(const std::chrono::milliseconds& timeout) {
 
 // The lexical guard must not fire on atoms that merely contain W or M, or
 // every formula over such atoms would pay an ltlfilt exec it does not need.
-void test_weak_operator_scan_respects_token_boundaries() {
+TEST(test_weak_operator_scan_respects_token_boundaries) {
     expect(!has_weak_operator("(G(WAIT)) & (F(ALARM))"),
            "ltlfilt: W and M inside atom names are not operators");
     expect(!has_weak_operator("(G(m_write)) | (F(w_M))"),
@@ -204,6 +204,19 @@ void test_weak_operator_scan_respects_token_boundaries() {
            "ltlfilt: a standalone M is an operator");
 }
 
+TEST(test_spot_satisfiable_decides_both_ways) {
+    const auto budget = std::chrono::milliseconds(5000);
+    expect(spot_satisfiable("F p", budget) == std::optional<bool>(true),
+           "spot: F p should be satisfiable");
+    expect(spot_satisfiable("(G !p) & (F p)", budget) ==
+               std::optional<bool>(false),
+           "spot: (G !p) & (F p) should be unsatisfiable");
+    // Exit status 2, which must read as no answer rather than as UNSAT: a
+    // parse error reported as unsatisfiable would drop a candidate silently.
+    expect(!spot_satisfiable("a &&& b", budget).has_value(),
+           "spot: a formula SPOT cannot parse yields no answer");
+}
+
 // SPOT's own blowup case, and the reason the first stage carries a budget at
 // all. A chain of `<->` over `G F` terms builds an automaton large enough that
 // construction runs unboundedly: left without a deadline one of these reached
@@ -211,7 +224,7 @@ void test_weak_operator_scan_respects_token_boundaries() {
 // is that the deadline is honoured -- execute_and_capture kills the process
 // group, so nothing survives the call -- and that the result reads as no
 // answer rather than as UNSAT, which would drop a candidate over a budget.
-void test_spot_blowup_is_bounded_not_answered() {
+TEST(test_spot_blowup_is_bounded_not_answered) {
     std::string formula = "G(F(p0))";
     for (int term = 1; term < 12; ++term) {
         formula.append(" <-> G(F(p").append(std::to_string(term)).append("))");
@@ -227,27 +240,13 @@ void test_spot_blowup_is_bounded_not_answered() {
            "spot: the budget is honoured rather than run to completion");
 }
 
-void test_spot_satisfiable_decides_both_ways() {
-    const auto budget = std::chrono::milliseconds(5000);
-    expect(spot_satisfiable("F p", budget) == std::optional<bool>(true),
-           "spot: F p should be satisfiable");
-    expect(spot_satisfiable("(G !p) & (F p)", budget) ==
-               std::optional<bool>(false),
-           "spot: (G !p) & (F p) should be unsatisfiable");
-    // Exit status 2, which must read as no answer rather than as UNSAT: a
-    // parse error reported as unsatisfiable would drop a candidate silently.
-    expect(!spot_satisfiable("a &&& b", budget).has_value(),
-           "spot: a formula SPOT cannot parse yields no answer");
-}
-
 // The case the routing exists for. black cannot decide this within any budget
 // the engine gives it -- at an X-chain depth of 40 it takes seconds, and the
 // depth grows with every generation the search runs -- while SPOT answers by
 // automaton emptiness in milliseconds regardless of depth. Before SPOT took
 // the first stage this returned nullopt, and the implication filter kept every
 // candidate it could not judge.
-void test_deep_nested_x_implication_is_decided(
-    const std::chrono::milliseconds& timeout) {
+TEST(test_deep_nested_x_implication_is_decided) {
     const auto x_chain = [](int depth) {
         std::string chain = "q";
         for (int step = 0; step < depth; ++step) {
@@ -260,7 +259,7 @@ void test_deep_nested_x_implication_is_decided(
     const std::string chain = x_chain(60);
     const std::string wider = x_chain(61);
     SatisfiabilityChecker checker;
-    checker.set_timeout(timeout);
+    checker.set_timeout(k_test_black_timeout);
     // "within 60" implies "within 61", so the implication holds and the query
     // asking whether it fails is unsatisfiable.
     const std::optional<bool> sat = checker.check_satisfiability(
@@ -273,8 +272,7 @@ void test_deep_nested_x_implication_is_decided(
 // Polarity governs escalation alone. Both spellings must agree on every
 // formula either backend can decide, or the filters would disagree with one
 // another over the same candidate.
-void test_polarity_does_not_change_the_answer(
-    const std::chrono::milliseconds& timeout) {
+TEST(test_polarity_does_not_change_the_answer) {
     const std::array<std::pair<const char*, bool>, 4> cases{
         {{"F p", true},
          {"p & !p", false},
@@ -283,8 +281,8 @@ void test_polarity_does_not_change_the_answer(
     for (const auto& [formula, satisfiable] : cases) {
         SatisfiabilityChecker sat_checker;
         SatisfiabilityChecker unsat_checker;
-        sat_checker.set_timeout(timeout);
-        unsat_checker.set_timeout(timeout);
+        sat_checker.set_timeout(k_test_black_timeout);
+        unsat_checker.set_timeout(k_test_black_timeout);
         const std::optional<bool> as_sat =
             sat_checker.check_satisfiability(formula, QueryPolarity::ExpectSat);
         const std::optional<bool> as_unsat = unsat_checker.check_satisfiability(
@@ -298,19 +296,3 @@ void test_polarity_does_not_change_the_answer(
 }
 
 }  // namespace
-
-void run_black_runner_tests(const std::chrono::milliseconds& timeout) {
-    test_satisfiable_simple(timeout);
-    test_unsatisfiable_contradiction(timeout);
-    test_satisfiable_ltl(timeout);
-    test_unsatisfiable_ltl(timeout);
-    test_boolean_constants(timeout);
-    test_constant_rewrite_respects_token_boundaries(timeout);
-    test_implication_check_with_vacuous_conjunct(timeout);
-    test_weak_until_validity(timeout);
-    test_weak_operator_scan_respects_token_boundaries();
-    test_spot_satisfiable_decides_both_ways();
-    test_spot_blowup_is_bounded_not_answered();
-    test_deep_nested_x_implication_is_decided(timeout);
-    test_polarity_does_not_change_the_answer(timeout);
-}

@@ -1,14 +1,17 @@
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 #include "prop_formula.hpp"
 #include "runner/ltlfilt.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "tlsf_parser";
 
 // Wraps a MAIN body (INPUTS/OUTPUTS/sections) in a minimal INFO+MAIN document.
 std::string doc(const std::string& main_body,
@@ -23,12 +26,12 @@ bool equiv(const std::string& lhs, const std::string& rhs) {
 
 // Confirms the ltlfilt oracle is actually live (not silently short-circuiting
 // to "true"); every equivalence assertion below relies on this.
-void test_oracle_is_live() {
+TEST(test_oracle_is_live) {
     expect(equiv("a", "a"), "oracle: a is equivalent to itself");
     expect(!equiv("a", "X(a)"), "oracle: a is not equivalent to X a");
 }
 
-void test_info_fields() {
+TEST(test_info_fields) {
     const tlsf::Specification spec = tlsf::parse(
         "INFO {\n"
         "  TITLE: \"Arbiter\";\n"
@@ -49,7 +52,7 @@ void test_info_fields() {
            "info: outputs parsed");
 }
 
-void test_semantics_variants() {
+TEST(test_semantics_variants) {
     expect(tlsf::parse(doc("GUARANTEE { g; }", "Mealy")).m_semantics ==
                tlsf::Semantics::MealyStandard,
            "semantics: bare Mealy defaults to standard");
@@ -64,7 +67,7 @@ void test_semantics_variants() {
            "semantics: Moore,strict (case-insensitive mode)");
 }
 
-void test_finite_rejected() {
+TEST(test_finite_rejected) {
     bool threw = false;
     try {
         tlsf::parse(doc("GUARANTEE { g; }", "Mealy,finite"));
@@ -77,7 +80,7 @@ void test_finite_rejected() {
     expect(threw, "semantics: finite semantics is rejected");
 }
 
-void test_all_sections_and_aliases() {
+TEST(test_all_sections_and_aliases) {
     const tlsf::Specification spec =
         tlsf::parse(doc("INPUTS { a; } OUTPUTS { b; }\n"
                         "INITIALLY { a; }\n"
@@ -104,7 +107,7 @@ void test_all_sections_and_aliases() {
 
 // Real-world basic TLSF (as emitted by syfco): INFO entries have no `;`
 // terminator and boolean connectives use the doubled `&&`/`||`.
-void test_real_format_no_semicolons_and_double_ops() {
+TEST(test_real_format_no_semicolons_and_double_ops) {
     const tlsf::Specification spec = tlsf::parse(
         "INFO {\n"
         "  TITLE:       \"TLSF - Test Specification\"\n"
@@ -136,7 +139,7 @@ void test_real_format_no_semicolons_and_double_ops() {
     expect(spec.m_guarantee.size() == 2, "real: two GUARANTEES parsed");
 }
 
-void test_double_operators() {
+TEST(test_double_operators) {
     auto first = [](const std::string& body) {
         return tlsf::parse(
                    doc("OUTPUTS { a; b; c; } GUARANTEE { " + body + "; }"))
@@ -150,7 +153,7 @@ void test_double_operators() {
            "operators: && binds tighter than ||");
 }
 
-void test_precedence_and_associativity() {
+TEST(test_precedence_and_associativity) {
     auto first = [](const std::string& body) {
         return tlsf::parse(
                    doc("OUTPUTS { a; b; c; } GUARANTEE { " + body + "; }"))
@@ -169,7 +172,7 @@ void test_precedence_and_associativity() {
            "precedence: -> binds tighter than <->");
 }
 
-void test_bounded_expansion() {
+TEST(test_bounded_expansion) {
     auto first = [](const std::string& body) {
         return tlsf::parse(doc("OUTPUTS { p; } GUARANTEE { " + body + "; }"))
             .m_guarantee.front()
@@ -189,7 +192,7 @@ void test_bounded_expansion() {
     expect(threw, "bounded: bound over 64 throws");
 }
 
-void test_comments_and_multistatement() {
+TEST(test_comments_and_multistatement) {
     const tlsf::Specification spec =
         tlsf::parse(doc("OUTPUTS { a; b; }\n"
                         "// a line comment\n"
@@ -214,7 +217,7 @@ void expect_reject(const std::string& text, const std::string& mentions,
     expect(threw, msg);
 }
 
-void test_error_cases() {
+TEST(test_error_cases) {
     expect_reject(
         "INFO { SEMANTICS: Mealy; }\n"
         "GLOBAL { }\n"
@@ -255,7 +258,7 @@ void test_error_cases() {
     expect(threw_garbage, "reject: garbage input throws, never crashes");
 }
 
-void test_to_ltl_standard_lowering() {
+TEST(test_to_ltl_standard_lowering) {
     // GR(1)-style arbiter.
     const tlsf::Specification arbiter =
         tlsf::parse(doc("INPUTS { req; } OUTPUTS { grant; }\n"
@@ -290,7 +293,7 @@ void test_to_ltl_standard_lowering() {
            "to_ltl: multi-statement conjunction on both sides");
 }
 
-void test_to_ltl_strict_lowering() {
+TEST(test_to_ltl_strict_lowering) {
     // Strict semantics move the system invariant ψ_s (ASSERT) into a weak-until
     // guard (ψ_s W ¬ψ_e) and drop it from the consequent:
     //   θ_e -> (θ_s & (ψ_s W ¬ψ_e) & ((G ψ_e & φ_e) -> φ_s))
@@ -312,19 +315,3 @@ void test_to_ltl_strict_lowering() {
 }
 
 }  // namespace
-
-void run_tlsf_parser_tests() {
-    test_oracle_is_live();
-    test_info_fields();
-    test_semantics_variants();
-    test_finite_rejected();
-    test_all_sections_and_aliases();
-    test_real_format_no_semicolons_and_double_ops();
-    test_double_operators();
-    test_precedence_and_associativity();
-    test_bounded_expansion();
-    test_comments_and_multistatement();
-    test_error_cases();
-    test_to_ltl_standard_lowering();
-    test_to_ltl_strict_lowering();
-}

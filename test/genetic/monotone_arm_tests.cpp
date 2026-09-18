@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "config.hpp"
@@ -9,10 +10,12 @@
 #include "prop_formula.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "fretish_monotone";
 
 const std::vector<std::string>& atom_pool() {
     static const std::vector<std::string> pool = {"a", "b", "c"};
@@ -90,7 +93,7 @@ void check_direction(const Requirement& original, Direction direction,
     }
 }
 
-void test_response_arm_moves_the_requirement() {
+TEST(test_response_arm_moves_the_requirement) {
     const std::vector<Timing> timings = {timing::immediately(),
                                          timing::next_timepoint(),
                                          timing::always(),
@@ -121,10 +124,38 @@ void test_response_arm_moves_the_requirement() {
                std::to_string(answered));
 }
 
+// The response sits under a negation in an "only" scope, so the direction the
+// rewrite takes has to flip with it. Getting this backwards is silent: the
+// rewrite still runs and still returns a comparable formula, pointing the
+// wrong way.
+TEST(test_only_scope_flips_the_response) {
+    const Scope only_in{ScopeKind::OnlyIn, "m"};
+    const Config cfg = response_only();
+    std::size_t answered = 0;
+    for (const Timing& timing :
+         {timing::always(), timing::eventually(), timing::until(Formula("b")),
+          timing::before(Formula("b"))}) {
+        const Requirement original =
+            subject(timing, ConditionType::Continual, only_in);
+        check_direction(original, Direction::Weaken, cfg,
+                        "monotone arm: an only-scoped requirement must imply "
+                        "its weakened rewrite",
+                        answered);
+        check_direction(original, Direction::Strengthen, cfg,
+                        "monotone arm: the strengthened rewrite must imply its "
+                        "only-scoped original",
+                        answered);
+    }
+    expect(answered > 4,
+           "monotone arm: the implication oracle settled too few of the "
+           "only-scope queries, got " +
+               std::to_string(answered));
+}
+
 // The stop occurs positively in `until` and negatively in `before`, and an
 // "only" scope swaps the two, so the stop arm's direction depends on both. A
 // sign error in either is silent in the same way as the response's.
-void test_stop_arm_moves_the_requirement() {
+TEST(test_stop_arm_moves_the_requirement) {
     const Config cfg = stop_only();
     std::size_t answered = 0;
     for (const Scope& scope : {global_scope(), Scope{ScopeKind::OnlyIn, "m"}}) {
@@ -148,34 +179,6 @@ void test_stop_arm_moves_the_requirement() {
     expect(answered > 10,
            "stop arm: the implication oracle settled too few of the queries "
            "to have asserted anything, got " +
-               std::to_string(answered));
-}
-
-// The response sits under a negation in an "only" scope, so the direction the
-// rewrite takes has to flip with it. Getting this backwards is silent: the
-// rewrite still runs and still returns a comparable formula, pointing the
-// wrong way.
-void test_only_scope_flips_the_response() {
-    const Scope only_in{ScopeKind::OnlyIn, "m"};
-    const Config cfg = response_only();
-    std::size_t answered = 0;
-    for (const Timing& timing :
-         {timing::always(), timing::eventually(), timing::until(Formula("b")),
-          timing::before(Formula("b"))}) {
-        const Requirement original =
-            subject(timing, ConditionType::Continual, only_in);
-        check_direction(original, Direction::Weaken, cfg,
-                        "monotone arm: an only-scoped requirement must imply "
-                        "its weakened rewrite",
-                        answered);
-        check_direction(original, Direction::Strengthen, cfg,
-                        "monotone arm: the strengthened rewrite must imply its "
-                        "only-scoped original",
-                        answered);
-    }
-    expect(answered > 4,
-           "monotone arm: the implication oracle settled too few of the "
-           "only-scope queries, got " +
                std::to_string(answered));
 }
 
@@ -204,7 +207,7 @@ void expect_general_rewrite(const Requirement& original, const Config& cfg,
     expect(mutated.*field == expected.*field, label);
 }
 
-void test_after_ticks_declines_the_arm() {
+TEST(test_after_ticks_declines_the_arm) {
     expect_general_rewrite(
         subject(timing::after_ticks(1), ConditionType::Continual,
                 global_scope()),
@@ -214,7 +217,7 @@ void test_after_ticks_declines_the_arm() {
         "place");
 }
 
-void test_trigger_condition_declines_the_arm() {
+TEST(test_trigger_condition_declines_the_arm) {
     Config cfg = response_only();
     cfg.p_response = 0.0;
     cfg.p_trigger = 1.0;
@@ -226,11 +229,3 @@ void test_trigger_condition_declines_the_arm() {
 }
 
 }  // namespace
-
-void run_fretish_monotone_tests() {
-    test_response_arm_moves_the_requirement();
-    test_only_scope_flips_the_response();
-    test_stop_arm_moves_the_requirement();
-    test_after_ticks_declines_the_arm();
-    test_trigger_condition_declines_the_arm();
-}

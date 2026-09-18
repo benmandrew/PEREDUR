@@ -9,12 +9,15 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "driver_support.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "driver_support";
 
 void expect_seed(const std::string& text, std::size_t expected) {
     const std::optional<std::size_t> parsed = parse_seed(text);
@@ -33,7 +36,7 @@ void expect_rejected(const std::string& text) {
            "expected '" + text + "' to be rejected as a seed");
 }
 
-void test_parse_seed_accepts_decimal_digits() {
+TEST(test_parse_seed_accepts_decimal_digits) {
     expect_seed("0", 0);
     expect_seed("1", 1);
     expect_seed("42", 42);
@@ -46,7 +49,7 @@ void test_parse_seed_accepts_decimal_digits() {
 // The regression this suite exists for: each of these used to reach
 // std::stoull unguarded, which either aborted the process through an uncaught
 // exception or returned a number bearing no relation to what was typed.
-void test_parse_seed_rejects_malformed_values() {
+TEST(test_parse_seed_rejects_malformed_values) {
     expect_rejected("");
     expect_rejected("abc");
     // stoull stops at the first non-digit and would report 12.
@@ -62,7 +65,7 @@ void test_parse_seed_rejects_malformed_values() {
     expect_rejected("99999999999999999999999999");
 }
 
-void test_has_flag_matches_whole_arguments() {
+TEST(test_has_flag_matches_whole_arguments) {
     const std::array<const char* const, 4> argv = {"peredur", "--dashboard",
                                                    "--seed", "7"};
     const int argc = static_cast<int>(argv.size());
@@ -74,7 +77,7 @@ void test_has_flag_matches_whole_arguments() {
            "expected argv[0] to be skipped");
 }
 
-void test_parse_string_arg_reads_the_following_argument() {
+TEST(test_parse_string_arg_reads_the_following_argument) {
     const std::array<const char* const, 4> argv = {"peredur", "--seed", "7",
                                                    "--trailing"};
     const int argc = static_cast<int>(argv.size());
@@ -89,10 +92,3 @@ void test_parse_string_arg_reads_the_following_argument() {
 }
 
 }  // namespace
-
-void run_driver_support_tests() {
-    test_parse_seed_accepts_decimal_digits();
-    test_parse_seed_rejects_malformed_values();
-    test_has_flag_matches_whole_arguments();
-    test_parse_string_arg_reads_the_following_argument();
-}

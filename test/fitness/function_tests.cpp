@@ -3,15 +3,18 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "fitness/function.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "fitness_function";
 
 Specification make_spec(const std::string& trigger,
                         const std::string& response) {
@@ -23,13 +26,13 @@ Specification make_spec(const std::string& trigger,
 
 // --- std::hash<Specification> ---
 
-void test_hash_identical_specifications_are_equal() {
+TEST(test_hash_identical_specifications_are_equal) {
     const Specification spec = make_spec("p", "q");
     expect(std::hash<Specification>{}(spec) == std::hash<Specification>{}(spec),
            "hash: identical specifications must hash to the same value");
 }
 
-void test_hash_equal_specifications_are_equal() {
+TEST(test_hash_equal_specifications_are_equal) {
     const Specification spec_a = make_spec("p", "q");
     const Specification spec_b = make_spec("p", "q");
     expect(std::hash<Specification>{}(spec_a) ==
@@ -38,7 +41,7 @@ void test_hash_equal_specifications_are_equal() {
            "value");
 }
 
-void test_hash_different_specifications_differ() {
+TEST(test_hash_different_specifications_differ) {
     const Specification spec_a = make_spec("p", "q");
     const Specification spec_b = make_spec("r", "s");
     expect(std::hash<Specification>{}(spec_a) !=
@@ -49,7 +52,7 @@ void test_hash_different_specifications_differ() {
 
 // --- AggregateWeightedFitnessFunction memoisation ---
 
-void test_fitness_function_memoises_repeated_calls() {
+TEST(test_fitness_function_memoises_repeated_calls) {
     int call_count = 0;
     const AggregateWeightedFitnessFunction fitness_fn(
         {{[&call_count](const Specification&) {
@@ -64,7 +67,7 @@ void test_fitness_function_memoises_repeated_calls() {
            "fitness: identical specification should be scored only once");
 }
 
-void test_fitness_function_scores_distinct_specs_independently() {
+TEST(test_fitness_function_scores_distinct_specs_independently) {
     int call_count = 0;
     const AggregateWeightedFitnessFunction fitness_fn(
         {{[&call_count](const Specification&) {
@@ -78,7 +81,7 @@ void test_fitness_function_scores_distinct_specs_independently() {
            "fitness: distinct specifications should each be scored once");
 }
 
-void test_fitness_function_cached_value_is_correct() {
+TEST(test_fitness_function_cached_value_is_correct) {
     const AggregateWeightedFitnessFunction fitness_fn(
         {{[](const Specification&) { return 0.75; }, 1.0, ""}});
     const Specification spec = make_spec("p", "q");
@@ -92,7 +95,7 @@ void test_fitness_function_cached_value_is_correct() {
 
 // --- per-objective exposure ---
 
-void test_objectives_returns_raw_component_scores_in_order() {
+TEST(test_objectives_returns_raw_component_scores_in_order) {
     const AggregateWeightedFitnessFunction fitness_fn(
         {{[](const Specification&) { return 0.25; }, 3.0, "a"},
          {[](const Specification&) { return 0.75; }, 1.0, "b"}});
@@ -105,7 +108,7 @@ void test_objectives_returns_raw_component_scores_in_order() {
         "objectives: raw component scores, unweighted, in registration order");
 }
 
-void test_operator_is_weighted_average_of_objectives() {
+TEST(test_operator_is_weighted_average_of_objectives) {
     const AggregateWeightedFitnessFunction fitness_fn(
         {{[](const Specification&) { return 0.25; }, 3.0, "a"},
          {[](const Specification&) { return 0.75; }, 1.0, "b"}});
@@ -114,7 +117,7 @@ void test_operator_is_weighted_average_of_objectives() {
            "operator(): weighted average over the raw objective scores");
 }
 
-void test_objectives_and_operator_share_one_evaluation() {
+TEST(test_objectives_and_operator_share_one_evaluation) {
     int call_count = 0;
     const AggregateWeightedFitnessFunction fitness_fn(
         {{[&call_count](const Specification&) {
@@ -131,7 +134,7 @@ void test_objectives_and_operator_share_one_evaluation() {
            "once and served from one shared cache");
 }
 
-void test_objectives_and_fitness_matches_separate_calls() {
+TEST(test_objectives_and_fitness_matches_separate_calls) {
     const AggregateWeightedFitnessFunction fitness_fn(
         {{[](const Specification&) { return 0.25; }, 3.0, "a"},
          {[](const Specification&) { return 0.75; }, 1.0, "b"}});
@@ -149,7 +152,7 @@ void test_objectives_and_fitness_matches_separate_calls() {
 
 // The whole split rests on this: whatever an objective decomposes into, folding
 // its parts must give the number the serial call gives.
-void test_plan_and_fold_matches_the_serial_score() {
+TEST(test_plan_and_fold_matches_the_serial_score) {
     const AggregateWeightedFitnessFunction fitness_fn(
         {{[](const Specification&) { return 0.25; }, 3.0, "whole"},
          {[](const Specification&) { return 0.75; }, 1.0, "split",
@@ -192,7 +195,7 @@ void test_plan_and_fold_matches_the_serial_score() {
            "same specification");
 }
 
-void test_cached_objectives_answers_only_after_scoring() {
+TEST(test_cached_objectives_answers_only_after_scoring) {
     const AggregateWeightedFitnessFunction fitness_fn(
         {{[](const Specification&) { return 0.5; }, 1.0, ""}});
     const Specification spec = make_spec("p", "q");
@@ -216,18 +219,3 @@ void test_cached_objectives_answers_only_after_scoring() {
 }
 
 }  // namespace
-
-void run_fitness_function_tests() {
-    test_hash_identical_specifications_are_equal();
-    test_hash_equal_specifications_are_equal();
-    test_hash_different_specifications_differ();
-    test_fitness_function_memoises_repeated_calls();
-    test_fitness_function_scores_distinct_specs_independently();
-    test_fitness_function_cached_value_is_correct();
-    test_objectives_returns_raw_component_scores_in_order();
-    test_operator_is_weighted_average_of_objectives();
-    test_objectives_and_operator_share_one_evaluation();
-    test_objectives_and_fitness_matches_separate_calls();
-    test_plan_and_fold_matches_the_serial_score();
-    test_cached_objectives_answers_only_after_scoring();
-}

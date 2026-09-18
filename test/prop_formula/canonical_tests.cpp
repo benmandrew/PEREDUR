@@ -1,18 +1,47 @@
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "formula_key.hpp"
 #include "prop_formula.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "prop_formula_canonical";
+
+// The asserting constructor is right for a caller that built its own input.
+// try_parse is for a string from outside, and under NDEBUG the asserts are
+// gone -- the walk used to run past the end of the text and throw out of
+// std::string::compare, which is what this pins.
+TEST(test_try_parse_reports_a_malformed_string) {
+    const std::vector<std::string> malformed = {
+        "G(", "(p", "p)", "", "&", "G(p", "(p) & ",
+    };
+    for (const std::string& text : malformed) {
+        expect(!Formula::try_parse(text).has_value(),
+               "prop-formula-canonical: try_parse should report \"" + text +
+                   "\" as malformed rather than assert on it");
+    }
+}
+
+TEST(test_try_parse_accepts_what_the_renderer_emits) {
+    const std::vector<std::string> valid = {
+        "p", "!(p)", "(p) & (q)", "G((p) -> (X(q)))", "(p) W (q)",
+    };
+    for (const std::string& text : valid) {
+        const auto parsed = Formula::try_parse(text);
+        expect(parsed.has_value() && parsed->to_string() == text,
+               "prop-formula-canonical: try_parse should round-trip " + text);
+    }
+}
 
 // The renderer emitted the temporal operators long before the parser could
 // read them back, so every cache key built from a rendered formula was a
 // string nothing in-process could reparse. Canonicalisation depends on that
 // round trip, so it is pinned first.
-void test_parser_round_trips_temporal_operators() {
+TEST(test_parser_round_trips_temporal_operators) {
     const std::vector<std::string> formulae = {
         "G(p)",
         "F(X(p))",
@@ -34,7 +63,7 @@ void test_parser_round_trips_temporal_operators() {
 // An operator spelled as a letter is only an operator when what follows cannot
 // continue an identifier, or every atom beginning with G, F, X, U, R or W
 // lexes as an operator applied to its own tail.
-void test_operator_letters_do_not_eat_identifiers() {
+TEST(test_operator_letters_do_not_eat_identifiers) {
     const Formula grant("Grant");
     expect(grant.kind() == Formula::Kind::Atom &&
                grant.atom_name().value_or("") == "Grant",
@@ -47,7 +76,7 @@ void test_operator_letters_do_not_eat_identifiers() {
            "prop-formula-canonical: atoms named for operators should lex");
 }
 
-void test_commutative_operands_are_ordered() {
+TEST(test_commutative_operands_are_ordered) {
     const std::string left =
         Formula("(a) & ((b) & (c))").canonical().to_string();
     const std::string right =
@@ -64,7 +93,7 @@ void test_commutative_operands_are_ordered() {
            "prop-formula-canonical: | should order its operands");
 }
 
-void test_repeated_operands_are_dropped() {
+TEST(test_repeated_operands_are_dropped) {
     const std::string once = Formula("(a) & (b)").canonical().to_string();
     const std::string twice =
         Formula("((a) & (b)) & (a)").canonical().to_string();
@@ -72,7 +101,7 @@ void test_repeated_operands_are_dropped() {
                               once + " against " + twice);
 }
 
-void test_double_negation_is_dropped() {
+TEST(test_double_negation_is_dropped) {
     const std::string plain = Formula("p").canonical().to_string();
     const std::string negated = Formula("!(!(p))").canonical().to_string();
     expect(
@@ -82,7 +111,7 @@ void test_double_negation_is_dropped() {
 
 // Iff is commutative and associative but not idempotent: `a <-> a` is the
 // constant true, so deduplicating its operands would change what it says.
-void test_iff_is_ordered_but_not_deduplicated() {
+TEST(test_iff_is_ordered_but_not_deduplicated) {
     const std::string forward = Formula("(a) <-> (b)").canonical().to_string();
     const std::string backward = Formula("(b) <-> (a)").canonical().to_string();
     expect(forward == backward,
@@ -92,7 +121,7 @@ void test_iff_is_ordered_but_not_deduplicated() {
            "prop-formula-canonical: a <-> a must stay a biconditional");
 }
 
-void test_non_commutative_operators_keep_their_order() {
+TEST(test_non_commutative_operators_keep_their_order) {
     const std::vector<std::string> kinds = {"U", "R", "W", "->"};
     for (const std::string& kind : kinds) {
         const std::string forward =
@@ -105,7 +134,7 @@ void test_non_commutative_operators_keep_their_order() {
     }
 }
 
-void test_canonical_form_is_idempotent() {
+TEST(test_canonical_form_is_idempotent) {
     const Formula once =
         Formula("((c) & (b)) & ((a) | ((b) | (a)))").canonical();
     const Formula twice = once.canonical();
@@ -120,7 +149,7 @@ void test_canonical_form_is_idempotent() {
            "itself");
 }
 
-void test_renaming_collapses_alpha_equivalent_formulae() {
+TEST(test_renaming_collapses_alpha_equivalent_formulae) {
     expect(formula_key::renamed("G((p) -> (X(q)))") ==
                formula_key::renamed("G((r) -> (X(s)))"),
            "formula-key: alpha-equivalent formulae should share a key, got " +
@@ -136,7 +165,7 @@ void test_renaming_collapses_alpha_equivalent_formulae() {
 // reading it back would mean renaming inside a tool's own output and SPOT
 // prints a unary operator hard against its operand. The canonical key exists
 // for those caches, so it must leave the atom names alone.
-void test_canonical_key_preserves_atom_names() {
+TEST(test_canonical_key_preserves_atom_names) {
     const std::string key = formula_key::canonical("G((high_water) -> (pump))");
     expect(key.find("high_water") != std::string::npos &&
                key.find("pump") != std::string::npos,
@@ -144,7 +173,7 @@ void test_canonical_key_preserves_atom_names() {
                key);
 }
 
-void test_constants_are_never_renamed() {
+TEST(test_constants_are_never_renamed) {
     const std::string key = formula_key::renamed("(true) & ((p) | (false))");
     expect(key.find("true") != std::string::npos &&
                key.find("false") != std::string::npos,
@@ -156,7 +185,7 @@ void test_constants_are_never_renamed() {
 // Realizability is invariant under a bijection on the atoms only when that
 // bijection preserves the input/output partition, so an input and an output
 // must never collapse onto one another.
-void test_realizability_key_preserves_the_partition() {
+TEST(test_realizability_key_preserves_the_partition) {
     const std::vector<std::string> inputs = {"req"};
     const std::vector<std::string> outputs = {"grant"};
     const std::string forward =
@@ -176,7 +205,7 @@ void test_realizability_key_preserves_the_partition() {
 
 // A declared signal the formula never mentions is still part of the alphabet
 // the synthesiser plays over, so the key has to count them.
-void test_realizability_key_counts_unmentioned_signals() {
+TEST(test_realizability_key_counts_unmentioned_signals) {
     const std::vector<std::string> outputs = {"grant"};
     const std::string narrow =
         formula_key::realizability("G(grant)", {"req"}, outputs);
@@ -187,48 +216,4 @@ void test_realizability_key_counts_unmentioned_signals() {
            "change the key");
 }
 
-// The asserting constructor is right for a caller that built its own input.
-// try_parse is for a string from outside, and under NDEBUG the asserts are
-// gone -- the walk used to run past the end of the text and throw out of
-// std::string::compare, which is what this pins.
-void test_try_parse_reports_a_malformed_string() {
-    const std::vector<std::string> malformed = {
-        "G(", "(p", "p)", "", "&", "G(p", "(p) & ",
-    };
-    for (const std::string& text : malformed) {
-        expect(!Formula::try_parse(text).has_value(),
-               "prop-formula-canonical: try_parse should report \"" + text +
-                   "\" as malformed rather than assert on it");
-    }
-}
-
-void test_try_parse_accepts_what_the_renderer_emits() {
-    const std::vector<std::string> valid = {
-        "p", "!(p)", "(p) & (q)", "G((p) -> (X(q)))", "(p) W (q)",
-    };
-    for (const std::string& text : valid) {
-        const auto parsed = Formula::try_parse(text);
-        expect(parsed.has_value() && parsed->to_string() == text,
-               "prop-formula-canonical: try_parse should round-trip " + text);
-    }
-}
-
 }  // namespace
-
-void run_prop_formula_canonical_tests() {
-    test_try_parse_reports_a_malformed_string();
-    test_try_parse_accepts_what_the_renderer_emits();
-    test_parser_round_trips_temporal_operators();
-    test_operator_letters_do_not_eat_identifiers();
-    test_commutative_operands_are_ordered();
-    test_repeated_operands_are_dropped();
-    test_double_negation_is_dropped();
-    test_iff_is_ordered_but_not_deduplicated();
-    test_non_commutative_operators_keep_their_order();
-    test_canonical_form_is_idempotent();
-    test_renaming_collapses_alpha_equivalent_formulae();
-    test_canonical_key_preserves_atom_names();
-    test_constants_are_never_renamed();
-    test_realizability_key_preserves_the_partition();
-    test_realizability_key_counts_unmentioned_signals();
-}

@@ -15,6 +15,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -24,13 +25,15 @@
 #include "prop_formula.hpp"
 #include "requirement.hpp"
 #include "serialisation.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
 #include "tlsf/writer.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "accumulator";
 
 const char* const k_tlsf_spec =
     "INFO { SEMANTICS: Mealy; }\n"
@@ -126,7 +129,7 @@ std::string read_file(const std::filesystem::path& path) {
     return contents.str();
 }
 
-void test_disabled_accumulator_keeps_nothing() {
+TEST(test_disabled_accumulator_keeps_nothing) {
     RepairAccumulator<Specification> accumulator(false);
     expect(!accumulator.enabled(), "accumulator: constructed disabled");
     accumulator.insert(make_spec("x"), 1);
@@ -137,7 +140,7 @@ void test_disabled_accumulator_keeps_nothing() {
 
 // With the key off the output is what the final population's own collection
 // returned, unchanged and in its own order.
-void test_disabled_accumulator_leaves_the_output_alone() {
+TEST(test_disabled_accumulator_leaves_the_output_alone) {
     const RepairAccumulator<Specification> accumulator(false);
     std::vector<Specification> collected = {make_spec("x"), make_spec("y")};
     const std::size_t added =
@@ -150,7 +153,7 @@ void test_disabled_accumulator_leaves_the_output_alone() {
 
 // The case the accumulator exists for: gate-passing in an early generation,
 // gone by the last one.
-void test_early_repair_survives_its_generation() {
+TEST(test_early_repair_survives_its_generation) {
     RepairAccumulator<Specification> accumulator(true);
     const Specification early = make_spec("x");
     const Specification late = make_spec("y");
@@ -168,7 +171,7 @@ void test_early_repair_survives_its_generation() {
            "accumulator: a repair already collected is not emitted twice");
 }
 
-void test_repeated_insertions_collapse() {
+TEST(test_repeated_insertions_collapse) {
     RepairAccumulator<Specification> accumulator(true);
     // The same specification survives many generations, so the gate admits it
     // once per generation; the accumulator is a set, not a log.
@@ -180,7 +183,7 @@ void test_repeated_insertions_collapse() {
            "accumulator: repeated insertions of one specification collapse");
 }
 
-void test_first_seen_order_is_kept() {
+TEST(test_first_seen_order_is_kept) {
     RepairAccumulator<Specification> accumulator(true);
     accumulator.insert(make_spec("y"), 1);
     accumulator.insert(make_spec("x"), 2);
@@ -193,7 +196,7 @@ void test_first_seen_order_is_kept() {
 
 // A tombstoned guarantee is part of a specification's identity, so a candidate
 // that deleted one must not collapse onto the candidate it was derived from.
-void test_a_removed_guarantee_is_a_distinct_repair() {
+TEST(test_a_removed_guarantee_is_a_distinct_repair) {
     Specification removed = make_spec("x");
     removed.m_guarantees[0].m_removed = true;
     RepairAccumulator<Specification> accumulator(true);
@@ -203,7 +206,7 @@ void test_a_removed_guarantee_is_a_distinct_repair() {
            "accumulator: a deleted guarantee makes a distinct specification");
 }
 
-void test_merge_reports_only_what_it_added() {
+TEST(test_merge_reports_only_what_it_added) {
     std::vector<Specification> collected = {make_spec("x")};
     const std::vector<Specification> accumulated = {
         make_spec("x"), make_spec("y"), make_spec("y")};
@@ -215,7 +218,7 @@ void test_merge_reports_only_what_it_added() {
 
 // The key off must cost nothing on disk either: no directory, so nothing for a
 // campaign's output tree to grow that its configs never asked for.
-void test_nothing_is_written_with_the_key_off() {
+TEST(test_nothing_is_written_with_the_key_off) {
     const TempDir dir;
     RepairAccumulator<Specification> accumulator(false, json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
@@ -227,7 +230,7 @@ void test_nothing_is_written_with_the_key_off() {
 // The point of writing as we go: a run killed mid-search keeps everything it
 // had already accumulated, so each specification is a closed file before the
 // next one is inserted.
-void test_one_file_per_accumulated_specification() {
+TEST(test_one_file_per_accumulated_specification) {
     const TempDir dir;
     RepairAccumulator<Specification> accumulator(true, json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
@@ -245,10 +248,27 @@ void test_one_file_per_accumulated_specification() {
         "accumulator: file names carry the generation and a unique sequence");
 }
 
+TEST(test_written_files_parse_back_to_what_was_accumulated) {
+    const TempDir dir;
+    RepairAccumulator<Specification> accumulator(true, json_writer(dir));
+    accumulator.insert(make_spec("x"), 1);
+    accumulator.insert(make_spec("y"), 2);
+    const std::vector<std::filesystem::path> paths = written_files(dir);
+    expect(paths.size() == 2, "accumulator: both specifications were written");
+    std::vector<Specification> parsed;
+    parsed.reserve(paths.size());
+    for (const std::filesystem::path& path : paths) {
+        parsed.push_back(
+            nlohmann::json::parse(read_file(path)).get<Specification>());
+    }
+    expect(holds(parsed, make_spec("x")) && holds(parsed, make_spec("y")),
+           "accumulator: each file parses back to the specification written");
+}
+
 // The index is what makes a run's accumulation legible on a time axis: every
 // "over time" metric reads it rather than the file names, which carry the
 // generation but no clock.
-void test_the_index_carries_a_row_per_specification() {
+TEST(test_the_index_carries_a_row_per_specification) {
     const TempDir dir;
     RepairAccumulator<Specification> accumulator(true, json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
@@ -271,7 +291,7 @@ void test_the_index_carries_a_row_per_specification() {
 
 // A writer given no clock still writes its files; the column reads zero rather
 // than the row being absent, so a reader never has to handle a ragged index.
-void test_the_index_reports_zero_without_a_clock() {
+TEST(test_the_index_reports_zero_without_a_clock) {
     const TempDir dir;
     RepairAccumulator<Specification> accumulator(true, json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
@@ -284,7 +304,7 @@ void test_the_index_reports_zero_without_a_clock() {
 // The clock reaches the index, and rows carry it in the order they were
 // written. Whether the seconds are plausible is the driver's business; what
 // this pins is that the writer asks the clock at all.
-void test_the_index_records_the_clock_it_was_given() {
+TEST(test_the_index_records_the_clock_it_was_given) {
     const TempDir dir;
     double now = 0.0;
     AccumulatedRepairWriter<Specification> writer(
@@ -309,27 +329,10 @@ void test_the_index_records_the_clock_it_was_given() {
            "accumulator: the second row carries its own, got " + rows[2]);
 }
 
-void test_written_files_parse_back_to_what_was_accumulated() {
-    const TempDir dir;
-    RepairAccumulator<Specification> accumulator(true, json_writer(dir));
-    accumulator.insert(make_spec("x"), 1);
-    accumulator.insert(make_spec("y"), 2);
-    const std::vector<std::filesystem::path> paths = written_files(dir);
-    expect(paths.size() == 2, "accumulator: both specifications were written");
-    std::vector<Specification> parsed;
-    parsed.reserve(paths.size());
-    for (const std::filesystem::path& path : paths) {
-        parsed.push_back(
-            nlohmann::json::parse(read_file(path)).get<Specification>());
-    }
-    expect(holds(parsed, make_spec("x")) && holds(parsed, make_spec("y")),
-           "accumulator: each file parses back to the specification written");
-}
-
 // The other path's serialiser, on the same writer. tlsf::write is the boundary
 // where a specification becomes a document, so a tombstoned guarantee is absent
 // from the file and the text parses back without it.
-void test_the_tlsf_serialiser_round_trips() {
+TEST(test_the_tlsf_serialiser_round_trips) {
     const TempDir dir;
     const tlsf::Specification spec = tlsf::parse(k_tlsf_spec);
     AccumulatedRepairWriter<tlsf::Specification> writer(
@@ -346,20 +349,3 @@ void test_the_tlsf_serialiser_round_trips() {
 }
 
 }  // namespace
-
-void run_accumulator_tests() {
-    test_disabled_accumulator_keeps_nothing();
-    test_disabled_accumulator_leaves_the_output_alone();
-    test_early_repair_survives_its_generation();
-    test_repeated_insertions_collapse();
-    test_first_seen_order_is_kept();
-    test_a_removed_guarantee_is_a_distinct_repair();
-    test_merge_reports_only_what_it_added();
-    test_nothing_is_written_with_the_key_off();
-    test_one_file_per_accumulated_specification();
-    test_written_files_parse_back_to_what_was_accumulated();
-    test_the_index_carries_a_row_per_specification();
-    test_the_index_reports_zero_without_a_clock();
-    test_the_index_records_the_clock_it_was_given();
-    test_the_tlsf_serialiser_round_trips();
-}

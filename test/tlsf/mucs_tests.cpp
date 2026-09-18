@@ -1,17 +1,20 @@
 #include <algorithm>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "prop_formula.hpp"
 #include "runner/spot.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/mucs.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "tlsf_mucs";
 
 // Whether any guarantee-side section of `spec` contains the named atom. The
 // fake oracles below phrase their (un)realizability verdict over these.
@@ -36,7 +39,7 @@ std::set<std::string> core_atoms(const tlsf::MinimalUnrealizableCore& muc) {
 
 // The two-guarantee conflict {a, b} sits among four guarantees; QuickXplain
 // must return exactly {a, b}.
-void test_extracts_minimal_pair() {
+TEST(test_extracts_minimal_pair) {
     tlsf::Specification spec;
     spec.m_inputs = {"x"};
     spec.m_outputs = {"y"};
@@ -58,7 +61,7 @@ void test_extracts_minimal_pair() {
 
 // The conflict is on the last two candidates; confirms the result is a genuine
 // minimal set, not just a prefix of the input order.
-void test_conflict_at_tail() {
+TEST(test_conflict_at_tail) {
     tlsf::Specification spec;
     spec.m_outputs = {"y"};
     spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b"),
@@ -74,7 +77,7 @@ void test_conflict_at_tail() {
 }
 
 // A single-formula core.
-void test_singleton_core() {
+TEST(test_singleton_core) {
     tlsf::Specification spec;
     spec.m_outputs = {"y"};
     spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b")};
@@ -88,7 +91,7 @@ void test_singleton_core() {
 
 // The culprits span two different sections; the core must tag each with the
 // right section id so the rebuilt spec places them correctly.
-void test_core_spans_sections() {
+TEST(test_core_spans_sections) {
     tlsf::Specification spec;
     spec.m_outputs = {"y"};
     spec.m_preset = {Formula::make_atom("p")};
@@ -119,7 +122,7 @@ void test_core_spans_sections() {
 
 // With no guarantee-side formulae there is nothing to minimise: the core is
 // empty even when the oracle reports unrealizable.
-void test_empty_guarantee_side() {
+TEST(test_empty_guarantee_side) {
     tlsf::Specification spec;
     spec.m_inputs = {"x"};
     spec.m_outputs = {"y"};
@@ -129,6 +132,64 @@ void test_empty_guarantee_side() {
 
     const tlsf::MinimalUnrealizableCore muc = tlsf::extract_muc(spec, oracle);
     expect(muc.formulae.empty(), "empty guarantee side yields an empty core");
+}
+
+// The concurrent singleton pre-screen must not change the answer. A singleton
+// conflict sitting third is found by the screen rather than by QuickXplain's
+// walk, and the core is the same either way.
+TEST(test_screen_finds_singleton) {
+    tlsf::Specification spec;
+    spec.m_outputs = {"y"};
+    spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b"),
+                        Formula::make_atom("c"), Formula::make_atom("d")};
+    const tlsf::RealizabilityOracle oracle =
+        [](const tlsf::Specification& probe) { return !has_atom(probe, "c"); };
+
+    const tlsf::MinimalUnrealizableCore screened =
+        tlsf::extract_muc(spec, oracle, 4);
+    expect(core_atoms(screened) == std::set<std::string>({"c"}),
+           "the pre-screen returns the singleton core {c}");
+    expect(core_atoms(screened) == core_atoms(tlsf::extract_muc(spec, oracle)),
+           "screened and serial extraction agree");
+}
+
+// Two formulae are each unrealizable alone. The screen runs its probes
+// concurrently, so the tie is broken by index rather than by which probe
+// finishes first, or the core stops being reproducible.
+TEST(test_screen_picks_lowest_index) {
+    tlsf::Specification spec;
+    spec.m_outputs = {"y"};
+    spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b"),
+                        Formula::make_atom("c"), Formula::make_atom("d")};
+    const tlsf::RealizabilityOracle oracle =
+        [](const tlsf::Specification& probe) {
+            return !(has_atom(probe, "b") || has_atom(probe, "d"));
+        };
+
+    for (int repeat = 0; repeat < 8; ++repeat) {
+        const tlsf::MinimalUnrealizableCore muc =
+            tlsf::extract_muc(spec, oracle, 4);
+        expect(core_atoms(muc) == std::set<std::string>({"b"}),
+               "the earlier of two singleton conflicts wins every time");
+    }
+}
+
+// With no singleton conflict the screen finds nothing and QuickXplain answers,
+// with the probes it already ran served from the memo.
+TEST(test_screen_falls_through_to_quickxplain) {
+    tlsf::Specification spec;
+    spec.m_outputs = {"y"};
+    spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b"),
+                        Formula::make_atom("c"), Formula::make_atom("d")};
+    const tlsf::RealizabilityOracle oracle =
+        [](const tlsf::Specification& probe) {
+            return !(has_atom(probe, "c") && has_atom(probe, "d"));
+        };
+
+    const tlsf::MinimalUnrealizableCore muc =
+        tlsf::extract_muc(spec, oracle, 4);
+    expect(core_atoms(muc) == std::set<std::string>({"c", "d"}),
+           "a pairwise conflict still comes back as {c, d}");
 }
 
 // End-to-end against ltlsynt on the unrealizable arbiter fixture: the core
@@ -181,24 +242,9 @@ tlsf::Specification without(const tlsf::Specification& base,
     return reduced;
 }
 
-void test_arbiter_end_to_end() {
-    const tlsf::Specification spec = tlsf::parse(k_unrealizable_arbiter);
-    expect(!is_realizable(spec), "fixture is unrealizable");
-
-    const tlsf::MinimalUnrealizableCore muc = tlsf::extract_muc(spec);
-    expect(!muc.formulae.empty(), "arbiter core is non-empty");
-    expect(muc.formulae.size() < spec.m_guarantee.size(),
-           "core is a strict subset of the guarantees");
-    expect(!is_realizable(muc.spec), "core spec is still unrealizable");
-    for (const tlsf::CoreFormula& entry : muc.formulae) {
-        expect(is_realizable(without(muc.spec, entry)),
-               "dropping any one core formula restores realizability");
-    }
-}
-
 // non_core_formulae returns the guarantee-side formulae NOT in the core, with
 // multiset semantics (one occurrence removed per core member).
-void test_non_core_formulae() {
+TEST(test_non_core_formulae) {
     tlsf::Specification spec;
     spec.m_preset = {Formula::make_atom("p")};
     spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("a"),
@@ -222,7 +268,7 @@ void test_non_core_formulae() {
 
 // reintegrate appends the carried-over non-core formulae back onto a repaired
 // sub-specification, each into its tagged section.
-void test_reintegrate() {
+TEST(test_reintegrate) {
     tlsf::Specification repaired;
     repaired.m_outputs = {"y"};
     repaired.m_guarantee = {Formula::make_atom("a_repaired")};
@@ -239,69 +285,26 @@ void test_reintegrate() {
            "reintegrate appends non-core after the repaired core");
 }
 
-// The concurrent singleton pre-screen must not change the answer. A singleton
-// conflict sitting third is found by the screen rather than by QuickXplain's
-// walk, and the core is the same either way.
-void test_screen_finds_singleton() {
-    tlsf::Specification spec;
-    spec.m_outputs = {"y"};
-    spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b"),
-                        Formula::make_atom("c"), Formula::make_atom("d")};
-    const tlsf::RealizabilityOracle oracle =
-        [](const tlsf::Specification& probe) { return !has_atom(probe, "c"); };
+TEST(test_arbiter_end_to_end) {
+    const tlsf::Specification spec = tlsf::parse(k_unrealizable_arbiter);
+    expect(!is_realizable(spec), "fixture is unrealizable");
 
-    const tlsf::MinimalUnrealizableCore screened =
-        tlsf::extract_muc(spec, oracle, 4);
-    expect(core_atoms(screened) == std::set<std::string>({"c"}),
-           "the pre-screen returns the singleton core {c}");
-    expect(core_atoms(screened) == core_atoms(tlsf::extract_muc(spec, oracle)),
-           "screened and serial extraction agree");
-}
-
-// Two formulae are each unrealizable alone. The screen runs its probes
-// concurrently, so the tie is broken by index rather than by which probe
-// finishes first, or the core stops being reproducible.
-void test_screen_picks_lowest_index() {
-    tlsf::Specification spec;
-    spec.m_outputs = {"y"};
-    spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b"),
-                        Formula::make_atom("c"), Formula::make_atom("d")};
-    const tlsf::RealizabilityOracle oracle =
-        [](const tlsf::Specification& probe) {
-            return !(has_atom(probe, "b") || has_atom(probe, "d"));
-        };
-
-    for (int repeat = 0; repeat < 8; ++repeat) {
-        const tlsf::MinimalUnrealizableCore muc =
-            tlsf::extract_muc(spec, oracle, 4);
-        expect(core_atoms(muc) == std::set<std::string>({"b"}),
-               "the earlier of two singleton conflicts wins every time");
+    const tlsf::MinimalUnrealizableCore muc = tlsf::extract_muc(spec);
+    expect(!muc.formulae.empty(), "arbiter core is non-empty");
+    expect(muc.formulae.size() < spec.m_guarantee.size(),
+           "core is a strict subset of the guarantees");
+    expect(!is_realizable(muc.spec), "core spec is still unrealizable");
+    for (const tlsf::CoreFormula& entry : muc.formulae) {
+        expect(is_realizable(without(muc.spec, entry)),
+               "dropping any one core formula restores realizability");
     }
-}
-
-// With no singleton conflict the screen finds nothing and QuickXplain answers,
-// with the probes it already ran served from the memo.
-void test_screen_falls_through_to_quickxplain() {
-    tlsf::Specification spec;
-    spec.m_outputs = {"y"};
-    spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b"),
-                        Formula::make_atom("c"), Formula::make_atom("d")};
-    const tlsf::RealizabilityOracle oracle =
-        [](const tlsf::Specification& probe) {
-            return !(has_atom(probe, "c") && has_atom(probe, "d"));
-        };
-
-    const tlsf::MinimalUnrealizableCore muc =
-        tlsf::extract_muc(spec, oracle, 4);
-    expect(core_atoms(muc) == std::set<std::string>({"c", "d"}),
-           "a pairwise conflict still comes back as {c, d}");
 }
 
 // n_undecided counts only probes the oracle left undecided. An oracle that
 // answers every query -- as every fixture oracle here does, and as ltlsynt
 // does with no timeout set -- must leave it at zero, or the MUC loop reports
 // a sound core as provisional on every iteration.
-void test_undecided_count_is_zero_when_decided() {
+TEST(test_undecided_count_is_zero_when_decided) {
     tlsf::Specification spec;
     spec.m_outputs = {"y"};
     spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b")};
@@ -316,18 +319,3 @@ void test_undecided_count_is_zero_when_decided() {
 }
 
 }  // namespace
-
-void run_tlsf_mucs_tests() {
-    test_extracts_minimal_pair();
-    test_conflict_at_tail();
-    test_singleton_core();
-    test_core_spans_sections();
-    test_empty_guarantee_side();
-    test_screen_finds_singleton();
-    test_screen_picks_lowest_index();
-    test_screen_falls_through_to_quickxplain();
-    test_non_core_formulae();
-    test_reintegrate();
-    test_arbiter_end_to_end();
-    test_undecided_count_is_zero_when_decided();
-}

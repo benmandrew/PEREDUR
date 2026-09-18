@@ -11,18 +11,21 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "config.hpp"
 #include "genetic/random_source.hpp"
 #include "prop_formula.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/mutation.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "tlsf_assumption";
 
 tlsf::Specification three_input_spec() {
     return tlsf::parse(
@@ -80,7 +83,7 @@ void collect_atoms(const Formula& formula, std::vector<std::string>& into) {
 
 // At width 1 the body is a single literal, which is what the operator emitted
 // before the grammar existed.
-void test_width_one_draws_a_single_literal() {
+TEST(test_width_one_draws_a_single_literal) {
     const tlsf::Specification spec = three_input_spec();
     Config cfg;
     cfg.p_add_assumption = 1.0;
@@ -101,7 +104,7 @@ void test_width_one_draws_a_single_literal() {
 // Above width 1 the grammar must actually reach both connectives, or it is the
 // old template with extra draws. lift's ideal is a disjunction and
 // humanoid-503's is a conjunction, so neither alone would do.
-void test_wide_bodies_reach_both_connectives() {
+TEST(test_wide_bodies_reach_both_connectives) {
     const tlsf::Specification spec = three_input_spec();
     Config cfg;
     cfg.p_add_assumption = 1.0;
@@ -123,7 +126,7 @@ void test_wide_bodies_reach_both_connectives() {
 // Every atom of an appended body is an input, whatever the width: an assumption
 // obliging an output is one the system defeats by withholding its own signal.
 // The guard may be an output, so the unconditional form is forced here.
-void test_wide_bodies_use_inputs_only() {
+TEST(test_wide_bodies_use_inputs_only) {
     const tlsf::Specification spec = three_input_spec();
     Config cfg;
     cfg.p_add_assumption = 1.0;
@@ -146,7 +149,7 @@ void test_wide_bodies_use_inputs_only() {
 
 // lily11's whole ideal is `F req`. Wrapped in G it is strictly stronger, so the
 // bare form has to be drawn rather than rewritten into.
-void test_bare_assumption_is_reachable() {
+TEST(test_bare_assumption_is_reachable) {
     const tlsf::Specification spec = three_input_spec();
     Config cfg;
     cfg.p_add_assumption = 1.0;
@@ -182,7 +185,7 @@ void test_bare_assumption_is_reachable() {
 // is pinned separately, by the absolute golden in
 // test_zero_probability_costs_no_draw over in monotone_tests.cpp, which holds
 // both of them at no-op.
-void test_each_key_draws_only_when_armed() {
+TEST(test_each_key_draws_only_when_armed) {
     const tlsf::Specification bare_spec = three_input_spec();
 
     // The width and the bare form are reached only through an appended
@@ -208,11 +211,3 @@ void test_each_key_draws_only_when_armed() {
 }
 
 }  // namespace
-
-void run_tlsf_assumption_tests() {
-    test_width_one_draws_a_single_literal();
-    test_wide_bodies_reach_both_connectives();
-    test_wide_bodies_use_inputs_only();
-    test_bare_assumption_is_reachable();
-    test_each_key_draws_only_when_armed();
-}

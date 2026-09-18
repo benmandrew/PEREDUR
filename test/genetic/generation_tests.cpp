@@ -3,6 +3,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -11,10 +12,12 @@
 #include "genetic/generation.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "generation";
 
 Requirement make_req(const std::string& trigger, const std::string& response,
                      Timing timing = timing::immediately()) {
@@ -50,7 +53,7 @@ std::string first_condition(const Specification& spec) {
 // The stop is simplified with the condition and response. `until false` is
 // Always spelt another way and folds into it, so the two do not split a cache
 // key; `before false` keeps its kind, being valid rather than a respelling.
-void test_simplify_folds_until_false_into_always() {
+TEST(test_simplify_folds_until_false_into_always) {
     const auto simplified_timing = [](const Timing& timing) {
         return fretish_operators()
             .simplify(make_spec("a", "b", timing))
@@ -70,7 +73,7 @@ void test_simplify_folds_until_false_into_always() {
 
 // --- score_population ---
 
-void test_score_population_single_function() {
+TEST(test_score_population_single_function) {
     const std::vector<Specification> pop = {make_spec("p", "q"),
                                             make_spec("r", "s")};
     const AggregateWeightedFitnessFunction fns =
@@ -85,7 +88,7 @@ void test_score_population_single_function() {
            "score_population: all equal fitness with constant function");
 }
 
-void test_score_population_weighted_aggregation() {
+TEST(test_score_population_weighted_aggregation) {
     const std::vector<Specification> pop = {make_spec("p", "q")};
     // (0.0 * 1.0 + 1.0 * 3.0) / (1.0 + 3.0) == 0.75
     const AggregateWeightedFitnessFunction fns =
@@ -100,7 +103,7 @@ void test_score_population_weighted_aggregation() {
            "score_population: should compute weighted average correctly");
 }
 
-void test_score_population_equal_weights_give_average() {
+TEST(test_score_population_equal_weights_give_average) {
     const std::vector<Specification> pop = {make_spec("p", "q")};
     // (0.2 * 1.0 + 0.8 * 1.0) / 2.0 == 0.5
     const AggregateWeightedFitnessFunction fns =
@@ -112,7 +115,7 @@ void test_score_population_equal_weights_give_average() {
            "score_population: equal weights should give arithmetic average");
 }
 
-void test_score_population_drops_failing_individual() {
+TEST(test_score_population_drops_failing_individual) {
     const std::vector<Specification> pop = {
         make_spec("p", "q"), make_spec("boom", "q"), make_spec("r", "s")};
     // Mimics an external tool failing on one evolved formula: the individual
@@ -136,7 +139,7 @@ void test_score_population_drops_failing_individual() {
            "score_population: survivors should keep their relative order");
 }
 
-void test_score_population_circuit_breaker_trips() {
+TEST(test_score_population_circuit_breaker_trips) {
     const std::vector<Specification> pop = {
         make_spec("p", "q"), make_spec("r", "s"), make_spec("t", "u")};
     // Every individual fails, as it would with a missing or broken tool. That
@@ -159,7 +162,7 @@ void test_score_population_circuit_breaker_trips() {
 
 // --- make_predicate_filter / filter_population ---
 
-void test_make_predicate_filter_keeps_matching() {
+TEST(test_make_predicate_filter_keeps_matching) {
     const std::vector<Specification> pop = {make_spec("p", "q"),
                                             make_spec("r", "s")};
     const FilterFunction filter = make_predicate_filter(
@@ -172,7 +175,7 @@ void test_make_predicate_filter_keeps_matching() {
            "make_predicate_filter: should keep the matching specification");
 }
 
-void test_filter_population_empty_filter_list_keeps_all() {
+TEST(test_filter_population_empty_filter_list_keeps_all) {
     const std::vector<Specification> pop = {make_spec("p", "q"),
                                             make_spec("r", "s")};
     const auto survivors = filter_population(pop, {});
@@ -181,7 +184,7 @@ void test_filter_population_empty_filter_list_keeps_all() {
         "filter_population: empty filter list should keep all specifications");
 }
 
-void test_filter_population_removes_failing() {
+TEST(test_filter_population_removes_failing) {
     const std::vector<Specification> pop = {make_spec("p", "q"),
                                             make_spec("r", "s")};
     const std::vector<FilterFunction> filters = {
@@ -196,7 +199,7 @@ void test_filter_population_removes_failing() {
            "filter_population: should keep the passing specification");
 }
 
-void test_filter_population_applies_sequentially() {
+TEST(test_filter_population_applies_sequentially) {
     const std::vector<Specification> pop = {
         make_spec("p", "q"), make_spec("r", "s"), make_spec("t", "u")};
     // First filter removes t; second filter removes r — only p survives.
@@ -215,7 +218,7 @@ void test_filter_population_applies_sequentially() {
            "filter_population: sequential filters should leave only p");
 }
 
-void test_filter_population_population_level_maximal_elements() {
+TEST(test_filter_population_population_level_maximal_elements) {
     // Keep only specs with the simplest (fewest-node) condition formula.
     const std::vector<Specification> pop = {make_spec("p", "q"),
                                             make_spec("p & r", "q")};
@@ -255,7 +258,7 @@ void test_filter_population_population_level_maximal_elements() {
 
 // --- evolve_generation ---
 
-void test_evolve_generation_produces_target_size() {
+TEST(test_evolve_generation_produces_target_size) {
     const AggregateWeightedFitnessFunction fns =
         AggregateWeightedFitnessFunction(
             {{[](const Specification&) { return 0.5; }, 1.0, ""}});
@@ -270,7 +273,7 @@ void test_evolve_generation_produces_target_size() {
         "evolve_generation: should produce the requested number of offspring");
 }
 
-void test_evolve_generation_pads_up_to_target_size() {
+TEST(test_evolve_generation_pads_up_to_target_size) {
     const AggregateWeightedFitnessFunction fns =
         AggregateWeightedFitnessFunction(
             {{[](const Specification&) { return 0.5; }, 1.0, ""}});
@@ -283,7 +286,7 @@ void test_evolve_generation_pads_up_to_target_size() {
            "requested target size");
 }
 
-void test_evolve_generation_selects_parents_before_offspring_filtering() {
+TEST(test_evolve_generation_selects_parents_before_offspring_filtering) {
     // The filter is applied after breeding, and the generation is then padded
     // back to the requested size if filtering shrinks the offspring pool.
     // Padding is truncation selection's path, so this pins WeightedAverage
@@ -315,7 +318,7 @@ void test_evolve_generation_selects_parents_before_offspring_filtering() {
            "surviving specification");
 }
 
-void test_evolve_generation_elitism_preserves_best_through_filter() {
+TEST(test_evolve_generation_elitism_preserves_best_through_filter) {
     // Fitness ranks "p" > "r" > "t", so ("p","q") is the top (elite) parent.
     const AggregateWeightedFitnessFunction fns =
         AggregateWeightedFitnessFunction({{[](const Specification& spec) {
@@ -411,7 +414,7 @@ Config nsga2_truncate_config() {
     return cfg;
 }
 
-void test_evolve_generation_nsga2_truncate_produces_target_size() {
+TEST(test_evolve_generation_nsga2_truncate_produces_target_size) {
     const Config cfg = nsga2_truncate_config();
     const AggregateWeightedFitnessFunction fns = two_objective_fns();
     const std::vector<ScoredSpecification> pop = score_population(
@@ -425,7 +428,7 @@ void test_evolve_generation_nsga2_truncate_produces_target_size() {
            "target_size survivors");
 }
 
-void test_evolve_generation_nsga2_truncate_preserves_front_no_elitism() {
+TEST(test_evolve_generation_nsga2_truncate_preserves_front_no_elitism) {
     Config cfg = nsga2_truncate_config();
     cfg.crossover_rate = 0.0;
     cfg.mutation_rate = 0.0;
@@ -454,7 +457,7 @@ void test_evolve_generation_nsga2_truncate_preserves_front_no_elitism() {
            "filtered out");
 }
 
-void test_evolve_generation_nsga2_truncate_is_deterministic() {
+TEST(test_evolve_generation_nsga2_truncate_is_deterministic) {
     const Config cfg = nsga2_truncate_config();
     const AggregateWeightedFitnessFunction fns = two_objective_fns();
     const std::vector<ScoredSpecification> pop = score_population(
@@ -510,7 +513,7 @@ std::vector<std::size_t> copy_counts(const std::vector<Scored<int>>& replicated,
     return counts;
 }
 
-void test_dedup_by_specification_keeps_first_occurrence_in_order() {
+TEST(test_dedup_by_specification_keeps_first_occurrence_in_order) {
     const std::vector<Scored<int>> pool = {
         make_scored(7, 0), make_scored(3, 1), make_scored(7, 2),
         make_scored(9, 1), make_scored(3, 0), make_scored(7, 3)};
@@ -524,7 +527,7 @@ void test_dedup_by_specification_keeps_first_occurrence_in_order() {
         "first occurrence, not a later duplicate");
 }
 
-void test_dedup_by_specification_all_distinct_is_identity() {
+TEST(test_dedup_by_specification_all_distinct_is_identity) {
     const std::vector<Scored<int>> pool = {make_scored(1, 0), make_scored(2, 1),
                                            make_scored(3, 2)};
     expect(specifications_of(generation_detail::dedup_by_specification<int>(
@@ -533,14 +536,14 @@ void test_dedup_by_specification_all_distinct_is_identity() {
            "unchanged");
 }
 
-void test_replicate_to_size_produces_target_size() {
+TEST(test_replicate_to_size_produces_target_size) {
     const std::vector<Scored<int>> distinct = {
         make_scored(1, 0), make_scored(2, 1), make_scored(3, 2)};
     expect(generation_detail::replicate_to_size(distinct, 10).size() == 10,
            "replicate_to_size: output should be exactly target_size");
 }
 
-void test_replicate_to_size_keeps_every_individual() {
+TEST(test_replicate_to_size_keeps_every_individual) {
     const std::vector<Scored<int>> distinct = {
         make_scored(1, 0), make_scored(2, 1), make_scored(3, 5),
         make_scored(4, 9)};
@@ -552,7 +555,7 @@ void test_replicate_to_size_keeps_every_individual() {
            "one copy, however poor its rank");
 }
 
-void test_replicate_to_size_copies_non_increasing_in_rank() {
+TEST(test_replicate_to_size_copies_non_increasing_in_rank) {
     const std::vector<Scored<int>> distinct = {
         make_scored(1, 0), make_scored(2, 1), make_scored(3, 2)};
     const auto counts = copy_counts(
@@ -569,7 +572,7 @@ void test_replicate_to_size_copies_non_increasing_in_rank() {
            "apportionment exactly");
 }
 
-void test_replicate_to_size_is_deterministic() {
+TEST(test_replicate_to_size_is_deterministic) {
     const std::vector<Scored<int>> distinct = {
         make_scored(1, 0), make_scored(2, 0), make_scored(3, 1),
         make_scored(4, 4)};
@@ -580,7 +583,7 @@ void test_replicate_to_size_is_deterministic() {
            "on identical input must agree");
 }
 
-void test_replicate_to_size_exact_fit_copies_once_each() {
+TEST(test_replicate_to_size_exact_fit_copies_once_each) {
     const std::vector<Scored<int>> distinct = {
         make_scored(1, 0), make_scored(2, 1), make_scored(3, 2)};
     const auto replicated = generation_detail::replicate_to_size(distinct, 3);
@@ -589,7 +592,7 @@ void test_replicate_to_size_exact_fit_copies_once_each() {
            "exactly one copy, in input order");
 }
 
-void test_replicate_to_size_single_individual_fills_population() {
+TEST(test_replicate_to_size_single_individual_fills_population) {
     const std::vector<Scored<int>> distinct = {make_scored(42, 0)};
     const auto replicated = generation_detail::replicate_to_size(distinct, 5);
     expect(replicated.size() == 5 && specifications_of(replicated) ==
@@ -598,7 +601,7 @@ void test_replicate_to_size_single_individual_fills_population() {
            "population");
 }
 
-void test_replicate_to_size_equal_ranks_apportion_evenly() {
+TEST(test_replicate_to_size_equal_ranks_apportion_evenly) {
     const std::vector<Scored<int>> distinct = {
         make_scored(1, 0), make_scored(2, 0), make_scored(3, 0),
         make_scored(4, 0)};
@@ -633,7 +636,7 @@ Config nsga2_apportion_config() {
     return cfg;
 }
 
-void test_evolve_generation_nsga2_apportion_produces_target_size() {
+TEST(test_evolve_generation_nsga2_apportion_produces_target_size) {
     const Config cfg = nsga2_apportion_config();
     const AggregateWeightedFitnessFunction fns = two_objective_fns();
     // Every parent is the same specification, so the pool deduplicates well
@@ -650,7 +653,7 @@ void test_evolve_generation_nsga2_apportion_produces_target_size() {
            "target_size must still be replicated back up to it");
 }
 
-void test_evolve_generation_nsga2_apportion_retains_distinct_candidates() {
+TEST(test_evolve_generation_nsga2_apportion_retains_distinct_candidates) {
     const AggregateWeightedFitnessFunction fns = two_objective_fns();
     // "p" dominates both others on both objectives, so under nsga2-truncate its
     // three copies fill the rank-0 front and truncation keeps the copies in
@@ -674,7 +677,7 @@ void test_evolve_generation_nsga2_apportion_retains_distinct_candidates() {
         "when duplicates crowd the rank-0 front");
 }
 
-void test_evolve_generation_nsga2_apportion_is_deterministic() {
+TEST(test_evolve_generation_nsga2_apportion_is_deterministic) {
     const Config cfg = nsga2_apportion_config();
     const AggregateWeightedFitnessFunction fns = two_objective_fns();
     const std::vector<ScoredSpecification> pop = score_population(
@@ -696,36 +699,3 @@ void test_evolve_generation_nsga2_apportion_is_deterministic() {
 }
 
 }  // namespace
-
-void run_generation_tests() {
-    test_simplify_folds_until_false_into_always();
-    test_score_population_single_function();
-    test_score_population_weighted_aggregation();
-    test_score_population_equal_weights_give_average();
-    test_score_population_drops_failing_individual();
-    test_score_population_circuit_breaker_trips();
-    test_make_predicate_filter_keeps_matching();
-    test_filter_population_empty_filter_list_keeps_all();
-    test_filter_population_removes_failing();
-    test_filter_population_applies_sequentially();
-    test_filter_population_population_level_maximal_elements();
-    test_evolve_generation_produces_target_size();
-    test_evolve_generation_pads_up_to_target_size();
-    test_evolve_generation_selects_parents_before_offspring_filtering();
-    test_evolve_generation_elitism_preserves_best_through_filter();
-    test_evolve_generation_nsga2_truncate_produces_target_size();
-    test_evolve_generation_nsga2_truncate_preserves_front_no_elitism();
-    test_evolve_generation_nsga2_truncate_is_deterministic();
-    test_dedup_by_specification_keeps_first_occurrence_in_order();
-    test_dedup_by_specification_all_distinct_is_identity();
-    test_replicate_to_size_produces_target_size();
-    test_replicate_to_size_keeps_every_individual();
-    test_replicate_to_size_copies_non_increasing_in_rank();
-    test_replicate_to_size_is_deterministic();
-    test_replicate_to_size_exact_fit_copies_once_each();
-    test_replicate_to_size_single_individual_fills_population();
-    test_replicate_to_size_equal_ranks_apportion_evenly();
-    test_evolve_generation_nsga2_apportion_produces_target_size();
-    test_evolve_generation_nsga2_apportion_retains_distinct_candidates();
-    test_evolve_generation_nsga2_apportion_is_deterministic();
-}

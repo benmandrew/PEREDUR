@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -8,10 +9,12 @@
 #include "genetic/mutation.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "mutation";
 
 RandomSource make_source(std::vector<std::size_t> values,
                          std::size_t fallback) {
@@ -27,7 +30,7 @@ RandomSource make_source(std::vector<std::size_t> values,
         });
 }
 
-void test_mutation_with_false_source_leaves_formula_unchanged() {
+TEST(test_mutation_with_false_source_leaves_formula_unchanged) {
     const Formula formula("P & Q");
     // P & Q has 3 subformulae; fallback 1 gives next_index(3) = 1 != 0, so no
     // subformula is selected and the formula is left unchanged.
@@ -37,7 +40,7 @@ void test_mutation_with_false_source_leaves_formula_unchanged() {
            "formula unchanged");
 }
 
-void test_mutation_renames_atom_to_one_from_atoms_list() {
+TEST(test_mutation_renames_atom_to_one_from_atoms_list) {
     // An atom has three moves, rename (0), negate (1) and graft (2), so a zero
     // source selects the subformula and then the rename branch; atoms = {"Q"}
     // so "P" becomes "Q".
@@ -53,7 +56,7 @@ void test_mutation_renames_atom_to_one_from_atoms_list() {
 // that could grow a formula fired at a Not node, so guarding a positive
 // literal took three chained mutations (see
 // experiments/2026-08-14-aurus-h2h/REPORT.md).
-void test_mutation_grafts_an_anchor_onto_an_atom() {
+TEST(test_mutation_grafts_an_anchor_onto_an_atom) {
     const Formula formula("P");
     // Draws: select subformula (bound 1), move 2 of 3, anchor index 0 of 1,
     // anchor polarity 0 of 2 (positive), connective 0 of 4 (and), anchor-first
@@ -72,7 +75,7 @@ void test_mutation_grafts_an_anchor_onto_an_atom() {
 
 // With no atom pool there is no anchor to draw, so the atom keeps its two
 // original moves and the graft case is not reachable.
-void test_mutation_without_atoms_never_grafts() {
+TEST(test_mutation_without_atoms_never_grafts) {
     const Formula formula("P");
     const Formula mutated =
         mutate_formula(formula, {}, make_source({0, 1}, 0U));
@@ -80,7 +83,7 @@ void test_mutation_without_atoms_never_grafts() {
            "mutation: an empty atom pool leaves rename and negate only");
 }
 
-void test_mutation_atom_unchanged_when_no_atoms_provided() {
+TEST(test_mutation_atom_unchanged_when_no_atoms_provided) {
     // Select the subformula (0), then move 0, the rename; with no atoms to
     // draw from the name is left alone.
     const Formula formula("P");
@@ -91,7 +94,7 @@ void test_mutation_atom_unchanged_when_no_atoms_provided() {
            "empty");
 }
 
-void test_mutation_atom_selected_from_atoms_list() {
+TEST(test_mutation_atom_selected_from_atoms_list) {
     // mutation_function consumes next_index(1) = 0 (subformula selected),
     // mutate_atom_formula consumes next_index(3) = 0 → rename branch,
     // mutate_atom_name consumes next_index(3) = 2 → atoms[2] = "c".
@@ -103,7 +106,7 @@ void test_mutation_atom_selected_from_atoms_list() {
            "by the random source");
 }
 
-void test_timing_mutation_non_parameterized_becomes_within_one_tick() {
+TEST(test_timing_mutation_non_parameterized_becomes_within_one_tick) {
     const Timing mutated = mutate_timing(
         timing::next_timepoint(), Direction::Weaken, {}, make_source({}, 0U));
     const auto* within = std::get_if<timing::WithinTicks>(&mutated);
@@ -113,7 +116,7 @@ void test_timing_mutation_non_parameterized_becomes_within_one_tick() {
            "mutation: next-timepoint should weaken to within 1 tick");
 }
 
-void test_timing_mutation_immediately_becomes_within_one_tick() {
+TEST(test_timing_mutation_immediately_becomes_within_one_tick) {
     const Timing mutated = mutate_timing(
         timing::immediately(), Direction::Weaken, {}, make_source({}, 0U));
     const auto* within = std::get_if<timing::WithinTicks>(&mutated);
@@ -123,7 +126,7 @@ void test_timing_mutation_immediately_becomes_within_one_tick() {
            "mutation: immediately should weaken to within 1 tick");
 }
 
-void test_timing_mutation_eventually_is_unchanged() {
+TEST(test_timing_mutation_eventually_is_unchanged) {
     const Timing mutated = mutate_timing(
         timing::eventually(), Direction::Weaken, {}, make_source({}, 0U));
     expect(std::holds_alternative<timing::Eventually>(mutated),
@@ -134,7 +137,7 @@ void test_timing_mutation_eventually_is_unchanged() {
 // be left alone rather than acquiring an invented deadline. This was the whole
 // of the Always branch until the pool reached it: it weakened to a hard-coded
 // `for 10 ticks`, and was frozen rather than given a basis for the count.
-void test_timing_weaken_always_without_donor_is_unchanged() {
+TEST(test_timing_weaken_always_without_donor_is_unchanged) {
     const std::vector<Timing> no_donors = {timing::always(),
                                            timing::eventually()};
     for (std::size_t draw = 0; draw < 6; ++draw) {
@@ -153,7 +156,7 @@ void test_timing_weaken_always_without_donor_is_unchanged() {
 // The mirror of the Eventually donation, from the other end of the order:
 // every quantified donor lends only its tick count, spent as `for n ticks`,
 // and Immediately and NextTimepoint lend themselves.
-void test_timing_weaken_always_takes_donated_timings() {
+TEST(test_timing_weaken_always_takes_donated_timings) {
     const std::vector<Timing> donors = {
         timing::within_ticks(7),  timing::after_ticks(2), timing::immediately(),
         timing::next_timepoint(), timing::eventually(),   timing::always()};
@@ -191,7 +194,7 @@ void test_timing_weaken_always_takes_donated_timings() {
 // is incomparable rather than weaker and must never be taken whole; the same
 // donor's count spent as `for n` is a genuine weakening. `within n` is one too,
 // but a donated count keeps a single spelling on both sides of the order.
-void test_timing_weaken_always_never_becomes_within_or_after() {
+TEST(test_timing_weaken_always_never_becomes_within_or_after) {
     const std::vector<Timing> donors = {timing::within_ticks(4),
                                         timing::after_ticks(9)};
     for (std::size_t draw = 0; draw < 40; ++draw) {
@@ -203,7 +206,7 @@ void test_timing_weaken_always_never_becomes_within_or_after() {
     }
 }
 
-void test_timing_mutation_within_ticks_step_down() {
+TEST(test_timing_mutation_within_ticks_step_down) {
     // next_index(3) = 0 → step down: within_ticks(3 + 1 = 4)
     const Timing mutated = mutate_timing(
         timing::within_ticks(3), Direction::Weaken, {}, make_source({0}, 0));
@@ -214,7 +217,7 @@ void test_timing_mutation_within_ticks_step_down() {
            "mutation: within-ticks step-down weakening should add one tick");
 }
 
-void test_timing_mutation_within_ticks_double() {
+TEST(test_timing_mutation_within_ticks_double) {
     // next_index(3) = 1 → double: within_ticks(3 * 2 = 6)
     const Timing mutated = mutate_timing(
         timing::within_ticks(3), Direction::Weaken, {}, make_source({1}, 0));
@@ -225,7 +228,7 @@ void test_timing_mutation_within_ticks_double() {
            "mutation: within-ticks double weakening should double the count");
 }
 
-void test_timing_mutation_after_ticks_becomes_within_ticks() {
+TEST(test_timing_mutation_after_ticks_becomes_within_ticks) {
     const Timing mutated = mutate_timing(
         timing::after_ticks(3), Direction::Weaken, {}, make_source({}, 0));
     const auto* within = std::get_if<timing::WithinTicks>(&mutated);
@@ -235,7 +238,7 @@ void test_timing_mutation_after_ticks_becomes_within_ticks() {
            "mutation: after 3 ticks should weaken to within 4 ticks");
 }
 
-void test_timing_strengthen_non_parameterized_becomes_for_one_tick() {
+TEST(test_timing_strengthen_non_parameterized_becomes_for_one_tick) {
     for (const Timing& start :
          {timing::next_timepoint(), timing::immediately()}) {
         const Timing mutated = mutate_timing(start, Direction::Strengthen, {},
@@ -250,7 +253,7 @@ void test_timing_strengthen_non_parameterized_becomes_for_one_tick() {
     }
 }
 
-void test_timing_strengthen_always_is_unchanged() {
+TEST(test_timing_strengthen_always_is_unchanged) {
     const Timing mutated = mutate_timing(
         timing::always(), Direction::Strengthen, {}, make_source({}, 0U));
     expect(
@@ -260,7 +263,7 @@ void test_timing_strengthen_always_is_unchanged() {
 
 // With nothing to donate a tick count, eventually has no strengthening and
 // must be left alone rather than acquiring an invented deadline.
-void test_timing_strengthen_eventually_without_donor_is_unchanged() {
+TEST(test_timing_strengthen_eventually_without_donor_is_unchanged) {
     const std::vector<Timing> no_donors = {timing::eventually(),
                                            timing::always()};
     for (std::size_t draw = 0; draw < 6; ++draw) {
@@ -275,7 +278,7 @@ void test_timing_strengthen_eventually_without_donor_is_unchanged() {
 
 // Every quantified donor lends only its tick count, spent as `for n ticks` —
 // never `within n`. Immediately and NextTimepoint lend themselves.
-void test_timing_strengthen_eventually_takes_donated_timings() {
+TEST(test_timing_strengthen_eventually_takes_donated_timings) {
     const std::vector<Timing> donors = {
         timing::within_ticks(7),  timing::after_ticks(2), timing::immediately(),
         timing::next_timepoint(), timing::eventually(),   timing::always()};
@@ -313,7 +316,7 @@ void test_timing_strengthen_eventually_takes_donated_timings() {
 
 // The whole point of drawing from a pool: a spec with no quantified timing
 // anywhere cannot invent one.
-void test_timing_strengthen_eventually_never_becomes_within() {
+TEST(test_timing_strengthen_eventually_never_becomes_within) {
     const std::vector<Timing> donors = {timing::within_ticks(4),
                                         timing::for_ticks(9)};
     for (std::size_t draw = 0; draw < 40; ++draw) {
@@ -326,7 +329,7 @@ void test_timing_strengthen_eventually_never_becomes_within() {
     }
 }
 
-void test_timing_strengthen_for_ticks_branches() {
+TEST(test_timing_strengthen_for_ticks_branches) {
     // next_index(3) = 0 → step up; 1 → double; 2 → always.
     const Timing step = mutate_timing(
         timing::for_ticks(3), Direction::Strengthen, {}, make_source({0}, 0));
@@ -344,7 +347,7 @@ void test_timing_strengthen_for_ticks_branches() {
            "strengthen: for-ticks should be able to maximise to always");
 }
 
-void test_timing_strengthen_within_ticks_branches() {
+TEST(test_timing_strengthen_within_ticks_branches) {
     // within 1 tick has no numeric room: it steps up to the qualitative pair.
     const Timing one =
         mutate_timing(timing::within_ticks(1), Direction::Strengthen, {},
@@ -377,7 +380,7 @@ void test_timing_strengthen_within_ticks_branches() {
 // `after n` pins the response to exactly tick n+1 and forbids it before, so
 // `after n-1` and `always` contradict it rather than strengthen it. It has no
 // strengthening and must be returned unchanged.
-void test_timing_strengthen_after_ticks_is_unchanged() {
+TEST(test_timing_strengthen_after_ticks_is_unchanged) {
     for (std::size_t ticks : {std::size_t{1}, std::size_t{5}}) {
         for (std::size_t draw = 0; draw < 6; ++draw) {
             const Timing mutated =
@@ -396,7 +399,7 @@ void test_timing_strengthen_after_ticks_is_unchanged() {
 // sitting there. Sweeping the random source over both an empty and a populated
 // donor pool exercises every branch of both directions, the two extremes moving
 // only when the pool has something to lend them.
-void test_timing_mutation_directions_are_monotone() {
+TEST(test_timing_mutation_directions_are_monotone) {
     const std::vector<Timing> starts = {timing::immediately(),
                                         timing::next_timepoint(),
                                         timing::always(),
@@ -438,7 +441,7 @@ void test_timing_mutation_directions_are_monotone() {
 // into `until s` for any stop the pool carries, after the candidates a
 // stop-free pool already lends, so the index a draw lands on is unchanged for
 // those.
-void test_timing_stop_edges() {
+TEST(test_timing_stop_edges) {
     const Timing until_s = timing::until(Formula("s"));
     const Timing before_t = timing::before(Formula("t"));
     for (std::size_t draw = 0; draw < 4; ++draw) {
@@ -470,7 +473,105 @@ void test_timing_stop_edges() {
     }
 }
 
-void test_mutation_all_locked_is_noop() {
+// A two-guarantee specification with p_remove_guarantee forced to 1: the first
+// action tombstones a guarantee. The slot must survive, because everything
+// comparing this candidate against the original pairs requirements by position.
+TEST(test_remove_guarantee_tombstones_in_place) {
+    const Specification spec(
+        {},
+        {Requirement(Formula("a"), Formula("b"), timing::immediately()),
+         Requirement(Formula("c"), Formula("d"), timing::immediately())},
+        {"a", "c"}, {"b", "d"});
+    Config cfg;
+    cfg.p_add_assumption = 0.0;
+    cfg.p_remove_guarantee = 1.0;
+    const Specification result =
+        mutate_specification(spec, make_source({}, 0), cfg);
+    expect(result.m_guarantees.size() == spec.m_guarantees.size(),
+           "remove-guarantee: the slot is kept, so the list does not shrink");
+    expect(count_live(result.m_guarantees) == 1,
+           "remove-guarantee: exactly one guarantee is deleted");
+    expect(
+        result.m_guarantees[0].m_removed && !result.m_guarantees[1].m_removed,
+        "remove-guarantee: a zero-yielding source deletes the first slot");
+    expect(
+        result.m_guarantees[0].m_condition == spec.m_guarantees[0].m_condition,
+        "remove-guarantee: the deleted requirement keeps its content");
+    expect(result.m_guarantees[1] == spec.m_guarantees[1],
+           "remove-guarantee: later guarantees do not shift");
+}
+
+TEST(test_remove_guarantee_keeps_the_last_live_one) {
+    const Specification spec(
+        {}, {Requirement(Formula("a"), Formula("b"), timing::immediately())},
+        {"a"}, {"b"});
+    Config cfg;
+    cfg.p_add_assumption = 0.0;
+    cfg.p_remove_guarantee = 1.0;
+    const Specification result =
+        mutate_specification(spec, make_source({}, 0), cfg);
+    expect(count_live(result.m_guarantees) == 1,
+           "remove-guarantee: the only guarantee is never deleted");
+}
+
+// The floor counts live guarantees rather than removable ones, so the sole
+// weakenable guarantee may go while a locked one still holds the specification
+// up.
+TEST(test_remove_guarantee_may_take_the_only_weakenable_one) {
+    const Specification spec(
+        {},
+        {Requirement(Formula("a"), Formula("b"), timing::immediately(),
+                     ConditionType::Continual, /*weakenable=*/false),
+         Requirement(Formula("c"), Formula("d"), timing::immediately())},
+        {"a", "c"}, {"b", "d"});
+    Config cfg;
+    cfg.p_add_assumption = 0.0;
+    cfg.p_remove_guarantee = 1.0;
+    const Specification result =
+        mutate_specification(spec, make_source({}, 0), cfg);
+    expect(
+        !result.m_guarantees[0].m_removed && result.m_guarantees[1].m_removed,
+        "remove-guarantee: a locked guarantee is never the one deleted");
+}
+
+TEST(test_remove_guarantee_never_deletes_a_locked_guarantee) {
+    const Specification spec(
+        {},
+        {Requirement(Formula("a"), Formula("b"), timing::immediately(),
+                     ConditionType::Continual, /*weakenable=*/false),
+         Requirement(Formula("c"), Formula("d"), timing::immediately(),
+                     ConditionType::Continual, /*weakenable=*/false)},
+        {"a", "c"}, {"b", "d"});
+    Config cfg;
+    cfg.p_add_assumption = 0.0;
+    cfg.p_remove_guarantee = 1.0;
+    const Specification result =
+        mutate_specification(spec, make_source({}, 0), cfg);
+    expect(count_live(result.m_guarantees) == 2,
+           "remove-guarantee: nothing is deleted when every guarantee is "
+           "locked");
+}
+
+// A zero-yielding source makes every probability test pass, so this pins that
+// the guard is on the configured probability rather than on the draw. The
+// operator drawing nothing at all when off is what keeps the determinism
+// goldens valid, and those cover it.
+TEST(test_remove_guarantee_disabled_by_zero_probability) {
+    const Specification spec(
+        {},
+        {Requirement(Formula("a"), Formula("b"), timing::immediately()),
+         Requirement(Formula("c"), Formula("d"), timing::immediately())},
+        {"a", "c"}, {"b", "d"});
+    Config cfg;
+    cfg.p_add_assumption = 0.0;
+    cfg.p_remove_guarantee = 0.0;
+    const Specification result =
+        mutate_specification(spec, make_source({}, 0), cfg);
+    expect(count_live(result.m_guarantees) == 2,
+           "remove-guarantee: none deleted when p_remove_guarantee is zero");
+}
+
+TEST(test_mutation_all_locked_is_noop) {
     const Specification spec(
         {},
         {Requirement(Formula("a"), Formula("b"), timing::immediately(),
@@ -486,7 +587,7 @@ void test_mutation_all_locked_is_noop() {
            "returned unchanged");
 }
 
-void test_mutation_skips_non_weakenable_requirement() {
+TEST(test_mutation_skips_non_weakenable_requirement) {
     // guarantees[0] is locked, guarantees[1] is weakenable. Only index 1 is
     // eligible, so the forced timing mutation must land on the weakenable
     // requirement and leave the locked one untouched.
@@ -520,7 +621,7 @@ void test_mutation_skips_non_weakenable_requirement() {
 // `within 4 ticks` is the discriminator — weakening only ever grows the
 // deadline or drops to `eventually`, strengthening only ever shrinks it, moves
 // to `after`, or rises to the qualitative timings.
-void test_assumption_and_guarantee_timings_move_opposite_ways() {
+TEST(test_assumption_and_guarantee_timings_move_opposite_ways) {
     const Requirement req(Formula("true"), Formula("a"),
                           timing::within_ticks(4), ConditionType::Continual,
                           true);
@@ -579,7 +680,7 @@ void test_assumption_and_guarantee_timings_move_opposite_ways() {
 // count can rescue an assumption stuck at eventually — the case that motivates
 // drawing from a pool at all, since add_assumption seeds every new assumption
 // with eventually.
-void test_eventually_assumption_escapes_using_a_guarantee_tick_count() {
+TEST(test_eventually_assumption_escapes_using_a_guarantee_tick_count) {
     const Requirement assumption(Formula("true"), Formula("a"),
                                  timing::eventually(), ConditionType::Continual,
                                  true);
@@ -614,7 +715,7 @@ void test_eventually_assumption_escapes_using_a_guarantee_tick_count() {
 
 // A specification containing no quantified timing anywhere donates nothing, so
 // its eventually assumption stays put rather than inventing a deadline.
-void test_eventually_assumption_stays_put_without_a_donor() {
+TEST(test_eventually_assumption_stays_put_without_a_donor) {
     const Requirement assumption(Formula("true"), Formula("a"),
                                  timing::eventually(), ConditionType::Continual,
                                  true);
@@ -637,7 +738,7 @@ void test_eventually_assumption_stays_put_without_a_donor() {
     }
 }
 
-void test_condition_mutation_never_introduces_output_atom() {
+TEST(test_condition_mutation_never_introduces_output_atom) {
     // Inputs and outputs are disjoint and distinctly named. With p_trigger = 1
     // every mutation rewrites the trigger; across many seeds this exercises
     // both atom renaming and new-atom introduction, none of which may pull an
@@ -661,7 +762,7 @@ void test_condition_mutation_never_introduces_output_atom() {
     }
 }
 
-void test_add_assumption_appends_environment_assumption() {
+TEST(test_add_assumption_appends_environment_assumption) {
     // p_add_assumption forced to 1 with a zero-yielding source: the first
     // action appends a fairness assumption over the first input (no negation,
     // since next_bool() is false). next_real() returns 0, which is below the
@@ -696,7 +797,7 @@ void test_add_assumption_appends_environment_assumption() {
 
 // The condition varies over the atom pool, and `true` stays in the draw so the
 // unconditional fairness assumption G F <input> is still reachable.
-void test_add_assumption_condition_varies_over_inputs_and_true() {
+TEST(test_add_assumption_condition_varies_over_inputs_and_true) {
     const Specification spec(
         {},
         {Requirement(Formula("a"), Formula("B"), timing::always(),
@@ -734,7 +835,7 @@ void test_add_assumption_condition_varies_over_inputs_and_true() {
 // The atom pool includes outputs, so an added assumption can reference an
 // output atom. The well-separation check (not a syntactic ban) is what keeps
 // such assumptions honest.
-void test_add_assumption_can_reference_output() {
+TEST(test_add_assumption_can_reference_output) {
     const Specification spec(
         {},
         {Requirement(Formula("a"), Formula("B"), timing::always(),
@@ -758,7 +859,7 @@ void test_add_assumption_can_reference_output() {
 
 // A rewrite draws from the same wider pool as the add, so an existing
 // assumption can acquire an output atom.
-void test_assumption_rewrite_can_reference_output() {
+TEST(test_assumption_rewrite_can_reference_output) {
     const Specification spec(
         {Requirement(Formula("a"), Formula("c"), timing::always(),
                      ConditionType::Trigger, /*weakenable=*/true)},
@@ -784,7 +885,7 @@ void test_assumption_rewrite_can_reference_output() {
            "introduce an output atom");
 }
 
-void test_add_assumption_disabled_by_zero_probability() {
+TEST(test_add_assumption_disabled_by_zero_probability) {
     const Specification spec(
         {}, {Requirement(Formula("a"), Formula("b"), timing::immediately())},
         {"a"}, {"b"});
@@ -797,146 +898,4 @@ void test_add_assumption_disabled_by_zero_probability() {
            "add-assumption: none added when p_add_assumption is zero");
 }
 
-// A two-guarantee specification with p_remove_guarantee forced to 1: the first
-// action tombstones a guarantee. The slot must survive, because everything
-// comparing this candidate against the original pairs requirements by position.
-void test_remove_guarantee_tombstones_in_place() {
-    const Specification spec(
-        {},
-        {Requirement(Formula("a"), Formula("b"), timing::immediately()),
-         Requirement(Formula("c"), Formula("d"), timing::immediately())},
-        {"a", "c"}, {"b", "d"});
-    Config cfg;
-    cfg.p_add_assumption = 0.0;
-    cfg.p_remove_guarantee = 1.0;
-    const Specification result =
-        mutate_specification(spec, make_source({}, 0), cfg);
-    expect(result.m_guarantees.size() == spec.m_guarantees.size(),
-           "remove-guarantee: the slot is kept, so the list does not shrink");
-    expect(count_live(result.m_guarantees) == 1,
-           "remove-guarantee: exactly one guarantee is deleted");
-    expect(
-        result.m_guarantees[0].m_removed && !result.m_guarantees[1].m_removed,
-        "remove-guarantee: a zero-yielding source deletes the first slot");
-    expect(
-        result.m_guarantees[0].m_condition == spec.m_guarantees[0].m_condition,
-        "remove-guarantee: the deleted requirement keeps its content");
-    expect(result.m_guarantees[1] == spec.m_guarantees[1],
-           "remove-guarantee: later guarantees do not shift");
-}
-
-void test_remove_guarantee_keeps_the_last_live_one() {
-    const Specification spec(
-        {}, {Requirement(Formula("a"), Formula("b"), timing::immediately())},
-        {"a"}, {"b"});
-    Config cfg;
-    cfg.p_add_assumption = 0.0;
-    cfg.p_remove_guarantee = 1.0;
-    const Specification result =
-        mutate_specification(spec, make_source({}, 0), cfg);
-    expect(count_live(result.m_guarantees) == 1,
-           "remove-guarantee: the only guarantee is never deleted");
-}
-
-// The floor counts live guarantees rather than removable ones, so the sole
-// weakenable guarantee may go while a locked one still holds the specification
-// up.
-void test_remove_guarantee_may_take_the_only_weakenable_one() {
-    const Specification spec(
-        {},
-        {Requirement(Formula("a"), Formula("b"), timing::immediately(),
-                     ConditionType::Continual, /*weakenable=*/false),
-         Requirement(Formula("c"), Formula("d"), timing::immediately())},
-        {"a", "c"}, {"b", "d"});
-    Config cfg;
-    cfg.p_add_assumption = 0.0;
-    cfg.p_remove_guarantee = 1.0;
-    const Specification result =
-        mutate_specification(spec, make_source({}, 0), cfg);
-    expect(
-        !result.m_guarantees[0].m_removed && result.m_guarantees[1].m_removed,
-        "remove-guarantee: a locked guarantee is never the one deleted");
-}
-
-void test_remove_guarantee_never_deletes_a_locked_guarantee() {
-    const Specification spec(
-        {},
-        {Requirement(Formula("a"), Formula("b"), timing::immediately(),
-                     ConditionType::Continual, /*weakenable=*/false),
-         Requirement(Formula("c"), Formula("d"), timing::immediately(),
-                     ConditionType::Continual, /*weakenable=*/false)},
-        {"a", "c"}, {"b", "d"});
-    Config cfg;
-    cfg.p_add_assumption = 0.0;
-    cfg.p_remove_guarantee = 1.0;
-    const Specification result =
-        mutate_specification(spec, make_source({}, 0), cfg);
-    expect(count_live(result.m_guarantees) == 2,
-           "remove-guarantee: nothing is deleted when every guarantee is "
-           "locked");
-}
-
-// A zero-yielding source makes every probability test pass, so this pins that
-// the guard is on the configured probability rather than on the draw. The
-// operator drawing nothing at all when off is what keeps the determinism
-// goldens valid, and those cover it.
-void test_remove_guarantee_disabled_by_zero_probability() {
-    const Specification spec(
-        {},
-        {Requirement(Formula("a"), Formula("b"), timing::immediately()),
-         Requirement(Formula("c"), Formula("d"), timing::immediately())},
-        {"a", "c"}, {"b", "d"});
-    Config cfg;
-    cfg.p_add_assumption = 0.0;
-    cfg.p_remove_guarantee = 0.0;
-    const Specification result =
-        mutate_specification(spec, make_source({}, 0), cfg);
-    expect(count_live(result.m_guarantees) == 2,
-           "remove-guarantee: none deleted when p_remove_guarantee is zero");
-}
-
 }  // namespace
-
-void run_mutation_tests() {
-    test_mutation_with_false_source_leaves_formula_unchanged();
-    test_mutation_renames_atom_to_one_from_atoms_list();
-    test_mutation_grafts_an_anchor_onto_an_atom();
-    test_mutation_without_atoms_never_grafts();
-    test_mutation_atom_unchanged_when_no_atoms_provided();
-    test_mutation_atom_selected_from_atoms_list();
-    test_timing_mutation_non_parameterized_becomes_within_one_tick();
-    test_timing_mutation_immediately_becomes_within_one_tick();
-    test_timing_mutation_eventually_is_unchanged();
-    test_timing_weaken_always_without_donor_is_unchanged();
-    test_timing_weaken_always_takes_donated_timings();
-    test_timing_weaken_always_never_becomes_within_or_after();
-    test_timing_mutation_within_ticks_step_down();
-    test_timing_mutation_within_ticks_double();
-    test_timing_mutation_after_ticks_becomes_within_ticks();
-    test_timing_strengthen_non_parameterized_becomes_for_one_tick();
-    test_timing_strengthen_always_is_unchanged();
-    test_timing_strengthen_eventually_without_donor_is_unchanged();
-    test_timing_strengthen_eventually_takes_donated_timings();
-    test_timing_strengthen_eventually_never_becomes_within();
-    test_timing_strengthen_for_ticks_branches();
-    test_timing_strengthen_within_ticks_branches();
-    test_timing_strengthen_after_ticks_is_unchanged();
-    test_timing_mutation_directions_are_monotone();
-    test_timing_stop_edges();
-    test_remove_guarantee_tombstones_in_place();
-    test_remove_guarantee_keeps_the_last_live_one();
-    test_remove_guarantee_may_take_the_only_weakenable_one();
-    test_remove_guarantee_never_deletes_a_locked_guarantee();
-    test_remove_guarantee_disabled_by_zero_probability();
-    test_mutation_all_locked_is_noop();
-    test_mutation_skips_non_weakenable_requirement();
-    test_assumption_and_guarantee_timings_move_opposite_ways();
-    test_eventually_assumption_escapes_using_a_guarantee_tick_count();
-    test_eventually_assumption_stays_put_without_a_donor();
-    test_condition_mutation_never_introduces_output_atom();
-    test_add_assumption_appends_environment_assumption();
-    test_add_assumption_condition_varies_over_inputs_and_true();
-    test_add_assumption_can_reference_output();
-    test_assumption_rewrite_can_reference_output();
-    test_add_assumption_disabled_by_zero_probability();
-}

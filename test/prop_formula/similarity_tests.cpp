@@ -1,12 +1,15 @@
 #include <cmath>
+#include <string_view>
 
 #include "prop_formula.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-void test_formula_syntactic_similarity_identical_formulas() {
+constexpr std::string_view k_test_suite = "prop_formula_similarity";
+
+TEST(test_formula_syntactic_similarity_identical_formulas) {
     const Formula formula("P -> Q");
     const Formula other_formula("P -> Q");
     const std::size_t shared = formula.shared_subformulae(other_formula);
@@ -20,7 +23,7 @@ void test_formula_syntactic_similarity_identical_formulas() {
         "syntactic similarity");
 }
 
-void test_formula_shared_subformulae_partial_overlap() {
+TEST(test_formula_shared_subformulae_partial_overlap) {
     const Formula formula("P & Q");
     const Formula other_formula("P & R");
     const std::size_t shared = formula.shared_subformulae(other_formula);
@@ -29,7 +32,16 @@ void test_formula_shared_subformulae_partial_overlap() {
            "only one subformula");
 }
 
-void test_formula_syntactic_similarity_partial_overlap() {
+TEST(test_formula_shared_subformulae_counts_repeated_subformulae) {
+    const Formula formula("(P & P) & P");
+    const Formula other_formula("(P & P) & Q");
+    const std::size_t shared = formula.shared_subformulae(other_formula);
+    expect(shared == 3,
+           "formula-shared-subformulae: repeated subformulae should "
+           "be counted with multiplicity");
+}
+
+TEST(test_formula_syntactic_similarity_partial_overlap) {
     const Formula formula("~P");
     const Formula other_formula("P");
     const double synsim = formula.syntactic_similarity(other_formula);
@@ -44,7 +56,7 @@ void test_formula_syntactic_similarity_partial_overlap() {
 // (1.0 + tiny) / 2 ~= 0.5 under an arithmetic mean of the two containment
 // ratios, regardless of how much bigger the other formula is. The harmonic
 // mean lets the small ratio pull the score down instead.
-void test_formula_syntactic_similarity_small_subformula_of_large_formula() {
+TEST(test_formula_syntactic_similarity_small_subformula_of_large_formula) {
     const Formula formula("P");
     const Formula other_formula("P & Q & R & S & T");
     const double synsim = formula.syntactic_similarity(other_formula);
@@ -55,21 +67,4 @@ void test_formula_syntactic_similarity_small_subformula_of_large_formula() {
            "larger formula should score well below the old 0.5 floor");
 }
 
-void test_formula_shared_subformulae_counts_repeated_subformulae() {
-    const Formula formula("(P & P) & P");
-    const Formula other_formula("(P & P) & Q");
-    const std::size_t shared = formula.shared_subformulae(other_formula);
-    expect(shared == 3,
-           "formula-shared-subformulae: repeated subformulae should "
-           "be counted with multiplicity");
-}
-
 }  // namespace
-
-void run_prop_formula_similarity_tests() {
-    test_formula_syntactic_similarity_identical_formulas();
-    test_formula_shared_subformulae_partial_overlap();
-    test_formula_shared_subformulae_counts_repeated_subformulae();
-    test_formula_syntactic_similarity_partial_overlap();
-    test_formula_syntactic_similarity_small_subformula_of_large_formula();
-}

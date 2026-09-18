@@ -25,17 +25,20 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
 #include "profile.hpp"
 #include "runner/process.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-void test_scope_records_a_call() {
+constexpr std::string_view k_test_suite = "profile";
+
+TEST(test_scope_records_a_call) {
     profile::Site& site = profile::site_interned("test/scope-records");
     const std::uint64_t before = site.m_calls.load();
     {
@@ -52,7 +55,7 @@ void test_scope_records_a_call() {
     }
 }
 
-void test_repeated_names_share_one_site() {
+TEST(test_repeated_names_share_one_site) {
     // Named rather than passed as a literal: site_interned takes a
     // std::string and returns a reference, so a temporary argument makes gcc's
     // -Wdangling-reference suspect the result points into it. It does not --
@@ -73,7 +76,7 @@ void test_repeated_names_share_one_site() {
 
 // Interns enough distinct names to force the intern table to grow several
 // times, then re-reads the name of the very first one.
-void test_interned_names_survive_registry_growth() {
+TEST(test_interned_names_survive_registry_growth) {
     std::vector<profile::Site*> sites;
     constexpr int k_count = 200;
     sites.reserve(k_count);
@@ -89,7 +92,7 @@ void test_interned_names_survive_registry_growth() {
     }
 }
 
-void test_wall_and_cpu_are_measured_separately() {
+TEST(test_wall_and_cpu_are_measured_separately) {
     // A sleeping thread accrues wall time but almost no CPU time, which is the
     // distinction the whole profiler exists to draw. Only checkable when the
     // profiler is on, since otherwise nothing is recorded at all.
@@ -107,7 +110,7 @@ void test_wall_and_cpu_are_measured_separately() {
            "a sleeping scope records less CPU time than wall time");
 }
 
-void test_record_max_keeps_the_largest() {
+TEST(test_record_max_keeps_the_largest) {
     // The counter exists for peak resident sets, where summing a thousand
     // calls' peaks would describe nothing that ever happened. Both orders are
     // exercised because a naive implementation that assigns rather than
@@ -134,7 +137,7 @@ void test_record_max_keeps_the_largest() {
                std::to_string(descending));
 }
 
-void test_record_max_is_silent_when_disabled() {
+TEST(test_record_max_is_silent_when_disabled) {
     if (profile::enabled()) {
         return;
     }
@@ -146,7 +149,7 @@ void test_record_max_is_silent_when_disabled() {
     expect(!present, "a disabled profiler registers no counter at all");
 }
 
-void test_clocks_advance_monotonically() {
+TEST(test_clocks_advance_monotonically) {
     const std::uint64_t wall_before = profile::wall_ns();
     const std::uint64_t cpu_before = profile::thread_cpu_ns();
     std::uint64_t sink = 0;
@@ -170,7 +173,7 @@ void test_clocks_advance_monotonically() {
 // wide -- the burn is far longer than the amount allowed to leak through, and
 // the sleep far longer than the wall time required -- so this does not depend
 // on the two threads being scheduled in any particular way.
-void test_thread_cpu_excludes_other_threads() {
+TEST(test_thread_cpu_excludes_other_threads) {
     std::atomic<bool> stop{false};
     std::thread burner([&stop] {
         std::uint64_t sink = 0;
@@ -217,7 +220,9 @@ std::string this_executable() {
 #endif
 }
 
-void test_a_counter_name_survives_the_exit_report() {
+// Defined last, so it runs last: the scopes above have already latched
+// PEREDUR_PROFILE as unset.
+TEST(test_a_counter_name_survives_the_exit_report) {
     // Same defect as the interning one above, one registry over: the report is
     // registered with atexit on the first scope, so everything it reads has to
     // outlive static destruction. Sites are leaked for that reason and so is
@@ -259,16 +264,3 @@ void test_a_counter_name_survives_the_exit_report() {
 }
 
 }  // namespace
-
-void run_profile_tests() {
-    test_scope_records_a_call();
-    test_repeated_names_share_one_site();
-    test_interned_names_survive_registry_growth();
-    test_wall_and_cpu_are_measured_separately();
-    test_record_max_keeps_the_largest();
-    test_record_max_is_silent_when_disabled();
-    test_clocks_advance_monotonically();
-    test_thread_cpu_excludes_other_threads();
-    // Last, so the scopes above have already latched PEREDUR_PROFILE as unset.
-    test_a_counter_name_survives_the_exit_report();
-}

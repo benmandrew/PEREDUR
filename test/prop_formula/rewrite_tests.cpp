@@ -1,13 +1,16 @@
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "prop_formula.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-void test_rewrite_post_order_identity() {
+constexpr std::string_view k_test_suite = "prop_formula_rewrite";
+
+TEST(test_rewrite_post_order_identity) {
     const Formula formula = Formula::make_binary(
         Formula::Kind::And, Formula::make_atom("P"), Formula::make_atom("Q"));
     const Formula rewritten = formula.rewrite_post_order(
@@ -16,7 +19,7 @@ void test_rewrite_post_order_identity() {
            "prop-formula-rewrite: identity rewrite should preserve formula");
 }
 
-void test_rewrite_post_order_rewrites_children_before_parent() {
+TEST(test_rewrite_post_order_rewrites_children_before_parent) {
     const Formula formula = Formula::make_binary(
         Formula::Kind::And, Formula::make_atom("P"), Formula::make_atom("Q"));
     const Formula rewritten = formula.rewrite_post_order(
@@ -39,7 +42,7 @@ void test_rewrite_post_order_rewrites_children_before_parent() {
         "prop-formula-rewrite: parent callback should see rewritten children");
 }
 
-void test_simplify_idempotence() {
+TEST(test_simplify_idempotence) {
     Formula fml = Formula::make_binary(
         Formula::Kind::And, Formula::make_atom("A"), Formula::make_atom("A"));
     fml.simplify();
@@ -51,7 +54,7 @@ void test_simplify_idempotence() {
     expect(fml.to_string() == "A", "simplify: A | A -> A");
 }
 
-void test_simplify_tautology() {
+TEST(test_simplify_tautology) {
     Formula fml =
         Formula::make_binary(Formula::Kind::Implies, Formula::make_atom("A"),
                              Formula::make_atom("A"));
@@ -64,7 +67,7 @@ void test_simplify_tautology() {
     expect(fml.to_string() == "true", "simplify: A <-> A -> true");
 }
 
-void test_simplify_excluded_middle() {
+TEST(test_simplify_excluded_middle) {
     Formula fml = Formula::make_binary(
         Formula::Kind::Or, Formula::make_atom("A"),
         Formula::make_unary(Formula::Kind::Not, Formula::make_atom("A")));
@@ -79,7 +82,7 @@ void test_simplify_excluded_middle() {
     expect(fml.to_string() == "true", "simplify: !A | A -> true");
 }
 
-void test_simplify_with_true() {
+TEST(test_simplify_with_true) {
     const Formula tru;
 
     Formula fml =
@@ -112,7 +115,7 @@ void test_simplify_with_true() {
     expect(fml.to_string() == "A", "simplify: A <-> true -> A");
 }
 
-void test_simplify_double_negation() {
+TEST(test_simplify_double_negation) {
     Formula fml = Formula::make_unary(
         Formula::Kind::Not,
         Formula::make_unary(Formula::Kind::Not, Formula::make_atom("A")));
@@ -120,7 +123,7 @@ void test_simplify_double_negation() {
     expect(fml.to_string() == "A", "simplify: !!A -> A");
 }
 
-void test_simplify_negated_constants() {
+TEST(test_simplify_negated_constants) {
     Formula fml = Formula::make_unary(Formula::Kind::Not, Formula{});
     fml.simplify();
     expect(fml.to_string() == "false", "simplify: !true -> false");
@@ -130,7 +133,7 @@ void test_simplify_negated_constants() {
     expect(fml.to_string() == "true", "simplify: !false -> true");
 }
 
-void test_simplify_compound() {
+TEST(test_simplify_compound) {
     // (A & A) -> A  =>  A -> A  =>  true
     Formula inner = Formula::make_binary(
         Formula::Kind::And, Formula::make_atom("A"), Formula::make_atom("A"));
@@ -140,7 +143,7 @@ void test_simplify_compound() {
     expect(fml.to_string() == "true", "simplify: (A & A) -> A -> true");
 }
 
-void test_simplify_contradiction() {
+TEST(test_simplify_contradiction) {
     Formula fml = Formula::make_binary(
         Formula::Kind::And, Formula::make_atom("A"),
         Formula::make_unary(Formula::Kind::Not, Formula::make_atom("A")));
@@ -161,7 +164,7 @@ void test_simplify_contradiction() {
     expect(fml.to_string() == "false", "simplify: A <-> !A -> false");
 }
 
-void test_simplify_with_false() {
+TEST(test_simplify_with_false) {
     const Formula fls("false");
 
     Formula fml =
@@ -193,7 +196,7 @@ void test_simplify_with_false() {
     expect(fml.to_string() == "!(A)", "simplify: A <-> false -> !A");
 }
 
-void test_simplify_pointless_weakening() {
+TEST(test_simplify_pointless_weakening) {
     // A guarantee p weakened to !(!p <-> p) is semantically true, a pointless
     // weakening that the simplifier must fold to the literal true.
     Formula iff = Formula::make_binary(
@@ -205,7 +208,7 @@ void test_simplify_pointless_weakening() {
     expect(fml.to_string() == "true", "simplify: !(!p <-> p) -> true");
 }
 
-void test_simplify_cascade() {
+TEST(test_simplify_cascade) {
     // A single post-order pass collapses a subformula to a constant and lets
     // that constant ripple through every ancestor: (A & !A) reduces to false
     // and (B | !B) to true, so (false <-> true) is false and the outer negation
@@ -234,19 +237,3 @@ void test_simplify_cascade() {
 }
 
 }  // namespace
-
-void run_prop_formula_rewrite_tests() {
-    test_rewrite_post_order_identity();
-    test_rewrite_post_order_rewrites_children_before_parent();
-    test_simplify_idempotence();
-    test_simplify_tautology();
-    test_simplify_excluded_middle();
-    test_simplify_with_true();
-    test_simplify_double_negation();
-    test_simplify_negated_constants();
-    test_simplify_compound();
-    test_simplify_contradiction();
-    test_simplify_with_false();
-    test_simplify_pointless_weakening();
-    test_simplify_cascade();
-}

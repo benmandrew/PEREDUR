@@ -6,14 +6,21 @@
 #include <fstream>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "fitness/exhaustive_count.hpp"
 #include "runner/ganak.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
-void test_ganak_runner_on_trivial_cnf() {
+namespace {
+
+constexpr std::string_view k_test_suite = "ganak_runner";
+
+}  // namespace
+
+TEST(test_ganak_runner_on_trivial_cnf) {
     std::string dimacs_path = "/tmp/peredur-ganak-test-XXXXXX";
     const int file_descriptor = mkstemp(dimacs_path.data());
     expect(file_descriptor >= 0,
@@ -40,7 +47,7 @@ void test_ganak_runner_on_trivial_cnf() {
 // the whole of that collapse came from while `ltlfilt --simplify` sat in front
 // of this cache normalising operand order; the canonical form carries that
 // half now.
-void test_ganak_cache_is_rename_invariant() {
+TEST(test_ganak_cache_is_rename_invariant) {
     const std::size_t misses_before = GanakStats::n_cache_misses;
     const Count first = run_ganak_on_formula("(a) & (b)");
     const Count second = run_ganak_on_formula("(y) & (z)");
@@ -49,12 +56,22 @@ void test_ganak_cache_is_rename_invariant() {
            "ganak-runner: a renamed guard bought a second exec");
 }
 
+// The count must be over every variable the caller's formula mentions, since
+// count_guard_models multiplies it by two per variable of the wider alphabet
+// and computes that exponent from the HOA label rather than from whatever
+// reaches ganak. `ltlfilt --simplify` returns `a` for this subject, dropping
+// `b` from the DIMACS and halving the count; the canonical form keeps both.
+TEST(test_ganak_counts_over_every_mentioned_variable) {
+    expect(run_ganak_on_formula("(a) | ((a) & (b))") == 2,
+           "ganak-runner: a subsumed term cost the count a variable");
+}
+
 // The in-process enumeration is what answers a guard now, so it is checked
 // against the subprocess it stands in for rather than against a second
 // implementation of its own argument. The subjects are guard-shaped --
 // negation, conjunction and disjunction over a handful of atoms -- because
 // that is the whole of what hoa_label_to_formula can emit.
-void test_exhaustive_count_agrees_with_ganak() {
+TEST(test_exhaustive_count_agrees_with_ganak) {
     const std::vector<std::string> formulae = {
         "(a)",
         "(!a)",
@@ -71,21 +88,4 @@ void test_exhaustive_count_agrees_with_ganak() {
         expect(exact.value_or(-1) == run_ganak_on_formula(formula),
                "exhaustive-count: disagreed with ganak on " + formula);
     }
-}
-
-// The count must be over every variable the caller's formula mentions, since
-// count_guard_models multiplies it by two per variable of the wider alphabet
-// and computes that exponent from the HOA label rather than from whatever
-// reaches ganak. `ltlfilt --simplify` returns `a` for this subject, dropping
-// `b` from the DIMACS and halving the count; the canonical form keeps both.
-void test_ganak_counts_over_every_mentioned_variable() {
-    expect(run_ganak_on_formula("(a) | ((a) & (b))") == 2,
-           "ganak-runner: a subsumed term cost the count a variable");
-}
-
-void run_ganak_runner_tests() {
-    test_ganak_runner_on_trivial_cnf();
-    test_ganak_cache_is_rename_invariant();
-    test_ganak_counts_over_every_mentioned_variable();
-    test_exhaustive_count_agrees_with_ganak();
 }

@@ -2,17 +2,20 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
 
 #include "runner/formaliser.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-void test_basic_request_response() {
+constexpr std::string_view k_test_suite = "formaliser_runner";
+
+TEST(test_basic_request_response) {
     RequirementFormaliser formaliser(formaliser_command());
     const std::string result =
         formaliser.formalise("component shall satisfy trigger");
@@ -20,7 +23,7 @@ void test_basic_request_response() {
            "formaliser: expected transformed response for a single request");
 }
 
-void test_cache_hit_avoids_second_round_trip() {
+TEST(test_cache_hit_avoids_second_round_trip) {
     RequirementFormaliser formaliser(formaliser_command());
     const std::size_t misses_before = RequirementFormaliser::n_cache_misses;
     const std::size_t hits_before = RequirementFormaliser::n_cache_hits;
@@ -38,7 +41,7 @@ void test_cache_hit_avoids_second_round_trip() {
            "formaliser: the second call should hit the cache");
 }
 
-void test_concurrent_calls_get_matching_responses() {
+TEST(test_concurrent_calls_get_matching_responses) {
     RequirementFormaliser formaliser(formaliser_command());
     constexpr int n_threads = 8;
     constexpr int n_calls_per_thread = 20;
@@ -82,7 +85,7 @@ void test_concurrent_calls_get_matching_responses() {
                std::to_string(failures.size()) + ")");
 }
 
-void test_unexpected_eof_throws() {
+TEST(test_unexpected_eof_throws) {
     // Reads exactly one line, then exits without writing a response: the
     // formaliser's write succeeds (the child is still starting up), but the
     // read that follows sees EOF instead of a response line.
@@ -99,10 +102,3 @@ void test_unexpected_eof_throws() {
 }
 
 }  // namespace
-
-void run_formaliser_runner_tests() {
-    test_basic_request_response();
-    test_cache_hit_avoids_second_round_trip();
-    test_concurrent_calls_get_matching_responses();
-    test_unexpected_eof_throws();
-}

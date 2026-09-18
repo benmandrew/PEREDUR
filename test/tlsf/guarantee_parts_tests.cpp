@@ -1,15 +1,18 @@
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "prop_formula.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/guarantee_parts.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "tlsf_guarantee_parts";
 
 std::vector<std::string> part_strings(
     const std::vector<tlsf::CoreFormula>& parts) {
@@ -29,21 +32,21 @@ tlsf::Specification spec_with_guarantee(const std::string& formula) {
     return spec;
 }
 
-void test_splits_a_top_level_conjunction() {
+TEST(test_splits_a_top_level_conjunction) {
     const auto parts =
         tlsf::split_guarantee_parts(spec_with_guarantee("a & b"));
     expect(part_strings(parts) == std::vector<std::string>{"a", "b"},
            "guarantee parts: a top-level conjunction should split in two");
 }
 
-void test_splits_nested_conjunctions_fully() {
+TEST(test_splits_nested_conjunctions_fully) {
     const auto parts =
         tlsf::split_guarantee_parts(spec_with_guarantee("(a & b) & (c & d)"));
     expect(part_strings(parts) == std::vector<std::string>{"a", "b", "c", "d"},
            "guarantee parts: nested conjunctions should split all the way");
 }
 
-void test_distributes_globally_over_conjunction() {
+TEST(test_distributes_globally_over_conjunction) {
     // The rewrite that matters in practice: a TLSF GUARANTEE is commonly a
     // single G over a wide conjunction, and leaving it whole is what left the
     // detector specification's MRS score flat across every one of its links.
@@ -58,7 +61,7 @@ void test_distributes_globally_over_conjunction() {
            "guarantee parts: the G should distribute onto each conjunct");
 }
 
-void test_leaves_other_operators_alone() {
+TEST(test_leaves_other_operators_alone) {
     // Only conjunction is descended into. Splitting a disjunction or an
     // implication would not preserve the language.
     const auto disjunction =
@@ -71,7 +74,7 @@ void test_leaves_other_operators_alone() {
            "guarantee parts: an implication should stay whole");
 }
 
-void test_covers_the_guarantee_side_sections_in_order() {
+TEST(test_covers_the_guarantee_side_sections_in_order) {
     // PRESET, then ASSERT, then GUARANTEE -- the order the MUC extractor
     // enumerates in, so the two agree on what the guarantee side is made of.
     tlsf::Specification spec;
@@ -88,7 +91,7 @@ void test_covers_the_guarantee_side_sections_in_order() {
            "guarantee parts: the guarantee side alone, in section order");
 }
 
-void test_subset_keeps_the_environment_side_whole() {
+TEST(test_subset_keeps_the_environment_side_whole) {
     tlsf::Specification spec;
     spec.m_inputs = {"i"};
     spec.m_outputs = {"o"};
@@ -110,7 +113,7 @@ void test_subset_keeps_the_environment_side_whole() {
            "guarantee parts: a subset should hold exactly the named parts");
 }
 
-void test_subset_restores_each_part_to_its_own_section() {
+TEST(test_subset_restores_each_part_to_its_own_section) {
     tlsf::Specification spec;
     spec.m_preset.emplace_back(Formula("p"));
     spec.m_assert.emplace_back(Formula("s"));
@@ -124,7 +127,7 @@ void test_subset_restores_each_part_to_its_own_section() {
            "from, since the lowering differs per section");
 }
 
-void test_full_subset_reproduces_the_specification() {
+TEST(test_full_subset_reproduces_the_specification) {
     // The walk's last step asks about every part, and that query must be the
     // one the tiered scale would have asked -- otherwise 1.0 would not mean
     // what it means there.
@@ -144,14 +147,3 @@ void test_full_subset_reproduces_the_specification() {
 }
 
 }  // namespace
-
-void run_tlsf_guarantee_parts_tests() {
-    test_splits_a_top_level_conjunction();
-    test_splits_nested_conjunctions_fully();
-    test_distributes_globally_over_conjunction();
-    test_leaves_other_operators_alone();
-    test_covers_the_guarantee_side_sections_in_order();
-    test_subset_keeps_the_environment_side_whole();
-    test_subset_restores_each_part_to_its_own_section();
-    test_full_subset_reproduces_the_specification();
-}

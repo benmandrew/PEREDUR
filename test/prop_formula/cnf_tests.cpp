@@ -4,15 +4,18 @@
 #include <cstdlib>
 #include <fstream>
 #include <string>
+#include <string_view>
 
 #include "prop_formula.hpp"
 #include "runner/ganak.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-void test_formula_to_dimacs_implies_count() {
+constexpr std::string_view k_test_suite = "prop_formula_cnf";
+
+TEST(test_formula_to_dimacs_implies_count) {
     const Formula formula = Formula("P -> Q");
     std::string dimacs_path = "/tmp/peredur-formula-implies-XXXXXX";
     const int file_descriptor = mkstemp(dimacs_path.data());
@@ -31,7 +34,7 @@ void test_formula_to_dimacs_implies_count() {
     std::remove(dimacs_path.c_str());
 }
 
-void test_formula_to_dimacs_precedence_count() {
+TEST(test_formula_to_dimacs_precedence_count) {
     const Formula formula = Formula("A | B & C");
     std::string dimacs_path = "/tmp/peredur-formula-precedence-XXXXXX";
     const int file_descriptor = mkstemp(dimacs_path.data());
@@ -51,8 +54,3 @@ void test_formula_to_dimacs_precedence_count() {
 }
 
 }  // namespace
-
-void run_prop_formula_cnf_tests() {
-    test_formula_to_dimacs_implies_count();
-    test_formula_to_dimacs_precedence_count();
-}

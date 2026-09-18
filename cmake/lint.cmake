@@ -134,6 +134,7 @@ if(CPPCHECK_EXE)
             --enable=warning,style,performance,portability
             --error-exitcode=1
             --suppressions-list=${CMAKE_CURRENT_SOURCE_DIR}/.cppcheck_suppressions.txt
+            --library=${CMAKE_CURRENT_SOURCE_DIR}/test/test_registry.cfg
             --quiet
             ${PEREDUR_LINT_FILES}
         COMMENT "Running cppcheck on C++ sources"

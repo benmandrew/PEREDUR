@@ -50,6 +50,7 @@ add_executable(peredur_tests
     tlsf/pipeline_tests.cpp
     fingerprint/lasso_tests.cpp
     drivers/e2e_tests.cpp
+    test_registry.cpp
 )
 
 # src/ as well as test/, so suites can reach the private headers next to the
@@ -75,8 +76,71 @@ else()
     target_compile_options(peredur_tests PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-add_test(NAME peredur_tests.profile COMMAND peredur_tests profile)
-# Again with the profiler switched on. The suite branches on
+# One entry per suite in the table in main.cpp, which also fixes which tests
+# each runs. The drivers' end-to-end suites are separate entries so a failure
+# names the driver rather than a suite covering eight of them.
+set(peredur_test_suites
+    profile
+    transfer_matrix
+    black_runner
+    formaliser_runner
+    ganak_runner
+    ltlfilt_runner
+    process_runner
+    spot_runner
+    accumulator
+    crossover
+    generation
+    determinism
+    pipeline
+    termination
+    nsga2
+    mutation
+    fretish_monotone
+    prop_formula_ast
+    prop_formula_canonical
+    prop_formula_cnf
+    prop_formula_rewrite
+    prop_formula_similarity
+    prop_formula_temporal
+    fingerprint_lasso
+    semantic_similarity
+    syntactic_similarity
+    fitness_function
+    status
+    correctness
+    implication_filter
+    vacuity_filter
+    well_separation_filter
+    requirement
+    scope
+    serialisation
+    config_io
+    dashboard
+    driver_support
+    tlsf_parser
+    tlsf_writer
+    tlsf_filter
+    tlsf_fitness
+    tlsf_mucs
+    tlsf_genetic
+    tlsf_monotone
+    tlsf_assumption
+    tlsf_pipeline
+    driver_peredur
+    driver_realize
+    driver_ltl
+    driver_mucs
+    driver_compare
+    driver_maximal
+    driver_lint_ideals
+    driver_signal_tracer
+)
+foreach(suite IN LISTS peredur_test_suites)
+    add_test(NAME peredur_tests.${suite} COMMAND peredur_tests ${suite})
+endforeach()
+
+# The profile suite again with the profiler switched on. The suite branches on
 # profile::enabled(), so registering it only once means every assertion about
 # actually recording anything is skipped -- the suite would pass by testing that
 # a disabled profiler does nothing, which is the half that cannot regress.
@@ -92,66 +156,6 @@ add_test(NAME peredur_tests.thread_pool_default COMMAND peredur_tests thread_poo
 add_test(NAME peredur_tests.thread_pool_sized COMMAND peredur_tests thread_pool)
 set_tests_properties(peredur_tests.thread_pool_sized PROPERTIES
     ENVIRONMENT "PEREDUR_TEST_POOL_SIZE=3")
-add_test(NAME peredur_tests.transfer_matrix COMMAND peredur_tests transfer_matrix)
-add_test(NAME peredur_tests.black_runner COMMAND peredur_tests black_runner)
-add_test(NAME peredur_tests.formaliser_runner COMMAND peredur_tests formaliser_runner)
-add_test(NAME peredur_tests.ganak_runner COMMAND peredur_tests ganak_runner)
-add_test(NAME peredur_tests.ltlfilt_runner COMMAND peredur_tests ltlfilt_runner)
-add_test(NAME peredur_tests.process_runner COMMAND peredur_tests process_runner)
-add_test(NAME peredur_tests.spot_runner COMMAND peredur_tests spot_runner)
-add_test(NAME peredur_tests.accumulator COMMAND peredur_tests accumulator)
-add_test(NAME peredur_tests.crossover COMMAND peredur_tests crossover)
-add_test(NAME peredur_tests.generation COMMAND peredur_tests generation)
-add_test(NAME peredur_tests.determinism COMMAND peredur_tests determinism)
-add_test(NAME peredur_tests.pipeline COMMAND peredur_tests pipeline)
-add_test(NAME peredur_tests.termination COMMAND peredur_tests termination)
-add_test(NAME peredur_tests.nsga2 COMMAND peredur_tests nsga2)
-add_test(NAME peredur_tests.mutation COMMAND peredur_tests mutation)
-add_test(NAME peredur_tests.fretish_monotone COMMAND peredur_tests fretish_monotone)
-add_test(NAME peredur_tests.prop_formula_ast COMMAND peredur_tests prop_formula_ast)
-add_test(NAME peredur_tests.prop_formula_canonical COMMAND peredur_tests prop_formula_canonical)
-add_test(NAME peredur_tests.prop_formula_cnf COMMAND peredur_tests prop_formula_cnf)
-add_test(NAME peredur_tests.prop_formula_rewrite COMMAND peredur_tests prop_formula_rewrite)
-add_test(NAME peredur_tests.prop_formula_similarity COMMAND peredur_tests prop_formula_similarity)
-add_test(NAME peredur_tests.prop_formula_temporal COMMAND peredur_tests prop_formula_temporal)
-add_test(NAME peredur_tests.fingerprint_lasso COMMAND peredur_tests fingerprint_lasso)
-add_test(NAME peredur_tests.semantic_similarity COMMAND peredur_tests semantic_similarity)
-add_test(NAME peredur_tests.syntactic_similarity COMMAND peredur_tests syntactic_similarity)
-add_test(NAME peredur_tests.fitness_function COMMAND peredur_tests fitness_function)
-add_test(NAME peredur_tests.status COMMAND peredur_tests status)
-add_test(NAME peredur_tests.correctness COMMAND peredur_tests correctness)
-add_test(NAME peredur_tests.implication_filter COMMAND peredur_tests implication_filter)
-add_test(NAME peredur_tests.vacuity_filter COMMAND peredur_tests vacuity_filter)
-add_test(NAME peredur_tests.well_separation_filter COMMAND peredur_tests well_separation_filter)
-add_test(NAME peredur_tests.requirement COMMAND peredur_tests requirement)
-add_test(NAME peredur_tests.scope COMMAND peredur_tests scope)
-add_test(NAME peredur_tests.serialisation COMMAND peredur_tests serialisation)
-add_test(NAME peredur_tests.config_io COMMAND peredur_tests config_io)
-add_test(NAME peredur_tests.dashboard COMMAND peredur_tests dashboard)
-add_test(NAME peredur_tests.driver_support COMMAND peredur_tests driver_support)
-add_test(NAME peredur_tests.tlsf_parser COMMAND peredur_tests tlsf_parser)
-add_test(NAME peredur_tests.tlsf_writer COMMAND peredur_tests tlsf_writer)
-add_test(NAME peredur_tests.tlsf_filter COMMAND peredur_tests tlsf_filter)
-add_test(NAME peredur_tests.tlsf_fitness COMMAND peredur_tests tlsf_fitness)
-add_test(NAME peredur_tests.tlsf_mucs COMMAND peredur_tests tlsf_mucs)
-add_test(NAME peredur_tests.tlsf_genetic COMMAND peredur_tests tlsf_genetic)
-add_test(NAME peredur_tests.tlsf_monotone COMMAND peredur_tests tlsf_monotone)
-add_test(NAME peredur_tests.tlsf_assumption COMMAND peredur_tests tlsf_assumption)
-add_test(NAME peredur_tests.tlsf_pipeline COMMAND peredur_tests tlsf_pipeline)
-
-# One end-to-end entry per built driver, each running the binary the way a user
-# would. They are registered separately so a failure names the driver rather
-# than a suite covering eight of them.
-add_test(NAME peredur_tests.driver_peredur COMMAND peredur_tests driver_peredur)
-add_test(NAME peredur_tests.driver_realize COMMAND peredur_tests driver_realize)
-add_test(NAME peredur_tests.driver_ltl COMMAND peredur_tests driver_ltl)
-add_test(NAME peredur_tests.driver_mucs COMMAND peredur_tests driver_mucs)
-add_test(NAME peredur_tests.driver_compare COMMAND peredur_tests driver_compare)
-add_test(NAME peredur_tests.driver_maximal COMMAND peredur_tests driver_maximal)
-add_test(NAME peredur_tests.driver_lint_ideals
-         COMMAND peredur_tests driver_lint_ideals)
-add_test(NAME peredur_tests.driver_signal_tracer
-         COMMAND peredur_tests driver_signal_tracer)
 
 # The dashboard page ships as one self-contained HTML file, so its script is
 # tested by extracting it from the page and running it under node -- the same

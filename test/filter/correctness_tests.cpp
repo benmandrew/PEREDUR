@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "config.hpp"
@@ -10,7 +11,7 @@
 #include "requirement.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/evolve.hpp"
 #include "tlsf/filter.hpp"
@@ -18,6 +19,8 @@
 #include "tlsf/specification.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "correctness";
 
 std::vector<std::string> correctness_stage_names(
     const std::vector<FilterFunction>& filters) {
@@ -70,7 +73,7 @@ tlsf::Specification tlsf_spec(const std::string& main_body) {
 // One direction only, deliberately. A row without a stage is a property checked
 // at the gate alone, which is a supported configuration (well-separation's row
 // is one) and is where a future change may deliberately move a check.
-void test_every_correctness_stage_has_a_gate_check() {
+TEST(test_every_correctness_stage_has_a_gate_check) {
     const Config cfg;
     const Specification original = fretish_spec();
     const std::vector<std::string> stages = correctness_stage_names(
@@ -88,7 +91,7 @@ void test_every_correctness_stage_has_a_gate_check() {
     }
 }
 
-void test_every_tlsf_correctness_stage_has_a_gate_check() {
+TEST(test_every_tlsf_correctness_stage_has_a_gate_check) {
     const Config cfg;
     const tlsf::Specification original =
         tlsf_spec("INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); }");
@@ -110,7 +113,7 @@ void test_every_tlsf_correctness_stage_has_a_gate_check() {
 // The two paths' tables must agree on names as well as on content: the
 // dashboard, the filter report and run_experiments.py all key on the stage
 // name, and a repair is screened by whichever table its front end reads.
-void test_both_paths_name_the_same_checks_in_the_same_order() {
+TEST(test_both_paths_name_the_same_checks_in_the_same_order) {
     const std::vector<CorrectnessCheck> fretish =
         correctness_checks(global_sat_checker(), global_real_checker());
     const std::vector<CorrectnessCheckT<tlsf::Specification>> tlsf_checks =
@@ -129,7 +132,7 @@ void test_both_paths_name_the_same_checks_in_the_same_order() {
 // realizability is a scored objective and vacuity's queries are keyed per
 // requirement, but nothing warms an ltlsynt well-separation query when its
 // per-generation stage is off.
-void test_well_separation_is_the_last_check() {
+TEST(test_well_separation_is_the_last_check) {
     const std::vector<CorrectnessCheck> checks =
         correctness_checks(global_sat_checker(), global_real_checker());
     expect(!checks.empty() && checks.back().name == "not-well-separated",
@@ -140,7 +143,7 @@ void test_well_separation_is_the_last_check() {
 // A row without a per-generation stage still sits in the table, which is what
 // makes the gate unconditional: the stage is search pressure, never output
 // correctness. Well-separation is that row.
-void test_gate_only_row_has_no_stage_but_keeps_its_check() {
+TEST(test_gate_only_row_has_no_stage_but_keeps_its_check) {
     const Config cfg;
     const Specification original = fretish_spec();
     const std::vector<std::string> stages = correctness_stage_names(
@@ -159,7 +162,7 @@ void test_gate_only_row_has_no_stage_but_keeps_its_check() {
 // is realizable only because the system can defeat its own assumption. It is
 // not vacuous -- `G b` is satisfiable and `G (a -> b)` is not valid -- so the
 // vacuity check keeps it and only well-separation rejects it.
-void test_gate_rejects_a_not_well_separated_specification() {
+TEST(test_gate_rejects_a_not_well_separated_specification) {
     const tlsf::Specification spec = tlsf_spec(
         "INPUTS { a; } OUTPUTS { b; } ASSUME { G b; } "
         "GUARANTEE { G (a -> b); }");
@@ -173,7 +176,7 @@ void test_gate_rejects_a_not_well_separated_specification() {
            "well-separation check specifically");
 }
 
-void test_gate_keeps_a_well_separated_specification() {
+TEST(test_gate_keeps_a_well_separated_specification) {
     const tlsf::Specification spec = tlsf_spec(
         "INPUTS { a; } OUTPUTS { b; } ASSUME { G F a; } "
         "GUARANTEE { G (a -> b); }");
@@ -186,13 +189,3 @@ void test_gate_keeps_a_well_separated_specification() {
 }
 
 }  // namespace
-
-void run_correctness_tests() {
-    test_every_correctness_stage_has_a_gate_check();
-    test_every_tlsf_correctness_stage_has_a_gate_check();
-    test_both_paths_name_the_same_checks_in_the_same_order();
-    test_well_separation_is_the_last_check();
-    test_gate_only_row_has_no_stage_but_keeps_its_check();
-    test_gate_rejects_a_not_well_separated_specification();
-    test_gate_keeps_a_well_separated_specification();
-}

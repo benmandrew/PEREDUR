@@ -13,6 +13,7 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "config.hpp"
@@ -20,10 +21,12 @@
 #include "genetic/pipeline.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "termination";
 
 constexpr std::size_t k_target_size = 4;
 
@@ -90,7 +93,7 @@ void drive(const Config& cfg, SearchBudget& budget, std::size_t seed) {
 
 // The default configuration must not be able to end a run early, since every
 // archived campaign's config omits these keys and inherits whatever they mean.
-void test_default_config_budget_is_inactive() {
+TEST(test_default_config_budget_is_inactive) {
     const SearchBudget budget(Config{}, SearchBudget::Clock::now());
     expect(!budget.active(),
            "termination: the default configuration should leave the budget "
@@ -102,7 +105,7 @@ void test_default_config_budget_is_inactive() {
 // An inactive budget must be invisible to the search. Breeding skips the parent
 // comparison and the clock read when the budget cannot fire, so passing one
 // must cost exactly what passing none costs -- in draws and in output.
-void test_inactive_budget_costs_no_draw() {
+TEST(test_inactive_budget_costs_no_draw) {
     const Config cfg;
     const AggregateWeightedFitnessFunction fns = constant_fitness();
     const std::vector<ScoredSpecification> pop =
@@ -135,7 +138,7 @@ void test_inactive_budget_costs_no_draw() {
 
 // Counted per offspring and tested between them, so the run stops on the cap
 // rather than overshooting it by the rest of the generation.
-void test_individual_cap_stops_the_run() {
+TEST(test_individual_cap_stops_the_run) {
     Config cfg = individuals_config(2);
     cfg.generations = 6;
     SearchBudget budget(cfg, SearchBudget::Clock::now());
@@ -157,7 +160,7 @@ void test_individual_cap_stops_the_run() {
 // A slot whose operators left the offspring equal to its parent is free, which
 // is what AuRUS counts: its mutation arm increments only on
 // !chromosome.equals(mutated).
-void test_offspring_equal_to_parent_is_not_counted() {
+TEST(test_offspring_equal_to_parent_is_not_counted) {
     Config cfg = individuals_config(4);
     cfg.generations = 3;
     // Neither operator fires, so every slot returns its parent verbatim.
@@ -178,7 +181,7 @@ void test_offspring_equal_to_parent_is_not_counted() {
 
 // Honoured whatever the termination mode is: the deadline is about the clock,
 // not about how the search budget is counted.
-void test_deadline_stops_the_run_under_either_mode() {
+TEST(test_deadline_stops_the_run_under_either_mode) {
     for (const TerminationMode mode :
          {TerminationMode::Generations, TerminationMode::Individuals}) {
         Config cfg = individuals_config(1000);
@@ -204,7 +207,7 @@ void test_deadline_stops_the_run_under_either_mode() {
 
 // AuRUS's checkTermination() tests the individual count first and the timeout
 // second, so a run that trips both reports the same criterion on both sides.
-void test_individuals_reported_before_deadline() {
+TEST(test_individuals_reported_before_deadline) {
     Config cfg = individuals_config(1);
     cfg.generations = 4;
     cfg.max_wall_s = 1;
@@ -217,7 +220,7 @@ void test_individuals_reported_before_deadline() {
 
 // Zero is off rather than an instantly-passed deadline, which is what an
 // archived config omitting the key has to keep meaning.
-void test_zero_deadline_never_fires() {
+TEST(test_zero_deadline_never_fires) {
     Config cfg;
     cfg.max_wall_s = 0;
     const SearchBudget budget(
@@ -230,7 +233,7 @@ void test_zero_deadline_never_fires() {
 
 // The manifest reports the count on every run, so it has to be maintained
 // whether or not a budget is capable of firing.
-void test_generations_counted_without_a_budget() {
+TEST(test_generations_counted_without_a_budget) {
     Config cfg;
     cfg.generations = 3;
     SearchBudget budget(cfg, SearchBudget::Clock::now());
@@ -242,14 +245,3 @@ void test_generations_counted_without_a_budget() {
 }
 
 }  // namespace
-
-void run_termination_tests() {
-    test_default_config_budget_is_inactive();
-    test_inactive_budget_costs_no_draw();
-    test_individual_cap_stops_the_run();
-    test_offspring_equal_to_parent_is_not_counted();
-    test_deadline_stops_the_run_under_either_mode();
-    test_individuals_reported_before_deadline();
-    test_zero_deadline_never_fires();
-    test_generations_counted_without_a_budget();
-}

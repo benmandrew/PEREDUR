@@ -1,6 +1,7 @@
 #include <cmath>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -8,12 +9,14 @@
 #include "fitness/semantic_similarity.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-void test_semantic_similarity_identical_requirements_score_two() {
+constexpr std::string_view k_test_suite = "semantic_similarity";
+
+TEST(test_semantic_similarity_identical_requirements_score_two) {
     const Requirement requirement{Formula("P"), Formula("Q"),
                                   timing::immediately()};
     const double score = semantic_similarity(requirement, requirement, 1);
@@ -21,7 +24,7 @@ void test_semantic_similarity_identical_requirements_score_two() {
            "semantic-similarity: identical requirements should have score 1");
 }
 
-void test_semantic_similarity_formula_value_explicit_step_count() {
+TEST(test_semantic_similarity_formula_value_explicit_step_count) {
     const Requirement requirement{Formula("P"), Formula("Q"),
                                   timing::immediately()};
     const Requirement other_requirement{Formula("P"), Formula("P|Q"),
@@ -34,7 +37,7 @@ void test_semantic_similarity_formula_value_explicit_step_count() {
            "semantic-similarity: expected score 6/7 from formula");
 }
 
-void test_semantic_similarity_default_overload_matches_explicit_step_count() {
+TEST(test_semantic_similarity_default_overload_matches_explicit_step_count) {
     const Requirement requirement{Formula("P"), Formula("Q"),
                                   timing::immediately()};
     const Requirement other_requirement{Formula("P"), Formula("P|Q"),
@@ -53,7 +56,7 @@ void test_semantic_similarity_default_overload_matches_explicit_step_count() {
            "and metric");
 }
 
-void test_semantic_similarity_identical_specifications_score_one() {
+TEST(test_semantic_similarity_identical_specifications_score_one) {
     const Specification spec(
         {},
         {Requirement{Formula("P"), Formula("Q"), timing::immediately()},
@@ -71,7 +74,7 @@ void test_semantic_similarity_identical_specifications_score_one() {
 // spec's assumptions (an assertion in debug builds, undefined behaviour once
 // NDEBUG disables it). The score must stay finite, bounded, and independent of
 // argument order.
-void test_semantic_similarity_differing_assumption_counts() {
+TEST(test_semantic_similarity_differing_assumption_counts) {
     const Requirement req_q{Formula("P"), Formula("Q"), timing::immediately()};
     const Requirement req_not_q{Formula("P"), Formula("!Q"),
                                 timing::immediately()};
@@ -91,7 +94,7 @@ void test_semantic_similarity_differing_assumption_counts() {
            "either argument order");
 }
 
-void test_semantic_similarity_specification_averages_requirements() {
+TEST(test_semantic_similarity_specification_averages_requirements) {
     const Requirement req_imm{Formula("P"), Formula("Q"),
                               timing::immediately()};
     const Requirement req_next{Formula("P"), Formula("Q"),
@@ -123,7 +126,7 @@ void test_semantic_similarity_specification_averages_requirements() {
 // directional ratios this floored the score at 0.5 no matter how vacuous the
 // weakening was; the harmonic mean lets a near-zero "precision" ratio pull
 // the score down toward 0 instead.
-void test_semantic_similarity_tautology_scores_near_zero() {
+TEST(test_semantic_similarity_tautology_scores_near_zero) {
     const Requirement original{Formula("P"), Formula("Q"),
                                timing::after_ticks(1)};
     const Requirement tautology{Formula("Q"), Formula("Q"),
@@ -137,7 +140,7 @@ void test_semantic_similarity_tautology_scores_near_zero() {
 // Two distinct eventually-timing requirements. Their conjunction produces a
 // generalized-Buchi automaton; the old HOA parser over-counted accepting states
 // and returned similarity > 1. Verifies the result stays in [0, 1].
-void test_semantic_similarity_liveness_in_range() {
+TEST(test_semantic_similarity_liveness_in_range) {
     const Requirement req_a{Formula("P"), Formula("Q"), timing::eventually()};
     // A, B avoid SPOT's reserved LTL operator letters (e.g. R for Release).
     const Requirement req_b{Formula("A"), Formula("B"), timing::eventually()};
@@ -149,38 +152,101 @@ void test_semantic_similarity_liveness_in_range() {
            "semantic-similarity: eventually cross-score must lie in [0, 1]");
 }
 
-// Propositionally-equivalent responses that differ syntactically must produce
-// the same semantic similarity when scored against the same original.
-// Regression: repair_2 and repair_13 from the takeoff-unfixed-1 run had
-// divergent stored scores because the automata happened to differ in an older
-// version of requirement_to_ltl; the current code must agree.
-void test_semantic_similarity_propequiv_responses_score_equal() {
-    // repair_2.req2: response = !((!tr & lo) -> tr)  ≡  !tr & lo
-    const Requirement repair2_req2{
-        Formula("true"),
-        Formula("!(((!(takeoff_roll)) & (lift_off)) -> (takeoff_roll))"),
-        timing::within_ticks(5), ConditionType::Trigger};
-    // repair_13.req2: response = !tr & lo  (same formula, simpler string)
-    const Requirement repair13_req2{
-        Formula("true"), Formula("(!(takeoff_roll)) & (lift_off)"),
-        timing::within_ticks(5), ConditionType::Trigger};
-    // original req2
-    const Requirement original_req2{
-        Formula("true"), Formula("!(takeoff_roll) & (lift_off)"),
-        timing::within_ticks(7), ConditionType::Trigger};
-    const double score2 = semantic_similarity(
-        repair2_req2, original_req2, Config{}.default_model_counting_bound);
-    const double score13 = semantic_similarity(
-        repair13_req2, original_req2, Config{}.default_model_counting_bound);
-    expect(std::fabs(score2 - score13) < 1e-12,
-           "semantic-similarity: propositionally-equivalent responses must "
-           "score identically against the same original (got " +
-               std::to_string(score2) + " vs " + std::to_string(score13) + ")");
+// A bounded timing (WithinTicks/AfterTicks/...) compiles to a safety automaton
+// -- ltl2tgba emits "acc-name: all", and a violating trace is rejected by
+// running out of transitions. Eventually compiles to a Buchi automaton, which
+// is complete: every trace has a run, and rejection is carried entirely by the
+// accepting mask. Counting k-step traces asks the same question of both only
+// once k reaches the bounded operand's horizon (ticks + 1). Below it the safety
+// automaton has not yet reached its stuck transition, so it still counts traces
+// that already missed the deadline -- more than the Buchi side admits for the
+// weaker formula it implies. The containment ratio then exceeds 1.
+TEST(test_semantic_similarity_bounded_timing_vs_eventually_in_range) {
+    const Requirement within5{Formula("true"), Formula("lift_off"),
+                              timing::within_ticks(5), ConditionType::Trigger};
+    const Requirement eventually{Formula("true"), Formula("lift_off"),
+                                 timing::eventually(), ConditionType::Trigger};
+    // Spans both sides of the horizon (6): 3-5 are below it, 6-10 at or above.
+    for (const std::size_t step_count : {3, 4, 5, 6, 7, 10}) {
+        const double score =
+            semantic_similarity(within5, eventually, step_count);
+        expect(score >= 0.0 && score <= 1.0,
+               "semantic-similarity: WithinTicks(5) vs Eventually must stay in "
+               "[0, 1] at bound " +
+                   std::to_string(step_count) +
+                   ", including below the horizon where the safety automaton "
+                   "has not yet enforced its deadline");
+    }
+}
+
+// The same defect at the shipped default_bound of 10: mutate_timing can raise a
+// requirement's tick count to 10 or beyond, putting its horizon (11) above the
+// bound. Guards against treating the defect as a small-bound curiosity.
+TEST(test_semantic_similarity_deep_ticks_at_default_bound_in_range) {
+    const Requirement within10{Formula("true"), Formula("lift_off"),
+                               timing::within_ticks(10),
+                               ConditionType::Trigger};
+    const Requirement eventually{Formula("true"), Formula("lift_off"),
+                                 timing::eventually(), ConditionType::Trigger};
+    const double score = semantic_similarity(
+        within10, eventually, Config{}.default_model_counting_bound);
+    expect(score >= 0.0 && score <= 1.0,
+           "semantic-similarity: a WithinTicks(10) mutant scored against "
+           "Eventually at the default bound must stay in [0, 1]");
+}
+
+// An atom-rich pair whose horizon (21) sits above the ceiling a 128-bit Count
+// imposed: max_representable_step_count clamped to 127/10 == 12, so the bound
+// landed below the horizon and reopened the ratio defect documented on
+// effective_step_count. long double's 16384-bit exponent range lifts the clamp
+// to 1638, letting the bound actually reach the horizon.
+TEST(test_semantic_similarity_atom_rich_deep_horizon_in_range) {
+    const Formula condition("a0 & a1 & a2 & a3 & a4");
+    const Requirement wide{condition, Formula("a5 | a6 | a7 | a8 | a9"),
+                           timing::within_ticks(20), ConditionType::Trigger};
+    const Requirement narrow{condition, Formula("a5 | a6"),
+                             timing::within_ticks(20), ConditionType::Trigger};
+    const double self_score = semantic_similarity(wide, wide, 1);
+    expect(std::fabs(self_score - 1.0) < 1e-12,
+           "semantic-similarity: an atom-rich requirement scored against "
+           "itself must be exactly 1 even once the horizon drives the bound "
+           "past the old 128-bit clamp");
+    const double cross_score = semantic_similarity(wide, narrow, 1);
+    expect(cross_score >= 0.0 && cross_score <= 1.0,
+           "semantic-similarity: a 10-atom pair with a horizon of 21 must stay "
+           "in [0, 1] (got " +
+               std::to_string(cross_score) + ")");
+}
+
+// A conjunction count is mathematically at most either individual count, but
+// once Count is a float and the counts climb past the 64-bit mantissa, a
+// rounding error larger than double's precision can leave it slightly greater
+// -- driving a directional ratio above 1. Feeding that straight in checks the
+// [0, 1] clamp in semantic_similarity_from_counts: without it the harmonic mean
+// would exceed 1. The overshoot (2^30 against a 2^70 count) is deliberately
+// coarser than double epsilon so it survives ratio_or_throw's cast to double,
+// which a mere ulp of long double would not.
+TEST(test_semantic_similarity_from_counts_clamps_rounding_overshoot) {
+    const Count base = std::ldexp(1.0L, 70);
+    // base + 2^30 is exact and strictly greater in long double's 64-bit
+    // mantissa (the two differ by 40 bits), so the conjunction count exceeds
+    // the individual counts and the directional ratios land just above 1.
+    const Count overshoot = base + std::ldexp(1.0L, 30);
+    const SemanticSimilarityCounts counts{base, base, overshoot};
+    const double score = semantic_similarity_from_counts(counts);
+    expect(score >= 0.0 && score <= 1.0,
+           "semantic-similarity: a conjunction count rounded above the "
+           "individual counts must still yield a score in [0, 1] (got " +
+               std::to_string(score) + ")");
+    // Both ratios clamp to exactly 1, so the harmonic mean is exactly 1 -- the
+    // clamp lands on the boundary, it does not merely bound from above.
+    expect(std::fabs(score - 1.0) < 1e-12,
+           "semantic-similarity: clamped ratios of 1 must give exactly 1");
 }
 
 // Checks that all timing variants produce similarity in [0, 1] when compared
 // cross-requirement. This exercises both safety and liveness automaton paths.
-void test_semantic_similarity_all_timings_in_range() {
+TEST(test_semantic_similarity_all_timings_in_range) {
     const Requirement other{Formula("P"), Formula("A"), timing::immediately()};
     const std::vector<std::pair<std::string, Requirement>> cases = {
         {"immediately",
@@ -208,96 +274,33 @@ void test_semantic_similarity_all_timings_in_range() {
     }
 }
 
-// A bounded timing (WithinTicks/AfterTicks/...) compiles to a safety automaton
-// -- ltl2tgba emits "acc-name: all", and a violating trace is rejected by
-// running out of transitions. Eventually compiles to a Buchi automaton, which
-// is complete: every trace has a run, and rejection is carried entirely by the
-// accepting mask. Counting k-step traces asks the same question of both only
-// once k reaches the bounded operand's horizon (ticks + 1). Below it the safety
-// automaton has not yet reached its stuck transition, so it still counts traces
-// that already missed the deadline -- more than the Buchi side admits for the
-// weaker formula it implies. The containment ratio then exceeds 1.
-void test_semantic_similarity_bounded_timing_vs_eventually_in_range() {
-    const Requirement within5{Formula("true"), Formula("lift_off"),
-                              timing::within_ticks(5), ConditionType::Trigger};
-    const Requirement eventually{Formula("true"), Formula("lift_off"),
-                                 timing::eventually(), ConditionType::Trigger};
-    // Spans both sides of the horizon (6): 3-5 are below it, 6-10 at or above.
-    for (const std::size_t step_count : {3, 4, 5, 6, 7, 10}) {
-        const double score =
-            semantic_similarity(within5, eventually, step_count);
-        expect(score >= 0.0 && score <= 1.0,
-               "semantic-similarity: WithinTicks(5) vs Eventually must stay in "
-               "[0, 1] at bound " +
-                   std::to_string(step_count) +
-                   ", including below the horizon where the safety automaton "
-                   "has not yet enforced its deadline");
-    }
-}
-
-// The same defect at the shipped default_bound of 10: mutate_timing can raise a
-// requirement's tick count to 10 or beyond, putting its horizon (11) above the
-// bound. Guards against treating the defect as a small-bound curiosity.
-void test_semantic_similarity_deep_ticks_at_default_bound_in_range() {
-    const Requirement within10{Formula("true"), Formula("lift_off"),
-                               timing::within_ticks(10),
-                               ConditionType::Trigger};
-    const Requirement eventually{Formula("true"), Formula("lift_off"),
-                                 timing::eventually(), ConditionType::Trigger};
-    const double score = semantic_similarity(
-        within10, eventually, Config{}.default_model_counting_bound);
-    expect(score >= 0.0 && score <= 1.0,
-           "semantic-similarity: a WithinTicks(10) mutant scored against "
-           "Eventually at the default bound must stay in [0, 1]");
-}
-
-// An atom-rich pair whose horizon (21) sits above the ceiling a 128-bit Count
-// imposed: max_representable_step_count clamped to 127/10 == 12, so the bound
-// landed below the horizon and reopened the ratio defect documented on
-// effective_step_count. long double's 16384-bit exponent range lifts the clamp
-// to 1638, letting the bound actually reach the horizon.
-void test_semantic_similarity_atom_rich_deep_horizon_in_range() {
-    const Formula condition("a0 & a1 & a2 & a3 & a4");
-    const Requirement wide{condition, Formula("a5 | a6 | a7 | a8 | a9"),
-                           timing::within_ticks(20), ConditionType::Trigger};
-    const Requirement narrow{condition, Formula("a5 | a6"),
-                             timing::within_ticks(20), ConditionType::Trigger};
-    const double self_score = semantic_similarity(wide, wide, 1);
-    expect(std::fabs(self_score - 1.0) < 1e-12,
-           "semantic-similarity: an atom-rich requirement scored against "
-           "itself must be exactly 1 even once the horizon drives the bound "
-           "past the old 128-bit clamp");
-    const double cross_score = semantic_similarity(wide, narrow, 1);
-    expect(cross_score >= 0.0 && cross_score <= 1.0,
-           "semantic-similarity: a 10-atom pair with a horizon of 21 must stay "
-           "in [0, 1] (got " +
-               std::to_string(cross_score) + ")");
-}
-
-// A conjunction count is mathematically at most either individual count, but
-// once Count is a float and the counts climb past the 64-bit mantissa, a
-// rounding error larger than double's precision can leave it slightly greater
-// -- driving a directional ratio above 1. Feeding that straight in checks the
-// [0, 1] clamp in semantic_similarity_from_counts: without it the harmonic mean
-// would exceed 1. The overshoot (2^30 against a 2^70 count) is deliberately
-// coarser than double epsilon so it survives ratio_or_throw's cast to double,
-// which a mere ulp of long double would not.
-void test_semantic_similarity_from_counts_clamps_rounding_overshoot() {
-    const Count base = std::ldexp(1.0L, 70);
-    // base + 2^30 is exact and strictly greater in long double's 64-bit
-    // mantissa (the two differ by 40 bits), so the conjunction count exceeds
-    // the individual counts and the directional ratios land just above 1.
-    const Count overshoot = base + std::ldexp(1.0L, 30);
-    const SemanticSimilarityCounts counts{base, base, overshoot};
-    const double score = semantic_similarity_from_counts(counts);
-    expect(score >= 0.0 && score <= 1.0,
-           "semantic-similarity: a conjunction count rounded above the "
-           "individual counts must still yield a score in [0, 1] (got " +
-               std::to_string(score) + ")");
-    // Both ratios clamp to exactly 1, so the harmonic mean is exactly 1 -- the
-    // clamp lands on the boundary, it does not merely bound from above.
-    expect(std::fabs(score - 1.0) < 1e-12,
-           "semantic-similarity: clamped ratios of 1 must give exactly 1");
+// Propositionally-equivalent responses that differ syntactically must produce
+// the same semantic similarity when scored against the same original.
+// Regression: repair_2 and repair_13 from the takeoff-unfixed-1 run had
+// divergent stored scores because the automata happened to differ in an older
+// version of requirement_to_ltl; the current code must agree.
+TEST(test_semantic_similarity_propequiv_responses_score_equal) {
+    // repair_2.req2: response = !((!tr & lo) -> tr)  ≡  !tr & lo
+    const Requirement repair2_req2{
+        Formula("true"),
+        Formula("!(((!(takeoff_roll)) & (lift_off)) -> (takeoff_roll))"),
+        timing::within_ticks(5), ConditionType::Trigger};
+    // repair_13.req2: response = !tr & lo  (same formula, simpler string)
+    const Requirement repair13_req2{
+        Formula("true"), Formula("(!(takeoff_roll)) & (lift_off)"),
+        timing::within_ticks(5), ConditionType::Trigger};
+    // original req2
+    const Requirement original_req2{
+        Formula("true"), Formula("!(takeoff_roll) & (lift_off)"),
+        timing::within_ticks(7), ConditionType::Trigger};
+    const double score2 = semantic_similarity(
+        repair2_req2, original_req2, Config{}.default_model_counting_bound);
+    const double score13 = semantic_similarity(
+        repair13_req2, original_req2, Config{}.default_model_counting_bound);
+    expect(std::fabs(score2 - score13) < 1e-12,
+           "semantic-similarity: propositionally-equivalent responses must "
+           "score identically against the same original (got " +
+               std::to_string(score2) + " vs " + std::to_string(score13) + ")");
 }
 
 // Direct and logarithmic metrics agree on identical languages but diverge on a
@@ -307,7 +310,7 @@ void test_semantic_similarity_from_counts_clamps_rounding_overshoot() {
 // it stable as the counting bound (and hence the counts' magnitude) grows.
 // Exercises the metric branch through semantic_similarity_from_counts, without
 // invoking the model counter.
-void test_semantic_similarity_metric_direct_vs_logarithmic() {
+TEST(test_semantic_similarity_metric_direct_vs_logarithmic) {
     const Count whole = std::ldexp(1.0L, 20);
     const Count shared = std::ldexp(1.0L, 10);
     const SemanticSimilarityCounts counts{whole, whole, shared};
@@ -334,7 +337,7 @@ void test_semantic_similarity_metric_direct_vs_logarithmic() {
 
 // The split scoring path dispatches one term per changed slot and takes their
 // mean, so the two have to agree by construction rather than by inspection.
-void test_semantic_similarity_terms_mean_matches_the_score() {
+TEST(test_semantic_similarity_terms_mean_matches_the_score) {
     const Requirement req_imm{Formula("P"), Formula("Q"),
                               timing::immediately()};
     const Requirement req_next{Formula("P"), Formula("Q"),
@@ -365,7 +368,7 @@ void test_semantic_similarity_terms_mean_matches_the_score() {
         "differently from the serial one");
 }
 
-void test_semantic_similarity_terms_are_empty_when_nothing_differs() {
+TEST(test_semantic_similarity_terms_are_empty_when_nothing_differs) {
     const Requirement req{Formula("P"), Formula("Q"), timing::immediately()};
     const Specification spec({}, {req}, {"P"}, {"Q"});
     expect(semantic_similarity_terms(spec, spec, 1, SimilarityMetric::Direct)
@@ -375,23 +378,3 @@ void test_semantic_similarity_terms_are_empty_when_nothing_differs() {
 }
 
 }  // namespace
-
-void run_semantic_similarity_tests() {
-    test_semantic_similarity_identical_requirements_score_two();
-    test_semantic_similarity_formula_value_explicit_step_count();
-    test_semantic_similarity_default_overload_matches_explicit_step_count();
-    test_semantic_similarity_identical_specifications_score_one();
-    test_semantic_similarity_differing_assumption_counts();
-    test_semantic_similarity_specification_averages_requirements();
-    test_semantic_similarity_tautology_scores_near_zero();
-    test_semantic_similarity_liveness_in_range();
-    test_semantic_similarity_bounded_timing_vs_eventually_in_range();
-    test_semantic_similarity_deep_ticks_at_default_bound_in_range();
-    test_semantic_similarity_atom_rich_deep_horizon_in_range();
-    test_semantic_similarity_from_counts_clamps_rounding_overshoot();
-    test_semantic_similarity_all_timings_in_range();
-    test_semantic_similarity_propequiv_responses_score_equal();
-    test_semantic_similarity_metric_direct_vs_logarithmic();
-    test_semantic_similarity_terms_mean_matches_the_score();
-    test_semantic_similarity_terms_are_empty_when_nothing_differs();
-}

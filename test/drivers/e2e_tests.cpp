@@ -13,7 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include "runner/process.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 // Where the driver binaries land, from CMake. These suites are the only place
@@ -296,7 +296,7 @@ nlohmann::json expect_run_manifest(const std::filesystem::path& dir,
     return manifest;
 }
 
-void test_peredur_repairs_tlsf() {
+TEST_IN("driver_peredur", test_peredur_repairs_tlsf) {
     const TempDir dir("peredur_tlsf");
     const std::string input =
         write_file(dir.path() / "spec.tlsf", k_unrealizable).string();
@@ -339,7 +339,7 @@ void test_peredur_repairs_tlsf() {
     }
 }
 
-void test_peredur_repairs_fretish() {
+TEST_IN("driver_peredur", test_peredur_repairs_fretish) {
     const TempDir dir("peredur_fretish");
     const std::string input =
         write_file(dir.path() / "spec.json", k_fretish).string();
@@ -363,7 +363,7 @@ void test_peredur_repairs_fretish() {
     }
 }
 
-void test_peredur_rejects_bad_arguments() {
+TEST_IN("driver_peredur", test_peredur_rejects_bad_arguments) {
     const TempDir dir("peredur_args");
     const std::string input =
         write_file(dir.path() / "spec.tlsf", k_unrealizable).string();
@@ -387,7 +387,7 @@ void test_peredur_rejects_bad_arguments() {
            "peredur: an input that is not there is refused");
 }
 
-void test_realize_decides_both_ways() {
+TEST_IN("driver_realize", test_realize_decides_both_ways) {
     const TempDir dir("realize");
     const std::string unrealizable =
         write_file(dir.path() / "unrealizable.tlsf", k_unrealizable).string();
@@ -418,7 +418,7 @@ void test_realize_decides_both_ways() {
     expect(absent.m_exit_code != 0, "realize: an unreadable input is refused");
 }
 
-void test_ltl_lowers_both_formats() {
+TEST_IN("driver_ltl", test_ltl_lowers_both_formats) {
     const TempDir dir("ltl");
     const std::string tlsf =
         write_file(dir.path() / "spec.tlsf", k_unrealizable).string();
@@ -446,7 +446,7 @@ void test_ltl_lowers_both_formats() {
     expect(absent.m_exit_code != 0, "ltl: an unreadable input is refused");
 }
 
-void test_mucs_extracts_a_core() {
+TEST_IN("driver_mucs", test_mucs_extracts_a_core) {
     const TempDir dir("mucs");
     const std::string unrealizable =
         write_file(dir.path() / "unrealizable.tlsf", k_unrealizable).string();
@@ -475,7 +475,7 @@ void test_mucs_extracts_a_core() {
            "mucs: the refusal says which format it wanted");
 }
 
-void test_compare_orders_repairs_against_ideals() {
+TEST_IN("driver_compare", test_compare_orders_repairs_against_ideals) {
     const TempDir dir("compare");
     const std::filesystem::path repairs = dir.path() / "repairs";
     const std::filesystem::path ideals = dir.path() / "ideals";
@@ -508,7 +508,7 @@ void test_compare_orders_repairs_against_ideals() {
            "compare: a repairs directory that is not there is refused");
 }
 
-void test_lint_ideals_checks_a_subject() {
+TEST_IN("driver_lint_ideals", test_lint_ideals_checks_a_subject) {
     const TempDir dir("lint_ideals");
     const std::filesystem::path good = dir.path() / "good";
     write_file(good / "spec.tlsf", k_unrealizable);
@@ -566,7 +566,7 @@ std::string run_signal_tracer(const std::vector<std::string>& arguments) {
     return read.first;
 }
 
-void test_signal_tracer_writes_a_report() {
+TEST_IN("driver_signal_tracer", test_signal_tracer_writes_a_report) {
     const TempDir dir("signal_tracer");
     const std::filesystem::path report = dir.path() / "crash.txt";
 
@@ -597,7 +597,7 @@ void test_signal_tracer_writes_a_report() {
            "signal_tracer: the second signal is named too");
 }
 
-void test_maximal_reports_both_formats() {
+TEST_IN("driver_maximal", test_maximal_reports_both_formats) {
     const TempDir dir("maximal");
 
     // The unrealizable specification implies its own weakening and not the
@@ -654,43 +654,34 @@ void test_maximal_reports_both_formats() {
            "maximal: the refusal says which extension it wanted");
 }
 
-}  // namespace
-
-void run_peredur_driver_tests() {
-    test_peredur_repairs_tlsf();
-    test_peredur_repairs_fretish();
-    test_peredur_rejects_bad_arguments();
+// Registered after each driver's own tests, so each suite checks --version
+// last.
+TEST_IN("driver_peredur", test_peredur_reports_its_version) {
     expect_reports_version("peredur");
 }
 
-void run_realize_driver_tests() {
-    test_realize_decides_both_ways();
+TEST_IN("driver_realize", test_realize_reports_its_version) {
     expect_reports_version("realize");
 }
 
-void run_ltl_driver_tests() {
-    test_ltl_lowers_both_formats();
+TEST_IN("driver_ltl", test_ltl_reports_its_version) {
     expect_reports_version("ltl");
 }
 
-void run_mucs_driver_tests() {
-    test_mucs_extracts_a_core();
+TEST_IN("driver_mucs", test_mucs_reports_its_version) {
     expect_reports_version("mucs");
 }
 
-void run_compare_driver_tests() {
-    test_compare_orders_repairs_against_ideals();
+TEST_IN("driver_compare", test_compare_reports_its_version) {
     expect_reports_version("compare");
 }
 
-void run_maximal_driver_tests() {
-    test_maximal_reports_both_formats();
+TEST_IN("driver_maximal", test_maximal_reports_its_version) {
     expect_reports_version("maximal");
 }
 
-void run_lint_ideals_driver_tests() {
-    test_lint_ideals_checks_a_subject();
+TEST_IN("driver_lint_ideals", test_lint_ideals_reports_its_version) {
     expect_reports_version("lint-ideals");
 }
 
-void run_signal_tracer_driver_tests() { test_signal_tracer_writes_a_report(); }
+}  // namespace
