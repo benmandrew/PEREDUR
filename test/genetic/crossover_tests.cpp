@@ -1,9 +1,9 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
+#include "fixtures.hpp"
 #include "genetic/crossover.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
@@ -13,20 +13,6 @@
 namespace {
 
 constexpr std::string_view k_test_suite = "crossover";
-
-RandomSource make_source(std::vector<std::size_t> values,
-                         std::size_t fallback) {
-    return RandomSource(
-        [values = std::move(values), fallback,
-         index = std::size_t{0}](std::size_t upper_bound) mutable {
-            if (index >= values.size()) {
-                return fallback % upper_bound;
-            }
-            const std::size_t value = values[index];
-            ++index;
-            return value % upper_bound;
-        });
-}
 
 // Every crossover grafts: there is no branch that copies a parent's field
 // verbatim, so an all-ones source replaces rather than inherits.

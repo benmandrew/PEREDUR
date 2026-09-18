@@ -13,7 +13,6 @@
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -98,13 +97,6 @@ std::vector<std::string> index_rows(const TempDir& dir) {
         rows.push_back(line);
     }
     return rows;
-}
-
-std::string read_file(const std::filesystem::path& path) {
-    std::ifstream file(path);
-    std::ostringstream contents;
-    contents << file.rdbuf();
-    return contents.str();
 }
 
 TEST(test_disabled_accumulator_keeps_nothing) {
@@ -237,7 +229,7 @@ TEST(test_written_files_parse_back_to_what_was_accumulated) {
     parsed.reserve(paths.size());
     for (const std::filesystem::path& path : paths) {
         parsed.push_back(
-            nlohmann::json::parse(read_file(path)).get<Specification>());
+            nlohmann::json::parse(read_text(path)).get<Specification>());
     }
     expect(holds(parsed, make_spec("x")) && holds(parsed, make_spec("y")),
            "accumulator: each file parses back to the specification written");
@@ -322,7 +314,7 @@ TEST(test_the_tlsf_serialiser_round_trips) {
     expect(
         paths.size() == 1 && paths[0].filename().string() == "gen02_0000.tlsf",
         "accumulator: the TLSF writer names its file the same way");
-    expect(tlsf::parse(read_file(paths[0])) == spec,
+    expect(tlsf::parse(read_text(paths[0])) == spec,
            "accumulator: a TLSF file parses back to the specification written");
 }
 

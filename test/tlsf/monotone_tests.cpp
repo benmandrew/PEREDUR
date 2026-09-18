@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "fixtures.hpp"
 #include "genetic/monotone.hpp"
 #include "genetic/random_source.hpp"
 #include "prop_formula.hpp"
@@ -17,8 +18,8 @@
 #include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/mutation.hpp"
-#include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
+#include "tlsf_fixtures.hpp"
 
 namespace {
 
@@ -31,32 +32,9 @@ TEST(set_suite_sat_timeout) {
     global_sat_checker().set_timeout(std::chrono::milliseconds(5000));
 }
 
-const std::vector<std::string>& atom_pool() {
-    static const std::vector<std::string> pool = {"a", "b", "c"};
-    return pool;
-}
-
-// Whether `from` implies `dest`, asked as the unsatisfiability of
-// `from & !dest`. nullopt (a timeout, or an operator black cannot decide) is
-// reported separately by the callers rather than folded into a verdict: a
-// monotonicity assertion that passes on an unanswered query asserts nothing.
-std::optional<bool> implies(const Formula& from, const Formula& dest) {
-    SatisfiabilityChecker& checker = global_sat_checker();
-    const std::string query =
-        "(" + from.to_string() + ") & !(" + dest.to_string() + ")";
-    const std::optional<bool> sat =
-        checker.check_satisfiability(query, QueryPolarity::ExpectUnsat);
-    if (!sat.has_value()) {
-        return std::nullopt;
-    }
-    return !*sat;
-}
-
 Formula formula_of(const std::string& text) {
-    const tlsf::Specification spec = tlsf::parse(
-        "INFO { SEMANTICS: Mealy; }\nMAIN {\nINPUTS { a; b; } "
-        "OUTPUTS { c; }\nGUARANTEE { " +
-        text + " }\n}\n");
+    const tlsf::Specification spec = parse_main(
+        "INPUTS { a; b; } OUTPUTS { c; }\nGUARANTEE { " + text + " }");
     return spec.m_guarantee.front().m_formula;
 }
 
@@ -94,7 +72,8 @@ void test_monotone_rewrite_direction_holds(MonotoneDirection direction) {
             const Formula child =
                 monotone_rewrite(parent, direction, atom_pool(), rng);
             const std::optional<bool> held =
-                weaken ? implies(parent, child) : implies(child, parent);
+                weaken ? implies(parent.to_string(), child.to_string())
+                       : implies(child.to_string(), parent.to_string());
             if (!held.has_value()) {
                 continue;
             }
@@ -215,9 +194,8 @@ TEST(test_extra_rules_reach_the_strengthenings) {
 // was lost, or the surrounding grammar moved and the number wants re-pinning.
 TEST(test_zero_probability_costs_no_draw) {
     constexpr std::size_t k_expected_draws = 95;
-    const tlsf::Specification original = tlsf::parse(
-        "INFO { SEMANTICS: Mealy; }\nMAIN {\nINPUTS { a; } "
-        "OUTPUTS { c; }\nGUARANTEE { G (a -> F c); }\n}\n");
+    const tlsf::Specification original =
+        parse_main("INPUTS { a; } OUTPUTS { c; }\nGUARANTEE { G (a -> F c); }");
     Config off;
     off.p_monotone = 0.0;
     // Pinned rather than left to the defaults, the discipline golden_config()
@@ -247,9 +225,8 @@ TEST(test_zero_probability_costs_no_draw) {
 // The arm is not inert when it is on: some offspring must differ from what the
 // same seed produces with it off.
 TEST(test_non_zero_probability_changes_offspring) {
-    const tlsf::Specification original = tlsf::parse(
-        "INFO { SEMANTICS: Mealy; }\nMAIN {\nINPUTS { a; } "
-        "OUTPUTS { c; }\nGUARANTEE { G (a -> F c); }\n}\n");
+    const tlsf::Specification original =
+        parse_main("INPUTS { a; } OUTPUTS { c; }\nGUARANTEE { G (a -> F c); }");
     Config off;
     off.p_monotone = 0.0;
     Config armed_cfg = off;

@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "fixtures.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/pipeline.hpp"
 #include "prop_formula.hpp"
@@ -29,24 +30,6 @@ namespace {
 constexpr std::string_view k_test_suite = "termination";
 
 constexpr std::size_t k_target_size = 4;
-
-Specification make_spec(const std::string& condition,
-                        const std::string& response) {
-    return Specification({},
-                         {Requirement{Formula(condition), Formula(response),
-                                      timing::immediately()}},
-                         {"a", "b"}, {"x", "y"});
-}
-
-std::vector<Specification> distinct_specs() {
-    return {make_spec("a", "x"), make_spec("b", "y"), make_spec("a", "y"),
-            make_spec("b", "x")};
-}
-
-AggregateWeightedFitnessFunction constant_fitness() {
-    return AggregateWeightedFitnessFunction(
-        {{[](const Specification&) { return 0.5; }, 1.0, "constant"}});
-}
 
 // A real generator rather than a fixed sequence: the budget counts an offspring
 // only where breeding actually changed it, so a source that makes every

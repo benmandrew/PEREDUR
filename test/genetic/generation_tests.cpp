@@ -4,11 +4,11 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <variant>
 #include <vector>
 
 #include "config.hpp"
+#include "fixtures.hpp"
 #include "genetic/generation.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
@@ -18,31 +18,6 @@
 namespace {
 
 constexpr std::string_view k_test_suite = "generation";
-
-Requirement make_req(const std::string& trigger, const std::string& response,
-                     Timing timing = timing::immediately()) {
-    return Requirement{Formula(trigger), Formula(response), std::move(timing)};
-}
-
-Specification make_spec(const std::string& trigger, const std::string& response,
-                        Timing timing = timing::immediately()) {
-    return Specification({}, {make_req(trigger, response, std::move(timing))},
-                         {}, {});
-}
-
-RandomSource make_source(std::vector<std::size_t> values,
-                         std::size_t fallback) {
-    return RandomSource(
-        [values = std::move(values), fallback,
-         index = std::size_t{0}](std::size_t upper_bound) mutable {
-            if (index >= values.size()) {
-                return fallback % upper_bound;
-            }
-            const std::size_t value = values[index];
-            ++index;
-            return value % upper_bound;
-        });
-}
 
 std::string first_condition(const Specification& spec) {
     return spec.m_guarantees.begin()->m_condition.to_string();
@@ -56,7 +31,7 @@ std::string first_condition(const Specification& spec) {
 TEST(test_simplify_folds_until_false_into_always) {
     const auto simplified_timing = [](const Timing& timing) {
         return fretish_operators()
-            .simplify(make_spec("a", "b", timing))
+            .simplify(Specification({}, {make_req("a", "b", timing)}, {}, {}))
             .m_guarantees.front()
             .m_timing;
     };

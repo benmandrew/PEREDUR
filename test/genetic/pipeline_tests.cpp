@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "fixtures.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/pipeline.hpp"
 #include "prop_formula.hpp"
@@ -25,29 +26,6 @@ constexpr std::string_view k_test_suite = "pipeline";
 constexpr std::size_t k_target_size = 4;
 constexpr std::size_t k_elitism_size = 1;
 
-Specification make_spec(const std::string& condition,
-                        const std::string& response) {
-    return Specification({},
-                         {Requirement{Formula(condition), Formula(response),
-                                      timing::immediately()}},
-                         {"a", "b"}, {"x", "y"});
-}
-
-RandomSource make_source() {
-    return RandomSource(
-        [](std::size_t upper_bound) { return std::size_t{0} % upper_bound; });
-}
-
-AggregateWeightedFitnessFunction constant_fitness() {
-    return AggregateWeightedFitnessFunction(
-        {{[](const Specification&) { return 0.5; }, 1.0, "constant"}});
-}
-
-std::vector<Specification> distinct_specs() {
-    return {make_spec("a", "x"), make_spec("b", "y"), make_spec("a", "y"),
-            make_spec("b", "x")};
-}
-
 std::vector<StageObservation> observe_generation(
     const std::vector<FilterFunction>& filters,
     const std::vector<Specification>& specs = distinct_specs(),
@@ -58,7 +36,7 @@ std::vector<StageObservation> observe_generation(
         score_population(cfg, specs, fns);
     std::vector<StageObservation> seen;
     evolve_generation(
-        cfg, pop, k_target_size, elitism_size, fns, filters, make_source(),
+        cfg, pop, k_target_size, elitism_size, fns, filters, make_source({}, 0),
         nullptr, [&seen](const StageObservation& obs) { seen.push_back(obs); });
     return seen;
 }
@@ -170,9 +148,8 @@ TEST(test_pipeline_distinct_sees_through_a_duplicated_population) {
     // population_size byte-identical copies of the input specification, so
     // every size the pipeline reports is 4 while the population holds one
     // specification. distinct is the only field that can tell those apart.
-    const std::vector<StageObservation> seen =
-        observe_generation({}, {make_spec("a", "x"), make_spec("a", "x"),
-                                make_spec("a", "x"), make_spec("a", "x")});
+    const std::vector<StageObservation> seen = observe_generation(
+        {}, std::vector<Specification>(4, distinct_specs().front()));
     expect(stage(seen, "order-parents").n_out == 4 &&
                stage(seen, "order-parents").distinct == 1,
            "pipeline: a population of four copies of one specification should "

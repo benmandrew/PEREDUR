@@ -16,25 +16,21 @@
 #include "tlsf/filter.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
+#include "tlsf_fixtures.hpp"
 
 namespace {
 
 constexpr std::string_view k_test_suite = "tlsf_filter";
 
-tlsf::Specification parse_spec(const std::string& main_body) {
-    return tlsf::parse("INFO { SEMANTICS: Mealy; }\nMAIN {\n" + main_body +
-                       "\n}\n");
-}
-
 // A base guarantee-only spec and a strictly weaker variant that adds a fairness
 // assumption. Adding an assumption is a logical weakening: base => weaker but
 // not conversely.
 tlsf::Specification base_spec() {
-    return parse_spec("INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); }");
+    return parse_main("INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); }");
 }
 
 tlsf::Specification weaker_spec() {
-    return parse_spec(
+    return parse_main(
         "INPUTS { a; } OUTPUTS { b; } ASSUME { G F a; } "
         "GUARANTEE { G (a -> b); }");
 }
@@ -94,7 +90,7 @@ TEST(test_tlsf_subsumption_agrees_with_ltlsynt) {
 // The same formula in PRESET and in GUARANTEE lowers differently and sits on
 // different sides, so the two must never intern to one conjunct.
 TEST(test_tlsf_sides_tag_their_sections) {
-    const tlsf::Specification spec = parse_spec(
+    const tlsf::Specification spec = parse_main(
         "INPUTS { a; } OUTPUTS { b; } PRESET { b; } GUARANTEE { b; }");
     const SpecificationSides sides = tlsf::specification_sides(spec);
     expect(sides.m_guarantees.size() == 2,
@@ -135,7 +131,7 @@ TEST(test_unsatisfiable_assumptions_detected) {
 
     // Contradictory assumptions: the antecedent of (A) -> (G) is false, so the
     // spec is realizable for free without repairing anything.
-    const tlsf::Specification contradictory = parse_spec(
+    const tlsf::Specification contradictory = parse_main(
         "INPUTS { a; } OUTPUTS { b; } ASSUME { G a; G !a; } "
         "GUARANTEE { G (a -> b); }");
     expect(tlsf_has_unsatisfiable_assumptions(contradictory, checker),
@@ -151,7 +147,7 @@ TEST(test_unsatisfiable_assumptions_detected) {
 }
 
 TEST(test_vacuity_filter_drops_contradictory_assumptions) {
-    const tlsf::Specification contradictory = parse_spec(
+    const tlsf::Specification contradictory = parse_main(
         "INPUTS { a; } OUTPUTS { b; } ASSUME { G a; G !a; } "
         "GUARANTEE { G (a -> b); }");
     const tlsf::Specification sound = weaker_spec();
@@ -178,7 +174,7 @@ TEST(test_vacuity_filter_drops_contradictory_assumptions) {
 TEST(test_trivial_section_literals_detected) {
     SatisfiabilityChecker& checker = global_sat_checker();
 
-    const tlsf::Specification false_assumption = parse_spec(
+    const tlsf::Specification false_assumption = parse_main(
         "INPUTS { a; } OUTPUTS { b; } ASSUME { G F a; false; } "
         "GUARANTEE { G (a -> b); }");
     expect(tlsf_is_trivially_vacuous(false_assumption),
@@ -186,27 +182,27 @@ TEST(test_trivial_section_literals_detected) {
     expect(tlsf_is_vacuous(false_assumption, checker),
            "vacuity: the syntactic screen rejects what the solver would keep");
 
-    const tlsf::Specification true_guarantee = parse_spec(
+    const tlsf::Specification true_guarantee = parse_main(
         "INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); true; }");
     expect(tlsf_is_trivially_vacuous(true_guarantee),
            "vacuity: a true GUARANTEE formula is trivially vacuous");
 
     const tlsf::Specification true_assert =
-        parse_spec("INPUTS { a; } OUTPUTS { b; } ASSERT { true; }");
+        parse_main("INPUTS { a; } OUTPUTS { b; } ASSERT { true; }");
     expect(tlsf_is_trivially_vacuous(true_assert),
            "vacuity: a true ASSERT formula is trivially vacuous");
 
     // The two sides are not symmetric: a `true` assumption is a no-op the
     // filter has no reason to reject, and a `false` guarantee makes the spec
     // unrealizable, which the search punishes on its own.
-    const tlsf::Specification true_assumption = parse_spec(
+    const tlsf::Specification true_assumption = parse_main(
         "INPUTS { a; } OUTPUTS { b; } ASSUME { true; } "
         "GUARANTEE { G (a -> b); }");
     expect(!tlsf_is_trivially_vacuous(true_assumption),
            "vacuity: a true ASSUME formula is not trivially vacuous");
 
     const tlsf::Specification false_guarantee =
-        parse_spec("INPUTS { a; } OUTPUTS { b; } GUARANTEE { false; }");
+        parse_main("INPUTS { a; } OUTPUTS { b; } GUARANTEE { false; }");
     expect(!tlsf_is_trivially_vacuous(false_guarantee),
            "vacuity: a false GUARANTEE formula is not trivially vacuous");
 
@@ -215,7 +211,7 @@ TEST(test_trivial_section_literals_detected) {
 }
 
 TEST(test_vacuity_filter_drops_trivial_section_literals) {
-    const tlsf::Specification true_guarantee = parse_spec(
+    const tlsf::Specification true_guarantee = parse_main(
         "INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); true; }");
     const FilterFunctionT<tlsf::Specification> filter =
         tlsf_make_vacuity_filter();
@@ -233,7 +229,7 @@ TEST(test_vacuity_filter_drops_trivial_section_literals) {
 TEST(test_valid_guarantee_caught_only_semantically) {
     SatisfiabilityChecker& checker = global_sat_checker();
     const tlsf::Specification tautological =
-        parse_spec("INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a | !a); }");
+        parse_main("INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a | !a); }");
     expect(!tlsf_is_trivially_vacuous(tautological),
            "vacuity: G (a | !a) is not a trivial section literal");
     expect(tlsf_has_valid_guarantee(tautological, checker),
@@ -250,19 +246,19 @@ TEST(test_valid_guarantee_caught_only_semantically) {
 TEST(test_one_valid_guarantee_among_substantive_ones_rejects) {
     SatisfiabilityChecker& checker = global_sat_checker();
     expect(tlsf_has_valid_guarantee(
-               parse_spec("INPUTS { a; } OUTPUTS { b; } "
+               parse_main("INPUTS { a; } OUTPUTS { b; } "
                           "GUARANTEE { G (a | !a); G (a -> b); }"),
                checker),
            "vacuity: a valid guarantee is caught when it comes first");
     expect(tlsf_has_valid_guarantee(
-               parse_spec("INPUTS { a; } OUTPUTS { b; } "
+               parse_main("INPUTS { a; } OUTPUTS { b; } "
                           "GUARANTEE { G (a -> b); G (a | !a); }"),
                checker),
            "vacuity: a valid guarantee is caught when it comes last");
     // ASSERT is G-wrapped by the lowering, and `G psi` is valid exactly when
     // psi is, so the raw formula is the query.
     expect(tlsf_has_valid_guarantee(
-               parse_spec("INPUTS { a; } OUTPUTS { b; } "
+               parse_main("INPUTS { a; } OUTPUTS { b; } "
                           "ASSERT { a | !a; } GUARANTEE { G (a -> b); }"),
                checker),
            "vacuity: a valid ASSERT formula is caught unwrapped");
@@ -291,7 +287,7 @@ TEST(test_assumption_side_stays_a_joint_query) {
                checker.check_satisfiability("G !a").value_or(false),
            "vacuity: 'G a' and 'G !a' are each satisfiable alone");
     expect(tlsf_has_unsatisfiable_assumptions(
-               parse_spec("INPUTS { a; } OUTPUTS { b; } ASSUME { G a; G !a; } "
+               parse_main("INPUTS { a; } OUTPUTS { b; } ASSUME { G a; G !a; } "
                           "GUARANTEE { G (a -> b); }"),
                checker),
            "vacuity: 'G a' and 'G !a' are jointly unsatisfiable");
@@ -301,9 +297,9 @@ TEST(test_assumption_side_stays_a_joint_query) {
 
 TEST(test_bloat_cap_filter_drops_oversized) {
     const tlsf::Specification original =
-        parse_spec("INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); }");
+        parse_main("INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); }");
     // A candidate with a much larger guarantee formula than the original's.
-    const tlsf::Specification bloated = parse_spec(
+    const tlsf::Specification bloated = parse_main(
         "INPUTS { a; } OUTPUTS { b; } "
         "GUARANTEE { G (((a & b) | (a & b)) -> ((a | b) & (a | b))); }");
     const FilterFunctionT<tlsf::Specification> filter =
@@ -333,7 +329,7 @@ TEST(test_implication_filter_keeps_maximal) {
 // never assert it, forcing the assumption to fail. `(G F g) -> false` is
 // realizable, so the spec is vacuously satisfiable and not well-separated.
 tlsf::Specification output_liveness_assumption_spec() {
-    return parse_spec(
+    return parse_main(
         "INPUTS { r; } OUTPUTS { g; } ASSUME { G F g; } "
         "GUARANTEE { G (r -> g); }");
 }
@@ -343,7 +339,7 @@ tlsf::Specification output_liveness_assumption_spec() {
 // can hold false forever. A reactive-environment assumption that is still
 // well-separated.
 tlsf::Specification reactive_output_assumption_spec() {
-    return parse_spec(
+    return parse_main(
         "INPUTS { r; } OUTPUTS { g; } ASSUME { G (g -> F r); } "
         "GUARANTEE { G (r -> g); }");
 }

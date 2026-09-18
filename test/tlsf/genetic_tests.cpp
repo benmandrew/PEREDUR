@@ -18,18 +18,12 @@
 #include "tlsf/fitness.hpp"
 #include "tlsf/mutation.hpp"
 #include "tlsf/operators.hpp"
-#include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
+#include "tlsf_fixtures.hpp"
 
 namespace {
 
 constexpr std::string_view k_test_suite = "tlsf_genetic";
-
-tlsf::Specification parse(const std::string& main_body,
-                          const std::string& semantics = "Mealy") {
-    return tlsf::parse("INFO { SEMANTICS: " + semantics + "; }\nMAIN {\n" +
-                       main_body + "\n}\n");
-}
 
 bool is_temporal(Formula::Kind kind) {
     switch (kind) {
@@ -99,7 +93,7 @@ TEST(test_mutation_preserves_temporal_skeleton) {
     Config cfg;
     cfg.tlsf_p_temporal = 0.0;  // isolate the skeleton-preserving rewrite
     cfg.p_monotone = 0.0;  // ... which the monotone arm is offered ahead of
-    const tlsf::Specification original = parse(
+    const tlsf::Specification original = parse_main(
         "INPUTS { req; } OUTPUTS { grant; } GUARANTEE { G(req -> F "
         "grant); }");
     const std::multiset<int> skeleton =
@@ -182,7 +176,7 @@ TEST(test_temporal_mutation_changes_skeleton) {
     cfg.p_monotone = 0.0;        // the monotone arm is offered ahead of it
     cfg.p_add_assumption = 0.0;  // isolate the rewrite path
     cfg.p_remove_guarantee = 0.0;
-    const tlsf::Specification original = parse(
+    const tlsf::Specification original = parse_main(
         "INPUTS { req; } OUTPUTS { grant; } GUARANTEE { G(req -> F "
         "grant); }");
     const std::multiset<int> skeleton =
@@ -220,7 +214,7 @@ TEST(test_temporal_mutation_can_emit_an_implication) {
     cfg.p_add_assumption = 0.0;
     cfg.p_remove_guarantee = 0.0;
     const tlsf::Specification original =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> X r); }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> X r); }");
     expect(!contains_kind(original.m_guarantee.front().m_formula,
                           Formula::Kind::Implies),
            "implication draw: the input carries no implication to start with");
@@ -247,7 +241,7 @@ TEST(test_temporal_mutation_can_emit_an_implication) {
 // case (1) emits only an atom or a unary node, so pick_connective_kind is the
 // sole source of a binary node anywhere in the result.
 tlsf::Specification connective_subject() {
-    return parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G g; }");
+    return parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G g; }");
 }
 
 Config connective_config() {
@@ -285,8 +279,8 @@ TEST(test_add_assumption_forms) {
     tlsf::Specification spec;
     spec.m_inputs = {"req"};
     spec.m_outputs = {"grant"};
-    spec.m_guarantee = {parse("INPUTS { req; } OUTPUTS { grant; } "
-                              "GUARANTEE { G (req -> F grant); }")
+    spec.m_guarantee = {parse_main("INPUTS { req; } OUTPUTS { grant; } "
+                                   "GUARANTEE { G (req -> F grant); }")
                             .m_guarantee.front()};
     Config cfg;
     cfg.p_add_assumption = 1.0;
@@ -313,8 +307,8 @@ TEST(test_add_assumption_never_obliges_an_output) {
     tlsf::Specification spec;
     spec.m_inputs = {"req"};
     spec.m_outputs = {"grant"};
-    spec.m_guarantee = {parse("INPUTS { req; } OUTPUTS { grant; } "
-                              "GUARANTEE { G (req -> F grant); }")
+    spec.m_guarantee = {parse_main("INPUTS { req; } OUTPUTS { grant; } "
+                                   "GUARANTEE { G (req -> F grant); }")
                             .m_guarantee.front()};
     Config cfg;
     cfg.p_add_assumption = 1.0;
@@ -338,7 +332,7 @@ TEST(test_add_assumption_never_obliges_an_output) {
 // 29-node assumption mirroring the specification's own third one, and no
 // template reaches that.
 TEST(test_add_assumption_can_clone_an_existing_one) {
-    const tlsf::Specification spec = parse(
+    const tlsf::Specification spec = parse_main(
         "INPUTS { req; } OUTPUTS { grant; } "
         "ASSUME { G (req -> F (!(req))); } "
         "GUARANTEE { G (req -> F grant); }");
@@ -363,8 +357,8 @@ TEST(test_clone_assumption_falls_back_to_the_template) {
     tlsf::Specification spec;
     spec.m_inputs = {"req"};
     spec.m_outputs = {"grant"};
-    spec.m_guarantee = {parse("INPUTS { req; } OUTPUTS { grant; } "
-                              "GUARANTEE { G (req -> F grant); }")
+    spec.m_guarantee = {parse_main("INPUTS { req; } OUTPUTS { grant; } "
+                                   "GUARANTEE { G (req -> F grant); }")
                             .m_guarantee.front()};
     spec.m_assume = {tlsf::SectionEntry(Formula("req"), /*removed=*/true)};
     Config cfg;
@@ -388,7 +382,7 @@ TEST(test_clone_assumption_falls_back_to_the_template) {
 // pair conjuncts by position, so erasing it would start comparing the
 // candidate's remaining conjuncts against unrelated ones of the original.
 TEST(test_remove_guarantee_tombstones_in_place) {
-    const tlsf::Specification spec = parse(
+    const tlsf::Specification spec = parse_main(
         "INPUTS { req; } OUTPUTS { grant; } "
         "ASSERT { !(grant); } "
         "GUARANTEE { G (req -> F grant); }");
@@ -418,7 +412,7 @@ TEST(test_remove_guarantee_tombstones_in_place) {
 }
 
 TEST(test_remove_guarantee_keeps_the_last_live_conjunct) {
-    const tlsf::Specification spec = parse(
+    const tlsf::Specification spec = parse_main(
         "INPUTS { req; } OUTPUTS { grant; } "
         "GUARANTEE { G (req -> F grant); }");
     Config cfg;
@@ -441,8 +435,8 @@ TEST(test_add_assumption_can_reference_output) {
     tlsf::Specification spec;
     spec.m_inputs = {"req"};
     spec.m_outputs = {"grant"};
-    spec.m_guarantee = {parse("INPUTS { req; } OUTPUTS { grant; } "
-                              "GUARANTEE { G (req -> F grant); }")
+    spec.m_guarantee = {parse_main("INPUTS { req; } OUTPUTS { grant; } "
+                                   "GUARANTEE { G (req -> F grant); }")
                             .m_guarantee.front()};
     Config cfg;
     cfg.p_add_assumption = 1.0;
@@ -504,8 +498,8 @@ TEST(test_weak_until_over_output_is_reachable) {
     tlsf::Specification seed_spec;
     seed_spec.m_inputs = {"r"};
     seed_spec.m_outputs = {"g"};
-    seed_spec.m_assume = {parse("INPUTS { r; } OUTPUTS { g; } "
-                                "ASSUME { G (r -> F g); }")
+    seed_spec.m_assume = {parse_main("INPUTS { r; } OUTPUTS { g; } "
+                                     "ASSUME { G (r -> F g); }")
                               .m_assume.front()};
     expect_some_seed(
         200,
@@ -641,7 +635,7 @@ TEST(test_end_to_end_evolution) {
     // A Mealy spec requiring the output to predict the next input:
     // unrealizable.
     const tlsf::Specification original =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> X r); }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> X r); }");
     const auto fitness = tlsf_get_fitness_function(original, cfg);
 
     const std::size_t target_size = 4;

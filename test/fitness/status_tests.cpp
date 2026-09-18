@@ -7,6 +7,7 @@
 
 #include "config.hpp"
 #include "fitness/status.hpp"
+#include "fixtures.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
@@ -17,18 +18,9 @@ namespace {
 
 constexpr std::string_view k_test_suite = "status";
 
-// Builds a one-requirement spec with an immediate trigger/response. The LTL
-// is derived automatically from trigger/response/timing; these tests only
-// exercise specification_status's propositional pre-checks (trigger/response
-// satisfiability), which never look at the LTL string.
-Specification make_spec(const std::string& trigger, const std::string& response,
-                        const std::vector<std::string>& in_atoms = {},
-                        const std::vector<std::string>& out_atoms = {}) {
-    return Specification({},
-                         {Requirement(Formula(trigger), Formula(response),
-                                      timing::immediately())},
-                         in_atoms, out_atoms);
-}
+// make_spec derives each requirement's LTL from trigger, response and timing;
+// these tests only exercise specification_status's propositional pre-checks
+// (trigger and response satisfiability), which never look at the LTL string.
 
 // --- specification_status ---
 

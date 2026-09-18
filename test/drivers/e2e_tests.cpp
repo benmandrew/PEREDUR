@@ -2,8 +2,6 @@
 #include <cctype>
 #include <chrono>
 #include <filesystem>
-#include <fstream>
-#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -131,13 +129,6 @@ population_size = 8
 parallel = 1
 )";
 
-std::string read_file(const std::filesystem::path& path) {
-    std::ifstream file(path);
-    std::ostringstream contents;
-    contents << file.rdbuf();
-    return contents.str();
-}
-
 bool contains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;
 }
@@ -207,7 +198,7 @@ nlohmann::json expect_run_manifest(const std::filesystem::path& dir,
     const std::filesystem::path manifest_path = dir / "run.json";
     expect(std::filesystem::exists(manifest_path), label + ": writes run.json");
     const nlohmann::json manifest =
-        nlohmann::json::parse(read_file(manifest_path));
+        nlohmann::json::parse(read_text(manifest_path));
     expect(manifest.at("seed").get<int>() == seed,
            label + ": the manifest carries the seed it was given");
     expect(manifest.at("input").get<std::string>() == input,
@@ -300,7 +291,7 @@ TEST_IN("driver_peredur", test_peredur_repairs_tlsf) {
     for (std::size_t i = 0; i < first_repairs.size(); ++i) {
         expect(first_repairs[i].filename() == second_repairs[i].filename(),
                "peredur: the repairs are named the same way twice");
-        expect(read_file(first_repairs[i]) == read_file(second_repairs[i]),
+        expect(read_text(first_repairs[i]) == read_text(second_repairs[i]),
                "peredur: one seed writes byte-identical repairs twice");
     }
 }
@@ -324,7 +315,7 @@ TEST_IN("driver_peredur", test_peredur_repairs_fretish) {
     for (const auto& repair : repair_files(out)) {
         expect(repair.extension() == ".json",
                "peredur: a FRETISH run writes FRETISH repairs");
-        expect(nlohmann::json::parse(read_file(repair)).contains("guarantees"),
+        expect(nlohmann::json::parse(read_text(repair)).contains("guarantees"),
                "peredur: each repair parses as a specification");
     }
 }
@@ -540,7 +531,7 @@ TEST_IN("driver_signal_tracer", test_signal_tracer_writes_a_report) {
         run_signal_tracer({report.string(), "6", "4242", "seed=1 spec=probe"});
     expect(streamed.empty(),
            "signal_tracer: a named report file takes the whole report");
-    const std::string written = read_file(report);
+    const std::string written = read_text(report);
     expect(contains(written, "=== CRASH REPORT ==="),
            "signal_tracer: the report is written to the named file");
     expect(contains(written, "Signal: SIGABRT (6)"),
@@ -555,7 +546,7 @@ TEST_IN("driver_signal_tracer", test_signal_tracer_writes_a_report) {
     // A second crash appends rather than replacing: a run that dies twice must
     // not lose the first report.
     run_signal_tracer({report.string(), "11", "4243", ""});
-    const std::string appended = read_file(report);
+    const std::string appended = read_text(report);
     expect(contains(appended, "PID:    4242") &&
                contains(appended, "PID:    4243"),
            "signal_tracer: a second report is appended to the first");

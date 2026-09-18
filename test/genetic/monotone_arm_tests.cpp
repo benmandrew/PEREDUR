@@ -5,36 +5,17 @@
 #include <vector>
 
 #include "config.hpp"
+#include "fixtures.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/random_source.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
-#include "runner/black.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
 constexpr std::string_view k_test_suite = "fretish_monotone";
-
-const std::vector<std::string>& atom_pool() {
-    static const std::vector<std::string> pool = {"a", "b", "c"};
-    return pool;
-}
-
-// Whether `from` implies `dest` over two lowered requirements, asked as the
-// unsatisfiability of `from & !dest`. An ExpectUnsat query is never escalated
-// to black, so nullopt here means SPOT ran out of budget; the callers count
-// what was answered rather than folding an unanswered query into a verdict,
-// since a monotonicity assertion that passes on one asserts nothing.
-std::optional<bool> implies(const std::string& from, const std::string& dest) {
-    const std::optional<bool> sat = global_sat_checker().check_satisfiability(
-        "(" + from + ") & !(" + dest + ")", QueryPolarity::ExpectUnsat);
-    if (!sat.has_value()) {
-        return std::nullopt;
-    }
-    return !*sat;
-}
 
 // Only the response arm, so a firing draw is unambiguously that one, and the
 // monotone rewrite rather than the general one every time.

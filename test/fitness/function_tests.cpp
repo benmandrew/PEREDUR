@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "fitness/function.hpp"
+#include "fixtures.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
 #include "test_registry.hpp"
@@ -15,14 +16,6 @@
 namespace {
 
 constexpr std::string_view k_test_suite = "fitness_function";
-
-Specification make_spec(const std::string& trigger,
-                        const std::string& response) {
-    return Specification({},
-                         {Requirement{Formula(trigger), Formula(response),
-                                      timing::immediately()}},
-                         {}, {});
-}
 
 // --- std::hash<Specification> ---
 

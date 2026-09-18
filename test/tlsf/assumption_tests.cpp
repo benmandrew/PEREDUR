@@ -20,17 +20,17 @@
 #include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/mutation.hpp"
-#include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
+#include "tlsf_fixtures.hpp"
 
 namespace {
 
 constexpr std::string_view k_test_suite = "tlsf_assumption";
 
 tlsf::Specification three_input_spec() {
-    return tlsf::parse(
-        "INFO { SEMANTICS: Mealy; }\nMAIN {\nINPUTS { b1; b2; b3; } "
-        "OUTPUTS { f1; }\nGUARANTEE { G (b1 -> F f1); }\n}\n");
+    return parse_main(
+        "INPUTS { b1; b2; b3; } OUTPUTS { f1; }\nGUARANTEE { G (b1 -> F f1); "
+        "}");
 }
 
 // Counts draws so a "costs no draw" claim is measured rather than assumed.

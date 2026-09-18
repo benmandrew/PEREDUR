@@ -1,11 +1,11 @@
 #include <algorithm>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <variant>
 #include <vector>
 
 #include "config.hpp"
+#include "fixtures.hpp"
 #include "genetic/mutation.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
@@ -15,20 +15,6 @@
 namespace {
 
 constexpr std::string_view k_test_suite = "mutation";
-
-RandomSource make_source(std::vector<std::size_t> values,
-                         std::size_t fallback) {
-    return RandomSource(
-        [values = std::move(values), fallback,
-         index = std::size_t{0}](std::size_t upper_bound) mutable {
-            if (index >= values.size()) {
-                return fallback % upper_bound;
-            }
-            const std::size_t value = values[index];
-            ++index;
-            return value % upper_bound;
-        });
-}
 
 TEST(test_mutation_with_false_source_leaves_formula_unchanged) {
     const Formula formula("P & Q");

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "filter/well_separation.hpp"
+#include "fixtures.hpp"
 #include "requirement.hpp"
 #include "runner/spot.hpp"
 #include "test_registry.hpp"
@@ -31,21 +32,9 @@ class ScopedLtlsyntTimeout {
     }
 };
 
-Requirement continual(const std::string& response, const Timing& tim) {
-    return Requirement(Formula("true"), Formula(response), tim);
-}
-
 Requirement continual_when(const std::string& condition,
                            const std::string& response, const Timing& tim) {
     return Requirement(Formula(condition), Formula(response), tim);
-}
-
-// Inputs are environment-controlled, outputs system-controlled. The system can
-// force an assumption to fail only when it constrains an output atom.
-Specification with_assumptions(std::vector<Requirement> assumptions) {
-    return Specification(std::move(assumptions),
-                         {continual("grant", timing::immediately())}, {"req"},
-                         {"grant"});
 }
 
 TEST(test_no_assumptions_is_well_separated) {

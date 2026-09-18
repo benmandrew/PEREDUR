@@ -6,6 +6,7 @@
 
 #include "config.hpp"
 #include "fitness/syntactic_similarity.hpp"
+#include "fixtures.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
 #include "test_registry.hpp"
@@ -14,11 +15,6 @@
 namespace {
 
 constexpr std::string_view k_test_suite = "syntactic_similarity";
-
-Requirement make_req(const std::string& trigger, const std::string& response) {
-    return Requirement{Formula(trigger), Formula(response),
-                       timing::immediately()};
-}
 
 Specification make_spec(
     std::initializer_list<std::pair<const char*, const char*>> reqs) {

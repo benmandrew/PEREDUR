@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -98,6 +99,14 @@ inline std::filesystem::path write_text(const std::filesystem::path& path,
     expect(file.good(), "could not open " + path.string() + " for writing");
     file << contents;
     return path;
+}
+
+/// The whole of the file at `path`, empty when it cannot be read.
+inline std::string read_text(const std::filesystem::path& path) {
+    std::ifstream file(path);
+    std::ostringstream contents;
+    contents << file.rdbuf();
+    return contents.str();
 }
 
 /// The SAT budget every test runs under. The production default is tuned tight

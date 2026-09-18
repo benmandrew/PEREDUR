@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "fixtures.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/random_source.hpp"
@@ -99,12 +100,6 @@ std::string render_trace(const DrawTrace& trace) {
 
 const std::vector<std::string> k_in_atoms = {"a", "b", "c"};
 const std::vector<std::string> k_out_atoms = {"x", "y"};
-
-Requirement make_req(const std::string& condition, const std::string& response,
-                     Timing timing) {
-    return Requirement{Formula(condition), Formula(response),
-                       std::move(timing)};
-}
 
 /// Pins every Config field the breeding path reads, so the goldens below track
 /// the code rather than the config defaults. A default that changes the draw

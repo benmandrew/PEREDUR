@@ -7,23 +7,17 @@
 #include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/fitness.hpp"
-#include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
+#include "tlsf_fixtures.hpp"
 
 namespace {
 
 constexpr std::string_view k_test_suite = "tlsf_fitness";
 
-tlsf::Specification parse(const std::string& main_body,
-                          const std::string& semantics = "Mealy") {
-    return tlsf::parse("INFO { SEMANTICS: " + semantics + "; }\nMAIN {\n" +
-                       main_body + "\n}\n");
-}
-
 TEST(test_syntactic_self_similarity_is_one) {
     const Config cfg;
     const tlsf::Specification spec =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> F g); }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> F g); }");
     expect(tlsf_syntactic_similarity(spec, spec, cfg) == 1.0,
            "syntactic: a spec is syntactically identical to itself");
 }
@@ -32,7 +26,7 @@ TEST(test_semantic_self_similarity_is_one) {
     Config cfg;
     cfg.default_model_counting_bound = 4;
     const tlsf::Specification spec =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> F g); }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> F g); }");
     expect(tlsf_semantic_similarity(spec, spec, cfg) == 1.0,
            "semantic: identical section formulae contribute nothing, so self "
            "similarity is 1.0");
@@ -47,9 +41,9 @@ TEST(test_semantic_similarity_honours_configured_metric) {
     Config cfg;
     cfg.default_model_counting_bound = 4;
     const tlsf::Specification original =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> F g); }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> F g); }");
     const tlsf::Specification candidate =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> g); }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> g); }");
 
     cfg.similarity_metric = SimilarityMetric::Direct;
     const double direct = tlsf_semantic_similarity(candidate, original, cfg);
@@ -68,7 +62,7 @@ TEST(test_semantic_similarity_honours_configured_metric) {
 TEST(test_status_realizable_is_one) {
     const Config cfg;
     const tlsf::Specification spec =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> r); }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> r); }");
     expect(tlsf_status(spec, cfg) == 1.0,
            "status: a realizable spec scores 1.0");
 }
@@ -77,7 +71,7 @@ TEST(test_status_individually_unsatisfiable_formula_is_zero) {
     // One section formula that cannot hold on its own: the component tier.
     const Config cfg;
     const tlsf::Specification spec =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { g & !g; }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { g & !g; }");
     expect(tlsf_status(spec, cfg) == k_status_component_unsatisfiable,
            "status: an individually unsatisfiable section formula scores the "
            "component tier");
@@ -90,7 +84,7 @@ TEST(test_status_jointly_unsatisfiable_guarantees_are_unrealizable) {
     // was dropped as unpopulated.
     const Config cfg;
     const tlsf::Specification spec =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { g; !g; }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { g; !g; }");
     expect(tlsf_status(spec, cfg) == k_status_unrealizable,
            "status: jointly contradictory guarantees score the unrealizable "
            "tier");
@@ -105,20 +99,23 @@ TEST(test_status_aurus_grades_by_which_side_survives) {
     Config cfg;
     cfg.status_grading = StatusGrading::Aurus;
     const std::string atoms = "INPUTS { r; } OUTPUTS { g; } ";
-    expect(tlsf_status(parse(atoms + "ASSUME { r; !r; } GUARANTEE { g; !g; }"),
-                       cfg) == k_status_component_unsatisfiable,
-           "aurus: neither side satisfiable scores the bottom level");
     expect(tlsf_status(
-               parse(atoms + "ASSUME { r; !r; } GUARANTEE { G(g <-> r); }"),
-               cfg) == k_status_aurus_guarantees_only,
-           "aurus: only the guarantee side satisfiable scores 0.05");
-    expect(tlsf_status(parse(atoms + "GUARANTEE { g; !g; }"), cfg) ==
+               parse_main(atoms + "ASSUME { r; !r; } GUARANTEE { g; !g; }"),
+               cfg) == k_status_component_unsatisfiable,
+           "aurus: neither side satisfiable scores the bottom level");
+    expect(
+        tlsf_status(
+            parse_main(atoms + "ASSUME { r; !r; } GUARANTEE { G(g <-> r); }"),
+            cfg) == k_status_aurus_guarantees_only,
+        "aurus: only the guarantee side satisfiable scores 0.05");
+    expect(tlsf_status(parse_main(atoms + "GUARANTEE { g; !g; }"), cfg) ==
                k_status_aurus_assumptions_only,
            "aurus: only the assumption side satisfiable scores 0.1");
-    expect(tlsf_status(parse(atoms + "ASSUME { G r; } GUARANTEE { G !r; }"),
-                       cfg) == k_status_aurus_contradictory,
-           "aurus: two sides that hold alone but not together score 0.2");
-    expect(tlsf_status(parse(atoms + "GUARANTEE { G(g <-> r); }"), cfg) ==
+    expect(
+        tlsf_status(parse_main(atoms + "ASSUME { G r; } GUARANTEE { G !r; }"),
+                    cfg) == k_status_aurus_contradictory,
+        "aurus: two sides that hold alone but not together score 0.2");
+    expect(tlsf_status(parse_main(atoms + "GUARANTEE { G(g <-> r); }"), cfg) ==
                k_status_realizable,
            "aurus: a realizable spec scores 1.0");
 }
@@ -129,7 +126,7 @@ TEST(test_status_aurus_grades_by_which_side_survives) {
 // because AuRUS does not.
 TEST(test_status_aurus_does_not_penalise_an_ill_separated_spec) {
     Config cfg;
-    const tlsf::Specification spec = parse(
+    const tlsf::Specification spec = parse_main(
         "INPUTS { r; } OUTPUTS { g; } ASSUME { G F g; } "
         "GUARANTEE { G (r -> g); }");
     cfg.status_grading = StatusGrading::Tiered;
@@ -145,7 +142,7 @@ TEST(test_aggregate_scores_in_unit_interval) {
     Config cfg;
     cfg.default_model_counting_bound = 4;
     const tlsf::Specification spec =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> r); }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> r); }");
     const auto fitness = tlsf_get_fitness_function(spec, cfg);
     expect(!fitness.empty(),
            "aggregate: default weights yield a non-empty fitness function");

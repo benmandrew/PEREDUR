@@ -5,12 +5,12 @@
 #include <vector>
 
 #include "prop_formula.hpp"
-#include "runner/spot.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/mucs.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
+#include "tlsf_fixtures.hpp"
 
 namespace {
 
@@ -192,31 +192,6 @@ TEST(test_screen_falls_through_to_quickxplain) {
            "a pairwise conflict still comes back as {c, d}");
 }
 
-// End-to-end against ltlsynt on the unrealizable arbiter fixture: the core
-// must be a strict, still-unrealizable subset, minimal in that dropping any
-// one member restores realizability.
-const char* const k_unrealizable_arbiter =
-    "INFO { SEMANTICS: Mealy; }\n"
-    "MAIN {\n"
-    "  INPUTS { r0; r1; }\n"
-    "  OUTPUTS { g0; g1; }\n"
-    "  GUARANTEE {\n"
-    "    G (g0 -> r0);\n"
-    "    G (g1 -> r1);\n"
-    "    G !(g0 & g1);\n"
-    "    G F g0;\n"
-    "    G F g1;\n"
-    "  }\n"
-    "}\n";
-
-bool is_realizable(const tlsf::Specification& spec) {
-    // No timeout is set in the tests, so every query is decided; value_or's
-    // argument is unreachable rather than a policy choice.
-    return global_real_checker()
-        .check_realizability_ltl(spec.to_ltl(), spec.m_inputs, spec.m_outputs)
-        .value_or(false);
-}
-
 tlsf::Specification without(const tlsf::Specification& base,
                             const tlsf::CoreFormula& entry) {
     tlsf::Specification reduced = base;
@@ -285,6 +260,9 @@ TEST(test_reintegrate) {
            "reintegrate appends non-core after the repaired core");
 }
 
+// End-to-end against ltlsynt on the unrealizable arbiter fixture: the core
+// must be a strict, still-unrealizable subset, minimal in that dropping any
+// one member restores realizability.
 TEST(test_arbiter_end_to_end) {
     const tlsf::Specification spec = tlsf::parse(k_unrealizable_arbiter);
     expect(!is_realizable(spec), "fixture is unrealizable");

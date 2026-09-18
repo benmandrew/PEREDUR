@@ -8,6 +8,7 @@
 
 #include "config.hpp"
 #include "filter/vacuity.hpp"
+#include "fixtures.hpp"
 #include "genetic/generation.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
@@ -18,20 +19,10 @@ namespace {
 
 constexpr std::string_view k_test_suite = "vacuity_filter";
 
-Requirement continual(const std::string& response, const Timing& tim) {
-    return Requirement(Formula("true"), Formula(response), tim);
-}
-
 Requirement conditional(const std::string& condition,
                         const std::string& response) {
     return Requirement(Formula(condition), Formula(response),
                        timing::immediately());
-}
-
-Specification with_assumptions(std::vector<Requirement> assumptions) {
-    return Specification(std::move(assumptions),
-                         {continual("grant", timing::immediately())}, {"req"},
-                         {"grant"});
 }
 
 Specification with_guarantees(std::vector<Requirement> guarantees) {
