@@ -1,6 +1,5 @@
 #include "evolution.hpp"
 
-#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <fstream>
@@ -18,6 +17,7 @@
 
 #include "filter/implication_check.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/generation_loop.hpp"
 #include "genetic/output_gate.hpp"
 #include "runner/black.hpp"
 #include "serialisation.hpp"
@@ -93,11 +93,8 @@ EvolutionResult run_evolution(
         std::move(sink));
     const std::vector<std::string> objective_names =
         fitness_objective_names(fitness_function);
-    std::vector<FilterRunStats> filter_stats;
-    filter_stats.reserve(filter_functions.size());
-    for (const FilterFunction& flt : filter_functions) {
-        filter_stats.push_back({flt.name(), 0, 0});
-    }
+    std::vector<FilterRunStats> filter_stats =
+        empty_filter_stats(filter_functions);
     StatusLine status;
     const std::size_t col_gen = status.add("gen");
     // Transient: within-generation progress is the reason the line updates at
@@ -117,16 +114,7 @@ EvolutionResult run_evolution(
         return oss.str();
     };
 
-    const std::size_t pop_size = population.size();
-    const std::size_t selection_size = std::max(
-        std::size_t{1}, static_cast<std::size_t>(static_cast<double>(pop_size) *
-                                                 cfg.selection_rate));
-    // Elites carry over verbatim; unlike selection there is no floor of 1, so
-    // a small population or rate can legitimately yield no elites. The config
-    // guarantees elitism_rate < selection_rate, keeping this below
-    // selection_size.
-    const auto elitism_size = static_cast<std::size_t>(
-        static_cast<double>(pop_size) * cfg.elitism_rate);
+    const GenerationSizes sizes = generation_sizes(cfg, population.size());
     const std::string total_str = std::to_string(cfg.generations);
     for (std::size_t gen_idx = 0; gen_idx < cfg.generations; ++gen_idx) {
         // Checked before the generation as well as between offspring, matching
@@ -160,46 +148,23 @@ EvolutionResult run_evolution(
         };
 
         population = evolve_generation(
-            cfg, population, selection_size, elitism_size, fitness_function,
+            cfg, population, sizes.selection, sizes.elitism, fitness_function,
             filter_functions, random_source, on_progress, on_stage, &budget);
         budget.count_generation();
 
-        // Each active filter copy carries this generation's in/out sizes; fold
-        // them into the running per-filter totals reported at the end.
-        for (const FilterFunction& flt : filter_functions) {
-            for (FilterRunStats& stat : filter_stats) {
-                if (stat.name == flt.name()) {
-                    stat.total_in += flt.n_in();
-                    stat.total_out += flt.n_out();
-                    break;
-                }
-            }
-        }
+        fold_filter_stats(filter_functions, filter_stats);
 
         const double elapsed = std::chrono::duration<double>(
                                    std::chrono::steady_clock::now() - start)
                                    .count();
         status.set(col_time, format_elapsed(elapsed));
 
-        // The maximum, not population[0]: under NSGA-II the population is
-        // ordered by front rank and crowding distance, so the first individual
-        // need not hold the highest weighted scalar. Reporting it as "best"
-        // would put a number on the dashboard below the mean beside it -- and
-        // put one on the status line that falls between generations while the
-        // search is still improving, which reads as the search going backwards.
-        // Computed before the status line rather than after so both report it.
-        double fitness_total = 0.0;
-        double fitness_best = 0.0;
-        std::vector<std::vector<double>> objectives;
-        objectives.reserve(population.size());
-        for (const ScoredSpecification& cand : population) {
-            fitness_total += cand.fitness;
-            fitness_best = std::max(fitness_best, cand.fitness);
-            objectives.push_back(cand.objectives);
-        }
+        // Computed before the status line rather than after so both report
+        // the same best.
+        const FitnessSummary summary = summarise_fitness(population);
         if (!population.empty()) {
             std::ostringstream oss;
-            oss << std::fixed << std::setprecision(3) << fitness_best;
+            oss << std::fixed << std::setprecision(3) << summary.best;
             status.set(col_best, oss.str());
         }
         const std::optional<std::size_t> n_real =
@@ -212,11 +177,8 @@ EvolutionResult run_evolution(
         status.finish();
 
         dashboard.generation(
-            gen_idx + 1, elapsed, fitness_best,
-            population.empty()
-                ? 0.0
-                : fitness_total / static_cast<double>(population.size()),
-            mean_objectives(objective_names, objectives), n_real,
+            gen_idx + 1, elapsed, summary.best, summary.mean,
+            mean_objectives(objective_names, objectives_of(population)), n_real,
             population.size());
     }
     return {std::move(population), std::move(filter_stats),

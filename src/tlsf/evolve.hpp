@@ -32,11 +32,6 @@ struct DashboardProgress {
     std::size_t muc_iter = 0;
 };
 
-// The TLSF counterparts of the FRETISH per-generation filter set (dedup, bloat
-// cap and the vacuity filter).
-std::vector<FilterFunctionT<Specification>> build_per_gen_filters(
-    const Specification& spec);
-
 // Evolves `spec` under `cfg` against `fitness`, returning the final scored
 // population and, via `filter_stats_out`, this run's per-filter in/out totals.
 // Shared by both repair modes; in MUC mode `spec` is a core sub-specification.

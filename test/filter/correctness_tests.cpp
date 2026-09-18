@@ -93,7 +93,7 @@ void test_every_tlsf_correctness_stage_has_a_gate_check() {
     const tlsf::Specification original =
         tlsf_spec("INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); }");
     const std::vector<std::string> stages = tlsf_correctness_stage_names(
-        tlsf::internal::build_per_gen_filters(original));
+        get_filter_functions(original, global_sat_checker()));
     expect(!stages.empty(),
            "correctness: the TLSF generation chain should run correctness "
            "stages");
