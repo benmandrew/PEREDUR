@@ -22,6 +22,7 @@
 #include "genetic/scored.hpp"
 #include "repair_modes.hpp"
 #include "repair_output.hpp"
+#include "runner/atom_names.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
 #include "survivors.hpp"
@@ -83,6 +84,15 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
         original = parse(*text);
     } catch (const std::invalid_argument& exc) {
         std::cerr << "parse error: " << exc.what() << "\n";
+        return 1;
+    }
+
+    // Before the screens, because an unsafe name makes every realizability
+    // verdict below meaningless rather than merely suspect.
+    if (const std::optional<std::string> unsafe =
+            runner::first_unsafe_atom_name(original.m_inputs,
+                                           original.m_outputs)) {
+        std::cerr << "fatal: " << input_path << ": " << *unsafe << "\n";
         return 1;
     }
 
