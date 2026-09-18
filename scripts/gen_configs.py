@@ -75,7 +75,7 @@ METRICS: dict[str, list[tuple[str, str]]] = {
 # tlsf.repair_mode as a crossed factor, exactly like WEAKENINGS/METRICS above.
 # Each entry is (dir_label, toml_value): the directory + CSV label is the short
 # "mono"/"muc", and here the TOML value happens to differ only for "mono"
-# ("monolithic"), the string config_io.cpp's apply_tlsf accepts. Like
+# ("monolithic"), the string EnumNames<RepairMode> spells. Like
 # --weakening/--metric, --repair defaults to None so the flat layout and the
 # repair_mode from DEFAULTS stay byte-identical to the pre-factor grids.
 REPAIRS: dict[str, list[tuple[str, str]]] = {

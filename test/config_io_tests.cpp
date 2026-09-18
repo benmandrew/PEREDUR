@@ -501,10 +501,9 @@ void test_config_io_muc_max_iterations_nonpositive_throws() {
     expect(threw, "config_io: muc_max_iterations = 0 should throw");
 }
 
-// Every key config_key_spec() declares. Fails if an apply_* function gains a
-// key the unknown-key spec was not told about. A key absent from this TOML is
-// not covered, so a new key belongs here as well as in the two places
-// config_io.cpp names.
+// Every key k_config_keys declares, none of which may warn "unknown key". A
+// key absent from this TOML is not covered, so a new key belongs here as well
+// as in src/config/keys.hpp.
 void test_config_io_known_keys_do_not_warn() {
     const std::string toml = R"(
 [genetic]

@@ -4,13 +4,13 @@
 The config surface is spelled out in five places, and nothing in the compiler
 ties them together:
 
-  * ``config_key_spec()`` in ``src/config_io.cpp`` -- the keys the parser
-    recognises. A key missing here is reported as "unknown key" at run time
-    even though the parser reads it.
-  * ``config_json()`` in ``src/repair/manifest.cpp`` -- the effective config
-    written to ``run.json``, which is what a campaign reads back. A key missing
-    here is silent: the run behaves as configured and records nothing about it.
-    Two of the four ``[tlsf.mutation]`` keys were missing this way.
+  * ``k_config_keys`` in ``src/config/keys.hpp`` -- the keys the parser reads
+    and recognises. ``config_json()`` in ``src/repair/manifest.cpp`` writes the
+    effective config to ``run.json`` from the same table, which is what a
+    campaign reads back; this checks that it still does. A key missing from
+    ``run.json`` is silent: the run behaves as configured and records nothing
+    about it. Two of the four ``[tlsf.mutation]`` keys were missing this way
+    before the table existed.
   * ``schemas/config-schema.json`` -- what an editor validates against. It sets
     ``additionalProperties: false``, so a key missing here is flagged as an
     error in the editor even though the binary accepts it.
@@ -25,9 +25,8 @@ Drift between them is silent and has happened: ``nsga2-replicate`` was added to
 the parser and the docs but not to the schema enum. This compares all four
 key sets and exits non-zero on any disagreement.
 
-It does not, and cannot cheaply, catch a key added to an ``apply_*`` function
-and nowhere else -- that needs reflection the language does not offer. It does
-mean such a key cannot reach the schema or the template unnoticed.
+The parser reads only the keys the table lists, so a key cannot be read
+without this check seeing it.
 """
 
 import argparse
@@ -44,88 +43,30 @@ ENUM_KEYS = ("selection_scheme", "metric", "repair_mode", "status_grading",
              "mrs_admission_order")
 
 
-# --- src/config_io.cpp -------------------------------------------------------
+# --- src/config/keys.hpp -----------------------------------------------------
 
 
-def tokenise(source):
-    return re.findall(r'"[^"]*"|[A-Za-z_][A-Za-z_0-9]*|[(){},]', source)
-
-
-class SpecParser:
-    """Recursive-descent parser for the section(...) literal in config_io.cpp.
-
-    The literal is pure data -- section({keys}, {{"name", section(...)}, ...})
-    -- so a parser small enough to read beats a regex that half-works.
-    """
-
-    def __init__(self, tokens):
-        self.toks = tokens
-        self.i = 0
-
-    def peek(self):
-        return self.toks[self.i] if self.i < len(self.toks) else None
-
-    def take(self, expected=None):
-        tok = self.peek()
-        if tok is None:
-            raise ValueError(f"unexpected end of the section(...) literal")
-        if expected is not None and tok != expected:
-            raise ValueError(f"expected {expected!r} at token {self.i}, got {tok!r}")
-        self.i += 1
-        return tok
-
-    def parse_section(self):
-        self.take("section")
-        self.take("(")
-        keys = self.parse_string_list()
-        tables = {}
-        if self.peek() == ",":
-            self.take(",")
-            tables = self.parse_table_map()
-        self.take(")")
-        return keys, tables
-
-    def parse_string_list(self):
-        self.take("{")
-        keys = set()
-        while self.peek() != "}":
-            keys.add(self.take()[1:-1])
-            if self.peek() == ",":
-                self.take(",")
-        self.take("}")
-        return keys
-
-    def parse_table_map(self):
-        self.take("{")
-        tables = {}
-        while self.peek() == "{":
-            self.take("{")
-            name = self.take()[1:-1]
-            self.take(",")
-            tables[name] = self.parse_section()
-            self.take("}")
-            if self.peek() == ",":
-                self.take(",")
-        self.take("}")
-        return tables
-
-
-def flatten(spec, prefix=""):
-    """Turn a (keys, tables) tree into a set of dotted paths."""
-    keys, tables = spec
-    paths = {prefix + k for k in keys}
-    for name, sub in tables.items():
-        paths.add(prefix + name)
-        paths |= flatten(sub, prefix + name + ".")
-    return paths
+def table_entries(source):
+    """(section, key, member) per k_config_keys entry, in table order."""
+    start = source.find("k_config_keys{{")
+    if start < 0:
+        raise ValueError("k_config_keys not found")
+    body = source[start : source.index("}};", start)]
+    entries = re.findall(r'\{"([\w.]+)",\s*"(\w+)",\s*&Config::(\w+),', body)
+    if not entries:
+        raise ValueError("k_config_keys has no entries")
+    return entries
 
 
 def parser_keys(source):
-    start = source.find("const KeySpec& config_key_spec()")
-    if start < 0:
-        raise ValueError("config_key_spec() not found")
-    body = source[source.index("section(", start) : source.index("return spec;", start)]
-    return flatten(SpecParser(tokenise(body)).parse_section())
+    """Dotted paths of every key and section the table declares."""
+    paths = set()
+    for section, key, _ in table_entries(source):
+        parts = section.split(".")
+        for depth in range(1, len(parts) + 1):
+            paths.add(".".join(parts[:depth]))
+        paths.add(f"{section}.{key}")
+    return paths
 
 
 def enum_spellings(source):
@@ -137,7 +78,7 @@ def enum_spellings(source):
 
 
 def member_types(hpp_source):
-    """Declared type per Config member, for the members read as enums."""
+    """Declared type per Config member."""
     body = hpp_source[hpp_source.index("struct Config {") :]
     return dict(
         (name, kind) for kind, name in re.findall(r"^\s*(\w+) (\w+) = ", body, re.M)
@@ -145,80 +86,33 @@ def member_types(hpp_source):
 
 
 def parser_enums(source, names_source, hpp_source):
-    """Accepted string values per key: each read_enum call's Config member,
-    through its declared type, to that type's EnumNames spellings."""
+    """Accepted string values per key: each entry's Config member, through its
+    declared type, to that type's EnumNames spellings."""
     spellings = enum_spellings(names_source)
     types = member_types(hpp_source)
-    found = {}
-    for key, member in re.findall(r'read_enum\(\s*tbl,\s*"(\w+)",\s*cfg\.(\w+)', source):
-        found[key] = spellings.get(types.get(member), set())
-    return found
+    return {
+        key: spellings[types[member]]
+        for _, key, member in table_entries(source)
+        if types.get(member) in spellings
+    }
 
 
 # --- src/repair/manifest.cpp -------------------------------------------------
 
 
-def manifest_paths(source):
+def manifest_paths(source, keys_source):
     """Dotted paths of the effective config `config_json()` writes to run.json.
 
-    The literal is pure data too -- nested {"name", value} pairs, where a value
-    that opens with a brace is a section -- so the same recursive-descent trick
-    works. A leaf's value is skipped rather than read: what this check is for is
-    which keys reach the manifest, not what they hold.
+    config_json() writes one field per k_config_keys entry, so its paths are
+    the table's, provided it still walks the table rather than a literal.
     """
     start = source.find("nlohmann::json config_json(const Config& cfg)")
     if start < 0:
         raise ValueError("config_json() not found")
-    open_brace = source.index("return {", start) + len("return ")
-    depth = 0
-    end = -1
-    for i in range(open_brace, len(source)):
-        if source[i] == "{":
-            depth += 1
-        elif source[i] == "}":
-            depth -= 1
-            if depth == 0:
-                end = i
-                break
-    if end < 0:
-        raise ValueError("config_json(): unbalanced braces")
-    body = re.sub(r"//[^\n]*", "", source[open_brace : end + 1])
-    toks = re.findall(r'"(?:[^"\\]|\\.)*"|[{},]|[^"{}, \t\r\n]+', body)
-
-    pos = 0
-
-    def want(tok):
-        nonlocal pos
-        if pos >= len(toks) or toks[pos] != tok:
-            got = toks[pos] if pos < len(toks) else "end of literal"
-            raise ValueError(f"expected {tok!r} at token {pos}, got {got!r}")
-        pos += 1
-
-    def parse_object(prefix):
-        nonlocal pos
-        want("{")
-        paths = set()
-        while toks[pos] != "}":
-            if toks[pos] == ",":
-                pos += 1
-                continue
-            want("{")
-            if not toks[pos].startswith('"'):
-                raise ValueError(f"expected a key name at token {pos}")
-            path = prefix + toks[pos].strip('"')
-            pos += 1
-            want(",")
-            paths.add(path)
-            if toks[pos] == "{":
-                paths |= parse_object(path + ".")
-            else:
-                while toks[pos] != "}":
-                    pos += 1
-            want("}")
-        pos += 1
-        return paths
-
-    return parse_object("")
+    end = source.find("\n}\n", start)
+    if "k_config_keys" not in source[start:end]:
+        raise ValueError("config_json() no longer iterates k_config_keys")
+    return parser_keys(keys_source)
 
 
 # --- schemas/config-schema.json ----------------------------------------------
@@ -503,7 +397,7 @@ def main():
     )
     root = ap.parse_args().root
 
-    cpp = root / "src" / "config_io.cpp"
+    cpp = root / "src" / "config" / "keys.hpp"
     manifest_cpp = root / "src" / "repair" / "manifest.cpp"
     hpp = root / "include" / "config.hpp"
     names_hpp = root / "src" / "config" / "enum_names.hpp"
@@ -532,12 +426,12 @@ def main():
         try:
             from_parser = parser_keys(cpp_source)
         except ValueError as exc:
-            spec_error = f"{cpp}: could not read config_key_spec(): {exc}"
+            spec_error = f"{cpp}: could not read k_config_keys: {exc}"
 
     from_manifest, manifest_parse_error = (None, None)
-    if manifest_source is not None:
+    if manifest_source is not None and cpp_source is not None:
         try:
-            from_manifest = manifest_paths(manifest_source)
+            from_manifest = manifest_paths(manifest_source, cpp_source)
         except ValueError as exc:
             manifest_parse_error = (
                 f"{manifest_cpp}: could not read config_json(): {exc}")
@@ -579,7 +473,7 @@ def main():
         )
     for path in sorted(from_schema - from_parser):
         errors.append(
-            f"config_io.cpp: config_key_spec() is missing '{path}', which the "
+            f"keys.hpp: k_config_keys is missing '{path}', which the "
             f"schema declares. The parser will warn 'unknown key' on it."
         )
     # run.json is what a campaign reads its own configuration back out of, so a
@@ -596,7 +490,7 @@ def main():
     for path in sorted(from_manifest - from_parser):
         errors.append(
             f"manifest.cpp: config_json() reports '{path}', which "
-            f"config_key_spec() does not declare. A manifest field with no key "
+            f"k_config_keys does not declare. A manifest field with no key "
             f"behind it cannot be set and cannot be reproduced from."
         )
 
@@ -699,7 +593,7 @@ def main():
     for key in ENUM_KEYS:
         accepted = enums.get(key)
         if accepted is None:
-            errors.append(f"config_io.cpp: no string-valued key '{key}' found.")
+            errors.append(f"keys.hpp: no enum-valued key '{key}' found.")
             continue
         matches = [(p, n) for p, n in nodes.items() if p.split(".")[-1] == key]
         if len(matches) != 1:
@@ -748,7 +642,7 @@ def main():
         return 1
 
     print(f"Config key parity: {len(from_parser)} keys agree across "
-          f"config_io.cpp, manifest.cpp, {schema_path.name}, and "
+          f"keys.hpp, manifest.cpp, {schema_path.name}, and "
           f"{example_path.name}; "
           f"{len(GEN_CONFIGS_FIELDS)} gen_configs.DEFAULTS entries match "
           f"config.hpp ({len(GEN_CONFIGS_EXEMPT)} exempt).")
