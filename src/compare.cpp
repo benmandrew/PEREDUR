@@ -3,13 +3,11 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -17,7 +15,6 @@
 #include <nlohmann/json.hpp>
 
 #include "bounded_async.hpp"
-#include "config.hpp"
 #include "driver_support.hpp"
 #include "filter/implication_check.hpp"
 #include "repair/manifest.hpp"
@@ -28,7 +25,6 @@
 #include "tlsf/filter.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
-#include "version.hpp"
 
 namespace {
 
@@ -58,14 +54,7 @@ std::optional<Args> parse_args(int argc, const char* const* argv) {
             continue;
         }
         const std::string arg(argv[i]);
-        if (arg == "--version") {
-            version::print(std::cout);
-            std::exit(0);
-        } else if (arg == "--help" || arg == "-h") {
-            print_usage(argv[0]);
-            std::exit(0);
-        } else if (arg == "--repairs" && i + 1 < argc &&
-                   argv[i + 1] != nullptr) {
+        if (arg == "--repairs" && i + 1 < argc && argv[i + 1] != nullptr) {
             args.repairs_dir = argv[++i];
         } else if (arg == "--ideals" && i + 1 < argc &&
                    argv[i + 1] != nullptr) {
@@ -137,14 +126,6 @@ std::vector<std::pair<std::string, Specification>> load_ideals(
     return ideals;
 }
 
-std::string read_file(const std::string& path) {
-    const std::optional<std::string> contents = read_file_contents(path);
-    if (!contents.has_value()) {
-        throw std::runtime_error("cannot open file: " + path);
-    }
-    return *contents;
-}
-
 // PEREDUR writes each TLSF repair as repair_N.tlsf alongside a
 // repair_N.fitness.json carrying its weighted total. The fitness file is
 // optional here: a missing or malformed one just leaves the fitness unset,
@@ -158,8 +139,8 @@ std::optional<double> read_tlsf_fitness(
         return std::nullopt;
     }
     try {
-        const nlohmann::json jobj =
-            nlohmann::json::parse(read_file(fitness_path.string()));
+        const nlohmann::json jobj = nlohmann::json::parse(
+            read_file_or_throw(fitness_path.string(), "cannot open file"));
         return jobj.at("total").get<double>();
     } catch (const std::exception&) {
         return std::nullopt;
@@ -179,7 +160,8 @@ std::vector<TlsfRepair> load_tlsf_repairs(const std::string& dir) {
             continue;
         }
         repairs.push_back({entry.path().filename().string(),
-                           tlsf::parse(read_file(entry.path().string())),
+                           tlsf::parse(read_file_or_throw(entry.path().string(),
+                                                          "cannot open file")),
                            read_tlsf_fitness(entry.path())});
     }
     std::sort(repairs.begin(), repairs.end(),
@@ -197,7 +179,8 @@ std::vector<std::pair<std::string, tlsf::Specification>> load_tlsf_ideals(
             continue;
         }
         ideals.emplace_back(entry.path().filename().string(),
-                            tlsf::parse(read_file(entry.path().string())));
+                            tlsf::parse(read_file_or_throw(
+                                entry.path().string(), "cannot open file")));
     }
     std::sort(
         ideals.begin(), ideals.end(),
@@ -429,9 +412,11 @@ int run_fretish(const Args& args, SatisfiabilityChecker& checker) {
 }  // namespace
 
 int main(int argc, const char* const argv[]) {
-    if (argc == 0 || argv == nullptr || argv[0] == nullptr) {
-        std::cerr << "fatal: missing argv[0]\n";
+    if (!has_program_name(argc, argv)) {
         return 1;
+    }
+    if (handle_info_flags(argc, argv, print_usage)) {
+        return 0;
     }
     const auto maybe_args = parse_args(argc, argv);
     if (!maybe_args.has_value()) {
@@ -440,36 +425,8 @@ int main(int argc, const char* const argv[]) {
     }
     const Args& args = *maybe_args;
 
-    Config cfg;
-    // Comparison is dominated by solver calls on specs the search has already
-    // stretched, so every budget here is generous next to a run's. They are set
-    // through apply_tool_timeouts rather than one at a time: this driver used
-    // to set only black's, which left ltlsynt (reachable through the TLSF
-    // filters) unbounded, so a single hard query could spend the whole
-    // per-invocation budget the experiment harness allows.
-    cfg.black_timeout = std::chrono::milliseconds{20'000};
-    cfg.ltlsynt_timeout = std::chrono::milliseconds{60'000};
-    cfg.ltl2tgba_timeout = std::chrono::milliseconds{60'000};
-    // ltlfilt's default is 10 s, and config.hpp justifies it by "an abandoned
-    // call costs only a missed simplification, never an individual". That
-    // premise holds inside a run and fails here. check_satisfiability answers
-    // from a simplification of "0" or "1" before black is spawned, so on this
-    // path the fold IS the verdict: losing it hands the query to a solver
-    // black.cpp:155 records as unsound on W under negation, and this driver
-    // prints whatever comes back as the relation. That is not hypothetical --
-    // at 10 s, compare reported examples/amba as incomparable with itself
-    // minus three GUARANTEES, with 0 timeouts.
-    //
-    // Sized off amba, the only subject big enough to cross the old default at
-    // 44 requirements and 16 atomic propositions. Its four spec-against-ideal
-    // queries need 80 s, 83 s, 90 s and 145 s; the two that fold to "0" decide
-    // there, and black clears the two satisfiable ones in 0.02 s once the fold
-    // has ruled out the cheap answer. 300 s leaves headroom over the 145 s
-    // worst case. A pair can now cost minutes, which is affordable for an
-    // offline comparison and would not be inside a run.
-    cfg.ltlfilt_timeout = std::chrono::milliseconds{300'000};
-    apply_tool_timeouts(cfg);
-    SatisfiabilityChecker& checker = global_sat_checker();
+    SatisfiabilityChecker& checker =
+        configure_offline_checkers(std::chrono::milliseconds{20'000}, true);
 
     // Route by input format. A .tlsf extension on either directory path, or any
     // .tlsf file in either directory, selects the TLSF path; otherwise FRETISH
@@ -480,20 +437,6 @@ int main(int argc, const char* const argv[]) {
         std::filesystem::path(args.ideals_dir).extension() == ".tlsf" ||
         dir_has_extension(args.repairs_dir, ".tlsf") ||
         dir_has_extension(args.ideals_dir, ".tlsf");
-
-    // Both paths ask one whole-spec implication query per pair, and maximal.cpp
-    // records the measurement: the simplify pass is 95.6% of solver wall on
-    // that shape and decides nothing the satisfiability call cannot. Over this
-    // campaign's corpus the pass put 205 of 3000 runs past the harness's 600 s
-    // cap, 118 of 120 on humanoid-742, and a timed-out compare reads as no
-    // ideal relation at all. SPOT takes black's budget for the same reason as
-    // there: an undecided ExpectUnsat query is never escalated and classifies
-    // as Timeout. Only the TLSF path took these settings until 2026-09-11, on
-    // the grounds that FRETISH decomposed per requirement and that shape had
-    // not been measured; ed5413f made spec_implies lower the whole
-    // specification, so the premise is gone and the two ask the same question.
-    checker.set_simplify(false);
-    checker.set_spot_budget(cfg.black_timeout);
 
     return tlsf ? run_tlsf(args, checker) : run_fretish(args, checker);
 }

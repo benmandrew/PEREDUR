@@ -10,7 +10,6 @@
 #include "runner/atom_names.hpp"
 #include "runner/spot.hpp"
 #include "serialisation.hpp"
-#include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
 
 namespace {
@@ -32,22 +31,21 @@ void print_usage(const char* prog) {
 
 std::optional<bool> check_tlsf_realizable(const std::string& path,
                                           RealizabilityChecker& checker) {
-    const std::optional<std::string> contents = read_file_contents(path);
-    if (!contents.has_value()) {
-        std::cerr << path << ": cannot read file\n";
+    const std::optional<tlsf::Specification> spec = load_tlsf_or_report(path);
+    if (!spec.has_value()) {
         return std::nullopt;
     }
     try {
-        const tlsf::Specification spec = tlsf::parse(*contents);
         // ltlsynt reads an unmatched --ins as an output, so an unsafe name
         // turns this tool's verdict into one about a different specification.
         if (const std::optional<std::string> unsafe =
-                runner::first_unsafe_atom_name(spec.m_inputs, spec.m_outputs)) {
+                runner::first_unsafe_atom_name(spec->m_inputs,
+                                               spec->m_outputs)) {
             std::cerr << path << ": " << *unsafe << "\n";
             return std::nullopt;
         }
         const std::optional<bool> realizable = checker.check_realizability_ltl(
-            spec.to_ltl(), spec.m_inputs, spec.m_outputs);
+            spec->to_ltl(), spec->m_inputs, spec->m_outputs);
         if (!realizable.has_value()) {
             std::cerr << path
                       << ": ltlsynt timed out, realizability undecided\n";
@@ -92,8 +90,7 @@ std::optional<bool> realize_one(const std::string& path,
 }  // namespace
 
 int main(int argc, const char* const argv[]) {
-    if (argc == 0 || argv == nullptr || argv[0] == nullptr) {
-        std::cerr << "fatal: missing argv[0]\n";
+    if (!has_program_name(argc, argv)) {
         return 1;
     }
     if (handle_info_flags(argc, argv, print_usage)) {
