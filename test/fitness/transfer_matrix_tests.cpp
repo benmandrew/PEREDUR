@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <limits>
@@ -6,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -42,13 +44,6 @@ CountMatrix count_matrix_from_rows(const CountGrid& rows) {
         }
     }
     return matrix;
-}
-
-template <typename CaseType, typename Fn>
-void run_cases(const std::vector<CaseType>& cases, Fn run_case) {
-    for (const CaseType& test_case : cases) {
-        run_case(test_case);
-    }
 }
 
 using Trace = std::vector<std::pair<bool, bool>>;
@@ -196,21 +191,24 @@ Count brute_force_trace_count(const Requirement& req, std::size_t step_count) {
     return count;
 }
 
+void expect_exact_count(Count actual, Count expected,
+                        const std::string& label) {
+    if (actual != expected) {
+        std::ostringstream message;
+        message << label << ": expected " << count_to_string(expected)
+                << " but found " << count_to_string(actual);
+        fail(message.str());
+    }
+}
+
 void expect_trace_counts(const TransferSystem& system,
                          const std::vector<Count>& expected_counts,
                          const std::string& label) {
     for (std::size_t index = 0; index < expected_counts.size(); ++index) {
         const std::size_t trace_length = index + 1;
-        const Count actual_count = count_traces(system, trace_length);
-        const Count expected_count = expected_counts[index];
-        if (actual_count != expected_count) {
-            std::ostringstream message;
-            message << label << ": count mismatch for trace length "
-                    << trace_length << ", expected "
-                    << count_to_string(expected_count) << " but found "
-                    << count_to_string(actual_count);
-            fail(message.str());
-        }
+        expect_exact_count(
+            count_traces(system, trace_length), expected_counts[index],
+            label + ": count for trace length " + std::to_string(trace_length));
     }
 }
 
@@ -227,17 +225,11 @@ void expect_matrix_equals(const CountMatrix& actual, const CountGrid& expected,
 
     for (Eigen::Index row = 0; row < actual.rows(); ++row) {
         for (Eigen::Index column = 0; column < actual.cols(); ++column) {
-            const Count actual_value = actual(row, column);
-            const Count expected_value =
-                expected[static_cast<std::size_t>(row)]
-                        [static_cast<std::size_t>(column)];
-            if (actual_value != expected_value) {
-                std::ostringstream message;
-                message << label << ": mismatch at (" << row << ", " << column
-                        << "), expected " << count_to_string(expected_value)
-                        << " but found " << count_to_string(actual_value);
-                fail(message.str());
-            }
+            expect_exact_count(actual(row, column),
+                               expected[static_cast<std::size_t>(row)]
+                                       [static_cast<std::size_t>(column)],
+                               label + ": entry (" + std::to_string(row) +
+                                   ", " + std::to_string(column) + ")");
         }
     }
 }
@@ -273,12 +265,12 @@ TEST(test_transfer_system_cases) {
          {4, 14, 46, 148}},
     };
 
-    run_cases(cases, [](const TransferSystemCase& test_case) {
+    for (const TransferSystemCase& test_case : cases) {
         const TransferSystem system =
             build_transfer_system(test_case.m_requirement);
         expect_trace_counts(system, test_case.m_expected_trace_counts,
                             test_case.m_label + " trace counts");
-    });
+    }
 }
 
 struct TraceAcceptanceCase {
@@ -324,12 +316,12 @@ TEST(test_trace_acceptance_cases) {
          false},
     };
 
-    run_cases(cases, [](const TraceAcceptanceCase& test_case) {
+    for (const TraceAcceptanceCase& test_case : cases) {
         const bool actual = trace_satisfies_requirement(test_case.m_requirement,
                                                         test_case.m_trace);
         expect(actual == test_case.m_expected_acceptance,
                test_case.m_label + ": oracle acceptance mismatch");
-    });
+    }
 }
 
 // Cross-validates count_traces against the brute-force oracle for all timing
@@ -353,15 +345,9 @@ TEST(test_transfer_system_vs_oracle) {
     for (const auto& [label, req] : cases) {
         const TransferSystem system = build_transfer_system(req);
         for (std::size_t k = 1; k <= 4; ++k) {
-            const Count expected = brute_force_trace_count(req, k);
-            const Count actual = count_traces(system, k);
-            if (actual != expected) {
-                std::ostringstream msg;
-                msg << label << " k=" << k << ": expected "
-                    << count_to_string(expected) << " but got "
-                    << count_to_string(actual);
-                fail(msg.str());
-            }
+            expect_exact_count(count_traces(system, k),
+                               brute_force_trace_count(req, k),
+                               label + " k=" + std::to_string(k));
         }
     }
 }
@@ -388,7 +374,7 @@ TEST(test_weighted_transition_matrix_cases) {
          {{2, 4}, {6, 8}}},
     };
 
-    run_cases(cases, [](const WeightedTransitionCase& test_case) {
+    for (const WeightedTransitionCase& test_case : cases) {
         TransferSystem system;
         const std::size_t state_count = test_case.m_valuation_counts.size();
         system.m_states.assign(state_count, State{});
@@ -402,7 +388,7 @@ TEST(test_weighted_transition_matrix_cases) {
         const CountMatrix weighted = weighted_transition_matrix(system);
         expect_matrix_equals(weighted, test_case.m_expected_weighted_matrix,
                              test_case.m_label);
-    });
+    }
 }
 
 TEST(test_count_traces_formula) {
@@ -414,9 +400,11 @@ TEST(test_count_traces_formula) {
     system.m_transition_matrix = weighted;
     system.m_transition_matrix_is_weighted = true;
 
-    expect(count_traces(system, 0) == 1, "start-state trace count for k=0");
-    expect(count_traces(system, 1) == 3, "start-state trace count for k=1");
-    expect(count_traces(system, 2) == 17, "start-state trace count for k=2");
+    const std::vector<Count> expected = {1, 3, 17};
+    for (std::size_t k = 0; k < expected.size(); ++k) {
+        expect(count_traces(system, k) == expected[k],
+               "start-state trace count for k=" + std::to_string(k));
+    }
 }
 
 // build_transfer_system_from_ltl weights each edge by
@@ -427,75 +415,51 @@ TEST(test_count_traces_formula) {
 // this file (expected counts of 1, 3, 17) never reaches.
 Count exact_power_of_two(int exponent) { return std::ldexp(1.0L, exponent); }
 
-void expect_exact_count(Count actual, Count expected,
-                        const std::string& label) {
-    if (actual != expected) {
-        std::ostringstream message;
-        message << label << ": expected " << count_to_string(expected)
-                << " but found " << count_to_string(actual);
-        fail(message.str());
+Count power_of_three(std::size_t exponent) {
+    Count result = 1.0L;
+    for (std::size_t step = 0; step < exponent; ++step) {
+        result *= 3.0L;
     }
+    return result;
 }
 
-// A tautology mentions no atoms, so every one of the N is free and the "t"
-// self-loop weighs 2^N. Powers of two are bit-exact in long double at any
-// magnitude (mantissa 1.0, exponent e), so this is an exact comparison.
-TEST(test_count_traces_tautology_beyond_128_bits) {
-    struct TautologyCase {
-        std::size_t m_n_atoms;
-        std::size_t m_step_count;
+TEST(test_count_traces_beyond_128_bits) {
+    struct WideCase {
+        std::string m_ltl;
+        std::size_t m_n_atoms = 0;
+        std::size_t m_step_count = 0;
+        Count m_expected = 0;
     };
-
-    const std::vector<TautologyCase> cases = {
-        {10, 20},   // 2^200
-        {32, 100},  // 2^3200
-        {50, 300},  // 2^15000, deliberately near long double's 2^16384 ceiling
+    const std::vector<WideCase> cases = {
+        // A tautology mentions no atoms, so every one of the N is free and the
+        // "t" self-loop weighs 2^N. Powers of two are bit-exact in long double
+        // at any magnitude (mantissa 1.0, exponent e), so these comparisons are
+        // exact.
+        {"1", 10, 20, exact_power_of_two(200)},
+        {"1", 32, 100, exact_power_of_two(3200)},
+        // Deliberately near long double's 2^16384 ceiling.
+        {"1", 50, 300, exact_power_of_two(15000)},
+        // Drives ganak and the HOA label parse with ten genuinely mentioned
+        // atoms, while keeping the oracle exact: the guard has a single model
+        // over them, so the self-loop weighs 2^(20-10).
+        {"G(a0 & a1 & a2 & a3 & a4 & a5 & a6 & a7 & a8 & a9)", 20, 30,
+         exact_power_of_two(10 * 30)},
+        // The strongest case: three of the four (a, b) valuations satisfy the
+        // guard, so the self-loop weighs 3 * 2^8 and the count is
+        // 3^k * 2^(8k) -- mantissa exactness and exponent range at once, where
+        // the 2^160 factor alone already overflows 128 bits. k stays <= 40 so
+        // that 3^k remains under 2^64 and is therefore still exact in long
+        // double's 64-bit mantissa.
+        {"G(a | b)", 10, 20, power_of_three(20) * exact_power_of_two(8 * 20)},
     };
-
-    run_cases(cases, [](const TautologyCase& test_case) {
+    for (const WideCase& wide : cases) {
         const TransferSystem system =
-            build_transfer_system_from_ltl("1", test_case.m_n_atoms);
-        const auto exponent =
-            static_cast<int>(test_case.m_n_atoms * test_case.m_step_count);
+            build_transfer_system_from_ltl(wide.m_ltl, wide.m_n_atoms);
         expect_exact_count(
-            count_traces(system, test_case.m_step_count),
-            exact_power_of_two(exponent),
-            "tautology over " + std::to_string(test_case.m_n_atoms) +
-                " atoms at k=" + std::to_string(test_case.m_step_count));
-    });
-}
-
-// Drives ganak and the HOA label parse with ten genuinely mentioned atoms,
-// while keeping the oracle exact: the guard has a single model over them, so
-// the self-loop weighs 2^(20-10) and the count is exactly 2^(10*k).
-TEST(test_count_traces_many_mentioned_atoms) {
-    std::string conjunction = "a0";
-    for (std::size_t atom_idx = 1; atom_idx < 10; ++atom_idx) {
-        conjunction += " & a" + std::to_string(atom_idx);
+            count_traces(system, wide.m_step_count), wide.m_expected,
+            wide.m_ltl + " over " + std::to_string(wide.m_n_atoms) +
+                " atoms at k=" + std::to_string(wide.m_step_count));
     }
-    const TransferSystem system =
-        build_transfer_system_from_ltl("G(" + conjunction + ")", 20);
-    expect_exact_count(count_traces(system, 30), exact_power_of_two(10 * 30),
-                       "G(a0 & ... & a9) over 20 atoms at k=30");
-}
-
-// The strongest case: three of the four (a, b) valuations satisfy the guard, so
-// the self-loop weighs 3 * 2^8 and the count is 3^k * 2^(8k) -- mantissa
-// exactness and exponent range at once, where the 2^160 factor alone already
-// overflows 128 bits. k stays <= 40 so that 3^k remains under 2^64 and is
-// therefore still exact in long double's 64-bit mantissa.
-TEST(test_count_traces_non_power_of_two_weight) {
-    const std::size_t step_count = 20;
-    const TransferSystem system =
-        build_transfer_system_from_ltl("G(a | b)", 10);
-    Count mantissa = 1.0L;
-    for (std::size_t step = 0; step < step_count; ++step) {
-        mantissa *= 3.0L;
-    }
-    const Count expected =
-        mantissa * exact_power_of_two(static_cast<int>(8 * step_count));
-    expect_exact_count(count_traces(system, step_count), expected,
-                       "G(a | b) over 10 atoms at k=20");
 }
 
 // Now that Count is floating-point, overflow is reported by an isfinite check
@@ -603,10 +567,3 @@ TEST(test_count_traces_rounds_faithfully_above_64_bits) {
 #endif
 
 }  // namespace
-
-void expect_square_matrix_size(const CountMatrix& matrix,
-                               Eigen::Index expected_size,
-                               const std::string& label) {
-    expect(matrix.rows() == expected_size, label + ": unexpected row count");
-    expect(matrix.cols() == expected_size, label + ": unexpected column count");
-}

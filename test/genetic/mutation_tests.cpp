@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -92,31 +93,104 @@ TEST(test_mutation_atom_selected_from_atoms_list) {
            "by the random source");
 }
 
-TEST(test_timing_mutation_non_parameterized_becomes_within_one_tick) {
-    const Timing mutated = mutate_timing(
-        timing::next_timepoint(), Direction::Weaken, {}, make_source({}, 0U));
-    const auto* within = std::get_if<timing::WithinTicks>(&mutated);
-    expect(within != nullptr,
-           "mutation: next-timepoint should weaken to within-ticks");
-    expect(within->m_ticks == 1,
-           "mutation: next-timepoint should weaken to within 1 tick");
-}
+struct TimingStep {
+    const char* m_name = nullptr;
+    Timing m_start;
+    Direction m_direction;
+    std::vector<std::size_t> m_values;
+    Timing m_expected;
+};
 
-TEST(test_timing_mutation_immediately_becomes_within_one_tick) {
-    const Timing mutated = mutate_timing(
-        timing::immediately(), Direction::Weaken, {}, make_source({}, 0U));
-    const auto* within = std::get_if<timing::WithinTicks>(&mutated);
-    expect(within != nullptr,
-           "mutation: immediately should weaken to within-ticks");
-    expect(within->m_ticks == 1,
-           "mutation: immediately should weaken to within 1 tick");
-}
-
-TEST(test_timing_mutation_eventually_is_unchanged) {
-    const Timing mutated = mutate_timing(
-        timing::eventually(), Direction::Weaken, {}, make_source({}, 0U));
-    expect(std::holds_alternative<timing::Eventually>(mutated),
-           "mutation: eventually has no weakening and should be unchanged");
+// With an empty donor pool each start has one outcome for a given draw; the
+// draw picks among the branches (step, double or halve, then the third).
+TEST(test_timing_mutation_single_steps) {
+    const Direction weaken = Direction::Weaken;
+    const Direction strengthen = Direction::Strengthen;
+    const std::vector<TimingStep> steps = {
+        {"weaken next-timepoint to within 1",
+         timing::next_timepoint(),
+         weaken,
+         {},
+         timing::within_ticks(1)},
+        {"weaken immediately to within 1",
+         timing::immediately(),
+         weaken,
+         {},
+         timing::within_ticks(1)},
+        {"eventually has no weakening",
+         timing::eventually(),
+         weaken,
+         {},
+         timing::eventually()},
+        {"weaken within 3 by stepping to within 4",
+         timing::within_ticks(3),
+         weaken,
+         {0},
+         timing::within_ticks(4)},
+        {"weaken within 3 by doubling to within 6",
+         timing::within_ticks(3),
+         weaken,
+         {1},
+         timing::within_ticks(6)},
+        {"weaken after 3 to within 4",
+         timing::after_ticks(3),
+         weaken,
+         {},
+         timing::within_ticks(4)},
+        {"strengthen next-timepoint to for 1",
+         timing::next_timepoint(),
+         strengthen,
+         {},
+         timing::for_ticks(1)},
+        {"strengthen immediately to for 1",
+         timing::immediately(),
+         strengthen,
+         {},
+         timing::for_ticks(1)},
+        {"always is the top of the order and has no strengthening",
+         timing::always(),
+         strengthen,
+         {},
+         timing::always()},
+        {"strengthen for 3 by stepping to for 4",
+         timing::for_ticks(3),
+         strengthen,
+         {0},
+         timing::for_ticks(4)},
+        {"strengthen for 3 by doubling to for 6",
+         timing::for_ticks(3),
+         strengthen,
+         {1},
+         timing::for_ticks(6)},
+        {"strengthen for 3 by maximising to always",
+         timing::for_ticks(3),
+         strengthen,
+         {2},
+         timing::always()},
+        {"strengthen within 5 by stepping to within 4",
+         timing::within_ticks(5),
+         strengthen,
+         {0},
+         timing::within_ticks(4)},
+        {"strengthen within 5 by halving (rounding up) to within 3",
+         timing::within_ticks(5),
+         strengthen,
+         {1},
+         timing::within_ticks(3)},
+        {"strengthen within 5 by switching to after 4",
+         timing::within_ticks(5),
+         strengthen,
+         {2},
+         timing::after_ticks(4)},
+    };
+    for (const TimingStep& step : steps) {
+        const Timing mutated = mutate_timing(step.m_start, step.m_direction, {},
+                                             make_source(step.m_values, 0U));
+        const std::string label = std::string("timing: ") + step.m_name +
+                                  ", got " + to_string(mutated);
+        expect(mutated.index() == step.m_expected.index(), label + " (kind)");
+        expect(mutated == step.m_expected, label);
+    }
 }
 
 // With nothing to donate an interior timing, always has no weakening and must
@@ -192,61 +266,6 @@ TEST(test_timing_weaken_always_never_becomes_within_or_after) {
     }
 }
 
-TEST(test_timing_mutation_within_ticks_step_down) {
-    // next_index(3) = 0 → step down: within_ticks(3 + 1 = 4)
-    const Timing mutated = mutate_timing(
-        timing::within_ticks(3), Direction::Weaken, {}, make_source({0}, 0));
-    const auto* within = std::get_if<timing::WithinTicks>(&mutated);
-    expect(within != nullptr,
-           "mutation: within-ticks should remain within-ticks after step-down");
-    expect(within->m_ticks == 4,
-           "mutation: within-ticks step-down weakening should add one tick");
-}
-
-TEST(test_timing_mutation_within_ticks_double) {
-    // next_index(3) = 1 → double: within_ticks(3 * 2 = 6)
-    const Timing mutated = mutate_timing(
-        timing::within_ticks(3), Direction::Weaken, {}, make_source({1}, 0));
-    const auto* within = std::get_if<timing::WithinTicks>(&mutated);
-    expect(within != nullptr,
-           "mutation: within-ticks should remain within-ticks after doubling");
-    expect(within->m_ticks == 6,
-           "mutation: within-ticks double weakening should double the count");
-}
-
-TEST(test_timing_mutation_after_ticks_becomes_within_ticks) {
-    const Timing mutated = mutate_timing(
-        timing::after_ticks(3), Direction::Weaken, {}, make_source({}, 0));
-    const auto* within = std::get_if<timing::WithinTicks>(&mutated);
-    expect(within != nullptr,
-           "mutation: after-ticks should weaken to within-ticks");
-    expect(within->m_ticks == 4,
-           "mutation: after 3 ticks should weaken to within 4 ticks");
-}
-
-TEST(test_timing_strengthen_non_parameterized_becomes_for_one_tick) {
-    for (const Timing& start :
-         {timing::next_timepoint(), timing::immediately()}) {
-        const Timing mutated = mutate_timing(start, Direction::Strengthen, {},
-                                             make_source({}, 0U));
-        const auto* for_ticks = std::get_if<timing::ForTicks>(&mutated);
-        expect(
-            for_ticks != nullptr,
-            "strengthen: immediately/next-timepoint should become for-ticks");
-        expect(
-            for_ticks->m_ticks == 1,
-            "strengthen: immediately/next-timepoint should become for 1 tick");
-    }
-}
-
-TEST(test_timing_strengthen_always_is_unchanged) {
-    const Timing mutated = mutate_timing(
-        timing::always(), Direction::Strengthen, {}, make_source({}, 0U));
-    expect(
-        std::holds_alternative<timing::Always>(mutated),
-        "strengthen: always is the top of the order and has no strengthening");
-}
-
 // With nothing to donate a tick count, eventually has no strengthening and
 // must be left alone rather than acquiring an invented deadline.
 TEST(test_timing_strengthen_eventually_without_donor_is_unchanged) {
@@ -315,25 +334,7 @@ TEST(test_timing_strengthen_eventually_never_becomes_within) {
     }
 }
 
-TEST(test_timing_strengthen_for_ticks_branches) {
-    // next_index(3) = 0 → step up; 1 → double; 2 → always.
-    const Timing step = mutate_timing(
-        timing::for_ticks(3), Direction::Strengthen, {}, make_source({0}, 0));
-    expect(std::get_if<timing::ForTicks>(&step) != nullptr &&
-               std::get_if<timing::ForTicks>(&step)->m_ticks == 4,
-           "strengthen: for 3 ticks should step up to for 4 ticks");
-    const Timing doubled = mutate_timing(
-        timing::for_ticks(3), Direction::Strengthen, {}, make_source({1}, 0));
-    expect(std::get_if<timing::ForTicks>(&doubled) != nullptr &&
-               std::get_if<timing::ForTicks>(&doubled)->m_ticks == 6,
-           "strengthen: for 3 ticks should double to for 6 ticks");
-    const Timing maxed = mutate_timing(
-        timing::for_ticks(3), Direction::Strengthen, {}, make_source({2}, 0));
-    expect(std::holds_alternative<timing::Always>(maxed),
-           "strengthen: for-ticks should be able to maximise to always");
-}
-
-TEST(test_timing_strengthen_within_ticks_branches) {
+TEST(test_timing_strengthen_within_one_tick_becomes_qualitative) {
     // within 1 tick has no numeric room: it steps up to the qualitative pair.
     const Timing one =
         mutate_timing(timing::within_ticks(1), Direction::Strengthen, {},
@@ -342,25 +343,6 @@ TEST(test_timing_strengthen_within_ticks_branches) {
         std::holds_alternative<timing::Immediately>(one) ||
             std::holds_alternative<timing::NextTimepoint>(one),
         "strengthen: within 1 tick should become immediately/next-timepoint");
-    // next_index(3) = 0 → step up; 1 → halve (ceil); 2 → switch to after.
-    const Timing step =
-        mutate_timing(timing::within_ticks(5), Direction::Strengthen, {},
-                      make_source({0}, 0));
-    expect(std::get_if<timing::WithinTicks>(&step) != nullptr &&
-               std::get_if<timing::WithinTicks>(&step)->m_ticks == 4,
-           "strengthen: within 5 ticks should step up to within 4 ticks");
-    const Timing halved =
-        mutate_timing(timing::within_ticks(5), Direction::Strengthen, {},
-                      make_source({1}, 0));
-    expect(std::get_if<timing::WithinTicks>(&halved) != nullptr &&
-               std::get_if<timing::WithinTicks>(&halved)->m_ticks == 3,
-           "strengthen: within 5 ticks should halve (rounding up) to within 3");
-    const Timing after =
-        mutate_timing(timing::within_ticks(5), Direction::Strengthen, {},
-                      make_source({2}, 0));
-    expect(std::get_if<timing::AfterTicks>(&after) != nullptr &&
-               std::get_if<timing::AfterTicks>(&after)->m_ticks == 4,
-           "strengthen: within 5 ticks should be able to switch to after 4");
 }
 
 // `after n` pins the response to exactly tick n+1 and forbids it before, so

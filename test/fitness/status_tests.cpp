@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -24,37 +25,81 @@ constexpr std::string_view k_test_suite = "status";
 
 // --- specification_status ---
 
-TEST(test_status_unsat_trigger_returns_zero) {
-    // Condition p & !p is unsatisfiable, so is `condition & response`.
-    SatisfiabilityChecker sat;
-    RealizabilityChecker real;
-    const auto spec = make_spec("p & !p", "q");
-    expect(specification_status(spec, sat, real) ==
-               k_status_component_unsatisfiable,
-           "status: unsatisfiable condition should score the component tier");
+// `G(i -> o)` under the assumption `G <atom>`. Over the output o, the system
+// satisfies the specification by holding o false, which breaks the assumption
+// and makes the implication hold for nothing; over the input i it cannot.
+Specification assuming_always(const std::string& atom) {
+    return Specification(
+        {Requirement(Formula("true"), Formula(atom), timing::always())},
+        {Requirement(Formula("i"), Formula("o"), timing::immediately())}, {"i"},
+        {"o"});
 }
 
-TEST(test_status_unsat_response_returns_zero) {
-    // An unsatisfiable response makes `condition & response` unsatisfiable, so
-    // the single component tier catches it without a check of its own.
-    SatisfiabilityChecker sat;
-    RealizabilityChecker real;
-    const auto spec = make_spec("p", "q & !q");
-    expect(specification_status(spec, sat, real) ==
-               k_status_component_unsatisfiable,
-           "status: unsatisfiable response should score the component tier");
-}
+struct TierCase {
+    std::string m_name;
+    Specification m_spec;
+    std::optional<StatusGrading> m_grading;  // empty: the default argument
+    double m_expected = 0.0;
+};
 
-TEST(test_status_unsat_conjunction_returns_zero) {
-    // Condition p and response !p are individually satisfiable but cannot hold
-    // together, which is what makes the requirement incoherent.
-    SatisfiabilityChecker sat;
-    RealizabilityChecker real;
-    const auto spec = make_spec("p", "!p");
-    expect(specification_status(spec, sat, real) ==
-               k_status_component_unsatisfiable,
-           "status: a condition and response that cannot hold together should "
-           "score the component tier");
+TEST(test_status_scores_each_shape_at_its_tier) {
+    const Specification realizable = make_spec("i", "o", {"i"}, {"o"});
+    const std::vector<TierCase> cases = {
+        // Condition p & !p is unsatisfiable, so is `condition & response`.
+        {"unsatisfiable condition", make_spec("p & !p", "q"), std::nullopt,
+         k_status_component_unsatisfiable},
+        // An unsatisfiable response makes `condition & response`
+        // unsatisfiable, so the single component tier catches it without a
+        // check of its own.
+        {"unsatisfiable response", make_spec("p", "q & !q"), std::nullopt,
+         k_status_component_unsatisfiable},
+        // Condition p and response !p are individually satisfiable but cannot
+        // hold together, which is what makes the requirement incoherent.
+        {"condition and response that cannot hold together",
+         make_spec("p", "!p"), std::nullopt, k_status_component_unsatisfiable},
+        // G(i -> o): controller mirrors the input. Strategy o := i always
+        // works.
+        {"realizable", realizable, std::nullopt, k_status_realizable},
+        {"realizable under mrs", realizable, StatusGrading::Mrs,
+         k_status_realizable},
+        {"realizable under aurus", realizable, StatusGrading::Aurus,
+         k_status_realizable},
+        // Realizable, so the old three-point scale scored the ill-separated
+        // spec 1.0 -- level with a genuine repair. It now scores level with
+        // unrealizable instead, which is the whole of the change: the search
+        // is paid for repairing, not for cheating.
+        {"realizable only by defeating its own assumption",
+         assuming_always("o"), std::nullopt, k_status_unrealizable},
+        // The counterparts, so the tier above is not passing for the wrong
+        // reason.
+        {"assumption over inputs alone", assuming_always("i"), std::nullopt,
+         k_status_realizable},
+        {"assumption over inputs alone under mrs", assuming_always("i"),
+         StatusGrading::Mrs, k_status_realizable},
+        // The divergence, asserted rather than only commented. Tiered folds
+        // well-separation into its realizability query and scores the
+        // ill-separated spec 0.5; the AuRUS ladder does not ask the question
+        // at all, because AuRUS does not -- WellSeparationAnalysis.java has no
+        // caller in its search -- and scores it full marks. An arm that graded
+        // it would not be the ladder it is named after.
+        {"ill-separated under an explicit tiered", assuming_always("o"),
+         StatusGrading::Tiered, k_status_unrealizable},
+        {"ill-separated under aurus, which never asks about well-separation",
+         assuming_always("o"), StatusGrading::Aurus, k_status_realizable},
+    };
+    for (const TierCase& tier_case : cases) {
+        SatisfiabilityChecker sat;
+        RealizabilityChecker real;
+        const double score =
+            tier_case.m_grading.has_value()
+                ? specification_status(tier_case.m_spec, sat, real,
+                                       *tier_case.m_grading)
+                : specification_status(tier_case.m_spec, sat, real);
+        expect(score == tier_case.m_expected,
+               "status: " + tier_case.m_name + " scored " +
+                   std::to_string(score) + ", expected " +
+                   std::to_string(tier_case.m_expected));
+    }
 }
 
 TEST(test_status_jointly_unsat_responses_pass_individual_checks) {
@@ -97,48 +142,6 @@ TEST(test_status_unrealizable_returns_point_five) {
     expect(specification_status(spec, sat, real) == k_status_unrealizable,
            "status: satisfiable but unrealizable spec should score the "
            "unrealizable tier");
-}
-
-TEST(test_status_realizable_returns_one) {
-    // G(i -> o): controller mirrors the input. Strategy o := i always works.
-    SatisfiabilityChecker sat;
-    RealizabilityChecker real;
-    const auto spec = make_spec("i", "o", {"i"}, {"o"});
-    expect(specification_status(spec, sat, real) == k_status_realizable,
-           "status: satisfiable and realizable spec should score 1.0");
-}
-
-// `G o` as an assumption over the system's own output: the system satisfies
-// the specification by holding o false, which breaks the assumption and makes
-// the implication hold for nothing. Realizable, so the old three-point scale
-// scored it 1.0 -- level with a genuine repair. It now scores level with
-// unrealizable instead, which is the whole of the change: the search is paid
-// for repairing, not for cheating.
-TEST(test_status_ill_separated_scores_level_with_unrealizable) {
-    SatisfiabilityChecker sat;
-    RealizabilityChecker real;
-    const Specification spec(
-        {Requirement(Formula("true"), Formula("o"), timing::always())},
-        {Requirement(Formula("i"), Formula("o"), timing::immediately())}, {"i"},
-        {"o"});
-    expect(specification_status(spec, sat, real) == k_status_unrealizable,
-           "status: a spec realizable only by defeating its own assumptions "
-           "should score level with unrealizable, not with a genuine repair");
-}
-
-// The counterpart, so the tier above is not passing for the wrong reason: an
-// assumption over an input atom alone cannot be defeated by the system, and
-// still scores as a genuine repair.
-TEST(test_status_input_only_assumption_still_scores_one) {
-    SatisfiabilityChecker sat;
-    RealizabilityChecker real;
-    const Specification spec(
-        {Requirement(Formula("true"), Formula("i"), timing::always())},
-        {Requirement(Formula("i"), Formula("o"), timing::immediately())}, {"i"},
-        {"o"});
-    expect(specification_status(spec, sat, real) == k_status_realizable,
-           "status: a realizable spec whose assumption is over inputs alone "
-           "should still score 1.0");
 }
 
 TEST(test_status_no_guarantees_skips_the_solver) {
@@ -372,15 +375,6 @@ TEST(test_mrs_grades_an_unrealizable_spec_between_the_tiers) {
         "mrs: two of three guarantees kept should score 2/3");
 }
 
-TEST(test_mrs_realizable_spec_still_scores_one) {
-    SatisfiabilityChecker sat;
-    RealizabilityChecker real;
-    const auto spec = make_spec("i", "o", {"i"}, {"o"});
-    expect(specification_status(spec, sat, real, StatusGrading::Mrs) ==
-               k_status_realizable,
-           "mrs: a realizable spec should still score exactly 1.0");
-}
-
 TEST(test_mrs_ill_separated_spec_does_not_score_one) {
     // Well-separation is folded into the subset oracle, so a guarantee only
     // reachable by defeating the specification's own assumption is rejected
@@ -388,27 +382,11 @@ TEST(test_mrs_ill_separated_spec_does_not_score_one) {
     // realizable for a real reason.
     SatisfiabilityChecker sat;
     RealizabilityChecker real;
-    const Specification spec(
-        {Requirement(Formula("true"), Formula("o"), timing::always())},
-        {Requirement(Formula("i"), Formula("o"), timing::immediately())}, {"i"},
-        {"o"});
+    const Specification spec = assuming_always("o");
     expect(specification_status(spec, sat, real, StatusGrading::Mrs) <
                k_status_realizable,
            "mrs: a spec realizable only by defeating its own assumptions must "
            "not score 1.0");
-}
-
-TEST(test_mrs_input_only_assumption_still_scores_one) {
-    // The counterpart, so the test above is not passing for the wrong reason.
-    SatisfiabilityChecker sat;
-    RealizabilityChecker real;
-    const Specification spec(
-        {Requirement(Formula("true"), Formula("i"), timing::always())},
-        {Requirement(Formula("i"), Formula("o"), timing::immediately())}, {"i"},
-        {"o"});
-    expect(specification_status(spec, sat, real, StatusGrading::Mrs) ==
-               k_status_realizable,
-           "mrs: an assumption over inputs alone should still score 1.0");
 }
 
 TEST(test_mrs_defaults_to_the_tiered_scale) {
@@ -491,39 +469,6 @@ TEST(test_aurus_unrealizable_scores_point_five) {
                k_status_unrealizable,
            "aurus: a jointly satisfiable but unrealizable spec should score "
            "0.5");
-}
-
-TEST(test_aurus_realizable_scores_one) {
-    SatisfiabilityChecker sat;
-    RealizabilityChecker real;
-    const auto spec = make_spec("i", "o", {"i"}, {"o"});
-    expect(specification_status(spec, sat, real, StatusGrading::Aurus) ==
-               k_status_realizable,
-           "aurus: a realizable spec should score 1.0");
-}
-
-// The divergence, asserted rather than only commented. The assumption `G o` is
-// over the system's own output, so the system satisfies the specification by
-// holding o false and defeating it. Tiered folds well-separation into its
-// realizability query and scores that 0.5; the AuRUS ladder does not ask the
-// question at all, because AuRUS does not -- WellSeparationAnalysis.java has no
-// caller in its search -- and scores it full marks. An arm that graded it would
-// not be the ladder it is named after.
-TEST(test_aurus_does_not_penalise_an_ill_separated_candidate) {
-    SatisfiabilityChecker sat;
-    RealizabilityChecker real;
-    const Specification spec(
-        {Requirement(Formula("true"), Formula("o"), timing::always())},
-        {Requirement(Formula("i"), Formula("o"), timing::immediately())}, {"i"},
-        {"o"});
-    expect(specification_status(spec, sat, real, StatusGrading::Tiered) ==
-               k_status_unrealizable,
-           "aurus: the tiered scale should still cap an ill-separated "
-           "candidate at the unrealizable tier");
-    expect(specification_status(spec, sat, real, StatusGrading::Aurus) ==
-               k_status_realizable,
-           "aurus: the AuRUS ladder must score an ill-separated but realizable "
-           "candidate 1.0, since AuRUS never asks about well-separation");
 }
 
 }  // namespace

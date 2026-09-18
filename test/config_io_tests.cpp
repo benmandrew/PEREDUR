@@ -162,85 +162,98 @@ TEST(test_config_io_elitism_not_less_than_selection_throws) {
         "elitism_rate");
 }
 
-// Pinned because the default is what an archived config inherits wherever it
-// states no scheme. It has moved three times -- WeightedAverage, Nsga2 (renamed
-// Nsga2Truncate), and Nsga2Apportion from 2026-08-14 -- and only the 64
-// `sweep_B_pop50_takeoff_*` configs under 2026-07-13-fretish-sweeps are
-// exposed.
-// See "Config vintage" in experiments/README.md before moving it again.
-TEST(test_config_io_selection_scheme_defaults_to_nsga2_apportion) {
-    const Config cfg = config_from_toml_string("");
-    expect(cfg.selection_scheme == SelectionScheme::Nsga2Apportion,
-           "config_io: selection_scheme should default to Nsga2Apportion");
+// An enum-valued key: its default, every spelling it accepts, and one it
+// rejects. The default is read both from a bare Config and from a file that
+// omits the key, since an archived config inherits it either way.
+template <typename Enum>
+struct EnumKey {
+    std::string m_section;
+    std::string m_key;
+    Enum Config::* m_member = nullptr;
+    Enum m_default{};
+    std::vector<std::pair<std::string, Enum>> m_spellings;
+    std::string m_unknown;
+    bool m_error_names_key = false;
+};
+
+template <typename Enum>
+void expect_enum_key(const EnumKey<Enum>& key) {
+    const std::string name = "config_io: " + key.m_section + "." + key.m_key;
+    const auto toml = [&](const std::string& spelling) {
+        return "[" + key.m_section + "]\n" + key.m_key + " = \"" + spelling +
+               "\"\n";
+    };
+    expect(Config{}.*key.m_member == key.m_default,
+           name + " should default to the pinned value");
+    expect(config_from_toml_string("").*key.m_member == key.m_default,
+           name + " should keep its default when the file omits it");
+    for (const auto& [spelling, value] : key.m_spellings) {
+        std::string label = name;
+        label.append(" = \"").append(spelling).append("\" should parse");
+        expect(config_from_toml_string(toml(spelling)).*key.m_member == value,
+               label);
+    }
+    expect_throws([&] { config_from_toml_string(toml(key.m_unknown)); },
+                  name + " = \"" + key.m_unknown + "\" should be rejected",
+                  key.m_error_names_key ? key.m_key : std::string{});
 }
 
-// Pinned because the default is what every archived config inherits: the key
-// did not exist before 2026-08-11, so no archived config can state it, and
-// moving this back to Tiered silently re-reads every one of them under a
-// different status objective. See "Config vintage" in experiments/README.md.
-TEST(test_config_io_status_grading_defaults_to_mrs) {
-    const Config cfg = config_from_toml_string("");
-    expect(cfg.status_grading == StatusGrading::Mrs,
-           "config_io: status_grading should default to Mrs");
-}
-
-TEST(test_config_io_status_grading_tiered_parsed) {
-    const Config cfg =
-        config_from_toml_string("[fitness]\nstatus_grading = \"tiered\"\n");
-    expect(cfg.status_grading == StatusGrading::Tiered,
-           "config_io: status_grading = \"tiered\" should parse as Tiered");
-}
-
-TEST(test_config_io_status_grading_mrs_parsed) {
-    const Config cfg =
-        config_from_toml_string("[fitness]\nstatus_grading = \"mrs\"\n");
-    expect(cfg.status_grading == StatusGrading::Mrs,
-           "config_io: status_grading = \"mrs\" should parse as Mrs");
-}
-
-TEST(test_config_io_status_grading_aurus_parsed) {
-    const Config cfg =
-        config_from_toml_string("[fitness]\nstatus_grading = \"aurus\"\n");
-    expect(cfg.status_grading == StatusGrading::Aurus,
-           "config_io: status_grading = \"aurus\" should parse as Aurus");
-}
-
-TEST(test_config_io_status_grading_rejects_unknown) {
-    expect_throws(
-        [&] {
-            config_from_toml_string("[fitness]\nstatus_grading = \"greedy\"\n");
-        },
-        "config_io: an unknown status_grading should be rejected");
-}
-
-TEST(test_config_io_mrs_admission_order_defaults_to_degree) {
-    const Config cfg;
-    expect(cfg.mrs_admission_order == MrsAdmissionOrder::Degree,
-           "config_io: mrs_admission_order should default to Degree");
-}
-
-TEST(test_config_io_mrs_admission_order_spec_parsed) {
-    const Config cfg =
-        config_from_toml_string("[fitness]\nmrs_admission_order = \"spec\"\n");
-    expect(cfg.mrs_admission_order == MrsAdmissionOrder::Spec,
-           "config_io: mrs_admission_order = \"spec\" should parse as Spec");
-}
-
-TEST(test_config_io_mrs_admission_order_degree_parsed) {
-    const Config cfg = config_from_toml_string(
-        "[fitness]\nmrs_admission_order = \"degree\"\n");
-    expect(cfg.mrs_admission_order == MrsAdmissionOrder::Degree,
-           "config_io: mrs_admission_order = \"degree\" should parse as "
-           "Degree");
-}
-
-TEST(test_config_io_mrs_admission_order_rejects_unknown) {
-    expect_throws(
-        [&] {
-            config_from_toml_string(
-                "[fitness]\nmrs_admission_order = \"rotate\"\n");
-        },
-        "config_io: an unknown mrs_admission_order should be rejected");
+TEST(test_config_io_enum_keys) {
+    // Pinned because the default is what an archived config inherits wherever
+    // it states no scheme. It has moved three times -- WeightedAverage, Nsga2
+    // (renamed Nsga2Truncate), and Nsga2Apportion from 2026-08-14 -- and only
+    // the 64 `sweep_B_pop50_takeoff_*` configs under 2026-07-13-fretish-sweeps
+    // are exposed.
+    // See "Config vintage" in experiments/README.md before moving it again.
+    expect_enum_key<SelectionScheme>(
+        {"genetic",
+         "selection_scheme",
+         &Config::selection_scheme,
+         SelectionScheme::Nsga2Apportion,
+         {{"weighted", SelectionScheme::WeightedAverage},
+          {"nsga2-truncate", SelectionScheme::Nsga2Truncate},
+          {"nsga2-apportion", SelectionScheme::Nsga2Apportion}},
+         "pareto",
+         true});
+    // Pinned because the default is what every archived config inherits: the
+    // key did not exist before 2026-08-11, so no archived config can state it,
+    // and moving this back to Tiered silently re-reads every one of them under
+    // a different status objective. See "Config vintage" in
+    // experiments/README.md.
+    expect_enum_key<StatusGrading>({"fitness",
+                                    "status_grading",
+                                    &Config::status_grading,
+                                    StatusGrading::Mrs,
+                                    {{"tiered", StatusGrading::Tiered},
+                                     {"mrs", StatusGrading::Mrs},
+                                     {"aurus", StatusGrading::Aurus}},
+                                    "greedy",
+                                    false});
+    expect_enum_key<MrsAdmissionOrder>({"fitness",
+                                        "mrs_admission_order",
+                                        &Config::mrs_admission_order,
+                                        MrsAdmissionOrder::Degree,
+                                        {{"spec", MrsAdmissionOrder::Spec},
+                                         {"degree", MrsAdmissionOrder::Degree}},
+                                        "rotate",
+                                        false});
+    expect_enum_key<SimilarityMetric>(
+        {"model_counting",
+         "metric",
+         &Config::similarity_metric,
+         SimilarityMetric::Logarithmic,
+         {{"direct", SimilarityMetric::Direct},
+          {"logarithmic", SimilarityMetric::Logarithmic}},
+         "geometric",
+         true});
+    expect_enum_key<RepairMode>(
+        {"tlsf",
+         "repair_mode",
+         &Config::repair_mode,
+         RepairMode::Monolithic,
+         {{"muc", RepairMode::Muc}, {"monolithic", RepairMode::Monolithic}},
+         "iterative",
+         true});
 }
 
 // Pinned because every archived config omits these keys and inherits whatever
@@ -303,29 +316,6 @@ TEST(test_config_io_max_wall_s_parsed_under_either_mode) {
            "config_io: max_wall_s should parse under the Individuals mode");
 }
 
-TEST(test_config_io_selection_scheme_weighted_parsed) {
-    const Config cfg =
-        config_from_toml_string("[genetic]\nselection_scheme = \"weighted\"\n");
-    expect(cfg.selection_scheme == SelectionScheme::WeightedAverage,
-           "config_io: selection_scheme = \"weighted\" should parse as "
-           "WeightedAverage");
-}
-
-TEST(test_config_io_selection_scheme_nsga2_truncate_parsed) {
-    const Config cfg = config_from_toml_string(
-        "[genetic]\nselection_scheme = \"nsga2-truncate\"\n");
-    expect(cfg.selection_scheme == SelectionScheme::Nsga2Truncate,
-           "config_io: selection_scheme = \"nsga2-truncate\" should be parsed");
-}
-
-TEST(test_config_io_selection_scheme_nsga2_apportion_parsed) {
-    const Config cfg = config_from_toml_string(
-        "[genetic]\nselection_scheme = \"nsga2-apportion\"\n");
-    expect(cfg.selection_scheme == SelectionScheme::Nsga2Apportion,
-           "config_io: selection_scheme = \"nsga2-apportion\" should be "
-           "parsed");
-}
-
 // The two original spellings are rejected rather than aliased, and rejected by
 // name: an archived config that sets one must fail loudly and say what to do,
 // not run silently under a scheme this binary no longer calls by that name.
@@ -352,45 +342,6 @@ TEST(test_config_io_selection_scheme_retired_replicate_rejected) {
     expect_retired_spelling_rejected("nsga2-replicate");
 }
 
-TEST(test_config_io_selection_scheme_invalid_throws) {
-    expect_throws(
-        [&] {
-            config_from_toml_string(
-                "[genetic]\nselection_scheme = \"pareto\"\n");
-        },
-        "config_io: an unknown selection_scheme should throw",
-        "selection_scheme");
-}
-
-TEST(test_config_io_similarity_metric_defaults_to_logarithmic) {
-    const Config cfg = config_from_toml_string("");
-    expect(cfg.similarity_metric == SimilarityMetric::Logarithmic,
-           "config_io: similarity_metric should default to Logarithmic");
-}
-
-TEST(test_config_io_similarity_metric_direct_parsed) {
-    const Config cfg =
-        config_from_toml_string("[model_counting]\nmetric = \"direct\"\n");
-    expect(cfg.similarity_metric == SimilarityMetric::Direct,
-           "config_io: metric = \"direct\" should parse as Direct");
-}
-
-TEST(test_config_io_similarity_metric_logarithmic_parsed) {
-    const Config cfg =
-        config_from_toml_string("[model_counting]\nmetric = \"logarithmic\"\n");
-    expect(cfg.similarity_metric == SimilarityMetric::Logarithmic,
-           "config_io: metric = \"logarithmic\" should parse as Logarithmic");
-}
-
-TEST(test_config_io_similarity_metric_invalid_throws) {
-    expect_throws(
-        [&] {
-            config_from_toml_string(
-                "[model_counting]\nmetric = \"geometric\"\n");
-        },
-        "config_io: an unknown similarity metric should throw", "metric");
-}
-
 TEST(test_config_io_empty_string_gives_defaults) {
     const Config cfg = config_from_toml_string("");
     const Config defaults;
@@ -398,34 +349,6 @@ TEST(test_config_io_empty_string_gives_defaults) {
            "config_io: empty TOML should give default generations");
     expect(cfg.population_size == defaults.population_size,
            "config_io: empty TOML should give default population_size");
-}
-
-TEST(test_config_io_repair_mode_defaults_to_monolithic) {
-    const Config cfg = config_from_toml_string("");
-    expect(cfg.repair_mode == RepairMode::Monolithic,
-           "config_io: repair_mode should default to Monolithic");
-}
-
-TEST(test_config_io_repair_mode_muc_parsed) {
-    const Config cfg =
-        config_from_toml_string("[tlsf]\nrepair_mode = \"muc\"\n");
-    expect(cfg.repair_mode == RepairMode::Muc,
-           "config_io: repair_mode = \"muc\" should be parsed");
-}
-
-TEST(test_config_io_repair_mode_monolithic_parsed) {
-    const Config cfg =
-        config_from_toml_string("[tlsf]\nrepair_mode = \"monolithic\"\n");
-    expect(cfg.repair_mode == RepairMode::Monolithic,
-           "config_io: repair_mode = \"monolithic\" should be parsed");
-}
-
-TEST(test_config_io_repair_mode_invalid_throws) {
-    expect_throws(
-        [&] {
-            config_from_toml_string("[tlsf]\nrepair_mode = \"iterative\"\n");
-        },
-        "config_io: an unknown repair_mode should throw", "repair_mode");
 }
 
 TEST(test_config_io_muc_max_iterations_parsed) {
