@@ -118,6 +118,15 @@ int run_tlsf_repair(const Config& cfg, const std::string& input_path,
 int run_fretish_repair(const Config& cfg, const std::string& input_path,
                        const std::string& output_dir,
                        const std::optional<std::size_t>& seed) {
+    // Rejected rather than ignored. Only the TLSF path reads repair_mode, so a
+    // FRETISH run carrying this key used to evolve monolithically while its
+    // manifest recorded "muc", which makes an archived run say what it did not
+    // do.
+    if (cfg.repair_mode != RepairMode::Monolithic) {
+        std::cerr << "fatal: [tlsf] repair_mode is TLSF-only; this input is "
+                     "FRETISH JSON\n";
+        return 1;
+    }
     Specification original_spec;
     try {
         original_spec = load_specification(input_path);

@@ -92,6 +92,14 @@ int main(int argc, const char* const argv[]) {
     const tlsf::MinimalUnrealizableCore muc = tlsf::extract_muc(spec);
     const std::size_t n_guarantee_side =
         spec.m_preset.size() + spec.m_assert.size() + spec.m_guarantee.size();
+    if (muc.n_undecided > 0) {
+        // The input was decided above, but a subset probe need not be: the
+        // core below rests on probes that ran out of budget, so it is reported
+        // as provisional rather than as a core.
+        std::cerr << path << ": " << muc.n_undecided
+                  << " subset probe(s) undecided; the core below is "
+                     "provisional\n";
+    }
     std::cout << "core: " << muc.formulae.size() << " of " << n_guarantee_side
               << " guarantee-side formulae\n";
     for (const tlsf::CoreFormula& entry : muc.formulae) {

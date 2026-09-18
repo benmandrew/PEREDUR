@@ -290,8 +290,12 @@ struct Config {
     /// An archived campaign config that omits the key therefore means something
     /// it did not; see the config vintage note in experiments/README.md.
     ///
-    /// Inert under `[tlsf] repair_mode = "muc"`, which evolves cores rather
-    /// than whole specifications.
+    /// Live under `[tlsf] repair_mode = "muc"` as well, since 2026-09-18: the
+    /// core populations themselves are never accumulated, because a candidate
+    /// that repairs a core is realizable only against that core, but every
+    /// reintegrated whole specification that passes the output gate is. Before
+    /// that date the MUC loop kept one repair per run and the key did nothing
+    /// there.
     ///
     /// It has an on-disk side effect: with the key on, each newly accumulated
     /// specification is written to `<output-dir>/accumulated/` as it is found,

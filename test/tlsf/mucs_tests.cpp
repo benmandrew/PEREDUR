@@ -239,6 +239,82 @@ void test_reintegrate() {
            "reintegrate appends non-core after the repaired core");
 }
 
+// The concurrent singleton pre-screen must not change the answer. A singleton
+// conflict sitting third is found by the screen rather than by QuickXplain's
+// walk, and the core is the same either way.
+void test_screen_finds_singleton() {
+    tlsf::Specification spec;
+    spec.m_outputs = {"y"};
+    spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b"),
+                        Formula::make_atom("c"), Formula::make_atom("d")};
+    const tlsf::RealizabilityOracle oracle =
+        [](const tlsf::Specification& probe) { return !has_atom(probe, "c"); };
+
+    const tlsf::MinimalUnrealizableCore screened =
+        tlsf::extract_muc(spec, oracle, 4);
+    expect(core_atoms(screened) == std::set<std::string>({"c"}),
+           "the pre-screen returns the singleton core {c}");
+    expect(core_atoms(screened) == core_atoms(tlsf::extract_muc(spec, oracle)),
+           "screened and serial extraction agree");
+}
+
+// Two formulae are each unrealizable alone. The screen runs its probes
+// concurrently, so the tie is broken by index rather than by which probe
+// finishes first, or the core stops being reproducible.
+void test_screen_picks_lowest_index() {
+    tlsf::Specification spec;
+    spec.m_outputs = {"y"};
+    spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b"),
+                        Formula::make_atom("c"), Formula::make_atom("d")};
+    const tlsf::RealizabilityOracle oracle =
+        [](const tlsf::Specification& probe) {
+            return !(has_atom(probe, "b") || has_atom(probe, "d"));
+        };
+
+    for (int repeat = 0; repeat < 8; ++repeat) {
+        const tlsf::MinimalUnrealizableCore muc =
+            tlsf::extract_muc(spec, oracle, 4);
+        expect(core_atoms(muc) == std::set<std::string>({"b"}),
+               "the earlier of two singleton conflicts wins every time");
+    }
+}
+
+// With no singleton conflict the screen finds nothing and QuickXplain answers,
+// with the probes it already ran served from the memo.
+void test_screen_falls_through_to_quickxplain() {
+    tlsf::Specification spec;
+    spec.m_outputs = {"y"};
+    spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b"),
+                        Formula::make_atom("c"), Formula::make_atom("d")};
+    const tlsf::RealizabilityOracle oracle =
+        [](const tlsf::Specification& probe) {
+            return !(has_atom(probe, "c") && has_atom(probe, "d"));
+        };
+
+    const tlsf::MinimalUnrealizableCore muc =
+        tlsf::extract_muc(spec, oracle, 4);
+    expect(core_atoms(muc) == std::set<std::string>({"c", "d"}),
+           "a pairwise conflict still comes back as {c, d}");
+}
+
+// n_undecided counts only probes the oracle left undecided. An oracle that
+// answers every query -- as every fixture oracle here does, and as ltlsynt
+// does with no timeout set -- must leave it at zero, or the MUC loop reports
+// a sound core as provisional on every iteration.
+void test_undecided_count_is_zero_when_decided() {
+    tlsf::Specification spec;
+    spec.m_outputs = {"y"};
+    spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("b")};
+    const tlsf::RealizabilityOracle oracle =
+        [](const tlsf::Specification& probe) { return !has_atom(probe, "a"); };
+
+    expect(tlsf::extract_muc(spec, oracle).n_undecided == 0,
+           "a decided oracle leaves no undecided probes");
+    const tlsf::Specification arbiter = tlsf::parse(k_unrealizable_arbiter);
+    expect(tlsf::extract_muc(arbiter).n_undecided == 0,
+           "ltlsynt decides every arbiter probe when no timeout is set");
+}
+
 }  // namespace
 
 void run_tlsf_mucs_tests() {
@@ -247,7 +323,11 @@ void run_tlsf_mucs_tests() {
     test_singleton_core();
     test_core_spans_sections();
     test_empty_guarantee_side();
+    test_screen_finds_singleton();
+    test_screen_picks_lowest_index();
+    test_screen_falls_through_to_quickxplain();
     test_non_core_formulae();
     test_reintegrate();
     test_arbiter_end_to_end();
+    test_undecided_count_is_zero_when_decided();
 }

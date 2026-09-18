@@ -38,7 +38,8 @@ selection_scheme = "nsga2-apportion"
 # p = 0.0312) for a median paired wall ratio of 1.034. That campaign made it a
 # candidate default subject to a FRETISH replication that has not been run.
 # Free on the FRETISH path, one gate sweep per generation on the TLSF one;
-# inert under [tlsf] repair_mode = "muc".
+# live under [tlsf] repair_mode = "muc" too, over the reintegrated whole
+# specifications rather than the core populations.
 accumulate_repairs = true
 # What ends the search. "generations" is PEREDUR's own budget: the rounds above,
 # whatever they cost. "individuals" is AuRUS's, for a head-to-head where both
@@ -98,7 +99,9 @@ p_conditional_assumption = 0.25
 p_remove_guarantee       = 0.05
 
 [tlsf]
-# TLSF mode only (a .tlsf input or --format tlsf); ignored on the FRETISH path.
+# TLSF mode only (a .tlsf input or --format tlsf). A FRETISH run carrying any
+# value but "monolithic" exits 1, rather than evolving monolithically under a
+# manifest that records "muc".
 repair_mode        = "monolithic"  # or "muc"
 muc_max_iterations = 32            # muc mode only
 
