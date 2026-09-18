@@ -5,47 +5,10 @@
 #include <optional>
 #include <string>
 #include <unordered_set>
-#include <utility>
 
-#include "prop_formula.hpp"
+#include "prop_formula/atoms.hpp"
 
 namespace {
-
-// Collects the atom names appearing in a propositional formula. Conditions and
-// responses are guaranteed propositional (the temporal structure lives in the
-// timing), so only Atom/Not/binary kinds are reachable; the temporal kinds are
-// walked defensively for completeness.
-void collect_atoms(const Formula& formula,
-                   std::unordered_set<std::string>& out) {
-    switch (formula.kind()) {
-        case Formula::Kind::Atom:
-            if (const std::optional<std::string> name = formula.atom_name()) {
-                out.insert(*name);
-            }
-            return;
-        case Formula::Kind::Not:
-        case Formula::Kind::Next:
-        case Formula::Kind::Eventually:
-        case Formula::Kind::Globally:
-            if (const std::optional<Formula> child = formula.unary_child()) {
-                collect_atoms(*child, out);
-            }
-            return;
-        case Formula::Kind::And:
-        case Formula::Kind::Or:
-        case Formula::Kind::Implies:
-        case Formula::Kind::Iff:
-        case Formula::Kind::Until:
-        case Formula::Kind::Release:
-        case Formula::Kind::WeakUntil:
-            if (const std::optional<std::pair<Formula, Formula>> children =
-                    formula.binary_children()) {
-                collect_atoms(children->first, out);
-                collect_atoms(children->second, out);
-            }
-            return;
-    }
-}
 
 // True if any assumption's condition or response references an output atom.
 // Only then can the system possibly force the assumptions to fail, so only then

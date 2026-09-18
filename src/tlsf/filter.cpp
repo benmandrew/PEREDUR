@@ -19,6 +19,7 @@
 #include "filter/implication.hpp"
 #include "filter/well_separation.hpp"
 #include "prop_formula.hpp"
+#include "prop_formula/atoms.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
 #include "thread_pool.hpp"
@@ -26,39 +27,6 @@
 #include "tlsf/specification.hpp"
 
 namespace {
-
-// Collects the atom names appearing in a (possibly temporal) formula.
-void collect_atoms(const Formula& formula,
-                   std::unordered_set<std::string>& out) {
-    switch (formula.kind()) {
-        case Formula::Kind::Atom:
-            if (const std::optional<std::string> name = formula.atom_name()) {
-                out.insert(*name);
-            }
-            return;
-        case Formula::Kind::Not:
-        case Formula::Kind::Next:
-        case Formula::Kind::Eventually:
-        case Formula::Kind::Globally:
-            if (const std::optional<Formula> child = formula.unary_child()) {
-                collect_atoms(*child, out);
-            }
-            return;
-        case Formula::Kind::And:
-        case Formula::Kind::Or:
-        case Formula::Kind::Implies:
-        case Formula::Kind::Iff:
-        case Formula::Kind::Until:
-        case Formula::Kind::Release:
-        case Formula::Kind::WeakUntil:
-            if (const std::optional<std::pair<Formula, Formula>> children =
-                    formula.binary_children()) {
-                collect_atoms(children->first, out);
-                collect_atoms(children->second, out);
-            }
-            return;
-    }
-}
 
 // True if any assumption-side formula (INITIALLY, REQUIRE, ASSUME) references
 // an output atom. Only then can the system force the assumptions to fail, so

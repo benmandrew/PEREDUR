@@ -4,8 +4,8 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
-#include <set>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -13,6 +13,7 @@
 #include "fitness/status.hpp"
 #include "guarantee_parts.hpp"
 #include "prop_formula.hpp"
+#include "prop_formula/atoms.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
 #include "tlsf/filter.hpp"
@@ -25,36 +26,6 @@ using tlsf::SectionEntry;
 
 constexpr std::size_t k_n_sections = 6;
 
-void collect_atoms(const Formula& formula, std::set<std::string>& out) {
-    switch (formula.kind()) {
-        case Formula::Kind::Atom: {
-            const auto name = formula.atom_name();
-            if (name.has_value()) {
-                out.insert(*name);
-            }
-            break;
-        }
-        case Formula::Kind::Not:
-        case Formula::Kind::Next:
-        case Formula::Kind::Eventually:
-        case Formula::Kind::Globally: {
-            const auto child = formula.unary_child();
-            if (child.has_value()) {
-                collect_atoms(*child, out);
-            }
-            break;
-        }
-        default: {
-            const auto children = formula.binary_children();
-            if (children.has_value()) {
-                collect_atoms(children->first, out);
-                collect_atoms(children->second, out);
-            }
-            break;
-        }
-    }
-}
-
 // Semantic similarity of a single (changed) formula pair. Counts the bounded
 // traces of both formulae and their conjunction over one shared atom universe
 // (the union of both formulae's atoms, so the conjunction count never exceeds
@@ -66,7 +37,7 @@ double formula_pair_semantic_similarity(const Formula& first,
                                         const Formula& second,
                                         std::size_t bound,
                                         SimilarityMetric metric) {
-    std::set<std::string> atoms;
+    std::unordered_set<std::string> atoms;
     collect_atoms(first, atoms);
     collect_atoms(second, atoms);
     const std::size_t n_atoms = atoms.size();
