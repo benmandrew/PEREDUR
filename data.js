@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789547373511,
+  "lastUpdate": 1789804764816,
   "repoUrl": "https://github.com/benmandrew/PEREDUR",
   "entries": {
     "counter benchmarks": [
@@ -6898,6 +6898,100 @@ window.BENCHMARK_DATA = {
             "value": 1797.2218505753442,
             "unit": "ns/iter",
             "extra": "iterations: 383578\ncpu: 1797.084796312616 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Ben Andrew",
+            "username": "benmandrew",
+            "email": "benmandrew@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "4114f52fe2cd9ce3c7d58079d1581284f4d7bf7a",
+          "message": "Merge pull request #189 from benmandrew/feat/fret-stop-timings\n\nfeat(fretish): add FRET's until/before stop timings",
+          "timestamp": "2026-09-18T13:28:48Z",
+          "url": "https://github.com/benmandrew/PEREDUR/commit/4114f52fe2cd9ce3c7d58079d1581284f4d7bf7a"
+        },
+        "date": 1789804763552,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "Copy formula - 8 variables",
+            "value": 6.932636080632825,
+            "unit": "ns/iter",
+            "extra": "iterations: 100978789\ncpu: 6.928158120414773 ns\nthreads: 1"
+          },
+          {
+            "name": "Copy specification - 3-guarantee takeoff spec",
+            "value": 150.01798569550195,
+            "unit": "ns/iter",
+            "extra": "iterations: 4711522\ncpu: 149.9573694020743 ns\nthreads: 1"
+          },
+          {
+            "name": "Hash specification - 3-guarantee takeoff spec",
+            "value": 106.86475830070403,
+            "unit": "ns/iter",
+            "extra": "iterations: 6556639\ncpu: 106.86226266231832 ns\nthreads: 1"
+          },
+          {
+            "name": "Compare specifications - equal, distinct arenas",
+            "value": 80.5463296450453,
+            "unit": "ns/iter",
+            "extra": "iterations: 8820087\ncpu: 80.54414621987289 ns\nthreads: 1"
+          },
+          {
+            "name": "Syntactic similarity - small formulas (3 variables)",
+            "value": 507.3585777803332,
+            "unit": "ns/iter",
+            "extra": "iterations: 1374190\ncpu: 507.34472525633254 ns\nthreads: 1"
+          },
+          {
+            "name": "Syntactic similarity - large formulas (11 variables, O(n*m) shared_subformulae)",
+            "value": 2033.8015881097813,
+            "unit": "ns/iter",
+            "extra": "iterations: 343679\ncpu: 2033.7404322056345 ns\nthreads: 1"
+          },
+          {
+            "name": "Spec implication check - warm black cache",
+            "value": 672.0231865586726,
+            "unit": "ns/iter",
+            "extra": "iterations: 1041983\ncpu: 671.9978013076988 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:5",
+            "value": 165.5119309849577,
+            "unit": "ns/iter",
+            "extra": "iterations: 4232006\ncpu: 165.506521257295 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:10",
+            "value": 187.4913780956322,
+            "unit": "ns/iter",
+            "extra": "iterations: 3732934\ncpu: 187.4848245374817 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:20",
+            "value": 208.41766965162225,
+            "unit": "ns/iter",
+            "extra": "iterations: 3361300\ncpu: 208.40625472287488 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:50",
+            "value": 261.9150999227026,
+            "unit": "ns/iter",
+            "extra": "iterations: 2695133\ncpu: 261.9024660378541 ns\nthreads: 1"
+          },
+          {
+            "name": "Mutate specification - 3-guarantee takeoff spec",
+            "value": 3336.9012157981088,
+            "unit": "ns/iter",
+            "extra": "iterations: 208505\ncpu: 3336.7384427231923 ns\nthreads: 1"
           }
         ]
       }
