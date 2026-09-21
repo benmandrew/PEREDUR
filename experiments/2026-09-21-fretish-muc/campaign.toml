@@ -1,0 +1,21 @@
+name = "2026-09-21-fretish-muc"
+branch = "campaign/fretish-muc"
+profile = "muc-fret"
+description = "MUC repair mode on the FRETISH path over ventilator, rad and valu3s-uc6: 2026-09-09-fretish-grading's selection x grading 2x2 at 30 seeds and its operating point, with tlsf.repair_mode = \"muc\" the one change. Endpoints, tests and threats are pre-registered in PLAN.md."
+
+# Split by seed, both factors crossed within each host, so a host difference
+# cancels inside the (spec, seed) cell. Two hosts rather than one because the
+# ventilator runs are deadline-bound at about 1,950 s each: 120 of them at
+# jobs = 4 on one host would take about 16 h against a 12 h budget. The seed
+# list must equal the muc-fret profile's.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+# gradsel-fret's generator line with --repair muc added and its own configs
+# directory; see that campaign's declaration for why each flag is stated.
+# muc_max_iterations and muc_screen_depth are not emitted and run at the
+# binary's defaults (32 and 3), which run.json records.
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion weighted --sweeps K --levels mrs,aurus --metric log --weakening off --repair muc --weights 0.1 0.2 0.7 --generations 10 --population-size 200 --max-wall-s 1800 --out-dir experiments/configs-muc-fret --pin-vintage"
+
+# One phase, 180 runs a host. Sized from single runs on 2026-09-21 (see
+# PLAN.md, Budget): about 8.6 h of wall a host.
+phases = [ { profile = "muc-fret", jobs = 4 } ]

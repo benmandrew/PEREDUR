@@ -77,6 +77,14 @@ FRETISH_SPECS: dict[str, dict[str, Path]] = {
     "fsm-timing": _spec("fsm-timing", "json"),
     "fsm-combined": _spec("fsm-combined", "json"),
     "mode-arbiter": _spec("mode-arbiter", "json"),
+    # Imported from FRET exports for the 2026-09-21 FRETISH MUC campaign. None
+    # has a fixes/ dir, so compare fails on every run that found a repair and
+    # the row reads best_relation "unknown", implies_ideal 0: carried for
+    # found_repair, n_repairs and wall_time_s only. The ventilator and RAD are
+    # the first corpus specs too large for monolithic repair.
+    "ventilator": _spec("ventilator", "json"),
+    "rad": _spec("rad", "json"),
+    "valu3s-uc6": _spec("valu3s-uc6", "json"),
 }
 
 # The four-family corpus every FRETISH profile before 2026-09-09 ran, frozen as
@@ -1817,6 +1825,36 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-gradsel-fret-m.csv",
         # 4 as on every FRETISH profile; ltlsynt is not in play here, so the
         # per-call RAM ceiling that pins the TLSF profiles to 1 does not bind.
+        "default_jobs": 4,
+    },
+
+    # The 2026-09-21 FRETISH MUC campaign: gradsel-fret's 2x2 (selection x
+    # grading) at gradsel-fret's operating point, with tlsf.repair_mode = "muc"
+    # the one change, over the three specs monolithic repair cannot finish
+    # (ventilator, rad) plus valu3s-uc6. Generate with
+    #   python3 scripts/gen_configs.py --schemes nsga2-apportion weighted \
+    #       --sweeps K --levels mrs,aurus --metric log --weakening off \
+    #       --repair muc --weights 0.1 0.2 0.7 --generations 10 \
+    #       --population-size 200 --max-wall-s 1800 \
+    #       --out-dir experiments/configs-muc-fret --pin-vintage
+    "muc-fret": {
+        "schemes": ["nsga2-apportion", "weighted"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        # The <mono|muc> path segment gen_configs.py writes under --repair.
+        "repair_modes": ["muc"],
+        "sweeps": ["K"],
+        "levels": {"K": ["mrs", "aurus"]},
+        "specs": ["ventilator", "rad", "valu3s-uc6"],
+        "seeds": list(range(30)),
+        # max_wall_s bounds the whole MUC run since d002997, gate and screen
+        # included; what overruns is the query in flight, at worst about 2 min
+        # on the ventilator. 4050 s keeps gradsel-fret's 2.25x margin.
+        "timeout_caps": {"ventilator": 4050, "rad": 4050, "valu3s-uc6": 4050},
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-muc-fret",
+        "results_dir": EXPERIMENTS_DIR / "results-muc-fret",
+        "results_csv": EXPERIMENTS_DIR / "results-muc-fret.csv",
         "default_jobs": 4,
     },
 

@@ -148,6 +148,8 @@ PROFILE_CSVS: dict[str, str] = {
     # corpus and the path all differ, and neither the corpus nor the path is in
     # the key.
     "gradsel-fret": "results-gradsel-fret-m.csv",
+    # The 2026-09-21 FRETISH MUC campaign over ventilator, rad and valu3s-uc6.
+    "muc-fret": "results-muc-fret.csv",
 }
 
 # Per-run output directory each profile writes under experiments/. Most profiles
@@ -197,6 +199,7 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
     "rematch": "results-rematch",
     "rematch-calib": "results-rematch-calib",
     "gradsel-fret": "results-gradsel-fret-m",
+    "muc-fret": "results-muc-fret",
 }
 
 # Natural key of a results row: one run per (sweep, level_name, selection,
