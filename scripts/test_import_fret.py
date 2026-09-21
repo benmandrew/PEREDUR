@@ -67,7 +67,9 @@ def load(export, **kw):
         path = Path(d) / "export.json"
         path.write_text(json.dumps(export))
         return I.load([path], kw.get("component"), kw.get("as_input", []),
-                      kw.get("as_output", []))
+                      kw.get("as_output", []), kw.get("all_components", False),
+                      kw.get("atomise", False), kw.get("from_fulltext", ()),
+                      kw.get("skip", ()), kw.get("merge_case", False))
 
 
 spec, conv = load(EXPORT)
@@ -138,5 +140,71 @@ try:
     sys.exit(1)
 except I.FretImportError:
     pass
+
+
+def responses(requirements, **kw):
+    spec, conv = load(requirements, **kw)
+    return [g["response"] for g in spec["guarantees"]], spec, conv
+
+
+# Older FRET writes a bare list of requirements, with list durations.
+got, spec, _ = responses([
+    req("EQ", timing="always", post_condition="((a | b) = x)"),
+    req("BOOL", timing="always", post_condition="(u = v & w)"),
+    req("NUM", timing="always", post_condition="(s = t)"),
+    req("LIT", timing="always", post_condition="(ridgeOn = TRUE)"),
+    req("IMP", timing="always", post_condition="(IMUFail => ( Stop ))"),
+    req("LIST", timing="for", duration=["3"], post_condition="(u)"),
+])
+check(got, ["(a | b) <-> x", "(u <-> v) & w", "s_eq_t", "ridge_on",
+            "imu_fail -> ( stop )", "u"],
+      "= is iff beside a formula or a bare name, else an atom; => is ->; "
+      "acronyms split")
+check(spec["guarantees"][5]["timing"], {"type": "ForTicks", "ticks": 3},
+      "a one-element list duration is read")
+
+got, _, _ = responses({"requirements": [
+    req("ARITH", timing="always", post_condition="(abs(x) < y + 1)")],
+    "variables": []}, atomise=True)
+check(got, ["abs_x_lt_y_plus_1"],
+      "--atomise-arithmetic turns an arithmetic comparison into an atom")
+rejects(req("X", timing="always", post_condition="(abs(x) => y)"), "abs",
+        "a function outside a comparison is rejected")
+
+lossy = dict(req("DROP", timing="always", post_condition="((a | b))"),
+             fulltext="R shall always satisfy (a | b) = x")
+rejects(lossy, "lacks ['x']", "a name FRET's parse dropped is rejected")
+got, _, conv = responses([lossy], from_fulltext=["DROP"])
+check(got, ["(a | b) <-> x"], "--from-fulltext reads the response itself")
+
+placeholder = {"reqid": "EMPTY", "fulltext": "", "semantics": {}}
+prose = {"reqid": "PROSE", "fulltext": "The system shall be good.",
+         "semantics": {"type": "nasa"}}
+_, _, conv = responses([placeholder, req("A", timing="always",
+                                         post_condition="(p)")])
+check(conv.notes["empty, skipped"], ["EMPTY"], "a placeholder is skipped")
+rejects(prose, "did not formalise", "an unformalised requirement is rejected")
+_, _, conv = responses([prose], skip=["PROSE"])
+check(conv.notes["skipped by --skip"], ["PROSE"], "--skip leaves one out")
+
+cased = [req("A", timing="always", post_condition="(explain)"),
+         req("B", timing="always", post_condition="(Explain)")]
+try:
+    load(cased)
+    print("FAIL: case variants accepted without --merge-case")
+    sys.exit(1)
+except I.FretImportError:
+    pass
+got, _, _ = responses(cased, merge_case=True)
+check(got, ["explain"], "--merge-case reads case variants as one atom")
+
+spec, _ = load([req("A", timing="always",
+                    post_condition="(uiBypass0 & uiBypass1)"),
+                req("B", timing="always", post_condition="(q)",
+                    component_name="Human")],
+               all_components=True, as_input=["ui_bypass*"])
+check((spec["in_atoms"], spec["out_atoms"]),
+      (["ui_bypass0", "ui_bypass1"], ["q"]),
+      "--all-components keeps every component; --as-input takes patterns")
 
 print("ok: all FRET import checks pass")
