@@ -1,0 +1,1092 @@
+{
+  "assumptions": [],
+  "guarantees": [
+    {
+      "condition": "start_up_mode",
+      "condition-type": "trigger",
+      "response": "(check_comms_sensors & check_comms_valves)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "(psv_mode) & (v_e_lt_expiratory_trigger_sensitivity_times_peak_v_e)",
+      "condition-type": "trigger",
+      "response": "expiration_phase_start",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "start_up_mode",
+      "condition-type": "trigger",
+      "response": "check_comms_gui",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "(pcv_mode) & (breathing_cycle_start_2)",
+      "condition-type": "trigger",
+      "response": "inspiratory_phase_start",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(pcv_mode) & (drop_paw_gt_its_pcv)",
+      "condition-type": "trigger",
+      "response": "patient_breathing_request",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(((((start_up_mode | self_test_mode) | standby_mode) | pcv_mode) | psv_mode) | fail_safe_mode)",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "((psv_mode & inspiratory_pause_button)) & (inspiratory_phase_end)",
+      "condition-type": "trigger",
+      "response": "(inspiratory_pause_button -> (in_valve_close & out_valve_close))",
+      "timing": {
+        "type": "ForTicks",
+        "ticks": 3
+      }
+    },
+    {
+      "condition": "(start_up_mode | standby_mode)",
+      "condition-type": "continual",
+      "response": "(in_valve_close & out_valve_open)",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "((pcv_mode | psv_mode)) & (inspiratory_pause_button)",
+      "condition-type": "trigger",
+      "response": "(inspiratory_pause | !inspiratory_pause_button)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "start_up_mode",
+      "condition-type": "trigger",
+      "response": "default_params_loaded",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "expiration_phase_start",
+      "condition-type": "trigger",
+      "response": "monitor_inhale_trigger",
+      "timing": {
+        "type": "AfterTicks",
+        "ticks": 1
+      }
+    },
+    {
+      "condition": "(self_test_mode) & ((self_test_passed | gui_resume_request))",
+      "condition-type": "trigger",
+      "response": "standby_mode",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(start_up_mode) & (init_done)",
+      "condition-type": "trigger",
+      "response": "self_test_mode",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "((psv_mode & rm_button)) & (inspiratory_phase_end)",
+      "condition-type": "trigger",
+      "response": "rm",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "((pcv_mode & inspiratory_pause_button)) & (inspiratory_phase_end)",
+      "condition-type": "trigger",
+      "response": "(inspiratory_pause_button -> (in_valve_close & out_valve_close))",
+      "timing": {
+        "type": "ForTicks",
+        "ticks": 3
+      }
+    },
+    {
+      "condition": "rm",
+      "condition-type": "trigger",
+      "response": "(!rm & expiration_phase_start)",
+      "timing": {
+        "type": "AfterTicks",
+        "ticks": 2
+      }
+    },
+    {
+      "condition": "fail_safe_mode",
+      "condition-type": "continual",
+      "response": "(in_valve_close & out_valve_open)",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "((pcv_mode | psv_mode)) & (expiratory_pause_button)",
+      "condition-type": "trigger",
+      "response": "(expiratory_pause | !expiratory_pause_button)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "inspiratory_phase",
+      "condition-type": "continual",
+      "response": "(((out_valve_close & ((pcv_mode & !apnea) -> p_insp_eq_p_isnp_pcv)) & (psv_mode -> p_insp_eq_p_insp_psv)) & ((pcv_mode & apnea) -> p_insp_eq_p_insp_ap))",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "(standby_mode) & (psv_mode_selected)",
+      "condition-type": "trigger",
+      "response": "psv_mode",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "pcv_mode",
+      "condition-type": "continual",
+      "response": "p_insp_eq_p_insp_pcv",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "((((pcv_mode | psv_mode) & rm_button) & !inspiratory_pause_button)) & (inspiratory_phase_end)",
+      "condition-type": "trigger",
+      "response": "rm",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(psv_mode) & (stop_ventilation)",
+      "condition-type": "trigger",
+      "response": "standby_mode",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "((pcv_mode & rm_button)) & (inspiratory_phase_end)",
+      "condition-type": "trigger",
+      "response": "rm",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(((pcv_mode | psv_mode) & expiratory_pause_button)) & (expiratory_phase_end)",
+      "condition-type": "trigger",
+      "response": "(expiratory_pause_button -> ((expiratory_pause & in_valve_close) & out_valve_close))",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(standby_mode) & (pcv_mode_selected)",
+      "condition-type": "trigger",
+      "response": "pcv_mode",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "rm",
+      "condition-type": "continual",
+      "response": "(out_valve_close & in_valve_open)",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "(((pcv_mode | psv_mode) & inspiratory_pause_button)) & (inspiratory_phase_end)",
+      "condition-type": "trigger",
+      "response": "(inspiratory_pause_button -> ((inspiratory_pause & in_valve_close) & out_valve_close))",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "self_test_mode",
+      "condition-type": "trigger",
+      "response": "(self_test_passed | self_test_failed)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "(psv_mode) & (fl1_lt_expiratory_trigger_sensitivity)",
+      "condition-type": "trigger",
+      "response": "expiration_phase_start",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "((log_ventilation_params & log_alarm_params) & log_calibration_params)",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(start_up_mode -> (((new_patient -> ((self_test_mode & !new_patient) -> standby_mode)) & self_test_mode) -> (((self_test_passed -> standby_mode) & standby_mode) -> (((start_pcv -> ((pcv_mode & start_psv) -> ((psv_mode & run_self_test) -> self_test_mode))) & error) -> ((fail_safe_mode & power_off) -> off)))))",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "(pcv_mode) & (psv_mode_selected)",
+      "condition-type": "trigger",
+      "response": "confirm_psv_parameters",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "p_insp_gt_max_p_insp",
+      "condition-type": "trigger",
+      "response": "(inspiratory_phase_end & expiration_phase_start)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(param_v_gt_param_max_v | param_v_lt_param_min_v)",
+      "condition-type": "trigger",
+      "response": "param_alarm_v",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "self_test_mode",
+      "condition-type": "trigger",
+      "response": "((test_fl2_pass | test_fl2_fail) | test_fl2_skip)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "measure_p_sins",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "start_up_mode",
+      "condition-type": "trigger",
+      "response": "(((init_start & check_comms_sensors) & check_comms_valves) & check_comms_gui)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "(gui_failue | !gui_connected)",
+      "condition-type": "trigger",
+      "response": "(ventilating & high_priority_alarm)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "self_test_passed",
+      "condition-type": "trigger",
+      "response": "((start_monitoring & start_reporting_health_params) & standby_mode)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "patient_safe",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "resume_ventilation",
+      "condition-type": "trigger",
+      "response": "(self_test_mode & (((((((test_power_switch_pass | test_power_switch_skip) & (test_leaks_pass | test_leaks_skip)) & (test_fl2_pass | test_fl2_skip)) & (test_ps_exp_pass | test_ps_exp_skip)) & (test_oxygen_sensor_pass | test_oxygen_sensor_skip)) & (test_alarms_pass | test_alarms_skip)) -> self_test_passed))",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "(psv_mode) & (breathing_time_ge_apnea_lag_time)",
+      "condition-type": "trigger",
+      "response": "apnea",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(user_eq_operator -> !erase_log)",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(measure_tv & display_tv)",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "((start_up_mode | self_test_mode) -> !patient_connected)",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "enter_alarm_thresholds",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "pcv_mode",
+      "condition-type": "continual",
+      "response": "((breathing_cycle_done | patient_breathing_request) -> breathing_cycle_start)",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "apnea",
+      "condition-type": "trigger",
+      "response": "(((pcv_mode & rr_eq_rr_ap) & p_insp_eq_p_insp_ap) & ito_e_eq_ito_e_ap)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "self_test_mode",
+      "condition-type": "trigger",
+      "response": "((test_ps_exp_pass | test_ps_exp_fail) | test_ps_exp_skip)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "apnea",
+      "condition-type": "trigger",
+      "response": "apnea_alarm",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "self_test_passed",
+      "condition-type": "trigger",
+      "response": "standby_mode",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "ventilator_settings_changed",
+      "condition-type": "trigger",
+      "response": "log_ventilator_settings",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "self_test_mode",
+      "condition-type": "trigger",
+      "response": "(self_test_passed | self_test_failed)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "start_up_done",
+      "condition-type": "trigger",
+      "response": "(new_patient | resume_ventilation)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(((((start_up_mode | self_test_mode) | standby_mode) | pcv_mode) | psv_mode) | fail_safe_mode)",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(measure_fl1 & display)",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "fail_safe_mode",
+      "condition-type": "continual",
+      "response": "patient_safe",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "pcv_mode",
+      "condition-type": "continual",
+      "response": "(((confirm_psv_parameters & psv_mode) | (!confirm_psv_parameters & pcv_mode)) & ventilating)",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "alarm_settings_changed",
+      "condition-type": "trigger",
+      "response": "log_alarm_settings",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "standby_mode",
+      "condition-type": "continual",
+      "response": "(ventilation_off & ventilation_params_adjustable)",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "start_up_mode",
+      "condition-type": "trigger",
+      "response": "(init_done | ((init_fail & out_of_service_warning) & fail_safe_mode))",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "(pcv_mode) & (psv_mode_selected)",
+      "condition-type": "trigger",
+      "response": "!(pcv_insp_time_end & psv_mode)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "power_failure",
+      "condition-type": "trigger",
+      "response": "patient_safe",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "self_test_mode",
+      "condition-type": "trigger",
+      "response": "((test_oxygen_sensor_pass | test_oxygen_sensor_fail) | test_oxygen_sensor_skip)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "gbps_le_5p2",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "patient_changed",
+      "condition-type": "trigger",
+      "response": "log_patient_change",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "inspiratory_pressure_lt_inhale_trigger_sensitivity_pcv",
+      "condition-type": "trigger",
+      "response": "breathing_cycle_start",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "self_test_mode",
+      "condition-type": "trigger",
+      "response": "((test_alarms_pass | test_alarms_fail) | test_alarms_skip)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "gas_supply_failure",
+      "condition-type": "trigger",
+      "response": "patient_safe",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "((enable_leak_compensation -> leak_compensation) & (disable_leak_compensation -> (!leak_compensation & !enable_leak_compensation)))",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "off",
+      "condition-type": "trigger",
+      "response": "!resume_ventilation",
+      "timing": {
+        "type": "AfterTicks",
+        "ticks": 4
+      }
+    },
+    {
+      "condition": "power_supply_changed",
+      "condition-type": "trigger",
+      "response": "log_power_supply",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "pcv_mode",
+      "condition-type": "continual",
+      "response": "(breathing_cycle_time_eq_1_div_rr_pcv & expiratory_time_eq_breathing_cycle_time_div_1_plus_ito_e_pcv)",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "((log_params & save_log) & load_log)",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "patient_breath_trigger",
+      "condition-type": "trigger",
+      "response": "breathing_timer_reset",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "self_test_mode",
+      "condition-type": "trigger",
+      "response": "((test_power_switch_pass | test_power_switch_fail) | test_power_switch_skip)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "(pcv_mode) & (rm_button)",
+      "condition-type": "trigger",
+      "response": "rm",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(leak_compensation_enable & min_peep_alarm)",
+      "condition-type": "trigger",
+      "response": "leak_compensation_active",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(power_button & (((breathing_circuit_connected & !patient_connected) & air_supply_connected) & power_connected))",
+      "condition-type": "trigger",
+      "response": "start_up_mode",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "pre_use_check_done",
+      "condition-type": "trigger",
+      "response": "log_pre_use_check",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(psv_mode) & (inspiratory_pressure_lt_inhale_trigger_sensitivity_psv)",
+      "condition-type": "trigger",
+      "response": "breathing_cycle_start",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(self_test_mode) & (self_test_fail)",
+      "condition-type": "trigger",
+      "response": "(out_of_service_warning & fail_safe_mode)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "self_test_mode",
+      "condition-type": "trigger",
+      "response": "((test_leaks_pass | test_leaks_fail) | test_leaks_skip)",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "new_patient",
+      "condition-type": "trigger",
+      "response": "((patient_attributes_entered & self_test_mode) & ((((((test_power_switch_pass & test_leaks_pass) & test_fl2_pass) & test_ps_exp_pass) & test_oxygen_sensor_pass) & test_alarms_pass) -> self_test_passed))",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(measure_rr & display_rr)",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "power_failure",
+      "condition-type": "trigger",
+      "response": "!off",
+      "timing": {
+        "type": "ForTicks",
+        "ticks": 5
+      }
+    },
+    {
+      "condition": "(pcv_mode) & (psv_mode_selected)",
+      "condition-type": "trigger",
+      "response": "(ventilating & psv_mode)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(inspiratory_pause_button) & (inspiratory_phase_end)",
+      "condition-type": "trigger",
+      "response": "(inspiratory_pause_button -> (in_valve_close & out_valve_close))",
+      "timing": {
+        "type": "ForTicks",
+        "ticks": 3
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "log_o2_sensor_use",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "(measure_o2_prc & display_o2_prc)",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "resume_ventilation",
+      "condition-type": "trigger",
+      "response": "load_last_params",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "pcv_mode",
+      "condition-type": "continual",
+      "response": "((breathing_cycle_done | patient_breathing_request) -> (breathing_cycle_start & inspiratory_phase_start))",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "(start_up_mode) & ((pressure_sensor_retries_ge_5 & (pressure_sensor_conn_failure | pressure_sensor_error)))",
+      "condition-type": "trigger",
+      "response": "fail_safe_mode",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "expiratory_pause",
+      "condition-type": "trigger",
+      "response": "(!expiratory_pause & inspiratory_phase_start)",
+      "timing": {
+        "type": "AfterTicks",
+        "ticks": 3
+      }
+    },
+    {
+      "condition": "standby_mode",
+      "condition-type": "continual",
+      "response": "((ventilation_off & in_valve_close) & out_valve_open)",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "(psv_mode) & (breathing_time_ge_apnea_lag_time)",
+      "condition-type": "trigger",
+      "response": "(((pcv_mode & rr_eq_rr_ap) & p_insp_eq_p_insp_ap) & ito_e_eq_ito_e_ap)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "start_up_mode",
+      "condition-type": "trigger",
+      "response": "(init_start & (init_done | ((init_fail & out_of_service_warning) & fail_safe_mode)))",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "pcv_mode",
+      "condition-type": "continual",
+      "response": "(breathing_cycle_time_eq_1_div_rr_pcv & expiratory_time_eq_breathing_cycle_time_div_1_plus_ito_e_pcv)",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "pcv_mode",
+      "condition-type": "continual",
+      "response": "inspiratory_time_eq_60_times_ito_e_pcv_div_rr_pcv_times_1_plus_ito_e_pcv",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "(rm) & (!rm_button)",
+      "condition-type": "trigger",
+      "response": "(!rm & expiration_phase_start)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "expiratory_state",
+      "condition-type": "continual",
+      "response": "(in_valve_close & out_valve_open)",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "(power_off & !power_button)",
+      "condition-type": "trigger",
+      "response": "!start_up_mode",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "inspiratory_pause",
+      "condition-type": "trigger",
+      "response": "(!inspiratory_pause & expiration_phase_start)",
+      "timing": {
+        "type": "AfterTicks",
+        "ticks": 3
+      }
+    },
+    {
+      "condition": "psv_mode",
+      "condition-type": "continual",
+      "response": "((min_expiratory_time_ge_0p4 & min_expiratory_time_le_2) & (expiratory_phase -> min_expiratory_time_eq_insp_clock_div_2))",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "(start_up_mode) & ((adc_retries_ge_5 & (adc_conn_failure | adc_error)))",
+      "condition-type": "trigger",
+      "response": "fail_safe_mode",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(psv_mode) & (exp_clock_ge_apnea_lag_time)",
+      "condition-type": "trigger",
+      "response": "((((apnea & pcv_mode) & rr_eq_rr_ap) & p_insp_eq_p_insp_ap) & ito_e_eq_ito_e_ap)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "((psv_mode & expiratory_phase)) & (drop_paw_gt_its_psv)",
+      "condition-type": "trigger",
+      "response": "patient_breathing_request",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(pcv_mode) & ((inspiratory_phase_end & psv_mode_selected))",
+      "condition-type": "trigger",
+      "response": "(ventilating & psv_mode)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(pcv_mode) & (stop_ventilation)",
+      "condition-type": "trigger",
+      "response": "standby_mode",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "(psv_mode) & (breathing_cycle_start_2)",
+      "condition-type": "trigger",
+      "response": "inspiratory_phase_start",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "p_insp_gt_max_p_insp",
+      "condition-type": "trigger",
+      "response": "(inspiratory_phase_end & expiration_phase_start)",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "power_off",
+      "condition-type": "trigger",
+      "response": "final_state",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "final_state",
+      "condition-type": "trigger",
+      "response": "(parameters_stored & off)",
+      "timing": {
+        "type": "Eventually"
+      }
+    }
+  ],
+  "in_atoms": [
+    "adc_conn_failure",
+    "adc_error",
+    "adc_retries_ge_5",
+    "air_supply_connected",
+    "alarm_settings_changed",
+    "breathing_circuit_connected",
+    "breathing_cycle_start_2",
+    "breathing_time_ge_apnea_lag_time",
+    "disable_leak_compensation",
+    "drop_paw_gt_its_pcv",
+    "drop_paw_gt_its_psv",
+    "enable_leak_compensation",
+    "error",
+    "exp_clock_ge_apnea_lag_time",
+    "expiratory_pause_button",
+    "expiratory_phase_end",
+    "expiratory_state",
+    "fl1_lt_expiratory_trigger_sensitivity",
+    "gas_supply_failure",
+    "gui_connected",
+    "gui_failue",
+    "gui_resume_request",
+    "inspiratory_pause_button",
+    "inspiratory_phase",
+    "inspiratory_pressure_lt_inhale_trigger_sensitivity_pcv",
+    "inspiratory_pressure_lt_inhale_trigger_sensitivity_psv",
+    "leak_compensation_enable",
+    "min_peep_alarm",
+    "p_insp_gt_max_p_insp",
+    "param_v_gt_param_max_v",
+    "param_v_lt_param_min_v",
+    "patient_breath_trigger",
+    "patient_changed",
+    "patient_connected",
+    "pcv_mode_selected",
+    "power_button",
+    "power_connected",
+    "power_failure",
+    "power_off",
+    "power_supply_changed",
+    "pre_use_check_done",
+    "pressure_sensor_conn_failure",
+    "pressure_sensor_error",
+    "pressure_sensor_retries_ge_5",
+    "psv_mode_selected",
+    "rm_button",
+    "run_self_test",
+    "self_test_fail",
+    "start_pcv",
+    "start_psv",
+    "start_up_done",
+    "stop_ventilation",
+    "user_eq_operator",
+    "v_e_lt_expiratory_trigger_sensitivity_times_peak_v_e",
+    "ventilator_settings_changed"
+  ],
+  "out_atoms": [
+    "apnea",
+    "apnea_alarm",
+    "breathing_cycle_done",
+    "breathing_cycle_start",
+    "breathing_cycle_time_eq_1_div_rr_pcv",
+    "breathing_timer_reset",
+    "check_comms_gui",
+    "check_comms_sensors",
+    "check_comms_valves",
+    "confirm_psv_parameters",
+    "default_params_loaded",
+    "display",
+    "display_o2_prc",
+    "display_rr",
+    "display_tv",
+    "enter_alarm_thresholds",
+    "erase_log",
+    "expiration_phase_start",
+    "expiratory_pause",
+    "expiratory_phase",
+    "expiratory_time_eq_breathing_cycle_time_div_1_plus_ito_e_pcv",
+    "fail_safe_mode",
+    "final_state",
+    "gbps_le_5p2",
+    "high_priority_alarm",
+    "in_valve_close",
+    "in_valve_open",
+    "init_done",
+    "init_fail",
+    "init_start",
+    "inspiratory_pause",
+    "inspiratory_phase_end",
+    "inspiratory_phase_start",
+    "inspiratory_time_eq_60_times_ito_e_pcv_div_rr_pcv_times_1_plus_ito_e_pcv",
+    "ito_e_eq_ito_e_ap",
+    "leak_compensation",
+    "leak_compensation_active",
+    "load_last_params",
+    "load_log",
+    "log_alarm_params",
+    "log_alarm_settings",
+    "log_calibration_params",
+    "log_o2_sensor_use",
+    "log_params",
+    "log_patient_change",
+    "log_power_supply",
+    "log_pre_use_check",
+    "log_ventilation_params",
+    "log_ventilator_settings",
+    "measure_fl1",
+    "measure_o2_prc",
+    "measure_p_sins",
+    "measure_rr",
+    "measure_tv",
+    "min_expiratory_time_eq_insp_clock_div_2",
+    "min_expiratory_time_ge_0p4",
+    "min_expiratory_time_le_2",
+    "monitor_inhale_trigger",
+    "new_patient",
+    "off",
+    "out_of_service_warning",
+    "out_valve_close",
+    "out_valve_open",
+    "p_insp_eq_p_insp_ap",
+    "p_insp_eq_p_insp_pcv",
+    "p_insp_eq_p_insp_psv",
+    "p_insp_eq_p_isnp_pcv",
+    "param_alarm_v",
+    "parameters_stored",
+    "patient_attributes_entered",
+    "patient_breathing_request",
+    "patient_safe",
+    "pcv_insp_time_end",
+    "pcv_mode",
+    "psv_mode",
+    "resume_ventilation",
+    "rm",
+    "rr_eq_rr_ap",
+    "save_log",
+    "self_test_failed",
+    "self_test_mode",
+    "self_test_passed",
+    "standby_mode",
+    "start_monitoring",
+    "start_reporting_health_params",
+    "start_up_mode",
+    "test_alarms_fail",
+    "test_alarms_pass",
+    "test_alarms_skip",
+    "test_fl2_fail",
+    "test_fl2_pass",
+    "test_fl2_skip",
+    "test_leaks_fail",
+    "test_leaks_pass",
+    "test_leaks_skip",
+    "test_oxygen_sensor_fail",
+    "test_oxygen_sensor_pass",
+    "test_oxygen_sensor_skip",
+    "test_power_switch_fail",
+    "test_power_switch_pass",
+    "test_power_switch_skip",
+    "test_ps_exp_fail",
+    "test_ps_exp_pass",
+    "test_ps_exp_skip",
+    "ventilating",
+    "ventilation_off",
+    "ventilation_params_adjustable"
+  ]
+}
