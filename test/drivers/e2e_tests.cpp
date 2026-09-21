@@ -419,11 +419,11 @@ class ScopedEnv {
     const char* m_name;
 };
 
-TEST_IN("driver_peredur", test_peredur_fretish_muc_undecided_is_provisional) {
-    const TempDir dir("e2e_peredur_fretish_provisional");
-    // SPOT's own tools, but an ltlsynt that never answers a query naming both
-    // markers. `exec` so the budget's kill reaches the sleep itself.
-    const std::filesystem::path fake = dir.path() / "spot";
+// SPOT's own tools under @p dir, but an ltlsynt that never answers a query
+// naming both markers of k_fretish_marked. `exec` so the budget's kill reaches
+// the sleep itself. Returns the directory to point PEREDUR_SPOT_BIN_DIR at.
+std::filesystem::path marker_blind_spot(const std::filesystem::path& dir) {
+    const std::filesystem::path fake = dir / "spot";
     std::filesystem::create_directories(fake);
     const std::filesystem::path real = spot_bin_dir();
     for (const auto& entry : std::filesystem::directory_iterator(real)) {
@@ -443,7 +443,13 @@ TEST_IN("driver_peredur", test_peredur_fretish_muc_undecided_is_provisional) {
             (real / "ltlsynt").string() + " \"$@\"\n");
     std::filesystem::permissions(ltlsynt, std::filesystem::perms::owner_exec,
                                  std::filesystem::perm_options::add);
-    const ScopedEnv spot_dir("PEREDUR_SPOT_BIN_DIR", fake.string());
+    return fake;
+}
+
+TEST_IN("driver_peredur", test_peredur_fretish_muc_undecided_is_provisional) {
+    const TempDir dir("e2e_peredur_fretish_provisional");
+    const ScopedEnv spot_dir("PEREDUR_SPOT_BIN_DIR",
+                             marker_blind_spot(dir.path()).string());
 
     const std::string input =
         write_text(dir.path() / "spec.json", k_fretish_marked).string();
@@ -475,6 +481,49 @@ TEST_IN("driver_peredur", test_peredur_fretish_muc_undecided_is_provisional) {
     expect(nlohmann::json::parse(read_text(out / "provisional_0.json"))
                .contains("guarantees"),
            "peredur: a provisional file parses as a specification");
+}
+
+TEST_IN("driver_peredur", test_peredur_fretish_muc_deadline_ends_the_gate) {
+    const TempDir dir("e2e_peredur_fretish_deadline");
+    const ScopedEnv spot_dir("PEREDUR_SPOT_BIN_DIR",
+                             marker_blind_spot(dir.path()).string());
+
+    // The input check before the run memoises the head check, and the core's
+    // search is quick, so the gate starts well before the deadline passes at
+    // 2s; its one check times out at 2s, after the deadline, which leaves the
+    // candidate undecided and its screen never started.
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish_marked).string();
+    const std::string config =
+        write_text(dir.path() / "config.toml",
+                   "[genetic]\ngenerations = 2\npopulation_size = 8\n"
+                   "max_wall_s = 1\n\n"
+                   "[runtime]\nparallel = 1\nltlsynt_timeout_ms = 2000\n\n"
+                   "[tlsf]\nrepair_mode = \"muc\"\nmuc_screen_depth = 1\n")
+            .string();
+    const std::filesystem::path out = dir.path() / "out";
+    std::filesystem::create_directories(out);
+
+    const DriverRun run =
+        run_driver("peredur", {"--input", input, "--output-dir", out.string(),
+                               "--config", config, "--seed", "1"});
+    expect(run.m_exit_code == 0,
+           "peredur: a muc run cut by its deadline exits zero");
+    expect(contains(run.m_output, "1 reintegrated"),
+           "peredur: the deadline cut the gate, not the search");
+    expect(std::filesystem::exists(out / "run.json"),
+           "peredur: a muc run cut by its deadline still writes run.json");
+    const nlohmann::json manifest =
+        nlohmann::json::parse(read_text(out / "run.json"));
+    const std::size_t n_unscreened =
+        manifest.at("n_deadline_unscreened").get<std::size_t>();
+    expect(n_unscreened >= 1,
+           "peredur: candidates the deadline left unjudged are counted");
+    expect(manifest.at("n_gate_undecided").get<std::size_t>() >= n_unscreened,
+           "peredur: an unjudged candidate counts as undecided");
+    expect(manifest.at("n_provisional").get<std::size_t>() == 0 &&
+               count_numbered(out, "provisional_") == 0,
+           "peredur: an unscreened candidate is never provisional");
 }
 
 TEST_IN("driver_peredur", test_peredur_rejects_bad_arguments) {

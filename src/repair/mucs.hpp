@@ -25,6 +25,11 @@ namespace fretish {
 using RealizabilityVerdict =
     std::function<std::optional<bool>(const Specification&)>;
 
+// Asked before each probe starts; true means start no more. Empty never stops.
+// Called concurrently, so it must be thread-safe. A probe already running when
+// it turns true runs to its end.
+using StopRequested = std::function<bool()>;
+
 // @p spec with only the guarantees at @p slots, in slot order, and its whole
 // environment side. @p slots must name live guarantees. Built the way the MRS
 // walk builds its subsets, so the two ask ltlsynt the same formula for the same
@@ -37,11 +42,14 @@ Specification guarantee_subset(const Specification& spec,
 // ranked by size first and then lexicographically by slot, so the answer does
 // not depend on which probe finished first. `n_undecided` counts the subsets
 // the screen could not decide, and `all_decided_realizable` is true only when
-// every subset it asked was decided realizable.
+// every subset it asked was decided realizable. `interrupted` is set when a
+// stop request left some subset unasked; such a screen is never
+// all_decided_realizable, and its unasked subsets are not counted undecided.
 struct SubsetScreen {
     std::optional<std::vector<std::size_t>> conflict;
     std::size_t n_undecided = 0;
     bool all_decided_realizable = true;
+    bool interrupted = false;
 };
 
 // Screens the subsets of @p spec's live guarantees of size 1, then 2, and so
@@ -49,11 +57,13 @@ struct SubsetScreen {
 // conflict found at size s is minimal, because no subset smaller than s is
 // one. Each size is one concurrent region of up to @p max_in_flight probes;
 // the verdict function is then called concurrently and must be thread-safe.
-// An undecided probe is not read as a conflict.
+// An undecided probe is not read as a conflict. Once @p stop holds, no further
+// probe starts, and the screen ends after the size in progress.
 SubsetScreen screen_small_subsets(const Specification& spec,
                                   const RealizabilityVerdict& verdict,
                                   std::size_t max_size,
-                                  std::size_t max_in_flight);
+                                  std::size_t max_in_flight,
+                                  const StopRequested& stop = {});
 
 // A core and where it came from. `slots` are positions in the specification
 // it was extracted from, ascending; `spec` is guarantee_subset of those.
@@ -67,6 +77,10 @@ struct GuaranteeCore {
     Specification spec;
     std::size_t n_undecided = 0;
     bool provisional = false;
+    // Set when @p stop cut the screen or the walk short; the core is then
+    // empty, since a partial screen's conflict need not be the lowest-ranked
+    // one and a partial walk's need not be minimal.
+    bool interrupted = false;
 };
 
 // Extracts a guarantee-side core from @p spec. Screens every subset of up to
@@ -78,11 +92,12 @@ struct GuaranteeCore {
 // whose cheap conflicts are gone its probes stop answering.
 //
 // Returns an empty core when there is nothing to report: no live guarantee,
-// no small conflict with the walk forbidden, or a walk that found none.
+// no small conflict with the walk forbidden, a walk that found none, or an
+// extraction @p stop interrupted.
 GuaranteeCore extract_core(const Specification& spec,
                            const RealizabilityVerdict& verdict,
                            std::size_t screen_depth, std::size_t max_in_flight,
-                           bool allow_walk);
+                           bool allow_walk, const StopRequested& stop = {});
 
 // @p context with the guarantees at @p slots replaced, in order, by those of
 // @p repaired_core, and the environment side taken from @p repaired_core,

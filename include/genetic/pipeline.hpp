@@ -108,12 +108,11 @@ class SearchBudget {
         return fallback;
     }
 
-   private:
-    [[nodiscard]] bool individuals_spent() const {
-        return m_max_individuals != 0 && m_bred >= m_max_individuals;
-    }
-
-    // Strictly greater, matching AuRUS's `current.toSeconds() > TIMEOUT`.
+    /// True once `max_wall_s` has passed, whatever the individuals budget
+    /// says. FRETISH MUC repair stops gating and screening on this alone: an
+    /// individuals budget is spent by the search, and reading it there would
+    /// leave every later candidate unjudged. Strictly greater, matching
+    /// AuRUS's `current.toSeconds() > TIMEOUT`.
     [[nodiscard]] bool past_deadline() const {
         if (m_max_wall_s == 0) {
             return false;
@@ -122,6 +121,11 @@ class SearchBudget {
                                  Clock::now() - m_start)
                                  .count();
         return elapsed > 0 && static_cast<std::size_t>(elapsed) > m_max_wall_s;
+    }
+
+   private:
+    [[nodiscard]] bool individuals_spent() const {
+        return m_max_individuals != 0 && m_bred >= m_max_individuals;
     }
 
     std::size_t m_max_individuals;

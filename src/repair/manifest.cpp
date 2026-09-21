@@ -183,7 +183,11 @@ namespace {
 // tlsf.repair_mode = "muc" exited 1 before it), and tlsf.muc_screen_depth.
 // Both read 0 on every monolithic run and every TLSF run, so an earlier
 // manifest missing them means 0.
-constexpr int k_schema_version = 30;
+//
+// 31 added n_deadline_unscreened: FRETISH muc repair candidates the wall
+// deadline left without a gate verdict or a finished screen. From this version
+// max_wall_s bounds the gate and the screens there, not only the search.
+constexpr int k_schema_version = 31;
 
 std::string utc_timestamp() {
     const std::time_t now =
@@ -414,6 +418,7 @@ void write_run_manifest(const std::string& output_dir,
         // realizability query never answered.
         {"n_provisional", MucStats::n_provisional},
         {"n_gate_undecided", MucStats::n_gate_undecided},
+        {"n_deadline_unscreened", MucStats::n_deadline_unscreened},
         // ltlsynt calls that reported SPOT's acceptance-set ceiling rather than
         // a verdict, resolved as undecided rather than ending the run.
         {"n_ltlsynt_capability_errors",

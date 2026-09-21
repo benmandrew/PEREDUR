@@ -48,10 +48,13 @@ std::vector<std::size_t> combinations(
 }
 
 // Verdicts for every subset of one size, by index. One byte per subset:
-// 0 realizable, 1 unrealizable, 2 undecided.
+// 0 realizable, 1 unrealizable, 2 undecided, 3 never asked.
 constexpr char k_realizable = 0;
 constexpr char k_unrealizable = 1;
 constexpr char k_undecided = 2;
+constexpr char k_unasked = 3;
+
+bool stop_requested(const StopRequested& stop) { return stop && stop(); }
 
 char encode(const std::optional<bool>& verdict) {
     if (!verdict.has_value()) {
@@ -64,10 +67,14 @@ std::vector<char> subset_verdicts(const Specification& spec,
                                   const std::vector<std::size_t>& flat,
                                   std::size_t size,
                                   const RealizabilityVerdict& verdict,
-                                  std::size_t max_in_flight) {
+                                  std::size_t max_in_flight,
+                                  const StopRequested& stop) {
     const std::size_t n_subsets = flat.size() / size;
     std::vector<char> verdicts(n_subsets, k_undecided);
-    const auto probe = [&spec, &flat, size, &verdict](std::size_t idx) {
+    const auto probe = [&spec, &flat, size, &verdict, &stop](std::size_t idx) {
+        if (stop_requested(stop)) {
+            return k_unasked;
+        }
         const auto first =
             flat.begin() + static_cast<std::ptrdiff_t>(idx * size);
         const std::vector<std::size_t> slots(
@@ -95,8 +102,9 @@ std::vector<char> subset_verdicts(const Specification& spec,
 // undecided probe reads as a conflict and is counted in @p n_undecided.
 class Walk {
    public:
-    Walk(const Specification& spec, const RealizabilityVerdict& verdict)
-        : m_spec(spec), m_verdict(verdict) {}
+    Walk(const Specification& spec, const RealizabilityVerdict& verdict,
+         const StopRequested& stop)
+        : m_spec(spec), m_verdict(verdict), m_stop(stop) {}
 
     std::vector<std::size_t> run(const std::vector<std::size_t>& background,
                                  bool background_grew,
@@ -120,6 +128,7 @@ class Walk {
     }
 
     [[nodiscard]] std::size_t n_undecided() const { return m_n_undecided; }
+    [[nodiscard]] bool interrupted() const { return m_interrupted; }
 
    private:
     // Sorted, so that one set lowers to one formula however the walk reached
@@ -131,7 +140,13 @@ class Walk {
         return lhs;
     }
 
+    // Once stopped, every probe reads as a conflict without asking, which
+    // ends the walk in as few steps as it has left; its answer is discarded.
     bool is_conflict(const std::vector<std::size_t>& slots) {
+        if (m_interrupted || stop_requested(m_stop)) {
+            m_interrupted = true;
+            return true;
+        }
         const std::optional<bool> realizable =
             m_verdict(guarantee_subset(m_spec, slots));
         if (!realizable.has_value()) {
@@ -143,7 +158,9 @@ class Walk {
 
     const Specification& m_spec;
     const RealizabilityVerdict& m_verdict;
+    const StopRequested& m_stop;
     std::size_t m_n_undecided = 0;
+    bool m_interrupted = false;
 };
 
 }  // namespace
@@ -164,16 +181,19 @@ Specification guarantee_subset(const Specification& spec,
 SubsetScreen screen_small_subsets(const Specification& spec,
                                   const RealizabilityVerdict& verdict,
                                   std::size_t max_size,
-                                  std::size_t max_in_flight) {
+                                  std::size_t max_in_flight,
+                                  const StopRequested& stop) {
     const std::vector<std::size_t> candidates = live_indices(spec.m_guarantees);
     SubsetScreen screen;
     for (std::size_t size = 1; size <= max_size && size <= candidates.size();
          ++size) {
         const std::vector<std::size_t> flat = combinations(candidates, size);
         const std::vector<char> verdicts =
-            subset_verdicts(spec, flat, size, verdict, max_in_flight);
+            subset_verdicts(spec, flat, size, verdict, max_in_flight, stop);
         for (std::size_t idx = 0; idx < verdicts.size(); ++idx) {
-            if (verdicts[idx] == k_undecided) {
+            if (verdicts[idx] == k_unasked) {
+                screen.interrupted = true;
+            } else if (verdicts[idx] == k_undecided) {
                 ++screen.n_undecided;
             }
             if (verdicts[idx] != k_realizable) {
@@ -186,7 +206,7 @@ SubsetScreen screen_small_subsets(const Specification& spec,
                     first, first + static_cast<std::ptrdiff_t>(size));
             }
         }
-        if (screen.conflict) {
+        if (screen.conflict || screen.interrupted) {
             break;
         }
     }
@@ -196,24 +216,30 @@ SubsetScreen screen_small_subsets(const Specification& spec,
 GuaranteeCore extract_core(const Specification& spec,
                            const RealizabilityVerdict& verdict,
                            std::size_t screen_depth, std::size_t max_in_flight,
-                           bool allow_walk) {
+                           bool allow_walk, const StopRequested& stop) {
     GuaranteeCore core;
     const SubsetScreen screen =
-        screen_small_subsets(spec, verdict, screen_depth, max_in_flight);
+        screen_small_subsets(spec, verdict, screen_depth, max_in_flight, stop);
     core.n_undecided = screen.n_undecided;
-    if (screen.conflict) {
+    if (screen.interrupted) {
+        core.interrupted = true;
+    } else if (screen.conflict) {
         core.slots = *screen.conflict;
     } else if (allow_walk) {
         const std::vector<std::size_t> candidates =
             live_indices(spec.m_guarantees);
         if (!candidates.empty()) {
-            Walk walk(spec, verdict);
+            Walk walk(spec, verdict, stop);
             std::vector<std::size_t> slots = walk.run(
                 /*background=*/{}, /*background_grew=*/false, candidates);
             std::sort(slots.begin(), slots.end());
-            core.slots = std::move(slots);
             core.n_undecided += walk.n_undecided();
-            core.provisional = walk.n_undecided() > 0;
+            if (walk.interrupted()) {
+                core.interrupted = true;
+            } else {
+                core.slots = std::move(slots);
+                core.provisional = walk.n_undecided() > 0;
+            }
         }
     }
     core.spec = guarantee_subset(spec, core.slots);

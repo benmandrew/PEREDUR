@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -36,9 +37,12 @@ enum class GateVerdict : std::uint8_t { Pass, Fail, Undecided };
 GateVerdict output_gate_verdict(const Specification& spec, const Config& cfg);
 
 // output_gate_verdict of every population entry, by index, evaluated
-// concurrently as gate_verdicts is.
-std::vector<GateVerdict> output_gate_verdicts(
-    const std::vector<Scored<Specification>>& population, const Config& cfg);
+// concurrently as gate_verdicts is and launched in index order. @p stop is
+// asked before each entry starts; once it holds, no further entry starts and
+// the rest are nullopt. A running entry finishes. Empty never stops.
+std::vector<std::optional<GateVerdict>> output_gate_verdicts(
+    const std::vector<Scored<Specification>>& population, const Config& cfg,
+    const std::function<bool()>& stop = {});
 
 // passes_output_gate of every population entry, by index, one byte per
 // candidate. Evaluated concurrently, and the verdicts are collected by index,

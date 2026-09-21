@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -97,25 +98,29 @@ GateVerdict output_gate_verdict(const Specification& spec, const Config& cfg) {
                                          : GateVerdict::Fail;
 }
 
-std::vector<GateVerdict> output_gate_verdicts(
-    const std::vector<Scored<Specification>>& population, const Config& cfg) {
+std::vector<std::optional<GateVerdict>> output_gate_verdicts(
+    const std::vector<Scored<Specification>>& population, const Config& cfg,
+    const std::function<bool()>& stop) {
+    const auto judge = [&cfg, &stop](const Specification& spec) {
+        return stop && stop() ? std::nullopt
+                              : std::optional(output_gate_verdict(spec, cfg));
+    };
     const std::size_t max_in_flight = dispatch_window();
-    std::vector<GateVerdict> verdicts(population.size(), GateVerdict::Fail);
+    std::vector<std::optional<GateVerdict>> verdicts(population.size());
     if (max_in_flight <= 1) {
         for (std::size_t idx = 0; idx < population.size(); ++idx) {
-            verdicts[idx] =
-                output_gate_verdict(population[idx].specification, cfg);
+            verdicts[idx] = judge(population[idx].specification);
         }
         return verdicts;
     }
     run_bounded_async(
         population.size(), max_in_flight,
-        [&population, &cfg](std::size_t idx) {
-            return [&spec = population[idx].specification, &cfg] {
-                return output_gate_verdict(spec, cfg);
+        [&population, &judge](std::size_t idx) {
+            return [&spec = population[idx].specification, &judge] {
+                return judge(spec);
             };
         },
-        [&verdicts](std::size_t idx, GateVerdict verdict) {
+        [&verdicts](std::size_t idx, std::optional<GateVerdict> verdict) {
             verdicts[idx] = verdict;
         });
     return verdicts;

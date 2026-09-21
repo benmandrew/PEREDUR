@@ -153,6 +153,62 @@ TEST(test_fretish_screen_counts_undecided) {
            "a spec with no small conflict screens clean");
 }
 
+// Stops once m_limit probes have been asked, counted across threads.
+struct StopAfter {
+    std::size_t m_limit = 0;
+    std::atomic<std::size_t> m_asked{0};
+};
+
+TEST(test_fretish_screen_stops_on_request) {
+    const Specification spec = spec_over({"a", "b", "c", "d"});
+    const fretish::RealizabilityVerdict clean = conflicts_on({});
+    const fretish::SubsetScreen stopped =
+        fretish::screen_small_subsets(spec, clean, 2, 1, [] { return true; });
+    expect(stopped.interrupted && !stopped.all_decided_realizable,
+           "a screen stopped before any probe is interrupted, never clean");
+    expect(!stopped.conflict && stopped.n_undecided == 0,
+           "unasked subsets are neither conflicts nor undecided");
+
+    // Stopping mid-way: size 1 finishes clean, size 2 is cut.
+    StopAfter stop{5};
+    const fretish::RealizabilityVerdict counted =
+        [&stop, &clean](const Specification& probe) {
+            ++stop.m_asked;
+            return clean(probe);
+        };
+    const fretish::SubsetScreen cut = fretish::screen_small_subsets(
+        spec, counted, 2, 1, [&stop] { return stop.m_asked >= stop.m_limit; });
+    expect(cut.interrupted && !cut.all_decided_realizable,
+           "a screen cut part-way is not clean");
+    expect(stop.m_asked == stop.m_limit, "no probe starts after the stop");
+
+    const fretish::SubsetScreen whole =
+        fretish::screen_small_subsets(spec, clean, 2, 1, [] { return false; });
+    expect(!whole.interrupted && whole.all_decided_realizable,
+           "a stop that never holds changes nothing");
+}
+
+TEST(test_fretish_core_stops_on_request) {
+    const Specification spec = spec_over({"a", "b", "c", "d"});
+    const fretish::RealizabilityVerdict verdict = conflicts_on({{"a", "c"}});
+    const fretish::GuaranteeCore screened =
+        fretish::extract_core(spec, verdict, 3, 1, true, [] { return true; });
+    expect(screened.interrupted && screened.slots.empty(),
+           "a stopped screen reports no core");
+    // Depth 1 finds nothing, and the walk's first probe is past the stop.
+    StopAfter stop{4};
+    const fretish::RealizabilityVerdict counted =
+        [&stop, &verdict](const Specification& probe) {
+            ++stop.m_asked;
+            return verdict(probe);
+        };
+    const fretish::GuaranteeCore walked =
+        fretish::extract_core(spec, counted, 1, 1, true,
+                              [&stop] { return stop.m_asked >= stop.m_limit; });
+    expect(walked.interrupted && walked.slots.empty(),
+           "a stopped walk reports no core");
+}
+
 TEST(test_fretish_reintegrate_restores_slots) {
     const Specification context = spec_over({"a", "b", "c", "d"});
     const std::vector<std::size_t> slots = {1, 3};

@@ -20,8 +20,13 @@
 // Run-wide counters for run.json. Zero on a monolithic run and on TLSF.
 struct MucStats {
     // Reintegrated specifications whose whole-spec realizability query never
-    // answered, each counted once per gate check.
+    // answered, each counted once per gate check, and those the deadline left
+    // ungated.
     inline static std::size_t n_gate_undecided{0};
+    // Reintegrated specifications the wall deadline left without a verdict:
+    // never gated, or gated undecided and not screened to the end. Each is in
+    // n_gate_undecided and none is provisional.
+    inline static std::size_t n_deadline_unscreened{0};
     // provisional_N.json files written.
     inline static std::size_t n_provisional{0};
 };
