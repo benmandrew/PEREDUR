@@ -43,6 +43,7 @@ add_executable(peredur_tests
     tlsf/filter_tests.cpp
     tlsf/fitness_tests.cpp
     tlsf/mucs_tests.cpp
+    fretish_mucs_tests.cpp
     tlsf/guarantee_parts_tests.cpp
     tlsf/genetic_tests.cpp
     tlsf/assumption_tests.cpp
@@ -123,6 +124,7 @@ set(peredur_test_suites
     tlsf_filter
     tlsf_fitness
     tlsf_mucs
+    fretish_mucs
     tlsf_genetic
     tlsf_monotone
     tlsf_assumption

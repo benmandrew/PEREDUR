@@ -79,6 +79,48 @@ bool passes_output_gate(const Spec& spec, const Config& cfg) {
            !first_failing_check(spec, gate_checks<Spec>()).has_value();
 }
 
+GateVerdict output_gate_verdict(const Specification& spec, const Config& cfg) {
+    const std::optional<bool> realizable =
+        count_live(spec.m_guarantees) == 0
+            ? std::optional<bool>(true)
+            : global_real_checker().check_realizability(spec);
+    if (!realizable.has_value()) {
+        return first_failing_check(spec, gate_checks<Specification>())
+                       .has_value()
+                   ? GateVerdict::Fail
+                   : GateVerdict::Undecided;
+    }
+    if (!*realizable) {
+        return GateVerdict::Fail;
+    }
+    return passes_output_gate(spec, cfg) ? GateVerdict::Pass
+                                         : GateVerdict::Fail;
+}
+
+std::vector<GateVerdict> output_gate_verdicts(
+    const std::vector<Scored<Specification>>& population, const Config& cfg) {
+    const std::size_t max_in_flight = dispatch_window();
+    std::vector<GateVerdict> verdicts(population.size(), GateVerdict::Fail);
+    if (max_in_flight <= 1) {
+        for (std::size_t idx = 0; idx < population.size(); ++idx) {
+            verdicts[idx] =
+                output_gate_verdict(population[idx].specification, cfg);
+        }
+        return verdicts;
+    }
+    run_bounded_async(
+        population.size(), max_in_flight,
+        [&population, &cfg](std::size_t idx) {
+            return [&spec = population[idx].specification, &cfg] {
+                return output_gate_verdict(spec, cfg);
+            };
+        },
+        [&verdicts](std::size_t idx, GateVerdict verdict) {
+            verdicts[idx] = verdict;
+        });
+    return verdicts;
+}
+
 template <typename Spec>
 std::vector<char> gate_verdicts(const std::vector<Scored<Spec>>& population,
                                 const Config& cfg) {

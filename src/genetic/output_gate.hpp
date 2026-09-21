@@ -5,6 +5,7 @@
 // tlsf::Specification.
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -14,11 +15,30 @@
 #include "filter/streaming_maximal.hpp"
 #include "genetic/accumulator.hpp"
 #include "genetic/scored.hpp"
+#include "requirement.hpp"
 
 // True if @p spec counts as a repair: its status on cfg.status_grading is the
 // top tier and it passes every correctness-table row.
 template <typename Spec>
 bool passes_output_gate(const Spec& spec, const Config& cfg);
+
+// The gate with its realizability query's undecided answer kept apart, which
+// FRETISH MUC repair needs to tell a spec that fails the gate from one the gate
+// could not judge.
+enum class GateVerdict : std::uint8_t { Pass, Fail, Undecided };
+
+// Pass exactly where passes_output_gate holds. Asks whole-specification
+// realizability first: false is Fail, and undecided is Undecided where every
+// correctness-table row passes and Fail otherwise. Only a decided realizable
+// specification goes on to the status query, whose subset walk under
+// status_grading = "mrs" the realizability memo then answers by subsumption
+// rather than by asking ltlsynt about near-whole specifications one by one.
+GateVerdict output_gate_verdict(const Specification& spec, const Config& cfg);
+
+// output_gate_verdict of every population entry, by index, evaluated
+// concurrently as gate_verdicts is.
+std::vector<GateVerdict> output_gate_verdicts(
+    const std::vector<Scored<Specification>>& population, const Config& cfg);
 
 // passes_output_gate of every population entry, by index, one byte per
 // candidate. Evaluated concurrently, and the verdicts are collected by index,

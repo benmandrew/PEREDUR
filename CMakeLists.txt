@@ -124,6 +124,7 @@ target_sources(peredur_fitness PRIVATE
     src/tlsf/filter.cpp
     src/fingerprint/prefilter.cpp
     src/tlsf/mucs.cpp
+    src/repair/mucs.cpp
     src/tlsf/guarantee_parts.cpp
     src/tlsf/pipeline.cpp
     src/tlsf/evolve.cpp

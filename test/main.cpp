@@ -70,6 +70,7 @@ const std::vector<Suite>& suites() {
         suite_named("tlsf_filter"),
         suite_named("tlsf_fitness"),
         Suite{"tlsf_mucs", true, "tlsf_guarantee_parts"},
+        suite_named("fretish_mucs"),
         suite_named("tlsf_genetic"),
         suite_named("tlsf_monotone"),
         suite_named("tlsf_assumption"),
