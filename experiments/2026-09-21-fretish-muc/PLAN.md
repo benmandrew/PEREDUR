@@ -4,7 +4,7 @@ Registered 2026-09-21, before launch.
 
 ## Question
 
-How does MUC repair mode, new on the FRETISH path in `feat/fretish-muc` (`5a41203`, `c345203`, `d002997`), perform on three FRETISH specifications imported from FRET exports: `ventilator` (114 guarantees), `rad` (74 guarantees, 3 modes) and `valu3s-uc6` (12 guarantees)? All three are unrealizable under `realize`. Monolithic repair does not finish on the ventilator: on 2026-09-18 two generations of 20 took 1,599 s and returned nothing. The campaign also reads whether the two factors of `2026-09-09-fretish-grading` move anything under MUC mode.
+How does MUC repair mode, new on the FRETISH path in `feat/fretish-muc` (`5a41203`, `c345203`, `d002997`, and `0cde635`, a gcc build fix with no change in behaviour), perform on three FRETISH specifications imported from FRET exports: `ventilator` (114 guarantees), `rad` (74 guarantees, 3 modes) and `valu3s-uc6` (12 guarantees)? All three are unrealizable under `realize`. Monolithic repair does not finish on the ventilator: on 2026-09-18 two generations of 20 took 1,599 s and returned nothing. The campaign also reads whether the two factors of `2026-09-09-fretish-grading` move anything under MUC mode.
 
 ## Design
 
@@ -40,3 +40,7 @@ None. MUC mode is not the default and this campaign does not propose making it s
 ## Budget
 
 12 hours of wall-clock, set by the user. The measured single runs were: ventilator bounded by the deadline, about 1,800 s plus up to about 2 minutes of in-flight overrun; RAD 75 s on a loaded box; `valu3s-uc6` 17 s. Per host that is 60 ventilator runs × about 1,950 s / 4 slots ≈ 8.1 h, plus about 0.5 h for the other two specs, or about 8.6 h. The harness cap is 4,050 s a run.
+
+## Launch record
+
+The first enqueue at `4dbc77f` failed to build on both hosts: gcc 11 at `-O3` reported `-Werror=maybe-uninitialized` at `src/repair/evolution.cpp:175`, and the freshness gate refused the stale binary. Both entries were dequeued after 2 of 3 attempts, having written no rows. `0cde635` removes the `std::optional` gcc misreads, and the campaign was re-enqueued at the commit that adds this record. Endpoints, tests and design are unchanged. `provenance/fretish-muc` holds `4dbc77f`, and `provenance/fretish-muc-relaunch` holds the relaunch commit.
