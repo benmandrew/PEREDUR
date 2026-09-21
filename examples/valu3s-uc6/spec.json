@@ -1,0 +1,128 @@
+{
+  "assumptions": [],
+  "guarantees": [
+    {
+      "condition": "parallel_guidance_requested",
+      "condition-type": "trigger",
+      "response": "check_imu_connection -> parallel_guidance_mode",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "imu_fail",
+      "condition-type": "trigger",
+      "response": "stop",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "manual_mode_requestd",
+      "condition-type": "trigger",
+      "response": "stop -> manual_mode",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "control_cycle",
+      "timing": {
+        "type": "WithinTicks",
+        "ticks": 1
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "driving_cycle_complete",
+      "timing": {
+        "type": "WithinTicks",
+        "ticks": 2
+      }
+    },
+    {
+      "condition": "unwanted_manual_mode_requested",
+      "condition-type": "trigger",
+      "response": "drop_request",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "rc_disconnect_detected",
+      "condition-type": "trigger",
+      "response": "rc_disconnected_warning",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "unrecoverabl_error",
+      "condition-type": "trigger",
+      "response": "stop",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "unwanted_parallel_guidance_request",
+      "condition-type": "trigger",
+      "response": "drop_request",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "rc_connected | ! rc_connected & rc_connect_request -> rc_connected",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "comm_request",
+      "condition-type": "trigger",
+      "response": "authentication -> communication",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "parallel_guidance_requested",
+      "condition-type": "trigger",
+      "response": "check_gps -> parallel_guidance_mode",
+      "timing": {
+        "type": "Eventually"
+      }
+    }
+  ],
+  "in_atoms": [
+    "authentication",
+    "comm_request",
+    "imu_fail",
+    "manual_mode_requestd",
+    "parallel_guidance_requested",
+    "rc_connect_request",
+    "rc_connected",
+    "rc_disconnect_detected",
+    "unrecoverabl_error",
+    "unwanted_manual_mode_requested",
+    "unwanted_parallel_guidance_request"
+  ],
+  "out_atoms": [
+    "check_gps",
+    "check_imu_connection",
+    "communication",
+    "control_cycle",
+    "driving_cycle_complete",
+    "drop_request",
+    "manual_mode",
+    "parallel_guidance_mode",
+    "rc_disconnected_warning",
+    "stop"
+  ]
+}
