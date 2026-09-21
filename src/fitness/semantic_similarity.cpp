@@ -13,6 +13,7 @@
 #include <variant>
 #include <vector>
 
+#include "fitness/mean_or_perfect.hpp"
 #include "fitness/model_counter.hpp"
 #include "fitness/transfer_matrix.hpp"
 #include "formula_key.hpp"
@@ -260,14 +261,12 @@ double semantic_similarity(const Specification& specification,
     const std::vector<std::function<double()>> terms =
         semantic_similarity_terms(specification, other_specification,
                                   step_count, metric);
-    if (terms.empty()) {
-        return 1.0;
-    }
-    double total = 0.0;
+    std::vector<double> values;
+    values.reserve(terms.size());
     for (const std::function<double()>& term : terms) {
-        total += term();
+        values.push_back(term());
     }
-    return total / static_cast<double>(terms.size());
+    return mean_or_perfect(values);
 }
 
 double semantic_similarity(const Specification& specification,

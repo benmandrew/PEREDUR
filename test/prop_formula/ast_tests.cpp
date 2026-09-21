@@ -1,12 +1,15 @@
 #include <string>
+#include <string_view>
 
 #include "prop_formula.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-void test_make_atom_and_inspect() {
+constexpr std::string_view k_test_suite = "prop_formula_ast";
+
+TEST(test_make_atom_and_inspect) {
     const Formula formula = Formula::make_atom("P");
     expect(formula.kind() == Formula::Kind::Atom,
            "prop-formula-ast: atom should report Kind::Atom");
@@ -18,7 +21,7 @@ void test_make_atom_and_inspect() {
            "prop-formula-ast: atom should stringify to itself");
 }
 
-void test_make_unary_and_inspect() {
+TEST(test_make_unary_and_inspect) {
     const Formula child = Formula::make_atom("P");
     const Formula formula = Formula::make_unary(Formula::Kind::Not, child);
     expect(formula.kind() == Formula::Kind::Not,
@@ -32,7 +35,7 @@ void test_make_unary_and_inspect() {
            "prop-formula-ast: unary should stringify canonically");
 }
 
-void test_make_binary_and_inspect() {
+TEST(test_make_binary_and_inspect) {
     const Formula left = Formula::make_atom("P");
     const Formula right = Formula::make_atom("Q");
     const Formula formula =
@@ -51,9 +54,3 @@ void test_make_binary_and_inspect() {
 }
 
 }  // namespace
-
-void run_prop_formula_ast_tests() {
-    test_make_atom_and_inspect();
-    test_make_unary_and_inspect();
-    test_make_binary_and_inspect();
-}

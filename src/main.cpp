@@ -13,8 +13,7 @@
 #include "thread_pool.hpp"
 
 int main(int argc, const char* const argv[]) {
-    if (argc == 0 || argv == nullptr || argv[0] == nullptr) {
-        std::cerr << "fatal: missing argv[0]\n";
+    if (!has_program_name(argc, argv)) {
         return 1;
     }
     if (handle_info_flags(argc, argv, print_help)) {

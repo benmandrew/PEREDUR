@@ -19,7 +19,9 @@ struct WellSeparationStats {
 };
 
 /// Returns whether the system can vacuously satisfy @p specification by
-/// falsifying its own assumptions.
+/// falsifying its own assumptions. Instantiated for Specification, whose
+/// assumptions are its assumption requirements, and tlsf::Specification, whose
+/// assumptions are its INITIALLY, REQUIRE and ASSUME sections.
 ///
 /// Realizability is decided on `(assumptions) -> (guarantees)`, so a candidate
 /// is satisfied for free on any trace where the assumptions fail. A candidate
@@ -63,15 +65,18 @@ struct WellSeparationStats {
 /// @param checker       Realizability checker for the ltlsynt query;
 /// thread-safe
 ///                      for concurrent calls
-bool specification_is_not_well_separated(const Specification& specification,
+template <typename Spec>
+bool specification_is_not_well_separated(const Spec& specification,
                                          RealizabilityChecker& checker);
 
 /// Returns a filter dropping specifications that are not well-separated: ones
 /// the system can vacuously satisfy by forcing its own assumptions to fail.
 /// @p checker is captured by reference and must outlive the returned filter.
+/// Instantiated for Specification (the default) and tlsf::Specification.
 ///
 /// @param checker       Realizability checker for the ltlsynt query; must be
 ///                      thread-safe when max_in_flight exceeds 1
 /// @param max_in_flight Concurrent checks. Each is a full ltlsynt query.
-FilterFunction make_well_separation_filter(RealizabilityChecker& checker,
-                                           std::size_t max_in_flight = 1);
+template <typename Spec = Specification>
+FilterFunctionT<Spec> make_well_separation_filter(
+    RealizabilityChecker& checker, std::size_t max_in_flight = 1);

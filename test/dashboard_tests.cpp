@@ -4,42 +4,21 @@
 // means are labelled by name.
 
 #include <cstddef>
-#include <filesystem>
 #include <fstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
 
 #include "dashboard.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-// A directory unique to this suite, removed on scope exit so a failing test
-// cannot leave the next run reading a stale log.
-class TempDir {
-   public:
-    TempDir()
-        : m_path(std::filesystem::temp_directory_path() /
-                 "peredur_dashboard_tests") {
-        std::filesystem::remove_all(m_path);
-        std::filesystem::create_directories(m_path);
-    }
-    ~TempDir() { std::filesystem::remove_all(m_path); }
-
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-    TempDir(TempDir&&) = delete;
-    TempDir& operator=(TempDir&&) = delete;
-
-    [[nodiscard]] std::string string() const { return m_path.string(); }
-
-   private:
-    std::filesystem::path m_path;
-};
+constexpr std::string_view k_test_suite = "dashboard";
 
 std::vector<nlohmann::json> read_records(const std::string& path) {
     std::vector<nlohmann::json> records;
@@ -65,8 +44,8 @@ StageObservation observation(const std::string& name, std::size_t n_in,
     return obs;
 }
 
-void test_records_are_one_json_object_per_line() {
-    const TempDir dir;
+TEST(test_records_are_one_json_object_per_line) {
+    const TempDir dir("dashboard_tests");
     {
         DashboardWriter writer(dir.string(), true);
         expect(writer.enabled(),
@@ -102,8 +81,8 @@ void test_records_are_one_json_object_per_line() {
            "are distinct, which is what the population sizes cannot show");
 }
 
-void test_unmeasured_fields_are_omitted_not_defaulted() {
-    const TempDir dir;
+TEST(test_unmeasured_fields_are_omitted_not_defaulted) {
+    const TempDir dir("dashboard_tests");
     {
         DashboardWriter writer(dir.string(), true);
         // The TLSF driver counts realizable survivors only at the end of a run,
@@ -128,7 +107,7 @@ void test_unmeasured_fields_are_omitted_not_defaulted() {
            "belonged to");
 }
 
-void test_writer_survives_an_unwritable_directory() {
+TEST(test_writer_survives_an_unwritable_directory) {
     DashboardWriter writer("/nonexistent-directory-for-peredur-tests", true);
     expect(!writer.enabled(),
            "dashboard: a writer that cannot open its log should report itself "
@@ -144,7 +123,7 @@ void test_writer_survives_an_unwritable_directory() {
            "page");
 }
 
-void test_mean_objectives_labels_and_averages() {
+TEST(test_mean_objectives_labels_and_averages) {
     const std::vector<std::string> names = {"syntactic", "semantic"};
     const std::vector<std::vector<double>> population = {
         {1.0, 0.0}, {0.0, 1.0}, {0.5, 0.5}};
@@ -159,7 +138,7 @@ void test_mean_objectives_labels_and_averages() {
            "population");
 }
 
-void test_mean_objectives_handles_ragged_and_empty_input() {
+TEST(test_mean_objectives_handles_ragged_and_empty_input) {
     const std::vector<std::string> names = {"a", "b", "c"};
     // A dropped individual can leave a shorter objective vector; the missing
     // tail must not be counted as a zero.
@@ -182,11 +161,3 @@ void test_mean_objectives_handles_ragged_and_empty_input() {
 }
 
 }  // namespace
-
-void run_dashboard_tests() {
-    test_records_are_one_json_object_per_line();
-    test_unmeasured_fields_are_omitted_not_defaulted();
-    test_writer_survives_an_unwritable_directory();
-    test_mean_objectives_labels_and_averages();
-    test_mean_objectives_handles_ragged_and_empty_input();
-}

@@ -11,6 +11,7 @@
 #include "genetic/monotone.hpp"
 #include "genetic/mutation.hpp"
 #include "prop_formula.hpp"
+#include "slots.hpp"
 
 namespace {
 
@@ -247,36 +248,16 @@ std::vector<Section*> side_sections(tlsf::Specification& spec,
     return {sections[0], sections[1], sections[2]};
 }
 
-// A conjunct a mutation may rewrite: its section, its slot in it, and which of
-// the side's three sections it came from. Deleted conjuncts are left out, so a
-// mutation is never spent rewriting content nothing reads.
-//
-// The section index is what makes a rewrite section-aware. Index 0 is the
-// initial-condition section — INITIALLY on the assumption side, PRESET on the
-// guarantee one — and basic TLSF requires both to be propositional, over the
-// inputs and the outputs respectively. One pool and one temporal/propositional
-// draw for the whole side ignored that, and the 2026-08-14-aurus-h2h corpus
-// shows the result: 15 INITIALLY entries carrying a temporal operator and 8
-// PRESET entries carrying an input, against none in any of the 25 inputs.
-// Those repairs are outside the format they are written in.
-struct Slot {
-    Section* m_section;
-    std::size_t m_index;
-    std::size_t m_section_index;
-};
-
-std::vector<Slot> side_live_slots(const std::vector<Section*>& sections) {
-    std::vector<Slot> slots;
-    for (std::size_t index = 0; index < sections.size(); ++index) {
-        Section* section = sections[index];
-        for (std::size_t i = 0; i < section->size(); ++i) {
-            if (!(*section)[i].m_removed) {
-                slots.push_back({section, i, index});
-            }
-        }
-    }
-    return slots;
-}
+// The section index of a Slot is what makes a rewrite section-aware. Index 0 is
+// the initial-condition section — INITIALLY on the assumption side, PRESET on
+// the guarantee one — and basic TLSF requires both to be propositional, over
+// the inputs and the outputs respectively. One pool and one
+// temporal/propositional draw for the whole side ignored that, and the
+// 2026-08-14-aurus-h2h corpus shows the result: 15 INITIALLY entries carrying a
+// temporal operator and 8 PRESET entries carrying an input, against none in any
+// of the 25 inputs. Those repairs are outside the format they are written in.
+using tlsf::internal::live_slots;
+using tlsf::internal::Slot;
 
 // The initial-condition section admits neither a temporal operator nor a
 // signal from the other side.
@@ -552,8 +533,7 @@ tlsf::Specification tlsf_remove_guarantee(const tlsf::Specification& spec,
                                           const RandomSource& random_source) {
     tlsf::Specification mutated = spec;
     const auto sections = tlsf::mutable_guarantee_sections_of(mutated);
-    const std::vector<Slot> slots =
-        side_live_slots({sections[0], sections[1], sections[2]});
+    const std::vector<Slot> slots = live_slots(sections);
     assert(!slots.empty());
     const Slot& slot = slots[random_source.next_index(slots.size())];
     (*slot.m_section)[slot.m_index].m_removed = true;
@@ -612,14 +592,14 @@ tlsf::Specification tlsf_mutate(const tlsf::Specification& spec,
     const double side_draw = random_source.next_real();
     bool assumption_side = side_draw < cfg.tlsf_p_assumption;
     std::vector<Section*> sections = side_sections(mutated, assumption_side);
-    std::vector<Slot> slots = side_live_slots(sections);
+    std::vector<Slot> slots = live_slots(sections);
     if (slots.empty()) {
         // Fall back to the other side when the chosen one has nothing left to
         // rewrite, whether because it is absent or because every conjunct on it
         // has been deleted.
         assumption_side = !assumption_side;
         sections = side_sections(mutated, assumption_side);
-        slots = side_live_slots(sections);
+        slots = live_slots(sections);
     }
     if (slots.empty()) {
         return spec;

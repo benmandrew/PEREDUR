@@ -35,7 +35,7 @@ cmake --build build --target lint    # cpplint + clang-tidy + cppcheck + config 
 cmake --build build --target format  # format-ci for a dry run
 ```
 
-Tests use `expect`/`fail` from `test/test_support.hpp`, with each suite a free function declared in `test/test_suite.hpp`. Hooks live in `.githooks/`; edit them there.
+Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves with `TEST(name)` from `test/test_registry.hpp`, one suite per file. Hooks live in `.githooks/`; edit them there.
 
 ## Code style
 
@@ -57,7 +57,7 @@ Tests use `expect`/`fail` from `test/test_support.hpp`, with each suite a free f
 
 ### Config and output
 
-- A new TOML key touches `apply_*` and `config_key_spec()` in `src/config_io.cpp`, `config_json()` in `src/repair/manifest.cpp`, `schemas/config-schema.json`, `example-config.toml` (whose values must equal the built-in defaults), and `DEFAULT_FIELDS` or `GEN_CONFIGS_FIELDS` in `scripts/check_config_schema.py`. `lint` checks them against each other.
+- A new TOML key is one row in `k_config_keys` (`src/config/keys.hpp`), which drives the parser, the key spec and `config_json()`; a new enum type also needs its `EnumNames` array in `src/config/enum_names.hpp` and a `ConfigMember` alternative. It also touches `schemas/config-schema.json`, `example-config.toml` (whose values must equal the built-in defaults), and `DEFAULT_FIELDS` or `GEN_CONFIGS_FIELDS` in `scripts/check_config_schema.py`. `lint` checks them against each other.
 - Moving a C++ default changes what every archived config means: record it under "Config vintage" in `experiments/README.md`. Removing a key retires the sweeps and runner profiles that emit it.
 - A new `--diagnostics` counter also joins `write_run_manifest` and bumps `k_schema_version`.
 - A new `peredur` flag joins the table in `src/main.cpp`, or `find_unknown_arg` rejects it.
@@ -81,7 +81,8 @@ Tests use `expect`/`fail` from `test/test_support.hpp`, with each suite a free f
 
 - Every header in `include/` needs a `docs/api/` `.rst` page and a `docs/index.rst` toctree entry.
 - Only `///` reaches Doxygen. Wrap text like `<input>` in backticks, or `WARN_AS_ERROR` fails the docs build.
-- A new driver's end-to-end suite needs its function in `test/drivers/e2e_tests.cpp`, its declaration in `test/test_suite.hpp`, both dispatch points in `test/main.cpp`, an `add_dependencies` entry and a ctest registration in `test/CMakeLists.txt`.
+- A new suite needs its name in the table in `test/main.cpp` and in `peredur_test_suites` in `test/CMakeLists.txt`; a test registered under a suite the table lacks stops the binary, but one missing from the CMake list silently never runs under ctest. A new driver's end-to-end suite registers its tests with `TEST_IN` in `test/drivers/e2e_tests.cpp` and also needs an `add_dependencies` entry.
+- Tests in one suite run in definition order, so reordering a file's `TEST`s reorders the run.
 - A new binary joins `BINARIES` in `scripts/coverage_badge.py`. Run that script before merging a change that moves coverage.
 
 ### Campaigns and provenance

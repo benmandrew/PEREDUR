@@ -4,7 +4,7 @@ What adding, moving or removing a config key does to archived campaigns, and how
 
 ## Config keys
 
-A new TOML key needs four edits that the compiler does not tie together: its `apply_*` reader in `src/config_io.cpp`, `config_json()` in `src/repair/manifest.cpp` (else it never reaches `run.json`), `config_key_spec()` in `src/config_io.cpp` (else the parser warns "unknown key"), and `schemas/config-schema.json` (else editors reject it). `scripts/check_config_schema.py`, run by `lint`, checks the last three against each other and against `example-config.toml`.
+A new TOML key needs an entry in `k_config_keys` in `src/config/keys.hpp`, which drives the reader and the unknown-key warning in `src/config_io.cpp` and `config_json()` in `src/repair/manifest.cpp`, and an entry in `schemas/config-schema.json` (else editors reject it). An enum-valued key also needs its spellings in `EnumNames` in `src/config/enum_names.hpp`, which both the parser and `run.json` use. A check that spans two keys is written by hand in `apply_toml`. `scripts/check_config_schema.py`, run by `lint`, checks the table against the schema and `example-config.toml`.
 
 Every value in `example-config.toml` must equal its default in `include/config.hpp`, so copying the file whole is a no-op. The same script enforces this through `DEFAULT_FIELDS`; a new key goes there or into `UNPINNED_KEYS` (the enums and `runtime.parallel`), or the check fails. Eight keys had silently drifted before it existed.
 

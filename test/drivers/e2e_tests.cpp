@@ -1,11 +1,7 @@
-#include <unistd.h>
-
 #include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <filesystem>
-#include <fstream>
-#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -13,7 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include "runner/process.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 // Where the driver binaries land, from CMake. These suites are the only place
@@ -133,45 +129,6 @@ population_size = 8
 parallel = 1
 )";
 
-// A directory unique to the calling suite and to this process, removed on
-// scope exit so a failed run cannot feed the next one stale repairs.
-class TempDir {
-   public:
-    explicit TempDir(const std::string& name)
-        : m_path(std::filesystem::temp_directory_path() /
-                 ("peredur_e2e_" + name + "_" + std::to_string(getpid()))) {
-        std::filesystem::remove_all(m_path);
-        std::filesystem::create_directories(m_path);
-    }
-    ~TempDir() { std::filesystem::remove_all(m_path); }
-
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-    TempDir(TempDir&&) = delete;
-    TempDir& operator=(TempDir&&) = delete;
-
-    [[nodiscard]] std::filesystem::path path() const { return m_path; }
-    [[nodiscard]] std::string string() const { return m_path.string(); }
-
-   private:
-    std::filesystem::path m_path;
-};
-
-std::filesystem::path write_file(const std::filesystem::path& path,
-                                 const std::string& contents) {
-    std::filesystem::create_directories(path.parent_path());
-    std::ofstream file(path);
-    file << contents;
-    return path;
-}
-
-std::string read_file(const std::filesystem::path& path) {
-    std::ifstream file(path);
-    std::ostringstream contents;
-    contents << file.rdbuf();
-    return contents.str();
-}
-
 bool contains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;
 }
@@ -241,7 +198,7 @@ nlohmann::json expect_run_manifest(const std::filesystem::path& dir,
     const std::filesystem::path manifest_path = dir / "run.json";
     expect(std::filesystem::exists(manifest_path), label + ": writes run.json");
     const nlohmann::json manifest =
-        nlohmann::json::parse(read_file(manifest_path));
+        nlohmann::json::parse(read_text(manifest_path));
     expect(manifest.at("seed").get<int>() == seed,
            label + ": the manifest carries the seed it was given");
     expect(manifest.at("input").get<std::string>() == input,
@@ -296,12 +253,12 @@ nlohmann::json expect_run_manifest(const std::filesystem::path& dir,
     return manifest;
 }
 
-void test_peredur_repairs_tlsf() {
-    const TempDir dir("peredur_tlsf");
+TEST_IN("driver_peredur", test_peredur_repairs_tlsf) {
+    const TempDir dir("e2e_peredur_tlsf");
     const std::string input =
-        write_file(dir.path() / "spec.tlsf", k_unrealizable).string();
+        write_text(dir.path() / "spec.tlsf", k_unrealizable).string();
     const std::string config =
-        write_file(dir.path() / "config.toml", k_config).string();
+        write_text(dir.path() / "config.toml", k_config).string();
     const std::filesystem::path first = dir.path() / "first";
     const std::filesystem::path second = dir.path() / "second";
     std::filesystem::create_directories(first);
@@ -334,17 +291,17 @@ void test_peredur_repairs_tlsf() {
     for (std::size_t i = 0; i < first_repairs.size(); ++i) {
         expect(first_repairs[i].filename() == second_repairs[i].filename(),
                "peredur: the repairs are named the same way twice");
-        expect(read_file(first_repairs[i]) == read_file(second_repairs[i]),
+        expect(read_text(first_repairs[i]) == read_text(second_repairs[i]),
                "peredur: one seed writes byte-identical repairs twice");
     }
 }
 
-void test_peredur_repairs_fretish() {
-    const TempDir dir("peredur_fretish");
+TEST_IN("driver_peredur", test_peredur_repairs_fretish) {
+    const TempDir dir("e2e_peredur_fretish");
     const std::string input =
-        write_file(dir.path() / "spec.json", k_fretish).string();
+        write_text(dir.path() / "spec.json", k_fretish).string();
     const std::string config =
-        write_file(dir.path() / "config.toml", k_config).string();
+        write_text(dir.path() / "config.toml", k_config).string();
     const std::filesystem::path out = dir.path() / "out";
     std::filesystem::create_directories(out);
 
@@ -358,15 +315,15 @@ void test_peredur_repairs_fretish() {
     for (const auto& repair : repair_files(out)) {
         expect(repair.extension() == ".json",
                "peredur: a FRETISH run writes FRETISH repairs");
-        expect(nlohmann::json::parse(read_file(repair)).contains("guarantees"),
+        expect(nlohmann::json::parse(read_text(repair)).contains("guarantees"),
                "peredur: each repair parses as a specification");
     }
 }
 
-void test_peredur_rejects_bad_arguments() {
-    const TempDir dir("peredur_args");
+TEST_IN("driver_peredur", test_peredur_rejects_bad_arguments) {
+    const TempDir dir("e2e_peredur_args");
     const std::string input =
-        write_file(dir.path() / "spec.tlsf", k_unrealizable).string();
+        write_text(dir.path() / "spec.tlsf", k_unrealizable).string();
 
     // An unknown flag is refused rather than ignored, which is what stops a
     // campaign silently running without the knob it thought it set.
@@ -387,12 +344,12 @@ void test_peredur_rejects_bad_arguments() {
            "peredur: an input that is not there is refused");
 }
 
-void test_realize_decides_both_ways() {
-    const TempDir dir("realize");
+TEST_IN("driver_realize", test_realize_decides_both_ways) {
+    const TempDir dir("e2e_realize");
     const std::string unrealizable =
-        write_file(dir.path() / "unrealizable.tlsf", k_unrealizable).string();
+        write_text(dir.path() / "unrealizable.tlsf", k_unrealizable).string();
     const std::string realizable =
-        write_file(dir.path() / "realizable.tlsf", k_realizable).string();
+        write_text(dir.path() / "realizable.tlsf", k_realizable).string();
 
     const DriverRun one = run_driver("realize", {unrealizable});
     expect(one.m_exit_code == 0, "realize: a single input exits zero");
@@ -418,12 +375,12 @@ void test_realize_decides_both_ways() {
     expect(absent.m_exit_code != 0, "realize: an unreadable input is refused");
 }
 
-void test_ltl_lowers_both_formats() {
-    const TempDir dir("ltl");
+TEST_IN("driver_ltl", test_ltl_lowers_both_formats) {
+    const TempDir dir("e2e_ltl");
     const std::string tlsf =
-        write_file(dir.path() / "spec.tlsf", k_unrealizable).string();
+        write_text(dir.path() / "spec.tlsf", k_unrealizable).string();
     const std::string fretish =
-        write_file(dir.path() / "spec.json", k_fretish).string();
+        write_text(dir.path() / "spec.json", k_fretish).string();
 
     const DriverRun lowered = run_driver("ltl", {tlsf});
     expect(lowered.m_exit_code == 0, "ltl: a TLSF input exits zero");
@@ -446,14 +403,14 @@ void test_ltl_lowers_both_formats() {
     expect(absent.m_exit_code != 0, "ltl: an unreadable input is refused");
 }
 
-void test_mucs_extracts_a_core() {
-    const TempDir dir("mucs");
+TEST_IN("driver_mucs", test_mucs_extracts_a_core) {
+    const TempDir dir("e2e_mucs");
     const std::string unrealizable =
-        write_file(dir.path() / "unrealizable.tlsf", k_unrealizable).string();
+        write_text(dir.path() / "unrealizable.tlsf", k_unrealizable).string();
     const std::string realizable =
-        write_file(dir.path() / "realizable.tlsf", k_realizable).string();
+        write_text(dir.path() / "realizable.tlsf", k_realizable).string();
     const std::string fretish =
-        write_file(dir.path() / "spec.json", k_fretish).string();
+        write_text(dir.path() / "spec.json", k_fretish).string();
 
     const DriverRun core = run_driver("mucs", {unrealizable});
     expect(core.m_exit_code == 0, "mucs: an unrealizable input exits zero");
@@ -475,12 +432,12 @@ void test_mucs_extracts_a_core() {
            "mucs: the refusal says which format it wanted");
 }
 
-void test_compare_orders_repairs_against_ideals() {
-    const TempDir dir("compare");
+TEST_IN("driver_compare", test_compare_orders_repairs_against_ideals) {
+    const TempDir dir("e2e_compare");
     const std::filesystem::path repairs = dir.path() / "repairs";
     const std::filesystem::path ideals = dir.path() / "ideals";
-    write_file(repairs / "repair_0.tlsf", k_realizable);
-    write_file(ideals / "add_assumption.tlsf", k_realizable);
+    write_text(repairs / "repair_0.tlsf", k_realizable);
+    write_text(ideals / "add_assumption.tlsf", k_realizable);
 
     const DriverRun run = run_driver("compare", {"--repairs", repairs.string(),
                                                  "--ideals", ideals.string()});
@@ -493,7 +450,7 @@ void test_compare_orders_repairs_against_ideals() {
     // The unrealizable original is strictly stronger than its own weakening,
     // which is the relation the search is trying to move away from.
     const std::filesystem::path stronger = dir.path() / "stronger";
-    write_file(stronger / "repair_0.tlsf", k_unrealizable);
+    write_text(stronger / "repair_0.tlsf", k_unrealizable);
     const DriverRun ordered = run_driver(
         "compare",
         {"--repairs", stronger.string(), "--ideals", ideals.string()});
@@ -508,11 +465,11 @@ void test_compare_orders_repairs_against_ideals() {
            "compare: a repairs directory that is not there is refused");
 }
 
-void test_lint_ideals_checks_a_subject() {
-    const TempDir dir("lint_ideals");
+TEST_IN("driver_lint_ideals", test_lint_ideals_checks_a_subject) {
+    const TempDir dir("e2e_lint_ideals");
     const std::filesystem::path good = dir.path() / "good";
-    write_file(good / "spec.tlsf", k_unrealizable);
-    write_file(good / "fixes" / "add_assumption.tlsf", k_realizable);
+    write_text(good / "spec.tlsf", k_unrealizable);
+    write_text(good / "fixes" / "add_assumption.tlsf", k_realizable);
 
     const DriverRun passing = run_driver("lint-ideals", {good.string()});
     expect(passing.m_exit_code == 0,
@@ -526,8 +483,8 @@ void test_lint_ideals_checks_a_subject() {
     // reachable, well separated and non-trivial, and unrealizable, so exactly
     // one column fails.
     const std::filesystem::path bad = dir.path() / "bad";
-    write_file(bad / "spec.tlsf", k_unrealizable);
-    write_file(bad / "fixes" / "still_unrealizable.tlsf", k_unrealizable);
+    write_text(bad / "spec.tlsf", k_unrealizable);
+    write_text(bad / "fixes" / "still_unrealizable.tlsf", k_unrealizable);
 
     const DriverRun failing = run_driver("lint-ideals", {bad.string()});
     expect(failing.m_exit_code == 1,
@@ -566,15 +523,15 @@ std::string run_signal_tracer(const std::vector<std::string>& arguments) {
     return read.first;
 }
 
-void test_signal_tracer_writes_a_report() {
-    const TempDir dir("signal_tracer");
+TEST_IN("driver_signal_tracer", test_signal_tracer_writes_a_report) {
+    const TempDir dir("e2e_signal_tracer");
     const std::filesystem::path report = dir.path() / "crash.txt";
 
     const std::string streamed =
         run_signal_tracer({report.string(), "6", "4242", "seed=1 spec=probe"});
     expect(streamed.empty(),
            "signal_tracer: a named report file takes the whole report");
-    const std::string written = read_file(report);
+    const std::string written = read_text(report);
     expect(contains(written, "=== CRASH REPORT ==="),
            "signal_tracer: the report is written to the named file");
     expect(contains(written, "Signal: SIGABRT (6)"),
@@ -589,7 +546,7 @@ void test_signal_tracer_writes_a_report() {
     // A second crash appends rather than replacing: a run that dies twice must
     // not lose the first report.
     run_signal_tracer({report.string(), "11", "4243", ""});
-    const std::string appended = read_file(report);
+    const std::string appended = read_text(report);
     expect(contains(appended, "PID:    4242") &&
                contains(appended, "PID:    4243"),
            "signal_tracer: a second report is appended to the first");
@@ -597,16 +554,16 @@ void test_signal_tracer_writes_a_report() {
            "signal_tracer: the second signal is named too");
 }
 
-void test_maximal_reports_both_formats() {
-    const TempDir dir("maximal");
+TEST_IN("driver_maximal", test_maximal_reports_both_formats) {
+    const TempDir dir("e2e_maximal");
 
     // The unrealizable specification implies its own weakening and not the
     // reverse, so the pair has one maximal member; the third file is a copy of
     // the second and collapses into it before any solver call.
     const std::filesystem::path tlsf = dir.path() / "tlsf";
-    write_file(tlsf / "original.tlsf", k_unrealizable);
-    write_file(tlsf / "weaker.tlsf", k_realizable);
-    write_file(tlsf / "weaker_again.tlsf", k_realizable);
+    write_text(tlsf / "original.tlsf", k_unrealizable);
+    write_text(tlsf / "weaker.tlsf", k_realizable);
+    write_text(tlsf / "weaker_again.tlsf", k_realizable);
 
     const DriverRun tlsf_run = run_driver("maximal", {tlsf.string()});
     expect(tlsf_run.m_exit_code == 0, "maximal: a TLSF directory exits zero");
@@ -626,9 +583,9 @@ void test_maximal_reports_both_formats() {
     // the manifest as a specification would land in the report as an unparsed
     // file, so its absence from the counts is the assertion.
     const std::filesystem::path fretish = dir.path() / "fretish";
-    write_file(fretish / "repair_0.json", k_fretish);
-    write_file(fretish / "repair_1.json", k_fretish_weaker);
-    write_file(fretish / "run.json", "{\"schema_version\": 25}\n");
+    write_text(fretish / "repair_0.json", k_fretish);
+    write_text(fretish / "repair_1.json", k_fretish_weaker);
+    write_text(fretish / "run.json", "{\"schema_version\": 25}\n");
 
     const DriverRun fretish_run = run_driver("maximal", {fretish.string()});
     expect(fretish_run.m_exit_code == 0,
@@ -654,43 +611,34 @@ void test_maximal_reports_both_formats() {
            "maximal: the refusal says which extension it wanted");
 }
 
-}  // namespace
-
-void run_peredur_driver_tests() {
-    test_peredur_repairs_tlsf();
-    test_peredur_repairs_fretish();
-    test_peredur_rejects_bad_arguments();
+// Registered after each driver's own tests, so each suite checks --version
+// last.
+TEST_IN("driver_peredur", test_peredur_reports_its_version) {
     expect_reports_version("peredur");
 }
 
-void run_realize_driver_tests() {
-    test_realize_decides_both_ways();
+TEST_IN("driver_realize", test_realize_reports_its_version) {
     expect_reports_version("realize");
 }
 
-void run_ltl_driver_tests() {
-    test_ltl_lowers_both_formats();
+TEST_IN("driver_ltl", test_ltl_reports_its_version) {
     expect_reports_version("ltl");
 }
 
-void run_mucs_driver_tests() {
-    test_mucs_extracts_a_core();
+TEST_IN("driver_mucs", test_mucs_reports_its_version) {
     expect_reports_version("mucs");
 }
 
-void run_compare_driver_tests() {
-    test_compare_orders_repairs_against_ideals();
+TEST_IN("driver_compare", test_compare_reports_its_version) {
     expect_reports_version("compare");
 }
 
-void run_maximal_driver_tests() {
-    test_maximal_reports_both_formats();
+TEST_IN("driver_maximal", test_maximal_reports_its_version) {
     expect_reports_version("maximal");
 }
 
-void run_lint_ideals_driver_tests() {
-    test_lint_ideals_checks_a_subject();
+TEST_IN("driver_lint_ideals", test_lint_ideals_reports_its_version) {
     expect_reports_version("lint-ideals");
 }
 
-void run_signal_tracer_driver_tests() { test_signal_tracer_writes_a_report(); }
+}  // namespace

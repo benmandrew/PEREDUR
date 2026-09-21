@@ -9,9 +9,15 @@
 #include <iostream>
 #include <set>
 #include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <variant>
 
 #include <nlohmann/json.hpp>
 
+#include "config/enum_names.hpp"
+#include "config/keys.hpp"
 #include "filter/correctness.hpp"
 #include "filter/implication.hpp"
 #include "filter/well_separation.hpp"
@@ -23,6 +29,14 @@
 #include "runner/ltlfilt.hpp"
 #include "runner/spot.hpp"
 #include "version.hpp"
+
+template <>
+struct EnumNames<StopReason> {
+    static constexpr std::array<std::pair<StopReason, const char*>, 3> k_names{
+        {{StopReason::Generations, "generations"},
+         {StopReason::Individuals, "individuals"},
+         {StopReason::Deadline, "deadline"}}};
+};
 
 namespace {
 
@@ -164,86 +178,6 @@ namespace {
 // so an earlier run's search is what it would have been at any value.
 constexpr int k_schema_version = 29;
 
-// The inverse of the spellings config_io.cpp parses. It has no table to
-// borrow -- it only ever goes string to enum -- so these must be kept in step
-// with it by hand. Getting one wrong writes a manifest that no longer round
-// trips into the config it describes.
-const char* scheme_name(SelectionScheme scheme) {
-    switch (scheme) {
-        case SelectionScheme::WeightedAverage:
-            return "weighted";
-        case SelectionScheme::Nsga2Truncate:
-            return "nsga2-truncate";
-        case SelectionScheme::Nsga2Apportion:
-            return "nsga2-apportion";
-    }
-    return "unknown";
-}
-
-const char* metric_name(SimilarityMetric metric) {
-    switch (metric) {
-        case SimilarityMetric::Direct:
-            return "direct";
-        case SimilarityMetric::Logarithmic:
-            return "logarithmic";
-    }
-    return "unknown";
-}
-
-const char* status_grading_name(StatusGrading grading) {
-    switch (grading) {
-        case StatusGrading::Tiered:
-            return "tiered";
-        case StatusGrading::Mrs:
-            return "mrs";
-        case StatusGrading::Aurus:
-            return "aurus";
-    }
-    return "unknown";
-}
-
-const char* mrs_admission_order_name(MrsAdmissionOrder order) {
-    switch (order) {
-        case MrsAdmissionOrder::Spec:
-            return "spec";
-        case MrsAdmissionOrder::Degree:
-            return "degree";
-    }
-    return "unknown";
-}
-
-const char* termination_name(TerminationMode mode) {
-    switch (mode) {
-        case TerminationMode::Generations:
-            return "generations";
-        case TerminationMode::Individuals:
-            return "individuals";
-    }
-    return "unknown";
-}
-
-const char* stop_reason_name(StopReason reason) {
-    switch (reason) {
-        case StopReason::Generations:
-            return "generations";
-        case StopReason::Individuals:
-            return "individuals";
-        case StopReason::Deadline:
-            return "deadline";
-    }
-    return "unknown";
-}
-
-const char* repair_mode_name(RepairMode mode) {
-    switch (mode) {
-        case RepairMode::Monolithic:
-            return "monolithic";
-        case RepairMode::Muc:
-            return "muc";
-    }
-    return "unknown";
-}
-
 std::string utc_timestamp() {
     const std::time_t now =
         std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -282,61 +216,29 @@ std::size_t count_repairs(const std::filesystem::path& dir) {
 nlohmann::json config_json(const Config& cfg) {
     // Mirrors the TOML section layout so a manifest diffs directly against a
     // config file rather than needing a key-by-key translation.
-    return {{"genetic",
-             {{"generations", cfg.generations},
-              {"population_size", cfg.population_size},
-              {"selection_rate", cfg.selection_rate},
-              {"elitism_rate", cfg.elitism_rate},
-              {"crossover_rate", cfg.crossover_rate},
-              {"mutation_rate", cfg.mutation_rate},
-              {"selection_scheme", scheme_name(cfg.selection_scheme)},
-              {"termination", termination_name(cfg.termination)},
-              {"max_individuals", cfg.max_individuals},
-              {"max_wall_s", cfg.max_wall_s},
-              {"accumulate_repairs", cfg.accumulate_repairs}}},
-            {"fitness",
-             {{"weight_syntactic", cfg.fitness_weight_syntactic},
-              {"weight_semantic", cfg.fitness_weight_semantic},
-              {"weight_status", cfg.fitness_weight_status},
-              {"status_grading", status_grading_name(cfg.status_grading)},
-              {"mrs_admission_order",
-               mrs_admission_order_name(cfg.mrs_admission_order)}}},
-            {"mutation",
-             {{"p_trigger", cfg.p_trigger},
-              {"p_response", cfg.p_response},
-              {"p_timing", cfg.p_timing},
-              {"p_condition_type", cfg.p_condition_type},
-              {"p_scope", cfg.p_scope},
-              {"p_stop", cfg.p_stop},
-              {"p_monotone", cfg.p_monotone},
-              {"p_add_assumption", cfg.p_add_assumption},
-              {"p_remove_guarantee", cfg.p_remove_guarantee},
-              {"p_conditional_assumption", cfg.p_conditional_assumption}}},
-            {"tlsf",
-             {{"repair_mode", repair_mode_name(cfg.repair_mode)},
-              {"muc_max_iterations", cfg.muc_max_iterations},
-              // Every key of [tlsf.mutation], not the two this block reported
-              // until 2026-08-26. A campaign reads its arms out of run.json,
-              // and the ones that were missing are exactly those the recent
-              // operator work added.
-              {"mutation",
-               {{"p_assumption", cfg.tlsf_p_assumption},
-                {"p_temporal", cfg.tlsf_p_temporal},
-                {"p_clone_assumption", cfg.tlsf_p_clone_assumption},
-                {"max_assumption_width", cfg.tlsf_max_assumption_width},
-                {"p_bare_assumption", cfg.tlsf_p_bare_assumption}}}}},
-            {"model_counting",
-             {{"default_bound", cfg.default_model_counting_bound},
-              {"metric", metric_name(cfg.similarity_metric)}}},
-            {"filters", {{"run_implication", cfg.run_implication_filter}}},
-            {"runtime",
-             {{"black_timeout_ms", cfg.black_timeout.count()},
-              {"ltlsynt_timeout_ms", cfg.ltlsynt_timeout.count()},
-              {"ltl2tgba_timeout_ms", cfg.ltl2tgba_timeout.count()},
-              {"ltlfilt_timeout_ms", cfg.ltlfilt_timeout.count()},
-              {"parallel", cfg.parallel},
-              {"max_scoring_failure_rate", cfg.max_scoring_failure_rate},
-              {"dashboard", cfg.dashboard}}}};
+    nlohmann::json out = nlohmann::json::object();
+    for (const ConfigKey& entry : k_config_keys) {
+        nlohmann::json* section = &out;
+        for (const std::string_view name : section_path(entry.section)) {
+            section = &(*section)[std::string(name)];
+        }
+        nlohmann::json& slot = (*section)[entry.key];
+        std::visit(
+            [&](auto member) {
+                const auto& field = cfg.*member;
+                using Field = std::decay_t<decltype(field)>;
+                if constexpr (std::is_same_v<Field,
+                                             std::chrono::milliseconds>) {
+                    slot = field.count();
+                } else if constexpr (std::is_enum_v<Field>) {
+                    slot = enum_name(field);
+                } else {
+                    slot = field;
+                }
+            },
+            entry.member);
+    }
+    return out;
 }
 
 nlohmann::json tool_calls_json() {
@@ -454,8 +356,7 @@ void write_run_manifest(const std::string& output_dir,
         // against the parent it was bred from, which an unbudgeted run does not
         // pay for, so a zero here would read as a fact rather than as an
         // absence.
-        {"stopped_by",
-         stop_reason_name(budget.reason(StopReason::Generations))},
+        {"stopped_by", enum_name(budget.reason(StopReason::Generations))},
         {"generations_run", budget.generations()},
         {"individuals_bred", budget.active() ? nlohmann::json(budget.bred())
                                              : nlohmann::json(nullptr)},

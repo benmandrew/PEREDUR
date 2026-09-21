@@ -1,12 +1,15 @@
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "requirement.hpp"
 #include "runner/formaliser.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "requirement";
 
 // A malformed requirement makes the CLI's parser write its "Line N: ..."
 // message to stderr (not stdout) and still emit an empty line on stdout for
@@ -37,49 +40,49 @@ std::string ltl_trigger(const Formula& condition, const Formula& response,
 
 // --- Continual semantics (default) ---
 
-void test_immediately() {
+TEST(test_immediately) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::immediately());
     expect(result == "G((t) -> (r))",
            "requirement_to_ltl: Immediately should produce G(T -> R)");
 }
 
-void test_next_timepoint() {
+TEST(test_next_timepoint) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::next_timepoint());
     expect(result == "G((t) -> X(r))",
            "requirement_to_ltl: NextTimepoint should produce G(T -> X R)");
 }
 
-void test_eventually() {
+TEST(test_eventually) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::eventually());
     expect(result == "G((t) -> F(r))",
            "requirement_to_ltl: Eventually should produce G(T -> F R)");
 }
 
-void test_always() {
+TEST(test_always) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::always());
     expect(result == "G((t) -> G(r))",
            "requirement_to_ltl: Always should produce G(T -> G R)");
 }
 
-void test_within_ticks_zero() {
+TEST(test_within_ticks_zero) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::within_ticks(0));
     expect(result == "G((t) -> ((r)))",
            "requirement_to_ltl: WithinTicks(0) should produce G(T -> (R))");
 }
 
-void test_within_ticks_one() {
+TEST(test_within_ticks_one) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::within_ticks(1));
     expect(result == "G((t) -> ((r) | X((r))))",
            "requirement_to_ltl: WithinTicks(1) should expand to R | X(R)");
 }
 
-void test_within_ticks_two() {
+TEST(test_within_ticks_two) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::within_ticks(2));
     expect(
@@ -87,28 +90,28 @@ void test_within_ticks_two() {
         "requirement_to_ltl: WithinTicks(2) should expand to R | X(R | X(R))");
 }
 
-void test_for_ticks_zero() {
+TEST(test_for_ticks_zero) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::for_ticks(0));
     expect(result == "G((t) -> ((r)))",
            "requirement_to_ltl: ForTicks(0) should produce G(T -> (R))");
 }
 
-void test_for_ticks_one() {
+TEST(test_for_ticks_one) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::for_ticks(1));
     expect(result == "G((t) -> ((r) & X((r))))",
            "requirement_to_ltl: ForTicks(1) should expand to R & X(R)");
 }
 
-void test_for_ticks_two() {
+TEST(test_for_ticks_two) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::for_ticks(2));
     expect(result == "G((t) -> ((r) & X((r) & X((r)))))",
            "requirement_to_ltl: ForTicks(2) should expand to R & X(R & X(R))");
 }
 
-void test_after_ticks_zero() {
+TEST(test_after_ticks_zero) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::after_ticks(0));
     expect(result == "G((t) -> (!(r) & X((r))))",
@@ -117,7 +120,7 @@ void test_after_ticks_zero() {
            "at the next one");
 }
 
-void test_after_ticks_one() {
+TEST(test_after_ticks_one) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::after_ticks(1));
     expect(
@@ -125,7 +128,7 @@ void test_after_ticks_one() {
         "requirement_to_ltl: AfterTicks(1) should expand to !R & X(!R & X(R))");
 }
 
-void test_after_ticks_two() {
+TEST(test_after_ticks_two) {
     const std::string result =
         ltl_continual(Formula("t"), Formula("r"), timing::after_ticks(2));
     expect(
@@ -136,7 +139,7 @@ void test_after_ticks_two() {
 
 // --- Trigger semantics ---
 
-void test_trigger_immediately() {
+TEST(test_trigger_immediately) {
     const std::string result =
         ltl_trigger(Formula("c"), Formula("r"), timing::immediately());
     expect(result == "G((!(c) & X(c)) -> X((r))) & ((c) -> (r))",
@@ -144,7 +147,7 @@ void test_trigger_immediately() {
            "G((!C & XC) -> X(R)) & (C -> R)");
 }
 
-void test_trigger_next_timepoint() {
+TEST(test_trigger_next_timepoint) {
     const std::string result =
         ltl_trigger(Formula("c"), Formula("r"), timing::next_timepoint());
     expect(result == "G((!(c) & X(c)) -> X(X(r))) & ((c) -> X(r))",
@@ -152,7 +155,7 @@ void test_trigger_next_timepoint() {
            "G((!C & XC) -> X(X(R))) & (C -> X(R))");
 }
 
-void test_trigger_eventually() {
+TEST(test_trigger_eventually) {
     const std::string result =
         ltl_trigger(Formula("c"), Formula("r"), timing::eventually());
     expect(result == "G((!(c) & X(c)) -> X(F(r))) & ((c) -> F(r))",
@@ -160,7 +163,7 @@ void test_trigger_eventually() {
            "G((!C & XC) -> X(F(R))) & (C -> F(R))");
 }
 
-void test_trigger_always() {
+TEST(test_trigger_always) {
     const std::string result =
         ltl_trigger(Formula("c"), Formula("r"), timing::always());
     expect(result == "G((!(c) & X(c)) -> X(G(r))) & ((c) -> G(r))",
@@ -168,7 +171,7 @@ void test_trigger_always() {
            "G((!C & XC) -> X(G(R))) & (C -> G(R))");
 }
 
-void test_trigger_for_ticks_one() {
+TEST(test_trigger_for_ticks_one) {
     const std::string result =
         ltl_trigger(Formula("c"), Formula("r"), timing::for_ticks(1));
     expect(result ==
@@ -178,7 +181,7 @@ void test_trigger_for_ticks_one() {
            "G((!C & XC) -> X((R & X(R)))) & (C -> (R & X(R)))");
 }
 
-void test_trigger_within_ticks_one() {
+TEST(test_trigger_within_ticks_one) {
     const std::string result =
         ltl_trigger(Formula("c"), Formula("r"), timing::within_ticks(1));
     expect(result ==
@@ -188,7 +191,7 @@ void test_trigger_within_ticks_one() {
            "G((!C & XC) -> X((R | X(R)))) & (C -> (R | X(R)))");
 }
 
-void test_trigger_after_ticks_one() {
+TEST(test_trigger_after_ticks_one) {
     const std::string result =
         ltl_trigger(Formula("c"), Formula("r"), timing::after_ticks(1));
     expect(result ==
@@ -201,7 +204,7 @@ void test_trigger_after_ticks_one() {
 
 // --- specification_has_false_condition ---
 
-void test_specification_has_false_condition_detects_assumption() {
+TEST(test_specification_has_false_condition_detects_assumption) {
     const Specification spec(
         {Requirement(Formula("false"), Formula("r"), timing::immediately())},
         {Requirement(Formula("t"), Formula("r"), timing::immediately())}, {"t"},
@@ -211,7 +214,7 @@ void test_specification_has_false_condition_detects_assumption() {
            "in an assumption");
 }
 
-void test_specification_has_false_condition_detects_guarantee() {
+TEST(test_specification_has_false_condition_detects_guarantee) {
     const Specification spec(
         {},
         {Requirement(Formula("false"), Formula("r"), timing::immediately())},
@@ -221,7 +224,7 @@ void test_specification_has_false_condition_detects_guarantee() {
            "in a guarantee");
 }
 
-void test_specification_has_false_condition_false_for_normal_spec() {
+TEST(test_specification_has_false_condition_false_for_normal_spec) {
     const Specification spec(
         {}, {Requirement(Formula("t"), Formula("r"), timing::immediately())},
         {"t"}, {"r"});
@@ -232,7 +235,7 @@ void test_specification_has_false_condition_false_for_normal_spec() {
 
 // --- Requirement::to_string against the real FRET formaliser CLI ---
 
-void test_to_string_is_valid_fretish_for_all_timings_and_condition_types() {
+TEST(test_to_string_is_valid_fretish_for_all_timings_and_condition_types) {
     RequirementFormaliser formaliser(formaliser_command());
     const std::vector<Timing> timings = {
         timing::immediately(),
@@ -255,7 +258,7 @@ void test_to_string_is_valid_fretish_for_all_timings_and_condition_types() {
     }
 }
 
-void test_to_string_is_valid_fretish_for_true_condition() {
+TEST(test_to_string_is_valid_fretish_for_true_condition) {
     RequirementFormaliser formaliser(formaliser_command());
     // A literal "true" condition collapses condition_to_string() to "", so
     // this exercises the branch that omits the condition clause entirely.
@@ -268,7 +271,7 @@ void test_to_string_is_valid_fretish_for_true_condition() {
                                 timing::eventually(), ConditionType::Trigger));
 }
 
-void test_to_string_is_valid_fretish_for_compound_formulae() {
+TEST(test_to_string_is_valid_fretish_for_compound_formulae) {
     RequirementFormaliser formaliser(formaliser_command());
     expect_valid_fretish(
         formaliser,
@@ -276,7 +279,7 @@ void test_to_string_is_valid_fretish_for_compound_formulae() {
                     timing::within_ticks(2), ConditionType::Continual));
 }
 
-void test_add_atom_prefix_tags_atoms() {
+TEST(test_add_atom_prefix_tags_atoms) {
     const Requirement req(Formula("c"), Formula("GF"), timing::immediately(),
                           ConditionType::Continual);
     const Requirement prefixed = add_atom_prefix(req);
@@ -288,7 +291,7 @@ void test_add_atom_prefix_tags_atoms() {
            "add_atom_prefix: derived LTL should contain the tagged atom");
 }
 
-void test_add_atom_prefix_preserves_constants() {
+TEST(test_add_atom_prefix_preserves_constants) {
     const Requirement req(Formula("true"), Formula("r"), timing::immediately(),
                           ConditionType::Trigger);
     const Requirement prefixed = add_atom_prefix(req);
@@ -298,7 +301,7 @@ void test_add_atom_prefix_preserves_constants() {
            "add_atom_prefix: ordinary response atom should be tagged");
 }
 
-void test_strip_atom_prefix_is_inverse() {
+TEST(test_strip_atom_prefix_is_inverse) {
     const Requirement req(Formula("a & GF"), Formula("Uu | b"),
                           timing::within_ticks(2), ConditionType::Continual);
     const Requirement round = strip_atom_prefix(add_atom_prefix(req));
@@ -310,7 +313,7 @@ void test_strip_atom_prefix_is_inverse() {
 // silently reverts to its default. For the removal tombstone that means a
 // deleted guarantee coming back to life on a round trip through the atom
 // prefix, which every specification takes at load and at output.
-void test_atom_prefix_preserves_locked_and_removed_flags() {
+TEST(test_atom_prefix_preserves_locked_and_removed_flags) {
     Requirement req(Formula("a"), Formula("b"), timing::immediately(),
                     ConditionType::Continual, /*weakenable=*/false);
     req.m_removed = true;
@@ -323,14 +326,14 @@ void test_atom_prefix_preserves_locked_and_removed_flags() {
            "strip_atom_prefix: the round trip preserves both flags");
 }
 
-void test_strip_atom_prefix_defensive_on_untagged() {
+TEST(test_strip_atom_prefix_defensive_on_untagged) {
     const Requirement req(Formula("a"), Formula("b"), timing::immediately());
     const Requirement stripped = strip_atom_prefix(req);
     expect(stripped == req,
            "strip_atom_prefix: untagged requirement should be unchanged");
 }
 
-void test_add_atom_prefix_ltl_regression_gf() {
+TEST(test_add_atom_prefix_ltl_regression_gf) {
     // 'GF' previously lexed as two temporal operators by SPOT, diverging from
     // black and crashing realize. After tagging, the LTL carries 'iap_GF' and
     // no bare 'GF' operator token remains.
@@ -353,38 +356,3 @@ void test_add_atom_prefix_ltl_regression_gf() {
 }
 
 }  // namespace
-
-void run_requirement_tests() {
-    test_immediately();
-    test_next_timepoint();
-    test_eventually();
-    test_always();
-    test_within_ticks_zero();
-    test_within_ticks_one();
-    test_within_ticks_two();
-    test_for_ticks_zero();
-    test_for_ticks_one();
-    test_for_ticks_two();
-    test_after_ticks_zero();
-    test_after_ticks_one();
-    test_after_ticks_two();
-    test_trigger_immediately();
-    test_trigger_next_timepoint();
-    test_trigger_eventually();
-    test_trigger_always();
-    test_trigger_for_ticks_one();
-    test_trigger_within_ticks_one();
-    test_trigger_after_ticks_one();
-    test_specification_has_false_condition_detects_assumption();
-    test_specification_has_false_condition_detects_guarantee();
-    test_specification_has_false_condition_false_for_normal_spec();
-    test_to_string_is_valid_fretish_for_all_timings_and_condition_types();
-    test_to_string_is_valid_fretish_for_true_condition();
-    test_to_string_is_valid_fretish_for_compound_formulae();
-    test_add_atom_prefix_tags_atoms();
-    test_add_atom_prefix_preserves_constants();
-    test_strip_atom_prefix_is_inverse();
-    test_atom_prefix_preserves_locked_and_removed_flags();
-    test_strip_atom_prefix_defensive_on_untagged();
-    test_add_atom_prefix_ltl_regression_gf();
-}

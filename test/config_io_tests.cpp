@@ -3,15 +3,18 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "config.hpp"
 #include "config_io.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "config_io";
 
 Config config_capturing_warnings(const std::string& toml,
                                  std::string& warnings) {
@@ -35,7 +38,7 @@ std::string warnings_from(const std::string& toml) {
     return warnings;
 }
 
-void test_config_io_all_fields() {
+TEST(test_config_io_all_fields) {
     const std::string toml = R"(
 [genetic]
 generations     = 5
@@ -109,7 +112,7 @@ dashboard        = true
            "not mention it leaves progress output off");
 }
 
-void test_config_io_partial_overrides_defaults() {
+TEST(test_config_io_partial_overrides_defaults) {
     const std::string toml = R"(
 [genetic]
 generations = 5
@@ -124,154 +127,139 @@ generations = 5
            "config_io: unspecified crossover_rate should remain default");
 }
 
-void test_config_io_missing_file_throws() {
-    bool threw = false;
-    try {
-        config_from_toml("/tmp/peredur_test_nonexistent_config.toml");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("does not exist") != std::string::npos,
-               "config_io: missing file error should mention 'does not exist'");
-    }
-    expect(threw, "config_io: missing file should throw");
+TEST(test_config_io_missing_file_throws) {
+    expect_throws(
+        [&] { config_from_toml("/tmp/peredur_test_nonexistent_config.toml"); },
+        "config_io: missing file should throw", "does not exist");
 }
 
-void test_config_io_invalid_toml_throws() {
-    bool threw = false;
-    try {
-        config_from_toml_string("this is not valid toml ===");
-    } catch (const std::exception&) {
-        threw = true;
-    }
-    expect(threw, "config_io: invalid TOML should throw");
+TEST(test_config_io_invalid_toml_throws) {
+    expect_throws(
+        [&] { config_from_toml_string("this is not valid toml ==="); },
+        "config_io: invalid TOML should throw");
 }
 
-void test_config_io_out_of_range_probability_throws() {
-    bool threw = false;
-    try {
-        config_from_toml_string("[mutation]\np_trigger = 1.5\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("p_trigger") != std::string::npos,
-               "config_io: out-of-range error should name the field");
-    }
-    expect(threw, "config_io: out-of-range probability should throw");
+TEST(test_config_io_out_of_range_probability_throws) {
+    expect_throws(
+        [&] { config_from_toml_string("[mutation]\np_trigger = 1.5\n"); },
+        "config_io: out-of-range probability should throw", "p_trigger");
 }
 
-void test_config_io_elitism_rate_parsed() {
+TEST(test_config_io_elitism_rate_parsed) {
     const Config cfg = config_from_toml_string(
         "[genetic]\nselection_rate = 0.6\nelitism_rate = 0.2\n");
     expect(cfg.elitism_rate == 0.2,
            "config_io: genetic.elitism_rate should be parsed from TOML");
 }
 
-void test_config_io_elitism_not_less_than_selection_throws() {
-    bool threw = false;
-    try {
-        config_from_toml_string(
-            "[genetic]\nselection_rate = 0.3\nelitism_rate = 0.3\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("elitism_rate") != std::string::npos,
-               "config_io: constraint error should name elitism_rate");
+TEST(test_config_io_elitism_not_less_than_selection_throws) {
+    expect_throws(
+        [&] {
+            config_from_toml_string(
+                "[genetic]\nselection_rate = 0.3\nelitism_rate = 0.3\n");
+        },
+        "config_io: elitism_rate not less than selection_rate should throw",
+        "elitism_rate");
+}
+
+// An enum-valued key: its default, every spelling it accepts, and one it
+// rejects. The default is read both from a bare Config and from a file that
+// omits the key, since an archived config inherits it either way.
+template <typename Enum>
+struct EnumKey {
+    std::string m_section;
+    std::string m_key;
+    Enum Config::* m_member = nullptr;
+    Enum m_default{};
+    std::vector<std::pair<std::string, Enum>> m_spellings;
+    std::string m_unknown;
+    bool m_error_names_key = false;
+};
+
+template <typename Enum>
+void expect_enum_key(const EnumKey<Enum>& key) {
+    const std::string name = "config_io: " + key.m_section + "." + key.m_key;
+    const auto toml = [&](const std::string& spelling) {
+        return "[" + key.m_section + "]\n" + key.m_key + " = \"" + spelling +
+               "\"\n";
+    };
+    expect(Config{}.*key.m_member == key.m_default,
+           name + " should default to the pinned value");
+    expect(config_from_toml_string("").*key.m_member == key.m_default,
+           name + " should keep its default when the file omits it");
+    for (const auto& [spelling, value] : key.m_spellings) {
+        std::string label = name;
+        label.append(" = \"").append(spelling).append("\" should parse");
+        expect(config_from_toml_string(toml(spelling)).*key.m_member == value,
+               label);
     }
-    expect(threw,
-           "config_io: elitism_rate not less than selection_rate should throw");
+    expect_throws([&] { config_from_toml_string(toml(key.m_unknown)); },
+                  name + " = \"" + key.m_unknown + "\" should be rejected",
+                  key.m_error_names_key ? key.m_key : std::string{});
 }
 
-// Pinned because the default is what an archived config inherits wherever it
-// states no scheme. It has moved three times -- WeightedAverage, Nsga2 (renamed
-// Nsga2Truncate), and Nsga2Apportion from 2026-08-14 -- and only the 64
-// `sweep_B_pop50_takeoff_*` configs under 2026-07-13-fretish-sweeps are
-// exposed.
-// See "Config vintage" in experiments/README.md before moving it again.
-void test_config_io_selection_scheme_defaults_to_nsga2_apportion() {
-    const Config cfg = config_from_toml_string("");
-    expect(cfg.selection_scheme == SelectionScheme::Nsga2Apportion,
-           "config_io: selection_scheme should default to Nsga2Apportion");
-}
-
-// Pinned because the default is what every archived config inherits: the key
-// did not exist before 2026-08-11, so no archived config can state it, and
-// moving this back to Tiered silently re-reads every one of them under a
-// different status objective. See "Config vintage" in experiments/README.md.
-void test_config_io_status_grading_defaults_to_mrs() {
-    const Config cfg = config_from_toml_string("");
-    expect(cfg.status_grading == StatusGrading::Mrs,
-           "config_io: status_grading should default to Mrs");
-}
-
-void test_config_io_status_grading_tiered_parsed() {
-    const Config cfg =
-        config_from_toml_string("[fitness]\nstatus_grading = \"tiered\"\n");
-    expect(cfg.status_grading == StatusGrading::Tiered,
-           "config_io: status_grading = \"tiered\" should parse as Tiered");
-}
-
-void test_config_io_status_grading_mrs_parsed() {
-    const Config cfg =
-        config_from_toml_string("[fitness]\nstatus_grading = \"mrs\"\n");
-    expect(cfg.status_grading == StatusGrading::Mrs,
-           "config_io: status_grading = \"mrs\" should parse as Mrs");
-}
-
-void test_config_io_mrs_admission_order_defaults_to_degree() {
-    const Config cfg;
-    expect(cfg.mrs_admission_order == MrsAdmissionOrder::Degree,
-           "config_io: mrs_admission_order should default to Degree");
-}
-
-void test_config_io_mrs_admission_order_spec_parsed() {
-    const Config cfg =
-        config_from_toml_string("[fitness]\nmrs_admission_order = \"spec\"\n");
-    expect(cfg.mrs_admission_order == MrsAdmissionOrder::Spec,
-           "config_io: mrs_admission_order = \"spec\" should parse as Spec");
-}
-
-void test_config_io_mrs_admission_order_degree_parsed() {
-    const Config cfg = config_from_toml_string(
-        "[fitness]\nmrs_admission_order = \"degree\"\n");
-    expect(cfg.mrs_admission_order == MrsAdmissionOrder::Degree,
-           "config_io: mrs_admission_order = \"degree\" should parse as "
-           "Degree");
-}
-
-void test_config_io_mrs_admission_order_rejects_unknown() {
-    bool threw = false;
-    try {
-        config_from_toml_string(
-            "[fitness]\nmrs_admission_order = \"rotate\"\n");
-    } catch (const std::exception&) {
-        threw = true;
-    }
-    expect(threw,
-           "config_io: an unknown mrs_admission_order should be rejected");
-}
-
-void test_config_io_status_grading_aurus_parsed() {
-    const Config cfg =
-        config_from_toml_string("[fitness]\nstatus_grading = \"aurus\"\n");
-    expect(cfg.status_grading == StatusGrading::Aurus,
-           "config_io: status_grading = \"aurus\" should parse as Aurus");
-}
-
-void test_config_io_status_grading_rejects_unknown() {
-    bool threw = false;
-    try {
-        config_from_toml_string("[fitness]\nstatus_grading = \"greedy\"\n");
-    } catch (const std::exception&) {
-        threw = true;
-    }
-    expect(threw, "config_io: an unknown status_grading should be rejected");
+TEST(test_config_io_enum_keys) {
+    // Pinned because the default is what an archived config inherits wherever
+    // it states no scheme. It has moved three times -- WeightedAverage, Nsga2
+    // (renamed Nsga2Truncate), and Nsga2Apportion from 2026-08-14 -- and only
+    // the 64 `sweep_B_pop50_takeoff_*` configs under 2026-07-13-fretish-sweeps
+    // are exposed.
+    // See "Config vintage" in experiments/README.md before moving it again.
+    expect_enum_key<SelectionScheme>(
+        {"genetic",
+         "selection_scheme",
+         &Config::selection_scheme,
+         SelectionScheme::Nsga2Apportion,
+         {{"weighted", SelectionScheme::WeightedAverage},
+          {"nsga2-truncate", SelectionScheme::Nsga2Truncate},
+          {"nsga2-apportion", SelectionScheme::Nsga2Apportion}},
+         "pareto",
+         true});
+    // Pinned because the default is what every archived config inherits: the
+    // key did not exist before 2026-08-11, so no archived config can state it,
+    // and moving this back to Tiered silently re-reads every one of them under
+    // a different status objective. See "Config vintage" in
+    // experiments/README.md.
+    expect_enum_key<StatusGrading>({"fitness",
+                                    "status_grading",
+                                    &Config::status_grading,
+                                    StatusGrading::Mrs,
+                                    {{"tiered", StatusGrading::Tiered},
+                                     {"mrs", StatusGrading::Mrs},
+                                     {"aurus", StatusGrading::Aurus}},
+                                    "greedy",
+                                    false});
+    expect_enum_key<MrsAdmissionOrder>({"fitness",
+                                        "mrs_admission_order",
+                                        &Config::mrs_admission_order,
+                                        MrsAdmissionOrder::Degree,
+                                        {{"spec", MrsAdmissionOrder::Spec},
+                                         {"degree", MrsAdmissionOrder::Degree}},
+                                        "rotate",
+                                        false});
+    expect_enum_key<SimilarityMetric>(
+        {"model_counting",
+         "metric",
+         &Config::similarity_metric,
+         SimilarityMetric::Logarithmic,
+         {{"direct", SimilarityMetric::Direct},
+          {"logarithmic", SimilarityMetric::Logarithmic}},
+         "geometric",
+         true});
+    expect_enum_key<RepairMode>(
+        {"tlsf",
+         "repair_mode",
+         &Config::repair_mode,
+         RepairMode::Monolithic,
+         {{"muc", RepairMode::Muc}, {"monolithic", RepairMode::Monolithic}},
+         "iterative",
+         true});
 }
 
 // Pinned because every archived config omits these keys and inherits whatever
 // they mean. Generations with no caps is what a run did before they existed, so
 // the defaults have to keep reproducing it.
-void test_config_io_termination_defaults_to_generations() {
+TEST(test_config_io_termination_defaults_to_generations) {
     const Config cfg = config_from_toml_string("");
     expect(cfg.termination == TerminationMode::Generations,
            "config_io: termination should default to Generations");
@@ -280,7 +268,7 @@ void test_config_io_termination_defaults_to_generations() {
     expect(cfg.max_wall_s == 0, "config_io: max_wall_s should default to 0");
 }
 
-void test_config_io_termination_individuals_parsed() {
+TEST(test_config_io_termination_individuals_parsed) {
     const Config cfg = config_from_toml_string(
         "[genetic]\ntermination = \"individuals\"\nmax_individuals = 1000\n");
     expect(cfg.termination == TerminationMode::Individuals,
@@ -290,46 +278,33 @@ void test_config_io_termination_individuals_parsed() {
            "config_io: max_individuals should parse");
 }
 
-void test_config_io_termination_rejects_unknown() {
-    bool threw = false;
-    try {
-        config_from_toml_string("[genetic]\ntermination = \"wall\"\n");
-    } catch (const std::exception&) {
-        threw = true;
-    }
-    expect(threw, "config_io: an unknown termination mode should throw");
+TEST(test_config_io_termination_rejects_unknown) {
+    expect_throws(
+        [&] { config_from_toml_string("[genetic]\ntermination = \"wall\"\n"); },
+        "config_io: an unknown termination mode should throw");
 }
 
 // Rejected rather than read as unlimited: a run with no search budget is what
 // the other mode is for, so a zero here is a typo rather than an intent.
-void test_config_io_individuals_without_a_cap_throws() {
-    bool threw = false;
-    try {
-        config_from_toml_string("[genetic]\ntermination = \"individuals\"\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("max_individuals") != std::string::npos,
-               "config_io: the message should name max_individuals");
-    }
-    expect(threw,
-           "config_io: termination = \"individuals\" with no cap should throw");
+TEST(test_config_io_individuals_without_a_cap_throws) {
+    expect_throws(
+        [&] {
+            config_from_toml_string(
+                "[genetic]\ntermination = \"individuals\"\n");
+        },
+        "config_io: termination = \"individuals\" with no cap should throw",
+        "max_individuals");
 }
 
-void test_config_io_negative_budgets_throw() {
+TEST(test_config_io_negative_budgets_throw) {
     for (const char* toml : {"[genetic]\nmax_individuals = -1\n",
                              "[genetic]\nmax_wall_s = -1\n"}) {
-        bool threw = false;
-        try {
-            config_from_toml_string(toml);
-        } catch (const std::exception&) {
-            threw = true;
-        }
-        expect(threw, "config_io: a negative budget should throw");
+        expect_throws([&] { config_from_toml_string(toml); },
+                      "config_io: a negative budget should throw");
     }
 }
 
-void test_config_io_max_wall_s_parsed_under_either_mode() {
+TEST(test_config_io_max_wall_s_parsed_under_either_mode) {
     const Config generations =
         config_from_toml_string("[genetic]\nmax_wall_s = 7200\n");
     expect(generations.max_wall_s == 7200,
@@ -341,108 +316,33 @@ void test_config_io_max_wall_s_parsed_under_either_mode() {
            "config_io: max_wall_s should parse under the Individuals mode");
 }
 
-void test_config_io_selection_scheme_weighted_parsed() {
-    const Config cfg =
-        config_from_toml_string("[genetic]\nselection_scheme = \"weighted\"\n");
-    expect(cfg.selection_scheme == SelectionScheme::WeightedAverage,
-           "config_io: selection_scheme = \"weighted\" should parse as "
-           "WeightedAverage");
-}
-
-void test_config_io_selection_scheme_nsga2_truncate_parsed() {
-    const Config cfg = config_from_toml_string(
-        "[genetic]\nselection_scheme = \"nsga2-truncate\"\n");
-    expect(cfg.selection_scheme == SelectionScheme::Nsga2Truncate,
-           "config_io: selection_scheme = \"nsga2-truncate\" should be parsed");
-}
-
-void test_config_io_selection_scheme_nsga2_apportion_parsed() {
-    const Config cfg = config_from_toml_string(
-        "[genetic]\nselection_scheme = \"nsga2-apportion\"\n");
-    expect(cfg.selection_scheme == SelectionScheme::Nsga2Apportion,
-           "config_io: selection_scheme = \"nsga2-apportion\" should be "
-           "parsed");
-}
-
 // The two original spellings are rejected rather than aliased, and rejected by
 // name: an archived config that sets one must fail loudly and say what to do,
 // not run silently under a scheme this binary no longer calls by that name.
 void expect_retired_spelling_rejected(const std::string& spelling) {
-    bool threw = false;
-    try {
-        config_from_toml_string("[genetic]\nselection_scheme = \"" + spelling +
-                                "\"\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find(spelling) != std::string::npos,
-               "config_io: the error should quote the retired spelling " +
-                   spelling);
-        expect(msg.find("PROVENANCE.json") != std::string::npos,
-               "config_io: the error should say how to reproduce an archived "
-               "campaign that sets " +
-                   spelling);
-    }
-    expect(threw, "config_io: the retired spelling " + spelling +
-                      " should be rejected, not aliased");
+    const std::string msg = expect_throws(
+        [&] {
+            config_from_toml_string("[genetic]\nselection_scheme = \"" +
+                                    spelling + "\"\n");
+        },
+        "config_io: the retired spelling " + spelling +
+            " should be rejected, not aliased",
+        spelling);
+    expect(msg.find("PROVENANCE.json") != std::string::npos,
+           "config_io: the error should say how to reproduce an archived "
+           "campaign that sets " +
+               spelling);
 }
 
-void test_config_io_selection_scheme_retired_nsga2_rejected() {
+TEST(test_config_io_selection_scheme_retired_nsga2_rejected) {
     expect_retired_spelling_rejected("nsga2");
 }
 
-void test_config_io_selection_scheme_retired_replicate_rejected() {
+TEST(test_config_io_selection_scheme_retired_replicate_rejected) {
     expect_retired_spelling_rejected("nsga2-replicate");
 }
 
-void test_config_io_selection_scheme_invalid_throws() {
-    bool threw = false;
-    try {
-        config_from_toml_string("[genetic]\nselection_scheme = \"pareto\"\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("selection_scheme") != std::string::npos,
-               "config_io: invalid selection_scheme error should name the "
-               "field");
-    }
-    expect(threw, "config_io: an unknown selection_scheme should throw");
-}
-
-void test_config_io_similarity_metric_defaults_to_logarithmic() {
-    const Config cfg = config_from_toml_string("");
-    expect(cfg.similarity_metric == SimilarityMetric::Logarithmic,
-           "config_io: similarity_metric should default to Logarithmic");
-}
-
-void test_config_io_similarity_metric_direct_parsed() {
-    const Config cfg =
-        config_from_toml_string("[model_counting]\nmetric = \"direct\"\n");
-    expect(cfg.similarity_metric == SimilarityMetric::Direct,
-           "config_io: metric = \"direct\" should parse as Direct");
-}
-
-void test_config_io_similarity_metric_logarithmic_parsed() {
-    const Config cfg =
-        config_from_toml_string("[model_counting]\nmetric = \"logarithmic\"\n");
-    expect(cfg.similarity_metric == SimilarityMetric::Logarithmic,
-           "config_io: metric = \"logarithmic\" should parse as Logarithmic");
-}
-
-void test_config_io_similarity_metric_invalid_throws() {
-    bool threw = false;
-    try {
-        config_from_toml_string("[model_counting]\nmetric = \"geometric\"\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("metric") != std::string::npos,
-               "config_io: invalid metric error should name the field");
-    }
-    expect(threw, "config_io: an unknown similarity metric should throw");
-}
-
-void test_config_io_empty_string_gives_defaults() {
+TEST(test_config_io_empty_string_gives_defaults) {
     const Config cfg = config_from_toml_string("");
     const Config defaults;
     expect(cfg.generations == defaults.generations,
@@ -451,61 +351,23 @@ void test_config_io_empty_string_gives_defaults() {
            "config_io: empty TOML should give default population_size");
 }
 
-void test_config_io_repair_mode_defaults_to_monolithic() {
-    const Config cfg = config_from_toml_string("");
-    expect(cfg.repair_mode == RepairMode::Monolithic,
-           "config_io: repair_mode should default to Monolithic");
-}
-
-void test_config_io_repair_mode_muc_parsed() {
-    const Config cfg =
-        config_from_toml_string("[tlsf]\nrepair_mode = \"muc\"\n");
-    expect(cfg.repair_mode == RepairMode::Muc,
-           "config_io: repair_mode = \"muc\" should be parsed");
-}
-
-void test_config_io_repair_mode_monolithic_parsed() {
-    const Config cfg =
-        config_from_toml_string("[tlsf]\nrepair_mode = \"monolithic\"\n");
-    expect(cfg.repair_mode == RepairMode::Monolithic,
-           "config_io: repair_mode = \"monolithic\" should be parsed");
-}
-
-void test_config_io_repair_mode_invalid_throws() {
-    bool threw = false;
-    try {
-        config_from_toml_string("[tlsf]\nrepair_mode = \"iterative\"\n");
-    } catch (const std::exception& exc) {
-        threw = true;
-        const std::string msg(exc.what());
-        expect(msg.find("repair_mode") != std::string::npos,
-               "config_io: invalid repair_mode error should name the field");
-    }
-    expect(threw, "config_io: an unknown repair_mode should throw");
-}
-
-void test_config_io_muc_max_iterations_parsed() {
+TEST(test_config_io_muc_max_iterations_parsed) {
     const Config cfg =
         config_from_toml_string("[tlsf]\nmuc_max_iterations = 7\n");
     expect(cfg.muc_max_iterations == 7,
            "config_io: tlsf.muc_max_iterations should be parsed");
 }
 
-void test_config_io_muc_max_iterations_nonpositive_throws() {
-    bool threw = false;
-    try {
-        config_from_toml_string("[tlsf]\nmuc_max_iterations = 0\n");
-    } catch (const std::exception&) {
-        threw = true;
-    }
-    expect(threw, "config_io: muc_max_iterations = 0 should throw");
+TEST(test_config_io_muc_max_iterations_nonpositive_throws) {
+    expect_throws(
+        [&] { config_from_toml_string("[tlsf]\nmuc_max_iterations = 0\n"); },
+        "config_io: muc_max_iterations = 0 should throw");
 }
 
-// Every key config_key_spec() declares. Fails if an apply_* function gains a
-// key the unknown-key spec was not told about. A key absent from this TOML is
-// not covered, so a new key belongs here as well as in the two places
-// config_io.cpp names.
-void test_config_io_known_keys_do_not_warn() {
+// Every key k_config_keys declares, none of which may warn "unknown key". A
+// key absent from this TOML is not covered, so a new key belongs here as well
+// as in src/config/keys.hpp.
+TEST(test_config_io_known_keys_do_not_warn) {
     const std::string toml = R"(
 [genetic]
 generations      = 5
@@ -565,7 +427,7 @@ dashboard                    = true
 // A removed key is warned about with a hint saying why it is gone, rather than
 // as a bare typo: an archived config's omitted keys take the binary's current
 // default, so a removed key is the one case the config cannot be reinterpreted.
-void test_config_io_retired_key_warns_with_hint() {
+TEST(test_config_io_retired_key_warns_with_hint) {
     const std::string warnings =
         warnings_from("[mutation]\nstrengthen_assumptions = false\n");
     expect(warnings.find("unknown key mutation.strengthen_assumptions") !=
@@ -580,7 +442,7 @@ void test_config_io_retired_key_warns_with_hint() {
 // The keys removed with their operators or gates take the same path: each is
 // warned about by its full path with a removal hint, and ignored rather than
 // rejected, so an archived config that sets one still loads.
-void test_config_io_removed_operator_keys_warn_and_are_ignored() {
+TEST(test_config_io_removed_operator_keys_warn_and_are_ignored) {
     const std::vector<std::pair<std::string, std::string>> removed = {
         {"filters", "run_vacuity = false"},
         {"mutation", "allow_output_assumptions = false"},
@@ -611,26 +473,26 @@ void test_config_io_removed_operator_keys_warn_and_are_ignored() {
     }
 }
 
-void test_config_io_unknown_section_warns() {
+TEST(test_config_io_unknown_section_warns) {
     const std::string warnings = warnings_from("[genetics]\ngenerations = 5\n");
     expect(warnings.find("unknown section [genetics]") != std::string::npos,
            "config_io: an unknown section should be named in a warning");
 }
 
-void test_config_io_unknown_key_warns() {
+TEST(test_config_io_unknown_key_warns) {
     const std::string warnings = warnings_from("[genetic]\ngenerationss = 5\n");
     expect(
         warnings.find("unknown key genetic.generationss") != std::string::npos,
         "config_io: an unknown key should be warned about by its full path");
 }
 
-void test_config_io_unknown_top_level_key_warns() {
+TEST(test_config_io_unknown_top_level_key_warns) {
     const std::string warnings = warnings_from("generations = 5\n");
     expect(warnings.find("unknown key generations") != std::string::npos,
            "config_io: a key outside any section should be warned about");
 }
 
-void test_config_io_unknown_nested_key_warns() {
+TEST(test_config_io_unknown_nested_key_warns) {
     const std::string warnings = warnings_from(
         "[tlsf.mutation]\np_assumption_ = 0.3\np_temporal_ = 0.2\n");
     expect(warnings.find("unknown key tlsf.mutation.p_assumption_") !=
@@ -643,7 +505,7 @@ void test_config_io_unknown_nested_key_warns() {
            "warned about by its full path");
 }
 
-void test_config_io_unknown_nested_section_warns() {
+TEST(test_config_io_unknown_nested_section_warns) {
     const std::string warnings =
         warnings_from("[filters.interval]\ndedup = 2\n");
     expect(warnings.find("unknown section [filters.interval]") !=
@@ -653,7 +515,7 @@ void test_config_io_unknown_nested_section_warns() {
 }
 
 // A key in the wrong section is the typo the per-section spec exists to catch.
-void test_config_io_misplaced_key_warns() {
+TEST(test_config_io_misplaced_key_warns) {
     const std::string warnings = warnings_from("[fitness]\ngenerations = 5\n");
     expect(
         warnings.find("unknown key fitness.generations") != std::string::npos,
@@ -661,7 +523,7 @@ void test_config_io_misplaced_key_warns() {
         "about");
 }
 
-void test_config_io_unknown_key_still_applies_known_ones() {
+TEST(test_config_io_unknown_key_still_applies_known_ones) {
     std::string warnings;
     const Config cfg = config_capturing_warnings(
         "[genetic]\ngenerations = 5\nnonsense = 1\n", warnings);
@@ -670,56 +532,3 @@ void test_config_io_unknown_key_still_applies_known_ones() {
 }
 
 }  // namespace
-
-void run_config_io_tests() {
-    test_config_io_all_fields();
-    test_config_io_partial_overrides_defaults();
-    test_config_io_missing_file_throws();
-    test_config_io_invalid_toml_throws();
-    test_config_io_out_of_range_probability_throws();
-    test_config_io_elitism_rate_parsed();
-    test_config_io_elitism_not_less_than_selection_throws();
-    test_config_io_selection_scheme_defaults_to_nsga2_apportion();
-    test_config_io_status_grading_defaults_to_mrs();
-    test_config_io_status_grading_tiered_parsed();
-    test_config_io_status_grading_mrs_parsed();
-    test_config_io_status_grading_aurus_parsed();
-    test_config_io_status_grading_rejects_unknown();
-    test_config_io_mrs_admission_order_defaults_to_degree();
-    test_config_io_mrs_admission_order_spec_parsed();
-    test_config_io_mrs_admission_order_degree_parsed();
-    test_config_io_mrs_admission_order_rejects_unknown();
-    test_config_io_termination_defaults_to_generations();
-    test_config_io_termination_individuals_parsed();
-    test_config_io_termination_rejects_unknown();
-    test_config_io_individuals_without_a_cap_throws();
-    test_config_io_negative_budgets_throw();
-    test_config_io_max_wall_s_parsed_under_either_mode();
-    test_config_io_selection_scheme_weighted_parsed();
-    test_config_io_selection_scheme_nsga2_truncate_parsed();
-    test_config_io_selection_scheme_nsga2_apportion_parsed();
-    test_config_io_selection_scheme_retired_nsga2_rejected();
-    test_config_io_selection_scheme_retired_replicate_rejected();
-    test_config_io_selection_scheme_invalid_throws();
-    test_config_io_similarity_metric_defaults_to_logarithmic();
-    test_config_io_similarity_metric_direct_parsed();
-    test_config_io_similarity_metric_logarithmic_parsed();
-    test_config_io_similarity_metric_invalid_throws();
-    test_config_io_empty_string_gives_defaults();
-    test_config_io_repair_mode_defaults_to_monolithic();
-    test_config_io_repair_mode_muc_parsed();
-    test_config_io_repair_mode_monolithic_parsed();
-    test_config_io_repair_mode_invalid_throws();
-    test_config_io_muc_max_iterations_parsed();
-    test_config_io_muc_max_iterations_nonpositive_throws();
-    test_config_io_known_keys_do_not_warn();
-    test_config_io_retired_key_warns_with_hint();
-    test_config_io_removed_operator_keys_warn_and_are_ignored();
-    test_config_io_unknown_section_warns();
-    test_config_io_unknown_key_warns();
-    test_config_io_unknown_top_level_key_warns();
-    test_config_io_unknown_nested_key_warns();
-    test_config_io_unknown_nested_section_warns();
-    test_config_io_misplaced_key_warns();
-    test_config_io_unknown_key_still_applies_known_ones();
-}

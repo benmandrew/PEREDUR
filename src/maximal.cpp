@@ -6,16 +6,12 @@
 #include <filesystem>
 #include <iostream>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <system_error>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include <nlohmann/json.hpp>
-
-#include "config.hpp"
 #include "driver_support.hpp"
 #include "filter/implication.hpp"
 #include "filter/implication_check.hpp"
@@ -132,16 +128,8 @@ struct SpecOps<Specification> {
     static constexpr const char* k_extension = ".json";
     static constexpr const char* k_alphabet = "atom alphabets";
 
-    // load_specification reads the file itself, and this driver has already
-    // read it to report an unreadable one uniformly across the two formats, so
-    // the JSON half of that function is repeated here rather than the read.
     static Specification parse(const std::string& text) {
-        const nlohmann::json jobj = nlohmann::json::parse(text);
-        if (const std::optional<std::string> err =
-                validate_specification_json(jobj)) {
-            throw std::invalid_argument(*err);
-        }
-        return add_atom_prefix(jobj.get<Specification>());
+        return parse_specification_json(text);
     }
 
     static bool same_alphabet(const Specification& lhs,
@@ -162,7 +150,8 @@ struct SpecOps<Specification> {
         // No original specification here -- `maximal` takes a bare directory of
         // repairs -- so an equivalence class collapses on operator< with no
         // similarity to rank it.
-        return make_implication_filter(checker, nullptr, on_progress);
+        return make_implication_filter<Specification>(checker, nullptr,
+                                                      on_progress);
     }
 };
 
@@ -189,7 +178,8 @@ struct SpecOps<tlsf::Specification> {
     static FilterFunctionT<tlsf::Specification> maximality_filter(
         SatisfiabilityChecker& checker,
         const GenerationProgressCallback& on_progress) {
-        return tlsf_make_implication_filter(checker, nullptr, on_progress);
+        return make_implication_filter<tlsf::Specification>(checker, nullptr,
+                                                            on_progress);
     }
 };
 
@@ -413,8 +403,7 @@ int run(const Args& args, SatisfiabilityChecker& checker) {
 }  // namespace
 
 int main(int argc, const char* const argv[]) {
-    if (argc == 0 || argv == nullptr || argv[0] == nullptr) {
-        std::cerr << "fatal: missing argv[0]\n";
+    if (!has_program_name(argc, argv)) {
         return 1;
     }
     if (handle_info_flags(argc, argv, print_usage)) {
@@ -427,33 +416,9 @@ int main(int argc, const char* const argv[]) {
     }
     const Args& args = *maybe_args;
 
-    Config cfg;
-    cfg.parallel = args.jobs;
-    cfg.black_timeout = std::chrono::milliseconds{args.timeout_s * 1000};
-    // Reached through check_satisfiability's simplification step, which decides
-    // the query outright whenever it folds to a constant. compare.cpp sizes it
-    // at 300 s off amba and documents why anything smaller silently changes the
-    // verdict rather than merely losing a simplification.
-    cfg.ltlfilt_timeout = std::chrono::milliseconds{300'000};
-    apply_tool_timeouts(cfg);
-    set_thread_pool_size(cfg.parallel);
-    SatisfiabilityChecker& checker = global_sat_checker();
-    // Both measured over this tool's own queries, whole-spec implications of
-    // 1000-1600 characters. `ltlfilt --simplify` took 95.6% of solver wall
-    // time (1153.7s against 52.9s for the decision itself) and a 40-file batch
-    // went from 304s to 30s without it, with the same survivors; without the
-    // pass the unsimplified query runs about 2x longer, so the 500ms SPOT
-    // budget tuned for the search tips over under load and an undecided
-    // `ExpectUnsat` query keeps both sides. Giving SPOT black's budget instead
-    // restored agreement on 264 of 264 cut-values across a 10-run sample. The
-    // FRETISH path takes the same two settings, which is what its own final
-    // filters run under (src/repair/evolution.cpp). Its queries were per
-    // requirement rather than whole-spec until ed5413f, and measured at 40
-    // generations of 1000 the simplify pass was 59-61% of every ltlfilt exec a
-    // run made even at that shape; it now asks the whole-spec query this
-    // paragraph measures.
-    checker.set_simplify(false);
-    checker.set_spot_budget(cfg.black_timeout);
+    SatisfiabilityChecker& checker = configure_offline_checkers(
+        std::chrono::milliseconds{args.timeout_s * 1000}, true);
+    set_thread_pool_size(args.jobs);
 
     return wants_tlsf(args.paths) ? run<tlsf::Specification>(args, checker)
                                   : run<Specification>(args, checker);

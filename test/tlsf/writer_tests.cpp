@@ -1,13 +1,16 @@
 #include <string>
+#include <string_view>
 #include <vector>
 
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
 #include "tlsf/writer.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "tlsf_writer";
 
 // parse(write(parse(text))) must equal parse(text) under operator==.
 void expect_round_trip(const std::string& text, const std::string& label) {
@@ -16,7 +19,7 @@ void expect_round_trip(const std::string& text, const std::string& label) {
     expect(reparsed == original, "round-trip: " + label);
 }
 
-void test_round_trips() {
+TEST(test_round_trips) {
     expect_round_trip(
         "INFO { TITLE: \"Arbiter\"; DESCRIPTION: \"d\";\n"
         "       SEMANTICS: Mealy,standard; TARGET: Mealy; }\n"
@@ -41,7 +44,7 @@ void test_round_trips() {
         "until operator and empty inputs");
 }
 
-void test_write_structure() {
+TEST(test_write_structure) {
     const tlsf::Specification spec = tlsf::parse(
         "INFO { TITLE: \"T\"; SEMANTICS: Mealy; }\n"
         "MAIN { INPUTS { r; } OUTPUTS { g; }\n"
@@ -60,7 +63,7 @@ void test_write_structure() {
     expect(out.find("TITLE:") != std::string::npos, "write: emits title");
 }
 
-void test_semantics_written() {
+TEST(test_semantics_written) {
     const tlsf::Specification spec = tlsf::parse(
         "INFO { SEMANTICS: Moore,strict; }\nMAIN { GUARANTEE { g; } }");
     const std::string out = tlsf::write(spec);
@@ -72,7 +75,7 @@ void test_semantics_written() {
 
 // Written output must follow the TLSF grammar: INFO entries carry no `;`
 // terminator, and boolean connectives use the doubled `&&`/`||`.
-void test_write_conformance() {
+TEST(test_write_conformance) {
     const tlsf::Specification spec = tlsf::parse(
         "INFO { TITLE: \"T\"; SEMANTICS: Mealy; }\n"
         "MAIN { OUTPUTS { a; b; } GUARANTEE { a & b; } }");
@@ -85,10 +88,3 @@ void test_write_conformance() {
 }
 
 }  // namespace
-
-void run_tlsf_writer_tests() {
-    test_round_trips();
-    test_write_structure();
-    test_semantics_written();
-    test_write_conformance();
-}

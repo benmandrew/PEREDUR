@@ -9,14 +9,17 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
 #include "runner/process.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "process_runner";
 
 using Clock = std::chrono::steady_clock;
 using std::chrono::milliseconds;
@@ -37,7 +40,7 @@ std::string scratch_path(const std::string& name) {
         .string();
 }
 
-void test_captures_output_and_exit_code() {
+TEST(test_captures_output_and_exit_code) {
     const ProcessResult result =
         execute_and_capture({"/bin/sh", "-c", "printf hello; exit 3"});
     expect(result.m_output == "hello",
@@ -50,7 +53,7 @@ void test_captures_output_and_exit_code() {
            "process: a command that exits on its own has not timed out");
 }
 
-void test_merges_stderr_into_output() {
+TEST(test_merges_stderr_into_output) {
     const ProcessResult result =
         execute_and_capture({"/bin/sh", "-c", "printf out; printf err >&2"});
     expect(result.m_output.find("out") != std::string::npos &&
@@ -59,14 +62,14 @@ void test_merges_stderr_into_output() {
                result.m_output + "\"");
 }
 
-void test_zero_timeout_runs_to_completion() {
+TEST(test_zero_timeout_runs_to_completion) {
     const ProcessResult result = execute_and_capture(
         {"/bin/sh", "-c", "sleep 0.2; printf ok"}, milliseconds::zero());
     expect(result.m_output == "ok" && !result.m_timed_out,
            "process: a zero timeout means no deadline, not an instant one");
 }
 
-void test_timeout_fires_on_a_child_that_never_writes() {
+TEST(test_timeout_fires_on_a_child_that_never_writes) {
     const auto start = Clock::now();
     const ProcessResult result =
         execute_and_capture({"/bin/sh", "-c", "sleep 30"}, milliseconds{200});
@@ -84,7 +87,7 @@ void test_timeout_fires_on_a_child_that_never_writes() {
 // The case the old per-runner wrappers could still hang on: EOF on the pipe
 // means the child closed stdout, not that it exited, so reaping has to be
 // inside the deadline too.
-void test_timeout_fires_after_the_child_closes_its_output() {
+TEST(test_timeout_fires_after_the_child_closes_its_output) {
     const auto start = Clock::now();
     const ProcessResult result = execute_and_capture(
         {"/bin/sh", "-c", "printf done; exec 1>&- 2>&-; sleep 30"},
@@ -104,7 +107,7 @@ void test_timeout_fires_after_the_child_closes_its_output() {
 
 // The orphan case this wrapper exists for: a grandchild must not outlive the
 // timeout that killed its parent.
-void test_timeout_kills_the_whole_process_group() {
+TEST(test_timeout_kills_the_whole_process_group) {
     const std::string pid_path = scratch_path("grandchild_pid");
     std::filesystem::remove(pid_path);
     // The backgrounded inner shell stays in the child's process group (a
@@ -151,7 +154,7 @@ void test_timeout_kills_the_whole_process_group() {
 // this, since the pages are touched once and released.
 constexpr std::uint64_t k_allocation_kb = 512ULL * 1024ULL;
 
-void test_reports_the_child_peak_resident_set() {
+TEST(test_reports_the_child_peak_resident_set) {
     // dd is spawned by the shell and waited for by it, so this also pins that
     // ru_maxrss covers descendants the child reaped itself -- without that the
     // figure would miss every tool that forks internally.
@@ -203,7 +206,7 @@ std::uint64_t touch_every_page(std::vector<char>* buffer) {
 // back as however large PEREDUR happened to be -- which is what the assertion
 // below would catch, since /bin/sh cannot really have grown to the size of the
 // buffer this test is holding.
-void test_does_not_report_the_parents_footprint_as_the_childs() {
+TEST(test_does_not_report_the_parents_footprint_as_the_childs) {
     std::vector<char> ballast(k_allocation_kb * 1024, '\1');
     expect(touch_every_page(&ballast) > 0,
            "process: the ballast must actually be resident");
@@ -252,7 +255,7 @@ int guard_exit_status(ParentDeathPolicy policy, pid_t claimed_parent_pid) {
 // every case below except the two mismatches, and is wrong wherever PEREDUR is
 // itself pid 1 -- the container entrypoint case, where it exited 127 before
 // every tool exec and left each query with empty output and no timeout.
-void test_parent_death_guard_compares_the_recorded_parent_pid() {
+TEST(test_parent_death_guard_compares_the_recorded_parent_pid) {
     expect(getpid() != 1,
            "process: this test distinguishes a dead parent from pid 1, so it "
            "means nothing if the test binary is itself pid 1");
@@ -286,15 +289,3 @@ void test_parent_death_guard_compares_the_recorded_parent_pid() {
 }
 
 }  // namespace
-
-void run_process_runner_tests() {
-    test_captures_output_and_exit_code();
-    test_merges_stderr_into_output();
-    test_zero_timeout_runs_to_completion();
-    test_timeout_fires_on_a_child_that_never_writes();
-    test_timeout_fires_after_the_child_closes_its_output();
-    test_timeout_kills_the_whole_process_group();
-    test_reports_the_child_peak_resident_set();
-    test_does_not_report_the_parents_footprint_as_the_childs();
-    test_parent_death_guard_compares_the_recorded_parent_pid();
-}

@@ -22,6 +22,8 @@ struct ProcessResult {
     std::string m_output;
     /// The child's user+sys CPU seconds, from wait4's rusage.
     double m_cpu_s = 0.0;
+    /// Wall seconds from the start of the call to the reap.
+    double m_wall_s = 0.0;
     /// The child's peak resident set in kilobytes, from wait4's ru_maxrss
     /// (which the runner normalises: that field is kilobytes on Linux and
     /// bytes on macOS), or
@@ -164,17 +166,6 @@ std::pair<std::string, bool> read_until_eof(int read_fd,
 /// PDEATHSIG half covers that: the signal kills this process, and the kernel
 /// then kills the child.
 void harden_child_after_fork(ParentDeathPolicy policy, pid_t parent_pid);
-
-/// The parent half of the same policy, called immediately after fork(): repeats
-/// the child's setpgid so the group exists no matter which side is scheduled
-/// first. Without it a timeout firing before the child was scheduled would
-/// killpg a group that does not exist yet, and the tool would survive.
-void adopt_child_process_group(pid_t child_pid);
-
-/// SIGKILLs the process group led by `pid`, then `pid` itself. Must be called
-/// before the child is reaped, while the group still has a member and the pid
-/// cannot have been reused.
-void kill_process_tree(pid_t pid);
 
 /// Reaps `pid`, giving it `grace` to exit on its own before killing its process
 /// group. Returns the child's user+sys CPU seconds. For a child that is asked

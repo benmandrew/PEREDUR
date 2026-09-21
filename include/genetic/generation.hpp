@@ -114,22 +114,33 @@ using GenerationProgressCallback =
 /// A specification paired with its aggregated fitness score.
 using ScoredSpecification = Scored<Specification>;
 
-/// Wraps a per-element predicate as a population-level FilterFunction.
+/// Keeps a parameter out of template argument deduction, so a lambda can be
+/// passed where a std::function of the template parameter is expected.
+template <typename T>
+struct NonDeduced {
+    using type = T;
+};
+
+/// Wraps a per-element predicate as a population-level filter, on either front
+/// end: `Spec` defaults to the FRETISH Specification, and a TLSF caller names
+/// tlsf::Specification.
 ///
 /// A predicate that shells out to a solver costs a whole subprocess per
 /// cache-missing candidate, and the miss rate rises with population diversity,
 /// so those filters should pass a max_in_flight above 1. Structural predicates
 /// are cheaper than a thread-pool dispatch and should leave it at the default.
-/// Either way the survivors and their order are identical.
+/// Either way the survivors and their order are identical: verdicts are
+/// collected by index and the survivors rebuilt in population order.
 ///
 /// @param name          Display name used in diagnostic output
 /// @param predicate     A predicate returning true for specifications to keep
 /// @param max_in_flight Concurrent predicate evaluations; 1 evaluates serially
 /// @param kind          Whether the fallback may re-admit this filter's rejects
-/// @return              A FilterFunction that applies the predicate
-/// element-wise
-FilterFunction make_predicate_filter(
-    std::string name, std::function<bool(const Specification&)> predicate,
+/// @return              A filter that applies the predicate element-wise
+template <typename Spec = Specification>
+FilterFunctionT<Spec> make_predicate_filter(
+    std::string name,
+    std::function<bool(const typename NonDeduced<Spec>::type&)> predicate,
     std::size_t max_in_flight = 1, FilterKind kind = FilterKind::Correctness);
 
 /// An individual whose fitness scoring throws is dropped from the returned
@@ -518,15 +529,17 @@ std::vector<Spec> filter_population(
 }
 
 /// Returns the standard set of filter functions used during evolution, in
-/// order: deduplication, a bloat cap and the vacuity filter.
-/// Every one runs on every generation; the implication screen is not here but
-/// in get_final_filter_functions, which runs once over the survivors.
+/// order: deduplication, a bloat cap and the per-generation rows of the
+/// correctness table. Every one runs on every generation; the implication
+/// screen is not here but in get_final_filter_functions, which runs once over
+/// the survivors. Instantiated for Specification and tlsf::Specification.
 ///
 /// @param original  The reference specification the bloat cap is sized against
 /// @param checker   Satisfiability checker; captured by reference, must
 ///                  outlive the returned filters
-std::vector<FilterFunction> get_filter_functions(
-    const Specification& original, SatisfiabilityChecker& checker);
+template <typename Spec>
+std::vector<FilterFunctionT<Spec>> get_filter_functions(
+    const Spec& original, SatisfiabilityChecker& checker);
 
 /// Returns the set of filter functions applied to the final realizable
 /// population after evolution: deduplication, then (if run_implication_filter)

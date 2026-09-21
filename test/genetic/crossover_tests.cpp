@@ -1,33 +1,22 @@
 #include <cstddef>
 #include <string>
-#include <utility>
+#include <string_view>
 #include <vector>
 
+#include "fixtures.hpp"
 #include "genetic/crossover.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-RandomSource make_source(std::vector<std::size_t> values,
-                         std::size_t fallback) {
-    return RandomSource(
-        [values = std::move(values), fallback,
-         index = std::size_t{0}](std::size_t upper_bound) mutable {
-            if (index >= values.size()) {
-                return fallback % upper_bound;
-            }
-            const std::size_t value = values[index];
-            ++index;
-            return value % upper_bound;
-        });
-}
+constexpr std::string_view k_test_suite = "crossover";
 
 // Every crossover grafts: there is no branch that copies a parent's field
 // verbatim, so an all-ones source replaces rather than inherits.
-void test_crossover_always_recombines() {
+TEST(test_crossover_always_recombines) {
     const Requirement first_parent{Formula("P"), Formula("Q"),
                                    timing::immediately()};
     const Requirement second_parent{Formula("R"), Formula("S"),
@@ -42,7 +31,7 @@ void test_crossover_always_recombines() {
            "response");
 }
 
-void test_timing_crossover_can_swap_parameters() {
+TEST(test_timing_crossover_can_swap_parameters) {
     const Requirement first_parent{Formula("P"), Formula("Q"),
                                    timing::within_ticks(5)};
     const Requirement second_parent{Formula("P"), Formula("Q"),
@@ -64,7 +53,7 @@ void test_timing_crossover_can_swap_parameters() {
 // eleventh draws, after the two formula fields' eight and the timing's one.
 // Each coin is independent, so either field can come from the second parent
 // while the other stays with the first.
-void test_condition_type_and_scope_cross_over() {
+TEST(test_condition_type_and_scope_cross_over) {
     const Scope in_mode{ScopeKind::In, "m"};
     const Requirement first_parent(Formula("P"), Formula("Q"),
                                    timing::immediately(),
@@ -101,7 +90,7 @@ void test_condition_type_and_scope_cross_over() {
            "fields");
 }
 
-void test_formula_crossover_can_combine_atoms() {
+TEST(test_formula_crossover_can_combine_atoms) {
     const Requirement first_parent{Formula("P"), Formula("Q"),
                                    timing::immediately()};
     const Requirement second_parent{Formula("R"), Formula("S"),
@@ -112,7 +101,7 @@ void test_formula_crossover_can_combine_atoms() {
            "crossover: condition crossover should be able to combine atoms");
 }
 
-void test_crossover_keeps_non_weakenable_from_first_parent() {
+TEST(test_crossover_keeps_non_weakenable_from_first_parent) {
     // guarantees[0] is locked in both parents, guarantees[1] is weakenable, so
     // the locked slot is the target of no merge and the source of no donor:
     // the only eligible pair is (first[1], second[1]).
@@ -143,7 +132,7 @@ void test_crossover_keeps_non_weakenable_from_first_parent() {
 // subformula of guarantee 1 can graft into guarantee 0. Under the index-for-
 // index crossover this replaced, slot 0 could only ever see the second
 // parent's slot 0.
-void test_crossover_donor_comes_from_any_slot() {
+TEST(test_crossover_donor_comes_from_any_slot) {
     const Requirement first_a{Formula("P"), Formula("Q"),
                               timing::immediately()};
     const Requirement first_b{Formula("T"), Formula("U"),
@@ -185,7 +174,7 @@ void test_crossover_donor_comes_from_any_slot() {
 
 // The offspring keeps the first parent's shape whatever the second parent's
 // is, so unequal list lengths no longer stop two individuals breeding.
-void test_crossover_accepts_unequal_lengths() {
+TEST(test_crossover_accepts_unequal_lengths) {
     const Requirement first_a{Formula("P"), Formula("Q"),
                               timing::immediately()};
     const Requirement second_a{Formula("R"), Formula("S"),
@@ -209,13 +198,3 @@ void test_crossover_accepts_unequal_lengths() {
 }
 
 }  // namespace
-
-void run_crossover_tests() {
-    test_crossover_always_recombines();
-    test_timing_crossover_can_swap_parameters();
-    test_condition_type_and_scope_cross_over();
-    test_formula_crossover_can_combine_atoms();
-    test_crossover_keeps_non_weakenable_from_first_parent();
-    test_crossover_donor_comes_from_any_slot();
-    test_crossover_accepts_unequal_lengths();
-}

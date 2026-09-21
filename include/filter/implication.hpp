@@ -44,27 +44,35 @@ struct ImplicationFilterStats {
 
 /// Ranks candidates within one equivalence class, higher surviving. Returning
 /// the same value for two specs is allowed; the filter breaks the remaining
-/// ties on `Specification::operator<` so the survivor stays deterministic.
-using SimilarityKey = std::function<double(const Specification&)>;
+/// ties on the specification's `operator<` so the survivor stays deterministic.
+template <typename Spec>
+using SimilarityKeyT = std::function<double(const Spec&)>;
 
-/// Returns a SimilarityKey scoring each candidate by syntactic similarity to
+/// The FRETISH similarity key.
+using SimilarityKey = SimilarityKeyT<Specification>;
+
+/// Returns a similarity key scoring each candidate by syntactic similarity to
 /// @p original, so the member of an equivalence class that reads closest to the
-/// specification under repair is the one written out.
-SimilarityKey syntactic_similarity_key(Specification original,
-                                       const Config& cfg);
+/// specification under repair is the one written out. Instantiated for
+/// Specification and tlsf::Specification.
+template <typename Spec>
+SimilarityKeyT<Spec> syntactic_similarity_key(Spec original, const Config& cfg);
 
-/// Returns a FilterFunction that removes syntactically identical (structurally
-/// equal) duplicate specifications, keeping the first occurrence of each
-/// distinct spec in the input order.
-FilterFunction make_dedup_filter();
+/// Returns a filter that removes structurally equal duplicate specifications,
+/// keeping the first occurrence of each distinct spec in the input order.
+/// Instantiated for Specification (the default) and tlsf::Specification.
+template <typename Spec = Specification>
+FilterFunctionT<Spec> make_dedup_filter();
 
-/// Returns a FilterFunction that keeps only the maximal specifications of the
-/// population under the implication partial order.
+/// Returns a filter that keeps only the maximal specifications of the
+/// population under the implication partial order. Instantiated for
+/// Specification (the default) and tlsf::Specification, whose implication
+/// check is tlsf_spec_implies.
 ///
 /// Spec A strictly dominates spec B when A logically implies B (A & !B is
 /// unsatisfiable) but B does not imply A. Mutually equivalent specifications
 /// (A implies B and B implies A) contribute exactly one survivor, chosen by
-/// @p similarity and, where that ties, by `Specification::operator<`.
+/// @p similarity and, where that ties, by the specification's `operator<`.
 ///
 /// Equivalent specifications are logically one repair written two ways, so
 /// returning all of them charges a reader with a choice that is not one. The
@@ -82,14 +90,15 @@ FilterFunction make_dedup_filter();
 /// endpoint is already known subsumed.
 /// @p checker must be thread-safe (SatisfiabilityChecker satisfies this).
 /// The checker is captured by reference; it must outlive the returned
-/// FilterFunction.
+/// filter.
 ///
 /// @param checker      Satisfiability checker for pairwise implication tests
 /// @param similarity   Ranks the members of an equivalence class; an empty
 ///                     std::function ranks them all equal, leaving
-///                     `Specification::operator<` to choose
+///                     `operator<` to choose
 /// @param on_progress  Optional callback invoked after each batch of pairs is
 ///                     checked; receives (done, total) pair counts
-FilterFunction make_implication_filter(
-    SatisfiabilityChecker& checker, SimilarityKey similarity = nullptr,
+template <typename Spec = Specification>
+FilterFunctionT<Spec> make_implication_filter(
+    SatisfiabilityChecker& checker, SimilarityKeyT<Spec> similarity = nullptr,
     const GenerationProgressCallback& on_progress = nullptr);

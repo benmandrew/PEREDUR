@@ -27,19 +27,23 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "config.hpp"
+#include "fixtures.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/random_source.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "determinism";
 
 constexpr std::size_t k_seed = 20260730;
 constexpr std::size_t k_generations = 3;
@@ -96,12 +100,6 @@ std::string render_trace(const DrawTrace& trace) {
 
 const std::vector<std::string> k_in_atoms = {"a", "b", "c"};
 const std::vector<std::string> k_out_atoms = {"x", "y"};
-
-Requirement make_req(const std::string& condition, const std::string& response,
-                     Timing timing) {
-    return Requirement{Formula(condition), Formula(response),
-                       std::move(timing)};
-}
 
 /// Pins every Config field the breeding path reads, so the goldens below track
 /// the code rather than the config defaults. A default that changes the draw
@@ -221,7 +219,47 @@ std::string render_population(
 
 // --- the goldens ---
 
-void test_recording_source_matches_production_stream() {
+// bounded_uniform is the one piece of the draw stream PEREDUR owns rather than
+// inherits, and the reason it is owned is that std::uniform_int_distribution
+// gave a different answer under libc++ than under libstdc++ -- so a seed
+// reproduced a run only within one standard library, and a macOS run could not
+// reproduce a Linux campaign at all.
+//
+// These values were recorded from libstdc++'s uniform_int_distribution, which
+// is what every archived campaign was drawn against, so the vendored reduction
+// is a drop-in there and only macOS moves. Pinning them here is what stops a
+// future edit, or a libstdc++ change, drifting the stream back apart in
+// silence. A bound of 1 leads deliberately: it returns the only legal answer
+// but still spends an engine word, and an implementation that skips that draw
+// passes every other case here while shifting the whole stream by one.
+TEST(test_golden_bounded_uniform) {
+    std::mt19937 rng(20260820);
+    const std::vector<std::uint32_t> bounds = {1,  2,  3,    4,      7,
+                                               12, 60, 1000, 1000000};
+    const std::vector<std::uint32_t> expected = {
+        0, 0, 1, 3, 2, 9, 35, 181, 896636, 0, 0, 2, 1, 2, 1, 36, 243, 703569,
+        0, 0, 1, 1, 2, 8, 7,  348, 673845, 0, 1, 2, 0, 3, 1, 25, 736, 972698};
+
+    std::vector<std::uint32_t> actual;
+    for (int round = 0; round < 4; ++round) {
+        for (const std::uint32_t bound : bounds) {
+            actual.push_back(bounded_uniform(rng, bound));
+        }
+    }
+    expect(actual.size() == expected.size(),
+           "golden bounded_uniform: the fixture should draw once per bound");
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        expect(actual[i] == expected[i],
+               "golden bounded_uniform: draw " + std::to_string(i) +
+                   " for bound " + std::to_string(bounds[i % bounds.size()]) +
+                   " gave " + std::to_string(actual[i]) + ", pinned " +
+                   std::to_string(expected[i]) +
+                   "; the bounded draw no longer matches the stream every "
+                   "archived seed was drawn against");
+    }
+}
+
+TEST(test_recording_source_matches_production_stream) {
     // Includes 1000000, the bound next_real() uses, and 2, the bound
     // next_bool() uses.
     const std::vector<std::size_t> bounds = {4, 2, 3, 1000000, 7, 2, 2, 5};
@@ -246,7 +284,7 @@ void test_recording_source_matches_production_stream() {
 // number of draws, so the trace hash carries that weight. Pin the two
 // properties it needs: sensitivity to order, and to the bounds as well as the
 // values.
-void test_trace_hash_distinguishes_order_and_bounds() {
+TEST(test_trace_hash_distinguishes_order_and_bounds) {
     const DrawTrace baseline{{{4, 1}, {2, 0}, {1000000, 750}}};
     const DrawTrace reordered{{{2, 0}, {4, 1}, {1000000, 750}}};
     const DrawTrace rebounded{{{4, 1}, {3, 0}, {1000000, 750}}};
@@ -263,6 +301,26 @@ void test_trace_hash_distinguishes_order_and_bounds() {
            "trace hash: should be stable for an unchanged trace");
 }
 
+TEST(test_generation_draw_sequence_is_pinned) {
+    constexpr std::size_t k_expected_draws = 187;
+    constexpr std::uint64_t k_expected_hash = 6958607742440809774ULL;
+
+    const GoldenRun run = run_golden_evolution();
+    const std::uint64_t hash = fnv1a(render_trace(*run.trace));
+
+    expect(run.trace->draws.size() == k_expected_draws,
+           "golden draw sequence: the generation loop drew " +
+               std::to_string(run.trace->draws.size()) + " times, expected " +
+               std::to_string(k_expected_draws) +
+               "; breeding no longer consumes randomness in the same quantity, "
+               "so a fixed seed no longer reproduces earlier runs");
+    expect(hash == k_expected_hash,
+           "golden draw sequence: trace hash " + std::to_string(hash) +
+               " != pinned " + std::to_string(k_expected_hash) +
+               "; the order of RNG draws in breeding has changed, so a fixed "
+               "seed no longer reproduces earlier runs");
+}
+
 // The arms cost no draw at 0, which is what keeps the goldens above where they
 // were. A guard written that way passes just as
 // happily when the arm is dead, so this counts the draws of a single
@@ -273,7 +331,7 @@ void test_trace_hash_distinguishes_order_and_bounds() {
 // deduplicate away, which changes how much later generations draw. Turning
 // p_condition_type on over the golden run reads 195 draws against 187, and
 // neither number says anything about whether the probability was read.
-void test_new_arms_cost_no_draw_at_zero() {
+TEST(test_new_arms_cost_no_draw_at_zero) {
     const Requirement req(Formula("a"), Formula("x"), timing::immediately(),
                           ConditionType::Trigger);
     const std::vector<std::string> atoms = {"a", "x"};
@@ -361,27 +419,7 @@ void test_new_arms_cost_no_draw_at_zero() {
            "the zero-cost guard above is passing over a dead arm");
 }
 
-void test_generation_draw_sequence_is_pinned() {
-    constexpr std::size_t k_expected_draws = 187;
-    constexpr std::uint64_t k_expected_hash = 6958607742440809774ULL;
-
-    const GoldenRun run = run_golden_evolution();
-    const std::uint64_t hash = fnv1a(render_trace(*run.trace));
-
-    expect(run.trace->draws.size() == k_expected_draws,
-           "golden draw sequence: the generation loop drew " +
-               std::to_string(run.trace->draws.size()) + " times, expected " +
-               std::to_string(k_expected_draws) +
-               "; breeding no longer consumes randomness in the same quantity, "
-               "so a fixed seed no longer reproduces earlier runs");
-    expect(hash == k_expected_hash,
-           "golden draw sequence: trace hash " + std::to_string(hash) +
-               " != pinned " + std::to_string(k_expected_hash) +
-               "; the order of RNG draws in breeding has changed, so a fixed "
-               "seed no longer reproduces earlier runs");
-}
-
-void test_evolved_population_is_pinned() {
+TEST(test_evolved_population_is_pinned) {
     constexpr std::uint64_t k_expected_hash = 6487454080779250071ULL;
 
     const GoldenRun run = run_golden_evolution();
@@ -397,7 +435,7 @@ void test_evolved_population_is_pinned() {
                "elitism, padding or selection rather than in breeding");
 }
 
-void test_same_seed_reproduces_evolution() {
+TEST(test_same_seed_reproduces_evolution) {
     const std::string first =
         render_population(run_golden_evolution().population);
     const std::string second =
@@ -407,54 +445,4 @@ void test_same_seed_reproduces_evolution() {
            "identical population");
 }
 
-// bounded_uniform is the one piece of the draw stream PEREDUR owns rather than
-// inherits, and the reason it is owned is that std::uniform_int_distribution
-// gave a different answer under libc++ than under libstdc++ -- so a seed
-// reproduced a run only within one standard library, and a macOS run could not
-// reproduce a Linux campaign at all.
-//
-// These values were recorded from libstdc++'s uniform_int_distribution, which
-// is what every archived campaign was drawn against, so the vendored reduction
-// is a drop-in there and only macOS moves. Pinning them here is what stops a
-// future edit, or a libstdc++ change, drifting the stream back apart in
-// silence. A bound of 1 leads deliberately: it returns the only legal answer
-// but still spends an engine word, and an implementation that skips that draw
-// passes every other case here while shifting the whole stream by one.
-void test_golden_bounded_uniform() {
-    std::mt19937 rng(20260820);
-    const std::vector<std::uint32_t> bounds = {1,  2,  3,    4,      7,
-                                               12, 60, 1000, 1000000};
-    const std::vector<std::uint32_t> expected = {
-        0, 0, 1, 3, 2, 9, 35, 181, 896636, 0, 0, 2, 1, 2, 1, 36, 243, 703569,
-        0, 0, 1, 1, 2, 8, 7,  348, 673845, 0, 1, 2, 0, 3, 1, 25, 736, 972698};
-
-    std::vector<std::uint32_t> actual;
-    for (int round = 0; round < 4; ++round) {
-        for (const std::uint32_t bound : bounds) {
-            actual.push_back(bounded_uniform(rng, bound));
-        }
-    }
-    expect(actual.size() == expected.size(),
-           "golden bounded_uniform: the fixture should draw once per bound");
-    for (std::size_t i = 0; i < expected.size(); ++i) {
-        expect(actual[i] == expected[i],
-               "golden bounded_uniform: draw " + std::to_string(i) +
-                   " for bound " + std::to_string(bounds[i % bounds.size()]) +
-                   " gave " + std::to_string(actual[i]) + ", pinned " +
-                   std::to_string(expected[i]) +
-                   "; the bounded draw no longer matches the stream every "
-                   "archived seed was drawn against");
-    }
-}
-
 }  // namespace
-
-void run_determinism_tests() {
-    test_golden_bounded_uniform();
-    test_recording_source_matches_production_stream();
-    test_trace_hash_distinguishes_order_and_bounds();
-    test_generation_draw_sequence_is_pinned();
-    test_new_arms_cost_no_draw_at_zero();
-    test_evolved_population_is_pinned();
-    test_same_seed_reproduces_evolution();
-}

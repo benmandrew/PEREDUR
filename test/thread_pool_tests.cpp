@@ -22,11 +22,13 @@
 
 #include "bounded_async.hpp"
 #include "cpu_limits.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 #include "thread_pool.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "thread_pool";
 
 // Returns 0 when the variable is unset or does not parse as a positive count,
 // which is the "no size was requested" case rather than a request for zero.
@@ -75,9 +77,18 @@ void test_pool_defaults_to_the_available_parallelism() {
            "worker where that is unknown");
 }
 
+TEST(test_pool_takes_the_requested_or_default_size) {
+    const std::size_t requested = requested_pool_size();
+    if (requested > 0) {
+        test_pool_takes_the_requested_size(distinct_from_default(requested));
+    } else {
+        test_pool_defaults_to_the_available_parallelism();
+    }
+}
+
 // Whatever the machine, the affinity mask and the cgroup quota, sizing a pool
 // from this must never ask for zero workers.
-void test_available_parallelism_is_never_zero() {
+TEST(test_available_parallelism_is_never_zero) {
     expect(available_parallelism() >= 1,
            "available_parallelism should always report at least one worker");
 }
@@ -87,7 +98,7 @@ void expect_cpu_max(std::string_view content,
     expect(parse_cgroup_v2_cpu_max(content) == expected, message);
 }
 
-void test_cgroup_v2_cpu_max_parses() {
+TEST(test_cgroup_v2_cpu_max_parses) {
     expect_cpu_max("max 100000", std::nullopt,
                    "a cgroup v2 quota of \"max\" is unlimited, so it bounds "
                    "nothing");
@@ -106,7 +117,7 @@ void test_cgroup_v2_cpu_max_parses() {
                    "the parse");
 }
 
-void test_malformed_cgroup_v2_cpu_max_bounds_nothing() {
+TEST(test_malformed_cgroup_v2_cpu_max_bounds_nothing) {
     expect_cpu_max("", std::nullopt, "an empty cpu.max should bound nothing");
     expect_cpu_max("400000", std::nullopt,
                    "a cpu.max missing its period should bound nothing");
@@ -128,7 +139,7 @@ void expect_cfs_quota(std::string_view quota, std::string_view period,
     expect(parse_cgroup_v1_cpu_quota(quota, period) == expected, message);
 }
 
-void test_cgroup_v1_cpu_quota_parses() {
+TEST(test_cgroup_v1_cpu_quota_parses) {
     expect_cfs_quota("-1", "100000", std::nullopt,
                      "a cgroup v1 quota of -1 is unlimited, so it bounds "
                      "nothing");
@@ -151,7 +162,7 @@ void test_cgroup_v1_cpu_quota_parses() {
 
 // size() is only worth asserting on if it describes a pool that runs work, so
 // hand it more tasks than it has workers and wait for every one.
-void test_every_submitted_task_runs() {
+TEST(test_every_submitted_task_runs) {
     ThreadPool& pool = global_thread_pool();
     const std::size_t n_tasks = (pool.size() * 4) + 1;
 
@@ -174,7 +185,7 @@ void test_every_submitted_task_runs() {
 
 // One worker, held busy while both queues fill, so the order the queued tasks
 // run in is the order the worker chose them in and nothing else.
-void test_foreground_tasks_run_before_queued_background_ones() {
+TEST(test_foreground_tasks_run_before_queued_background_ones) {
     ThreadPool pool(1);
     std::promise<void> release;
     std::shared_future<void> gate = release.get_future().share();
@@ -205,7 +216,7 @@ void test_foreground_tasks_run_before_queued_background_ones() {
            "background one, each queue keeping its own submission order");
 }
 
-void test_background_region_collects_every_item() {
+TEST(test_background_region_collects_every_item) {
     constexpr std::size_t k_n_items = 32;
     std::vector<std::size_t> values(k_n_items, 0);
     run_bounded_async(
@@ -220,7 +231,7 @@ void test_background_region_collects_every_item() {
     }
 }
 
-void test_dispatch_window_is_twice_the_pool() {
+TEST(test_dispatch_window_is_twice_the_pool) {
     expect(dispatch_window() >= 1,
            "the dispatch window should always admit at least one task");
     expect(dispatch_window() == global_thread_pool().size() * 2,
@@ -231,7 +242,7 @@ void test_dispatch_window_is_twice_the_pool() {
 // to apply anywhere: permuting the launch order changes which item goes out
 // first and nothing else.
 
-void test_cost_ordered_indices_is_longest_first() {
+TEST(test_cost_ordered_indices_is_longest_first) {
     const std::vector<double> costs{1.0, 5.0, 3.0, 5.0, 0.0};
     const std::vector<std::size_t> order = cost_ordered_indices(
         costs.size(), [&costs](std::size_t idx) { return costs[idx]; });
@@ -242,7 +253,7 @@ void test_cost_ordered_indices_is_longest_first() {
            "estimates alone");
 }
 
-void test_cost_ordered_dispatch_pairs_results_with_their_own_index() {
+TEST(test_cost_ordered_dispatch_pairs_results_with_their_own_index) {
     constexpr std::size_t k_n_items = 64;
     // Deliberately not monotone in the index, so index order and cost order
     // disagree and a result filed under the launch slot would be caught.
@@ -270,22 +281,3 @@ void test_cost_ordered_dispatch_pairs_results_with_their_own_index() {
 }
 
 }  // namespace
-
-void run_thread_pool_tests() {
-    const std::size_t requested = requested_pool_size();
-    if (requested > 0) {
-        test_pool_takes_the_requested_size(distinct_from_default(requested));
-    } else {
-        test_pool_defaults_to_the_available_parallelism();
-    }
-    test_available_parallelism_is_never_zero();
-    test_cgroup_v2_cpu_max_parses();
-    test_malformed_cgroup_v2_cpu_max_bounds_nothing();
-    test_cgroup_v1_cpu_quota_parses();
-    test_every_submitted_task_runs();
-    test_foreground_tasks_run_before_queued_background_ones();
-    test_background_region_collects_every_item();
-    test_dispatch_window_is_twice_the_pool();
-    test_cost_ordered_indices_is_longest_first();
-    test_cost_ordered_dispatch_pairs_results_with_their_own_index();
-}

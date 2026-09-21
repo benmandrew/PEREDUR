@@ -1,34 +1,37 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "genetic/nsga2.hpp"
 #include "genetic/scored.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
+constexpr std::string_view k_test_suite = "nsga2";
+
 // --- dominates ---
 
-void test_dominates_strict_improvement_in_all_objectives() {
+TEST(test_dominates_strict_improvement_in_all_objectives) {
     expect(dominates({0.6, 0.7}, {0.5, 0.5}),
            "dominates: better in every objective dominates");
 }
 
-void test_dominates_equal_in_one_better_in_other() {
+TEST(test_dominates_equal_in_one_better_in_other) {
     expect(dominates({0.5, 0.7}, {0.5, 0.5}),
            "dominates: equal in one, strictly better in the other, dominates");
 }
 
-void test_dominates_requires_strict_improvement_somewhere() {
+TEST(test_dominates_requires_strict_improvement_somewhere) {
     expect(!dominates({0.5, 0.5}, {0.5, 0.5}),
            "dominates: identical vectors do not dominate each other");
 }
 
-void test_dominates_mutually_incomparable() {
+TEST(test_dominates_mutually_incomparable) {
     expect(!dominates({0.6, 0.4}, {0.4, 0.6}),
            "dominates: a trade-off pair is mutually non-dominating (lhs)");
     expect(!dominates({0.4, 0.6}, {0.6, 0.4}),
@@ -37,7 +40,7 @@ void test_dominates_mutually_incomparable() {
 
 // --- non_domination_ranks ---
 
-void test_ranks_layered_fronts() {
+TEST(test_ranks_layered_fronts) {
     // Front 0: the two trade-off extremes {0.9,0.1} and {0.1,0.9} plus the
     // balanced {0.5,0.5} — mutually non-dominating. {0.4,0.4} is dominated only
     // by {0.5,0.5} (front 1); {0.2,0.2} is dominated by both (front 2).
@@ -51,7 +54,7 @@ void test_ranks_layered_fronts() {
     expect(ranks[4] == 2, "ranks: {0.2,0.2} dominated across two fronts");
 }
 
-void test_ranks_total_order_chain() {
+TEST(test_ranks_total_order_chain) {
     const std::vector<std::vector<double>> objectives = {
         {0.1, 0.1}, {0.2, 0.2}, {0.3, 0.3}};
     const std::vector<std::size_t> ranks = non_domination_ranks(objectives);
@@ -59,7 +62,7 @@ void test_ranks_total_order_chain() {
            "ranks: a fully ordered chain yields one solution per front");
 }
 
-void test_ranks_identical_vectors_share_front() {
+TEST(test_ranks_identical_vectors_share_front) {
     const std::vector<std::vector<double>> objectives = {
         {0.5, 0.5}, {0.5, 0.5}, {0.5, 0.5}};
     const std::vector<std::size_t> ranks = non_domination_ranks(objectives);
@@ -69,7 +72,7 @@ void test_ranks_identical_vectors_share_front() {
 
 // --- crowding_distances ---
 
-void test_crowding_boundaries_are_infinite() {
+TEST(test_crowding_boundaries_are_infinite) {
     const std::vector<std::vector<double>> objectives = {
         {0.0, 1.0}, {0.5, 0.5}, {1.0, 0.0}};
     const std::vector<std::size_t> ranks = {0, 0, 0};
@@ -85,7 +88,7 @@ void test_crowding_boundaries_are_infinite() {
            "gaps");
 }
 
-void test_crowding_denser_neighbour_has_smaller_distance() {
+TEST(test_crowding_denser_neighbour_has_smaller_distance) {
     // Four mutually non-dominating points along a trade-off front. Index 1
     // sits between two close neighbours (0.0 and 0.2 on obj0), while index 2
     // has a distant upper neighbour (1.0), so index 1 is the more crowded and
@@ -102,7 +105,7 @@ void test_crowding_denser_neighbour_has_smaller_distance() {
            "crowded and gets the smaller distance");
 }
 
-void test_crowding_zero_range_objective_contributes_nothing() {
+TEST(test_crowding_zero_range_objective_contributes_nothing) {
     // obj1 is constant across the front; it must not produce NaN/inf for the
     // interior member, and obj0 alone drives the finite distance.
     const std::vector<std::vector<double>> objectives = {
@@ -113,7 +116,7 @@ void test_crowding_zero_range_objective_contributes_nothing() {
            "crowding: a zero-range objective adds nothing and yields no NaN");
 }
 
-void test_crowding_constant_objective_pins_nobody() {
+TEST(test_crowding_constant_objective_pins_nobody) {
     // Every objective is constant across the front, so nothing distinguishes
     // any member and none should be preferred. The infinities used to be
     // assigned before the zero-range guard, which pinned two members picked by
@@ -129,7 +132,7 @@ void test_crowding_constant_objective_pins_nobody() {
            "distance at zero, pinning nobody");
 }
 
-void test_crowding_zero_range_objective_adds_no_infinities() {
+TEST(test_crowding_zero_range_objective_adds_no_infinities) {
     // obj0 varies and legitimately anchors its two extremes; obj1 is constant
     // and must anchor nothing. A property assertion rather than a regression
     // guard: this case also passed before the guard moved, because the unstable
@@ -155,7 +158,7 @@ Scored<int> make_scored(int value, std::vector<double> objectives) {
     return scored;
 }
 
-void test_nsga2_sort_orders_by_rank_then_crowding() {
+TEST(test_nsga2_sort_orders_by_rank_then_crowding) {
     std::vector<Scored<int>> population;
     population.push_back(make_scored(0, {0.4, 0.4}));  // front 1
     population.push_back(make_scored(1, {0.9, 0.1}));  // front 0, boundary
@@ -173,7 +176,7 @@ void test_nsga2_sort_orders_by_rank_then_crowding() {
            "boundaries within its front");
 }
 
-void test_nsga2_sort_is_deterministic() {
+TEST(test_nsga2_sort_is_deterministic) {
     const auto build = []() {
         std::vector<Scored<int>> pop;
         pop.push_back(make_scored(0, {0.5, 0.5}));
@@ -192,20 +195,3 @@ void test_nsga2_sort_is_deterministic() {
 }
 
 }  // namespace
-
-void run_nsga2_tests() {
-    test_dominates_strict_improvement_in_all_objectives();
-    test_dominates_equal_in_one_better_in_other();
-    test_dominates_requires_strict_improvement_somewhere();
-    test_dominates_mutually_incomparable();
-    test_ranks_layered_fronts();
-    test_ranks_total_order_chain();
-    test_ranks_identical_vectors_share_front();
-    test_crowding_boundaries_are_infinite();
-    test_crowding_denser_neighbour_has_smaller_distance();
-    test_crowding_zero_range_objective_contributes_nothing();
-    test_crowding_constant_objective_pins_nobody();
-    test_crowding_zero_range_objective_adds_no_infinities();
-    test_nsga2_sort_orders_by_rank_then_crowding();
-    test_nsga2_sort_is_deterministic();
-}

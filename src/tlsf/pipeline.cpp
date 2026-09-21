@@ -18,6 +18,7 @@
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
 #include "genetic/generation.hpp"
+#include "genetic/output_gate.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "repair_modes.hpp"
@@ -102,8 +103,8 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
     // separate screen -- extraction leaves the environment side untouched, and
     // well-separation reads only that side.
     std::cerr << screen_input(
-        original,
-        tlsf_correctness_checks(global_sat_checker(), global_real_checker()));
+        original, correctness_checks<Specification>(global_sat_checker(),
+                                                    global_real_checker()));
     // After the input screen and before anything is scored: the query is
     // memoised, so this is the call the first scoring pass was about to make
     // anyway, timed.
@@ -132,10 +133,10 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
     // Built from the original spec purely to name the stages. MUC repair
     // rebuilds these per core, but the filter set, and so the roster, is the
     // same whichever sub-specification is being evolved.
-    dashboard.run_start(
-        input_path, cfg.generations, cfg.population_size,
-        maybe_seed.value_or(0), progress.objective_names,
-        generation_stage_names(internal::build_per_gen_filters(original)));
+    dashboard.run_start(input_path, cfg.generations, cfg.population_size,
+                        maybe_seed.value_or(0), progress.objective_names,
+                        generation_stage_names(get_filter_functions(
+                            original, global_sat_checker())));
     const auto wall_start = std::chrono::steady_clock::now();
     if (!dashboard.write_page().empty()) {
         std::cout << "Progress: " << dashboard.path() << "\n"
@@ -146,7 +147,7 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
     // Null unless the key is on, and then the final screens run while the
     // search does; destroyed unfinished if anything below throws.
     const std::unique_ptr<StreamingMaximalFilter<Specification>> stream =
-        internal::make_maximal_stream(original, cfg, output_dir);
+        make_maximal_stream(original, cfg, output_dir);
     std::vector<Scored<Specification>> survivors =
         cfg.repair_mode == RepairMode::Muc
             ? internal::run_muc(original, cfg, random_source, fitness, progress,

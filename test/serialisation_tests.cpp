@@ -1,9 +1,7 @@
-#include <unistd.h>
-
-#include <cstdio>
-#include <fstream>
+#include <filesystem>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -11,22 +9,12 @@
 
 #include "requirement.hpp"
 #include "serialisation.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-std::string write_temp_spec(const std::string& contents) {
-    std::string path = "/tmp/peredur-spec-XXXXXX";
-    const int file_descriptor = mkstemp(path.data());
-    expect(file_descriptor >= 0,
-           "atom-prefix: failed to create temp spec file");
-    close(file_descriptor);
-    std::ofstream out(path);
-    expect(out.good(), "atom-prefix: failed to open temp spec file");
-    out << contents;
-    return path;
-}
+constexpr std::string_view k_test_suite = "serialisation";
 
 // out_atom "GF" is the formerly-dangerous case (lexed as G F operators);
 // "STATE_FAULT" is a benign uppercase name that used to only warn.
@@ -42,39 +30,7 @@ const char* const k_atom_spec_json = R"JSON({
   "out_atoms": ["GF", "STATE_FAULT"]
 })JSON";
 
-void test_load_serialise_preserves_original_atom_names() {
-    const std::string path = write_temp_spec(k_atom_spec_json);
-    const Specification spec = load_specification(path);
-    std::remove(path.c_str());
-    nlohmann::json jobj;
-    to_json(jobj, spec);
-    expect(jobj.dump().find("iap_") == std::string::npos,
-           "atom-prefix: serialised spec must not leak the internal prefix");
-    expect(jobj.at("out_atoms").at(0) == "GF" &&
-               jobj.at("out_atoms").at(1) == "STATE_FAULT",
-           "atom-prefix: out_atoms should round-trip to original names");
-    expect(jobj.at("guarantees").at(0).at("response") == "GF",
-           "atom-prefix: response 'GF' should round-trip to original name");
-}
-
-void test_load_tags_atoms_internally() {
-    const std::string path = write_temp_spec(k_atom_spec_json);
-    const Specification spec = load_specification(path);
-    std::remove(path.c_str());
-    expect(spec.m_in_atoms.size() == 1 && spec.m_in_atoms[0] == "iap_c",
-           "atom-prefix: in-memory in_atom should carry the internal prefix");
-    expect(spec.m_out_atoms.size() == 2 && spec.m_out_atoms[0] == "iap_GF" &&
-               spec.m_out_atoms[1] == "iap_STATE_FAULT",
-           "atom-prefix: in-memory out_atoms should carry the internal prefix");
-    expect(spec.m_guarantees.size() == 2,
-           "atom-prefix: expected two guarantees after load");
-    expect(spec.m_guarantees[0].m_response.to_string() == "iap_GF",
-           "atom-prefix: in-memory response formula should carry the prefix");
-    expect(spec.m_guarantees[0].m_ltl.find("iap_GF") != std::string::npos,
-           "atom-prefix: derived LTL should contain the prefixed atom");
-}
-
-void test_timing_immediately() {
+TEST(test_timing_immediately) {
     const Timing tim = timing::immediately();
     nlohmann::json jobj;
     timing::to_json(jobj, tim);
@@ -84,7 +40,7 @@ void test_timing_immediately() {
            "from_json(Timing): Immediately round-trip should match");
 }
 
-void test_timing_next_timepoint() {
+TEST(test_timing_next_timepoint) {
     const Timing tim = timing::next_timepoint();
     nlohmann::json jobj;
     timing::to_json(jobj, tim);
@@ -94,7 +50,7 @@ void test_timing_next_timepoint() {
            "from_json(Timing): NextTimepoint round-trip should match");
 }
 
-void test_timing_within_ticks() {
+TEST(test_timing_within_ticks) {
     const Timing tim = timing::within_ticks(7);
     nlohmann::json jobj;
     timing::to_json(jobj, tim);
@@ -106,7 +62,7 @@ void test_timing_within_ticks() {
            "from_json(Timing): WithinTicks round-trip should match");
 }
 
-void test_timing_for_ticks() {
+TEST(test_timing_for_ticks) {
     const Timing tim = timing::for_ticks(3);
     nlohmann::json jobj;
     timing::to_json(jobj, tim);
@@ -118,7 +74,7 @@ void test_timing_for_ticks() {
            "from_json(Timing): ForTicks round-trip should match");
 }
 
-void test_timing_after_ticks() {
+TEST(test_timing_after_ticks) {
     const Timing tim = timing::after_ticks(2);
     nlohmann::json jobj;
     timing::to_json(jobj, tim);
@@ -130,7 +86,7 @@ void test_timing_after_ticks() {
            "from_json(Timing): AfterTicks round-trip should match");
 }
 
-void test_timing_eventually() {
+TEST(test_timing_eventually) {
     const Timing tim = timing::eventually();
     nlohmann::json jobj;
     timing::to_json(jobj, tim);
@@ -140,7 +96,7 @@ void test_timing_eventually() {
            "from_json(Timing): Eventually round-trip should match");
 }
 
-void test_timing_always() {
+TEST(test_timing_always) {
     const Timing tim = timing::always();
     nlohmann::json jobj;
     timing::to_json(jobj, tim);
@@ -150,7 +106,7 @@ void test_timing_always() {
            "from_json(Timing): Always round-trip should match");
 }
 
-void test_timing_until_and_before() {
+TEST(test_timing_until_and_before) {
     for (const Timing& tim :
          {timing::until(Formula("s & t")), timing::before(Formula("s"))}) {
         nlohmann::json jobj;
@@ -175,7 +131,7 @@ void test_timing_until_and_before() {
 
 // The stop is tagged with the atom prefix like the condition, and stripped
 // again on the way out, or a stop atom named like an operator would mis-lex.
-void test_stop_atoms_round_trip_through_the_prefix() {
+TEST(test_stop_atoms_round_trip_through_the_prefix) {
     const Requirement req(Formula("c"), Formula("r"),
                           timing::until(Formula("Grant")),
                           ConditionType::Continual);
@@ -187,7 +143,7 @@ void test_stop_atoms_round_trip_through_the_prefix() {
            "to_json(Requirement): a stop atom must be written untagged");
 }
 
-void test_requirement_round_trip() {
+TEST(test_requirement_round_trip) {
     const Requirement req(Formula("(P) & (Q)"), Formula("R"),
                           timing::within_ticks(3), ConditionType::Trigger);
     nlohmann::json jobj;
@@ -197,7 +153,7 @@ void test_requirement_round_trip() {
            "requirement_from_json: round-trip should preserve all fields");
 }
 
-void test_requirement_json_keys() {
+TEST(test_requirement_json_keys) {
     const Requirement req(Formula("t"), Formula("r"), timing::immediately(),
                           ConditionType::Continual);
     nlohmann::json jobj;
@@ -216,7 +172,7 @@ void test_requirement_json_keys() {
            "to_json(Requirement): timing type should be embedded");
 }
 
-void test_requirement_json_keys_trigger() {
+TEST(test_requirement_json_keys_trigger) {
     const Requirement req(Formula("c"), Formula("r"), timing::immediately(),
                           ConditionType::Trigger);
     nlohmann::json jobj;
@@ -225,7 +181,7 @@ void test_requirement_json_keys_trigger() {
            "to_json(Requirement): condition-type should be trigger");
 }
 
-void test_requirement_weakenable_omitted_when_true() {
+TEST(test_requirement_weakenable_omitted_when_true) {
     const Requirement req(Formula("a"), Formula("b"), timing::immediately());
     nlohmann::json jobj;
     to_json(jobj, req);
@@ -234,7 +190,7 @@ void test_requirement_weakenable_omitted_when_true() {
            "default (weakenable) requirement");
 }
 
-void test_requirement_non_weakenable_round_trip() {
+TEST(test_requirement_non_weakenable_round_trip) {
     const Requirement req(Formula("a"), Formula("b"), timing::immediately(),
                           ConditionType::Continual, false);
     nlohmann::json jobj;
@@ -250,7 +206,7 @@ void test_requirement_non_weakenable_round_trip() {
            "fields");
 }
 
-void test_requirement_weakenable_defaults_true_when_absent() {
+TEST(test_requirement_weakenable_defaults_true_when_absent) {
     const nlohmann::json jobj = {{"condition", "a"},
                                  {"response", "b"},
                                  {"condition-type", "continual"},
@@ -265,7 +221,7 @@ void test_requirement_weakenable_defaults_true_when_absent() {
 // document, and a deleted guarantee's meaning there is absence. Marking it
 // instead would leave every reader that has never heard of the flag treating a
 // requirement the repair removed as one it kept.
-void test_specification_omits_removed_requirements() {
+TEST(test_specification_omits_removed_requirements) {
     std::vector<Requirement> guarantees = {
         Requirement(Formula("a"), Formula("b"), timing::immediately()),
         Requirement(Formula("c"), Formula("d"), timing::immediately())};
@@ -290,7 +246,7 @@ void test_specification_omits_removed_requirements() {
            "deleted guarantee simply absent");
 }
 
-void test_removed_flag_is_part_of_requirement_identity() {
+TEST(test_removed_flag_is_part_of_requirement_identity) {
     const Requirement live(Formula("a"), Formula("b"), timing::immediately());
     Requirement deleted = live;
     deleted.m_removed = true;
@@ -304,7 +260,7 @@ void test_removed_flag_is_part_of_requirement_identity() {
            "requirement identity: the two are strictly ordered");
 }
 
-void test_specification_round_trip() {
+TEST(test_specification_round_trip) {
     const Specification spec(
         {Requirement(Formula("a"), Formula("b"), timing::immediately(),
                      ConditionType::Continual)},
@@ -320,7 +276,7 @@ void test_specification_round_trip() {
            "from_json(Specification): round-trip should preserve full spec");
 }
 
-void test_specification_json_structure() {
+TEST(test_specification_json_structure) {
     const Specification spec(
         {}, {Requirement(Formula("t"), Formula("r"), timing::immediately())},
         {"t"}, {"r"});
@@ -340,7 +296,7 @@ void test_specification_json_structure() {
            "to_json(Specification): should not have fitness key");
 }
 
-void test_scored_specification_without_fitness() {
+TEST(test_scored_specification_without_fitness) {
     const serialisation::ScoredSpecification scored{
         Specification(
             {},
@@ -359,7 +315,7 @@ void test_scored_specification_without_fitness() {
         "ScoredSpecification: fitness should remain absent after round-trip");
 }
 
-void test_scored_specification_with_fitness() {
+TEST(test_scored_specification_with_fitness) {
     const serialisation::ScoredSpecification scored{
         Specification(
             {}, {Requirement(Formula("t"), Formula("r"), timing::eventually())},
@@ -393,11 +349,43 @@ void test_scored_specification_with_fitness() {
            "ScoredSpecification: component weight round-trip should match");
 }
 
+TEST(test_load_serialise_preserves_original_atom_names) {
+    const TempDir dir("serialisation");
+    const Specification spec = load_specification(
+        write_text(dir.path() / "spec.json", k_atom_spec_json).string());
+    nlohmann::json jobj;
+    to_json(jobj, spec);
+    expect(jobj.dump().find("iap_") == std::string::npos,
+           "atom-prefix: serialised spec must not leak the internal prefix");
+    expect(jobj.at("out_atoms").at(0) == "GF" &&
+               jobj.at("out_atoms").at(1) == "STATE_FAULT",
+           "atom-prefix: out_atoms should round-trip to original names");
+    expect(jobj.at("guarantees").at(0).at("response") == "GF",
+           "atom-prefix: response 'GF' should round-trip to original name");
+}
+
+TEST(test_load_tags_atoms_internally) {
+    const TempDir dir("serialisation");
+    const Specification spec = load_specification(
+        write_text(dir.path() / "spec.json", k_atom_spec_json).string());
+    expect(spec.m_in_atoms.size() == 1 && spec.m_in_atoms[0] == "iap_c",
+           "atom-prefix: in-memory in_atom should carry the internal prefix");
+    expect(spec.m_out_atoms.size() == 2 && spec.m_out_atoms[0] == "iap_GF" &&
+               spec.m_out_atoms[1] == "iap_STATE_FAULT",
+           "atom-prefix: in-memory out_atoms should carry the internal prefix");
+    expect(spec.m_guarantees.size() == 2,
+           "atom-prefix: expected two guarantees after load");
+    expect(spec.m_guarantees[0].m_response.to_string() == "iap_GF",
+           "atom-prefix: in-memory response formula should carry the prefix");
+    expect(spec.m_guarantees[0].m_ltl.find("iap_GF") != std::string::npos,
+           "atom-prefix: derived LTL should contain the prefixed atom");
+}
+
 // --- Scopes and modes ----------------------------------------------------
 
 // Absence means Global, so a specification written before scopes existed reads
 // back exactly as it did and writes back byte for byte.
-void test_scope_omitted_when_global() {
+TEST(test_scope_omitted_when_global) {
     const Requirement req(Formula("a"), Formula("b"), timing::immediately());
     nlohmann::json jobj;
     to_json(jobj, req);
@@ -406,7 +394,7 @@ void test_scope_omitted_when_global() {
            "requirement");
 }
 
-void test_scope_round_trip() {
+TEST(test_scope_round_trip) {
     for (const ScopeKind kind :
          {ScopeKind::In, ScopeKind::NotIn, ScopeKind::Before, ScopeKind::After,
           ScopeKind::OnlyIn, ScopeKind::OnlyBefore, ScopeKind::OnlyAfter}) {
@@ -424,7 +412,7 @@ void test_scope_round_trip() {
     }
 }
 
-void test_scope_defaults_to_global_when_absent() {
+TEST(test_scope_defaults_to_global_when_absent) {
     const nlohmann::json jobj = {{"condition", "a"},
                                  {"condition-type", "continual"},
                                  {"response", "b"},
@@ -434,7 +422,7 @@ void test_scope_defaults_to_global_when_absent() {
            "requirement_from_json: an absent scope must read as Global");
 }
 
-void test_modes_omitted_when_empty() {
+TEST(test_modes_omitted_when_empty) {
     const Specification spec({}, {}, {"a"}, {"b"});
     nlohmann::json jobj;
     to_json(jobj, spec);
@@ -443,7 +431,7 @@ void test_modes_omitted_when_empty() {
            "modes are declared");
 }
 
-void test_modes_round_trip() {
+TEST(test_modes_round_trip) {
     const Specification spec({}, {}, {"a"}, {"b"}, {"roll_hold", "nav"});
     nlohmann::json jobj;
     to_json(jobj, spec);
@@ -457,7 +445,7 @@ void test_modes_round_trip() {
 // A mode is not an atom of either side, so a scope naming one that was never
 // declared would fall through to the output half of ltlsynt's partition, where
 // the synthesised system can discharge the scope by never entering the mode.
-void test_undeclared_mode_is_rejected() {
+TEST(test_undeclared_mode_is_rejected) {
     const nlohmann::json jobj = {
         {"assumptions", nlohmann::json::array()},
         {"guarantees",
@@ -474,7 +462,7 @@ void test_undeclared_mode_is_rejected() {
            "be rejected");
 }
 
-void test_stop_timing_without_stop_is_rejected() {
+TEST(test_stop_timing_without_stop_is_rejected) {
     for (const char* type : {"Until", "Before"}) {
         const nlohmann::json jobj = {{"assumptions", nlohmann::json::array()},
                                      {"guarantees",
@@ -492,7 +480,7 @@ void test_stop_timing_without_stop_is_rejected() {
 
 // FRET's `never r` loads as `always !r`, so it validates like any timing and
 // reaches the engine as a kind the grammar already has.
-void test_never_loads_as_always_over_a_negated_response() {
+TEST(test_never_loads_as_always_over_a_negated_response) {
     const nlohmann::json req_json = {{"condition", "a"},
                                      {"condition-type", "continual"},
                                      {"response", "b & c"},
@@ -511,7 +499,7 @@ void test_never_loads_as_always_over_a_negated_response() {
            "validate_specification_json: a Never timing must be accepted");
 }
 
-void test_mode_shared_with_an_atom_is_rejected() {
+TEST(test_mode_shared_with_an_atom_is_rejected) {
     const nlohmann::json jobj = {{"assumptions", nlohmann::json::array()},
                                  {"guarantees", nlohmann::json::array()},
                                  {"in_atoms", {"roll_hold"}},
@@ -523,7 +511,7 @@ void test_mode_shared_with_an_atom_is_rejected() {
            "atom must be rejected");
 }
 
-void test_global_scope_with_a_mode_is_rejected() {
+TEST(test_global_scope_with_a_mode_is_rejected) {
     const nlohmann::json jobj = {
         {"assumptions", nlohmann::json::array()},
         {"guarantees",
@@ -541,7 +529,7 @@ void test_global_scope_with_a_mode_is_rejected() {
            "rejected rather than silently dropping it");
 }
 
-void test_scoped_requirement_needs_a_mode() {
+TEST(test_scoped_requirement_needs_a_mode) {
     const nlohmann::json jobj = {{"assumptions", nlohmann::json::array()},
                                  {"guarantees",
                                   {{{"condition", "a"},
@@ -558,40 +546,3 @@ void test_scoped_requirement_needs_a_mode() {
 }
 
 }  // namespace
-
-void run_serialisation_tests() {
-    test_timing_immediately();
-    test_timing_next_timepoint();
-    test_timing_within_ticks();
-    test_timing_for_ticks();
-    test_timing_after_ticks();
-    test_timing_eventually();
-    test_timing_always();
-    test_timing_until_and_before();
-    test_stop_atoms_round_trip_through_the_prefix();
-    test_requirement_round_trip();
-    test_requirement_json_keys();
-    test_requirement_json_keys_trigger();
-    test_requirement_weakenable_omitted_when_true();
-    test_requirement_non_weakenable_round_trip();
-    test_requirement_weakenable_defaults_true_when_absent();
-    test_specification_omits_removed_requirements();
-    test_removed_flag_is_part_of_requirement_identity();
-    test_specification_round_trip();
-    test_specification_json_structure();
-    test_scored_specification_without_fitness();
-    test_scored_specification_with_fitness();
-    test_load_serialise_preserves_original_atom_names();
-    test_load_tags_atoms_internally();
-    test_scope_omitted_when_global();
-    test_scope_round_trip();
-    test_scope_defaults_to_global_when_absent();
-    test_modes_omitted_when_empty();
-    test_modes_round_trip();
-    test_undeclared_mode_is_rejected();
-    test_stop_timing_without_stop_is_rejected();
-    test_never_loads_as_always_over_a_negated_response();
-    test_mode_shared_with_an_atom_is_rejected();
-    test_global_scope_with_a_mode_is_rejected();
-    test_scoped_requirement_needs_a_mode();
-}

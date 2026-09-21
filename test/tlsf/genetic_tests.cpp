@@ -2,30 +2,28 @@
 #include <cstddef>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "config.hpp"
+#include "filter/implication.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/random_source.hpp"
 #include "prop_formula.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 #include "tlsf/crossover.hpp"
 #include "tlsf/filter.hpp"
 #include "tlsf/fitness.hpp"
 #include "tlsf/mutation.hpp"
 #include "tlsf/operators.hpp"
-#include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
+#include "tlsf_fixtures.hpp"
 
 namespace {
 
-tlsf::Specification parse(const std::string& main_body,
-                          const std::string& semantics = "Mealy") {
-    return tlsf::parse("INFO { SEMANTICS: " + semantics + "; }\nMAIN {\n" +
-                       main_body + "\n}\n");
-}
+constexpr std::string_view k_test_suite = "tlsf_genetic";
 
 bool is_temporal(Formula::Kind kind) {
     switch (kind) {
@@ -91,11 +89,11 @@ bool contains_kind(const Formula& formula, Formula::Kind kind) {
     return false;
 }
 
-void test_mutation_preserves_temporal_skeleton() {
+TEST(test_mutation_preserves_temporal_skeleton) {
     Config cfg;
     cfg.tlsf_p_temporal = 0.0;  // isolate the skeleton-preserving rewrite
     cfg.p_monotone = 0.0;  // ... which the monotone arm is offered ahead of
-    const tlsf::Specification original = parse(
+    const tlsf::Specification original = parse_main(
         "INPUTS { req; } OUTPUTS { grant; } GUARANTEE { G(req -> F "
         "grant); }");
     const std::multiset<int> skeleton =
@@ -122,7 +120,7 @@ void test_mutation_preserves_temporal_skeleton() {
 // guarantee side takes the complement. Both sides hold formulae here, so
 // neither can be reached by the empty-side fallback and the probability alone
 // decides.
-void test_mutation_side_probability_selects_side() {
+TEST(test_mutation_side_probability_selects_side) {
     tlsf::Specification spec;
     spec.m_inputs = {"a"};
     spec.m_outputs = {"b"};
@@ -168,7 +166,7 @@ void test_mutation_side_probability_selects_side() {
            "mutation: p_assumption = 0.5 splits evenly");
 }
 
-void test_temporal_mutation_changes_skeleton() {
+TEST(test_temporal_mutation_changes_skeleton) {
     // With tlsf_p_temporal forced to 1, the chosen formula is rewritten by the
     // Brizzio-style operator, which is allowed to insert/drop/swap temporal
     // operators. Over a range of seeds the temporal skeleton must actually
@@ -178,7 +176,7 @@ void test_temporal_mutation_changes_skeleton() {
     cfg.p_monotone = 0.0;        // the monotone arm is offered ahead of it
     cfg.p_add_assumption = 0.0;  // isolate the rewrite path
     cfg.p_remove_guarantee = 0.0;
-    const tlsf::Specification original = parse(
+    const tlsf::Specification original = parse_main(
         "INPUTS { req; } OUTPUTS { grant; } GUARANTEE { G(req -> F "
         "grant); }");
     const std::multiset<int> skeleton =
@@ -203,7 +201,7 @@ void test_temporal_mutation_changes_skeleton() {
            "one seed");
 }
 
-void test_temporal_mutation_can_emit_an_implication() {
+TEST(test_temporal_mutation_can_emit_an_implication) {
     // pick_binary_kind draws Implies since 2026-08-21. Case (3) of
     // mutate_temporal is the default branch over any binary node, Iff
     // included, so widening that draw is what puts `<->` → `->` in reach —
@@ -216,21 +214,21 @@ void test_temporal_mutation_can_emit_an_implication() {
     cfg.p_add_assumption = 0.0;
     cfg.p_remove_guarantee = 0.0;
     const tlsf::Specification original =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> X r); }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> X r); }");
     expect(!contains_kind(original.m_guarantee.front().m_formula,
                           Formula::Kind::Implies),
            "implication draw: the input carries no implication to start with");
 
-    bool emitted = false;
-    for (std::size_t seed = 0; seed < 40 && !emitted; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        const tlsf::Specification mutated = tlsf_mutate(original, rng, cfg);
-        emitted = contains_kind(mutated.m_guarantee.front().m_formula,
-                                Formula::Kind::Implies);
-    }
-    expect(emitted,
-           "implication draw: the temporal mutation emits an implication for "
-           "at least one seed");
+    expect_some_seed(
+        40,
+        [&](std::size_t seed) {
+            const RandomSource rng = make_random_source_from_seed(seed);
+            const tlsf::Specification mutated = tlsf_mutate(original, rng, cfg);
+            return contains_kind(mutated.m_guarantee.front().m_formula,
+                                 Formula::Kind::Implies);
+        },
+        "implication draw: the temporal mutation emits an implication for "
+        "at least one seed");
 }
 
 // Case (2d) of mutate_temporal is the arm firing at an atom or a unary node.
@@ -243,7 +241,7 @@ void test_temporal_mutation_can_emit_an_implication() {
 // case (1) emits only an atom or a unary node, so pick_connective_kind is the
 // sole source of a binary node anywhere in the result.
 tlsf::Specification connective_subject() {
-    return parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G g; }");
+    return parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G g; }");
 }
 
 Config connective_config() {
@@ -255,34 +253,34 @@ Config connective_config() {
     return cfg;
 }
 
-void test_connective_graft_can_emit_an_implication() {
+TEST(test_connective_graft_can_emit_an_implication) {
     const Config cfg = connective_config();
     const tlsf::Specification original = connective_subject();
-    bool grafted = false;
-    for (std::size_t seed = 0; seed < 200 && !grafted; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        const tlsf::Specification mutated = tlsf_mutate(original, rng, cfg);
-        const Formula& formula = mutated.m_guarantee.front().m_formula;
-        const auto children = formula.binary_children();
-        grafted = formula.kind() == Formula::Kind::Implies &&
-                  children.has_value() &&
-                  children->first.kind() == Formula::Kind::Atom;
-    }
-    expect(grafted,
-           "connective draw: the case (2d) graft emits `anchor -> inner` for "
-           "at least one seed");
+    expect_some_seed(
+        200,
+        [&](std::size_t seed) {
+            const RandomSource rng = make_random_source_from_seed(seed);
+            const tlsf::Specification mutated = tlsf_mutate(original, rng, cfg);
+            const Formula& formula = mutated.m_guarantee.front().m_formula;
+            const auto children = formula.binary_children();
+            return formula.kind() == Formula::Kind::Implies &&
+                   children.has_value() &&
+                   children->first.kind() == Formula::Kind::Atom;
+        },
+        "connective draw: the case (2d) graft emits `anchor -> inner` for "
+        "at least one seed");
 }
 
 // An appended assumption is a fairness property `G F <input>`, or, under
 // p_conditional_assumption, a guarded `G(<guard> -> o <input>)` whose
 // consequent carries F, X or no modality at all. The obliged literal is always
 // an input.
-void test_add_assumption_forms() {
+TEST(test_add_assumption_forms) {
     tlsf::Specification spec;
     spec.m_inputs = {"req"};
     spec.m_outputs = {"grant"};
-    spec.m_guarantee = {parse("INPUTS { req; } OUTPUTS { grant; } "
-                              "GUARANTEE { G (req -> F grant); }")
+    spec.m_guarantee = {parse_main("INPUTS { req; } OUTPUTS { grant; } "
+                                   "GUARANTEE { G (req -> F grant); }")
                             .m_guarantee.front()};
     Config cfg;
     cfg.p_add_assumption = 1.0;
@@ -305,12 +303,12 @@ void test_add_assumption_forms() {
 // The obliged literal is an input even though the guard may be an output:
 // `G(<output> -> F <input>)` stays reachable and `G(<input> -> F <output>)`
 // does not.
-void test_add_assumption_never_obliges_an_output() {
+TEST(test_add_assumption_never_obliges_an_output) {
     tlsf::Specification spec;
     spec.m_inputs = {"req"};
     spec.m_outputs = {"grant"};
-    spec.m_guarantee = {parse("INPUTS { req; } OUTPUTS { grant; } "
-                              "GUARANTEE { G (req -> F grant); }")
+    spec.m_guarantee = {parse_main("INPUTS { req; } OUTPUTS { grant; } "
+                                   "GUARANTEE { G (req -> F grant); }")
                             .m_guarantee.front()};
     Config cfg;
     cfg.p_add_assumption = 1.0;
@@ -333,8 +331,8 @@ void test_add_assumption_never_obliges_an_output() {
 // which ordinary mutation then edits. gyro-var2's single ideal is roughly a
 // 29-node assumption mirroring the specification's own third one, and no
 // template reaches that.
-void test_add_assumption_can_clone_an_existing_one() {
-    const tlsf::Specification spec = parse(
+TEST(test_add_assumption_can_clone_an_existing_one) {
+    const tlsf::Specification spec = parse_main(
         "INPUTS { req; } OUTPUTS { grant; } "
         "ASSUME { G (req -> F (!(req))); } "
         "GUARANTEE { G (req -> F grant); }");
@@ -355,12 +353,12 @@ void test_add_assumption_can_clone_an_existing_one() {
 
 // Nothing live to copy, so the template stands in rather than the operator
 // becoming a no-op.
-void test_clone_assumption_falls_back_to_the_template() {
+TEST(test_clone_assumption_falls_back_to_the_template) {
     tlsf::Specification spec;
     spec.m_inputs = {"req"};
     spec.m_outputs = {"grant"};
-    spec.m_guarantee = {parse("INPUTS { req; } OUTPUTS { grant; } "
-                              "GUARANTEE { G (req -> F grant); }")
+    spec.m_guarantee = {parse_main("INPUTS { req; } OUTPUTS { grant; } "
+                                   "GUARANTEE { G (req -> F grant); }")
                             .m_guarantee.front()};
     spec.m_assume = {tlsf::SectionEntry(Formula("req"), /*removed=*/true)};
     Config cfg;
@@ -383,8 +381,8 @@ void test_clone_assumption_falls_back_to_the_template() {
 // reachable. The deleted conjunct keeps its slot: the similarity objectives
 // pair conjuncts by position, so erasing it would start comparing the
 // candidate's remaining conjuncts against unrelated ones of the original.
-void test_remove_guarantee_tombstones_in_place() {
-    const tlsf::Specification spec = parse(
+TEST(test_remove_guarantee_tombstones_in_place) {
+    const tlsf::Specification spec = parse_main(
         "INPUTS { req; } OUTPUTS { grant; } "
         "ASSERT { !(grant); } "
         "GUARANTEE { G (req -> F grant); }");
@@ -413,8 +411,8 @@ void test_remove_guarantee_tombstones_in_place() {
            "remove-guarantee: the draw reaches both guarantee-side sections");
 }
 
-void test_remove_guarantee_keeps_the_last_live_conjunct() {
-    const tlsf::Specification spec = parse(
+TEST(test_remove_guarantee_keeps_the_last_live_conjunct) {
+    const tlsf::Specification spec = parse_main(
         "INPUTS { req; } OUTPUTS { grant; } "
         "GUARANTEE { G (req -> F grant); }");
     Config cfg;
@@ -429,75 +427,7 @@ void test_remove_guarantee_keeps_the_last_live_conjunct() {
     }
 }
 
-void test_assumption_rewrite_can_reference_output() {
-    // An assumption-side *rewrite* (not just the add-assumption action) may
-    // draw an output atom, so an output-referencing
-    // assumption can be reshaped instead of having its output overwritten. This
-    // is what lets a G F <output> or G(c -> F <output>) grow a weak-until
-    // hold-until form over successive generations.
-    Config cfg;
-    cfg.p_add_assumption = 0.0;  // isolate the rewrite path
-    cfg.p_remove_guarantee = 0.0;
-    tlsf::Specification spec;
-    spec.m_inputs = {"a", "c"};
-    spec.m_outputs = {"bout"};
-    spec.m_assume = {Formula("a")};
-    // No guarantee-side formulae, so every mutation falls to the assumption
-    // side, whose atom pool includes the outputs.
-    bool saw_output = false;
-    for (std::size_t seed = 0; seed < 60; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        const tlsf::Specification mutated = tlsf_mutate(spec, rng, cfg);
-        if (mutated.m_assume.front().m_formula.to_string().find("bout") !=
-            std::string::npos) {
-            saw_output = true;
-        }
-    }
-    expect(saw_output,
-           "mutation: an assumption-side rewrite can introduce an output "
-           "atom");
-}
-
-void test_weak_until_over_output_is_reachable() {
-    // A weak-until (hold-until) assumption over an output does not need a
-    // dedicated new operator: the temporal mutation already emits W, and the
-    // assumption-side pool keeps the output atom
-    // through a rewrite. Starting from the kind of fairness assumption
-    // tlsf_add_assumption creates (G(r -> F g)), a temporal rewrite can yield
-    // an assumption with a `... W ...` node referencing the output g.
-    Config cfg;
-    cfg.p_add_assumption = 0.0;  // isolate the rewrite path
-    cfg.p_remove_guarantee = 0.0;
-    cfg.tlsf_p_assumption = 1.0;  // always mutate the assumption side
-    cfg.tlsf_p_temporal = 1.0;    // always the temporal (skeleton) rewrite
-    cfg.p_monotone = 0.0;         // which the monotone arm is offered ahead of
-    tlsf::Specification seed_spec;
-    seed_spec.m_inputs = {"r"};
-    seed_spec.m_outputs = {"g"};
-    seed_spec.m_assume = {parse("INPUTS { r; } OUTPUTS { g; } "
-                                "ASSUME { G (r -> F g); }")
-                              .m_assume.front()};
-    bool reached = false;
-    for (std::size_t seed = 0; seed < 200 && !reached; ++seed) {
-        const RandomSource rng = make_random_source_from_seed(seed);
-        tlsf::Specification current = seed_spec;
-        for (int step = 0; step < 6 && !reached; ++step) {
-            current = tlsf_mutate(current, rng, cfg);
-            for (const tlsf::SectionEntry& entry : current.m_assume) {
-                const std::string text = entry.m_formula.to_string();
-                if (text.find(") W (") != std::string::npos &&
-                    text.find('g') != std::string::npos) {
-                    reached = true;
-                }
-            }
-        }
-    }
-    expect(reached,
-           "mutation: a weak-until assumption over an output is reachable by "
-           "temporal mutation of a fairness assumption");
-}
-
-void test_add_assumption_can_reference_output() {
+TEST(test_add_assumption_can_reference_output) {
     // The appended assumption's guard draws from inputs ∪ outputs, so the
     // output atom is reachable over a range of seeds.
     // The well-separation check at the final gate, not a syntactic ban, is
@@ -505,8 +435,8 @@ void test_add_assumption_can_reference_output() {
     tlsf::Specification spec;
     spec.m_inputs = {"req"};
     spec.m_outputs = {"grant"};
-    spec.m_guarantee = {parse("INPUTS { req; } OUTPUTS { grant; } "
-                              "GUARANTEE { G (req -> F grant); }")
+    spec.m_guarantee = {parse_main("INPUTS { req; } OUTPUTS { grant; } "
+                                   "GUARANTEE { G (req -> F grant); }")
                             .m_guarantee.front()};
     Config cfg;
     cfg.p_add_assumption = 1.0;
@@ -526,6 +456,72 @@ void test_add_assumption_can_reference_output() {
            "assumption");
 }
 
+TEST(test_assumption_rewrite_can_reference_output) {
+    // An assumption-side *rewrite* (not just the add-assumption action) may
+    // draw an output atom, so an output-referencing
+    // assumption can be reshaped instead of having its output overwritten. This
+    // is what lets a G F <output> or G(c -> F <output>) grow a weak-until
+    // hold-until form over successive generations.
+    Config cfg;
+    cfg.p_add_assumption = 0.0;  // isolate the rewrite path
+    cfg.p_remove_guarantee = 0.0;
+    tlsf::Specification spec;
+    spec.m_inputs = {"a", "c"};
+    spec.m_outputs = {"bout"};
+    spec.m_assume = {Formula("a")};
+    // No guarantee-side formulae, so every mutation falls to the assumption
+    // side, whose atom pool includes the outputs.
+    expect_some_seed(
+        60,
+        [&](std::size_t seed) {
+            const RandomSource rng = make_random_source_from_seed(seed);
+            const tlsf::Specification mutated = tlsf_mutate(spec, rng, cfg);
+            return mutated.m_assume.front().m_formula.to_string().find(
+                       "bout") != std::string::npos;
+        },
+        "mutation: an assumption-side rewrite can introduce an output atom");
+}
+
+TEST(test_weak_until_over_output_is_reachable) {
+    // A weak-until (hold-until) assumption over an output does not need a
+    // dedicated new operator: the temporal mutation already emits W, and the
+    // assumption-side pool keeps the output atom
+    // through a rewrite. Starting from the kind of fairness assumption
+    // tlsf_add_assumption creates (G(r -> F g)), a temporal rewrite can yield
+    // an assumption with a `... W ...` node referencing the output g.
+    Config cfg;
+    cfg.p_add_assumption = 0.0;  // isolate the rewrite path
+    cfg.p_remove_guarantee = 0.0;
+    cfg.tlsf_p_assumption = 1.0;  // always mutate the assumption side
+    cfg.tlsf_p_temporal = 1.0;    // always the temporal (skeleton) rewrite
+    cfg.p_monotone = 0.0;         // which the monotone arm is offered ahead of
+    tlsf::Specification seed_spec;
+    seed_spec.m_inputs = {"r"};
+    seed_spec.m_outputs = {"g"};
+    seed_spec.m_assume = {parse_main("INPUTS { r; } OUTPUTS { g; } "
+                                     "ASSUME { G (r -> F g); }")
+                              .m_assume.front()};
+    expect_some_seed(
+        200,
+        [&](std::size_t seed) {
+            const RandomSource rng = make_random_source_from_seed(seed);
+            tlsf::Specification current = seed_spec;
+            for (int step = 0; step < 6; ++step) {
+                current = tlsf_mutate(current, rng, cfg);
+                for (const tlsf::SectionEntry& entry : current.m_assume) {
+                    const std::string text = entry.m_formula.to_string();
+                    if (text.find(") W (") != std::string::npos &&
+                        text.find('g') != std::string::npos) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        },
+        "mutation: a weak-until assumption over an output is reachable by "
+        "temporal mutation of a fairness assumption");
+}
+
 tlsf::Specification globally(const std::vector<std::string>& atoms) {
     tlsf::Specification spec;
     spec.m_inputs = {"r"};
@@ -540,7 +536,7 @@ tlsf::Specification globally(const std::vector<std::string>& atoms) {
 // The point of the operator: the donor conjunct is drawn from anywhere on
 // parent B's side, so material can move between slots. Under the index-for-
 // index crossover this replaced, slot 0 could only ever see parent B's slot 0.
-void test_crossover_grafts_across_slots() {
+TEST(test_crossover_grafts_across_slots) {
     const tlsf::Specification parent_a = globally({"r", "g"});
     const tlsf::Specification parent_b = globally({"!(r)", "!(g)"});
 
@@ -576,7 +572,7 @@ void test_crossover_grafts_across_slots() {
 // however long parent B's side is, so an individual that has gained an
 // assumption can still breed -- which under index-for-index crossover it could
 // not.
-void test_crossover_accepts_mismatched_shape() {
+TEST(test_crossover_accepts_mismatched_shape) {
     const tlsf::Specification parent_a = globally({"r"});
     const tlsf::Specification parent_b = globally({"!(r)", "!(g)"});
 
@@ -593,7 +589,7 @@ void test_crossover_accepts_mismatched_shape() {
            "crossover: parents of different section sizes still breed");
 }
 
-void test_crossover_mismatched_signals_returns_first() {
+TEST(test_crossover_mismatched_signals_returns_first) {
     const tlsf::Specification parent_a = globally({"r"});
     tlsf::Specification parent_b = globally({"!(r)"});
     parent_b.m_inputs = {"other"};
@@ -607,7 +603,7 @@ void test_crossover_mismatched_signals_returns_first() {
 // Deletion is mutation's move alone, on both sides: a tombstoned slot of
 // parent A is never a target, and a tombstoned conjunct of parent B is never a
 // donor -- crossover would otherwise breed from content its parent threw away.
-void test_crossover_skips_deleted_conjuncts() {
+TEST(test_crossover_skips_deleted_conjuncts) {
     tlsf::Specification parent_a = globally({"r", "g"});
     parent_a.m_guarantee[0].m_removed = true;
     tlsf::Specification parent_b = globally({"!(r)", "!(g)"});
@@ -628,7 +624,7 @@ void test_crossover_skips_deleted_conjuncts() {
     }
 }
 
-void test_end_to_end_evolution() {
+TEST(test_end_to_end_evolution) {
     Config cfg;
     cfg.population_size = 4;
     cfg.default_model_counting_bound = 3;
@@ -639,7 +635,7 @@ void test_end_to_end_evolution() {
     // A Mealy spec requiring the output to predict the next input:
     // unrealizable.
     const tlsf::Specification original =
-        parse("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> X r); }");
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(g <-> X r); }");
     const auto fitness = tlsf_get_fitness_function(original, cfg);
 
     const std::size_t target_size = 4;
@@ -648,7 +644,7 @@ void test_end_to_end_evolution() {
         score_population(cfg, seed_pop, fitness);
 
     const std::vector<FilterFunctionT<tlsf::Specification>> filters = {
-        tlsf_make_dedup_filter(), tlsf_make_vacuity_filter()};
+        make_dedup_filter<tlsf::Specification>(), tlsf_make_vacuity_filter()};
 
     for (std::size_t generation = 0; generation < 2; ++generation) {
         const RandomSource rng = make_random_source_from_seed(generation + 1);
@@ -667,25 +663,3 @@ void test_end_to_end_evolution() {
 }
 
 }  // namespace
-
-void run_tlsf_genetic_tests() {
-    test_mutation_preserves_temporal_skeleton();
-    test_mutation_side_probability_selects_side();
-    test_temporal_mutation_changes_skeleton();
-    test_temporal_mutation_can_emit_an_implication();
-    test_connective_graft_can_emit_an_implication();
-    test_add_assumption_forms();
-    test_add_assumption_never_obliges_an_output();
-    test_add_assumption_can_clone_an_existing_one();
-    test_clone_assumption_falls_back_to_the_template();
-    test_remove_guarantee_tombstones_in_place();
-    test_remove_guarantee_keeps_the_last_live_conjunct();
-    test_add_assumption_can_reference_output();
-    test_assumption_rewrite_can_reference_output();
-    test_weak_until_over_output_is_reachable();
-    test_crossover_grafts_across_slots();
-    test_crossover_accepts_mismatched_shape();
-    test_crossover_mismatched_signals_returns_first();
-    test_crossover_skips_deleted_conjuncts();
-    test_end_to_end_evolution();
-}

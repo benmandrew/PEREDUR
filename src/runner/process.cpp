@@ -33,6 +33,7 @@
 #include <utility>
 #include <vector>
 
+#include "posix/descriptors.hpp"
 #include "profile.hpp"
 
 namespace {
@@ -296,27 +297,6 @@ class SpawnGuard {
     SpawnGuard& operator=(SpawnGuard&&) = delete;
 };
 
-// pipe2(O_CLOEXEC) where it exists; pipe plus FD_CLOEXEC where it does not.
-// The caller must hold a SpawnGuard across this and its own fork, which is
-// what makes the second form equivalent to the first.
-int make_cloexec_pipe(std::array<int, 2>& fds) {
-#ifdef __APPLE__
-    if (pipe(fds.data()) != 0) {
-        return -1;
-    }
-    for (const int pipe_fd : fds) {
-        if (fcntl(pipe_fd, F_SETFD, FD_CLOEXEC) != 0) {
-            close(fds[0]);
-            close(fds[1]);
-            return -1;
-        }
-    }
-    return 0;
-#else
-    return pipe2(fds.data(), O_CLOEXEC);
-#endif
-}
-
 #ifdef __APPLE__
 // Parent death, macOS side.
 //
@@ -494,6 +474,59 @@ void start_reaper_once() {}
 void unregister_from_reaper(pid_t /*group*/) {}
 #endif
 
+// The parent half of the containment policy, called immediately after fork():
+// repeats the child's setpgid so the group exists whichever side the scheduler
+// runs first -- otherwise a timeout firing in that window would killpg a group
+// that does not exist yet. Whichever call loses fails harmlessly (EACCES once
+// the child has exec'd, ESRCH once it has exited), so the result is
+// deliberately ignored.
+void adopt_child_process_group(pid_t child_pid) {
+    [[maybe_unused]] const int setpgid_result = setpgid(child_pid, child_pid);
+}
+
+// SIGKILLs the process group led by `pid`, to catch grandchildren, then `pid`
+// itself, in case setpgid never took effect and there is no such group. Call
+// before the child is reaped, while the pid cannot have been reused.
+void kill_process_tree(pid_t pid) {
+    killpg(pid, SIGKILL);
+    kill(pid, SIGKILL);
+}
+
+// Built before forking: heap allocation inside the child between fork() and
+// exec() can deadlock if another thread held the allocator lock at the moment
+// of the fork (e.g. under ASAN's allocator).
+std::vector<char*> exec_argv(const std::vector<std::string>& arguments) {
+    std::vector<char*> argv(arguments.size() + 1);
+    for (std::size_t arg_idx = 0; arg_idx < arguments.size(); ++arg_idx) {
+        argv[arg_idx] = const_cast<char*>(arguments[arg_idx].c_str());
+    }
+    argv[arguments.size()] = nullptr;
+    return argv;
+}
+
+// The child's side of both forks once its descriptors are in place: the
+// containment policy, then the exec, with 127 as the exit status of a failed
+// one.
+[[noreturn]] void exec_child(const std::vector<char*>& argv,
+                             ExecutableLookup lookup, ParentDeathPolicy policy,
+                             pid_t parent_pid) {
+    harden_child_after_fork(policy, parent_pid);
+    if (lookup == ExecutableLookup::SearchPath) {
+        execvp(argv[0], argv.data());
+    } else {
+        execv(argv[0], argv.data());
+    }
+    _exit(127);
+}
+
+std::optional<Clock::time_point> deadline_after(
+    std::chrono::milliseconds timeout) {
+    if (timeout > std::chrono::milliseconds::zero()) {
+        return Clock::now() + timeout;
+    }
+    return std::nullopt;
+}
+
 // Reaps `pid`, killing its process group and continuing to wait if `deadline`
 // passes first. Sets `timed_out` if that kill was needed. Returns the exit
 // status in ProcessResult's encoding.
@@ -565,14 +598,7 @@ PipedChild spawn_piped_child(const std::vector<std::string>& arguments,
                              ExecutableLookup lookup) {
     assert(!arguments.empty());
     PEREDUR_PROFILE_SCOPE("proc/fork+exec");
-    // Built before forking: heap allocation inside the child between fork() and
-    // exec() can deadlock if another thread held the allocator lock at the
-    // moment of the fork (e.g. under ASAN's allocator).
-    std::vector<char*> argv(arguments.size() + 1);
-    for (std::size_t arg_idx = 0; arg_idx < arguments.size(); ++arg_idx) {
-        argv[arg_idx] = const_cast<char*>(arguments[arg_idx].c_str());
-    }
-    argv[arguments.size()] = nullptr;
+    const std::vector<char*> argv = exec_argv(arguments);
     std::array<int, 2> stdin_pipe = {-1, -1};
     std::array<int, 2> stdout_pipe = {-1, -1};
     // Close-on-exec on both, for the reason spelled out at the pipe in
@@ -619,13 +645,7 @@ PipedChild spawn_piped_child(const std::vector<std::string>& arguments,
         }
         close(stdin_pipe[0]);
         close(stdout_pipe[1]);
-        harden_child_after_fork(policy, parent_pid);
-        if (lookup == ExecutableLookup::SearchPath) {
-            execvp(arguments[0].c_str(), argv.data());
-        } else {
-            execv(arguments[0].c_str(), argv.data());
-        }
-        _exit(127);
+        exec_child(argv, lookup, policy, parent_pid);
     }
     adopt_child_process_group(child_pid);
     close(stdin_pipe[0]);
@@ -636,11 +656,7 @@ PipedChild spawn_piped_child(const std::vector<std::string>& arguments,
 
 std::pair<std::string, bool> read_until_eof(int read_fd,
                                             std::chrono::milliseconds timeout) {
-    std::optional<Clock::time_point> deadline;
-    if (timeout > std::chrono::milliseconds::zero()) {
-        deadline = Clock::now() + timeout;
-    }
-    return read_until(read_fd, deadline);
+    return read_until(read_fd, deadline_after(timeout));
 }
 
 void harden_child_after_fork(ParentDeathPolicy policy, pid_t parent_pid) {
@@ -691,22 +707,6 @@ void harden_child_after_fork(ParentDeathPolicy policy, pid_t parent_pid) {
     }
 }
 
-void adopt_child_process_group(pid_t child_pid) {
-    // The child's own setpgid, repeated here so the group exists whichever
-    // side the scheduler runs first — otherwise a timeout firing in that
-    // window would killpg a group that does not exist yet. Whichever call
-    // loses fails harmlessly (EACCES once the child has exec'd, ESRCH once it
-    // has exited), so the result is deliberately ignored.
-    [[maybe_unused]] const int setpgid_result = setpgid(child_pid, child_pid);
-}
-
-void kill_process_tree(pid_t pid) {
-    // The group first, to catch grandchildren; then the pid directly, in case
-    // setpgid never took effect and there is no group led by this pid.
-    killpg(pid, SIGKILL);
-    kill(pid, SIGKILL);
-}
-
 double reap_with_grace(pid_t pid, std::chrono::milliseconds grace,
                        const std::string& executable,
                        std::uint64_t rss_floor_kb) {
@@ -725,13 +725,8 @@ ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
                                   std::chrono::milliseconds timeout,
                                   ExecutableLookup lookup) {
     assert(!arguments.empty());
-    // Built before forking, as in spawn_piped_child above and for the same
-    // allocator-lock reason.
-    std::vector<char*> argv(arguments.size() + 1);
-    for (std::size_t arg_idx = 0; arg_idx < arguments.size(); ++arg_idx) {
-        argv[arg_idx] = const_cast<char*>(arguments[arg_idx].c_str());
-    }
-    argv[arguments.size()] = nullptr;
+    const Clock::time_point start = Clock::now();
+    const std::vector<char*> argv = exec_argv(arguments);
     std::array<int, 2> pipe_fds = {-1, -1};
     pid_t child_pid = -1;
     std::uint64_t rss_floor_kb = 0;
@@ -775,23 +770,14 @@ ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
                 _exit(127);
             }
             close(pipe_fds[1]);
-            harden_child_after_fork(ParentDeathPolicy::KillWithParentThread,
-                                    parent_pid);
-            if (lookup == ExecutableLookup::SearchPath) {
-                execvp(arguments[0].c_str(), argv.data());
-            } else {
-                execv(arguments[0].c_str(), argv.data());
-            }
-            _exit(127);
+            exec_child(argv, lookup, ParentDeathPolicy::KillWithParentThread,
+                       parent_pid);
         }
         adopt_child_process_group(child_pid);
         close(pipe_fds[1]);
         rss_floor_kb = widen_rss_floor(rss_floor_kb);
     }
-    std::optional<Clock::time_point> deadline;
-    if (timeout > std::chrono::milliseconds::zero()) {
-        deadline = Clock::now() + timeout;
-    }
+    const std::optional<Clock::time_point> deadline = deadline_after(timeout);
     auto [output, timed_out] = read_until(pipe_fds[0], deadline);
     close(pipe_fds[0]);
     if (timed_out) {
@@ -807,6 +793,8 @@ ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
     const int exit_code = reap(child_pid, timed_out ? std::nullopt : deadline,
                                rss_floor_kb, cpu_s, peak_rss_kb, timed_out);
     record_tool_peak_rss(arguments[0], peak_rss_kb);
-    return {exit_code,   std::move(output), cpu_s,
+    const double wall_s =
+        std::chrono::duration<double>(Clock::now() - start).count();
+    return {exit_code,   std::move(output), cpu_s,    wall_s,
             peak_rss_kb, rss_floor_kb,      timed_out};
 }

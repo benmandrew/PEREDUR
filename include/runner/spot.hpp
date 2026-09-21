@@ -64,13 +64,6 @@ struct Ltl2tgbaStats {
     /// memoised, and a repeat of the same formula re-raises it as a cache hit
     /// without paying the budget again.
     inline static std::size_t n_timeouts = 0;
-
-    /// Folds one exec's wall and child-CPU time into the totals. The caller
-    /// must hold the stats/cache mutex, matching the other accumulators here.
-    static void record_time(double wall_s, double cpu_s) {
-        total_time_s += wall_s;
-        total_cpu_s += cpu_s;
-    }
 };
 
 /// The two conjunct sets a specification formula was built from: those whose

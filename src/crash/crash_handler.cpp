@@ -1,12 +1,10 @@
 #include "crash/crash_handler.hpp"
 
-#include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <array>
 #include <atomic>
-#include <cerrno>
 #include <csignal>
 #include <cstring>
 #include <ctime>
@@ -16,34 +14,14 @@
 
 #include <cpptrace/cpptrace.hpp>
 
+#include "posix/descriptors.hpp"
+
 namespace {
 
 constexpr std::size_t k_path_buffer_size = 4096;
 constexpr std::size_t k_num_buffer_size = 32;
 constexpr std::size_t k_frame_buffer_size = 100;
 constexpr std::size_t k_metadata_buffer_size = 4096;
-
-// pipe2(O_CLOEXEC) where it exists; pipe plus FD_CLOEXEC where it does not.
-// Async-signal-safe either way, which is the constraint at the one call site
-// -- and the reason the second form is not made atomic the way the runner's
-// is. See that call site.
-int make_cloexec_pipe_unsafe(std::array<int, 2>& fds) {
-#ifdef __APPLE__
-    if (pipe(fds.data()) != 0) {
-        return -1;
-    }
-    for (const int pipe_fd : fds) {
-        if (fcntl(pipe_fd, F_SETFD, FD_CLOEXEC) != 0) {
-            close(fds[0]);
-            close(fds[1]);
-            return -1;
-        }
-    }
-    return 0;
-#else
-    return pipe2(fds.data(), O_CLOEXEC);
-#endif
-}
 
 std::array<char, k_path_buffer_size> g_tracer_path = {};
 std::array<char, k_path_buffer_size> g_crash_dir = {};
@@ -78,22 +56,6 @@ std::size_t format_unsigned(char* destination, std::size_t destination_size,
     }
     destination[length] = '\0';
     return length;
-}
-
-bool write_all(int file_fd, const void* data, std::size_t size) {
-    const char* bytes = static_cast<const char*>(data);
-    std::size_t written = 0;
-    while (written < size) {
-        const ssize_t result = write(file_fd, bytes + written, size - written);
-        if (result < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            return false;
-        }
-        written += static_cast<std::size_t>(result);
-    }
-    return true;
 }
 
 // Walks one trace at startup so cpptrace's lazy loader and symbol
@@ -198,7 +160,7 @@ void crash_handler(int signo, [[maybe_unused]] siginfo_t* siginfo,
     // shim below is legal where a mutex is not, and the residual window costs
     // at worst a lost crash report from one of several simultaneous crashes.
     std::array<int, 2> pipefd = {-1, -1};
-    if (make_cloexec_pipe_unsafe(pipefd) != 0) {
+    if (make_cloexec_pipe(pipefd) != 0) {
         _exit(1);
     }
 

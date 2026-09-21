@@ -1,12 +1,10 @@
-#include "filter_report.hpp"
+#include "genetic/filter_report.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <iomanip>
 #include <iostream>
 #include <vector>
-
-namespace tlsf::internal {
 
 void accumulate_filter_stats(std::vector<FilterRunStats>& aggregate,
                              const std::vector<FilterRunStats>& run) {
@@ -20,17 +18,18 @@ void accumulate_filter_stats(std::vector<FilterRunStats>& aggregate,
     }
 }
 
-void print_filter_report(const std::vector<FilterRunStats>& stats) {
-    const bool any =
-        std::any_of(stats.begin(), stats.end(), [](const FilterRunStats& stat) {
-            return !stat.name.empty() && stat.total_in > 0;
-        });
-    if (!any) {
+void print_filter_report(const std::vector<FilterRunStats>& stats,
+                         EmptyFilterReport when_empty) {
+    const auto reported = [](const FilterRunStats& stat) {
+        return !stat.name.empty() && stat.total_in > 0;
+    };
+    if (when_empty == EmptyFilterReport::Silent &&
+        std::none_of(stats.begin(), stats.end(), reported)) {
         return;
     }
     std::cout << "\nFilter report:\n";
     for (const FilterRunStats& stat : stats) {
-        if (stat.name.empty() || stat.total_in == 0) {
+        if (!reported(stat)) {
             continue;
         }
         const double pct_drop =
@@ -43,5 +42,3 @@ void print_filter_report(const std::vector<FilterRunStats>& stats) {
                   << "% avg drop\n";
     }
 }
-
-}  // namespace tlsf::internal

@@ -1,7 +1,6 @@
 #include "tlsf/mucs.hpp"
 
 #include <cstddef>
-#include <exception>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -10,7 +9,6 @@
 #include "driver_support.hpp"
 #include "runner/atom_names.hpp"
 #include "runner/spot.hpp"
-#include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
 
 namespace {
@@ -32,8 +30,7 @@ void print_usage(const char* prog) {
 }  // namespace
 
 int main(int argc, const char* const argv[]) {
-    if (argc == 0 || argv == nullptr || argv[0] == nullptr) {
-        std::cerr << "fatal: missing argv[0]\n";
+    if (!has_program_name(argc, argv)) {
         return 1;
     }
     if (handle_info_flags(argc, argv, print_usage)) {
@@ -52,19 +49,11 @@ int main(int argc, const char* const argv[]) {
         return 1;
     }
 
-    const std::optional<std::string> contents = read_file_contents(path);
-    if (!contents.has_value()) {
-        std::cerr << path << ": cannot read file\n";
+    const std::optional<tlsf::Specification> loaded = load_tlsf_or_report(path);
+    if (!loaded.has_value()) {
         return 1;
     }
-
-    tlsf::Specification spec;
-    try {
-        spec = tlsf::parse(*contents);
-    } catch (const std::exception& exc) {
-        std::cerr << path << ": " << exc.what() << "\n";
-        return 1;
-    }
+    const tlsf::Specification& spec = *loaded;
 
     // Before the first query: ltlsynt reads an unmatched --ins as an output,
     // so an unsafe name here would answer about a different specification.

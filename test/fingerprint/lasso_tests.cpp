@@ -3,16 +3,19 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "fingerprint/lasso.hpp"
 #include "prop_formula.hpp"
 #include "runner/ltlfilt.hpp"
 #include "runner/process.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "fingerprint_lasso";
 
 using fingerprint::LassoWord;
 
@@ -71,7 +74,7 @@ std::string spot_word(const LassoWord& word) {
     return text + "}";
 }
 
-void test_propositional_operators_read_position_zero() {
+TEST(test_propositional_operators_read_position_zero) {
     const LassoWord word = word_of("10", "01", 1);
     expect(accepts("a", word), "a holds at position 0");
     expect(!accepts("b", word), "b does not hold at position 0");
@@ -83,7 +86,7 @@ void test_propositional_operators_read_position_zero() {
            "does not");
 }
 
-void test_next_steps_one_position() {
+TEST(test_next_steps_one_position) {
     const LassoWord word = word_of("10", "01", 1);
     expect(!accepts("X(a)", word), "a does not hold at position 1");
     expect(accepts("X(b)", word), "b holds at position 1");
@@ -91,7 +94,7 @@ void test_next_steps_one_position() {
     expect(accepts("X(X(b))", word), "the loop repeats position 1");
 }
 
-void test_globally_and_eventually_span_the_loop() {
+TEST(test_globally_and_eventually_span_the_loop) {
     // a holds at position 0 only, and the loop is position 1 alone, so `G a`
     // fails while `F a` holds; b is the mirror.
     const LassoWord word = word_of("10", "01", 1);
@@ -103,7 +106,7 @@ void test_globally_and_eventually_span_the_loop() {
     expect(accepts("G(a)", always_a), "G a holds where a holds everywhere");
 }
 
-void test_weak_and_strong_until_differ_on_an_unmet_obligation() {
+TEST(test_weak_and_strong_until_differ_on_an_unmet_obligation) {
     // a holds forever and b never does. `a U b` demands b arrive; `a W b`
     // does not, which is the only difference between them.
     const LassoWord word = word_of("11", "00", 0);
@@ -113,7 +116,7 @@ void test_weak_and_strong_until_differ_on_an_unmet_obligation() {
     expect(accepts("(a) U (b)", b_arrives), "b arrives at position 1");
 }
 
-void test_release_holds_until_released() {
+TEST(test_release_holds_until_released) {
     // b holds everywhere, so `a R b` holds whether or not a ever does.
     const LassoWord b_always = word_of("00", "11", 0);
     expect(accepts("(a) R (b)", b_always), "b holding forever releases");
@@ -122,14 +125,14 @@ void test_release_holds_until_released() {
            "b lapsing with no a to release it fails");
 }
 
-void test_unknown_atom_is_false_everywhere() {
+TEST(test_unknown_atom_is_false_everywhere) {
     const LassoWord word = word_of("11", "11", 0);
     expect(!accepts("c", word), "an atom no word names is false");
     expect(accepts("!c", word), "and its negation true");
     expect(accepts("true", word), "the true constant holds");
 }
 
-void test_sampling_is_a_function_of_its_arguments() {
+TEST(test_sampling_is_a_function_of_its_arguments) {
     const std::vector<std::string> signals{"r_1", "g_0", "r_0"};
     const std::vector<LassoWord> first =
         fingerprint::sample_words(signals, 32, 7, 2, 3);
@@ -156,7 +159,7 @@ void test_sampling_is_a_function_of_its_arguments() {
     expect(any_difference, "a different seed drew the same words");
 }
 
-void test_hex_round_trips_the_bit_order() {
+TEST(test_hex_round_trips_the_bit_order) {
     expect(fingerprint::to_hex({true, false, false, false}) == "1",
            "word 0 is the low bit");
     expect(fingerprint::to_hex({false, false, false, true}) == "8",
@@ -171,7 +174,7 @@ void test_hex_round_trips_the_bit_order() {
 /// The differential the rest of this suite rests on: every row is checked
 /// against SPOT rather than against the table above, because a hand-written
 /// expectation and a hand-written evaluator can be wrong in the same way.
-void test_agrees_with_ltlfilt() {
+TEST(test_agrees_with_ltlfilt) {
     const std::vector<std::string> formulae{
         "a",
         "!a",
@@ -230,15 +233,3 @@ void test_agrees_with_ltlfilt() {
 }
 
 }  // namespace
-
-void run_fingerprint_lasso_tests() {
-    test_propositional_operators_read_position_zero();
-    test_next_steps_one_position();
-    test_globally_and_eventually_span_the_loop();
-    test_weak_and_strong_until_differ_on_an_unmet_obligation();
-    test_release_holds_until_released();
-    test_unknown_atom_is_false_everywhere();
-    test_sampling_is_a_function_of_its_arguments();
-    test_hex_round_trips_the_bit_order();
-    test_agrees_with_ltlfilt();
-}

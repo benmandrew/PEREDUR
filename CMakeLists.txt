@@ -127,7 +127,8 @@ target_sources(peredur_fitness PRIVATE
     src/tlsf/guarantee_parts.cpp
     src/tlsf/pipeline.cpp
     src/tlsf/evolve.cpp
-    src/tlsf/filter_report.cpp
+    src/genetic/filter_report.cpp
+    src/genetic/output_gate.cpp
     src/tlsf/repair_modes.cpp
     src/tlsf/repair_output.cpp
     src/tlsf/survivors.cpp

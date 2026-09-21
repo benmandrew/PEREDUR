@@ -1,6 +1,5 @@
 #include "evolve.hpp"
 
-#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <iostream>
@@ -10,72 +9,19 @@
 
 #include "config.hpp"
 #include "dashboard.hpp"
-#include "filter/correctness.hpp"
-#include "filter_report.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
 #include "genetic/generation.hpp"
+#include "genetic/generation_loop.hpp"
+#include "genetic/output_gate.hpp"
 #include "genetic/pipeline.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "runner/black.hpp"
-#include "runner/spot.hpp"
-#include "survivors.hpp"
-#include "thread_pool.hpp"
-#include "tlsf/filter.hpp"
 #include "tlsf/operators.hpp"
 #include "tlsf/specification.hpp"
 
 namespace tlsf::internal {
-
-// The vacuity filter this builds carries all three tests the FRETISH one does:
-// the syntactic screen for a trivial section literal, the per-formula guarantee
-// validity check, and the assumption-satisfiability conjunction. The guarantee
-// half earns its place because nothing else rejects a gutted guarantee.
-std::vector<FilterFunctionT<Specification>> build_per_gen_filters(
-    const Specification& spec) {
-    const std::size_t max_in_flight = dispatch_window();
-    std::vector<FilterFunctionT<Specification>> filters;
-    FilterFunctionT<Specification> dedup = tlsf_make_dedup_filter();
-    filters.push_back(std::move(dedup));
-    FilterFunctionT<Specification> bloat = tlsf_make_bloat_cap_filter(spec);
-    filters.push_back(std::move(bloat));
-    // From the shared table, as on the FRETISH path: a property enforced here
-    // is enforced by the final gate and the input screen too, because all three
-    // read the same rows.
-    for (const CorrectnessCheckT<Specification>& check :
-         tlsf_correctness_checks(global_sat_checker(), global_real_checker())) {
-        if (check.per_generation) {
-            filters.push_back(tlsf_make_predicate_filter(
-                check.name, check.admissible, max_in_flight));
-        }
-    }
-    return filters;
-}
-
-namespace {
-
-// Not free: nothing else asks the gate per generation, so this sweep is work
-// the run would not otherwise do. The status query behind it is memoised from
-// scoring, leaving the correctness rows as the real cost. Hence the early
-// return rather than a caller-side branch. The FRETISH twin
-// (`accumulate_gate_passing`, src/repair/evolution.cpp) was unconditional
-// until 2026-09-09 and is now gated the same way.
-void accumulate_gate_passing(
-    const std::vector<Scored<Specification>>& population, const Config& cfg,
-    std::size_t generation, RepairAccumulator<Specification>& accumulator) {
-    if (!accumulator.enabled()) {
-        return;
-    }
-    const std::vector<char> keep = gate_verdicts(population, cfg);
-    for (std::size_t idx = 0; idx < population.size(); ++idx) {
-        if (keep[idx] != 0) {
-            accumulator.insert(population[idx].specification, generation);
-        }
-    }
-}
-
-}  // namespace
 
 std::vector<Scored<Specification>> evolve_population(
     const Specification& spec, const Config& cfg,
@@ -85,30 +31,17 @@ std::vector<Scored<Specification>> evolve_population(
     const DashboardProgress& progress,
     RepairAccumulator<Specification>& accumulator_out, SearchBudget& budget) {
     const std::vector<FilterFunctionT<Specification>> per_gen_filters =
-        build_per_gen_filters(spec);
+        get_filter_functions(spec, global_sat_checker());
 
     const std::vector<Specification> seed_population(cfg.population_size, spec);
     std::vector<Scored<Specification>> population =
         score_population(cfg, seed_population, fitness);
 
-    // Population sizing, matching the FRETISH path: each generation breeds
-    // selection_size offspring and carries the best elitism_size parents over
-    // verbatim. Both are derived once from the seed population size (cfg
-    // guarantees elitism_rate < selection_rate). Which candidates count as
-    // "best" is not truncation on the weighted scalar: order_population applies
-    // cfg.selection_scheme, which defaults to NSGA-II.
-    const std::size_t selection_size = std::max(
-        std::size_t{1},
-        static_cast<std::size_t>(static_cast<double>(cfg.population_size) *
-                                 cfg.selection_rate));
-    const auto elitism_size = static_cast<std::size_t>(
-        static_cast<double>(cfg.population_size) * cfg.elitism_rate);
-
-    filter_stats_out.clear();
-    filter_stats_out.reserve(per_gen_filters.size());
-    for (const FilterFunctionT<Specification>& filter : per_gen_filters) {
-        filter_stats_out.push_back({filter.name(), 0, 0});
-    }
+    // Sized on cfg.population_size, the seed population's size. Which
+    // candidates count as "best" is not truncation on the weighted scalar:
+    // order_population applies cfg.selection_scheme, which defaults to NSGA-II.
+    const GenerationSizes sizes = generation_sizes(cfg, cfg.population_size);
+    filter_stats_out = empty_filter_stats(per_gen_filters);
 
     for (std::size_t gen = 0; gen < cfg.generations; ++gen) {
         // Before the generation as well as between offspring, matching
@@ -132,52 +65,28 @@ std::vector<Scored<Specification>> evolve_population(
             }
         };
         population = evolve_generation_generic(
-            cfg, population, selection_size, elitism_size, fitness,
+            cfg, population, sizes.selection, sizes.elitism, fitness,
             per_gen_filters, tlsf_operators(), random_source, nullptr, on_stage,
             &budget);
         budget.count_generation();
-        // Each filter records this generation's in/out sizes in its own mutable
-        // counters; fold them into the running totals for the end-of-run
-        // report.
-        for (std::size_t k = 0; k < per_gen_filters.size(); ++k) {
-            filter_stats_out[k].total_in += per_gen_filters[k].n_in();
-            filter_stats_out[k].total_out += per_gen_filters[k].n_out();
-        }
-        // The maximum, not front(): NSGA-II orders by front rank and
-        // crowding distance, so the leading individual need not hold the
-        // highest weighted scalar. Reporting front() made the printed best
-        // fall between generations while the search was still improving.
-        // Scalars only, so a run without a dashboard pays a single pass and
-        // no copies; the objectives vector below is the part worth gating.
-        double total = 0.0;
-        double maximum = 0.0;
-        for (const Scored<Specification>& cand : population) {
-            total += cand.fitness;
-            maximum = std::max(maximum, cand.fitness);
-        }
+        fold_filter_stats(per_gen_filters, filter_stats_out);
+        const FitnessSummary summary = summarise_fitness(population);
         std::cout << "gen " << (gen + 1) << "/" << cfg.generations
-                  << "  best fitness " << maximum << "\n";
+                  << "  best fitness " << summary.best << "\n";
         accumulate_gate_passing(population, cfg, dashboard_gen,
                                 accumulator_out);
         if (progress.writer != nullptr) {
-            std::vector<std::vector<double>> objectives;
-            objectives.reserve(population.size());
-            for (const Scored<Specification>& cand : population) {
-                objectives.push_back(cand.objectives);
-            }
             progress.writer->generation(
                 dashboard_gen,
                 std::chrono::duration<double>(std::chrono::steady_clock::now() -
                                               gen_start)
                     .count(),
-                maximum,
-                population.empty()
-                    ? 0.0
-                    : total / static_cast<double>(population.size()),
+                summary.best, summary.mean,
                 // No count: this path checks realizability once, after
                 // evolution, so any number here would be one the run never
                 // measured.
-                mean_objectives(progress.objective_names, objectives),
+                mean_objectives(progress.objective_names,
+                                objectives_of(population)),
                 std::nullopt, population.size(), progress.muc_iter);
         }
     }

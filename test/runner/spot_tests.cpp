@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -9,10 +10,12 @@
 #include "runner/atom_names.hpp"
 #include "runner/spot.hpp"
 #include "runner/tool_paths.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
+
+constexpr std::string_view k_test_suite = "spot_runner";
 
 Requirement make_req(const std::string& trigger, const std::string& response,
                      Timing timing, std::string spec) {
@@ -72,191 +75,6 @@ bool counting_succeeds(const std::string& formula) {
     return true;
 }
 
-void test_realizable_immediately() {
-    RealizabilityChecker checker;
-    Requirement req =
-        make_req("p", "q", timing::immediately(), "G((p) -> (q))");
-    expect(realizable(checker, Specification({}, {req}, {"p"}, {"q"})),
-           "spot-runner: G(p -> q) should be realisable");
-}
-
-void test_unrealizable_immediately() {
-    RealizabilityChecker checker;
-    Requirement req = make_req("true", "false", timing::immediately(),
-                               "G((true) -> (false))");
-    expect(!realizable(checker, Specification({}, {req}, {}, {})),
-           "spot-runner: G(true -> false) should be unrealisable");
-}
-
-void test_realizable_next_timepoint() {
-    RealizabilityChecker checker;
-    Requirement req =
-        make_req("p", "q", timing::next_timepoint(), "G((p) -> (X(q)))");
-    expect(realizable(checker, Specification({}, {req}, {"p"}, {"q"})),
-           "spot-runner: G(p -> Xq) should be realisable");
-}
-
-void test_realizable_within_ticks() {
-    RealizabilityChecker checker;
-    Requirement req =
-        make_req("p", "q", timing::within_ticks(2), "G((p) -> ((q) | X(q)))");
-    expect(realizable(checker, Specification({}, {req}, {"p"}, {"q"})),
-           "spot-runner: G(p -> q | Xq) should be realisable");
-}
-
-void test_realizable_for_ticks() {
-    RealizabilityChecker checker;
-    Requirement req =
-        make_req("p", "q", timing::for_ticks(2), "G((p) -> ((q) & X(q)))");
-    expect(realizable(checker, Specification({}, {req}, {"p"}, {"q"})),
-           "spot-runner: G(p -> q & Xq) should be realisable");
-}
-
-void test_realizable_eventually() {
-    RealizabilityChecker checker;
-    Requirement req =
-        make_req("p", "q", timing::eventually(), "G((p) -> (F(q)))");
-    expect(realizable(checker, Specification({}, {req}, {"p"}, {"q"})),
-           "spot-runner: G(p -> Fq) should be realisable");
-}
-
-void test_realizable_with_assumption() {
-    RealizabilityChecker checker;
-    // Assumption: p persists once set (environment constraint)
-    Requirement assumption =
-        make_req("p", "p", timing::next_timepoint(), "G((p) -> (X(p)))");
-    // Guarantee: when p holds, q must hold
-    Requirement guarantee =
-        make_req("p", "q", timing::immediately(), "G((p) -> (q))");
-    expect(realizable(checker,
-                      Specification({assumption}, {guarantee}, {"p"}, {"q"})),
-           "spot-runner: G(p->Xp) -> G(p->q) should be realizable");
-}
-
-void test_assumption_enables_joint_realizability() {
-    RealizabilityChecker checker;
-    // These two guarantees are jointly unrealizable on their own
-    Requirement guarantee1 =
-        make_req("a", "b", timing::next_timepoint(), "G((a) -> (X(b)))");
-    Requirement guarantee2 =
-        make_req("a", "!b", timing::next_timepoint(), "G((a) -> (X(!b)))");
-    expect(!realizable(checker, Specification({}, {guarantee1, guarantee2},
-                                              {"a"}, {"b"})),
-           "spot-runner: G(a->Xb) & G(a->X!b) should be unrealizable without "
-           "assumption");
-    // Assumption G(!a): environment never sets a — makes both guarantees
-    // vacuously true
-    Requirement assum =
-        make_req("true", "!a", timing::immediately(), "G((true) -> (!a))");
-    expect(realizable(checker, Specification({assum}, {guarantee1, guarantee2},
-                                             {"a"}, {"b"})),
-           "spot-runner: G(!a) -> (G(a->Xb) & G(a->X!b)) should be realizable");
-}
-
-void test_individually_realizable_but_jointly_unrealizable() {
-    RealizabilityChecker checker;
-    // Req1: G(a -> X b)
-    Requirement req1 =
-        make_req("a", "b", timing::next_timepoint(), "G((a) -> (X(b)))");
-    // Req2: G(a -> X !b)
-    Requirement req2 =
-        make_req("a", "!b", timing::next_timepoint(), "G((a) -> (X(!b)))");
-
-    // Each is realizable alone
-    expect(realizable(checker, Specification({}, {req1}, {"a"}, {"b"})),
-           "spot-runner: G(a -> X b) should be realizable");
-    expect(realizable(checker, Specification({}, {req2}, {"a"}, {"b"})),
-           "spot-runner: G(a -> X !b) should be realizable");
-    // Together, not realizable
-    expect(!realizable(checker, Specification({}, {req1, req2}, {"a"}, {"b"})),
-           "spot-runner: G(a -> X b) & G(a -> X !b) should be unrealizable");
-}
-
-// A timeout is undecided, not unrealizable, and the undecided outcome is
-// memoised: ltlsynt is deterministic, so a formula that blows the budget blows
-// it every time and the exec is worth paying once. A 1 ms budget cannot
-// outlast even ltlsynt's process startup, so the first call times out whatever
-// the host; the second is served from the cache, which is why lifting the
-// budget afterwards does not change the answer.
-void test_timeout_is_undecided_and_cached() {
-    RealizabilityChecker checker;
-    const Requirement req =
-        make_req("p", "q", timing::immediately(), "G((p) -> (q))");
-    const Specification spec({}, {req}, {"p"}, {"q"});
-    const std::size_t before = RealizabilityChecker::n_timeouts;
-    {
-        const ScopedLtlsyntTimeout timeout(std::chrono::milliseconds(1));
-        expect(!checker.check_realizability(spec).has_value(),
-               "spot-runner: a timed-out query should report undecided rather "
-               "than unrealizable");
-    }
-    expect(RealizabilityChecker::n_timeouts == before + 1,
-           "spot-runner: a timed-out query should be tallied");
-    expect(!checker.check_realizability(spec).has_value(),
-           "spot-runner: the undecided outcome should be memoised");
-    expect(RealizabilityChecker::n_timeouts == before + 1,
-           "spot-runner: a memoised timeout should not re-run ltlsynt");
-    // A fresh checker has its own cache, so the query is decided there: what
-    // is cached is one checker's non-answer, not a fact about the formula.
-    RealizabilityChecker uncached;
-    expect(realizable(uncached, spec),
-           "spot-runner: the formula itself is realizable once a workable "
-           "budget is allowed");
-}
-
-// The counting path's abandonment is memoised the same way, and re-raised as
-// the identical error, so a formula whose determinization blows up costs one
-// exec per run rather than one per occurrence.
-void test_ltl2tgba_timeout_is_cached() {
-    // Unique to this test: the cache is process-wide and this poisons the key.
-    const std::string formula = "G((a1 & b1) -> X(c1 | d1))";
-    const std::size_t before = Ltl2tgbaStats::n_timeouts;
-    {
-        const ScopedLtl2tgbaTimeout timeout(std::chrono::milliseconds(1));
-        expect(!counting_succeeds(formula),
-               "spot-runner: a timed-out determinization should raise");
-    }
-    expect(Ltl2tgbaStats::n_timeouts == before + 1,
-           "spot-runner: a timed-out determinization should be tallied");
-    expect(!counting_succeeds(formula),
-           "spot-runner: the abandonment should be memoised and re-raised");
-    expect(Ltl2tgbaStats::n_timeouts == before + 1,
-           "spot-runner: a memoised abandonment should not re-run ltl2tgba");
-}
-
-// SPOT 2.15.1's ltl2tgba exits 2 with "print_hoa(): automaton is complete but
-// prop_complete()==false" on formulae that reduce to a tautology. The wrapper
-// must treat that as the trivially-true (universal) automaton rather than
-// re-raising it as a scoring error, so a genuinely-true formula never counts
-// against the run's scoring-failure tolerance.
-void test_tautology_exit2_yields_universal_automaton() {
-    // Minimal known trigger; ltlfilt simplifies it to 1.
-    const std::string tautology = "G((a & !((b & !c) -> d)) -> b)";
-    const std::size_t before = Ltl2tgbaStats::n_tautology_substitutions;
-    std::string hoa;
-    try {
-        hoa = run_ltl2tgba_for_counting(tautology);
-    } catch (const std::exception& e) {
-        fail(std::string("run_ltl2tgba_for_counting threw on a tautology "
-                         "instead of substituting the universal automaton: ") +
-             e.what());
-        return;
-    }
-    expect(
-        hoa.find("acc-name: all") != std::string::npos &&
-            hoa.find("AP: 0") != std::string::npos &&
-            hoa.find("[t] 0") != std::string::npos,
-        "spot-runner: exit-2 tautology should yield the universal automaton");
-    expect(Ltl2tgbaStats::n_tautology_substitutions == before + 1,
-           "spot-runner: a tautology substitution should be tallied");
-    // The substituted result is cached, so a second call is a hit and does not
-    // re-trigger the bug or tally again.
-    const std::string hoa2 = run_ltl2tgba_for_counting(tautology);
-    expect(
-        hoa2 == hoa && Ltl2tgbaStats::n_tautology_substitutions == before + 1,
-        "spot-runner: a substituted tautology should be memoised");
-}
-
 // Clears the variable however the test leaves, expect() throwing past the
 // end of a case that fails.
 class ScopedEnvVar {
@@ -280,7 +98,7 @@ class ScopedEnvVar {
 // function-local static, so calling one of them twice under two environments
 // cannot distinguish these cases. The helper underneath them is where the
 // logic is, and is tested here rather than through any one caller.
-void test_tool_path_env_wins_over_compiled_default() {
+TEST(test_tool_path_env_wins_over_compiled_default) {
     constexpr const char* k_var = "PEREDUR_TOOL_PATH_TEST";
     const ScopedEnvVar env(k_var);
 
@@ -294,7 +112,7 @@ void test_tool_path_env_wins_over_compiled_default() {
            "its source");
 }
 
-void test_tool_path_empty_env_falls_back() {
+TEST(test_tool_path_empty_env_falls_back) {
     constexpr const char* k_var = "PEREDUR_TOOL_PATH_TEST";
     const ScopedEnvVar env(k_var);
 
@@ -308,7 +126,7 @@ void test_tool_path_empty_env_falls_back() {
            "its source");
 }
 
-void test_tool_path_unset_env_falls_back() {
+TEST(test_tool_path_unset_env_falls_back) {
     constexpr const char* k_var = "PEREDUR_TOOL_PATH_TEST";
     const ScopedEnvVar env(k_var);
 
@@ -326,7 +144,7 @@ void test_tool_path_unset_env_falls_back() {
 // from that rather than from an exec. A wrong answer here is silent, so every
 // verdict it produces is checked against the one ltlsynt gives for the same
 // query on a fresh checker.
-void test_subsumption_agrees_with_ltlsynt() {
+TEST(test_subsumption_agrees_with_ltlsynt) {
     const std::vector<std::string> inputs = {"req"};
     const std::vector<std::string> outputs = {"grant"};
     // `responds` alone is realizable; with `silent` it is not, `silent`
@@ -387,11 +205,196 @@ void test_subsumption_agrees_with_ltlsynt() {
            "one of these queries without an exec");
 }
 
+// SPOT 2.15.1's ltl2tgba exits 2 with "print_hoa(): automaton is complete but
+// prop_complete()==false" on formulae that reduce to a tautology. The wrapper
+// must treat that as the trivially-true (universal) automaton rather than
+// re-raising it as a scoring error, so a genuinely-true formula never counts
+// against the run's scoring-failure tolerance.
+TEST(test_tautology_exit2_yields_universal_automaton) {
+    // Minimal known trigger; ltlfilt simplifies it to 1.
+    const std::string tautology = "G((a & !((b & !c) -> d)) -> b)";
+    const std::size_t before = Ltl2tgbaStats::n_tautology_substitutions;
+    std::string hoa;
+    try {
+        hoa = run_ltl2tgba_for_counting(tautology);
+    } catch (const std::exception& e) {
+        fail(std::string("run_ltl2tgba_for_counting threw on a tautology "
+                         "instead of substituting the universal automaton: ") +
+             e.what());
+        return;
+    }
+    expect(
+        hoa.find("acc-name: all") != std::string::npos &&
+            hoa.find("AP: 0") != std::string::npos &&
+            hoa.find("[t] 0") != std::string::npos,
+        "spot-runner: exit-2 tautology should yield the universal automaton");
+    expect(Ltl2tgbaStats::n_tautology_substitutions == before + 1,
+           "spot-runner: a tautology substitution should be tallied");
+    // The substituted result is cached, so a second call is a hit and does not
+    // re-trigger the bug or tally again.
+    const std::string hoa2 = run_ltl2tgba_for_counting(tautology);
+    expect(
+        hoa2 == hoa && Ltl2tgbaStats::n_tautology_substitutions == before + 1,
+        "spot-runner: a substituted tautology should be memoised");
+}
+
+TEST(test_realizable_eventually) {
+    RealizabilityChecker checker;
+    Requirement req =
+        make_req("p", "q", timing::eventually(), "G((p) -> (F(q)))");
+    expect(realizable(checker, Specification({}, {req}, {"p"}, {"q"})),
+           "spot-runner: G(p -> Fq) should be realisable");
+}
+
+TEST(test_realizable_immediately) {
+    RealizabilityChecker checker;
+    Requirement req =
+        make_req("p", "q", timing::immediately(), "G((p) -> (q))");
+    expect(realizable(checker, Specification({}, {req}, {"p"}, {"q"})),
+           "spot-runner: G(p -> q) should be realisable");
+}
+
+TEST(test_unrealizable_immediately) {
+    RealizabilityChecker checker;
+    Requirement req = make_req("true", "false", timing::immediately(),
+                               "G((true) -> (false))");
+    expect(!realizable(checker, Specification({}, {req}, {}, {})),
+           "spot-runner: G(true -> false) should be unrealisable");
+}
+
+TEST(test_realizable_next_timepoint) {
+    RealizabilityChecker checker;
+    Requirement req =
+        make_req("p", "q", timing::next_timepoint(), "G((p) -> (X(q)))");
+    expect(realizable(checker, Specification({}, {req}, {"p"}, {"q"})),
+           "spot-runner: G(p -> Xq) should be realisable");
+}
+
+TEST(test_realizable_within_ticks) {
+    RealizabilityChecker checker;
+    Requirement req =
+        make_req("p", "q", timing::within_ticks(2), "G((p) -> ((q) | X(q)))");
+    expect(realizable(checker, Specification({}, {req}, {"p"}, {"q"})),
+           "spot-runner: G(p -> q | Xq) should be realisable");
+}
+
+TEST(test_realizable_for_ticks) {
+    RealizabilityChecker checker;
+    Requirement req =
+        make_req("p", "q", timing::for_ticks(2), "G((p) -> ((q) & X(q)))");
+    expect(realizable(checker, Specification({}, {req}, {"p"}, {"q"})),
+           "spot-runner: G(p -> q & Xq) should be realisable");
+}
+
+TEST(test_realizable_with_assumption) {
+    RealizabilityChecker checker;
+    // Assumption: p persists once set (environment constraint)
+    Requirement assumption =
+        make_req("p", "p", timing::next_timepoint(), "G((p) -> (X(p)))");
+    // Guarantee: when p holds, q must hold
+    Requirement guarantee =
+        make_req("p", "q", timing::immediately(), "G((p) -> (q))");
+    expect(realizable(checker,
+                      Specification({assumption}, {guarantee}, {"p"}, {"q"})),
+           "spot-runner: G(p->Xp) -> G(p->q) should be realizable");
+}
+
+TEST(test_assumption_enables_joint_realizability) {
+    RealizabilityChecker checker;
+    // These two guarantees are jointly unrealizable on their own
+    Requirement guarantee1 =
+        make_req("a", "b", timing::next_timepoint(), "G((a) -> (X(b)))");
+    Requirement guarantee2 =
+        make_req("a", "!b", timing::next_timepoint(), "G((a) -> (X(!b)))");
+    expect(!realizable(checker, Specification({}, {guarantee1, guarantee2},
+                                              {"a"}, {"b"})),
+           "spot-runner: G(a->Xb) & G(a->X!b) should be unrealizable without "
+           "assumption");
+    // Assumption G(!a): environment never sets a — makes both guarantees
+    // vacuously true
+    Requirement assum =
+        make_req("true", "!a", timing::immediately(), "G((true) -> (!a))");
+    expect(realizable(checker, Specification({assum}, {guarantee1, guarantee2},
+                                             {"a"}, {"b"})),
+           "spot-runner: G(!a) -> (G(a->Xb) & G(a->X!b)) should be realizable");
+}
+
+TEST(test_individually_realizable_but_jointly_unrealizable) {
+    RealizabilityChecker checker;
+    // Req1: G(a -> X b)
+    Requirement req1 =
+        make_req("a", "b", timing::next_timepoint(), "G((a) -> (X(b)))");
+    // Req2: G(a -> X !b)
+    Requirement req2 =
+        make_req("a", "!b", timing::next_timepoint(), "G((a) -> (X(!b)))");
+
+    // Each is realizable alone
+    expect(realizable(checker, Specification({}, {req1}, {"a"}, {"b"})),
+           "spot-runner: G(a -> X b) should be realizable");
+    expect(realizable(checker, Specification({}, {req2}, {"a"}, {"b"})),
+           "spot-runner: G(a -> X !b) should be realizable");
+    // Together, not realizable
+    expect(!realizable(checker, Specification({}, {req1, req2}, {"a"}, {"b"})),
+           "spot-runner: G(a -> X b) & G(a -> X !b) should be unrealizable");
+}
+
+// A timeout is undecided, not unrealizable, and the undecided outcome is
+// memoised: ltlsynt is deterministic, so a formula that blows the budget blows
+// it every time and the exec is worth paying once. A 1 ms budget cannot
+// outlast even ltlsynt's process startup, so the first call times out whatever
+// the host; the second is served from the cache, which is why lifting the
+// budget afterwards does not change the answer.
+TEST(test_timeout_is_undecided_and_cached) {
+    RealizabilityChecker checker;
+    const Requirement req =
+        make_req("p", "q", timing::immediately(), "G((p) -> (q))");
+    const Specification spec({}, {req}, {"p"}, {"q"});
+    const std::size_t before = RealizabilityChecker::n_timeouts;
+    {
+        const ScopedLtlsyntTimeout timeout(std::chrono::milliseconds(1));
+        expect(!checker.check_realizability(spec).has_value(),
+               "spot-runner: a timed-out query should report undecided rather "
+               "than unrealizable");
+    }
+    expect(RealizabilityChecker::n_timeouts == before + 1,
+           "spot-runner: a timed-out query should be tallied");
+    expect(!checker.check_realizability(spec).has_value(),
+           "spot-runner: the undecided outcome should be memoised");
+    expect(RealizabilityChecker::n_timeouts == before + 1,
+           "spot-runner: a memoised timeout should not re-run ltlsynt");
+    // A fresh checker has its own cache, so the query is decided there: what
+    // is cached is one checker's non-answer, not a fact about the formula.
+    RealizabilityChecker uncached;
+    expect(realizable(uncached, spec),
+           "spot-runner: the formula itself is realizable once a workable "
+           "budget is allowed");
+}
+
+// The counting path's abandonment is memoised the same way, and re-raised as
+// the identical error, so a formula whose determinization blows up costs one
+// exec per run rather than one per occurrence.
+TEST(test_ltl2tgba_timeout_is_cached) {
+    // Unique to this test: the cache is process-wide and this poisons the key.
+    const std::string formula = "G((a1 & b1) -> X(c1 | d1))";
+    const std::size_t before = Ltl2tgbaStats::n_timeouts;
+    {
+        const ScopedLtl2tgbaTimeout timeout(std::chrono::milliseconds(1));
+        expect(!counting_succeeds(formula),
+               "spot-runner: a timed-out determinization should raise");
+    }
+    expect(Ltl2tgbaStats::n_timeouts == before + 1,
+           "spot-runner: a timed-out determinization should be tallied");
+    expect(!counting_succeeds(formula),
+           "spot-runner: the abandonment should be memoised and re-raised");
+    expect(Ltl2tgbaStats::n_timeouts == before + 1,
+           "spot-runner: a memoised abandonment should not re-run ltl2tgba");
+}
+
 // The name rules are asymmetric because the two SPOT failures are. Uppercase
 // breaks `ltlsynt --ins` matching alone, and the engine passes `--ins` only,
 // so it costs an input its side of the partition and leaves outputs untouched.
 // The leading-operator rule holds on both sides, since it is a parse.
-void test_atom_names_accept_safe_names() {
+TEST(test_atom_names_accept_safe_names) {
     const std::optional<std::string> unsafe =
         runner::first_unsafe_atom_name({"r0", "iap_state_nominal", "f_a", "x1"},
                                        {"STATE_FAULT", "System", "G0", "F1"});
@@ -400,7 +403,7 @@ void test_atom_names_accept_safe_names() {
            "are safe");
 }
 
-void test_atom_names_reject_uppercase_input() {
+TEST(test_atom_names_reject_uppercase_input) {
     const std::optional<std::string> unsafe =
         runner::first_unsafe_atom_name({"a_in", "A_in"}, {"b"});
     expect(unsafe.has_value(), "atom-names: an uppercase input is rejected");
@@ -408,7 +411,7 @@ void test_atom_names_reject_uppercase_input() {
            "atom-names: the message names the offending input");
 }
 
-void test_atom_names_reject_operator_lead() {
+TEST(test_atom_names_reject_operator_lead) {
     const std::optional<std::string> as_input =
         runner::first_unsafe_atom_name({"fail", "Gate"}, {"b"});
     expect(as_input.has_value(),
@@ -419,33 +422,10 @@ void test_atom_names_reject_operator_lead() {
            "atom-names: an output reading as X(_state) is rejected");
 }
 
-void test_atom_names_reject_empty_name() {
+TEST(test_atom_names_reject_empty_name) {
     const std::optional<std::string> unsafe =
         runner::first_unsafe_atom_name({"a", ""}, {"b"});
     expect(unsafe.has_value(), "atom-names: an empty name is rejected");
 }
 
 }  // namespace
-
-void run_spot_runner_tests() {
-    test_tool_path_env_wins_over_compiled_default();
-    test_tool_path_empty_env_falls_back();
-    test_tool_path_unset_env_falls_back();
-    test_subsumption_agrees_with_ltlsynt();
-    test_tautology_exit2_yields_universal_automaton();
-    test_realizable_eventually();
-    test_realizable_immediately();
-    test_unrealizable_immediately();
-    test_realizable_next_timepoint();
-    test_realizable_within_ticks();
-    test_realizable_for_ticks();
-    test_realizable_with_assumption();
-    test_assumption_enables_joint_realizability();
-    test_individually_realizable_but_jointly_unrealizable();
-    test_timeout_is_undecided_and_cached();
-    test_ltl2tgba_timeout_is_cached();
-    test_atom_names_accept_safe_names();
-    test_atom_names_reject_uppercase_input();
-    test_atom_names_reject_operator_lead();
-    test_atom_names_reject_empty_name();
-}

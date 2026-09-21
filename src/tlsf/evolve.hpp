@@ -9,9 +9,9 @@
 
 #include "config.hpp"
 #include "dashboard.hpp"
-#include "filter_report.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/filter_report.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/pipeline.hpp"
 #include "genetic/random_source.hpp"
@@ -31,11 +31,6 @@ struct DashboardProgress {
     std::size_t gen_offset = 0;
     std::size_t muc_iter = 0;
 };
-
-// The TLSF counterparts of the FRETISH per-generation filter set (dedup, bloat
-// cap and the vacuity filter).
-std::vector<FilterFunctionT<Specification>> build_per_gen_filters(
-    const Specification& spec);
 
 // Evolves `spec` under `cfg` against `fitness`, returning the final scored
 // population and, via `filter_stats_out`, this run's per-filter in/out totals.

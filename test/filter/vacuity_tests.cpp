@@ -2,22 +2,22 @@
 #include <chrono>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "config.hpp"
 #include "filter/vacuity.hpp"
+#include "fixtures.hpp"
 #include "genetic/generation.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
-Requirement continual(const std::string& response, const Timing& tim) {
-    return Requirement(Formula("true"), Formula(response), tim);
-}
+constexpr std::string_view k_test_suite = "vacuity_filter";
 
 Requirement conditional(const std::string& condition,
                         const std::string& response) {
@@ -25,24 +25,18 @@ Requirement conditional(const std::string& condition,
                        timing::immediately());
 }
 
-Specification with_assumptions(std::vector<Requirement> assumptions) {
-    return Specification(std::move(assumptions),
-                         {continual("grant", timing::immediately())}, {"req"},
-                         {"grant"});
-}
-
 Specification with_guarantees(std::vector<Requirement> guarantees) {
     return Specification({}, std::move(guarantees), {"req"}, {"grant"});
 }
 
-void test_no_assumptions_is_not_vacuous() {
+TEST(test_no_assumptions_is_not_vacuous) {
     SatisfiabilityChecker checker;
     const Specification spec = with_assumptions({});
     expect(!specification_has_unsatisfiable_assumptions(spec, checker),
            "vacuity: a spec with no assumptions is not vacuous");
 }
 
-void test_satisfiable_assumption_is_not_vacuous() {
+TEST(test_satisfiable_assumption_is_not_vacuous) {
     SatisfiabilityChecker checker;
     const Specification spec =
         with_assumptions({continual("req", timing::within_ticks(6))});
@@ -53,7 +47,7 @@ void test_satisfiable_assumption_is_not_vacuous() {
 // G(!R & X(!R & ... & X R)) asserts R at tick n+1 relative to every timepoint,
 // and !R at that same tick relative to the timepoint n+1 later. This is the
 // candidate the strengthening direction reaches via within n -> after n-1.
-void test_after_ticks_under_continual_true_is_vacuous() {
+TEST(test_after_ticks_under_continual_true_is_vacuous) {
     SatisfiabilityChecker checker;
     const Specification spec =
         with_assumptions({continual("req", timing::after_ticks(5))});
@@ -66,7 +60,7 @@ void test_after_ticks_under_continual_true_is_vacuous() {
 // This is why the assumption side stays one joint query while the guarantee
 // side splits per formula: validity distributes over conjunction and
 // unsatisfiability does not.
-void test_jointly_unsatisfiable_assumptions_are_vacuous() {
+TEST(test_jointly_unsatisfiable_assumptions_are_vacuous) {
     SatisfiabilityChecker checker;
     const Requirement always_req = continual("req", timing::always());
     const Requirement never_req = continual("!req", timing::always());
@@ -78,7 +72,7 @@ void test_jointly_unsatisfiable_assumptions_are_vacuous() {
            "vacuity: 'G req' and 'G !req' are jointly unsatisfiable");
 }
 
-void test_filter_drops_only_the_vacuous_spec() {
+TEST(test_filter_drops_only_the_vacuous_spec) {
     SatisfiabilityChecker checker;
     FilterFunction filter = make_vacuity_filter(checker);
     const Specification good =
@@ -98,7 +92,7 @@ void test_filter_drops_only_the_vacuous_spec() {
 // false one is vacuous under every timing. Both specs below have satisfiable
 // assumptions, so the solver would keep them: the screen is what rejects them,
 // and it runs first.
-void test_false_condition_is_trivially_vacuous() {
+TEST(test_false_condition_is_trivially_vacuous) {
     SatisfiabilityChecker checker;
     const Specification in_guarantee =
         with_guarantees({conditional("false", "grant")});
@@ -118,7 +112,7 @@ void test_false_condition_is_trivially_vacuous() {
 // A true response is still rejected under an ordinary timing -- but by the
 // semantic check reading the lowered formula, not by the screen. There is
 // deliberately no syntactic test for it; see the AfterTicks case below.
-void test_true_response_guarantee_is_rejected_semantically() {
+TEST(test_true_response_guarantee_is_rejected_semantically) {
     SatisfiabilityChecker checker;
     for (const Timing& tim : {timing::immediately(), timing::always()}) {
         const Specification spec =
@@ -142,7 +136,7 @@ void test_true_response_guarantee_is_rejected_semantically() {
 // not an empty one. A syntactic test on the response would reject this exactly
 // backwards. The semantic check reads the lowered formula, finds its negation
 // satisfiable, and keeps the candidate.
-void test_true_response_under_after_ticks_is_kept() {
+TEST(test_true_response_under_after_ticks_is_kept) {
     SatisfiabilityChecker checker;
     const Specification spec = with_guarantees(
         {Requirement(Formula("req"), Formula("true"), timing::after_ticks(2))});
@@ -158,7 +152,7 @@ void test_true_response_under_after_ticks_is_kept() {
 
 // Guarantees only. A valid assumption neither weakens what the system must do
 // nor makes the implication a tautology, so the scan never looks at one.
-void test_true_assumption_response_is_not_vacuous() {
+TEST(test_true_assumption_response_is_not_vacuous) {
     SatisfiabilityChecker checker;
     const Specification spec = with_assumptions({conditional("req", "true")});
     expect(!specification_has_valid_guarantee(spec, checker),
@@ -168,7 +162,7 @@ void test_true_assumption_response_is_not_vacuous() {
            "vacuity: a true response in an assumption is kept");
 }
 
-void test_filter_drops_the_vacuous_specs() {
+TEST(test_filter_drops_the_vacuous_specs) {
     SatisfiabilityChecker checker;
     FilterFunction filter = make_vacuity_filter(checker);
     const Specification good = with_guarantees({conditional("req", "grant")});
@@ -187,7 +181,7 @@ void test_filter_drops_the_vacuous_specs() {
 // requirement lowers to G((req & !req) -> grant), valid because the antecedent
 // never holds. Neither Formula nor Requirement simplifies on construction, so
 // this pins that the semantic verdict does not depend on simplify() having run.
-void test_valid_guarantee_is_caught_only_semantically() {
+TEST(test_valid_guarantee_is_caught_only_semantically) {
     SatisfiabilityChecker checker;
     const Specification tautological_response =
         with_guarantees({conditional("req", "grant | !grant")});
@@ -206,7 +200,7 @@ void test_valid_guarantee_is_caught_only_semantically() {
            "valid guarantee");
 }
 
-void test_substantive_guarantee_is_not_valid() {
+TEST(test_substantive_guarantee_is_not_valid) {
     SatisfiabilityChecker checker;
     expect(!specification_has_valid_guarantee(
                with_guarantees({conditional("req", "grant")}), checker),
@@ -216,7 +210,7 @@ void test_substantive_guarantee_is_not_valid() {
 // Per guarantee, not over the conjunction: one gutted conjunct is enough, and
 // the verdict does not depend on where in the list it sits -- the scan returns
 // on the first valid guarantee it reaches.
-void test_one_valid_guarantee_among_substantive_ones_rejects() {
+TEST(test_one_valid_guarantee_among_substantive_ones_rejects) {
     SatisfiabilityChecker checker;
     const Requirement valid = conditional("req", "grant | !grant");
     const Requirement substantive = conditional("req", "grant");
@@ -232,7 +226,7 @@ void test_one_valid_guarantee_among_substantive_ones_rejects() {
 // A non-answer keeps the candidate, matching the assumption side. 1ms cannot
 // spawn a subprocess, and `!(G(req -> grant))` does not fold to a constant, so
 // the query reaches the deadline rather than being decided ahead of it.
-void test_guarantee_timeout_keeps_the_candidate() {
+TEST(test_guarantee_timeout_keeps_the_candidate) {
     SatisfiabilityChecker checker;
     checker.set_timeout(std::chrono::milliseconds(1));
     const std::size_t before = SatisfiabilityChecker::n_timeouts;
@@ -253,7 +247,7 @@ bool chain_has_vacuity_stage(const std::vector<FilterFunction>& filters) {
                        });
 }
 
-void test_chain_always_carries_the_vacuity_stage() {
+TEST(test_chain_always_carries_the_vacuity_stage) {
     SatisfiabilityChecker checker;
     const Specification original =
         with_guarantees({conditional("req", "grant")});
@@ -268,21 +262,3 @@ void test_chain_always_carries_the_vacuity_stage() {
 }
 
 }  // namespace
-
-void run_vacuity_filter_tests() {
-    test_no_assumptions_is_not_vacuous();
-    test_satisfiable_assumption_is_not_vacuous();
-    test_after_ticks_under_continual_true_is_vacuous();
-    test_jointly_unsatisfiable_assumptions_are_vacuous();
-    test_filter_drops_only_the_vacuous_spec();
-    test_false_condition_is_trivially_vacuous();
-    test_true_response_guarantee_is_rejected_semantically();
-    test_true_response_under_after_ticks_is_kept();
-    test_true_assumption_response_is_not_vacuous();
-    test_filter_drops_the_vacuous_specs();
-    test_valid_guarantee_is_caught_only_semantically();
-    test_substantive_guarantee_is_not_valid();
-    test_one_valid_guarantee_among_substantive_ones_rejects();
-    test_guarantee_timeout_keeps_the_candidate();
-    test_chain_always_carries_the_vacuity_stage();
-}

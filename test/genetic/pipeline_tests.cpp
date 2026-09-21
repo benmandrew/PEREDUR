@@ -7,43 +7,24 @@
 #include <algorithm>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "config.hpp"
+#include "fixtures.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/pipeline.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
-#include "test_suite.hpp"
+#include "test_registry.hpp"
 #include "test_support.hpp"
 
 namespace {
 
+constexpr std::string_view k_test_suite = "pipeline";
+
 constexpr std::size_t k_target_size = 4;
 constexpr std::size_t k_elitism_size = 1;
-
-Specification make_spec(const std::string& condition,
-                        const std::string& response) {
-    return Specification({},
-                         {Requirement{Formula(condition), Formula(response),
-                                      timing::immediately()}},
-                         {"a", "b"}, {"x", "y"});
-}
-
-RandomSource make_source() {
-    return RandomSource(
-        [](std::size_t upper_bound) { return std::size_t{0} % upper_bound; });
-}
-
-AggregateWeightedFitnessFunction constant_fitness() {
-    return AggregateWeightedFitnessFunction(
-        {{[](const Specification&) { return 0.5; }, 1.0, "constant"}});
-}
-
-std::vector<Specification> distinct_specs() {
-    return {make_spec("a", "x"), make_spec("b", "y"), make_spec("a", "y"),
-            make_spec("b", "x")};
-}
 
 std::vector<StageObservation> observe_generation(
     const std::vector<FilterFunction>& filters,
@@ -55,7 +36,7 @@ std::vector<StageObservation> observe_generation(
         score_population(cfg, specs, fns);
     std::vector<StageObservation> seen;
     evolve_generation(
-        cfg, pop, k_target_size, elitism_size, fns, filters, make_source(),
+        cfg, pop, k_target_size, elitism_size, fns, filters, make_source({}, 0),
         nullptr, [&seen](const StageObservation& obs) { seen.push_back(obs); });
     return seen;
 }
@@ -88,7 +69,7 @@ const StageObservation& stage(const std::vector<StageObservation>& observations,
     return observations[index_of(stage_names(observations), name)];
 }
 
-void test_pipeline_reports_every_fixed_stage() {
+TEST(test_pipeline_reports_every_fixed_stage) {
     const std::vector<std::string> names = stage_names(observe_generation({}));
     for (const char* const expected :
          {"order-parents", "breed", "filter-fallback", "restore-elites", "pad",
@@ -102,7 +83,7 @@ void test_pipeline_reports_every_fixed_stage() {
            "seven fixed stages");
 }
 
-void test_pipeline_stages_run_in_dependency_order() {
+TEST(test_pipeline_stages_run_in_dependency_order) {
     const std::vector<std::string> names = stage_names(observe_generation({}));
     expect(index_of(names, "order-parents") < index_of(names, "breed"),
            "pipeline: parents must be ordered before breeding selects from "
@@ -116,7 +97,7 @@ void test_pipeline_stages_run_in_dependency_order() {
            "pipeline: selection ranks scored individuals");
 }
 
-void test_pipeline_derives_one_stage_per_filter() {
+TEST(test_pipeline_derives_one_stage_per_filter) {
     const std::vector<FilterFunction> filters = {
         make_predicate_filter("keep-all",
                               [](const Specification&) { return true; }),
@@ -137,7 +118,7 @@ void test_pipeline_derives_one_stage_per_filter() {
            "fallback, in their registration order");
 }
 
-void test_pipeline_sizes_track_the_population() {
+TEST(test_pipeline_sizes_track_the_population) {
     const std::vector<StageObservation> seen = observe_generation({});
     // target_size 4 with elitism 1 breeds 3 offspring, restores 1 elite, and
     // pads back to 4.
@@ -151,7 +132,7 @@ void test_pipeline_sizes_track_the_population() {
            "pipeline: selection should report exactly target_size survivors");
 }
 
-void test_pipeline_reports_distinct_alongside_size() {
+TEST(test_pipeline_reports_distinct_alongside_size) {
     const std::vector<StageObservation> seen = observe_generation({});
     for (const StageObservation& obs : seen) {
         expect(obs.distinct <= obs.n_out,
@@ -162,14 +143,13 @@ void test_pipeline_reports_distinct_alongside_size() {
            "pipeline: four distinct parents should be reported as four");
 }
 
-void test_pipeline_distinct_sees_through_a_duplicated_population() {
+TEST(test_pipeline_distinct_sees_through_a_duplicated_population) {
     // The real generation 0: original_population seeds the run with
     // population_size byte-identical copies of the input specification, so
     // every size the pipeline reports is 4 while the population holds one
     // specification. distinct is the only field that can tell those apart.
-    const std::vector<StageObservation> seen =
-        observe_generation({}, {make_spec("a", "x"), make_spec("a", "x"),
-                                make_spec("a", "x"), make_spec("a", "x")});
+    const std::vector<StageObservation> seen = observe_generation(
+        {}, std::vector<Specification>(4, distinct_specs().front()));
     expect(stage(seen, "order-parents").n_out == 4 &&
                stage(seen, "order-parents").distinct == 1,
            "pipeline: a population of four copies of one specification should "
@@ -181,7 +161,7 @@ FilterFunction reject_all(const std::string& name, FilterKind kind) {
         name, [](const Specification&) { return false; }, 1, kind);
 }
 
-void test_pipeline_filter_fallback_restores_preference_rejects() {
+TEST(test_pipeline_filter_fallback_restores_preference_rejects) {
     const std::vector<FilterFunction> filters = {
         reject_all("prefer-none", FilterKind::Preference)};
     const std::vector<StageObservation> seen = observe_generation(filters);
@@ -193,7 +173,7 @@ void test_pipeline_filter_fallback_restores_preference_rejects() {
            "filter emptied, since nothing about them is unfit to breed from");
 }
 
-void test_pipeline_filter_fallback_withholds_correctness_rejects() {
+TEST(test_pipeline_filter_fallback_withholds_correctness_rejects) {
     const std::vector<FilterFunction> filters = {
         reject_all("not-correct", FilterKind::Correctness)};
     const std::vector<StageObservation> seen = observe_generation(filters);
@@ -207,7 +187,7 @@ void test_pipeline_filter_fallback_withholds_correctness_rejects() {
            "target size");
 }
 
-void test_pipeline_filter_fallback_rescreens_the_rescued_offspring() {
+TEST(test_pipeline_filter_fallback_rescreens_the_rescued_offspring) {
     // The preference filter empties the population before the correctness
     // filter judges a single candidate, so every call it records is one the
     // rescue made.
@@ -234,7 +214,7 @@ void test_pipeline_filter_fallback_rescreens_the_rescued_offspring() {
            "should be restored");
 }
 
-void test_pipeline_filter_fallback_restores_offspring_without_elites() {
+TEST(test_pipeline_filter_fallback_restores_offspring_without_elites) {
     const std::vector<FilterFunction> filters = {
         reject_all("not-correct", FilterKind::Correctness)};
     const std::vector<StageObservation> seen =
@@ -246,16 +226,3 @@ void test_pipeline_filter_fallback_restores_offspring_without_elites() {
 }
 
 }  // namespace
-
-void run_pipeline_tests() {
-    test_pipeline_reports_every_fixed_stage();
-    test_pipeline_stages_run_in_dependency_order();
-    test_pipeline_derives_one_stage_per_filter();
-    test_pipeline_sizes_track_the_population();
-    test_pipeline_reports_distinct_alongside_size();
-    test_pipeline_distinct_sees_through_a_duplicated_population();
-    test_pipeline_filter_fallback_restores_preference_rejects();
-    test_pipeline_filter_fallback_withholds_correctness_rejects();
-    test_pipeline_filter_fallback_rescreens_the_rescued_offspring();
-    test_pipeline_filter_fallback_restores_offspring_without_elites();
-}

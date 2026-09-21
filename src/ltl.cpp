@@ -1,7 +1,6 @@
+#include <exception>
 #include <filesystem>
 #include <iostream>
-#include <optional>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -28,11 +27,8 @@ void print_usage(const char* prog) {
 }
 
 void print_tlsf_ltl(const std::string& path, bool show_path) {
-    const std::optional<std::string> contents = read_file_contents(path);
-    if (!contents.has_value()) {
-        throw std::runtime_error("cannot read file");
-    }
-    const tlsf::Specification spec = tlsf::parse(*contents);
+    const tlsf::Specification spec =
+        tlsf::parse(read_file_or_throw(path, "cannot read file", false));
     if (show_path) {
         std::cout << path << ":\n";
     }
@@ -85,8 +81,7 @@ void print_spec_ltl(const std::string& path, const Specification& prefixed_spec,
 }  // namespace
 
 int main(int argc, const char* const argv[]) {
-    if (argc == 0 || argv == nullptr || argv[0] == nullptr) {
-        std::cerr << "fatal: missing argv[0]\n";
+    if (!has_program_name(argc, argv)) {
         return 1;
     }
     if (handle_info_flags(argc, argv, print_usage)) {

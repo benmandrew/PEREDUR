@@ -20,7 +20,9 @@
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/filter_report.hpp"
 #include "genetic/generation.hpp"
+#include "genetic/output_gate.hpp"
 #include "genetic/random_source.hpp"
 #include "manifest.hpp"
 #include "profile.hpp"
@@ -196,7 +198,7 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
         // Null unless the key is on, and then the final screens run while the
         // search does; destroyed unfinished if anything below throws.
         const std::unique_ptr<StreamingMaximalFilter<Specification>> stream =
-            make_maximal_stream(cfg, original_spec, output_dir);
+            make_maximal_stream(original_spec, cfg, output_dir);
         RepairAccumulator<Specification>::Sink sink;
         if (stream) {
             sink = [&stream](const Specification& spec,
@@ -238,7 +240,7 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
                           maximal.size(), seconds_since(wall_start));
         filter_stats.insert(filter_stats.end(), final_filter_stats.begin(),
                             final_filter_stats.end());
-        print_filter_report(filter_stats);
+        print_filter_report(filter_stats, EmptyFilterReport::Heading);
         print_scoring_report();
         if (cfg.report_diagnostics) {
             print_diagnostics_report();

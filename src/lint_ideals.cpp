@@ -28,6 +28,7 @@
 // nothing either.
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdlib>
 #include <exception>
@@ -38,7 +39,6 @@
 #include <string>
 #include <vector>
 
-#include "config.hpp"
 #include "driver_support.hpp"
 #include "filter/implication_check.hpp"
 #include "filter/vacuity.hpp"
@@ -50,7 +50,6 @@
 #include "tlsf/filter.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
-#include "version.hpp"
 
 namespace {
 
@@ -204,14 +203,6 @@ std::string subject_name(const std::filesystem::path& dir) {
     return name.empty() ? dir.string() : name;
 }
 
-std::string read_or_throw(const std::string& path) {
-    const std::optional<std::string> contents = read_file_contents(path);
-    if (!contents.has_value()) {
-        throw std::runtime_error("cannot read file: " + path);
-    }
-    return *contents;
-}
-
 // Ideal paths for a subject, sorted so the report order is stable across runs.
 std::vector<std::filesystem::path> ideal_paths(
     const std::filesystem::path& fixes, const std::string& extension) {
@@ -284,7 +275,7 @@ std::size_t lint_tlsf(const std::filesystem::path& dir,
                       const std::filesystem::path& spec_path,
                       SatisfiabilityChecker& sat, RealizabilityChecker& real) {
     const tlsf::Specification spec =
-        tlsf::parse(read_or_throw(spec_path.string()));
+        tlsf::parse(read_file_or_throw(spec_path.string(), "cannot read file"));
     const std::vector<std::filesystem::path> paths =
         ideal_paths(dir / "fixes", ".tlsf");
     if (paths.empty()) {
@@ -299,13 +290,14 @@ std::size_t lint_tlsf(const std::filesystem::path& dir,
     std::size_t failures = 0;
     for (const auto& path : paths) {
         const tlsf::Specification ideal =
-            tlsf::parse(read_or_throw(path.string()));
+            tlsf::parse(read_file_or_throw(path.string(), "cannot read file"));
         Verdict verdict;
         verdict.name = path.filename().string();
         verdict.weakening = tlsf_spec_implies(spec, ideal, sat);
         verdict.realisable = real.check_realizability_ltl(
             ideal.to_ltl(), ideal.m_inputs, ideal.m_outputs);
-        const bool ill_separated = tlsf_is_not_well_separated(ideal, real);
+        const bool ill_separated =
+            specification_is_not_well_separated(ideal, real);
         verdict.separated = !ill_separated;
         verdict.nontrivial = !tlsf_has_valid_guarantee(ideal, sat);
         check_tlsf_reachable(spec, ideal, verdict);
@@ -371,36 +363,19 @@ std::size_t lint_fretish(const std::filesystem::path& dir,
 }  // namespace
 
 int main(int argc, char** argv) {
-    std::vector<std::string> dirs;
-    for (int i = 1; i < argc; ++i) {
-        const std::string arg(argv[i]);
-        if (arg == "--version") {
-            version::print(std::cout);
-            return 0;
-        }
-        if (arg == "--help" || arg == "-h") {
-            print_usage(argv[0]);
-            return 0;
-        }
-        dirs.push_back(arg);
+    if (handle_info_flags(argc, argv, print_usage)) {
+        return 0;
     }
+    const std::vector<std::string> dirs = collect_argument_paths(argc, argv);
     if (dirs.empty()) {
         print_usage(argv[0]);
         return 2;
     }
 
-    // Generous next to a run's budgets, for the same reason compare's are: the
-    // specs here have already been stretched by hand, and a lint runs rarely.
-    // ltlfilt is raised with the rest -- check_satisfiability answers from
-    // SPOT's constant folding before black is spawned, so a fold lost to a
-    // short budget costs a verdict rather than a simplification.
-    Config cfg;
-    cfg.black_timeout = std::chrono::milliseconds{20'000};
-    cfg.ltlsynt_timeout = std::chrono::milliseconds{60'000};
-    cfg.ltl2tgba_timeout = std::chrono::milliseconds{60'000};
-    cfg.ltlfilt_timeout = std::chrono::milliseconds{300'000};
-    apply_tool_timeouts(cfg);
-    SatisfiabilityChecker& sat = global_sat_checker();
+    // Unlike compare and maximal, keeps the simplify pass and the search's SPOT
+    // budget.
+    SatisfiabilityChecker& sat =
+        configure_offline_checkers(std::chrono::milliseconds{20'000}, false);
     RealizabilityChecker real;
 
     std::size_t failures = 0;
