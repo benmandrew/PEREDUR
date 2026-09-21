@@ -49,8 +49,9 @@ std::vector<Scored<Specification>> keep_maximal(
     SatisfiabilityChecker& checker);
 
 // keep_maximal runs during the search, fed from the accumulator, or null
-// where the key is off or cfg.repair_mode is MUC, whose loop accumulates
-// nothing.
+// where the key is off. Both repair modes stream: the MUC loop accumulates
+// every gate-passing repair it reintegrates into a whole specification, which
+// is a candidate in the same sense the monolithic path's are.
 std::unique_ptr<StreamingMaximalFilter<Specification>> make_maximal_stream(
     const Specification& original, const Config& cfg,
     const std::string& output_dir);

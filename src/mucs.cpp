@@ -8,6 +8,7 @@
 #include <string>
 
 #include "driver_support.hpp"
+#include "runner/atom_names.hpp"
 #include "runner/spot.hpp"
 #include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
@@ -65,6 +66,14 @@ int main(int argc, const char* const argv[]) {
         return 1;
     }
 
+    // Before the first query: ltlsynt reads an unmatched --ins as an output,
+    // so an unsafe name here would answer about a different specification.
+    if (const std::optional<std::string> unsafe =
+            runner::first_unsafe_atom_name(spec.m_inputs, spec.m_outputs)) {
+        std::cerr << path << ": " << *unsafe << "\n";
+        return 1;
+    }
+
     RealizabilityChecker& checker = global_real_checker();
     const std::optional<bool> realizable = checker.check_realizability_ltl(
         spec.to_ltl(), spec.m_inputs, spec.m_outputs);
@@ -83,6 +92,14 @@ int main(int argc, const char* const argv[]) {
     const tlsf::MinimalUnrealizableCore muc = tlsf::extract_muc(spec);
     const std::size_t n_guarantee_side =
         spec.m_preset.size() + spec.m_assert.size() + spec.m_guarantee.size();
+    if (muc.n_undecided > 0) {
+        // The input was decided above, but a subset probe need not be: the
+        // core below rests on probes that ran out of budget, so it is reported
+        // as provisional rather than as a core.
+        std::cerr << path << ": " << muc.n_undecided
+                  << " subset probe(s) undecided; the core below is "
+                     "provisional\n";
+    }
     std::cout << "core: " << muc.formulae.size() << " of " << n_guarantee_side
               << " guarantee-side formulae\n";
     for (const tlsf::CoreFormula& entry : muc.formulae) {

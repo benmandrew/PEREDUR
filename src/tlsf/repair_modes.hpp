@@ -30,14 +30,20 @@ std::vector<Scored<Specification>> run_monolithic(
     SearchBudget& budget, StreamingMaximalFilter<Specification>* stream);
 
 // MUC repair: iteratively extract a minimal unrealizable core, evolve only that
-// sub-specification, reintegrate the best realizable-on-sub-spec repair with
-// the untouched non-core guarantees, and repeat on the recombined spec until it
-// is realizable or the iteration cap trips. Returns the single realizable
-// repair (scored against the original for output), or empty if none was found.
+// sub-specification, reintegrate *every* realizable-on-sub-spec repair with the
+// untouched non-core guarantees, and gate each as a repair of the original;
+// the loop then continues on the first that passed, until it is realizable or
+// the iteration cap trips. Returns every gate-passing repair found across the
+// iterations, scored against the original, or empty if none was found.
+//
+// @p output_dir and @p stream carry the same meaning as in run_monolithic: what
+// they receive are whole reintegrated specifications, so accumulation and the
+// maximality stream mean here what they mean there.
 std::vector<Scored<Specification>> run_muc(
     const Specification& original, const Config& cfg,
     const RandomSource& random_source,
     const AggregateWeightedFitnessFunctionT<Specification>& output_fitness,
-    const DashboardProgress& progress, SearchBudget& budget);
+    const DashboardProgress& progress, const std::string& output_dir,
+    SearchBudget& budget, StreamingMaximalFilter<Specification>* stream);
 
 }  // namespace tlsf::internal

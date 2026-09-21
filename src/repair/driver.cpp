@@ -26,6 +26,7 @@
 #include "profile.hpp"
 #include "reports.hpp"
 #include "requirement.hpp"
+#include "runner/atom_names.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
 #include "serialisation.hpp"
@@ -117,11 +118,28 @@ int run_tlsf_repair(const Config& cfg, const std::string& input_path,
 int run_fretish_repair(const Config& cfg, const std::string& input_path,
                        const std::string& output_dir,
                        const std::optional<std::size_t>& seed) {
+    // Rejected rather than ignored. Only the TLSF path reads repair_mode, so a
+    // FRETISH run carrying this key used to evolve monolithically while its
+    // manifest recorded "muc", which makes an archived run say what it did not
+    // do.
+    if (cfg.repair_mode != RepairMode::Monolithic) {
+        std::cerr << "fatal: [tlsf] repair_mode is TLSF-only; this input is "
+                     "FRETISH JSON\n";
+        return 1;
+    }
     Specification original_spec;
     try {
         original_spec = load_specification(input_path);
     } catch (const std::exception& exc) {
         std::cerr << exc.what() << "\n";
+        return 1;
+    }
+    // Before the screens, because an unsafe name makes every realizability
+    // verdict below meaningless rather than merely suspect.
+    if (const std::optional<std::string> unsafe =
+            runner::first_unsafe_atom_name(environment_signals(original_spec),
+                                           original_spec.m_out_atoms)) {
+        std::cerr << "fatal: " << input_path << ": " << *unsafe << "\n";
         return 1;
     }
     // Screened before anything is built from it. The seed population is

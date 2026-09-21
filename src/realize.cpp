@@ -7,6 +7,7 @@
 
 #include "driver_support.hpp"
 #include "requirement.hpp"
+#include "runner/atom_names.hpp"
 #include "runner/spot.hpp"
 #include "serialisation.hpp"
 #include "tlsf/parser.hpp"
@@ -38,6 +39,13 @@ std::optional<bool> check_tlsf_realizable(const std::string& path,
     }
     try {
         const tlsf::Specification spec = tlsf::parse(*contents);
+        // ltlsynt reads an unmatched --ins as an output, so an unsafe name
+        // turns this tool's verdict into one about a different specification.
+        if (const std::optional<std::string> unsafe =
+                runner::first_unsafe_atom_name(spec.m_inputs, spec.m_outputs)) {
+            std::cerr << path << ": " << *unsafe << "\n";
+            return std::nullopt;
+        }
         const std::optional<bool> realizable = checker.check_realizability_ltl(
             spec.to_ltl(), spec.m_inputs, spec.m_outputs);
         if (!realizable.has_value()) {
@@ -65,6 +73,12 @@ std::optional<bool> realize_one(const std::string& path,
         spec = load_specification(path);
     } catch (const std::exception& exc) {
         std::cerr << (multi ? path + ": " : "") << exc.what() << "\n";
+        return std::nullopt;
+    }
+    if (const std::optional<std::string> unsafe =
+            runner::first_unsafe_atom_name(environment_signals(spec),
+                                           spec.m_out_atoms)) {
+        std::cerr << (multi ? path + ": " : "") << *unsafe << "\n";
         return std::nullopt;
     }
     const std::optional<bool> realizable = checker.check_realizability(spec);

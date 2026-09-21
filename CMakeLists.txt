@@ -91,6 +91,7 @@ target_include_directories(peredur_core SYSTEM PUBLIC ${nlohmann_json_SOURCE_DIR
 add_library(peredur_fitness STATIC)
 target_sources(peredur_fitness PRIVATE
     src/fitness/function.cpp
+    src/runner/atom_names.cpp
     src/runner/black.cpp
     src/runner/formaliser.cpp
     src/runner/ganak.cpp

@@ -22,6 +22,7 @@
 #include "genetic/scored.hpp"
 #include "repair_modes.hpp"
 #include "repair_output.hpp"
+#include "runner/atom_names.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
 #include "survivors.hpp"
@@ -86,6 +87,15 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
         return 1;
     }
 
+    // Before the screens, because an unsafe name makes every realizability
+    // verdict below meaningless rather than merely suspect.
+    if (const std::optional<std::string> unsafe =
+            runner::first_unsafe_atom_name(original.m_inputs,
+                                           original.m_outputs)) {
+        std::cerr << "fatal: " << input_path << ": " << *unsafe << "\n";
+        return 1;
+    }
+
     // As on the FRETISH path: the seed population is copies of this
     // specification and no filter screens them, so the run says at the start
     // what the gate would otherwise only reveal at the end. MUC repair needs no
@@ -140,7 +150,7 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
     std::vector<Scored<Specification>> survivors =
         cfg.repair_mode == RepairMode::Muc
             ? internal::run_muc(original, cfg, random_source, fitness, progress,
-                                budget)
+                                output_dir, budget, stream.get())
             : internal::run_monolithic(original, cfg, random_source, fitness,
                                        progress, output_dir, budget,
                                        stream.get());

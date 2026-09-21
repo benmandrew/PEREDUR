@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "requirement.hpp"
+#include "runner/atom_names.hpp"
 #include "runner/spot.hpp"
 #include "runner/tool_paths.hpp"
 #include "test_suite.hpp"
@@ -386,6 +387,44 @@ void test_subsumption_agrees_with_ltlsynt() {
            "one of these queries without an exec");
 }
 
+// The name rules are asymmetric because the two SPOT failures are. Uppercase
+// breaks `ltlsynt --ins` matching alone, and the engine passes `--ins` only,
+// so it costs an input its side of the partition and leaves outputs untouched.
+// The leading-operator rule holds on both sides, since it is a parse.
+void test_atom_names_accept_safe_names() {
+    const std::optional<std::string> unsafe =
+        runner::first_unsafe_atom_name({"r0", "iap_state_nominal", "f_a", "x1"},
+                                       {"STATE_FAULT", "System", "G0", "F1"});
+    expect(!unsafe.has_value(),
+           "atom-names: uppercase outputs and digit-suffixed operator letters "
+           "are safe");
+}
+
+void test_atom_names_reject_uppercase_input() {
+    const std::optional<std::string> unsafe =
+        runner::first_unsafe_atom_name({"a_in", "A_in"}, {"b"});
+    expect(unsafe.has_value(), "atom-names: an uppercase input is rejected");
+    expect(unsafe.value_or("").find("A_in") != std::string::npos,
+           "atom-names: the message names the offending input");
+}
+
+void test_atom_names_reject_operator_lead() {
+    const std::optional<std::string> as_input =
+        runner::first_unsafe_atom_name({"fail", "Gate"}, {"b"});
+    expect(as_input.has_value(),
+           "atom-names: an input reading as G(ate) is rejected");
+    const std::optional<std::string> as_output =
+        runner::first_unsafe_atom_name({"a"}, {"X_state"});
+    expect(as_output.has_value(),
+           "atom-names: an output reading as X(_state) is rejected");
+}
+
+void test_atom_names_reject_empty_name() {
+    const std::optional<std::string> unsafe =
+        runner::first_unsafe_atom_name({"a", ""}, {"b"});
+    expect(unsafe.has_value(), "atom-names: an empty name is rejected");
+}
+
 }  // namespace
 
 void run_spot_runner_tests() {
@@ -405,4 +444,8 @@ void run_spot_runner_tests() {
     test_individually_realizable_but_jointly_unrealizable();
     test_timeout_is_undecided_and_cached();
     test_ltl2tgba_timeout_is_cached();
+    test_atom_names_accept_safe_names();
+    test_atom_names_reject_uppercase_input();
+    test_atom_names_reject_operator_lead();
+    test_atom_names_reject_empty_name();
 }
