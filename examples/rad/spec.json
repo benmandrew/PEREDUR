@@ -1,0 +1,816 @@
+{
+  "assumptions": [],
+  "guarantees": [
+    {
+      "condition": "dressing_requested & garment_already_worn",
+      "condition-type": "trigger",
+      "response": "notify_already_wearing_garment",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "ambiguity_present | risk_present",
+      "condition-type": "continual",
+      "response": "use_multiple_modalities",
+      "timing": {
+        "type": "Before",
+        "stop": "confirm_command"
+      }
+    },
+    {
+      "condition": "user_pose_change_detected",
+      "condition-type": "trigger",
+      "response": "advise_pose_improvement",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "required_pose_information_still_unavailable",
+      "condition-type": "trigger",
+      "response": "user_notified & user_assistance_requested",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "garment_movement_delay_detected",
+      "condition-type": "trigger",
+      "response": "user_notified_of_movement_delay & user_confirmation_received",
+      "timing": {
+        "type": "Before",
+        "stop": "garment_movement_initiated"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "request_validated",
+      "timing": {
+        "type": "Before",
+        "stop": "action_taken"
+      }
+    },
+    {
+      "condition": "feedback_inconsistency_probability_ge_0p9",
+      "condition-type": "trigger",
+      "response": "feedback_verified_using_multiple_sensing_modalities & user_confirmation_requested",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "user_input_correctly_interpreted",
+      "timing": {
+        "type": "Before",
+        "stop": "action_taken"
+      }
+    },
+    {
+      "condition": "user_interaction_ongoing & ! interaction_interruption_required",
+      "condition-type": "continual",
+      "response": "user_interaction_supported & ! robot_initiated_interruption",
+      "timing": {
+        "type": "Always"
+      },
+      "scope": {
+        "type": "In",
+        "mode": "task_execution"
+      }
+    },
+    {
+      "condition": "user_override_attempt_probability_ge_0p9",
+      "condition-type": "trigger",
+      "response": "user_clarification_requested",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "confirm_task_request",
+      "timing": {
+        "type": "Before",
+        "stop": "dressing_process_initiated"
+      }
+    },
+    {
+      "condition": "doubt_present",
+      "condition-type": "continual",
+      "response": "use_multiple_modalities",
+      "timing": {
+        "type": "Before",
+        "stop": "task_execution_initiated"
+      }
+    },
+    {
+      "condition": "speech_commands_incomplete",
+      "condition-type": "continual",
+      "response": "use_multiple_modalities",
+      "timing": {
+        "type": "Before",
+        "stop": "confirm_command"
+      }
+    },
+    {
+      "condition": "user_interaction_required",
+      "condition-type": "trigger",
+      "response": "user_interaction_initiated | ( user_interaction_delay_detected & interaction_recovery_initiated )",
+      "timing": {
+        "type": "WithinTicks",
+        "ticks": 60
+      }
+    },
+    {
+      "condition": "user_decision_change_probability_ge_0p9",
+      "condition-type": "trigger",
+      "response": "updated_user_decision_confirmed",
+      "timing": {
+        "type": "Before",
+        "stop": "task_transitioned"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "command_intent_verified",
+      "timing": {
+        "type": "Before",
+        "stop": "user_request_executed"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "user_interaction_initiated_successfully",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "background_noise_overpowering",
+      "condition-type": "continual",
+      "response": "use_multiple_modalities",
+      "timing": {
+        "type": "Before",
+        "stop": "confirm_command"
+      }
+    },
+    {
+      "condition": "ambiguity_present | risk_present",
+      "condition-type": "continual",
+      "response": "confirm_command",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "garment_detection_failed",
+      "condition-type": "trigger",
+      "response": "query_user_for_garment",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "gesture_command_detected",
+      "condition-type": "trigger",
+      "response": "use_multiple_modalities & request_user_confirmation",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "dressing_started",
+      "condition-type": "trigger",
+      "response": "user_reminded_to_remain_seated",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "user_interference",
+      "condition-type": "trigger",
+      "response": "remind_user_to_remain_still & remind_user_not_to_move_garment",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "user_removes_garment",
+      "condition-type": "trigger",
+      "response": "remind_user_not_to_move_garment",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "user_removes_garment",
+      "condition-type": "trigger",
+      "response": "confirm_steps_with_user",
+      "timing": {
+        "type": "NextTimepoint"
+      }
+    },
+    {
+      "condition": "user_speech_detected_during_audio_feedback",
+      "condition-type": "trigger",
+      "response": "audio_feedback_stopped",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "dressing_stage_active",
+      "condition-type": "continual",
+      "response": "remind_user_to_remain_still",
+      "timing": {
+        "type": "Eventually"
+      },
+      "scope": {
+        "type": "In",
+        "mode": "dressing_mode"
+      }
+    },
+    {
+      "condition": "unsuitable_user_pose_detected",
+      "condition-type": "trigger",
+      "response": "task_paused & request_suitable_pose",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "gesture_detected & gesture_detection_confidence_le_0p9",
+      "condition-type": "trigger",
+      "response": "user_gesture_confirmation_requested",
+      "timing": {
+        "type": "Before",
+        "stop": "gesture_acted_upon"
+      }
+    },
+    {
+      "condition": "second_actor_detected",
+      "condition-type": "trigger",
+      "response": "task_paused & query_second_person_presence",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "instructions_clear_and_unambiguous",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "multimodal_output_supported",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "task_started | task_continued",
+      "condition-type": "trigger",
+      "response": "current_task_and_robot_motion_announced_to_user",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "task_or_response_processing_started",
+      "condition-type": "trigger",
+      "response": "task_or_response_processing_in_progress -> ( user_notified_of_delay & current_task_status_provided )",
+      "timing": {
+        "type": "AfterTicks",
+        "ticks": 60
+      }
+    },
+    {
+      "condition": "wrong_limb_probability_ge_0p9",
+      "condition-type": "trigger",
+      "response": "user_advised_to_present_correct_limb",
+      "timing": {
+        "type": "Eventually"
+      },
+      "scope": {
+        "type": "In",
+        "mode": "dressing_mode"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "request_garment_verification",
+      "timing": {
+        "type": "Before",
+        "stop": "fetch_item"
+      }
+    },
+    {
+      "condition": "user_interference & lost_task_segmentation",
+      "condition-type": "trigger",
+      "response": "confirm_steps_with_user",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "high_risk_command",
+      "condition-type": "continual",
+      "response": "explicit_validation_from_user",
+      "timing": {
+        "type": "Before",
+        "stop": "execution"
+      }
+    },
+    {
+      "condition": "different_garment_requested",
+      "condition-type": "continual",
+      "response": "exit_dressing_sequence & update_garment_selection & initiate_dressing_process",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "able_to_restart_dressing_sequence",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "request_validated & user_confirmation_received",
+      "timing": {
+        "type": "Before",
+        "stop": "task_initiation"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "user_confirmation_received & sensor_validation_complete",
+      "timing": {
+        "type": "Before",
+        "stop": "request_validated"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "request_validated & user_confirmation_received",
+      "timing": {
+        "type": "Before",
+        "stop": "movement_initiated"
+      }
+    },
+    {
+      "condition": "balance_lost",
+      "condition-type": "continual",
+      "response": "issue_balance_assistance_query",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "balance_assistance_requested",
+      "condition-type": "continual",
+      "response": "provide_assistance",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "garment_detection_failed",
+      "condition-type": "continual",
+      "response": "task_paused & garment_location_query_issued",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "track_user_position",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "user_out_of_range",
+      "condition-type": "continual",
+      "response": "alert_user",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "detect_user_request_not_received",
+      "condition-type": "continual",
+      "response": "request_confirmation",
+      "timing": {
+        "type": "Before",
+        "stop": "continue"
+      }
+    },
+    {
+      "condition": "background_noise_overpowering",
+      "condition-type": "trigger",
+      "response": "notify_noise_confusion",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "vision_occluded",
+      "condition-type": "trigger",
+      "response": "notify_user",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "notify_user_of_detection_mode & remind_user_not_to_move_garment",
+      "timing": {
+        "type": "Immediately"
+      },
+      "scope": {
+        "type": "In",
+        "mode": "detection_mode"
+      }
+    },
+    {
+      "condition": "user_moves_garment",
+      "condition-type": "trigger",
+      "response": "remind_user_not_to_move_garment & remind_user_to_not_obstruct_camera_view",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "garment_grip_expected & ! garment_gripped",
+      "condition-type": "trigger",
+      "response": "alert_user",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "user_tracking_lost",
+      "condition-type": "trigger",
+      "response": "notify_user",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "task_failure_condition | task_time_bound_exceeded",
+      "condition-type": "trigger",
+      "response": "task_exception_detected & task_paused",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "task_exception_detected",
+      "condition-type": "trigger",
+      "response": "user_notified & appropriate_user_input_requested",
+      "timing": {
+        "type": "Before",
+        "stop": "task_continued"
+      }
+    },
+    {
+      "condition": "user_pose_change_detected",
+      "condition-type": "trigger",
+      "response": "user_position_estimate_updated & trajectory_adjusted_to_user_position",
+      "timing": {
+        "type": "Before",
+        "stop": "task_resumed"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "( process_starting | process_continuing ) -> user_presence_validated_by_multiple_sensors",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "required_pose_information_unavailable",
+      "condition-type": "trigger",
+      "response": "multimodal_pose_detection_active",
+      "timing": {
+        "type": "Before",
+        "stop": "task_resumed"
+      }
+    },
+    {
+      "condition": "pose_update_required",
+      "condition-type": "trigger",
+      "response": "pose_update_need_recognised | ( pose_update_recognition_delay_detected & user_notified_of_pose_update_delay )",
+      "timing": {
+        "type": "WithinTicks",
+        "ticks": 30
+      }
+    },
+    {
+      "condition": "pose_detection_requested",
+      "condition-type": "trigger",
+      "response": "pose_detected",
+      "timing": {
+        "type": "WithinTicks",
+        "ticks": 30
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "garment_presence_detected",
+      "timing": {
+        "type": "Before",
+        "stop": "dressing_actions_initiated"
+      }
+    },
+    {
+      "condition": "trajectory_information_requested",
+      "condition-type": "trigger",
+      "response": "trajectory_information_available | ( trajectory_information_delay_detected & user_notified_of_trajectory_delay )",
+      "timing": {
+        "type": "WithinTicks",
+        "ticks": 60
+      }
+    },
+    {
+      "condition": "corrective_action_required",
+      "condition-type": "trigger",
+      "response": "corrective_action_applied",
+      "timing": {
+        "type": "WithinTicks",
+        "ticks": 30
+      }
+    },
+    {
+      "condition": "potential_robot_user_collision",
+      "condition-type": "continual",
+      "response": "collision_detected",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "action_response_time_exceeded",
+      "condition-type": "trigger",
+      "response": "delay_reduction_behaviour_activated | user_informed_of_delay",
+      "timing": {
+        "type": "Immediately"
+      }
+    },
+    {
+      "condition": "required_pose_information_still_unavailable",
+      "condition-type": "trigger",
+      "response": "user_notified",
+      "timing": {
+        "type": "Before",
+        "stop": "task_resumed"
+      }
+    },
+    {
+      "condition": "user_movement_detected",
+      "condition-type": "continual",
+      "response": "non_rigid_trajectory_active & user_movement_tracked",
+      "timing": {
+        "type": "Immediately"
+      },
+      "scope": {
+        "type": "In",
+        "mode": "dressing_mode"
+      }
+    },
+    {
+      "condition": "command_recognition_failed",
+      "condition-type": "trigger",
+      "response": "user_prompted_to_repeat_or_clarify_request",
+      "timing": {
+        "type": "Eventually"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "timer_checks_active & ! long_or_infinite_processing_loop",
+      "timing": {
+        "type": "Always"
+      }
+    },
+    {
+      "condition": "expected_task_duration_exceeded | task_behaviour_inconsistent",
+      "condition-type": "trigger",
+      "response": "user_clarification_requested",
+      "timing": {
+        "type": "Before",
+        "stop": "task_continued"
+      }
+    },
+    {
+      "condition": "required_element_missing_or_unobservable_detected",
+      "condition-type": "trigger",
+      "response": "user_or_external_assistance_requested",
+      "timing": {
+        "type": "Before",
+        "stop": "task_continued"
+      }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "monitor_user_attention & monitor_user_engagement",
+      "timing": {
+        "type": "Always"
+      },
+      "scope": {
+        "type": "In",
+        "mode": "task_execution"
+      }
+    }
+  ],
+  "in_atoms": [
+    "action_response_time_exceeded",
+    "ambiguity_present",
+    "background_noise_overpowering",
+    "balance_assistance_requested",
+    "balance_lost",
+    "collision_detected",
+    "command_recognition_failed",
+    "corrective_action_required",
+    "detect_user_request_not_received",
+    "different_garment_requested",
+    "doubt_present",
+    "dressing_process_initiated",
+    "dressing_requested",
+    "dressing_stage_active",
+    "dressing_started",
+    "expected_task_duration_exceeded",
+    "explicit_validation_from_user",
+    "feedback_inconsistency_probability_ge_0p9",
+    "garment_already_worn",
+    "garment_detection_failed",
+    "garment_grip_expected",
+    "garment_location_query_issued",
+    "garment_movement_delay_detected",
+    "garment_presence_detected",
+    "gesture_command_detected",
+    "gesture_detected",
+    "gesture_detection_confidence_le_0p9",
+    "high_risk_command",
+    "interaction_interruption_required",
+    "lost_task_segmentation",
+    "pose_detected",
+    "pose_detection_requested",
+    "pose_update_required",
+    "potential_robot_user_collision",
+    "required_element_missing_or_unobservable_detected",
+    "required_pose_information_still_unavailable",
+    "required_pose_information_unavailable",
+    "risk_present",
+    "second_actor_detected",
+    "sensor_validation_complete",
+    "speech_commands_incomplete",
+    "task_behaviour_inconsistent",
+    "task_exception_detected",
+    "task_failure_condition",
+    "task_or_response_processing_in_progress",
+    "task_or_response_processing_started",
+    "task_started",
+    "task_time_bound_exceeded",
+    "trajectory_information_requested",
+    "unsuitable_user_pose_detected",
+    "user_confirmation_received",
+    "user_decision_change_probability_ge_0p9",
+    "user_input_correctly_interpreted",
+    "user_interaction_delay_detected",
+    "user_interaction_ongoing",
+    "user_interaction_required",
+    "user_interference",
+    "user_movement_detected",
+    "user_movement_tracked",
+    "user_moves_garment",
+    "user_out_of_range",
+    "user_override_attempt_probability_ge_0p9",
+    "user_pose_change_detected",
+    "user_removes_garment",
+    "user_speech_detected_during_audio_feedback",
+    "user_tracking_lost",
+    "vision_occluded",
+    "wrong_limb_probability_ge_0p9"
+  ],
+  "out_atoms": [
+    "able_to_restart_dressing_sequence",
+    "action_taken",
+    "advise_pose_improvement",
+    "alert_user",
+    "appropriate_user_input_requested",
+    "audio_feedback_stopped",
+    "command_intent_verified",
+    "confirm_command",
+    "confirm_steps_with_user",
+    "confirm_task_request",
+    "continue",
+    "corrective_action_applied",
+    "current_task_and_robot_motion_announced_to_user",
+    "current_task_status_provided",
+    "delay_reduction_behaviour_activated",
+    "dressing_actions_initiated",
+    "execution",
+    "exit_dressing_sequence",
+    "feedback_verified_using_multiple_sensing_modalities",
+    "fetch_item",
+    "garment_gripped",
+    "garment_movement_initiated",
+    "gesture_acted_upon",
+    "initiate_dressing_process",
+    "instructions_clear_and_unambiguous",
+    "interaction_recovery_initiated",
+    "issue_balance_assistance_query",
+    "long_or_infinite_processing_loop",
+    "monitor_user_attention",
+    "monitor_user_engagement",
+    "movement_initiated",
+    "multimodal_output_supported",
+    "multimodal_pose_detection_active",
+    "non_rigid_trajectory_active",
+    "notify_already_wearing_garment",
+    "notify_noise_confusion",
+    "notify_user",
+    "notify_user_of_detection_mode",
+    "pose_update_need_recognised",
+    "pose_update_recognition_delay_detected",
+    "process_continuing",
+    "process_starting",
+    "provide_assistance",
+    "query_second_person_presence",
+    "query_user_for_garment",
+    "remind_user_not_to_move_garment",
+    "remind_user_to_not_obstruct_camera_view",
+    "remind_user_to_remain_still",
+    "request_confirmation",
+    "request_garment_verification",
+    "request_suitable_pose",
+    "request_user_confirmation",
+    "request_validated",
+    "robot_initiated_interruption",
+    "task_continued",
+    "task_execution_initiated",
+    "task_initiation",
+    "task_paused",
+    "task_resumed",
+    "task_transitioned",
+    "timer_checks_active",
+    "track_user_position",
+    "trajectory_adjusted_to_user_position",
+    "trajectory_information_available",
+    "trajectory_information_delay_detected",
+    "update_garment_selection",
+    "updated_user_decision_confirmed",
+    "use_multiple_modalities",
+    "user_advised_to_present_correct_limb",
+    "user_assistance_requested",
+    "user_clarification_requested",
+    "user_confirmation_requested",
+    "user_gesture_confirmation_requested",
+    "user_informed_of_delay",
+    "user_interaction_initiated",
+    "user_interaction_initiated_successfully",
+    "user_interaction_supported",
+    "user_notified",
+    "user_notified_of_delay",
+    "user_notified_of_movement_delay",
+    "user_notified_of_pose_update_delay",
+    "user_notified_of_trajectory_delay",
+    "user_or_external_assistance_requested",
+    "user_position_estimate_updated",
+    "user_presence_validated_by_multiple_sensors",
+    "user_prompted_to_repeat_or_clarify_request",
+    "user_reminded_to_remain_seated",
+    "user_request_executed"
+  ],
+  "modes": [
+    "detection_mode",
+    "dressing_mode",
+    "task_execution"
+  ]
+}
