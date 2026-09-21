@@ -104,9 +104,13 @@ EvolutionResult run_evolution(
     const std::size_t col_best = status.add("best");
     // Only where the sweep below runs: a column that reads the same number
     // every generation because nothing measured it is worse than no column.
-    const std::optional<std::size_t> col_real =
-        accumulator.enabled() ? std::optional<std::size_t>(status.add("real"))
-                              : std::nullopt;
+    //
+    // A flag and a plain index rather than an optional index: gcc 11 at -O3
+    // reports the optional's payload as maybe-uninitialized inside the
+    // has_value() guard below, which -Werror turns into a failed build on the
+    // lab hosts.
+    const bool show_real = accumulator.enabled();
+    const std::size_t col_real = show_real ? status.add("real") : 0;
 
     auto format_elapsed = [](double secs) -> std::string {
         std::ostringstream oss;
@@ -169,10 +173,11 @@ EvolutionResult run_evolution(
         }
         const std::optional<std::size_t> n_real =
             accumulate_gate_passing(population, cfg, gen_idx + 1, accumulator);
-        // Both optionals are governed by accumulator.enabled(), so either
-        // test decides the other; the pair is what lets the checker see it.
-        if (col_real.has_value() && n_real.has_value()) {
-            status.set(*col_real, std::to_string(*n_real));
+        // n_real and show_real are both governed by accumulator.enabled(), so
+        // either test decides the other; the pair is what lets the checker
+        // see it.
+        if (show_real && n_real.has_value()) {
+            status.set(col_real, std::to_string(*n_real));
         }
         status.finish();
 
