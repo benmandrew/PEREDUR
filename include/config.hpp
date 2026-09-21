@@ -37,12 +37,11 @@ enum class SelectionScheme : std::uint8_t {
 /// log campaign (overall implies-ideal 68.8% vs 61.5%, decisively on fsm).
 enum class SimilarityMetric : std::uint8_t { Direct, Logarithmic };
 
-/// How TLSF repair searches. Monolithic (the default) evolves the whole
-/// specification at once. Muc repairs iteratively: it extracts a minimal
-/// unrealizable core, evolves only that sub-specification, reintegrates the
-/// repaired core with the untouched non-core guarantees, and repeats on the
-/// recombined spec until it is realizable (or the iteration cap trips). The
-/// mode is TLSF-only; the FRETISH path ignores it.
+/// How repair searches, on both front ends. Monolithic (the default) evolves
+/// the whole specification at once. Muc repairs iteratively: it extracts a
+/// minimal unrealizable core, evolves only that sub-specification, reintegrates
+/// the repaired core with the untouched non-core guarantees, and repeats on the
+/// recombined spec until it is realizable (or the iteration cap trips).
 enum class RepairMode : std::uint8_t { Monolithic, Muc };
 
 /// How the status objective grades the region below realizability. Tiered is
@@ -544,12 +543,23 @@ struct Config {
     /// argument recorded at tlsf_max_assumption_width.
     double tlsf_p_bare_assumption = 0.0;
 
-    /// TLSF repair strategy (see RepairMode). Muc mode caps its outer
+    /// Repair strategy (see RepairMode), read by both front ends despite the
+    /// `[tlsf]` section it lives in. Muc mode caps its outer
     /// extract-repair-reintegrate loop at muc_max_iterations, so a spec whose
     /// core never becomes realizable ends the run without a repair rather than
     /// looping forever.
     RepairMode repair_mode = RepairMode::Monolithic;
     std::size_t muc_max_iterations = 32;
+    /// FRETISH muc mode only: the largest guarantee subset its core screen
+    /// asks about. Cores of up to this many guarantees are found by asking
+    /// every such subset, concurrently, before QuickXplain walks the whole
+    /// specification; and where the whole specification's realizability is
+    /// undecided, the screen is all the loop asks, a reintegrated repair the
+    /// gate cannot judge being written as provisional only when every subset
+    /// this size or smaller is decided realizable. The cost is the number of
+    /// subsets, which grows as n^k: on a 114-guarantee specification the pairs
+    /// took 11s and the triples 433s.
+    std::size_t muc_screen_depth = 3;
     /// Scoring thread pool size. The default is available_parallelism(), which
     /// is the hardware concurrency narrowed by the CPU affinity mask and the
     /// cgroup CPU quota where those apply -- so a containerised run is sized by

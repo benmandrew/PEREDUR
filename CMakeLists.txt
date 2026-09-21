@@ -194,6 +194,7 @@ add_executable(peredur
     src/repair/driver.cpp
     src/repair/evolution.cpp
     src/repair/manifest.cpp
+    src/repair/muc_mode.cpp
     src/repair/reports.cpp
 )
 target_link_libraries(peredur PRIVATE peredur_fitness cpptrace::cpptrace)

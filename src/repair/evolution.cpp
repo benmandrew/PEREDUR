@@ -307,10 +307,13 @@ finish_maximal_stream(StreamingMaximalFilter<Specification>& stream,
 void write_specifications(
     const std::vector<ScoredSpecification>& scored,
     const AggregateWeightedFitnessFunction& fitness_function,
-    const std::string& output_dir) {
+    const std::string& output_dir, const std::string& prefix) {
     for (std::size_t i = 0; i < scored.size(); ++i) {
-        const std::string path =
-            output_dir + "/repair_" + std::to_string(i) + ".json";
+        std::string path = output_dir;
+        path += "/";
+        path += prefix;
+        path += std::to_string(i);
+        path += ".json";
         std::ofstream file(path);
         if (!file) {
             throw std::runtime_error("cannot open output file: " + path);

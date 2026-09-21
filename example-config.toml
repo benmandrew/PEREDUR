@@ -102,11 +102,12 @@ p_conditional_assumption = 0.25
 p_remove_guarantee       = 0.05
 
 [tlsf]
-# TLSF mode only (a .tlsf input or --format tlsf). A FRETISH run carrying any
-# value but "monolithic" exits 1, rather than evolving monolithically under a
-# manifest that records "muc".
+# Read by both front ends, despite the section name.
 repair_mode        = "monolithic"  # or "muc"
 muc_max_iterations = 32            # muc mode only
+# FRETISH muc mode only: the largest guarantee subset the core screen asks
+# about, and the depth a provisional repair must screen clean to.
+muc_screen_depth   = 3
 
 [tlsf.mutation]
 p_assumption = 0.3

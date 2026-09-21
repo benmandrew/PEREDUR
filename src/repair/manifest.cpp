@@ -24,6 +24,7 @@
 #include "fitness/function.hpp"
 #include "fitness/semantic_similarity.hpp"
 #include "genetic/accumulator.hpp"
+#include "muc_mode.hpp"
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
 #include "runner/ltlfilt.hpp"
@@ -176,7 +177,13 @@ namespace {
 // 29 added mutation.p_stop, the FRETISH arm rewriting the stop condition of an
 // `until` or `before` timing. It draws nothing on a specification without one,
 // so an earlier run's search is what it would have been at any value.
-constexpr int k_schema_version = 29;
+//
+// 30 added n_provisional and n_gate_undecided, both from FRETISH muc repair
+// mode, which this version also enabled (FRETISH runs carrying
+// tlsf.repair_mode = "muc" exited 1 before it), and tlsf.muc_screen_depth.
+// Both read 0 on every monolithic run and every TLSF run, so an earlier
+// manifest missing them means 0.
+constexpr int k_schema_version = 30;
 
 std::string utc_timestamp() {
     const std::time_t now =
@@ -402,6 +409,11 @@ void write_run_manifest(const std::string& output_dir,
         // repair happened to survive to the last generation, so it is read
         // against the config key rather than on its own.
         {"n_accumulated_repairs", AccumulatorStats::n_contributed},
+        // FRETISH muc mode: provisional_N.json files written, which n_repairs
+        // never counts, and the gate checks behind them whose whole-spec
+        // realizability query never answered.
+        {"n_provisional", MucStats::n_provisional},
+        {"n_gate_undecided", MucStats::n_gate_undecided},
         // ltlsynt calls that reported SPOT's acceptance-set ceiling rather than
         // a verdict, resolved as undecided rather than ending the run.
         {"n_ltlsynt_capability_errors",

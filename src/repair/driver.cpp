@@ -25,6 +25,7 @@
 #include "genetic/output_gate.hpp"
 #include "genetic/random_source.hpp"
 #include "manifest.hpp"
+#include "muc_mode.hpp"
 #include "profile.hpp"
 #include "reports.hpp"
 #include "requirement.hpp"
@@ -120,15 +121,6 @@ int run_tlsf_repair(const Config& cfg, const std::string& input_path,
 int run_fretish_repair(const Config& cfg, const std::string& input_path,
                        const std::string& output_dir,
                        const std::optional<std::size_t>& seed) {
-    // Rejected rather than ignored. Only the TLSF path reads repair_mode, so a
-    // FRETISH run carrying this key used to evolve monolithically while its
-    // manifest recorded "muc", which makes an archived run say what it did not
-    // do.
-    if (cfg.repair_mode != RepairMode::Monolithic) {
-        std::cerr << "fatal: [tlsf] repair_mode is TLSF-only; this input is "
-                     "FRETISH JSON\n";
-        return 1;
-    }
     Specification original_spec;
     try {
         original_spec = load_specification(input_path);
@@ -206,19 +198,32 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
                 stream->push(spec, name);
             };
         }
-        EvolutionResult evolved = run_evolution(
-            cfg, std::move(population), fitness_function, filter_functions,
-            random_source, dashboard, output_dir, budget, std::move(sink));
-        population = std::move(evolved.population);
-        std::vector<FilterRunStats> filter_stats =
-            std::move(evolved.filter_stats);
-        std::vector<Specification> realizable_vec =
-            collect_realizable_specifications(cfg, population);
+        std::vector<FilterRunStats> filter_stats;
+        std::vector<Specification> realizable_vec;
+        std::vector<Specification> accumulated;
+        std::vector<Specification> provisional;
+        if (cfg.repair_mode == RepairMode::Muc) {
+            MucRepairResult muc =
+                run_fretish_muc(cfg, original_spec, random_source, dashboard,
+                                output_dir, budget, std::move(sink));
+            filter_stats = std::move(muc.filter_stats);
+            realizable_vec = std::move(muc.repairs);
+            accumulated = std::move(muc.accumulated);
+            provisional = std::move(muc.provisional);
+        } else {
+            EvolutionResult evolved = run_evolution(
+                cfg, std::move(population), fitness_function, filter_functions,
+                random_source, dashboard, output_dir, budget, std::move(sink));
+            population = std::move(evolved.population);
+            filter_stats = std::move(evolved.filter_stats);
+            realizable_vec = collect_realizable_specifications(cfg, population);
+            accumulated = std::move(evolved.accumulated);
+        }
         // The accumulated candidates passed this same gate in the generation
         // they were collected in, so they are merged rather than re-checked;
         // the final filters below screen the union as one set.
         AccumulatorStats::n_contributed +=
-            merge_accumulated(realizable_vec, evolved.accumulated);
+            merge_accumulated(realizable_vec, accumulated);
         auto [maximal, final_filter_stats] =
             stream ? finish_maximal_stream(*stream, realizable_vec)
                    : filter_maximal_specifications(cfg, original_spec,
@@ -226,6 +231,14 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
         const std::vector<ScoredSpecification> scored_maximal =
             score_and_sort_specifications(cfg, maximal, fitness_function);
         write_specifications(scored_maximal, fitness_function, output_dir);
+        // Apart from the repairs and after them: a provisional specification
+        // is one no whole-spec query confirmed, so it takes no part in the
+        // maximality screen and is never numbered among repair_N.
+        const std::vector<ScoredSpecification> scored_provisional =
+            score_and_sort_specifications(cfg, provisional, fitness_function);
+        write_specifications(scored_provisional, fitness_function, output_dir,
+                             "provisional_");
+        MucStats::n_provisional = scored_provisional.size();
         std::cout << "Realizable specifications: " << realizable_vec.size();
         if (cfg.run_implication_filter) {
             std::cout << " (" << maximal.size() << " maximal)";
@@ -236,6 +249,11 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
             std::cout << ", written to " << output_dir << "/";
         }
         std::cout << "\n";
+        if (!scored_provisional.empty()) {
+            std::cout << "Provisional specifications: "
+                      << scored_provisional.size() << ", written to "
+                      << output_dir << "/provisional_N.json\n";
+        }
         dashboard.run_end(budget.generations(), realizable_vec.size(),
                           maximal.size(), seconds_since(wall_start));
         filter_stats.insert(filter_stats.end(), final_filter_stats.begin(),

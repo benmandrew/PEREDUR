@@ -210,6 +210,7 @@ DEFAULT_FIELDS = {
     "mutation.p_remove_guarantee": "p_remove_guarantee",
     "mutation.p_conditional_assumption": "p_conditional_assumption",
     "tlsf.muc_max_iterations": "muc_max_iterations",
+    "tlsf.muc_screen_depth": "muc_screen_depth",
     "tlsf.mutation.p_assumption": "tlsf_p_assumption",
     "tlsf.mutation.p_temporal": "tlsf_p_temporal",
     "tlsf.mutation.p_clone_assumption": "tlsf_p_clone_assumption",

@@ -22,7 +22,7 @@ Algorithm flow
 
 7. **Score, sort, and write** each surviving spec to the output directory — ``repair_N.json`` on the FRETISH path, ``repair_N.tlsf`` on the TLSF path, each paired with a ``repair_N.fitness.json`` holding its score.
 
-On the TLSF path, step 4 has a second mode. ``[tlsf] repair_mode = "muc"`` replaces the single whole-spec search with a loop that extracts a *minimal unrealisable core*, evolves only that sub-specification, and reintegrates the repaired core with the untouched non-core guarantees. :doc:`tlsf` describes it.
+Step 4 has a second mode on both paths. ``[tlsf] repair_mode = "muc"`` replaces the single whole-spec search with a loop that extracts a *minimal unrealisable core*, evolves only that sub-specification, and reintegrates the repaired core with the untouched non-core guarantees. :doc:`tlsf` describes it.
 
 The generation pipeline
 -----------------------

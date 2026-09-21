@@ -71,7 +71,8 @@ std::pair<std::vector<Specification>, std::vector<FilterRunStats>>
 finish_maximal_stream(StreamingMaximalFilter<Specification>& stream,
                       const std::vector<Specification>& realizable_vec);
 
+// Writes each of @p scored to `<output_dir>/<prefix>N.json`, N its position.
 void write_specifications(
     const std::vector<ScoredSpecification>& scored,
     const AggregateWeightedFitnessFunction& fitness_function,
-    const std::string& output_dir);
+    const std::string& output_dir, const std::string& prefix = "repair_");

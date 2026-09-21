@@ -44,7 +44,7 @@ struct ConfigKey {
 // more than one. A new key also needs schemas/config-schema.json and
 // example-config.toml; scripts/check_config_schema.py reads this table to hold
 // them to it.
-inline constexpr std::array<ConfigKey, 43> k_config_keys{{
+inline constexpr std::array<ConfigKey, 44> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive},
     {"genetic", "population_size", &Config::population_size,
      KeyCheck::Positive},
@@ -114,6 +114,7 @@ inline constexpr std::array<ConfigKey, 43> k_config_keys{{
     {"tlsf", "repair_mode", &Config::repair_mode, KeyCheck::None},
     {"tlsf", "muc_max_iterations", &Config::muc_max_iterations,
      KeyCheck::Positive},
+    {"tlsf", "muc_screen_depth", &Config::muc_screen_depth, KeyCheck::Positive},
 }};
 
 // The table names along a dotted section, outermost first.

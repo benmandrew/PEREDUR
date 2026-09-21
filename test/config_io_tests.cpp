@@ -364,6 +364,21 @@ TEST(test_config_io_muc_max_iterations_nonpositive_throws) {
         "config_io: muc_max_iterations = 0 should throw");
 }
 
+TEST(test_config_io_muc_screen_depth_parsed) {
+    const Config cfg =
+        config_from_toml_string("[tlsf]\nmuc_screen_depth = 2\n");
+    expect(cfg.muc_screen_depth == 2,
+           "config_io: tlsf.muc_screen_depth should be parsed");
+    expect(Config{}.muc_screen_depth == 3,
+           "config_io: tlsf.muc_screen_depth defaults to 3");
+}
+
+TEST(test_config_io_muc_screen_depth_nonpositive_throws) {
+    expect_throws(
+        [&] { config_from_toml_string("[tlsf]\nmuc_screen_depth = 0\n"); },
+        "config_io: muc_screen_depth = 0 should throw");
+}
+
 // Every key k_config_keys declares, none of which may warn "unknown key". A
 // key absent from this TOML is not covered, so a new key belongs here as well
 // as in src/config/keys.hpp.
@@ -396,6 +411,7 @@ p_monotone               = 0.25
 [tlsf]
 repair_mode        = "muc"
 muc_max_iterations = 32
+muc_screen_depth   = 2
 
 [tlsf.mutation]
 p_assumption       = 0.3

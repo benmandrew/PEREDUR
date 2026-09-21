@@ -64,8 +64,9 @@
             "p_bare_assumption": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.0, "description": "Probability that an appended unconditional assumption is left as F body rather than wrapped as G F body. Every appended assumption was G-wrapped before 2026-08-25, which made a bare eventuality unreachable rather than unlikely: examples/lily11's whole ideal is F req, and G F req is strictly stronger. Read before the RandomSource is touched, so 0 costs no draw. It defaults to 0, off until experiments/assumption-reach decides it, the case for a positive value being argued rather than measured." }
           }
         },
-        "repair_mode": { "type": "string", "enum": ["monolithic", "muc"], "default": "monolithic", "description": "Repair strategy: 'monolithic' (default) evolves the whole specification at once; 'muc' extracts a minimal unrealizable core, evolves only that sub-specification, reintegrates it with the untouched non-core guarantees, and repeats." },
-        "muc_max_iterations": { "type": "integer", "minimum": 1, "description": "muc mode only: cap on the outer extract-repair-reintegrate loop." }
+        "repair_mode": { "type": "string", "enum": ["monolithic", "muc"], "default": "monolithic", "description": "Repair strategy, on both front ends: 'monolithic' (default) evolves the whole specification at once; 'muc' extracts a minimal unrealizable core, evolves only that sub-specification, reintegrates it with the untouched non-core guarantees, and repeats." },
+        "muc_max_iterations": { "type": "integer", "minimum": 1, "description": "muc mode only: cap on the outer extract-repair-reintegrate loop." },
+        "muc_screen_depth": { "type": "integer", "minimum": 1, "default": 3, "description": "FRETISH muc mode only: the largest guarantee subset the core screen asks about before QuickXplain, and the depth to which a reintegrated repair whose whole-spec realizability is undecided must screen clean to be written as provisional. The subset count grows as n^k." }
       }
     },
     "model_counting": {

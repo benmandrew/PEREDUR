@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <string>
 #include <utility>
@@ -9,6 +10,7 @@
 #include <nlohmann/json.hpp>
 
 #include "runner/process.hpp"
+#include "runner/spot.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
 
@@ -114,6 +116,45 @@ const char* const k_fretish_weaker = R"({
   ],
   "in_atoms": [],
   "out_atoms": ["takeoff_roll", "lift_off"]
+}
+)";
+
+// Unrealizable through one pair, {1, 2}, which asks `grant` both ways whenever
+// `req` holds; guarantee 0 is innocent. What MUC repair mode is for, at a size
+// ltlsynt decides in milliseconds.
+const char* const k_fretish_conflict = R"({
+  "assumptions": [],
+  "guarantees": [
+    {"condition": "true", "condition-type": "continual", "response": "ok",
+     "timing": {"type": "Immediately"}},
+    {"condition": "req", "condition-type": "continual", "response": "grant",
+     "timing": {"type": "Immediately"}},
+    {"condition": "req", "condition-type": "continual", "response": "!grant",
+     "timing": {"type": "Immediately"}}
+  ],
+  "in_atoms": ["req"],
+  "out_atoms": ["grant", "ok"]
+}
+)";
+
+// Unrealizable through guarantee 1 alone, which asks the system to drive its
+// input. The two locked guarantees name the markers a stand-in ltlsynt below
+// keys on: any query holding both is left to time out, so every whole
+// specification goes undecided while each single guarantee is decided.
+const char* const k_fretish_marked = R"({
+  "assumptions": [],
+  "guarantees": [
+    {"condition": "true", "condition-type": "continual",
+     "response": "okay_sig", "timing": {"type": "Immediately"},
+     "weakenable": false},
+    {"condition": "true", "condition-type": "continual", "response": "req",
+     "timing": {"type": "Immediately"}},
+    {"condition": "true", "condition-type": "continual",
+     "response": "fine_sig", "timing": {"type": "Immediately"},
+     "weakenable": false}
+  ],
+  "in_atoms": ["req"],
+  "out_atoms": ["grant", "okay_sig", "fine_sig"]
 }
 )";
 
@@ -318,6 +359,122 @@ TEST_IN("driver_peredur", test_peredur_repairs_fretish) {
         expect(nlohmann::json::parse(read_text(repair)).contains("guarantees"),
                "peredur: each repair parses as a specification");
     }
+}
+
+// Files named `<prefix>N.json` in @p dir.
+std::size_t count_numbered(const std::filesystem::path& dir,
+                           const std::string& prefix) {
+    std::size_t count = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        const std::string name = entry.path().filename().string();
+        if (name.rfind(prefix, 0) == 0 && entry.path().extension() == ".json") {
+            ++count;
+        }
+    }
+    return count;
+}
+
+TEST_IN("driver_peredur", test_peredur_fretish_muc_repairs) {
+    const TempDir dir("e2e_peredur_fretish_muc");
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish_conflict).string();
+    const std::string config =
+        write_text(dir.path() / "config.toml",
+                   std::string(k_config) + "\n[tlsf]\nrepair_mode = \"muc\"\n")
+            .string();
+    const std::filesystem::path out = dir.path() / "out";
+    std::filesystem::create_directories(out);
+
+    const DriverRun run =
+        run_driver("peredur", {"--input", input, "--output-dir", out.string(),
+                               "--config", config, "--seed", "1"});
+    expect(run.m_exit_code == 0, "peredur: a FRETISH muc run exits zero");
+    expect(contains(run.m_output, "core of 2 guarantee(s), slots {1, 2}"),
+           "peredur: the muc run finds the pair core");
+    const nlohmann::json manifest =
+        expect_run_manifest(out, input, 1, "peredur/fretish-muc");
+    expect(manifest.at("config").at("tlsf").at("repair_mode") == "muc",
+           "peredur: the manifest records the mode the run used");
+    expect(manifest.at("n_repairs").get<std::size_t>() >= 1,
+           "peredur: the muc run confirms a repair of the whole spec");
+    expect(manifest.at("n_provisional").get<std::size_t>() == 0 &&
+               count_numbered(out, "provisional_") == 0,
+           "peredur: every gate check decided, so nothing is provisional");
+}
+
+// Clears the variable however the test leaves.
+class ScopedEnv {
+   public:
+    ScopedEnv(const char* name, const std::string& value) : m_name(name) {
+        setenv(m_name, value.c_str(), 1);
+    }
+    ~ScopedEnv() { unsetenv(m_name); }
+
+    ScopedEnv(const ScopedEnv&) = delete;
+    ScopedEnv& operator=(const ScopedEnv&) = delete;
+    ScopedEnv(ScopedEnv&&) = delete;
+    ScopedEnv& operator=(ScopedEnv&&) = delete;
+
+   private:
+    const char* m_name;
+};
+
+TEST_IN("driver_peredur", test_peredur_fretish_muc_undecided_is_provisional) {
+    const TempDir dir("e2e_peredur_fretish_provisional");
+    // SPOT's own tools, but an ltlsynt that never answers a query naming both
+    // markers. `exec` so the budget's kill reaches the sleep itself.
+    const std::filesystem::path fake = dir.path() / "spot";
+    std::filesystem::create_directories(fake);
+    const std::filesystem::path real = spot_bin_dir();
+    for (const auto& entry : std::filesystem::directory_iterator(real)) {
+        if (entry.path().filename() != "ltlsynt") {
+            std::filesystem::create_symlink(entry.path(),
+                                            fake / entry.path().filename());
+        }
+    }
+    const std::filesystem::path ltlsynt = write_text(
+        fake / "ltlsynt",
+        "#!/bin/sh\n"
+        "for arg in \"$@\"; do\n"
+        "  case \"$arg\" in *okay_sig*) case \"$arg\" in *fine_sig*)\n"
+        "    exec sleep 60;; esac;; esac\n"
+        "done\n"
+        "exec " +
+            (real / "ltlsynt").string() + " \"$@\"\n");
+    std::filesystem::permissions(ltlsynt, std::filesystem::perms::owner_exec,
+                                 std::filesystem::perm_options::add);
+    const ScopedEnv spot_dir("PEREDUR_SPOT_BIN_DIR", fake.string());
+
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish_marked).string();
+    const std::string config =
+        write_text(dir.path() / "config.toml",
+                   "[genetic]\ngenerations = 2\npopulation_size = 8\n\n"
+                   "[runtime]\nparallel = 1\nltlsynt_timeout_ms = 1000\n\n"
+                   "[tlsf]\nrepair_mode = \"muc\"\nmuc_screen_depth = 1\n")
+            .string();
+    const std::filesystem::path out = dir.path() / "out";
+    std::filesystem::create_directories(out);
+
+    const DriverRun run =
+        run_driver("peredur", {"--input", input, "--output-dir", out.string(),
+                               "--config", config, "--seed", "1"});
+    expect(run.m_exit_code == 0, "peredur: an undecided muc run exits zero");
+    const nlohmann::json manifest =
+        nlohmann::json::parse(read_text(out / "run.json"));
+    expect(manifest.at("n_repairs").get<std::size_t>() == 0 &&
+               repair_files(out).empty(),
+           "peredur: no whole-spec check answered, so nothing is a repair");
+    expect(manifest.at("n_gate_undecided").get<std::size_t>() >= 1,
+           "peredur: the undecided gate checks are counted");
+    const std::size_t n_provisional =
+        manifest.at("n_provisional").get<std::size_t>();
+    expect(n_provisional >= 1 &&
+               count_numbered(out, "provisional_") == n_provisional,
+           "peredur: a clean-screened repair is written as provisional");
+    expect(nlohmann::json::parse(read_text(out / "provisional_0.json"))
+               .contains("guarantees"),
+           "peredur: a provisional file parses as a specification");
 }
 
 TEST_IN("driver_peredur", test_peredur_rejects_bad_arguments) {
