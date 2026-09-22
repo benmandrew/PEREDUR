@@ -60,13 +60,13 @@ The archive spent 457.9 wall-hours over 780 runs, median 329.2 s, split across t
 
 The un-censoring moves that estimate one way only: a run killed at 7500 s cost 7500 s in the archive too, so the six censored families are already priced at the cap. Total is about 46 wall-hours.
 
-## 8. Scoring passes
+## 8. Scoring is a separate campaign
 
-Four `kind = "score"` phases, the budgets copied unchanged from `2026-09-14-paper-rerun-curves` so both arms reduce through one scorer.
+The scoring tooling -- the `fingerprint` binary, `score_curves.py --epsilon` and the running-antichain `maximal --curve` -- exists only on `campaign/paper-rerun-curves`, which has not merged into `main`. This campaign's branch is off `main`, so its `score` phases cannot be declared here, and the search does not wait on that port.
 
-The separation pass runs first, over all gate-passing candidates at epsilon 0.05, 0.2 and 0.5 with 256 *fingerprint words* and fingerprint seed 0; it makes no solver call. The maximality-with-ideals pass follows at `maximal_timeout` 900 and `compare_timeout` 3000. The PEREDUR side is re-scored rather than reused, because the archived PEREDUR curves were written by the scorer at that campaign's commit and a comparison wants one scorer on both sides.
+`scripts/aurus_adapt.py` runs at the end of the AuRUS phase and materialises the arm as run directories named `aurus_<spec>_seed<NN>`, which is what the scorer's seed split and its resume already key on. The scoring campaign is declared afterwards, off the curves branch, as a campaign of `score` phases alone pointing at that directory.
 
-`scripts/aurus_adapt.py` materialises the arm as run directories named `aurus_<spec>_seed<NN>`, which the scorer's seed split and resume already key on. It runs inside the AuRUS phase, since the tree is scorable only once every repeat of a host's split has written.
+Its budgets are `2026-09-14-paper-rerun-curves`'s unchanged, so both arms reduce through one scorer: separation over all gate-passing candidates at epsilon 0.05, 0.2 and 0.5 with 256 *fingerprint words* and fingerprint seed 0, then maximality with ideals at `maximal_timeout` 900 and `compare_timeout` 3000. The PEREDUR side is re-scored rather than reused, a comparison wanting one scorer on both sides.
 
 ## 9. What the paper regenerates
 

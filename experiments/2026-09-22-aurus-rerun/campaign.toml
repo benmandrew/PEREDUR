@@ -1,0 +1,40 @@
+# The AuRUS baseline arm, re-run at the fork that does not lose its output.
+#
+# No PEREDUR search runs here. That arm is 2026-09-14-paper-rerun's, closed on
+# 2026-09-18 at current main, and nothing in this campaign touches it.
+#
+# The archive this replaces was launched by hand from an ssh line off
+# 2026-08-14-aurus-h2h/PLAN.md section 8, and 173 of its 780 runs (22.2%) were
+# killed at the 7200 s cap and lost every solution they had found. Six families
+# carry 172 of those kills and three of them lost all 30 repeats. `e1cfadf`
+# writes each solution as it is found and dates it to the microsecond, so a
+# capped run now keeps what it found. See PLAN.md.
+#
+# AuRUS is a separate tool in a separate repository and `stage` does not build
+# it. Both hosts hold ~/projects/tools/aurus-timeout at e1cfadf, built, with a
+# Linux Strix binary over the macOS one the upstream commit tracks; `stage`
+# checks the commit and refuses a host that disagrees.
+name = "2026-09-22-aurus-rerun"
+branch = "feat/aurus-rerun"
+
+# The archive's split, which is also what the scoring pass will read: a repeat
+# stands where a seed does, AuRUS being unseedable.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+[[phases]]
+kind = "aurus"
+out = "experiments/aurus-rerun-out"
+aurus_root = "~/projects/tools/aurus-timeout"
+aurus_commit = "e1cfadf"
+gato = 7200
+# A Java virtual machine reserves 8 GB of heap and holds about one core, so
+# memory bounds this rather than the host's 32 cores. Held at the archive's
+# value; peak_rss_mb per run is now recorded, which is what a later decision
+# to raise it would read.
+concurrency = 10
+spot_bin = "build-release/third_party/spot/bin"
+# Materialised as PEREDUR-shaped run directories once every repeat of this
+# host's split has written, so the scoring campaign that follows has a results
+# directory to point at. Scoring is a separate campaign: its tooling is on
+# campaign/paper-rerun-curves, which has not merged.
+adapt = "experiments/results-aurus-rerun"
