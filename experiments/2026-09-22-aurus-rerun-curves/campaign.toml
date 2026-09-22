@@ -1,0 +1,68 @@
+# The scoring passes over 2026-09-22-aurus-rerun's AuRUS arm.
+#
+# No search runs here, and no PEREDUR run directory is read. That arm was
+# scored by 2026-09-14-paper-rerun-curves at this same branch point, 1500
+# curves a host in each of experiments/curves-paper-rerun and
+# experiments/separation-paper-rerun, so re-scoring it would repeat one
+# scorer's work on unchanged inputs. Reusing those is what makes the two arms
+# comparable: they and these come from the same binaries at the same budgets.
+#
+# What is new is the AuRUS side. 2026-09-22-aurus-rerun re-ran the baseline at
+# fork commit e1cfadf, which writes each solution as it is found instead of
+# dumping the list after the search loop, so the 173 of 780 runs that the
+# 2026-08-14 archive lost at the 7200 s cap now keep what they found. Its
+# aurus phase leaves the adapted tree at experiments/results-aurus-rerun on
+# each host, one run directory per (family, repeat) for that host's split.
+#
+# The output directories are named for the un-censoring rather than reusing
+# experiments/curves-aurus-rerun and experiments/separation-aurus-rerun, which
+# already hold 2026-09-14-paper-rerun-curves' pass over the OLD archive on
+# both hosts. Writing into those would merge two different AuRUS vintages into
+# one set of curves with nothing to tell them apart.
+#
+# This campaign is declared on the curves branch and not on main: the
+# fingerprint binary, score_curves.py --epsilon and the running-antichain
+# maximal --curve exist only here.
+name = "2026-09-22-aurus-rerun-curves"
+branch = "campaign/aurus-rerun-curves"
+
+# The search campaign's split, which is also the split its adapter wrote: each
+# host scores only the repeats it ran.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+# Separation first, since it makes no solver call and costs minutes. The word
+# count, seed and epsilon list are 2026-09-14-paper-rerun-curves' and must stay
+# so: a fingerprint compares only against one drawn from an identical sampling,
+# and the PEREDUR curves this is read against were drawn with these.
+
+[[phases]]
+name = "separation-aurus"
+kind = "score"
+results = "experiments/results-aurus-rerun"
+out = "experiments/separation-aurus-uncensored"
+workers = 8
+cores = 1
+maximality = "off"
+ideals = "off"
+epsilon = "0.05,0.2,0.5"
+fingerprint_words = 256
+fingerprint_seed = 0
+cuts = 20
+compare_timeout = 600
+deadline_s = 900
+wall_cap_s = 1200
+
+# Maximality with ideals, at the budget 2026-09-14-paper-rerun-curves gave both
+# of its arms.
+
+[[phases]]
+name = "maximality-aurus"
+kind = "score"
+results = "experiments/results-aurus-rerun"
+out = "experiments/curves-aurus-uncensored"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 3000
+deadline_s = 7500
