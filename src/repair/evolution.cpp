@@ -167,18 +167,17 @@ EvolutionResult run_evolution(
             oss << std::fixed << std::setprecision(3) << summary.best;
             status.set(col_best, oss.str());
         }
-        const std::optional<std::size_t> n_real =
+        const std::size_t n_gate_passing =
             accumulate_gate_passing(population, cfg, gen_idx + 1, accumulator);
-        // Both optionals are governed by accumulator.enabled(), so either
-        // test decides the other; the pair is what lets the checker see it.
-        //
-        // Read through value_or rather than dereferenced: gcc 11 cannot
-        // correlate the engaged flag with the payload across the explicit
-        // instantiation's return, so `*n_real` raises -Wmaybe-uninitialized
-        // and -Werror fails the lab hosts' build. The guard above already
-        // decides this, so the fallback is never taken.
-        if (col_real.has_value() && n_real.has_value()) {
-            status.set(*col_real, std::to_string(n_real.value_or(0)));
+        // col_real is engaged on exactly the condition the count was taken
+        // under, so it decides both the column and whether the dashboard is
+        // told a number at all.
+        const std::optional<std::size_t> n_real =
+            col_real.has_value()
+                ? std::optional<std::size_t>(n_gate_passing)
+                : std::nullopt;
+        if (col_real.has_value()) {
+            status.set(*col_real, std::to_string(n_gate_passing));
         }
         status.finish();
 
