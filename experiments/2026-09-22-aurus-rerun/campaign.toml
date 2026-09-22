@@ -28,10 +28,11 @@ aurus_root = "~/projects/tools/aurus-timeout"
 aurus_commit = "e1cfadf"
 gato = 7200
 # A Java virtual machine reserves 8 GB of heap and holds about one core, so
-# memory bounds this rather than the host's 32 cores. Held at the archive's
-# value; peak_rss_mb per run is now recorded, which is what a later decision
-# to raise it would read.
-concurrency = 10
+# memory bounds this rather than the host's 32 cores. 14 is the largest value
+# that stays under both: 112 GB of the 122 GB free, and 14-20 of 32 cores.
+# The archive ran 10 and took 22.9 h a host; this is 16.4 h. peak_rss_mb per
+# run is now recorded, which is what a decision to go higher would read.
+concurrency = 14
 spot_bin = "build-release/third_party/spot/bin"
 # Materialised as PEREDUR-shaped run directories once every repeat of this
 # host's split has written, so the scoring campaign that follows has a results

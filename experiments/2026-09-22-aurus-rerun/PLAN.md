@@ -52,11 +52,11 @@ Per-family numbers and the contrast against the archive are secondary and carry 
 - **The PEREDUR arm is four days older than this one.** Its binary is `2026-09-14-paper-rerun`'s and is not rebuilt here. Commits landing on `main` between the two do not enter the comparison, and the arms therefore differ in date as well as tool. `PROVENANCE.json` records both commits.
 - **The six censored families dominate whatever moves.** 172 of 173 recovered runs sit there, so a swing on the primary is those families and must be reported per family rather than pooled.
 - **AuRUS's repeats do not pair with the archive's.** `Math.random()` is unseeded, so a family's 30 repeats are a fresh sample and a per-repeat diff against 2026-08-14 means nothing.
-- **Concurrency is a memory bound and is being held at the archive's 10.** A JVM reserves 8 GB of heap and holds about one core, measured at 1.0–1.4 cores a run with Strix single-threaded, so 32 cores are not the constraint. Raising it is a separate change and is not made here. `aurus_results.csv` now records `peak_rss_mb` per run, which is what a later decision would read.
+- **Concurrency is a memory bound and runs at 14 against the archive's 10.** A JVM reserves 8 GB of heap and holds about one core, measured at 1.0–1.4 cores a run with Strix single-threaded, so 32 cores are not the constraint. 14 reserves 112 GB of the 122 GB free and uses 14–20 cores, which is the largest value under both bounds without knowing the real peak. `aurus_results.csv` now records `peak_rss_mb` per run, which is what a decision to go higher would read. Wall time is not an endpoint here, so this changes cost alone.
 
 ## 7. Budget
 
-The archive spent 457.9 wall-hours over 780 runs, median 329.2 s, split across two hosts at concurrency 10. At the same concurrency this arm costs about 23 h a host, and the fork's extra writing is one file and one CSV row per solution.
+The archive spent 457.9 wall-hours over 780 runs, median 329.2 s, split across two hosts at concurrency 10, which is 22.9 h a host. At 14 the same work is 16.4 h a host, and the fork's extra writing is one file and one CSV row per solution.
 
 The un-censoring moves that estimate one way only: a run killed at 7500 s cost 7500 s in the archive too, so the six censored families are already priced at the cap. Total is about 46 wall-hours.
 
