@@ -66,7 +66,15 @@ The scoring tooling -- the `fingerprint` binary, `score_curves.py --epsilon` and
 
 `scripts/aurus_adapt.py` runs at the end of the AuRUS phase and materialises the arm as run directories named `aurus_<spec>_seed<NN>`, which is what the scorer's seed split and its resume already key on. The scoring campaign is declared afterwards, off the curves branch, as a campaign of `score` phases alone pointing at that directory.
 
-Its budgets are `2026-09-14-paper-rerun-curves`'s unchanged, so both arms reduce through one scorer: separation over all gate-passing candidates at epsilon 0.05, 0.2 and 0.5 with 256 *fingerprint words* and fingerprint seed 0, then maximality with ideals at `maximal_timeout` 900 and `compare_timeout` 3000. The PEREDUR side is re-scored rather than reused, a comparison wanting one scorer on both sides.
+Its budgets are `2026-09-14-paper-rerun-curves`'s unchanged, so both arms reduce through one scorer: separation over all gate-passing candidates at epsilon 0.05, 0.2 and 0.5 with 256 *fingerprint words* and fingerprint seed 0, then maximality with ideals at `maximal_timeout` 900 and `compare_timeout` 3000.
+
+### Amendment, 2026-09-22, after the search was enqueued and before any curve existed
+
+The AuRUS arm alone is scored. This section first said the PEREDUR side would be re-scored so that one scorer read both arms, and it is reused instead.
+
+The reason is that the condition already holds. The scoring campaign is declared on `campaign/aurus-rerun-curves`, branched from `campaign/paper-rerun-curves` at the commit that scored PEREDUR on 2026-09-16, and it changes no scoring source. Both hosts still hold that pass, 1500 curves each in `experiments/curves-paper-rerun` and 1500 in `experiments/separation-paper-rerun`, which is the full 3000-run design. Re-running identical binaries at identical budgets over unchanged run directories would spend several hundred worker-hours to reproduce files that are already there.
+
+The output directories are `separation-aurus-uncensored` and `curves-aurus-uncensored`, not the `*-aurus-rerun` pair, which on both hosts holds the earlier pass over the censored archive.
 
 ## 9. What the paper regenerates
 
