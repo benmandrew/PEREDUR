@@ -156,6 +156,10 @@ RUNNER_CMD = os.environ.get("PEREDUR_RUNNER_CMD",
 # a stub exactly as a run phase is.
 SCORER_CMD = os.environ.get("PEREDUR_SCORER_CMD",
                             f"{REMOTE_PYTHON} scripts/score_campaign.py")
+# The baseline twin, for a `kind = "aurus"` phase: AuRUS itself over this
+# host's repeats. Overridable for the same reason as the other two.
+AURUS_CMD = os.environ.get("PEREDUR_AURUS_CMD",
+                           f"{REMOTE_PYTHON} scripts/aurus_campaign.py")
 
 # Rebuilt by stage. The lab machines have no Nix, so this is the incremental
 # build against an already-configured preset directory, not a configure step;
@@ -232,7 +236,7 @@ while IFS= read -r m; do
   echo "@M@ENDFILE"
 done
 echo "@M@SCOREMANIFESTS"
-find experiments -mindepth 2 -maxdepth 2 -type f -name 'score-manifest-*.json' 2>/dev/null |
+find experiments -mindepth 2 -maxdepth 2 -type f \( -name 'score-manifest-*.json' -o -name 'aurus-manifest-*.json' \) 2>/dev/null |
 while IFS= read -r m; do
   echo "@M@SFILE $m"
   cat "$m"
@@ -291,6 +295,23 @@ def detail_script(root: str, campaigns: list[dict]) -> str:
                 f'  echo "{MARK}CSVS $(find {q_out} -maxdepth 1 -type f '
                 "-name '*.csv' 2>/dev/null | wc -l)\"",
                 f'  echo "{MARK}OUTMTIME $(find {q_out} -maxdepth 1 -type f '
+                "-printf '%T@\\n' 2>/dev/null | sort -rn | head -1)\"",
+                "fi",
+            ]
+            continue
+        if c.get("kind") == "aurus":
+            # The arm's progress is one out.txt per finished repeat, two
+            # levels down (<spec>/repeat-NN/), counted rather than taken from
+            # the manifest so a resumed arm reads what is on disk. Staleness
+            # is the newest file anywhere under the tree, which moves while a
+            # run is still writing its log.
+            q_out = shlex.quote(c["out"])
+            lines += [
+                f'echo "{MARK}CAMPAIGN {c["profile"]}"',
+                f"if [ -d {q_out} ]; then",
+                f'  echo "{MARK}CSVS $(find {q_out} -mindepth 3 -maxdepth 3 '
+                "-type f -name 'out.txt' 2>/dev/null | wc -l)\"",
+                f'  echo "{MARK}OUTMTIME $(find {q_out} -type f '
                 "-printf '%T@\\n' 2>/dev/null | sort -rn | head -1)\"",
                 "fi",
             ]
@@ -360,6 +381,7 @@ def run_shell(host: str, script: str, timeout: int = SSH_TIMEOUT_S):
 def parse_inventory(text: str) -> dict:
     """Split the inventory script's marker-delimited output into fields."""
     out: dict = {"ps": [], "manifests": [], "score_manifests": [],
+                 "aurus_manifests": [],
                  "queue": [], "hostname": "?", "epoch": None, "branch": "?",
                  "head": "?", "dirty": None, "error": None}
     section = None
@@ -400,7 +422,13 @@ def parse_inventory(text: str) -> dict:
             try:
                 manifest = json.loads("\n".join(manifest_lines))
                 manifest["file"] = score_name
-                out["score_manifests"].append(manifest)
+                # One sweep, two kinds: a scoring pass and an AuRUS arm both
+                # keep their manifest one level down, under the directory they
+                # write, and the stem says which is which.
+                key = ("aurus_manifests"
+                       if Path(score_name).name.startswith("aurus-manifest")
+                       else "score_manifests")
+                out[key].append(manifest)
             except (json.JSONDecodeError, TypeError):
                 pass
             section = "scoremanifests"
@@ -552,6 +580,13 @@ def live_processes(ps_lines: list[str]) -> list[dict]:
                 continue
             found.append({"comm": comm, "profile": None, "kind": "score",
                           "out": option_of_args(args, "--out"), "args": args})
+        elif comm.startswith("python") and "aurus_campaign.py" in args:
+            # The baseline arm, matched on its own output directory the way a
+            # scorer is. Its JVMs appear separately as `java`, which names no
+            # campaign and belongs in the host's process column.
+            found.append({"comm": comm, "profile": None, "kind": "aurus",
+                          "out": option_of_args(args, "--out-root"),
+                          "args": args})
     return found
 
 
@@ -645,6 +680,45 @@ def campaigns_from_score_manifests(manifests: list[dict]) -> list[dict]:
     return out
 
 
+def campaigns_from_aurus_manifests(manifests: list[dict]) -> list[dict]:
+    """One record per AuRUS manifest, in the shape the run records take.
+
+    The arm's output directory stands where a profile would, as it does for a
+    scoring pass. The planned count is the manifest's own: the arm wrote it
+    knowing this host's repeats and what of them was already on disk. The done
+    count is rewritten per run, so a poll mid-campaign reads live, and the
+    commit reported is AuRUS's, not this checkout's, since that is the version
+    under measurement.
+    """
+    out = []
+    for m in manifests:
+        git = m.get("git") or {}
+        counts = m.get("counts") or {}
+        out_dir = str(m.get("out") or Path(m.get("file", "?")).parent)
+        name = Path(out_dir).name
+        out.append({
+            "kind": "aurus",
+            "profile": name,
+            "label": f"aurus:{name}",
+            "out": out_dir,
+            "results": "",
+            "manifest_host": m.get("hostname", "?"),
+            "started": m.get("started"),
+            "finished": m.get("finished"),
+            "branch": git.get("branch", "?"),
+            "head": (git.get("head") or "?")[:7],
+            "binary_commit": m.get("aurus_commit", "?"),
+            # A checkout whose COMMIT.txt did not match is refused outright, so
+            # an arm that ran at all ran the commit it declared.
+            "dirty_binary": False,
+            "rows_planned": counts.get("planned"),
+            "rows_done": counts.get("done"),
+            "seeds": m.get("seeds") or [],
+        })
+    out.sort(key=lambda c: (c.get("started") or "", c["profile"]))
+    return out
+
+
 def gather_host(host: str, root: str, only: str | None, want_plan: bool,
                 show_all: bool) -> dict:
     """Everything status reports for one host.
@@ -680,7 +754,8 @@ def gather_host(host: str, root: str, only: str | None, want_plan: bool,
         "queue": inv["queue"],
     })
     campaigns = (campaigns_from_manifests(inv["manifests"])
-                 + campaigns_from_score_manifests(inv["score_manifests"]))
+                 + campaigns_from_score_manifests(inv["score_manifests"])
+                 + campaigns_from_aurus_manifests(inv["aurus_manifests"]))
     if only:
         campaigns = [c for c in campaigns if c["profile"] == only]
     elif not show_all:
@@ -762,13 +837,13 @@ def annotate(c: dict, host_report: dict) -> None:
 def claims_campaign(proc: dict, c: dict) -> bool:
     """Whether a live process is this campaign's own.
 
-    A runner claims the campaign whose profile it names; a scorer claims the
-    score phase whose output directory it names, compared by name since the
-    manifest and the process may spell the path relative or absolute. Neither
-    claims the other's kind, and an engine process claims nothing.
+    A runner claims the campaign whose profile it names; a scorer and an AuRUS
+    arm each claim the phase whose output directory they name, compared by name
+    since the manifest and the process may spell the path relative or absolute.
+    No kind claims another's, and an engine process claims nothing.
     """
-    if c.get("kind") == "score":
-        return (proc.get("kind") == "score" and bool(proc.get("out"))
+    if c.get("kind") in ("score", "aurus"):
+        return (proc.get("kind") == c["kind"] and bool(proc.get("out"))
                 and Path(proc["out"]).name == Path(c.get("out", "")).name)
     return bool(proc.get("profile")) and proc["profile"] == c["profile"]
 
@@ -1884,18 +1959,27 @@ class CampaignError(Exception):
 CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
                  "configs", "description"}
 # A phase is a search run (`kind = "run"`, the default and what every phase
-# was before the key existed) or an offline scoring pass over a results
-# directory (`kind = "score"`). Each kind reads its own keys: the runner's
-# selection keys mean nothing to the scorer, and the scorer's budgets mean
-# nothing to the runner, so a key from the other kind is refused by name
-# rather than carried along unread.
-PHASE_KINDS = ("run", "score")
+# was before the key existed), an offline scoring pass over a results
+# directory (`kind = "score"`), or the AuRUS baseline arm (`kind = "aurus"`).
+# Each kind reads its own keys: the runner's selection keys mean nothing to the
+# scorer, and the scorer's budgets mean nothing to the runner, so a key from
+# another kind is refused by name rather than carried along unread.
+PHASE_KINDS = ("run", "score", "aurus")
 RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts"}
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s")
 SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
                     *SCORE_BUDGET_KEYS}
-PHASE_KEYS = RUN_PHASE_KEYS | SCORE_PHASE_KEYS
+# The baseline arm runs AuRUS, not this project's engine, through
+# scripts/aurus_campaign.py. `aurus_root` is the staged AuRUS checkout on the
+# host and `aurus_commit` the commit that checkout must report for the phase to
+# run at all, which is the whole of what stops a baseline arm from quietly
+# measuring a different tool. Hosts split the repeats the way they split seeds,
+# a repeat being the AuRUS arm's only replicate dimension.
+AURUS_PHASE_KEYS = {"name", "kind", "out", "hosts", "specs", "aurus_root",
+                    "aurus_commit", "gato", "concurrency", "spot_bin", "adapt"}
+PHASE_KEYS = RUN_PHASE_KEYS | SCORE_PHASE_KEYS | AURUS_PHASE_KEYS
+AURUS_DEFAULTS = {"gato": 7200, "concurrency": 10}
 
 # `describe` prints a declaration for a campaign that has already closed. It
 # is not one of these: the factor cross below is what the results CSV carries,
@@ -2099,7 +2183,8 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
         if kind not in PHASE_KINDS:
             raise CampaignError(f"{where}: kind must be one of "
                                 f"{', '.join(PHASE_KINDS)}, not {kind!r}")
-        allowed = SCORE_PHASE_KEYS if kind == "score" else RUN_PHASE_KEYS
+        allowed = {"score": SCORE_PHASE_KEYS,
+                   "aurus": AURUS_PHASE_KEYS}.get(kind, RUN_PHASE_KEYS)
         unknown = sorted(set(phase) - allowed)
         if unknown:
             raise CampaignError(f"{where}: unknown key(s) {', '.join(unknown)} "
@@ -2118,9 +2203,12 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
                     f"{where}: a score phase needs `results` (a results "
                     f"directory) or `profile` (whose results directory it "
                     f"scores), and has neither")
-        # A score phase naming a results directory needs no profile. Every
-        # other phase does, and a profile named anywhere must be one this
-        # checkout's runner defines.
+        # A score phase naming a results directory needs no profile, and an
+        # AuRUS phase never has one: it runs another tool, which this
+        # checkout's runner knows nothing about. Every other phase does, and a
+        # profile named anywhere must be one this checkout's runner defines.
+        if kind == "aurus":
+            profile = None
         if profile is not None or kind == "run":
             if not isinstance(profile, str) or not profile:
                 raise CampaignError(f"{where}: no profile, and no top-level "
@@ -2144,6 +2232,9 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
         if kind == "score":
             normalised.append(normalise_score_phase(phase, where, profile,
                                                     phase_hosts))
+            continue
+        if kind == "aurus":
+            normalised.append(normalise_aurus_phase(phase, where, phase_hosts))
             continue
         jobs = phase.get("jobs")
         if jobs is not None and (isinstance(jobs, bool) or not isinstance(jobs, int)
@@ -2179,6 +2270,8 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
     return {"name": name, "branch": branch, "build": build, "path": path,
             "configs": configs, "config_dirs": config_dirs,
             "results_dirs": staged_results_dirs(normalised, seeds_by_host),
+            "aurus_checkouts": staged_aurus_checkouts(normalised,
+                                                      seeds_by_host),
             "hosts": seeds_by_host, "phases": normalised,
             "description": raw.get("description", "")}
 
@@ -2218,10 +2311,88 @@ def normalise_score_phase(phase: dict, where: str, profile,
             "hosts": phase_hosts, "results": results, "out": out, **budgets}
 
 
+def normalise_aurus_phase(phase: dict, where: str, phase_hosts) -> dict:
+    """An AuRUS phase's record: which AuRUS, over what, writing where.
+
+    ``out`` is a directory under the checkout rather than a path of its own
+    choosing, because that is where `campaign.py status` looks for the
+    manifest the arm writes, and where the adapter that makes the runs
+    scorable expects to find them. ``aurus_root`` is on the host and is not
+    under the checkout at all -- AuRUS is a separate tool -- so it is taken
+    verbatim, with `~` left for the host's shell to expand.
+
+    ``aurus_commit`` is mandatory. The arm's whole claim is that it ran the
+    published tool, and the difference between the upstream commit and the
+    branch that writes its solutions as it finds them is invisible in every
+    artefact downstream. The runner refuses a checkout whose COMMIT.txt
+    disagrees, and stage checks the same thing before a launch is queued.
+    """
+    out = phase.get("out")
+    if not isinstance(out, str) or not out:
+        raise CampaignError(f"{where}: an aurus phase needs `out`, a "
+                            f"directory under the checkout for its run "
+                            f"directories and its manifest")
+    root = phase.get("aurus_root")
+    if not isinstance(root, str) or not root:
+        raise CampaignError(f"{where}: an aurus phase needs `aurus_root`, the "
+                            f"AuRUS checkout staged on the host")
+    commit = phase.get("aurus_commit")
+    if not isinstance(commit, str) or not commit:
+        raise CampaignError(
+            f"{where}: an aurus phase needs `aurus_commit`, the commit that "
+            f"checkout's COMMIT.txt must report. A baseline arm that does not "
+            f"say which AuRUS it ran cannot be read afterwards.")
+    values = dict(AURUS_DEFAULTS)
+    for key in AURUS_DEFAULTS:
+        value = phase.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise CampaignError(f"{where}: {key} must be a positive integer")
+        values[key] = value
+    specs = phase.get("specs")
+    if specs is not None and not (isinstance(specs, list)
+                                  and all(isinstance(s, str) for s in specs)):
+        raise CampaignError(f"{where}: specs must be an array of strings")
+    spot_bin = phase.get("spot_bin")
+    if spot_bin is not None and (not isinstance(spot_bin, str)
+                                 or not spot_bin):
+        raise CampaignError(f"{where}: spot_bin must be a non-empty string")
+    adapt = phase.get("adapt")
+    if adapt is not None and (not isinstance(adapt, str) or not adapt):
+        raise CampaignError(f"{where}: adapt must be a non-empty string")
+    return {"name": phase.get("name", Path(out).name), "kind": "aurus",
+            "profile": None, "jobs": None, "sweeps": None, "specs": specs,
+            "hosts": phase_hosts, "out": out, "aurus_root": root,
+            "aurus_commit": commit, "spot_bin": spot_bin, "adapt": adapt,
+            **values}
+
+
 def phase_kind(phase: dict) -> str:
     """`run` unless the phase says otherwise. A phase record built before
     the key existed carries none, and every one of those is a run."""
     return phase.get("kind") or "run"
+
+
+def staged_aurus_checkouts(phases: list, seeds_by_host: dict) -> dict:
+    """Per host, the ``root|commit`` pairs stage has to find there already.
+
+    Only on the hosts a phase actually runs on, as with a results directory:
+    a phase narrowed away from a host needs no AuRUS there.
+    """
+    out: dict = {}
+    for host, seeds in seeds_by_host.items():
+        wanted: list = []
+        for phase in phases:
+            if phase_kind(phase) != "aurus":
+                continue
+            if not phase_seeds(phase, host, seeds):
+                continue
+            pair = f"{phase['aurus_root']}|{phase['aurus_commit']}"
+            if pair not in wanted:
+                wanted.append(pair)
+        out[host] = wanted
+    return out
 
 
 def staged_results_dirs(phases: list, seeds_by_host: dict) -> dict:
@@ -2245,6 +2416,13 @@ def staged_results_dirs(phases: list, seeds_by_host: dict) -> dict:
                 continue
             if phase_kind(phase) == "run":
                 produced.add(profile_results_dir(phase["profile"]))
+            elif phase_kind(phase) == "aurus":
+                # It reads no results directory at all; what it needs staged
+                # is the AuRUS checkout, which stage checks separately. With
+                # `adapt` it produces one, for a later score phase to read.
+                if phase.get("adapt"):
+                    produced.add(phase["adapt"])
+                continue
             elif (phase["results"] not in produced
                   and phase["results"] not in wanted):
                 wanted.append(phase["results"])
@@ -2307,6 +2485,8 @@ def phase_args(phase: dict, seeds: list) -> list:
     """
     if phase_kind(phase) == "score":
         return score_phase_args(phase, seeds)
+    if phase_kind(phase) == "aurus":
+        return aurus_phase_args(phase, seeds)
     args = ["--profile", phase["profile"]]
     if phase.get("jobs"):
         args += ["--jobs", str(phase["jobs"])]
@@ -2330,9 +2510,33 @@ def score_phase_args(phase: dict, seeds: list) -> list:
     return args + ["--seeds", *[str(s) for s in seeds]]
 
 
+def aurus_phase_args(phase: dict, seeds: list) -> list:
+    """The baseline arm's arguments: which AuRUS, which repeats, where to.
+
+    The repeats are this host's seeds, passed explicitly rather than as the
+    offset-and-count pair aurus_campaign.py also takes: a split like
+    ``"0-9,20-29"`` is not one contiguous range, and a range typed at launch
+    time is how two hosts come to run the same repeat.
+    """
+    args = ["--aurus-root", phase["aurus_root"],
+            "--aurus-commit", phase["aurus_commit"],
+            "--out-root", phase["out"],
+            "--gato", str(phase["gato"]),
+            "--concurrency", str(phase["concurrency"])]
+    if phase.get("spot_bin"):
+        args += ["--spot-bin", phase["spot_bin"]]
+    if phase.get("adapt"):
+        args += ["--adapt", phase["adapt"]]
+    if phase.get("specs"):
+        args += ["--specs", *phase["specs"]]
+    return args + ["--seeds", *[str(s) for s in seeds]]
+
+
 def phase_launcher(phase: dict) -> str:
-    """The command a phase's arguments follow: the runner, or the scorer."""
-    return SCORER_CMD if phase_kind(phase) == "score" else RUNNER_CMD
+    """The command a phase's arguments follow: the runner, the scorer, or
+    AuRUS itself."""
+    return {"score": SCORER_CMD, "aurus": AURUS_CMD}.get(phase_kind(phase),
+                                                         RUNNER_CMD)
 
 
 def phase_command(phase: dict, seeds: list) -> str:
@@ -2947,9 +3151,37 @@ RESULTS_CHECK = r"""for resdir in @RESULTS_DIRS@; do
 done
 """
 
+# An AuRUS phase's counterpart: the baseline tool is not in this repository and
+# is not built by the stage, so the checkout has to be there already, built,
+# and reporting the commit the campaign declares. Checked at stage time
+# because the alternative is a launch that runs for hours and turns out to have
+# measured a different tool -- nothing downstream records which AuRUS produced
+# a repair. The pair is `root|commit`; a leading `~/` is the host's own home,
+# which a quoted argument would not expand.
+AURUS_CHECK = r"""for pair in @AURUS_ROOTS@; do
+  aroot=${pair%%|*}
+  awant=${pair##*|}
+  case "$aroot" in "~/"*) aroot="$HOME/${aroot#~/}" ;; esac
+  if [ ! -f "$aroot/COMMIT.txt" ]; then
+    echo "@M@ERR no AuRUS checkout at $aroot (no COMMIT.txt) — stage one there and write its commit into COMMIT.txt, or fix aurus_root = ... in campaign.toml"
+    exit 12
+  fi
+  agot=$(awk 'NR==1 {print $1}' "$aroot/COMMIT.txt")
+  if [ "$agot" != "$awant" ]; then
+    echo "@M@ERR AuRUS at $aroot reports commit $agot, and the campaign declares $awant"
+    exit 12
+  fi
+  if [ ! -f "$aroot/bin/main/Main.class" ]; then
+    echo "@M@ERR AuRUS at $aroot is not built — run ant compile there"
+    exit 12
+  fi
+done
+"""
+
 
 def configs_block(configs: str | None, config_dirs: list,
-                  results_dirs: list | None = None) -> str:
+                  results_dirs: list | None = None,
+                  aurus_roots: list | None = None) -> str:
     """The configs section: the declared command, then the check, or just the
     check. The check is never conditional — a campaign that declares no command
     is the case that broke, not the case to trust. A score phase's results
@@ -2964,19 +3196,25 @@ def configs_block(configs: str | None, config_dirs: list,
     if results_dirs:
         results = RESULTS_CHECK.replace(
             "@RESULTS_DIRS@", " ".join(shlex.quote(d) for d in results_dirs))
-    return step + check + results
+    aurus = ""
+    if aurus_roots:
+        aurus = AURUS_CHECK.replace(
+            "@AURUS_ROOTS@", " ".join(shlex.quote(p) for p in aurus_roots))
+    return step + check + results + aurus
 
 
 def stage_apply_script(root: str, branch: str, sha: str, build: str,
                        configs: str | None, config_dirs: list,
-                       force: bool, results_dirs: list | None = None) -> str:
+                       force: bool, results_dirs: list | None = None,
+                       aurus_roots: list | None = None) -> str:
     # CONFIGS first, and the marker last inside render_script: the configs
     # block is itself a script fragment carrying markers of its own.
     # BUILD and BIN go in unquoted -- the first is a command line, the second
     # is spliced into `./@BIN@`.
     return render_script(
         STAGE_APPLY_SCRIPT,
-        CONFIGS=configs_block(configs, config_dirs, results_dirs),
+        CONFIGS=configs_block(configs, config_dirs, results_dirs,
+                              aurus_roots),
         ROOT=shlex.quote(root),
         BRANCH=shlex.quote(branch),
         SHA=shlex.quote(sha),
@@ -3113,6 +3351,8 @@ def cmd_stage(args: argparse.Namespace) -> int:
                                      campaign["build"], campaign["configs"],
                                      campaign["config_dirs"], args.force,
                                      (campaign.get("results_dirs") or {})
+                                     .get(host),
+                                     (campaign.get("aurus_checkouts") or {})
                                      .get(host)),
             timeout=args.build_timeout)
         result = parse_sections(text or "")

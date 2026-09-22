@@ -9,20 +9,31 @@ AuRUS is not seedable (its RNG comes from Math.random() with no CLI
 override), so independent repeats stand in for seeds and every out.txt is
 archived.
 
-`--aurus-root` must point at AuRUS as its authors left it, commit 3f6f01f,
-which is the last upstream commit before this project's fork. The fork above
-it changes the GA core, the model-counting fitness and the solver layer, and
-would measure an optimised AuRUS rather than the published baseline. Only one
-substitution is unavoidable: 3f6f01f tracks a macOS Mach-O Strix binary at
-lib/new_strix/strix, so any Linux run needs a Linux Strix dropped in there.
-Note the entry point lives at the repo root at that commit; the fork later
-moved it under scripts/.
+`--aurus-root` must point at AuRUS as its authors left it, commit 3f6f01f, or
+at the one branch above it this project maintains, `output-on-timeout`
+(e1cfadf), which changes nothing the search does: it writes each solution as
+it is found rather than dumping them when the run ends, and dates each one in
+`solution-times.csv` to the microsecond. That branch exists because a run the
+harness kills at the cap used to lose everything it had found, and because a
+discovery time inferred from the log is only good to the second. What must not
+be measured is `master`, whose commits change the GA core, the model-counting
+fitness and the solver layer, and would report an optimised AuRUS as the
+published baseline. `--aurus-commit` states which of the two a campaign meant
+and the run refuses a checkout whose `COMMIT.txt` says otherwise.
+
+Only one substitution is unavoidable: 3f6f01f tracks a macOS Mach-O Strix
+binary at lib/new_strix/strix, so any Linux run needs a Linux Strix dropped in
+there. Note the entry point lives at the repo root at that commit; the
+project's own fork later moved it under scripts/.
 
 Per-run wall time is measured here, externally, rather than trusting the
 JVM's self-report (recorded too, as aurus_time_s).
 
 Each run's out.txt is parsed (`Num. of Solutions:`, `Time:`, `Settings{...}`)
-into a row of <out-root>/aurus_results.csv. Resumable: a (spec, repeat) whose
+into a row of <out-root>/aurus_results.csv, with the JVM's peak resident set
+beside it, and the campaign's own facts go to
+<out-root>/aurus-manifest-<host>.json, which is what `campaign.py status`
+reads. Resumable: a (spec, repeat) whose
 out.txt already exists is not re-run — its CSV row is backfilled from the
 existing out.txt if missing (wall_time_s blank, since the original wall clock
 is gone). Repeat-major ordering, so killing the campaign at a wall-clock
@@ -42,6 +53,8 @@ Usage:
 
 import argparse
 import csv
+import datetime as dt
+import json
 import os
 import re
 import signal
@@ -208,8 +221,22 @@ KILL_GRACE_S = 300
 
 CSV_FIELDS = [
     "spec", "repeat", "n_solutions", "aurus_time_s", "wall_time_s",
-    "killed", "exit_code", "settings",
+    "killed", "exit_code", "peak_rss_mb", "settings",
 ]
+
+# The commits this script will measure, and what each one is. A checkout
+# states which it is in COMMIT.txt, written when it is staged.
+KNOWN_COMMITS = {
+    "3f6f01f": "upstream AuRUS as published",
+    "e1cfadf": "output-on-timeout: solutions written and dated as found",
+}
+COMMIT_FILE = "COMMIT.txt"
+MANIFEST_STEM = "aurus-manifest"
+# The JVM's peak resident set, sampled from its own /proc entry while it runs,
+# because a run the harness kills reports no rusage at all. Every AuRUS process
+# is one JVM (the search is single-threaded and its Strix and aalta children
+# are short-lived and small), so the parent's high-water mark is the run's.
+RSS_SAMPLE_S = 5.0
 
 N_SOLUTIONS_RE = re.compile(r"Num\. of Solutions:\s*(\d+)")
 # Anchored so "GA Time:" does not match.
@@ -237,9 +264,57 @@ def parse_out_txt(out_txt: Path) -> dict:
     return row
 
 
+def checkout_git() -> dict:
+    """The branch and head of the PEREDUR checkout this runs from.
+
+    Recorded because `campaign.py status` hides a manifest whose branch the
+    checkout has since left; without it the arm would read as an unknown from
+    the moment the host changed branch. It says nothing about AuRUS, whose own
+    commit is recorded separately.
+    """
+    def ask(*command: str) -> str:
+        try:
+            return subprocess.run(command, check=True, capture_output=True,
+                                  text=True,
+                                  cwd=Path(__file__).parent).stdout.strip()
+        except (OSError, subprocess.CalledProcessError):
+            return "?"
+    return {"branch": ask("git", "rev-parse", "--abbrev-ref", "HEAD"),
+            "head": ask("git", "rev-parse", "HEAD")}
+
+
+def read_commit(aurus_root: Path) -> str:
+    """The short commit a staged AuRUS checkout says it is, or ""."""
+    try:
+        text = (aurus_root / COMMIT_FILE).read_text().split()
+    except OSError:
+        return ""
+    return text[0] if text else ""
+
+
+def peak_rss_mb(pid: int) -> float:
+    """VmHWM of one process, in MB; 0.0 once it is gone."""
+    try:
+        with open(f"/proc/{pid}/status") as handle:
+            for line in handle:
+                if line.startswith("VmHWM:"):
+                    return int(line.split()[1]) / 1024.0
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0.0
+
+
+def sample_rss(proc, stop: threading.Event, into: dict) -> None:
+    """Keep the high-water mark of `proc` until it stops or is killed."""
+    while not stop.wait(RSS_SAMPLE_S):
+        value = peak_rss_mb(proc.pid)
+        if value:
+            into["peak"] = max(into.get("peak", 0.0), value)
+
+
 def run_one(aurus_root: Path, tlsf: Path, out_dir: Path, gato: int,
-            env: dict, flags: list[str]) -> tuple[int | str, int, float]:
-    """Execute one AuRUS repair run; return (exit_code, killed, wall_time_s).
+            env: dict, flags: list[str]) -> tuple[int | str, int, float, float]:
+    """Execute one AuRUS run; return (exit_code, killed, wall_s, peak_rss_mb).
 
     The JVM runs in its own session so a timeout kill takes the whole process
     group (java plus any strix/relsat/ltl2tgba children) rather than just the
@@ -251,10 +326,15 @@ def run_one(aurus_root: Path, tlsf: Path, out_dir: Path, gato: int,
     log_path = out_dir / "run.log"
     t_start = time.monotonic()
     killed = 0
+    rss: dict = {}
+    stop = threading.Event()
     with open(log_path, "wb") as log_file:
         proc = subprocess.Popen(cmd, cwd=aurus_root, env=env,
                                 stdout=log_file, stderr=subprocess.STDOUT,
                                 start_new_session=True)
+        watcher = threading.Thread(target=sample_rss, args=(proc, stop, rss),
+                                   daemon=True)
+        watcher.start()
         try:
             proc.wait(timeout=gato + KILL_GRACE_S)
         except subprocess.TimeoutExpired:
@@ -264,8 +344,12 @@ def run_one(aurus_root: Path, tlsf: Path, out_dir: Path, gato: int,
             except ProcessLookupError:
                 pass
             proc.wait()
+    # The last sample beats the kill in the usual case; take one more so a run
+    # shorter than the sampling interval still reports something.
+    rss["peak"] = max(rss.get("peak", 0.0), peak_rss_mb(proc.pid))
+    stop.set()
     wall = round(time.monotonic() - t_start, 2)
-    return proc.returncode, killed, wall
+    return proc.returncode, killed, wall, round(rss.get("peak", 0.0), 1)
 
 
 def main() -> None:
@@ -308,20 +392,46 @@ def main() -> None:
                              "JVM wedges")
     parser.add_argument("--concurrency", type=int, default=10, metavar="N",
                         help="Concurrent AuRUS runs (default: 10)")
+    parser.add_argument("--seeds", nargs="+", type=int, metavar="N",
+                        help="Explicit repeat indices, as campaign.py passes "
+                             "a host's seed split. Replaces --repeats and "
+                             "--repeat-offset, which describe one contiguous "
+                             "range and cannot state a split like 0-9,20-29")
+    parser.add_argument("--aurus-commit", metavar="SHA",
+                        help="Short commit the AuRUS checkout must report in "
+                             f"{COMMIT_FILE}: "
+                             + "; ".join(f"{k} ({v})"
+                                         for k, v in KNOWN_COMMITS.items()))
     parser.add_argument("--spot-bin", type=Path, default=None, metavar="PATH",
                         help="Directory prepended to PATH so AuRUS finds "
                              "ltl2tgba/autfilt (e.g. PEREDUR's "
                              "build-release/third_party/spot/bin). Omit if "
                              "SPOT is already on PATH")
+    parser.add_argument("--adapt", type=Path, default=None, metavar="DIR",
+                        help="Run aurus_adapt.py over --out-root into DIR "
+                             "once every repeat has finished, so a scoring "
+                             "phase has a results directory to read. Only "
+                             "this host's repeats are materialised")
     args = parser.parse_args()
 
     if args.concurrency < 1:
         sys.exit("--concurrency must be >= 1")
+    # campaign.py quotes every argument it passes, so a `~` in a declaration
+    # arrives here unexpanded rather than opened by the host's shell.
+    args.aurus_root = args.aurus_root.expanduser()
     repair_sh = args.aurus_root / "unreal-repair.sh"
     if not repair_sh.exists():
         sys.exit(f"Not an AuRUS checkout: {repair_sh} missing")
     if not (args.aurus_root / "bin" / "main" / "Main.class").exists():
         sys.exit(f"AuRUS is not built: run `ant compile` in {args.aurus_root}")
+    staged_commit = read_commit(args.aurus_root)
+    if args.aurus_commit and staged_commit != args.aurus_commit:
+        # Refused rather than warned: the two commits differ in what a killed
+        # run leaves behind, so a mismatch silently changes what the arm
+        # measures and nothing downstream could tell afterwards.
+        sys.exit(f"{args.aurus_root} reports commit "
+                 f"{staged_commit or '(none)'} in {COMMIT_FILE}, and this "
+                 f"campaign declares {args.aurus_commit}")
 
     env = os.environ.copy()
     if args.spot_bin is not None:
@@ -336,21 +446,22 @@ def main() -> None:
 
     # Repeat-major, mirroring run_experiments.py's seed-major order: a
     # wall-clock kill leaves every spec at the same repeat depth.
-    tasks = [(spec, rep)
-             for rep in range(args.repeat_offset,
-                              args.repeat_offset + args.repeats)
-             for spec in args.specs]
+    repeats = (sorted(set(args.seeds)) if args.seeds else
+               list(range(args.repeat_offset,
+                          args.repeat_offset + args.repeats)))
+    if not repeats:
+        sys.exit("no repeats to run: --repeats must be positive")
+    tasks = [(spec, rep) for rep in repeats for spec in args.specs]
     to_run = [(s, r) for s, r in tasks
               if not (args.out_root / s / f"repeat-{r:02d}" / "out.txt").exists()]
     backfill = [(s, r) for s, r in tasks
                 if (s, r) not in done and (s, r) not in to_run]
 
     print("=" * 64)
-    lo = args.repeat_offset
-    hi = args.repeat_offset + args.repeats - 1
-    print(f"  AuRUS baseline: {len(args.specs)} specs x {args.repeats} "
-          f"repeats ({lo}-{hi})")
-    print(f"    aurus:       {args.aurus_root}")
+    print(f"  AuRUS baseline: {len(args.specs)} specs x {len(repeats)} "
+          f"repeats ({repeats[0]}-{repeats[-1]})")
+    print(f"    aurus:       {args.aurus_root} "
+          f"[{staged_commit or 'commit unstated'}]")
     print(f"    out:         {args.out_root}")
     print(f"    GATO:        {args.gato}s (kill at +{KILL_GRACE_S}s)")
     print(f"    concurrency: {args.concurrency}")
@@ -359,6 +470,34 @@ def main() -> None:
     print("=" * 64)
 
     args.out_root.mkdir(parents=True, exist_ok=True)
+    manifest_path = args.out_root / f"{MANIFEST_STEM}-{os.uname().nodename}.json"
+    manifest = {
+        "written_by": "scripts/aurus_campaign.py",
+        "hostname": os.uname().nodename,
+        "git": checkout_git(),
+        "aurus_root": str(args.aurus_root),
+        "aurus_commit": staged_commit,
+        "declared_commit": args.aurus_commit or "",
+        "out": str(args.out_root),
+        "gato": args.gato,
+        "kill_grace_s": KILL_GRACE_S,
+        "concurrency": args.concurrency,
+        "specs": list(args.specs),
+        "seeds": repeats,
+        "flags": BASE_FLAGS,
+        "only_inputs_a": sorted(ONLY_INPUTS_A & set(args.specs)),
+        "started": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "finished": None,
+        "counts": {"planned": len(tasks), "to_run": len(to_run),
+                   "backfill": len(backfill), "done": 0},
+    }
+
+    def write_manifest() -> None:
+        with open(manifest_path, "w") as handle:
+            json.dump(manifest, handle, indent=2)
+            handle.write("\n")
+
+    write_manifest()
     lock = threading.Lock()
     state = {"completed": 0}
     n_exec = len(to_run)
@@ -380,7 +519,8 @@ def main() -> None:
         out_dir = args.out_root / spec / f"repeat-{rep:02d}"
         append_row({"spec": spec, "repeat": rep,
                     **parse_out_txt(out_dir / "out.txt"),
-                    "wall_time_s": "", "killed": "", "exit_code": ""})
+                    "wall_time_s": "", "killed": "", "exit_code": "",
+                    "peak_rss_mb": ""})
         done.add((spec, rep))
 
     def execute(task: tuple[str, int]) -> None:
@@ -390,11 +530,12 @@ def main() -> None:
         tlsf = args.aurus_root / SPEC_TLSF[spec]
         with lock:
             print(f"[start]      {run_id}", flush=True)
-        exit_code, killed, wall = run_one(
+        exit_code, killed, wall, rss = run_one(
             args.aurus_root, tlsf, out_dir, args.gato, env, flags_for(spec))
         row = {"spec": spec, "repeat": rep,
                **parse_out_txt(out_dir / "out.txt"),
-               "wall_time_s": wall, "killed": killed, "exit_code": exit_code}
+               "wall_time_s": wall, "killed": killed, "exit_code": exit_code,
+               "peak_rss_mb": rss}
         with lock:
             state["completed"] += 1
             n = state["completed"]
@@ -406,13 +547,38 @@ def main() -> None:
             note = "  KILLED" if killed else ""
             print(f"[{n}/{n_exec}]  {run_id}  done in {wall}s{note}"
                   f"  ETA {eta/60:.1f}min", flush=True)
+            # Rewritten per run rather than at the end, so a status poll mid
+            # campaign reads progress and a killed campaign leaves its own
+            # count behind.
+            manifest["counts"]["done"] = n
+            write_manifest()
 
     with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
         list(pool.map(execute, to_run))
 
     elapsed_total = time.monotonic() - t0
+    manifest["finished"] = \
+        dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    manifest["wall_s"] = round(elapsed_total, 1)
+    write_manifest()
     print(f"\nDone. {state['completed']} runs in {elapsed_total/60:.1f} min."
-          f"\nResults: {results_csv}")
+          f"\nResults: {results_csv}\nManifest: {manifest_path}")
+
+    if args.adapt is not None:
+        # Here rather than as a phase of its own, because the tree is only
+        # scorable once every repeat has written, and a scoring phase reads
+        # the directory this leaves behind. `--force` overwrites the previous
+        # attempt's tree, since a requeued phase re-runs this step.
+        adapt = [sys.executable,
+                 str(Path(__file__).parent / "aurus_adapt.py"),
+                 "--root", str(args.out_root), "--out", str(args.adapt),
+                 "--seeds", ",".join(str(r) for r in repeats), "--force"]
+        if args.specs:
+            adapt += ["--specs", ",".join(args.specs)]
+        print("\n$ " + " ".join(adapt), flush=True)
+        rc = subprocess.run(adapt).returncode
+        if rc != 0:
+            sys.exit(f"aurus_adapt.py exited {rc}")
 
 
 if __name__ == "__main__":

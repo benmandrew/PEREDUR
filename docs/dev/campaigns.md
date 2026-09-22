@@ -28,7 +28,7 @@ phases = [ { profile = "arbiter-probe", jobs = 4 } ]
 
 `configs` runs on the host during `stage`, after the build and before the version check so a failing generator reports as itself, in a subshell so `&&` behaves as written. It has no default, since no line suits every campaign and config trees are untracked.
 
-A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default) or `score`, which takes its own keys and refuses `jobs`, `sweeps` and `specs` by name.
+A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default), `score` or `aurus`; each of the latter two takes its own keys and refuses the run keys by name.
 
 A phase's `hosts` table overrides the campaign split for that phase under the same rules, and may only narrow it, since `stage` staged no other host; an omitted host runs nothing for that phase and a tick advances past it. It exists because `run_experiments.py --seeds` replaces a profile's seed list rather than intersecting it, so paths with different sample sizes cannot share one range without silently changing the row count. `enqueue` freezes these as `phase_seeds`; older entries fall back to the campaign split.
 
@@ -87,6 +87,35 @@ The pass exits 0 only when every run has a curve; otherwise the tick spends an a
 
 `stage` and the tick refuse a score phase whose results directory is missing, unless an earlier run phase of the campaign writes it. To reproduce an archived pass, declare a campaign of one score phase.
 
+## AuRUS phases
+
+The baseline arm runs AuRUS, which is a different program in a different repository, so no `run` phase can launch it. `2026-08-14-aurus-h2h` launched it by hand off `PLAN.md` §8, and every campaign since has re-used those 780 archived runs rather than collecting new ones. An `aurus` phase runs that arm as a phase, putting the seed split and the provenance in `campaign.toml` with everything else.
+
+```toml
+[[phases]]
+kind = "aurus"
+out = "experiments/aurus-rerun-out"            # under the checkout: <spec>/repeat-NN/
+aurus_root = "~/projects/tools/aurus-timeout"  # the AuRUS checkout on the host
+aurus_commit = "e1cfadf"                       # what its COMMIT.txt must say
+gato = 7200                                    # AuRUS's own timeout, the published 2 h
+concurrency = 10                               # Java virtual machines in flight, each -Xmx8g
+adapt = "experiments/results-aurus-rerun"      # optional; where the scorable tree goes
+specs = ["minepump", "lift"]                   # optional; the whole h2h set by default
+spot_bin = "build-release/third_party/spot/bin"  # optional, prepended to PATH
+```
+
+The host runs `scripts/aurus_campaign.py` with this host's seeds as `--seeds`. A repeat stands where a seed does, AuRUS drawing from `Math.random()` with no command-line override, so independent repeats are the arm's only replicate dimension.
+
+`aurus_commit` is mandatory and checked twice, by `stage` against the host's `COMMIT.txt` and again by the runner before the first Java virtual machine (JVM) starts. Two commits are known: `3f6f01f` is upstream AuRUS as published, and `e1cfadf` on branch `output-on-timeout` writes each solution as it is found and dates it to the microsecond in `solution-times.csv`. The search is the same under both. A run killed at the cap keeps what it found under the fork, where upstream loses all of it with the JVM, and nothing downstream records which vintage wrote a repair, so the declaration has to.
+
+`stage` does not build AuRUS, which needs Java 18 or later, an `ant compile` that reaches the network, and a Linux Strix binary dropped over the macOS one the upstream commit tracks. It checks that the checkout exists, is built, and reports the declared commit, and refuses the host otherwise.
+
+Progress is one `out.txt` per finished repeat. `aurus-manifest-<host>.json` under `out` is what `status` reads, rewritten after every run, so a poll mid-campaign reads live and a killed arm leaves its count behind. The row reads `aurus:<out>` and its BINARY column is AuRUS's commit rather than this checkout's.
+
+The arm resumes the way the runner does: a repeat whose `out.txt` exists is not re-run, and a CSV row missing beside an existing `out.txt` is backfilled from it. `aurus_results.csv` carries `peak_rss_mb` per run, sampled from the JVM's own `/proc` entry, because memory bounds `concurrency` rather than processor time. One run holds about one core and reserves 8 GB of heap.
+
+`adapt` names where `scripts/aurus_adapt.py` materialises the runs as PEREDUR-shaped run directories, which a `score` phase declared after it reads like any other results directory. Both arms of a head-to-head then reduce through one scorer at one set of budgets, which is what makes their curves comparable. The adapter runs inside the AuRUS phase rather than as a phase of its own, the tree being scorable only once every repeat of this host's split has written, and it materialises that split alone. `stage` counts an `adapt` directory as produced by the campaign, so it is not demanded up front.
+
 ## Reading a run
 
 `status` never caches, and progress is never derived from a CSV's length. It prints each host's checkout, one row per campaign, and the queue.
@@ -103,6 +132,8 @@ Tables are coloured only on a terminal, since `tick` logs to `$HOME/.peredur-que
 A `~` before ROWS means the whole CSV was counted because the runner returned no plan, which overstates progress. A `!` after BRANCH means the checkout has left the manifest's branch, so a resume would produce rows from other code. A `*` after BINARY means the launch used `--allow-stale-binary`, so its rows name a commit they did not come from.
 
 A score phase appears as `score:<out>`, read from `score-manifest-<host>.json`: ROWS counts curves against the frozen queue, STALE is the newest file's age, BINARY is `maximal`'s commit, and the same three-hour rule applies. `--campaign <out>` selects it.
+
+An AuRUS phase appears as `aurus:<out>`, read from `aurus-manifest-<host>.json` the same way. ROWS counts finished repeats against the frozen queue, and BINARY is the AuRUS commit the runner verified. A repeat may hold the processor for the full 7200-second cap, so the three-hour staleness rule reads a working arm as fresh.
 
 ## The binary freshness gate
 

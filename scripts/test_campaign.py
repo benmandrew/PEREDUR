@@ -1245,7 +1245,118 @@ phases = [ { kind = "score", results = "experiments/results-rematch" } ]
     check(dironly["results_dirs"], {"av2": ["experiments/results-rematch"]},
           "but does check the results directory it reads")
 
+    # The third phase kind: the AuRUS baseline arm, which the head-to-head
+    # campaigns launched by hand from an ssh line before it existed.
+    write_declaration(decl_root, "baseline", """
+name = "baseline"
+branch = "feat/baseline"
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+[[phases]]
+kind = "aurus"
+out = "experiments/aurus-rerun-out"
+aurus_root = "~/projects/tools/aurus-timeout"
+aurus_commit = "e1cfadf"
+
+[[phases]]
+kind = "aurus"
+name = "slice"
+out = "experiments/aurus-small"
+aurus_root = "~/projects/tools/aurus-base"
+aurus_commit = "3f6f01f"
+gato = 600
+concurrency = 24
+specs = ["minepump", "lift"]
+spot_bin = "build-release/third_party/spot/bin"
+adapt = "experiments/results-aurus-small"
+hosts = { av2 = "0-4" }
+
+[[phases]]
+kind = "score"
+results = "experiments/results-aurus-small"
+out = "experiments/curves-aurus-small"
+hosts = { av2 = "0-4" }
+""")
+    baseline = C.load_campaign("baseline", decl_root)
+    wide, narrow, scored = baseline["phases"]
+    check(wide["kind"], "aurus", "an aurus phase loads as its own kind")
+    check((wide["gato"], wide["concurrency"]), (7200, 10),
+          "the published 2 h timeout and the memory-bound concurrency are "
+          "the defaults")
+    check(wide["name"], "aurus-rerun-out",
+          "an aurus phase is named after its output directory by default")
+    check((wide["profile"], wide["specs"], wide["spot_bin"]),
+          (None, None, None),
+          "it names no profile: the runner knows nothing about AuRUS")
+    check((narrow["gato"], narrow["concurrency"], narrow["specs"]),
+          (600, 24, ["minepump", "lift"]),
+          "and every key it states is carried through")
+    check(narrow["hosts"], {"av2": list(range(5))},
+          "an aurus phase narrows the split as the other kinds do")
+    check(baseline["config_dirs"], [],
+          "an aurus arm reads no configs directory")
+    check(baseline["results_dirs"], {"av2": [], "av3": []},
+          "and no results directory: what it needs staged is AuRUS itself, "
+          "the third phase's being written by the second phase's `adapt`")
+    check(scored["results"], narrow["adapt"],
+          "which is how a baseline arm reaches the scorer at all")
+    check(C.phase_args(wide, [0, 1]),
+          ["--aurus-root", "~/projects/tools/aurus-timeout",
+           "--aurus-commit", "e1cfadf",
+           "--out-root", "experiments/aurus-rerun-out",
+           "--gato", "7200", "--concurrency", "10", "--seeds", "0", "1"],
+          "an aurus phase becomes aurus_campaign.py arguments, repeats last")
+    check(C.phase_args(narrow, [0, 1]),
+          ["--aurus-root", "~/projects/tools/aurus-base",
+           "--aurus-commit", "3f6f01f", "--out-root", "experiments/aurus-small",
+           "--gato", "600", "--concurrency", "24",
+           "--spot-bin", "build-release/third_party/spot/bin",
+           "--adapt", "experiments/results-aurus-small",
+           "--specs", "minepump", "lift", "--seeds", "0", "1"],
+          "with its SPOT directory, its family subset and the adapted tree "
+          "it leaves for the scorer")
+    check_true(C.phase_command(wide, [0]).startswith(C.AURUS_CMD + " "),
+               "and its command is AuRUS's, not the runner's or the scorer's")
+    check(baseline["aurus_checkouts"],
+          {"av2": ["~/projects/tools/aurus-timeout|e1cfadf",
+                   "~/projects/tools/aurus-base|3f6f01f"],
+           "av3": ["~/projects/tools/aurus-timeout|e1cfadf"]},
+          "stage checks each phase's AuRUS checkout, on the hosts it runs on: "
+          "av3 is narrowed out of the second phase and never sees its tool")
+    staged = C.stage_apply_script(
+        "/tmp/root", "feat/baseline", "abc1234", "true", None, [], False,
+        None, baseline["aurus_checkouts"]["av3"])
+    check_true("'~/projects/tools/aurus-timeout|e1cfadf'" in staged,
+               "and the declared pair reaches the host-side check")
+    check_true("COMMIT.txt" in staged and "ant compile" in staged,
+               "which reads the checkout's own commit and refuses one that "
+               "is not built")
+    check(C.staged_aurus_checkouts([wide], {"av2": []}), {"av2": []},
+          "a host with no seeds needs no AuRUS staged")
+
     for text, expect_in, why in (
+        ('phases = [ { kind = "aurus", aurus_root = "~/a", '
+         'aurus_commit = "e1cfadf" } ]',
+         "needs `out`", "an aurus phase with no output directory"),
+        ('phases = [ { kind = "aurus", out = "experiments/a", '
+         'aurus_commit = "e1cfadf" } ]',
+         "needs `aurus_root`", "an aurus phase naming no AuRUS checkout"),
+        ('phases = [ { kind = "aurus", out = "experiments/a", '
+         'aurus_root = "~/a" } ]',
+         "needs `aurus_commit`",
+         "an aurus phase that does not say which AuRUS it ran"),
+        ('phases = [ { kind = "aurus", out = "experiments/a", '
+         'aurus_root = "~/a", aurus_commit = "e1cfadf", jobs = 4 } ]',
+         "unknown key(s) jobs on a aurus phase", "jobs on an aurus phase"),
+        ('phases = [ { kind = "aurus", out = "experiments/a", '
+         'aurus_root = "~/a", aurus_commit = "e1cfadf", gato = 0 } ]',
+         "gato must be a positive integer", "a zero AuRUS timeout"),
+        ('phases = [ { kind = "aurus", out = "experiments/a", '
+         'aurus_root = "~/a", aurus_commit = "e1cfadf", concurrency = "8" } ]',
+         "concurrency must be a positive integer", "a string concurrency"),
+        ('phases = [ { kind = "aurus", out = "experiments/a", '
+         'aurus_root = "~/a", aurus_commit = "e1cfadf", adapt = "" } ]',
+         "adapt must be a non-empty string", "an empty adapted tree"),
         ('phases = [ { kind = "score" } ]', "neither",
          "a score phase with no results and no profile"),
         ('phases = [ { kind = "score", profile = "nope" } ]',
