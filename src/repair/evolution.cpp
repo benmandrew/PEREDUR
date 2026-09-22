@@ -171,8 +171,14 @@ EvolutionResult run_evolution(
             accumulate_gate_passing(population, cfg, gen_idx + 1, accumulator);
         // Both optionals are governed by accumulator.enabled(), so either
         // test decides the other; the pair is what lets the checker see it.
+        //
+        // Read through value_or rather than dereferenced: gcc 11 cannot
+        // correlate the engaged flag with the payload across the explicit
+        // instantiation's return, so `*n_real` raises -Wmaybe-uninitialized
+        // and -Werror fails the lab hosts' build. The guard above already
+        // decides this, so the fallback is never taken.
         if (col_real.has_value() && n_real.has_value()) {
-            status.set(*col_real, std::to_string(*n_real));
+            status.set(*col_real, std::to_string(n_real.value_or(0)));
         }
         status.finish();
 
