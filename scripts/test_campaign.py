@@ -2874,6 +2874,41 @@ finally:
 
 SCORE_CAMPAIGN_PY = Path(__file__).resolve().parent / "score_campaign.py"
 
+# The relation sidecar. compare's verdict on every accumulated candidate is
+# collapsed to the implying names and the rest dropped, so without this the
+# only way back to it is the whole pass again. The distinction the file keeps
+# is the one the docstring draws: an empty map is compare saying nothing
+# implied an ideal, and no map at all is the question never asked.
+import score_curves as SCV  # noqa: E402
+
+relations_root = Path(tempfile.mkdtemp(prefix="campaign-relations-"))
+try:
+    curve = relations_root / "run_seed0.csv.part"
+    check(SCV.relations_path(curve), relations_root / "run_seed0.relations.tsv",
+          "the sidecar is named for the run, with .part and .csv stripped")
+    check(SCV.relations_path(relations_root / "run_seed0.csv"),
+          relations_root / "run_seed0.relations.tsv",
+          "and lands in the same place once the curve is moved into position")
+    check_true(not str(SCV.relations_path(curve)).endswith(".csv"),
+               "never as a second .csv: status counts curves by globbing "
+               "*.csv and collect --curves joins them, and a foreign header "
+               "under that glob is caught by neither")
+    SCV.write_relations(curve, {"b.tlsf": "strictly stronger",
+                                "a.tlsf": "incomparable"})
+    check(SCV.relations_path(curve).read_text(),
+          "file\trelation\na.tlsf\tincomparable\nb.tlsf\tstrictly stronger\n",
+          "every candidate's relation is kept, not just the implying ones")
+    SCV.write_relations(curve, {})
+    check(SCV.relations_path(curve).read_text(), "file\trelation\n",
+          "and compare finding nothing is a header alone, not a missing file")
+    check_true("run_seed0.relations.tsv" in [
+        p.name for p in __import__("score_campaign").sidecar_paths(
+            relations_root, Path("run_seed0"))],
+        "the scorer unlinks it with the others when an attempt fails, so no "
+        "reader sees a sidecar whose curve was thrown away")
+finally:
+    shutil.rmtree(relations_root, ignore_errors=True)
+
 STUB_CURVES = '''#!/usr/bin/env python3
 """Stands in for score_curves.py: writes a curve, or fails as its run says."""
 import os, sys, time

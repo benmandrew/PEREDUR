@@ -608,6 +608,12 @@ def score_run(run_dir: Path, args, deadline: float | None = None,
         if relations is not None:
             implying = {name for name, relation in relations.items()
                         if relation in IMPLYING_RELATIONS}
+            # Kept whole, not just the implying names, and keyed only on the
+            # comparison having happened: an empty map is compare saying
+            # nothing implied an ideal, where None is the question going
+            # unasked. The caller writes it beside the curve.
+            if sidecars is not None:
+                sidecars["relations"] = relations
     elif not index:
         implying = set()
     else:
@@ -673,19 +679,61 @@ def summarise(rows: list[dict]) -> dict:
     return summary
 
 
-def sidecar_paths(out: Path) -> tuple[Path, Path]:
-    """The two membership files beside the curve CSV at @p out.
+def curve_stem(out: Path) -> str:
+    """The run's name, taken from the curve path being written.
 
     `.part` is stripped before the stem is taken, so a scorer writing
     `<run>.csv.part` produces `<run>.members.tsv` rather than
-    `<run>.csv.members.tsv`; score_campaign.py renames all three together.
+    `<run>.csv.members.tsv`; score_campaign.py renames them all together.
     """
     stem = out.name
     for suffix in (".part", ".csv"):
         if stem.endswith(suffix):
             stem = stem[: -len(suffix)]
+    return stem
+
+
+def sidecar_paths(out: Path) -> tuple[Path, Path]:
+    """The two membership files beside the curve CSV at @p out."""
+    stem = curve_stem(out)
     return (out.parent / f"{stem}.members.tsv",
             out.parent / f"{stem}.fingerprints.tsv")
+
+
+def relations_path(out: Path) -> Path:
+    """Where compare's relation map is kept, beside the curve CSV.
+
+    Tab-separated and named `.tsv` rather than `.csv` deliberately. Both
+    `campaign.py status` and `collect --curves` read a curve directory by
+    globbing `*.csv`: a second CSV per run would double the progress count in
+    the first and be joined as a curve with a foreign header in the second,
+    and neither would say so. The membership sidecars are `.tsv` for the same
+    reason, and a relation such as `strictly stronger` carries a space but
+    never a tab.
+    """
+    return out.parent / f"{curve_stem(out)}.relations.tsv"
+
+
+def write_relations(out: Path, relations: dict) -> None:
+    """Persist compare's verdict on every accumulated candidate.
+
+    The caller collapses the map to the names that imply an ideal and drops
+    the rest, so the relation `compare` gave each of the other candidates --
+    incomparable, strictly weaker, and which of the ideals it was measured
+    against -- survives only here. `compare` is quadratic in candidates times
+    ideals and was 7.2 s of a 7.3 s run on a 421-candidate directory, so a
+    later question about those verdicts otherwise costs the whole pass again.
+
+    Written only where the map exists. `None` means the comparison did not
+    happen, which is not the same claim as a run with no ideal-implying
+    repair, and an absent file is how that difference is kept: an empty map is
+    a real answer and lands as a header alone.
+    """
+    with open(relations_path(out), "w", newline="") as handle:
+        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+        writer.writerow(["file", "relation"])
+        for name in sorted(relations):
+            writer.writerow([name, relations[name]])
 
 
 def write_sidecars(out: Path, sidecars: dict) -> None:
@@ -786,6 +834,11 @@ def main() -> int:
         # is why score_campaign.py passes one at a time.
         if args.out and args.maximality and sidecars.get("members"):
             write_sidecars(args.out, sidecars)
+        # Its own condition, not the one above: the relation map is produced
+        # by the ideals stage and has nothing to do with the maximality
+        # sweep, so an `ideals = "on", maximality = "off"` pass writes it too.
+        if args.out and "relations" in sidecars:
+            write_relations(args.out, sidecars["relations"])
 
     fields = SUMMARY_FIELDS if args.summary else CURVE_FIELDS
     rows = summaries if args.summary else long_rows

@@ -153,7 +153,7 @@ def csv_path(out: Path, run_dir: Path) -> Path:
 
 
 def sidecar_paths(out: Path, run_dir: Path) -> list:
-    """The membership files score_curves.py writes beside a run's curve.
+    """The sidecars score_curves.py writes beside a run's curve.
 
     They are written under their final names, since score_curves.py strips
     `.csv.part` before taking the stem, so only a failed attempt has anything
@@ -162,7 +162,8 @@ def sidecar_paths(out: Path, run_dir: Path) -> list:
     away.
     """
     return [out / f"{run_dir.name}{suffix}"
-            for suffix in (".members.tsv", ".fingerprints.tsv")]
+            for suffix in (".members.tsv", ".fingerprints.tsv",
+                           ".relations.tsv")]
 
 
 def is_scored(path: Path) -> bool:
