@@ -156,6 +156,12 @@ RUNNER_CMD = os.environ.get("PEREDUR_RUNNER_CMD",
 # a stub exactly as a run phase is.
 SCORER_CMD = os.environ.get("PEREDUR_SCORER_CMD",
                             f"{REMOTE_PYTHON} scripts/score_campaign.py")
+# The AuRUS twin, for a `kind = "aurus-score"` phase: one score_aurus_anytime
+# or check_well_separated call per repeat over this host's seeds, driven by
+# scripts/aurus_score_campaign.py. The same override pattern again.
+AURUS_SCORER_CMD = os.environ.get(
+    "PEREDUR_AURUS_SCORER_CMD",
+    f"{REMOTE_PYTHON} scripts/aurus_score_campaign.py")
 
 # Rebuilt by stage. The lab machines have no Nix, so this is the incremental
 # build against an already-configured preset directory, not a configure step;
@@ -232,7 +238,7 @@ while IFS= read -r m; do
   echo "@M@ENDFILE"
 done
 echo "@M@SCOREMANIFESTS"
-find experiments -mindepth 2 -maxdepth 2 -type f -name 'score-manifest-*.json' 2>/dev/null |
+find experiments -mindepth 2 -maxdepth 2 -type f \( -name 'score-manifest-*.json' -o -name 'aurus-score-manifest-*.json' \) 2>/dev/null |
 while IFS= read -r m; do
   echo "@M@SFILE $m"
   cat "$m"
@@ -521,6 +527,10 @@ def parse_detail(text: str) -> dict:
 # still running a binary built under that name is as busy as one running
 # `peredur`.
 ENGINE_COMMS = ("peredur", "counter", "compare", "maximal", "ltlsynt", "black")
+# The scoring drivers, matched in a python process's arguments. Both are read
+# as scorers; which pass a row belongs to comes from its manifest, not from
+# the command line.
+SCORER_SCRIPTS = ("score_campaign.py", "aurus_score_campaign.py")
 
 
 def live_processes(ps_lines: list[str]) -> list[dict]:
@@ -531,10 +541,13 @@ def live_processes(ps_lines: list[str]) -> list[dict]:
     names it; the comm of that process is the login shell, so keying on comm
     excludes it by construction.
 
-    A scorer (score_campaign.py, the score phase's twin of the runner) is
-    reported with ``kind = "score"`` and the ``--out`` directory it writes,
-    which is what a score phase's status row is matched against; it names no
-    profile, so nothing that keys on one mistakes it for a run.
+    A scorer (score_campaign.py or aurus_score_campaign.py, the scoring
+    phases' twin of the runner) is reported with ``kind = "score"`` and the
+    ``--out`` directory it writes, which is what a scoring phase's status row
+    is matched against; it names no profile, so nothing that keys on one
+    mistakes it for a run. Both scorers report the same kind because the row
+    is matched on its output directory, and no host ever runs two passes into
+    one of those.
     """
     found = []
     for line in ps_lines:
@@ -547,7 +560,8 @@ def live_processes(ps_lines: list[str]) -> list[dict]:
                 continue
             found.append({"comm": comm, "profile": profile_of_args(args),
                           "args": args})
-        elif comm.startswith("python") and "score_campaign.py" in args:
+        elif comm.startswith("python") and any(
+                name in args for name in SCORER_SCRIPTS):
             if "--dry-run" in args:
                 continue
             found.append({"comm": comm, "profile": None, "kind": "score",
@@ -618,14 +632,22 @@ def campaigns_from_score_manifests(manifests: list[dict]) -> list[dict]:
     out = []
     for m in manifests:
         git = m.get("git") or {}
-        maximal = (m.get("binaries") or {}).get("maximal") or {}
+        binaries = m.get("binaries") or {}
+        # Whichever PEREDUR binary decided this pass's rows: `maximal` for the
+        # maximality pass, `compare` for the AuRUS anytime one. The wellsep
+        # pass has none -- ltlsynt carries no PEREDUR commit -- and reports
+        # `?` rather than borrowing a commit its rows did not come from.
+        maximal = binaries.get("maximal") or binaries.get("compare") or {}
         counts = m.get("counts") or {}
         out_dir = str(m.get("out") or Path(m.get("file", "?")).parent)
         name = Path(out_dir).name
         out.append({
+            # Both scoring kinds read the same way here: one row per manifest,
+            # counted against the queue it froze and matched to a live scorer
+            # by output directory. Only the label says which pass it is.
             "kind": "score",
             "profile": name,
-            "label": f"score:{name}",
+            "label": f"{m.get('kind') or 'score'}:{name}",
             "out": out_dir,
             "results": m.get("results", ""),
             "manifest_host": m.get("hostname", "?"),
@@ -1103,10 +1125,10 @@ def print_status(reports: list[dict]) -> None:
           f"{human_duration(STALE_RUN_S)}; stuck means the runner is there and "
           "the log is not moving. ETA\nextrapolates rows-so-far over time "
           "since the manifest was written, and is crude by\nconstruction. "
-          "A score: row is a scoring pass: ROWS is curves written against "
-          "runs queued,\nfrom its score-manifest, STALE is the newest file "
-          "under its output directory, and\nrunning means a scorer names "
-          "that directory.")
+          "A score: or aurus-score: row is a scoring pass: ROWS is files "
+          "written against\nunits queued, from its manifest, STALE is the "
+          "newest file under its output\ndirectory, and running means a "
+          "scorer names that directory.")
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -1884,12 +1906,18 @@ class CampaignError(Exception):
 CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
                  "configs", "description"}
 # A phase is a search run (`kind = "run"`, the default and what every phase
-# was before the key existed) or an offline scoring pass over a results
-# directory (`kind = "score"`). Each kind reads its own keys: the runner's
-# selection keys mean nothing to the scorer, and the scorer's budgets mean
-# nothing to the runner, so a key from the other kind is refused by name
-# rather than carried along unread.
-PHASE_KINDS = ("run", "score")
+# was before the key existed), an offline scoring pass over a results
+# directory (`kind = "score"`), or one of the two passes over an AuRUS tree
+# (`kind = "aurus-score"`). Each kind reads its own keys: the runner's
+# selection keys mean nothing to a scorer, and one scorer's budgets mean
+# nothing to another, so a key from another kind is refused by name rather
+# than carried along unread.
+PHASE_KINDS = ("run", "score", "aurus-score")
+# The kinds that score rather than search. They share the shape the tick and
+# stage act on -- a results directory that has to be on the host already, no
+# configs directory of their own, a manifest under the output directory --
+# and differ only in which scorer the phase launches.
+SCORING_KINDS = ("score", "aurus-score")
 RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts"}
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s",
@@ -1907,7 +1935,26 @@ SCORE_STRING_KEYS = ("epsilon",)
 SCORE_NONNEGATIVE_KEYS = ("fingerprint_seed",)
 SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
                     *SCORE_BUDGET_KEYS}
-PHASE_KEYS = RUN_PHASE_KEYS | SCORE_PHASE_KEYS
+
+# One kind, two passes: `pass = "anytime"` dates and grades every AuRUS
+# solution through `compare`, `pass = "wellsep"` decides well-separation per
+# candidate through `ltlsynt`. They read differently shaped trees and share no
+# budget, so each pass's budgets are a set of their own and the other pass's
+# are refused by name -- a `compare_timeout` on a wellsep phase is not a
+# harmless extra, it is a budget somebody expected to bind.
+AURUS_PASSES = ("anytime", "wellsep")
+AURUS_COMMON_KEYS = {"name", "kind", "pass", "results", "out", "hosts", "jobs"}
+AURUS_BUDGET_KEYS = {"anytime": ("compare_timeout",),
+                     "wellsep": ("ltlsynt_timeout", "pattern", "fast_path")}
+AURUS_CHOICE_KEYS = {"fast_path": ("on", "off")}
+AURUS_STRING_KEYS = ("pattern",)
+AURUS_PHASE_KEYS = {pass_name: AURUS_COMMON_KEYS | set(budgets)
+                    for pass_name, budgets in AURUS_BUDGET_KEYS.items()}
+# Before the pass is known -- a phase whose `pass` is missing or unreadable
+# still has to be told what it might have said.
+AURUS_ANY_KEYS = set().union(*AURUS_PHASE_KEYS.values())
+
+PHASE_KEYS = RUN_PHASE_KEYS | SCORE_PHASE_KEYS | AURUS_ANY_KEYS
 
 # `describe` prints a declaration for a campaign that has already closed. It
 # is not one of these: the factor cross below is what the results CSV carries,
@@ -2055,10 +2102,34 @@ def curves_dir_for(results: str) -> str:
     return name if parent in ("", ".") else f"{parent}/{name}"
 
 
+def aurus_out_dir_for(results: str, which_pass: str) -> str:
+    """Default output directory for an aurus-score phase: `<pass>-<stem>`.
+
+    The same rule `curves_dir_for` follows, with the pass standing where
+    `curves` does, so the two passes over one tree cannot land in one
+    directory: their rows have different headers and a reader joining `*.csv`
+    would refuse the mix, or worse, not notice it.
+    """
+    stem = Path(results).name
+    for prefix in ("results-", "aurus-"):
+        if stem.startswith(prefix):
+            stem = stem[len(prefix):]
+            break
+    parent = str(Path(results).parent)
+    name = f"{which_pass}-{stem}" if stem else which_pass
+    return name if parent in ("", ".") else f"{parent}/{name}"
+
+
 def score_defaults() -> dict:
     """The scorer's own defaults, read from it rather than copied here."""
     import score_campaign  # noqa: PLC0415
     return dict(score_campaign.DEFAULTS)
+
+
+def aurus_defaults() -> dict:
+    """The AuRUS scorer's own defaults, read from it rather than copied."""
+    import aurus_score_campaign  # noqa: PLC0415
+    return dict(aurus_score_campaign.DEFAULTS)
 
 
 def campaign_path(name: str, root: Path | None = None) -> Path:
@@ -2111,13 +2182,28 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
         if kind not in PHASE_KINDS:
             raise CampaignError(f"{where}: kind must be one of "
                                 f"{', '.join(PHASE_KINDS)}, not {kind!r}")
-        allowed = SCORE_PHASE_KEYS if kind == "score" else RUN_PHASE_KEYS
+        which_pass = None
+        if kind == "aurus-score":
+            which_pass = phase.get("pass")
+            if which_pass not in AURUS_PASSES:
+                raise CampaignError(
+                    f"{where}: pass must be one of "
+                    f"{', '.join(AURUS_PASSES)}, not {which_pass!r}")
+            allowed = AURUS_PHASE_KEYS[which_pass]
+        elif kind == "score":
+            allowed = SCORE_PHASE_KEYS
+        else:
+            allowed = RUN_PHASE_KEYS
         unknown = sorted(set(phase) - allowed)
         if unknown:
             raise CampaignError(f"{where}: unknown key(s) {', '.join(unknown)} "
                                 f"on a {kind} phase; known: "
                                 f"{', '.join(sorted(allowed))}")
-        profile = phase.get("profile", raw.get("profile"))
+        # An aurus-score phase takes no profile and inherits none: it reads a
+        # tree by name, and a campaign-level profile falling through to it
+        # would put a results directory it never names into the stage check.
+        profile = (None if kind == "aurus-score"
+                   else phase.get("profile", raw.get("profile")))
         if kind == "score":
             results = phase.get("results")
             if results is not None and (not isinstance(results, str)
@@ -2155,6 +2241,10 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
                     f"other phases would never run on.")
         if kind == "score":
             normalised.append(normalise_score_phase(phase, where, profile,
+                                                    phase_hosts))
+            continue
+        if kind == "aurus-score":
+            normalised.append(normalise_aurus_phase(phase, where, which_pass,
                                                     phase_hosts))
             continue
         jobs = phase.get("jobs")
@@ -2246,6 +2336,54 @@ def normalise_score_phase(phase: dict, where: str, profile,
             "hosts": phase_hosts, "results": results, "out": out, **budgets}
 
 
+def normalise_aurus_phase(phase: dict, where: str, which_pass: str,
+                          phase_hosts) -> dict:
+    """An aurus-score phase's record: which pass, which tree, its budgets.
+
+    ``results`` is named rather than derived: neither tree an AuRUS pass reads
+    belongs to a runner profile, the raw one being what the search wrote and
+    the adapted one what aurus_adapt.py made of it. ``out`` defaults to
+    ``<pass>-<stem>`` beside it. Every budget defaults to the scorer's own
+    value and is carried explicitly to the command line, so the manifest the
+    host writes names what the declaration meant rather than what the scorer
+    happened to default to.
+    """
+    results = phase.get("results")
+    if not isinstance(results, str) or not results:
+        raise CampaignError(f"{where}: results must be a non-empty string "
+                            f"naming the tree this pass reads")
+    out = phase.get("out", aurus_out_dir_for(results, which_pass))
+    if not isinstance(out, str) or not out:
+        raise CampaignError(f"{where}: out must be a non-empty string naming "
+                            f"a directory under the checkout")
+    jobs = phase.get("jobs")
+    if jobs is not None and (isinstance(jobs, bool)
+                             or not isinstance(jobs, int) or jobs < 1):
+        raise CampaignError(f"{where}: jobs must be a positive integer")
+    defaults = aurus_defaults()
+    budgets = {"jobs": jobs if jobs is not None else defaults["jobs"]}
+    for key in AURUS_BUDGET_KEYS[which_pass]:
+        value = phase.get(key, defaults[key])
+        if key in AURUS_CHOICE_KEYS:
+            allowed = AURUS_CHOICE_KEYS[key]
+            if value not in allowed:
+                raise CampaignError(f"{where}: {key} must be one of "
+                                    f"{', '.join(allowed)}")
+        elif key in AURUS_STRING_KEYS:
+            if not isinstance(value, str) or not value:
+                raise CampaignError(f"{where}: {key} must be a non-empty "
+                                    f"string")
+        elif isinstance(value, bool) or not isinstance(value, int):
+            raise CampaignError(f"{where}: {key} must be an integer")
+        elif value < 1:
+            raise CampaignError(f"{where}: {key} must be a positive integer")
+        budgets[key] = value
+    return {"name": phase.get("name", Path(out).name), "kind": "aurus-score",
+            "pass": which_pass, "profile": None, "sweeps": None,
+            "specs": None, "hosts": phase_hosts, "results": results,
+            "out": out, **budgets}
+
+
 def phase_kind(phase: dict) -> str:
     """`run` unless the phase says otherwise. A phase record built before
     the key existed carries none, and every one of those is a run."""
@@ -2335,6 +2473,8 @@ def phase_args(phase: dict, seeds: list) -> list:
     """
     if phase_kind(phase) == "score":
         return score_phase_args(phase, seeds)
+    if phase_kind(phase) == "aurus-score":
+        return aurus_phase_args(phase, seeds)
     args = ["--profile", phase["profile"]]
     if phase.get("jobs"):
         args += ["--jobs", str(phase["jobs"])]
@@ -2366,9 +2506,33 @@ def score_phase_args(phase: dict, seeds: list) -> list:
     return args + ["--seeds", *[str(s) for s in seeds]]
 
 
+def aurus_phase_args(phase: dict, seeds: list) -> list:
+    """The AuRUS scorer's arguments: the pass, every budget stated, the seeds.
+
+    Stated rather than left to the scorer's defaults so the two never
+    disagree about what a phase ran under, and so the manifest the scorer
+    writes on the host records the declaration's values.
+    """
+    which_pass = phase.get("pass") or AURUS_PASSES[0]
+    defaults = aurus_defaults()
+    args = ["--pass", which_pass,
+            "--results", phase["results"], "--out", phase["out"],
+            "--jobs", str(phase.get("jobs") or defaults["jobs"])]
+    for key in AURUS_BUDGET_KEYS[which_pass]:
+        value = phase.get(key, defaults[key])
+        args += [f"--{key.replace('_', '-')}", str(value)]
+    return args + ["--seeds", *[str(s) for s in seeds]]
+
+
 def phase_launcher(phase: dict) -> str:
-    """The command a phase's arguments follow: the runner, or the scorer."""
-    return SCORER_CMD if phase_kind(phase) == "score" else RUNNER_CMD
+    """The command a phase's arguments follow: the runner, or one of the two
+    scorers."""
+    kind = phase_kind(phase)
+    if kind == "score":
+        return SCORER_CMD
+    if kind == "aurus-score":
+        return AURUS_SCORER_CMD
+    return RUNNER_CMD
 
 
 def phase_command(phase: dict, seeds: list) -> str:
@@ -3682,7 +3846,7 @@ def run_phase(root: Path, phase: dict, seeds: list, log_path: Path) -> int:
 
 
 def results_dir_missing(root: Path, phase: dict):
-    """Why a score phase cannot run here, or None.
+    """Why a scoring phase cannot run here, or None.
 
     The scorer's own check, asked before the attempt is spent: the results
     directory is produced by an earlier phase or an earlier campaign, and a
@@ -3692,7 +3856,8 @@ def results_dir_missing(root: Path, phase: dict):
     directory = root / phase["results"]
     if directory.is_dir():
         return None
-    return (f"no results directory at {directory} for score phase "
+    return (f"no results directory at {directory} for "
+            f"{phase_kind(phase)} phase "
             f"{phase['name']} — the run phase that writes it has not run on "
             f"this host, or `results` in campaign.toml names the wrong "
             f"directory")
@@ -4049,7 +4214,7 @@ def tick_entry(entry: dict, campaign: dict, root: Path,
     # run, and the scorer would say so an attempt later; the refusal is here
     # so the entry names the directory rather than an exit status.
     blocked = (results_dir_missing(root, phase)
-               if phase_kind(phase) == "score" else None)
+               if phase_kind(phase) in SCORING_KINDS else None)
     if blocked is not None and not args.dry_run:
         fail_or_requeue(entry, blocked)
         write_entry(entry["path"], entry)

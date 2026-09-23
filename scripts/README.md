@@ -11,6 +11,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `campaign.py` | The operating surface for a campaign: `stage`, `start`, `enqueue`, `tick`, `status`, `queue`, `collect`, `describe`. Everything that acts on a campaign goes through it. See `docs/dev/campaigns.md` for the state each verb leaves behind. |
 | `run_experiments.py` | Runs one phase of a sweep on one host and appends rows to the results CSV. Vendored into every campaign archive. |
 | `score_campaign.py` | The runner's scoring twin: one `score_curves.py --maximality` per run directory over one host's seeds, under a pinned worker pool, with a manifest of the budgets and binaries. What a `kind = "score"` phase runs. |
+| `aurus_score_campaign.py` | The same twin for the two passes that read an AuRUS tree: one `score_aurus_anytime.py` or `check_well_separated.py` per repeat over one host's seeds, with a manifest of the budgets and binaries. What a `kind = "aurus-score"` phase runs. |
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
 | `merge_experiments.py` | Joins per-host CSVs on `KEY_FIELDS`, keeping one row per key. Vendored likewise. |
 | `check_config_schema.py` | Lint, wired into CI and the pre-commit hook. Holds `config_io.cpp`, `config-schema.json`, `example-config.toml` and `gen_configs.DEFAULTS` against `include/config.hpp`. |

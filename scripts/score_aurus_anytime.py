@@ -110,18 +110,32 @@ def main():
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--binary", required=True)
-    ap.add_argument("--root", required=True)
+    ap.add_argument("--root",
+                    help="an AuRUS tree; every <spec>/repeat-* under it is "
+                         "scored")
+    # The alternative to walking a whole tree: the repeat directories to
+    # score, named explicitly. aurus_score_campaign.py enforces one host's
+    # seed split, and the split has to be enforced where the campaign's
+    # declaration is read rather than rediscovered from a directory listing
+    # here -- two hosts sharing a tree would otherwise each walk all of it.
+    ap.add_argument("--dirs", nargs="+", metavar="DIR",
+                    help="repeat directories to score, in place of --root")
     ap.add_argument("--examples", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--timeout", type=int, default=3600)
     a = ap.parse_args()
+    if bool(a.root) == bool(a.dirs):
+        ap.error("give exactly one of --root and --dirs")
 
-    dirs = sorted(os.path.join(a.root, s, r)
-                  for s in os.listdir(a.root)
-                  if os.path.isdir(os.path.join(a.root, s))
-                  for r in os.listdir(os.path.join(a.root, s))
-                  if r.startswith("repeat-"))
+    # Normalised because spec and repeat are read off the last two path
+    # components, and a trailing slash makes the repeat the empty string.
+    dirs = sorted(os.path.normpath(d) for d in a.dirs) if a.dirs else sorted(
+        os.path.join(a.root, s, r)
+        for s in os.listdir(a.root)
+        if os.path.isdir(os.path.join(a.root, s))
+        for r in os.listdir(os.path.join(a.root, s))
+        if r.startswith("repeat-"))
     done = set()
     if os.path.exists(a.out):
         with open(a.out) as h:

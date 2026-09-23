@@ -28,7 +28,7 @@ phases = [ { profile = "arbiter-probe", jobs = 4 } ]
 
 `configs` runs on the host during `stage`, after the build and before the version check so a failing generator reports as itself, in a subshell so `&&` behaves as written. It has no default, since no line suits every campaign and config trees are untracked.
 
-A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default) or `score`, which takes its own keys and refuses `jobs`, `sweeps` and `specs` by name.
+A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default), `score`, or `aurus-score`. Each of the other two takes its own keys and refuses every key belonging to another kind by name, so a budget nobody reads is never carried along unread.
 
 A phase's `hosts` table overrides the campaign split for that phase under the same rules, and may only narrow it, since `stage` staged no other host; an omitted host runs nothing for that phase and a tick advances past it. It exists because `run_experiments.py --seeds` replaces a profile's seed list rather than intersecting it, so paths with different sample sizes cannot share one range without silently changing the row count. `enqueue` freezes these as `phase_seeds`; older entries fall back to the campaign split.
 
@@ -86,7 +86,7 @@ The last five choose which curves a phase writes. `maximality = "off"` with a no
 
 `results` defaults to the profile's results directory and `out` to `curves-<stem>`. Budgets default to `score_campaign.DEFAULTS` and are always written to the command line, so the manifest records the values used rather than a default that moved.
 
-The host runs `scripts/score_campaign.py`. Run directories are queued smallest first by `accumulated/index.tsv` length, so heavy families land last. Each worker holds `cores` cores under `taskset -c` and runs `score_curves.py --maximality` under `timeout <wall_cap_s>` in its own session, so a cap kills the `maximal` and `compare` it forked too. A curve is written as `<out>/<run>.csv.part` and moved into place only on a zero exit with a non-empty file. Beside it the scorer writes `<run>.members.tsv`, one row per (cut, surviving file), `<run>.fingerprints.tsv`, one row per candidate and its hex fingerprint, and `<run>.relations.tsv`, one row per candidate and the strongest relation `compare` found between it and any of the family's ideals. All four move or are unlinked together, so a reader never sees a sidecar whose curve was thrown away. The relation file is written whenever `ideals = "on"` and the `compare` call returned, the maximality stage having nothing to do with it; an empty map is a header alone, and a `compare` that did not run leaves no file at all, which is the difference between nothing implying an ideal and the question never being asked. It is `.tsv` rather than `.csv` because `status` counts a pass's progress by globbing `*.csv` and `collect --curves` joins that same glob: a second CSV per run would double one count and be merged as a curve with a foreign header in the other.  There is no flag for the sidecars, because a flag is how membership went missing before: the 2026-09-07 pass wrote only the sizes of the survivor sets it held, so asking which repairs were maximal at 60 s cost its 311.7 worker-hours again. A failed attempt lands as `rc run` in `<out>/failures.txt`, every attempt in `<out>/timings.txt` with its budgets, and output in `<out>/warnings.log`. Startup refuses `workers x cores` above the host's CPU count, since `taskset -c` on a missing core exits 1 and drains the queue into `failures.txt`, and exits 2 when no run directory matches this host's seeds, so a tick cannot mark an empty pass done.
+The host runs `scripts/score_campaign.py`. Run directories are queued smallest first by `accumulated/index.tsv` length, so heavy families land last. Each worker holds `cores` cores under `taskset -c` and runs `score_curves.py --maximality` under `timeout <wall_cap_s>` in its own session, so a cap kills the `maximal` and `compare` it forked too. A curve is written as `<out>/<run>.csv.part` and moved into place only on a zero exit with a non-empty file. Beside it the scorer writes `<run>.members.tsv`, one row per (cut, surviving file), `<run>.fingerprints.tsv`, one row per candidate and its hex fingerprint, and `<run>.relations.tsv`, one row per candidate and the strongest relation `compare` found between it and any of the family's ideals. All four move or are unlinked together, so a reader never sees a sidecar whose curve was thrown away. The relation file is written whenever `ideals = "on"` and the `compare` call returned, the maximality stage having nothing to do with it; an empty map is a header alone, and a `compare` that did not run leaves no file at all, which is the difference between nothing implying an ideal and the question never being asked. It is `.tsv` rather than `.csv` because `status` counts a pass's progress by globbing `*.csv` and `collect --curves` joins that same glob: a second CSV per run would double one count and be merged as a curve with a foreign header in the other. There is no flag for the sidecars, because a flag is how membership went missing before: the 2026-09-07 pass wrote only the sizes of the survivor sets it held, so asking which repairs were maximal at 60 s cost its 311.7 worker-hours again. A failed attempt lands as `rc run` in `<out>/failures.txt`, every attempt in `<out>/timings.txt` with its budgets, and output in `<out>/warnings.log`. Startup refuses `workers x cores` above the host's CPU count, since `taskset -c` on a missing core exits 1 and drains the queue into `failures.txt`, and exits 2 when no run directory matches this host's seeds, so a tick cannot mark an empty pass done.
 
 A host scores only run directories ending `_seed<N>` for its own seeds, so the union `collect --curves` verifies is disjoint by construction.
 
@@ -95,6 +95,44 @@ The runner's freshness gate covers `build-release/maximal` and `build-release/co
 The pass exits 0 only when every run has a curve; otherwise the tick spends an attempt and requeues it, and the resume skips existing non-empty CSVs. To raise a budget, commit to `campaign.toml` and `enqueue` again.
 
 `stage` and the tick refuse a score phase whose results directory is missing, unless an earlier run phase of the campaign writes it. To reproduce an archived pass, declare a campaign of one score phase.
+
+## AuRUS scoring phases
+
+Two passes read an AuRUS tree rather than a PEREDUR run, and a `kind = "aurus-score"` phase runs either of them. One kind, two passes, chosen by `pass`:
+
+```toml
+[[phases]]
+kind = "aurus-score"
+pass = "anytime"                          # scripts/score_aurus_anytime.py
+results = "experiments/aurus-rerun-out"   # the raw AuRUS tree
+out = "experiments/anytime-rerun-out"
+jobs = 8
+compare_timeout = 3600
+
+[[phases]]
+kind = "aurus-score"
+pass = "wellsep"                          # scripts/check_well_separated.py
+results = "experiments/results-aurus-rerun"   # the adapted tree
+out = "experiments/wellsep-uncensored"
+jobs = 8
+ltlsynt_timeout = 60
+pattern = "*.tlsf"
+fast_path = "off"
+```
+
+`name`, `results`, `out`, `hosts` and `jobs` are common to both passes, and `results` is required: neither tree belongs to a runner profile, so there is nothing to derive it from. `out` defaults to `<pass>-<stem>` beside the tree, the stem being its name less a `results-` or `aurus-` prefix, which keeps the two passes over one tree out of a single directory. `jobs` is the number of repeats in flight; each scorer is given `--jobs 1`, so one knob sets the load and the manifest records what ran. The **anytime** pass then takes `compare_timeout`, the budget for one repeat's `compare` call. The **wellsep** pass takes `ltlsynt_timeout`, the budget for one candidate's `ltlsynt` call, `pattern`, the glob that picks the candidate files out of a run's `accumulated/`, and `fast_path`, which is `off` so that every verdict is `ltlsynt`'s. A budget belonging to the other pass is refused by name, because a `compare_timeout` sitting unread on a wellsep phase is a bound somebody expected to bind.
+
+The two passes read differently shaped trees, and the shape is checked rather than assumed. The anytime pass reads the raw tree `aurus_campaign.py` writes, `<results>/<spec>/repeat-<NN>`, and it has to be that one: a solution is dated from the iteration series in its repeat's `run.log`, and `aurus_adapt.py` carries the dates it derived from that log but not the log. The wellsep pass reads the PEREDUR-shaped tree `aurus_adapt.py` leaves, `<results>/<run>_seed<NN>`, and is pointed at each run's `accumulated/` rather than at the run, so nothing beside the candidates can add a row. A phase pointed at the wrong one is refused by name; the alternative reading is an empty queue, which is what a host whose search has not run yet looks like.
+
+The host runs `scripts/aurus_score_campaign.py`, a sibling of `score_campaign.py` rather than a third stage inside it. That file drives one scorer and its whole vocabulary is `score_curves.py`'s — cuts, an antichain deadline, a per-worker block of cores under `taskset`, the three sidecars renamed with the curve — and these passes share none of it. What they share is the shape. A repeat stands where a seed does, AuRUS being unseedable, so both tree shapes split on the number in the directory name, enforced here in the same place the runner enforces it. The queue is smallest first, by solution count for the raw tree and by `accumulated/index.tsv` length for the adapted one, with ties on the name. Rows are written to `<unit>.csv.part` and moved into place only on an accepted exit with a non-empty file, so a reader listing `*.csv` never sees an output still being written. A failed attempt lands as `rc unit-dir` in `<out>/failures.txt`, every attempt in `<out>/timings.txt` with the budgets it ran under, and output in `<out>/warnings.log`.
+
+`check_well_separated.py` exits 1 when any candidate came back `undecided`, and that is a verdict its CSV carries rather than a failed unit: an `ltlsynt` timeout is the answer the script exists to record honestly, and treating it as a failure would retry the whole repeat on every requeue for ever. Its exit 2 — no input files, no `ltlsynt` — is a failure. The anytime pass accepts 0 alone.
+
+The freshness gate covers `compare` for the anytime pass. The wellsep pass runs no PEREDUR binary at all: `ltlsynt` comes out of the fetched Spot tree and carries no PEREDUR commit, so there is nothing to compare against, and its path and version string go in the manifest instead. Startup refuses `jobs` above the host's CPU count and exits 2 when no repeat matches this host's seeds, so a tick cannot mark an empty pass done.
+
+Neither pass has an outer wall cap. Both scorers bound their own solver call — `compare_timeout` per repeat, `ltlsynt_timeout` per candidate — so a unit's cost is bounded by its candidate count times that budget, and there is no forked walk for a cap to have to kill.
+
+The pass writes `aurus-score-manifest-<host>.json` into its output directory, carrying the pass, the seeds, every budget, the binaries and both timestamps, and rewrites it when it finishes. `status` reads it as `aurus-score:<out>`, counting the CSVs in that directory against the queue the manifest froze; BINARY is `compare`'s commit for an anytime pass and `?` for a wellsep one, which names no commit rather than borrowing one its rows did not come from. The pass exits 0 only when every repeat has rows; otherwise the tick spends an attempt and requeues it, and the resume skips existing non-empty CSVs. `stage` and the tick refuse an `aurus-score` phase whose tree is missing on the same terms a score phase's is refused.
 
 ## Reading a run
 
@@ -111,7 +149,7 @@ Tables are coloured only on a terminal, since `tick` logs to `$HOME/.peredur-que
 
 A `~` before ROWS means the whole CSV was counted because the runner returned no plan, which overstates progress. A `!` after BRANCH means the checkout has left the manifest's branch, so a resume would produce rows from other code. A `*` after BINARY means the launch used `--allow-stale-binary`, so its rows name a commit they did not come from.
 
-A score phase appears as `score:<out>`, read from `score-manifest-<host>.json`: ROWS counts curves against the frozen queue, STALE is the newest file's age, BINARY is `maximal`'s commit, and the same three-hour rule applies. `--campaign <out>` selects it.
+A score phase appears as `score:<out>`, read from `score-manifest-<host>.json`: ROWS counts curves against the frozen queue, STALE is the newest file's age, BINARY is `maximal`'s commit, and the same three-hour rule applies. An `aurus-score` phase appears as `aurus-score:<out>` and is read the same way, from `aurus-score-manifest-<host>.json`. `--campaign <out>` selects either.
 
 ## The binary freshness gate
 
@@ -214,6 +252,6 @@ The output is not runnable, naming retired profiles (`wellsep-timing`) and rejec
 python3 scripts/test_campaign.py
 ```
 
-A plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. It never touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `PEREDUR_RUNNER_CMD` and `PEREDUR_SCORER_CMD` stubs that record their arguments. `score_campaign.py` uses a fake results tree, a `PEREDUR_SCORE_CURVES_CMD` stub, and stub binaries under `PEREDUR_BIN_DIR`. New launch-path code must be tested the same way.
+A plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. It never touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `PEREDUR_RUNNER_CMD` and `PEREDUR_SCORER_CMD` stubs that record their arguments. `score_campaign.py` uses a fake results tree, a `PEREDUR_SCORE_CURVES_CMD` stub, and stub binaries under `PEREDUR_BIN_DIR`; `aurus_score_campaign.py` uses one fake tree of each shape, `PEREDUR_ANYTIME_CMD` and `PEREDUR_WELLSEP_CMD` stubs, and the same stub binaries. New launch-path code must be tested the same way.
 
 `campaign.py` parses TOML itself because av2 and av3 run python3 3.10.12 with neither `tomllib` nor `tomli`. Its subset is checked against `tomllib` on every fixture wherever that exists. Remote shell scripts never use bare globs, since zsh's `NOMATCH` aborts on an unmatched pattern and every later section vanishes in silence.

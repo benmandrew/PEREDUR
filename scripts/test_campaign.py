@@ -522,6 +522,64 @@ check((sparsed["rows_done"], sparsed["log_mtime"]), (12, 1786459940),
 check_true("rows_from_csv" not in sparsed,
            "which is not a whole-CSV fallback and is not marked as one")
 
+# An aurus-score phase reports the same way, off a manifest of its own name.
+# The sweep that finds it has to widen without catching anything else: a
+# manifest missed here reads as a pass that never started.
+AURUS_MANIFEST = """{
+  "kind": "aurus-score",
+  "pass": "wellsep",
+  "hostname": "av2",
+  "started": "2026-09-23T10:00:00+0100",
+  "finished": null,
+  "results": "experiments/results-aurus-rerun",
+  "out": "experiments/wellsep-uncensored",
+  "seeds": [0, 1],
+  "jobs": 4,
+  "budgets": {"ltlsynt_timeout": 60, "pattern": "*.tlsf",
+              "fast_path": "off"},
+  "git": {"branch": "campaign/aurus-rerun-anytime", "head": "beef123cafe"},
+  "binaries": {"ltlsynt": {"path": "third_party/spot/bin/ltlsynt",
+                           "version": "ltlsynt (spot) 2.15.1"}},
+  "allow_stale_binary": false,
+  "counts": {"queued": 40, "already_scored": 0, "scored": 0, "failed": 0}
+}"""
+
+ainv = C.parse_inventory(f"""##PS
+python3 python3 scripts/aurus_score_campaign.py --pass wellsep --out experiments/wellsep-uncensored --seeds 0 1
+##HOST
+av2
+1786460000
+##GIT
+campaign/aurus-rerun-anytime
+beef123
+0
+##MANIFESTS
+##SCOREMANIFESTS
+##SFILE experiments/wellsep-uncensored/aurus-score-manifest-av2.json
+{AURUS_MANIFEST}
+##ENDSFILE
+##END
+""")
+check(len(ainv["score_manifests"]), 1, "an aurus-score manifest is parsed")
+check_true("aurus-score-manifest-*.json" in C.INVENTORY_SCRIPT
+           and "score-manifest-*.json" in C.INVENTORY_SCRIPT,
+           "because the inventory sweep looks for both manifest names")
+aprocs = C.live_processes(ainv["ps"])
+check((aprocs[0].get("kind"), aprocs[0].get("out"), aprocs[0]["profile"]),
+      ("score", "experiments/wellsep-uncensored", None),
+      "the AuRUS scorer is read as a scorer naming its output directory")
+arec = C.campaigns_from_score_manifests(ainv["score_manifests"])[0]
+check((arec["profile"], arec["label"], arec["rows_planned"]),
+      ("wellsep-uncensored", "aurus-score:wellsep-uncensored", 40),
+      "and its row is labelled for its kind, counted against its own queue")
+check(arec["binary_commit"], "?",
+      "a wellsep pass names no PEREDUR commit: ltlsynt carries none")
+check(C.campaigns_from_score_manifests(
+    [dict(json.loads(AURUS_MANIFEST), **{"pass": "anytime", "binaries": {
+        "compare": {"commit_short": "abc1234", "dirty": "1"}}})])[0]
+    ["binary_commit"], "abc1234",
+    "an anytime pass names compare's, which decided its rows")
+
 
 def score_annotated(csvs, mtime, procs, finished=None, epoch=1786460000):
     record = dict(s, rows_done=csvs, log_mtime=mtime, finished=finished)
@@ -1292,6 +1350,137 @@ hosts = {{ av2 = "0-1" }}
 {text}
 """)
         check_true(expect_in in got, f"{why} must be refused ({got!r})")
+
+    # ── aurus-score phases ────────────────────────────────────────────────────
+    #
+    # A third kind, and the first with two passes under one name. The passes
+    # share a shape and no budget at all, so what is worth guarding is that
+    # each one's keys are refused on the other: a `compare_timeout` sitting
+    # unread on a wellsep phase is a budget somebody expected to bind.
+    write_declaration(decl_root, "aurusscored", """
+name = "aurusscored"
+branch = "feat/aurus"
+profile = "tlsf"
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+[[phases]]
+kind = "aurus-score"
+pass = "anytime"
+results = "experiments/aurus-rerun-out"
+
+[[phases]]
+kind = "aurus-score"
+pass = "wellsep"
+name = "separated"
+results = "experiments/results-aurus-rerun"
+out = "experiments/wellsep-uncensored"
+jobs = 8
+ltlsynt_timeout = 120
+pattern = "spec*.tlsf"
+fast_path = "on"
+hosts = { av2 = "0-4" }
+""")
+    aurus = C.load_campaign("aurusscored", decl_root)
+    anytime, wellsep = aurus["phases"]
+    check((anytime["kind"], anytime["pass"]), ("aurus-score", "anytime"),
+          "an anytime phase parses as its own kind and pass")
+    check((wellsep["kind"], wellsep["pass"]), ("aurus-score", "wellsep"),
+          "and so does a wellsep one")
+    check(anytime["out"], "experiments/anytime-rerun-out",
+          "out defaults to <pass>-<stem> beside the tree it reads")
+    check(anytime["name"], "anytime-rerun-out",
+          "and the phase is named after its output by default")
+    check({"jobs": anytime["jobs"],
+           "compare_timeout": anytime["compare_timeout"]},
+          {"jobs": 4, "compare_timeout": 3600},
+          "every anytime budget defaults to the scorer's own value")
+    check(C.aurus_defaults(), __import__("aurus_score_campaign").DEFAULTS,
+          "which come from aurus_score_campaign.py, not from a copy")
+    check(anytime["profile"], None,
+          "an aurus-score phase inherits no campaign-level profile")
+    check({k: wellsep[k] for k in ("name", "results", "out", "jobs",
+                                   "ltlsynt_timeout", "pattern", "fast_path")},
+          {"name": "separated", "results": "experiments/results-aurus-rerun",
+           "out": "experiments/wellsep-uncensored", "jobs": 8,
+           "ltlsynt_timeout": 120, "pattern": "spec*.tlsf",
+           "fast_path": "on"},
+          "and every wellsep key it states is carried through")
+    check(wellsep["hosts"], {"av2": list(range(5))},
+          "an aurus-score phase narrows the split as any other phase does")
+    check(aurus["config_dirs"], [],
+          "it adds no configs directory to the stage check")
+    check(aurus["results_dirs"],
+          {"av2": ["experiments/aurus-rerun-out",
+                   "experiments/results-aurus-rerun"],
+           "av3": ["experiments/aurus-rerun-out"]},
+          "but both trees are checked, on the hosts their phase runs on")
+    check(C.aurus_out_dir_for("experiments/results-aurus-rerun", "wellsep"),
+          "experiments/wellsep-aurus-rerun",
+          "the adapted tree's stem loses its results- prefix")
+
+    for text, expect_in, why in (
+        ('phases = [ { kind = "aurus-score", results = "x" } ]',
+         "pass must be one of", "an aurus-score phase with no pass"),
+        ('phases = [ { kind = "aurus-score", pass = "both", results = "x" } ]',
+         "pass must be one of", "an unknown pass"),
+        ('phases = [ { kind = "aurus-score", pass = "anytime" } ]',
+         "results must be a non-empty string",
+         "an aurus-score phase naming no tree"),
+        ('phases = [ { kind = "aurus-score", pass = "anytime", '
+         'results = "x", profile = "tlsf" } ]',
+         "unknown key(s) profile on a aurus-score phase",
+         "a profile on an aurus-score phase"),
+        ('phases = [ { kind = "aurus-score", pass = "anytime", '
+         'results = "x", sweeps = ["R"] } ]',
+         "unknown key(s) sweeps on a aurus-score phase",
+         "a run key on an aurus-score phase"),
+        ('phases = [ { kind = "aurus-score", pass = "anytime", '
+         'results = "x", specs = ["a"] } ]',
+         "unknown key(s) specs on a aurus-score phase",
+         "specs on an aurus-score phase"),
+        ('phases = [ { kind = "aurus-score", pass = "anytime", '
+         'results = "x", workers = 2, cuts = 5 } ]',
+         "unknown key(s) cuts, workers on a aurus-score phase",
+         "a score budget on an aurus-score phase"),
+        ('phases = [ { kind = "aurus-score", pass = "anytime", '
+         'results = "x", deadline_s = 100 } ]',
+         "unknown key(s) deadline_s on a aurus-score phase",
+         "a score deadline on an aurus-score phase"),
+        ('phases = [ { kind = "aurus-score", pass = "anytime", '
+         'results = "x", ltlsynt_timeout = 60 } ]',
+         "unknown key(s) ltlsynt_timeout on a aurus-score phase",
+         "a wellsep budget on an anytime phase"),
+        ('phases = [ { kind = "aurus-score", pass = "wellsep", '
+         'results = "x", compare_timeout = 60 } ]',
+         "unknown key(s) compare_timeout on a aurus-score phase",
+         "an anytime budget on a wellsep phase"),
+        ('phases = [ { kind = "aurus-score", pass = "anytime", '
+         'results = "x", jobs = 0 } ]',
+         "jobs must be a positive integer", "zero jobs"),
+        ('phases = [ { kind = "aurus-score", pass = "anytime", '
+         'results = "x", compare_timeout = "1" } ]',
+         "compare_timeout must be an integer", "a string budget"),
+        ('phases = [ { kind = "aurus-score", pass = "wellsep", '
+         'results = "x", fast_path = "yes" } ]',
+         "fast_path must be one of", "a fast_path that is not on or off"),
+        ('phases = [ { kind = "aurus-score", pass = "wellsep", '
+         'results = "x", pattern = "" } ]',
+         "pattern must be a non-empty string", "an empty pattern"),
+        ('phases = [ { kind = "aurus-score", pass = "anytime", '
+         'results = "x", out = 3 } ]',
+         "out must be a non-empty string", "a numeric out"),
+        ('phases = [ { profile = "full", pass = "anytime" } ]',
+         "unknown key(s) pass on a run phase", "a pass on a run phase"),
+        ('phases = [ { kind = "score", results = "x", pass = "anytime" } ]',
+         "unknown key(s) pass on a score phase", "a pass on a score phase"),
+    ):
+        got = declaration_error(decl_root, "badaurus", f"""
+name = "badaurus"
+branch = "feat/x"
+hosts = {{ av2 = "0-1" }}
+{text}
+""")
+        check_true(expect_in in got, f"{why} must be refused ({got!r})")
 finally:
     shutil.rmtree(decl_root, ignore_errors=True)
 
@@ -1335,6 +1524,32 @@ check(C.phase_command(score_phase, [0, 1]),
       "and its command is the scorer's, not the runner's")
 check(C.phase_launcher({"profile": "tlsf"}), C.RUNNER_CMD,
       "a phase record with no kind at all launches the runner")
+
+anytime_phase = {"name": "anytime", "kind": "aurus-score", "pass": "anytime",
+                 "profile": None, "results": "experiments/aurus-out",
+                 "out": "experiments/anytime-out", "jobs": 6,
+                 "compare_timeout": 1800}
+check(C.phase_args(anytime_phase, [0, 1]),
+      ["--pass", "anytime", "--results", "experiments/aurus-out",
+       "--out", "experiments/anytime-out", "--jobs", "6",
+       "--compare-timeout", "1800", "--seeds", "0", "1"],
+      "an anytime phase becomes AuRUS scorer arguments, seeds last")
+wellsep_phase = {"name": "wellsep", "kind": "aurus-score", "pass": "wellsep",
+                 "profile": None, "results": "experiments/results-aurus",
+                 "out": "experiments/wellsep-aurus", "jobs": 4,
+                 "ltlsynt_timeout": 90, "pattern": "spec*.tlsf",
+                 "fast_path": "off"}
+check(C.phase_args(wellsep_phase, [7]),
+      ["--pass", "wellsep", "--results", "experiments/results-aurus",
+       "--out", "experiments/wellsep-aurus", "--jobs", "4",
+       "--ltlsynt-timeout", "90", "--pattern", "spec*.tlsf",
+       "--fast-path", "off", "--seeds", "7"],
+      "and a wellsep phase states its own budgets and nothing else")
+check_true(C.phase_command(wellsep_phase, [7, 8]).startswith(
+    C.AURUS_SCORER_CMD + " "),
+    "an aurus-score phase's command is the AuRUS scorer's")
+check_true(C.phase_command(wellsep_phase, [7, 8]).endswith("--seeds 7 8"),
+           "and the host's seeds reach the command line, never a typed range")
 
 # The freeze has to reach the overrides. Freezing the campaign range alone
 # would pin the phases that do not narrow it and leave every phase that does
@@ -3197,6 +3412,250 @@ try:
                "a missing results directory is refused by name")
 finally:
     shutil.rmtree(score_root, ignore_errors=True)
+
+
+# ── aurus_score_campaign.py ───────────────────────────────────────────────────
+#
+# The AuRUS scorer, against two fake trees and a stub in place of each pass's
+# script. The bookkeeping is what matters here for the same reason it does
+# above -- a resume that re-scores a finished repeat, or skips a failed one,
+# is invisible until the bill arrives -- and one thing more: the two passes
+# read differently shaped trees that sit beside each other under experiments/,
+# so a phase pointed at the wrong one has to say so rather than report an
+# empty queue.
+
+AURUS_CAMPAIGN_PY = Path(__file__).resolve().parent / "aurus_score_campaign.py"
+
+STUB_PASS = '''#!/usr/bin/env python3
+"""Stands in for either pass's script: writes rows, or fails as its unit says."""
+import os, sys
+out = sys.argv[sys.argv.index("--out") + 1]
+target = sys.argv[-1]
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       "calls.txt"), "a") as handle:
+    handle.write(" ".join(sys.argv[1:]) + "\\n")
+name = os.path.basename(os.path.dirname(target)) + "/" + os.path.basename(target)
+if "fail" in name:
+    sys.exit(3)
+if "empty" in name:
+    open(out, "w").close()
+    sys.exit(0)
+with open(out, "w") as handle:
+    handle.write("spec,verdict\\n" + os.path.basename(target) + ",ok\\n")
+print("scored", name)
+# The undecided exit: a verdict the CSV carries, not a failed unit.
+sys.exit(1 if "undecided" in name else 0)
+'''
+
+aurus_root = Path(tempfile.mkdtemp(prefix="campaign-aurus-"))
+try:
+    abins = aurus_root / "bin"
+    abins.mkdir()
+    real_head = git(AURUS_CAMPAIGN_PY.parent.parent, "rev-parse", "HEAD")
+    fake_binary(abins / "compare", real_head)
+    astub_dir = aurus_root / "stub"
+    astub_dir.mkdir()
+    astub = astub_dir / "stub_pass.py"
+    astub.write_text(STUB_PASS)
+    acalls = astub_dir / "calls.txt"
+
+    # The raw AuRUS tree the anytime pass reads: <spec>/repeat-<NN>, one
+    # repeat standing where a seed does. Solution counts chosen so the
+    # smallest-first order differs from the alphabetical one.
+    raw = aurus_root / "aurus-out"
+    for spec, repeats in (("arbiter", ((0, 3), (1, 1), (9, 5))),
+                          ("fail", ((0, 2),)), ("empty", ((1, 2),))):
+        for repeat, solutions in repeats:
+            unit = raw / spec / f"repeat-{repeat:02d}"
+            unit.mkdir(parents=True)
+            (unit / "run.log").write_text("")
+            for i in range(solutions):
+                (unit / f"spec{i}.tlsf").write_text("x")
+
+    # The adapted tree the wellsep pass reads, as aurus_adapt.py leaves it.
+    adapted = aurus_root / "results-aurus"
+    for run, rows in (("aurus_arbiter_seed00", 3), ("aurus_amba_seed01", 1),
+                      ("aurus_undecided_seed00", 2),
+                      ("aurus_other_seed42", 1)):
+        accumulated = adapted / run / "accumulated"
+        accumulated.mkdir(parents=True)
+        (accumulated / "index.tsv").write_text("header\n" + "row\n" * rows)
+        (accumulated / "spec0.tlsf").write_text("x")
+    (adapted / "notes.txt").write_text("not a run\n")
+
+    def aurus(which_pass: str, results: Path, out: Path, *extra: str,
+              seeds=("0", "1")) -> subprocess.CompletedProcess:
+        env = dict(os.environ, PEREDUR_BIN_DIR=str(abins),
+                   PEREDUR_ANYTIME_CMD=f"{sys.executable} {astub}",
+                   PEREDUR_WELLSEP_CMD=f"{sys.executable} {astub}")
+        return subprocess.run(
+            [sys.executable, str(AURUS_CAMPAIGN_PY), "--pass", which_pass,
+             "--results", str(results), "--out", str(out), "--seeds", *seeds,
+             *extra],
+            cwd=str(aurus_root), env=env, capture_output=True, text=True)
+
+    # The shapes are checked, and each pass refuses the other's tree by name.
+    # An empty queue would be the alternative, and that reads as a host whose
+    # search has not run yet.
+    proc = aurus("anytime", adapted, aurus_root / "any")
+    check(proc.returncode, 2, "the anytime pass refuses the adapted tree")
+    check_true("run.log" in proc.stderr and "repeat-" in proc.stderr,
+               f"saying it needs the raw one, and why: {proc.stderr!r}")
+    proc = aurus("wellsep", raw, aurus_root / "ws")
+    check(proc.returncode, 2, "and the wellsep pass refuses the raw tree")
+    check_true("accumulated" in proc.stderr,
+               f"saying where its candidates live: {proc.stderr!r}")
+
+    anyout = aurus_root / "anytime-out"
+    proc = aurus("anytime", raw, anyout, "--dry-run", "--jobs", "1")
+    check(proc.returncode, 0, f"a dry run exits 0: {proc.stderr}")
+    check_true("4 unit(s)" in proc.stdout and "4 to score" in proc.stdout,
+               f"and counts this host's repeats alone: {proc.stdout}")
+    check_true("arbiter_repeat-09" not in proc.stdout,
+               "another host's repeat is not queued here")
+    check_true("--dirs <unit-dir>" in proc.stdout
+               and "--timeout 3600" in proc.stdout,
+               f"the command template is printed: {proc.stdout}")
+    check_true(not anyout.exists() and not acalls.exists(),
+               "and a dry run writes nothing and scores nothing")
+
+    # The gate: compare from another commit refuses, and nothing is written.
+    fake_binary(abins / "compare", "a" * 40)
+    proc = aurus("anytime", raw, anyout, "--jobs", "1")
+    check(proc.returncode, 1, "a stale compare refuses to score")
+    check_true("STALE BINARY" in proc.stdout and "compare" in proc.stdout,
+               f"naming the binary: {proc.stdout}")
+    check_true(not anyout.exists(), "before writing anything")
+    fake_binary(abins / "compare", real_head)
+
+    proc = aurus("anytime", raw, anyout, "--jobs", "1")
+    check(proc.returncode, 1, "a pass with failures exits 1")
+    units = [ln.split()[-1] for ln in acalls.read_text().splitlines()]
+    check([Path(u).parent.name + "/" + Path(u).name for u in units],
+          ["arbiter/repeat-01", "empty/repeat-01", "fail/repeat-00",
+           "arbiter/repeat-00"],
+          "smallest first by solution count, ties on the name")
+    check(sorted(p.name for p in anyout.glob("*.csv")),
+          ["arbiter_repeat-00.csv", "arbiter_repeat-01.csv"],
+          "the repeats that scored have their rows in place")
+    check(list(anyout.glob("*.part")), [], "and no .part file is left behind")
+    failures = {Path(ln.split()[1]).parent.name: ln.split()[0]
+                for ln in (anyout / "failures.txt").read_text().splitlines()}
+    check(failures, {"fail": "3", "empty": "0"},
+          "an empty output is a failure, as is a non-zero exit")
+    timings = [ln.split() for ln in
+               (anyout / "timings.txt").read_text().splitlines()]
+    check([t[3] for t in timings],
+          ["arbiter_repeat-01", "empty_repeat-01", "fail_repeat-00",
+           "arbiter_repeat-00"],
+          "timings.txt has one line per attempt, in order")
+    check({t[4] for t in timings}, {"compare_timeout=3600"},
+          "carrying the budget the unit was scored under")
+    check_true("scored arbiter/repeat-00" in
+               (anyout / "warnings.log").read_text(),
+               "and the scorers' output lands in warnings.log")
+
+    amanifests = list(anyout.glob("aurus-score-manifest-*.json"))
+    check(len(amanifests), 1, "one manifest, named for the host")
+    amanifest = json.loads(amanifests[0].read_text())
+    check((amanifest["kind"], amanifest["pass"]), ("aurus-score", "anytime"),
+          "the manifest names the kind and the pass")
+    check(amanifest["counts"],
+          {"queued": 4, "already_scored": 0, "scored": 2, "failed": 2},
+          "counts the pass")
+    check(amanifest["seeds"], [0, 1], "records this host's seeds")
+    check(amanifest["budgets"], {"compare_timeout": 3600},
+          "every budget it ran under")
+    check(amanifest["binaries"]["compare"]["commit"], real_head,
+          "the binary that decided the rows")
+    check(amanifest["git"]["head"], real_head, "the checkout's head")
+    check(amanifest["allow_stale_binary"], False,
+          "whether the gate was overridden")
+    check_true(amanifest["finished"] is not None and amanifest["started"],
+               "and both timestamps")
+    check_true(amanifest["invocation"].endswith("--dirs <unit-dir>"),
+               "and the invocation template")
+
+    # Resume: the failures are retried, the rows already there are not.
+    acalls.unlink()
+    proc = aurus("anytime", raw, anyout, "--jobs", "2")
+    check(proc.returncode, 1, "still failing, so still 1")
+    retried = sorted(Path(ln.split()[-1]).parent.name
+                     for ln in acalls.read_text().splitlines())
+    check(retried, ["empty", "fail"],
+          "a rerun scores only the repeats with no rows")
+    check(json.loads(amanifests[0].read_text())["counts"]["already_scored"], 2,
+          "and the manifest says which were already there")
+
+    # Every unit present: exit 0, so a tick moves the entry on.
+    (raw / "fail").rename(raw / "fixed")
+    (raw / "empty").rename(raw / "full")
+    proc = aurus("anytime", raw, anyout, "--jobs", "2")
+    check(proc.returncode, 0, f"a complete pass exits 0: {proc.stdout}")
+    check_true("4/4 present" in proc.stdout, "saying so")
+
+    # The wellsep pass: its own tree, its own budgets, and exit 1 from
+    # check_well_separated.py is an undecided verdict rather than a failure.
+    acalls.unlink()
+    wsout = aurus_root / "wellsep-out"
+    proc = aurus("wellsep", adapted, wsout, "--jobs", "2",
+                 "--ltlsynt-timeout", "30", "--pattern", "spec*.tlsf",
+                 "--fast-path", "on")
+    check(proc.returncode, 0, f"an undecided verdict is not a failure: "
+                              f"{proc.stdout} {proc.stderr}")
+    check(sorted(p.name for p in wsout.glob("*.csv")),
+          ["aurus_amba_seed01.csv", "aurus_arbiter_seed00.csv",
+           "aurus_undecided_seed00.csv"],
+          "one CSV per run directory on this host's seeds")
+    check((wsout / "failures.txt").read_text(), "",
+          "and nothing in failures.txt")
+    targets = [ln.split()[-1] for ln in acalls.read_text().splitlines()]
+    check_true(all(Path(t).name == "accumulated" for t in targets),
+               f"the scorer is pointed at the candidates, not the run: "
+               f"{targets}")
+    call = acalls.read_text().splitlines()[0]
+    check_true("--ltlsynt-timeout" not in call and "--timeout 30" in call
+               and "--pattern spec*.tlsf" in call and "--fast-path" in call
+               and "--jobs 1" in call,
+               f"with every budget stated in the scorer's own spelling: "
+               f"{call}")
+    wsmanifest = json.loads(
+        next(wsout.glob("aurus-score-manifest-*.json")).read_text())
+    check(wsmanifest["budgets"],
+          {"ltlsynt_timeout": 30, "pattern": "spec*.tlsf", "fast_path": "on"},
+          "and the manifest records them")
+    check("compare" in wsmanifest["binaries"], False,
+          "the wellsep pass runs no PEREDUR binary")
+    check_true("ltlsynt" in wsmanifest["binaries"],
+               "and names the third-party one it did run")
+
+    # Nothing to score is never a finished pass.
+    proc = aurus("wellsep", adapted, wsout, "--seeds", "7", seeds=("7",))
+    check(proc.returncode, 2, "a queue with no repeat on this host's seeds is "
+                              "an error")
+    check_true("nothing to score" in proc.stderr,
+               f"saying so: {proc.stderr!r}")
+
+    cpus = os.cpu_count()
+    if cpus is not None:
+        proc = aurus("wellsep", adapted, wsout, "--jobs", str(cpus + 1))
+        check(proc.returncode, 2, "more jobs than the host has CPUs is "
+                                  "refused at startup")
+
+    for bad, why in ((["--jobs", "0"], "zero jobs"),
+                     (["--compare-timeout", "-1"], "a negative compare budget"),
+                     (["--ltlsynt-timeout", "0"], "a zero ltlsynt budget"),
+                     (["--pass", "both"], "an unknown pass")):
+        proc = aurus("anytime", raw, anyout, *bad)
+        check(proc.returncode, 2, f"{why} is an argument error")
+    proc = subprocess.run(
+        [sys.executable, str(AURUS_CAMPAIGN_PY), "--pass", "anytime",
+         "--results", str(aurus_root / "absent"), "--out", str(anyout),
+         "--seeds", "1"], capture_output=True, text=True)
+    check_true(proc.returncode != 0 and "no results directory" in proc.stderr,
+               "a missing tree is refused by name")
+finally:
+    shutil.rmtree(aurus_root, ignore_errors=True)
 
 
 # ── The configs check, locally ────────────────────────────────────────────────
