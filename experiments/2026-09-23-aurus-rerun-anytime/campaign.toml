@@ -1,0 +1,44 @@
+# The per-solution scoring passes over 2026-09-22-aurus-rerun's AuRUS arm.
+#
+# 2026-09-22-aurus-rerun re-ran the baseline at fork e1cfadf, 780 runs over 26 families at 30 repeats, and collected 296,300 solutions. 175 of those runs hit the 7200 s cap and 118 of them kept what they had found. 2026-09-22-aurus-rerun-curves is scoring that arm for maximality and separation, which gives a curve per run. Neither pass emits a row per solution, and two things need one.
+#
+# The well-separation screen is the first of them. The paper screens AuRUS's found and ideal flags for well-separation, joining a verdict to a solution one-to-one on (spec, repeat, index). The archive's verdicts in experiments/2026-08-14-aurus-h2h/wellsep-av{2,3}.csv measured a different sample, 113,958 of 287,006 solutions ill-separated and 868 of those ideal hits. AuRUS is unseeded and draws from Math.random(), so a repeat here does not pair with a repeat there and those indices do not survive. Leaving the screen off would leave this arm's flags unscreened while the reused PEREDUR side stays screened, which moves the primary contrast in AuRUS's favour by construction rather than by measurement.
+#
+# The anytime pass supplies the other half of that join, the per-solution ideal verdicts the screen subtracts from. It also writes the per-run columns analyse_matched.py reads out of aurus_full.csv: n_solutions, n_ideal, and the time of the first ideal hit.
+#
+# score_curves.py's compare_relations() already runs compare once per run and returns a per-file relation map, then collapses it to a set of implying names and drops the rest. From commit 5da7d00 on this branch that map is kept as <run>.relations.tsv beside each curve, so a campaign after this one gets these verdicts for free. It lands too late for the 2026-09-22 pass, which was already 80% through when the sidecar was written, and score_campaign.py's resume skips a run already scored. This campaign pays for the map once and is the last that has to.
+#
+# Both output directories take the curves campaign's -uncensored suffix, which keeps this vintage out of any directory holding a pass over the 2026-08-14 archive.
+name = "2026-09-23-aurus-rerun-anytime"
+branch = "campaign/aurus-rerun-anytime"
+
+# The search campaign's split, which is also the split its adapter wrote: each host scores only the repeats it ran.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+# Anytime runs first, being what the 2026-09-22 campaign's decision waits on. It reads the raw tree aurus_campaign.py wrote, <spec>/repeat-NN, because it dates each solution from that repeat's own record, and aurus_adapt.py copies the dates it derived without either record they came from. The fork's solution-times.csv gives microsecond times and is preferred; upstream's run.log gives second-rounded inference and is the fall-back; the dated_by column says which one ran.
+#
+# compare_timeout = 3000 is what 2026-09-14-paper-rerun-curves gave both of its arms, and that budget is what removed the asymmetry the rematch carried as a caveat.
+
+[[phases]]
+name = "anytime-aurus"
+kind = "aurus-score"
+pass = "anytime"
+results = "experiments/aurus-rerun-out"
+out = "experiments/anytime-aurus-uncensored"
+jobs = 8
+compare_timeout = 3000
+
+# The cheaper of the two passes, and it reads none of the anytime pass's output. It takes the adapted tree, whose run directories are PEREDUR-shaped, so check_well_separated.py's parse_run_id populates the arm and spec columns the archive's pass left empty: there the AuRUS tree's shape defeated it and family attribution came off the path column. Both trees carry the same candidate filenames, spec<i>.tlsf, so the index joins across them.
+#
+# The budgets are the 2026-08-17 screen's, deliberately. That pass spent 1.99 core-hours over 287,006 candidates, a mean of 0.025 s a call against a 60 s timeout it never approached, and returned no undecided verdict. fast_path stays off because exactly 2 ill-separated files there had input-only assumptions, which the fast path would have called well-separated.
+
+[[phases]]
+name = "wellsep-aurus"
+kind = "aurus-score"
+pass = "wellsep"
+results = "experiments/results-aurus-rerun"
+out = "experiments/wellsep-aurus-uncensored"
+jobs = 8
+ltlsynt_timeout = 60
+pattern = "*.tlsf"
+fast_path = "off"
