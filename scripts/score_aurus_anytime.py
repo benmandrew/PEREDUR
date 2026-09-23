@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
-"""Score every AuRUS solution and date it from the run's own iteration series.
+"""Score every AuRUS solution and date it, from the run's own record.
 
-AuRUS writes all of a run's solutions in one batch when the run ends, so no
-solution file carries its discovery time. The run.log does. Main.java:170-187
-writes `ga.solutions` in list order as spec<i>.tlsf, and the log's per-iteration
-`#Sol` column is that list's length at that iteration, so spec_i was found at
-the first iteration whose #Sol reaches i+1. That iteration's `Elapsed Time`
-dates it, to second resolution.
+Two records exist, and which one a repeat carries says which AuRUS wrote it.
 
-A run killed at the cap writes nothing at all -- its solutions die with the
-JVM -- so such a repeat yields `files = 0` against a positive final #Sol. Those
-rows are emitted with status `lost-at-cap` rather than dropped, because the gap
-between what AuRUS found and what it returned is the thing worth seeing.
+Upstream AuRUS (3f6f01f) writes all of a run's solutions in one batch when the
+run ends, so no solution file carries its discovery time. The run.log does.
+Main.java:170-187 writes `ga.solutions` in list order as spec<i>.tlsf, and the
+log's per-iteration `#Sol` column is that list's length at that iteration, so
+spec_i was found at the first iteration whose #Sol reaches i+1. That
+iteration's `Elapsed Time` dates it, to second resolution. A run killed at the
+cap writes nothing at all -- its solutions die with the JVM -- so such a repeat
+yields `files = 0` against a positive final #Sol, and is emitted with status
+`lost-at-cap` rather than dropped, because the gap between what AuRUS found and
+what it returned is the thing worth seeing.
+
+The fork at `output-on-timeout` (e1cfadf) writes each solution as it is found
+and appends its discovery time to `solution-times.csv`, to the microsecond. A
+repeat carrying that file needs neither inference: the time is AuRUS's own and
+a run killed at the cap keeps everything it found. `solution_times()` reads it
+and every caller prefers it where it is present, so one archive may hold
+repeats of both vintages and each is dated the best way it can be.
 
 One row per (spec, repeat, index): the verdict, whether it implies an ideal,
 and the elapsed seconds at which it was found.
@@ -23,8 +31,10 @@ ELAPSED = re.compile(r"^Elapsed Time:\s*(\d+)\s*m\s+(\d+)\s*s")
 VERDICT = re.compile(r"^(spec\d+\.tlsf)\s*:\s*(.+?)\s*$")
 SPEC_I = re.compile(r"^spec(\d+)\.tlsf$")
 HIT = ("equivalent to", "strictly stronger than")
+TIMES_NAME = "solution-times.csv"
 FIELDS = ["spec", "repeat", "index", "verdict", "hit", "found_iter",
-          "found_elapsed_s", "final_nsol", "files_written", "status"]
+          "found_elapsed_s", "final_nsol", "files_written", "status",
+          "dated_by"]
 
 
 def iteration_series(log):
@@ -55,6 +65,36 @@ def found_at(series, index):
     return "", ""
 
 
+def solution_times(run_dir):
+    """{index: (generation, elapsed_s)} from the fork's per-solution log.
+
+    `solution-times.csv` is written a row at a time as each solution is found:
+    `solution,seconds,generation,fitness,timestamp`, where `seconds` is elapsed
+    from the run's start to the microsecond and `generation` is -1 for the
+    solutions AuRUS confirms after its search loop. A row whose file is missing
+    from the directory is dropped rather than dated, and the last write of a
+    killed run may be short, so a malformed final row is ignored instead of
+    failing the repeat.
+    """
+    path = os.path.join(run_dir, TIMES_NAME)
+    times = {}
+    try:
+        with open(path, newline="", errors="replace") as handle:
+            for row in csv.DictReader(handle):
+                match = SPEC_I.match((row.get("solution") or "").strip())
+                if not match:
+                    continue
+                try:
+                    elapsed = float(row["seconds"])
+                    generation = int(row["generation"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                times[int(match.group(1))] = (generation, elapsed)
+    except OSError:
+        return {}
+    return times
+
+
 def score_dir(binary, repairs, ideals, timeout_s):
     try:
         p = subprocess.run([binary, "--repairs", repairs, "--ideals", ideals],
@@ -77,15 +117,21 @@ def one_repeat(args):
     spec = os.path.basename(os.path.dirname(d))
     ideals = os.path.join(examples, spec, "fixes")
     series = iteration_series(os.path.join(d, "run.log"))
-    final_nsol = series[-1][1] if series else 0
+    times = solution_times(d)
+    # The fork writes a solution before the iteration line that would count it,
+    # so its own file count is the later record of the two.
+    final_nsol = max(len(times), series[-1][1] if series else 0)
     files = sorted(f for f in os.listdir(d) if SPEC_I.match(f))
     base = {"spec": spec, "repeat": repeat, "final_nsol": final_nsol,
-            "files_written": len(files)}
+            "files_written": len(files),
+            "dated_by": "solution-times" if times else "run-log"}
     if not os.path.isdir(ideals):
         return [dict(base, index="", verdict="", hit="", found_iter="",
                      found_elapsed_s="", status="no-ideals-dir")]
     if not files:
-        # Killed before the write, or a genuinely empty search.
+        # Upstream: killed before the single write at the end. The fork writes
+        # as it finds, so under it this pairing means the files went missing
+        # after the run, which is the same loss and reads the same way.
         return [dict(base, index="", verdict="", hit="", found_iter="",
                      found_elapsed_s="",
                      status="lost-at-cap" if final_nsol else "no-solutions")]
@@ -99,10 +145,16 @@ def one_repeat(args):
         if not m:
             continue
         i = int(m.group(1))
-        it, elapsed = found_at(series, i)
+        if i in times:
+            it, elapsed = times[i]
+            dated_by = "solution-times"
+        else:
+            it, elapsed = found_at(series, i)
+            dated_by = "run-log" if elapsed != "" else ""
         rows.append(dict(base, index=i, verdict=verdict,
                          hit=int(verdict.startswith(HIT)),
-                         found_iter=it, found_elapsed_s=elapsed, status="ok"))
+                         found_iter=it, found_elapsed_s=elapsed, status="ok",
+                         dated_by=dated_by))
     return rows
 
 

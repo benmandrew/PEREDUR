@@ -39,9 +39,14 @@ than assumed:
 
   anytime   the raw AuRUS tree, `<results>/<spec>/repeat-<NN>`, as
             aurus_campaign.py writes it. It has to be the raw one: a solution
-            is dated from the iteration series in that repeat's run.log, and
-            aurus_adapt.py's PEREDUR-shaped tree carries the dates it derived
-            but not the log they came from.
+            is dated from that repeat's own record of when it was found --
+            the fork's solution-times.csv, to the microsecond, where there is
+            one, and the run.log's iteration series, to the second, where
+            there is not -- and aurus_adapt.py copies neither record into its
+            PEREDUR-shaped tree, only the dates it derived from one of them.
+            A `dated_by` column carries which record dated each row, so one
+            tree may hold repeats of both AuRUS vintages and nothing has to
+            assume the resolution.
   wellsep   a PEREDUR-shaped results directory, `<results>/<run>_seed<NN>`,
             as aurus_adapt.py leaves it, whose candidates are read out of
             `accumulated/`.
@@ -253,8 +258,9 @@ def wrong_shape(results: Path, pass_name: str) -> str | None:
     if pass_name == "anytime" and not raw:
         return (f"{results} holds no <spec>/repeat-<NN> directory. The "
                 f"anytime pass reads the raw AuRUS tree, not the adapted "
-                f"one: a solution is dated from that repeat's run.log, which "
-                f"aurus_adapt.py does not copy")
+                f"one: a solution is dated from that repeat's "
+                f"solution-times.csv or its run.log, and aurus_adapt.py "
+                f"copies neither")
     if pass_name == "wellsep" and not adapted and raw:
         return (f"{results} is a raw AuRUS tree. The wellsep pass reads the "
                 f"PEREDUR-shaped tree aurus_adapt.py writes, whose "

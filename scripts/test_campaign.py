@@ -3654,6 +3654,68 @@ try:
          "--seeds", "1"], capture_output=True, text=True)
     check_true(proc.returncode != 0 and "no results directory" in proc.stderr,
                "a missing tree is refused by name")
+
+    # The whole point of the re-run, end to end through the real scorer: a
+    # repeat written by the fork carries solution-times.csv and is dated from
+    # it to the microsecond, and one written by upstream AuRUS falls back to
+    # the run.log's per-iteration #Sol column, rounded to the second. The
+    # `dated_by` column is what tells the two apart afterwards, so it has to
+    # reach the pass's own output and not only the reader.
+    vintages = aurus_root / "vintages"
+    for repeat, has_times in (("repeat-00", True), ("repeat-01", False)):
+        unit = vintages / "arbiter" / repeat
+        unit.mkdir(parents=True)
+        for i in range(2):
+            (unit / f"spec{i}.tlsf").write_text("x")
+        # Two iterations, the second reaching #Sol 2, dated 0m 41s.
+        (unit / "run.log").write_text(
+            "1\t0.5\tx\t0\t1\nElapsed Time: 0 m 17 s\n"
+            "2\t0.5\tx\t0\t2\nElapsed Time: 0 m 41 s\n")
+        if has_times:
+            (unit / "solution-times.csv").write_text(
+                "solution,seconds,generation,fitness,timestamp\n"
+                "spec0.tlsf,12.345678,1,0.5,t0\n"
+                "spec1.tlsf,40.987654,-1,0.5,t1\n")
+    vex = aurus_root / "examples" / "arbiter" / "fixes"
+    vex.mkdir(parents=True)
+    (vex / "fix1.tlsf").write_text("x")
+    # One binary answering both probes: the freshness gate's --version, and
+    # the scorer's own --repairs/--ideals call.
+    (abins / "compare").write_text(
+        f'#!/bin/sh\ncase "$1" in --version) echo commit={real_head}; '
+        f'echo commit_short={real_head[:7]}; echo dirty=0;; '
+        f'*) echo "spec0.tlsf : equivalent to fix1.tlsf"; '
+        f'echo "spec1.tlsf : incomparable with fix1.tlsf";; esac\n')
+    (abins / "compare").chmod(0o755)
+    vout = aurus_root / "vintage-out"
+    proc = subprocess.run(
+        [sys.executable, str(AURUS_CAMPAIGN_PY), "--pass", "anytime",
+         "--results", str(vintages), "--out", str(vout),
+         "--seeds", "0", "1", "--jobs", "1"],
+        cwd=str(aurus_root),
+        env=dict(os.environ, PEREDUR_BIN_DIR=str(abins),
+                 PEREDUR_EXAMPLES_DIR=str(aurus_root / "examples")),
+        capture_output=True, text=True)
+    check(proc.returncode, 0,
+          f"the real scorer runs under the pass: {proc.stdout} {proc.stderr}")
+    with (vout / "arbiter_repeat-00.csv").open() as handle:
+        forked = {r["index"]: r for r in csv.DictReader(handle)}
+    check({r["dated_by"] for r in forked.values()}, {"solution-times"},
+          "a repeat carrying solution-times.csv is dated from it")
+    check((forked["0"]["found_elapsed_s"], forked["1"]["found_elapsed_s"]),
+          ("12.345678", "40.987654"),
+          "to the microsecond, which is what the re-run exists to keep")
+    check(forked["1"]["found_iter"], "-1",
+          "with the fork's own generation, -1 for a post-loop confirmation")
+    with (vout / "arbiter_repeat-01.csv").open() as handle:
+        logged = {r["index"]: r for r in csv.DictReader(handle)}
+    check({r["dated_by"] for r in logged.values()}, {"run-log"},
+          "a repeat with only a run.log falls back to the iteration series")
+    check((logged["0"]["found_elapsed_s"], logged["1"]["found_elapsed_s"]),
+          ("17", "41"), "rounded to the second, as that log records it")
+    check_true("dated_by" in
+               (vout / "arbiter_repeat-00.csv").read_text().splitlines()[0],
+               "and the column reaches the pass's output, not just the reader")
 finally:
     shutil.rmtree(aurus_root, ignore_errors=True)
 
