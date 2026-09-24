@@ -736,8 +736,9 @@ TEST(test_add_assumption_appends_environment_assumption) {
     // p_add_assumption forced to 1 with a zero-yielding source: the first
     // action appends a fairness assumption over the first input (no negation,
     // since next_bool() is false). next_real() returns 0, which is below the
-    // default p_conditional_assumption, so the condition is a drawn input atom
-    // rather than `true`. The guarantees are left untouched.
+    // default p_conditional_assumption, so the condition is a drawn atom rather
+    // than `true`. It draws the same `a` as the response, so its polarity is
+    // flipped to keep `G(a -> F a)` out. The guarantees are left untouched.
     const Specification spec(
         {},
         {Requirement(Formula("a"), Formula("B"), timing::always(),
@@ -759,8 +760,8 @@ TEST(test_add_assumption_appends_environment_assumption) {
            "add-assumption: fairness assumption uses Eventually timing");
     expect(added.m_response.to_string() == "a",
            "add-assumption: response is drawn from the input atoms");
-    expect(added.m_condition.to_string() == "a",
-           "add-assumption: condition is drawn from the input atoms");
+    expect(added.m_condition.to_string() == "!(a)",
+           "add-assumption: a condition equal to the response is negated");
     expect(added.m_ltl.find('B') == std::string::npos,
            "add-assumption: an output atom never enters an added assumption");
 }
@@ -802,9 +803,9 @@ TEST(test_add_assumption_condition_varies_over_inputs_and_true) {
            "add-assumption: a negated input condition should be reachable");
 }
 
-// The atom pool includes outputs, so an added assumption can reference an
-// output atom. The well-separation check (not a syntactic ban) is what keeps
-// such assumptions honest.
+// The condition pool includes outputs, so an added assumption can be guarded
+// on an output atom: conditioning on system behaviour adds no obligation the
+// system can dodge.
 TEST(test_add_assumption_can_reference_output) {
     const Specification spec(
         {},
@@ -857,6 +858,80 @@ TEST(test_assumption_rewrite_can_reference_output) {
         },
         "assumption rewrite: a rewrite of an existing assumption can "
         "introduce an output atom");
+}
+
+// The response of an added assumption is always an input literal. An
+// assumption obliging an output, `G(c -> F <output>)`, is one the system
+// defeats by never raising the output, and well-separation passes the guarded
+// form.
+TEST(test_add_assumption_response_is_always_input) {
+    const Specification spec(
+        {},
+        {Requirement(Formula("a"), Formula("B"), timing::always(),
+                     ConditionType::Trigger, true)},
+        {"a", "c"}, {"B", "D"});
+    Config cfg;
+    cfg.p_add_assumption = 1.0;
+    cfg.p_conditional_assumption = 0.5;
+    for (std::size_t seed = 0; seed < 300; ++seed) {
+        const Specification result =
+            mutate_specification(spec, make_random_source_from_seed(seed), cfg);
+        expect(result.m_assumptions.size() == 1,
+               "add-assumption: one assumption is appended");
+        const std::string response =
+            result.m_assumptions.front().m_response.to_string();
+        expect(response == "a" || response == "c" || response == "!(a)" ||
+                   response == "!(c)",
+               "add-assumption: the response must be an input literal, got " +
+                   response);
+    }
+}
+
+// Condition and response are drawn independently, but the tautology
+// `G(l -> F l)` never comes out: a condition equal to the response is negated.
+TEST(test_add_assumption_never_tautological) {
+    const Specification spec(
+        {},
+        {Requirement(Formula("a"), Formula("B"), timing::always(),
+                     ConditionType::Trigger, true)},
+        {"a"}, {"B"});
+    Config cfg;
+    cfg.p_add_assumption = 1.0;
+    cfg.p_conditional_assumption = 1.0;
+    bool saw_flip_partner = false;
+    for (std::size_t seed = 0; seed < 300; ++seed) {
+        const Specification result =
+            mutate_specification(spec, make_random_source_from_seed(seed), cfg);
+        const Requirement& added = result.m_assumptions.front();
+        expect(!(added.m_condition == added.m_response),
+               "add-assumption: condition and response must differ, got " +
+                   added.m_ltl);
+        const std::string condition = added.m_condition.to_string();
+        const std::string response = added.m_response.to_string();
+        saw_flip_partner = saw_flip_partner ||
+                           (condition == "!(a)" && response == "a") ||
+                           (condition == "a" && response == "!(a)");
+    }
+    expect(saw_flip_partner, "add-assumption: `G(!l -> F l)` stays reachable");
+}
+
+// With no input there is nothing the environment alone can be obliged to do,
+// so no assumption is added.
+TEST(test_add_assumption_needs_an_input) {
+    const Specification spec(
+        {},
+        {Requirement(Formula("B"), Formula("D"), timing::always(),
+                     ConditionType::Trigger, true)},
+        {}, {"B", "D"});
+    Config cfg;
+    cfg.p_add_assumption = 1.0;
+    cfg.p_remove_guarantee = 0.0;
+    for (std::size_t seed = 0; seed < 50; ++seed) {
+        const Specification result =
+            mutate_specification(spec, make_random_source_from_seed(seed), cfg);
+        expect(result.m_assumptions.empty(),
+               "add-assumption: nothing is added to a spec without inputs");
+    }
 }
 
 TEST(test_add_assumption_disabled_by_zero_probability) {
