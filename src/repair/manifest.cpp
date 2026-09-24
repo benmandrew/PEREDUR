@@ -1,5 +1,6 @@
 #include "manifest.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -13,6 +14,7 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -179,7 +181,44 @@ namespace {
 //
 // 30 counts implication.timeouts on TLSF, where tlsf_spec_implies counted none
 // and the field read 0 on every earlier TLSF manifest.
-constexpr int k_schema_version = 30;
+//
+// 31 records the config keys a path never reads as null on that path: the
+// FRETISH-only [mutation] rewrite arms on a TLSF run, and [tlsf]
+// muc_max_iterations and [tlsf.mutation] on a FRETISH run. An earlier
+// manifest records whatever the config said, which the search ignored.
+constexpr int k_schema_version = 31;
+
+// A config key that only one of the two repair paths reads, as a JSON pointer
+// into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
+// non-default value outright rather than ignoring it, so what the manifest
+// records there is what ran.
+struct SinglePathKey {
+    const char* pointer;
+    RepairInput reader;
+};
+
+constexpr std::array<SinglePathKey, 12> k_single_path_keys{{
+    {"/mutation/p_trigger", RepairInput::Fretish},
+    {"/mutation/p_response", RepairInput::Fretish},
+    {"/mutation/p_timing", RepairInput::Fretish},
+    {"/mutation/p_condition_type", RepairInput::Fretish},
+    {"/mutation/p_scope", RepairInput::Fretish},
+    {"/mutation/p_stop", RepairInput::Fretish},
+    {"/tlsf/muc_max_iterations", RepairInput::Tlsf},
+    {"/tlsf/mutation/p_assumption", RepairInput::Tlsf},
+    {"/tlsf/mutation/p_temporal", RepairInput::Tlsf},
+    {"/tlsf/mutation/p_clone_assumption", RepairInput::Tlsf},
+    {"/tlsf/mutation/max_assumption_width", RepairInput::Tlsf},
+    {"/tlsf/mutation/p_bare_assumption", RepairInput::Tlsf},
+}};
+
+// "/tlsf/mutation/p_temporal" -> "tlsf.mutation.p_temporal", the spelling a
+// config file and a warning use.
+std::string dotted(const char* pointer) {
+    std::string path(pointer + 1);
+    std::replace(path.begin(), path.end(), '/', '.');
+    return path;
+}
 
 std::string utc_timestamp() {
     const std::time_t now =
@@ -340,11 +379,37 @@ nlohmann::json fitness_cache_json() {
 
 }  // namespace
 
+std::vector<std::string> ignored_non_default_keys(const Config& cfg,
+                                                  RepairInput input) {
+    // Compared through config_json() so that each key is read by the same code
+    // that records it, and a key added to one table cannot drift from the
+    // other.
+    const nlohmann::json actual = config_json(cfg);
+    const nlohmann::json defaults = config_json(Config{});
+    std::vector<std::string> ignored;
+    for (const SinglePathKey& key : k_single_path_keys) {
+        if (key.reader == input) {
+            continue;
+        }
+        const nlohmann::json::json_pointer pointer(key.pointer);
+        if (actual.at(pointer) != defaults.at(pointer)) {
+            ignored.push_back(dotted(key.pointer));
+        }
+    }
+    return ignored;
+}
+
 void write_run_manifest(const std::string& output_dir,
                         const std::string& input_path, std::size_t seed,
                         const Config& cfg, double wall_s,
-                        const SearchBudget& budget) {
+                        const SearchBudget& budget, RepairInput input) {
     const std::filesystem::path dir(output_dir);
+    nlohmann::json config = config_json(cfg);
+    for (const SinglePathKey& key : k_single_path_keys) {
+        if (key.reader != input) {
+            config[nlohmann::json::json_pointer(key.pointer)] = nullptr;
+        }
+    }
     const nlohmann::json manifest{
         {"schema_version", k_schema_version},
         {"tool", "peredur"},
@@ -390,7 +455,7 @@ void write_run_manifest(const std::string& output_dir,
              ? nlohmann::json(nullptr)
              : nlohmann::json({{"ltlsynt_ms", BudgetScreen::observed_ms},
                                {"decided", BudgetScreen::decided}})},
-        {"config", config_json(cfg)},
+        {"config", std::move(config)},
         {"tool_calls", tool_calls_json()},
         {"n_constant_folded", SatisfiabilityChecker::n_constant_folded.load()},
         {"n_spot_decided", SatisfiabilityChecker::n_spot_decided.load()},

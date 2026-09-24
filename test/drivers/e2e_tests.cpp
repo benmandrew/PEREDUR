@@ -121,9 +121,26 @@ const char* const k_fretish_weaker = R"({
 // smallest that reliably leaves the filters something to report; the thread
 // count is pinned because a run these suites compare against itself must not
 // depend on how many cores the machine has.
-const char* const k_config = R"([genetic]
+// Two generations of eight on one thread, plus a non-default value for one key
+// that only the *other* path reads, so the extra key changes nothing about the
+// search and the warning and the manifest's null are all it can affect.
+const char* const k_config_with_fretish_key = R"([genetic]
 generations = 2
 population_size = 8
+
+[mutation]
+p_trigger = 0.9
+
+[runtime]
+parallel = 1
+)";
+
+const char* const k_config_with_tlsf_key = R"([genetic]
+generations = 2
+population_size = 8
+
+[tlsf.mutation]
+p_temporal = 0.4
 
 [runtime]
 parallel = 1
@@ -258,7 +275,8 @@ TEST_IN("driver_peredur", test_peredur_repairs_tlsf) {
     const std::string input =
         write_text(dir.path() / "spec.tlsf", k_unrealizable).string();
     const std::string config =
-        write_text(dir.path() / "config.toml", k_config).string();
+        write_text(dir.path() / "config.toml", k_config_with_fretish_key)
+            .string();
     const std::filesystem::path first = dir.path() / "first";
     const std::filesystem::path second = dir.path() / "second";
     std::filesystem::create_directories(first);
@@ -274,7 +292,23 @@ TEST_IN("driver_peredur", test_peredur_repairs_tlsf) {
            "peredur: the run prints the filter report");
     expect(contains(run.m_output, "Done in"),
            "peredur: the run prints its closing line");
-    expect_run_manifest(first, input, 2, "peredur/tlsf");
+    const nlohmann::json manifest =
+        expect_run_manifest(first, input, 2, "peredur/tlsf");
+    // A key only the FRETISH path reads is warned about when it is changed,
+    // and recorded as null, since this run's search never read it.
+    expect(contains(run.m_output,
+                    "config key mutation.p_trigger is read only "
+                    "on the FRETISH path"),
+           "peredur: a TLSF run warns about a changed FRETISH-only key");
+    expect(!contains(run.m_output, "config key mutation.p_response"),
+           "peredur: a FRETISH-only key left at its default is not warned "
+           "about");
+    const nlohmann::json& config_block = manifest.at("config");
+    expect(config_block.at("mutation").at("p_trigger").is_null() &&
+               config_block.at("mutation").at("p_stop").is_null(),
+           "peredur: a TLSF manifest records FRETISH-only keys as null");
+    expect(config_block.at("tlsf").at("mutation").at("p_temporal").is_number(),
+           "peredur: a TLSF manifest records the TLSF keys");
 
     // The same seed twice, which is the whole claim --seed makes. Compared over
     // the repairs rather than run.json, whose timings are wall-clock.
@@ -301,7 +335,7 @@ TEST_IN("driver_peredur", test_peredur_repairs_fretish) {
     const std::string input =
         write_text(dir.path() / "spec.json", k_fretish).string();
     const std::string config =
-        write_text(dir.path() / "config.toml", k_config).string();
+        write_text(dir.path() / "config.toml", k_config_with_tlsf_key).string();
     const std::filesystem::path out = dir.path() / "out";
     std::filesystem::create_directories(out);
 
@@ -311,7 +345,21 @@ TEST_IN("driver_peredur", test_peredur_repairs_fretish) {
     expect(run.m_exit_code == 0, "peredur: a FRETISH run exits zero");
     expect(contains(run.m_output, "Done in"),
            "peredur: the FRETISH run prints its closing line");
-    expect_run_manifest(out, input, 5, "peredur/fretish");
+    const nlohmann::json manifest =
+        expect_run_manifest(out, input, 5, "peredur/fretish");
+    expect(contains(run.m_output,
+                    "config key tlsf.mutation.p_temporal is read "
+                    "only on the TLSF path"),
+           "peredur: a FRETISH run warns about a changed TLSF-only key");
+    const nlohmann::json& config_block = manifest.at("config");
+    expect(config_block.at("tlsf").at("mutation").at("p_temporal").is_null() &&
+               config_block.at("tlsf").at("muc_max_iterations").is_null(),
+           "peredur: a FRETISH manifest records TLSF-only keys as null");
+    expect(config_block.at("tlsf").at("repair_mode").is_string(),
+           "peredur: a FRETISH manifest still records the repair_mode it "
+           "enforced");
+    expect(config_block.at("mutation").at("p_trigger").is_number(),
+           "peredur: a FRETISH manifest records the FRETISH keys");
     for (const auto& repair : repair_files(out)) {
         expect(repair.extension() == ".json",
                "peredur: a FRETISH run writes FRETISH repairs");
