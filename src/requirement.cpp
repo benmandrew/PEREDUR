@@ -458,8 +458,9 @@ std::vector<std::string> environment_signals(
         return specification.m_in_atoms;
     }
     const auto is_atom = [&specification](const std::string& name) {
-        const auto declared_in = [&name](const std::vector<std::string>& v) {
-            return std::find(v.begin(), v.end(), name) != v.end();
+        const auto declared_in = [&name](
+                                     const std::vector<std::string>& atoms) {
+            return std::find(atoms.begin(), atoms.end(), name) != atoms.end();
         };
         return declared_in(specification.m_in_atoms) ||
                declared_in(specification.m_out_atoms);
