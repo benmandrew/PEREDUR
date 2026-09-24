@@ -7,9 +7,12 @@ one conversion rule, with its `semantics` shaped as FRET's formaliser writes
 them.
 """
 
+import itertools
 import json
+import random
 import sys
 import tempfile
+from fractions import Fraction
 from pathlib import Path
 
 import import_fret as I  # noqa: E402
@@ -69,7 +72,8 @@ def load(export, **kw):
         return I.load([path], kw.get("component"), kw.get("as_input", []),
                       kw.get("as_output", []), kw.get("all_components", False),
                       kw.get("atomise", False), kw.get("from_fulltext", ()),
-                      kw.get("skip", ()), kw.get("merge_case", False))
+                      kw.get("skip", ()), kw.get("merge_case", False),
+                      kw.get("domains", True))
 
 
 spec, conv = load(EXPORT)
@@ -206,5 +210,146 @@ spec, _ = load([req("A", timing="always",
 check((spec["in_atoms"], spec["out_atoms"]),
       (["ui_bypass0", "ui_bypass1"], ["q"]),
       "--all-components keeps every component; --as-input takes patterns")
+
+spec, conv = load({"requirements": [
+    req("LO", timing="always", post_condition="(speed >= 10 -> fast)"),
+    req("HI", timing="always", post_condition="(speed >= 20 -> faster)"),
+    req("NEG", timing="always", post_condition="(-5 < speed -> moving)"),
+    req("MODE", timing="always",
+        post_condition="((mode = 0 -> idle) & (mode = 1 -> busy))"),
+    req("GUST", condition="regular", regular_condition="(gust > 3)",
+        timing="immediately", post_condition="(slow)"),
+    req("CALM", condition="regular", regular_condition="(gust <= 1)",
+        timing="immediately", post_condition="(fast)"),
+    req("LEVEL", timing="always",
+        post_condition="((level > 2 -> fast) & (level > 4 -> faster))"),
+    req("PAIR", timing="always", post_condition="(a < b -> fast)")],
+    "variables": [var("speed", "Input"), var("mode", "Input"),
+                  var("fast", "Output"), var("faster", "Output"),
+                  var("moving", "Output"), var("idle", "Output"),
+                  var("busy", "Output"), var("slow", "Output"),
+                  var("level", "Output"),
+                  dict(var("gust", "Input"), dataType="integer"),
+                  dict(var("mode", "Input"), dataType="integer")]},
+    atomise=True)
+domain = {r["response"].split("_")[0].lstrip("(!"): r["response"]
+          for r in spec["assumptions"] + spec["guarantees"]
+          if r.get("weakenable") is False}
+check(domain["speed"],
+      "(speed_ge_10 -> minus_5_lt_speed) & (speed_ge_20 -> speed_ge_10)",
+      "an input variable's comparisons are ordered by an assumption, with a "
+      "flipped comparison and a negative constant read right")
+check([domain["gust"], domain["mode"]],
+      ["!(gust_gt_3 & gust_le_1)", "!(mode_eq_0 & mode_eq_1)"],
+      "integer comparisons that no value satisfies together are excluded")
+check(domain["level"], "(level_gt_4 -> level_gt_2)",
+      "an output variable's comparisons are ordered by a guarantee")
+check("mode_eq_0" in spec["in_atoms"], True,
+      "a comparison atom takes its variable's label, not its role")
+check(spec["guarantees"][-1]["weakenable"], False,
+      "domain constraints are not weakenable")
+check("a" in domain, False,
+      "a lone comparison of two names allows both values, so adds nothing")
+check(conv.reqids[-1], ["domain"], "--ids marks a domain constraint")
+spec, _ = load({"requirements": [
+    req("LO", timing="always", post_condition="(speed >= 10 -> fast)"),
+    req("HI", timing="always", post_condition="(speed >= 20 -> faster)")],
+    "variables": []}, domains=False)
+check(spec["assumptions"], [], "--no-domains adds nothing")
+rejects(req("X", condition="regular", regular_condition="(v > 1)",
+            timing="immediately", post_condition="(v > 2)"),
+        "both inputs", "a variable compared on both sides is rejected")
+
+
+def oracle(preds, integer, unsigned):
+    """The truth vectors the predicates take over a grid fine enough to
+    land inside every region their quarter-integer constants cut."""
+    step = Fraction(1) if integer else Fraction(1, 8)
+    xs = [Fraction(n) * step for n in range(int(-12 / step), int(12 / step))]
+    return {tuple(I.HOLDS[op](x, c) for op, c in preds)
+            for x in xs if not unsigned or x >= 0}
+
+
+rng = random.Random(0)
+for trial in range(400):
+    integer = rng.random() < 0.5
+    unsigned = integer and rng.random() < 0.3
+    preds = [(rng.choice(list(I.HOLDS)), Fraction(rng.randint(-24, 24), 4))
+             for _ in range(rng.randint(1, 6))]
+    clauses = I.domain_clauses(preds, integer, unsigned)
+    models = {m for m in itertools.product((True, False), repeat=len(preds))
+              if all(I.satisfies(m, c) for c in clauses)}
+    check(models, oracle(preds, integer, unsigned),
+          f"trial {trial}: clauses admit exactly the realisable vectors of "
+          f"{preds}, integer={integer}, unsigned={unsigned}")
+
+var_a, var_b = ("var", "a"), ("var", "b")
+for trial in range(150):
+    integer = rng.random() < 0.5
+    unsigned = integer and rng.random() < 0.3
+    preds = [(rng.choice(list(I.HOLDS)), Fraction(rng.randint(-24, 24), 4))
+             for _ in range(rng.randint(1, 5))]
+    types = {"a": "unsigned integer" if unsigned else
+             "integer" if integer else "double"}
+    check(I.smt_vectors([(op, var_a, ("num", c)) for op, c in preds], types),
+          I.sampled_vectors(preds, integer, unsigned),
+          f"trial {trial}: z3 and sampling agree on {preds}, {types}")
+
+
+def two_variable_oracle(comparisons, integer):
+    step = Fraction(1) if integer else Fraction(1, 4)
+    grid = [Fraction(n) * step for n in range(int(-16 / step), int(16 / step))]
+
+    def value(t, env):
+        if t[0] == "var":
+            return env[t[1]]
+        if t[0] == "num":
+            return t[1]
+        return {"+": lambda x, y: x + y, "-": lambda x, y: x - y}[t[0]](
+            value(t[1], env), value(t[2], env))
+    return {tuple(I.HOLDS[op](value(x, env), value(y, env))
+                  for op, x, y in comparisons)
+            for a in grid for b in grid for env in [{"a": a, "b": b}]}
+
+
+SIDES = [var_a, var_b, ("+", var_a, var_b), ("-", var_a, var_b)]
+for trial in range(60):
+    integer = rng.random() < 0.5
+    comparisons = [(rng.choice(list(I.HOLDS)), rng.choice(SIDES),
+                    rng.choice([("num", Fraction(rng.randint(-4, 4))),
+                                var_b]))
+                   for _ in range(rng.randint(2, 4))]
+    kind = "integer" if integer else "double"
+    got = I.smt_vectors(comparisons, {"a": kind, "b": kind})
+    check(got, two_variable_oracle(comparisons, integer),
+          f"trial {trial}: z3 finds exactly the realisable vectors of "
+          f"{comparisons}, {kind}")
+    clauses = I.exact_clauses(got, len(comparisons))
+    check({m for m in itertools.product((True, False),
+                                        repeat=len(comparisons))
+           if all(I.satisfies(m, c) for c in clauses)}, got,
+          f"trial {trial}: clauses admit exactly z3's vectors")
+
+spec, conv = load({"requirements": [
+    req("AB", timing="always", post_condition="(a < b -> p)"),
+    req("BC", timing="always", post_condition="(b < c -> q)"),
+    req("AC", timing="always", post_condition="(a < c -> r)"),
+    req("SUM", timing="always",
+        post_condition="(x + y > 10 -> p & (x > 5 -> q) & (y > 5 -> r))")],
+    "variables": [var(v, "Input") for v in "abcxy"]
+    + [var(v, "Output") for v in "pqr"]
+    + [dict(var(v, "Input"), dataType="integer") for v in "xy"]},
+    atomise=True)
+check([r["response"] for r in spec["assumptions"]],
+      ["(a_lt_b & b_lt_c -> a_lt_c) & (a_lt_c -> a_lt_b | b_lt_c)",
+       "(x_gt_5 & y_gt_5 -> x_plus_y_gt_10) & "
+       "(x_plus_y_gt_10 -> x_gt_5 | y_gt_5)"],
+      "z3 constrains comparisons across variables and over arithmetic")
+check(sorted(conv.notes["domain constraint"]),
+      ["a, b, c (z3): 2 clause(s)", "x, y (z3): 2 clause(s)"],
+      "the summary names the solver")
+rejects(req("X", condition="regular", regular_condition="(u < 1 & v < u)",
+            timing="immediately", post_condition="(v < 0)"),
+        "both inputs", "a group spanning inputs and outputs is rejected")
 
 print("ok: all FRET import checks pass")

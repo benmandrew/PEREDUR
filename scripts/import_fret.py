@@ -27,6 +27,15 @@ rule below matches the formula FRET itself emits (`semantics.ft`):
 - Names become snake_case, since SPOT mishandles uppercase inputs.
 - Durations are ticks: FRET discards the unit of `within 5 minutes`.
 - Requirements identical after conversion are kept once.
+- Comparison atoms are otherwise free, so a boolean spec could set
+  `x_ge_5 & !x_ge_3`. For each group of comparisons sharing variables, one
+  non-weakenable Always requirement admits exactly the truth vectors some
+  value realises, integer-valued where FRET's `dataType` says so: an
+  assumption when its atoms are inputs, a guarantee when outputs.
+  `--no-domains` leaves them out. Comparisons sharing variables are
+  constrained together; where one compares two names or carries arithmetic
+  (`--atomise-arithmetic`), z3 decides which vectors some values realise,
+  and a group it cannot decide is rejected.
 
 FRET's parser silently drops the `= X` of `(a | b) = X`, so a name in the
 fulltext's response that the parsed response lacks is rejected;
@@ -36,11 +45,12 @@ only in case and `--merge-case` is given. A requirement with empty fulltext is
 a placeholder and is skipped; any other one FRET did not formalise is rejected
 unless named by `--skip`.
 
-An atom FRET labels exactly once keeps its label. An unlabelled atom, or one
-labelled both ways across exports, becomes an output when it appears in a
-response or a stop condition and an input otherwise. `--as-input`/`--as-output`
-override both, and take shell-style patterns. Every requirement becomes a
-guarantee; FRET has no assumptions.
+An atom FRET labels exactly once keeps its label, and a comparison atom takes
+its variable's. An unlabelled atom, or one labelled both ways across exports,
+becomes an output when it appears in a response or a stop condition and an
+input otherwise. `--as-input`/`--as-output` override both, and take shell-
+style patterns. Every requirement becomes a guarantee; FRET has no
+assumptions.
 
 The summary on stderr lists every rule that fired, so a reviewer can check
 each lossy step. `--ids` writes which FRET reqids each guarantee came from.
@@ -49,9 +59,12 @@ each lossy step. `--ids` writes which FRET reqids each guarantee came from.
 import argparse
 import collections
 import fnmatch
+import itertools
 import json
+import math
 import re
 import sys
+from fractions import Fraction
 from pathlib import Path
 
 IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -62,6 +75,7 @@ SPELLINGS = {"=>": "->", "<=>": "<->"}
 RELATIONS = {">=": "ge", "<=": "le", ">": "gt", "<": "lt",
              "=": "eq", "==": "eq", "!=": "ne"}
 ARITH_NAMES = {"+": "plus", "-": "minus", "*": "times", "/": "div", "^": "pow"}
+FUNCTIONS = {"abs", "absReal", "min", "max"}
 NXT = re.compile(r"Nxt\s*\((.*)\)")
 TEMPORAL = re.compile(r"\b(xor|persisted|occurred|preBool|prevOcc|nextOcc|"
                       r"FTP|FTF)\b")
@@ -261,6 +275,9 @@ class Converter:
         # Names used as booleans somewhere, and name pairs compared by `=`,
         # which are iff when either side is in the set.
         self.boolean, self.equated = set(), []
+        # Each comparison atom as (op, lhs, rhs) over term trees, and each
+        # variable's FRET dataType.
+        self.comparisons, self.types = {}, {}
 
     def name(self, raw):
         new = snake(raw)
@@ -357,8 +374,28 @@ class Converter:
             atom = self.name("_".join(words))
             self.notes["comparison"].append(
                 f"{reqid}: {self.source(node, p)} -> {atom}")
+            a, b = (self.term(unwrap(k), p) for k in node.kids)
+            self.comparisons[atom] = (RELATIONS[node.text], a, b)
             return atom
         return self.splice(node, p, reqid)
+
+    def term(self, node, p):
+        """`node`, a side of a comparison, as a term tree: `("var", name)`,
+        `("num", value)`, `("neg", t)`, `(op, t, u)` for `+ - * / ^`, or
+        `(func, t, ...)` for abs, absReal, min and max."""
+        node = unwrap(node)
+        if node.kind == "ident":
+            return ("var", snake(node.text))
+        if node.kind == "num":
+            return ("num", Fraction(node.text))
+        if node.kind == "minus":
+            return ("neg", self.term(node.kids[0], p))
+        if node.kind == "arith":
+            op = p.toks[node.kids[0].hi][0]
+            return (op, *(self.term(k, p) for k in node.kids))
+        if node.kind == "func" and node.text in FUNCTIONS:
+            return (node.text, *(self.term(k, p) for k in node.kids))
+        p.fail(f"cannot compare {node.kind} {self.source(node, p)!r}")
 
     def splice(self, node, p, reqid):
         """Re-emit `node`'s own tokens as written, its children converted."""
@@ -508,6 +545,8 @@ class Converter:
         self.reqids.append([reqid])
 
     def label(self, v):
+        if v.get("dataType"):
+            self.types[snake(v["variable_name"])] = v["dataType"]
         if v.get("idType"):
             self.labels[snake(v["variable_name"])].add(v["idType"])
 
@@ -521,7 +560,10 @@ class Converter:
 
         ins, outs = [], []
         for a in sorted(self.roles):
-            lab = self.labels.get(a, set())
+            # A comparison atom takes the labels of the variables it compares.
+            lab = set().union(*(self.labels.get(v, set()) for v in
+                                variables(self.comparisons[a])))\
+                if a in self.comparisons else self.labels.get(a, set())
             if forced(a, force_in) or forced(a, force_out):
                 output = forced(a, force_out)
             elif len(lab) == 1:
@@ -535,8 +577,282 @@ class Converter:
         return ins, outs
 
 
+HOLDS = {"lt": lambda x, c: x < c, "le": lambda x, c: x <= c,
+         "gt": lambda x, c: x > c, "ge": lambda x, c: x >= c,
+         "eq": lambda x, c: x == c, "ne": lambda x, c: x != c}
+FLIPPED = {"lt": "gt", "le": "ge", "gt": "lt", "ge": "le", "eq": "eq",
+           "ne": "ne"}
+INTEGER_TYPES = {"integer", "unsigned integer"}
+MAX_GROUP = 16
+
+
+def samples(consts, integer, unsigned):
+    """One value inside every region the constants cut the line into.
+
+    Each predicate `x op c` changes truth only at its `c`, so these values
+    realise every truth vector the predicates can take together.
+    """
+    cs = sorted(set(consts))
+    if integer:
+        pts = set()
+        for c in cs:
+            lo, hi = math.floor(c), math.ceil(c)
+            pts |= {lo - 1, lo, hi, hi + 1}
+    else:
+        pts = set(cs) | {cs[0] - 1, cs[-1] + 1}
+        pts |= {(a + b) / 2 for a, b in zip(cs, cs[1:])}
+    if unsigned:
+        # The region holding 0 may have only negative samples so far.
+        pts = {p for p in pts | {0} if p >= 0}
+    return pts
+
+
+def satisfies(vector, clause):
+    return any(vector[i] == pol for i, pol in clause)
+
+
+def entails(clauses, target):
+    """Whether the unit and binary `clauses` entail `target`.
+
+    Adding the negation of `target` and propagating along the implication
+    graph finds a conflict exactly when it is entailed, since `clauses` are
+    satisfiable and whatever propagation leaves untouched is a subset of
+    them.
+    """
+    edges = collections.defaultdict(set)
+    for c in clauses:
+        if len(c) == 2:
+            (a, pa), (b, pb) = c
+            edges[(a, not pa)].add((b, pb))
+            edges[(b, not pb)].add((a, pa))
+    seen = set()
+    todo = [(i, not pol) for i, pol in target] + \
+        [c[0] for c in clauses if len(c) == 1]
+    while todo:
+        lit = todo.pop()
+        if lit not in seen:
+            seen.add(lit)
+            todo.extend(edges[lit])
+    return any((i, not pol) in seen for i, pol in seen)
+
+
+def variables(comparison):
+    """The variable names in a comparison or term."""
+    if comparison[0] == "var":
+        return {comparison[1]}
+    return set().union(set(), *(variables(t) for t in comparison[1:]
+                               if isinstance(t, tuple)))
+
+
+def against_constant(comparison):
+    """A comparison of one variable with a number as `(variable, op, c)`,
+    else None."""
+    def fold(t):
+        return ("num", -t[1][1]) if t[0] == "neg" and t[1][0] == "num" else t
+    op, a, b = comparison[0], fold(comparison[1]), fold(comparison[2])
+    if a[0] == "num":
+        a, b, op = b, a, FLIPPED[op]
+    if a[0] == "var" and b[0] == "num":
+        return a[1], op, b[1]
+    return None
+
+
+def sampled_vectors(preds, integer=False, unsigned=False):
+    """The truth vectors of `preds`, each `(op, c)` on one variable, over
+    every value it can take: exact, and needs no solver."""
+    return {tuple(HOLDS[op](x, c) for op, c in preds)
+            for x in samples([c for _, c in preds], integer, unsigned)}
+
+
+def smt_vectors(comparisons, types):
+    """The truth vectors of `comparisons` that some values of their
+    variables realise, enumerated by z3 one blocked vector at a time."""
+    try:
+        import z3
+    except ImportError:
+        raise FretImportError(
+            "comparisons over several variables or arithmetic need z3's "
+            "Python bindings (z3-solver, in `nix develop`); --no-domains "
+            "skips them") from None
+    names = sorted(set().union(*(variables(c) for c in comparisons)))
+    zvars = {v: z3.Int(v) if types.get(v) in INTEGER_TYPES else z3.Real(v)
+             for v in names}
+
+    def real(t):
+        return z3.ToReal(t) if z3.is_int(t) else t
+
+    def term(t):
+        head, args = t[0], [term(u) for u in t[1:] if isinstance(u, tuple)]
+        if head == "var":
+            return zvars[t[1]]
+        if head == "num":
+            return z3.RealVal(str(t[1]))
+        if head == "neg":
+            return -args[0]
+        if head in ("abs", "absReal"):
+            return z3.If(args[0] >= 0, args[0], -args[0])
+        if head in ("min", "max"):
+            pick = args[0] <= args[1] if head == "min" else args[0] >= args[1]
+            return z3.If(pick, args[0], args[1])
+        if head == "/":
+            return real(args[0]) / real(args[1])
+        return {"+": lambda a, b: a + b, "-": lambda a, b: a - b,
+                "*": lambda a, b: a * b, "^": lambda a, b: a ** b}[head](*args)
+
+    solver = z3.Solver()
+    solver.set("timeout", 10000)
+    for v in names:
+        if types.get(v) == "unsigned integer":
+            solver.add(zvars[v] >= 0)
+    flags = [z3.Bool(f"cmp!{i}") for i in range(len(comparisons))]
+    ops = {"lt": lambda a, b: a < b, "le": lambda a, b: a <= b,
+           "gt": lambda a, b: a > b, "ge": lambda a, b: a >= b,
+           "eq": lambda a, b: a == b, "ne": lambda a, b: a != b}
+    for flag, (op, a, b) in zip(flags, comparisons):
+        solver.add(flag == ops[op](term(a), term(b)))
+    vectors = set()
+    while True:
+        verdict = solver.check()
+        if verdict == z3.unknown:
+            raise FretImportError(
+                f"z3 cannot decide comparisons over {names}: "
+                f"{solver.reason_unknown()}; --no-domains skips them")
+        if verdict == z3.unsat:
+            return vectors
+        model = solver.model()
+        vector = tuple(z3.is_true(model.eval(f, model_completion=True))
+                       for f in flags)
+        vectors.add(vector)
+        solver.add(z3.Or([f != val for f, val in zip(flags, vector)]))
+
+
+def exact_clauses(real, k, span=lambda c: 0):
+    """Clauses over `k` atoms whose models are exactly the vectors `real`.
+
+    A clause is a tuple of `(index, polarity)` literals. Binary clauses are
+    tried first and cover orderings and exclusions; a wider clause is added
+    only where they admit a vector no value realises, as with `x >= 1`,
+    `x <= 1` and `x != 1` together. Redundant binary clauses are then
+    dropped, largest `span` first.
+    """
+    lits = [(i, pol) for i in range(k) for pol in (True, False)]
+    clauses = [(lit,) for lit in lits
+               if all(satisfies(v, (lit,)) for v in real)]
+    units = {c[0][0] for c in clauses}
+    clauses += [(a, b) for n, a in enumerate(lits) for b in lits[n + 1:]
+                if a[0] != b[0] and a[0] not in units and b[0] not in units
+                and all(satisfies(v, (a, b)) for v in real)]
+    while True:
+        extra = next((m for m in itertools.product((True, False), repeat=k)
+                      if m not in real
+                      and all(satisfies(m, c) for c in clauses)), None)
+        if extra is None:
+            break
+        # Shrink the extra vector's literals to a set no value realises.
+        core = list(range(k))
+        for i in list(core):
+            rest = [j for j in core if j != i]
+            if not any(all(v[j] == extra[j] for j in rest) for v in real):
+                core = rest
+        clauses.append(tuple((j, not extra[j]) for j in core))
+    for c in sorted([c for c in clauses if len(c) == 2], key=span,
+                    reverse=True):
+        rest = [d for d in clauses if d is not c and len(d) <= 2]
+        if entails(rest, c):
+            clauses.remove(c)
+    return clauses
+
+
+def domain_clauses(preds, integer=False, unsigned=False):
+    """`exact_clauses` for `preds`, each `(op, c)` on one variable. Dropping
+    the widest spans first leaves the chain of neighbouring thresholds."""
+    def span(c):
+        return max(preds[i][1] for i, _ in c) - min(preds[i][1] for i, _ in c)
+    return exact_clauses(sampled_vectors(preds, integer, unsigned),
+                         len(preds), span)
+
+
+def render(clause, atoms):
+    pos = [atoms[i] for i, pol in clause if pol]
+    neg = [atoms[i] for i, pol in clause if not pol]
+    if len(clause) == 1:
+        return pos[0] if pos else f"!{neg[0]}"
+    if not pos:
+        return f"!({' & '.join(neg)})"
+    if not neg:
+        return f"({' | '.join(pos)})"
+    return f"({' & '.join(neg)} -> {' | '.join(pos)})"
+
+
+def groups(comparisons):
+    """The comparison atoms, split into groups that share no variable."""
+    parent = {}
+
+    def root(v):
+        while parent.setdefault(v, v) != v:
+            v = parent[v]
+        return v
+    for c in comparisons.values():
+        vs = sorted(variables(c))
+        for v in vs[1:]:
+            parent[root(v)] = root(vs[0])
+    by_root = collections.defaultdict(list)
+    for atom, c in sorted(comparisons.items()):
+        by_root[root(min(variables(c)))].append(atom)
+    return sorted(by_root.values())
+
+
+def domain_requirements(comparisons, types, ins, outs):
+    """One non-weakenable Always requirement per group of comparison atoms
+    sharing variables, as `(assumptions, guarantees, notes)`.
+
+    `comparisons` maps an atom to `(op, lhs, rhs)` over term trees, and
+    `types` a variable to its FRET `dataType`. A group of comparisons of
+    one variable with numbers is solved by sampling; any other group by z3.
+    A group whose atoms are all inputs constrains the environment, one whose
+    atoms are all outputs the system; one with both has no side that is
+    exact, so it is rejected.
+    """
+    ins, outs = set(ins), set(outs)
+    assumptions, guarantees, notes = [], [], []
+    for atoms in groups(comparisons):
+        names = sorted(set().union(*(variables(comparisons[a])
+                                     for a in atoms)))
+        var = ", ".join(names)
+        sides = {a in ins for a in atoms}
+        if len(sides) > 1:
+            raise FretImportError(
+                f"comparisons on {var} are both inputs "
+                f"{sorted(a for a in atoms if a in ins)} and outputs "
+                f"{sorted(a for a in atoms if a in outs)}")
+        if len(atoms) > MAX_GROUP:
+            raise FretImportError(f"{len(atoms)} comparisons on {var}; the "
+                                  f"exactness check stops at {MAX_GROUP}")
+        plain = [against_constant(comparisons[a]) for a in atoms]
+        if all(plain) and len(names) == 1:
+            dtype = types.get(var)
+            clauses = domain_clauses([(op, c) for _, op, c in plain],
+                                     dtype in INTEGER_TYPES,
+                                     dtype == "unsigned integer")
+            how = dtype or "untyped, read as real"
+        else:
+            clauses = exact_clauses(
+                smt_vectors([comparisons[a] for a in atoms], types),
+                len(atoms))
+            how = "z3"
+        if not clauses:
+            continue
+        req = {"condition": "true", "condition-type": "continual",
+               "response": " & ".join(render(c, atoms) for c in clauses),
+               "timing": {"type": "Always"}, "weakenable": False}
+        (assumptions if sides == {True} else guarantees).append(req)
+        notes.append(f"{var} ({how}): {len(clauses)} clause(s)")
+    return assumptions, guarantees, notes
+
+
 def load(paths, component, force_in, force_out, all_components=False,
-         atomise=False, from_fulltext=(), skip=(), merge_case=False):
+         atomise=False, from_fulltext=(), skip=(), merge_case=False,
+         domains=True):
     conv = Converter(atomise, from_fulltext, skip, merge_case)
     exports = []
     for p in paths:
@@ -563,6 +879,14 @@ def load(paths, component, force_in, force_out, all_components=False,
                                {snake(a) for a in force_out})
     spec = {"assumptions": [], "guarantees": conv.guarantees,
             "in_atoms": ins, "out_atoms": outs}
+    if domains:
+        assumptions, guarantees, notes = domain_requirements(
+            conv.comparisons, conv.types, ins, outs)
+        spec["assumptions"] += assumptions
+        spec["guarantees"] += guarantees
+        conv.reqids += [["domain"] for _ in guarantees]
+        if notes:
+            conv.notes["domain constraint"] += notes
     if conv.modes:
         spec["modes"] = sorted(conv.modes)
     return spec, conv
@@ -580,6 +904,9 @@ def main(argv=None):
     ap.add_argument("--atomise-arithmetic", action="store_true",
                     help="turn a comparison over arithmetic or functions "
                          "into an atom instead of rejecting it")
+    ap.add_argument("--no-domains", action="store_true",
+                    help="leave comparison atoms unconstrained instead of "
+                         "adding what each variable's values allow")
     ap.add_argument("--from-fulltext", action="append", default=[],
                     metavar="REQID",
                     help="parse REQID's response from its fulltext, for when "
@@ -601,7 +928,7 @@ def main(argv=None):
         spec, conv = load(args.exports, args.component, args.as_input,
                           args.as_output, args.all_components,
                           args.atomise_arithmetic, args.from_fulltext,
-                          args.skip, args.merge_case)
+                          args.skip, args.merge_case, not args.no_domains)
     except FretImportError as e:
         print(f"import_fret: {e}", file=sys.stderr)
         return 1

@@ -70,13 +70,16 @@
             # profile as malformed rather than as out of date.
             llvmPackages.llvm
 
-            # Docs targets (doxygen + sphinx)
+            # Docs targets (doxygen + sphinx), and z3's Python bindings for
+            # scripts/import_fret.py, which asks z3 which combinations of
+            # comparison atoms over shared variables some values realise.
             doxygen
             (python3.withPackages (ps: with ps; [
               sphinx
               breathe
               furo
               sphinxcontrib-katex
+              z3-solver
             ]))
 
             # KaTeX renders the maths in doc comments. The extension above
