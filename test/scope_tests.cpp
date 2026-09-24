@@ -253,6 +253,13 @@ TEST(test_environment_signals_appends_modes) {
     const std::vector<std::string> expected = {"a", "m"};
     expect(environment_signals(with) == expected,
            "scope: modes must join the environment side of the partition");
+    const Specification as_output({}, {}, {"a"}, {"b", "m"}, {"m"});
+    expect(environment_signals(as_output) == std::vector<std::string>{"a"},
+           "scope: a mode declared as an output must stay off the environment "
+           "side");
+    const Specification as_input({}, {}, {"a", "m"}, {"b"}, {"m"});
+    expect(environment_signals(as_input) == std::vector<std::string>{"a", "m"},
+           "scope: a mode declared as an input must appear once");
 }
 
 // The load-bearing test for scopes. requirement_to_ltl reimplements FRET's

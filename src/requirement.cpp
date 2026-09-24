@@ -457,9 +457,19 @@ std::vector<std::string> environment_signals(
     if (specification.m_modes.empty()) {
         return specification.m_in_atoms;
     }
+    const auto is_atom = [&specification](const std::string& name) {
+        const auto declared_in = [&name](const std::vector<std::string>& v) {
+            return std::find(v.begin(), v.end(), name) != v.end();
+        };
+        return declared_in(specification.m_in_atoms) ||
+               declared_in(specification.m_out_atoms);
+    };
     std::vector<std::string> signals = specification.m_in_atoms;
-    signals.insert(signals.end(), specification.m_modes.begin(),
-                   specification.m_modes.end());
+    for (const std::string& mode : specification.m_modes) {
+        if (!is_atom(mode)) {
+            signals.push_back(mode);
+        }
+    }
     return signals;
 }
 

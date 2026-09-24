@@ -31,7 +31,7 @@
       "items": { "type": "string" }
     },
     "modes": {
-      "description": "Operating modes a requirement's scope may be relative to. Their own namespace, disjoint from in_atoms and out_atoms; they join the environment (uncontrollable) side of the synthesis partition. Absent means the specification uses no scopes.",
+      "description": "Operating modes a requirement's scope may be relative to. A mode also listed in in_atoms or out_atoms takes that side; any other mode joins the environment (uncontrollable) side of the synthesis partition. Absent means the specification uses no scopes.",
       "type": "array",
       "items": { "type": "string" }
     },
