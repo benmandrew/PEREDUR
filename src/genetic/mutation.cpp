@@ -745,15 +745,11 @@ bool creates_duplicate(const std::vector<Requirement>& requirements,
     return false;
 }
 
-// The atom pool a freshly added assumption draws its condition and response
-// from: inputs plus outputs. Historically outputs were excluded on the same
-// reasoning as the trigger restriction (an output denotes the next state, so
-// guarding on one gives the synthesiser a self-referential condition it can
-// discharge vacuously); that syntactic ban is lifted and well-separation is
-// delegated to the well-separation check, which the status objective scores
-// and the final gate enforces against any assumption the system can force to
-// fail.
-std::vector<std::string> assumption_atom_pool(
+// The atom pool a freshly added assumption draws its condition from: inputs
+// plus outputs. Conditioning on system behaviour adds no obligation the system
+// can dodge, so an output is safe in the condition. The response is drawn from
+// the inputs alone (see add_assumption).
+std::vector<std::string> assumption_condition_pool(
     const Specification& specification) {
     std::vector<std::string> pool = specification.m_in_atoms;
     pool.insert(pool.end(), specification.m_out_atoms.begin(),
@@ -781,25 +777,46 @@ Formula add_assumption_condition(const std::vector<std::string>& pool,
     return condition;
 }
 
-// Builds a new environment assumption over the specification's atom pool:
-// `whenever <atom|true> C shall eventually satisfy <atom>` — i.e.
-// G(c -> F <atom>), a conditional fairness assumption (each of condition and
-// response is negated on a coin flip). The pool is the input and output atoms;
-// the well-separation check at the final gate (rather than a syntactic ban) is
-// what keeps the system from producing a vacuously-satisfiable assumption.
-// Appending it strengthens the environment, which is how the algorithm repairs
-// unrealizability that the rewrite-only operators cannot reach.
+// Builds a new environment assumption:
+// `whenever <literal|true> C shall eventually satisfy <input literal>` -- i.e.
+// G(c -> F r), a conditional fairness assumption (each of condition and
+// response is negated on a coin flip). Appending it strengthens the
+// environment, which is how the algorithm repairs unrealizability that the
+// rewrite-only operators cannot reach. It mirrors tlsf_add_assumption.
+//
+// The response is always an *input*, though the condition may be an output. An
+// assumption that obliges an output is one the system can defeat by never
+// raising its own signal, which discharges every guarantee at a stroke.
+// Well-separation does not catch that in general: it rejects the unconditional
+// `G F <output>`, but it passes the guarded `G(<lit> -> F <output>)`, because
+// it asks whether the environment *can* satisfy the assumptions, and an
+// environment that never raises the condition can. Drawing the response from
+// the inputs closes the gap without a solver query. With no input there is
+// nothing the environment alone can be obliged to do, so nothing is added.
+//
+// Condition and response are drawn independently from overlapping pools, so
+// they can coincide, and `G(l -> F l)` is a tautology that constrains nothing.
+// Flipping the condition's polarity in that case costs no draw and yields an
+// assumption that says something.
 Specification add_assumption(const Specification& specification,
                              const RandomSource& random_source,
                              const Config& cfg) {
-    const std::vector<std::string> pool = assumption_atom_pool(specification);
+    const std::vector<std::string>& inputs = specification.m_in_atoms;
+    if (inputs.empty()) {
+        return specification;
+    }
     Formula response =
-        Formula::make_atom(pool[random_source.next_index(pool.size())]);
+        Formula::make_atom(inputs[random_source.next_index(inputs.size())]);
     if (random_source.next_bool()) {
         response = Formula::make_unary(Formula::Kind::Not, response);
     }
-    Formula condition = add_assumption_condition(pool, random_source,
-                                                 cfg.p_conditional_assumption);
+    Formula condition =
+        add_assumption_condition(assumption_condition_pool(specification),
+                                 random_source, cfg.p_conditional_assumption);
+    if (condition == response) {
+        condition = Formula::make_unary(Formula::Kind::Not, condition);
+        condition.remove_double_negation();
+    }
     std::vector<Requirement> assumptions = specification.m_assumptions;
     assumptions.emplace_back(std::move(condition), std::move(response),
                              timing::eventually(), ConditionType::Continual,
@@ -851,12 +868,10 @@ Specification mutate_specification(const Specification& specification,
     assert(n_assumptions + specification.m_guarantees.size() > 0);
     // Low-probability structural action: add a new environment assumption. The
     // Specification constructor deduplicates, so re-adding an existing
-    // assumption is a harmless no-op. Available whenever the assumption atom
-    // pool (inputs plus outputs) is non-empty, so a spec with outputs but no
-    // inputs can still gain an assumption.
-    const bool have_assumption_pool =
-        !specification.m_in_atoms.empty() || !specification.m_out_atoms.empty();
-    if (have_assumption_pool &&
+    // assumption is a harmless no-op. Available only when the specification
+    // has an input, since the response of an added assumption must be one; a
+    // spec without inputs spends no draw here and goes on to the rewrites.
+    if (!specification.m_in_atoms.empty() &&
         random_source.next_real() < cfg.p_add_assumption) {
         return add_assumption(specification, random_source, cfg);
     }

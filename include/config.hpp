@@ -42,7 +42,8 @@ enum class SimilarityMetric : std::uint8_t { Direct, Logarithmic };
 /// unrealizable core, evolves only that sub-specification, reintegrates the
 /// repaired core with the untouched non-core guarantees, and repeats on the
 /// recombined spec until it is realizable (or the iteration cap trips). The
-/// mode is TLSF-only; the FRETISH path ignores it.
+/// mode is TLSF-only; the FRETISH path rejects any value but Monolithic and
+/// exits 1.
 enum class RepairMode : std::uint8_t { Monolithic, Muc };
 
 /// How the status objective grades the region below realizability. Tiered is

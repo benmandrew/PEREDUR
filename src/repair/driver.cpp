@@ -56,6 +56,19 @@ std::string format_crash_metadata(std::size_t seed,
     return out.str();
 }
 
+// Warned rather than rejected, unlike a non-default repair_mode on FRETISH:
+// campaign configs and example-config.toml set every key, so a shared config
+// always carries the other path's keys, and only a changed value says the
+// config asked for something this run will not do.
+void warn_ignored_keys(const Config& cfg, RepairInput input) {
+    const char* const reader = input == RepairInput::Tlsf ? "FRETISH" : "TLSF";
+    const char* const run = input == RepairInput::Tlsf ? "TLSF" : "FRETISH";
+    for (const std::string& key : ignored_non_default_keys(cfg, input)) {
+        std::cerr << "warning: config key " << key << " is read only on the "
+                  << reader << " path; this " << run << " run ignores it\n";
+    }
+}
+
 RandomSource init_random_source(const std::optional<std::size_t>& seed) {
     if (seed.has_value()) {
         return make_random_source_from_seed(*seed);
@@ -76,6 +89,7 @@ int run_tlsf_repair(const Config& cfg, const std::string& input_path,
                     const std::string& output_dir,
                     const std::optional<std::size_t>& seed) {
     const auto wall_start = std::chrono::steady_clock::now();
+    warn_ignored_keys(cfg, RepairInput::Tlsf);
     RandomSource random_source = init_random_source(seed);
     const std::optional<std::size_t> effective_seed = random_source.seed();
     if (effective_seed.has_value()) {
@@ -105,7 +119,8 @@ int run_tlsf_repair(const Config& cfg, const std::string& input_path,
         // since there is then no output directory worth describing.
         if (result == 0 && effective_seed.has_value()) {
             write_run_manifest(output_dir, input_path, *effective_seed, cfg,
-                               seconds_since(wall_start), budget);
+                               seconds_since(wall_start), budget,
+                               RepairInput::Tlsf);
         }
         // Last on both paths, so the figure covers the same work either way.
         std::cout << "Done in " << std::fixed << std::setprecision(2)
@@ -129,6 +144,7 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
                      "FRETISH JSON\n";
         return 1;
     }
+    warn_ignored_keys(cfg, RepairInput::Fretish);
     Specification original_spec;
     try {
         original_spec = load_specification(input_path);
@@ -252,7 +268,8 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
         // After the reports, so the per-tool counts it records are the run's
         // totals.
         write_run_manifest(output_dir, input_path, effective_seed, cfg,
-                           seconds_since(wall_start), budget);
+                           seconds_since(wall_start), budget,
+                           RepairInput::Fretish);
         std::cout << "Done in " << std::fixed << std::setprecision(2)
                   << seconds_since(wall_start) << "s\n";
     } catch (const std::exception& exc) {

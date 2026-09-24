@@ -1,11 +1,13 @@
 #include "tlsf/filter.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include "filter/implication.hpp"
 #include "genetic/generation.hpp"
 #include "prop_formula.hpp"
 #include "runner/black.hpp"
@@ -99,6 +101,10 @@ std::optional<bool> tlsf_spec_implies(const tlsf::Specification& from,
         "(" + from.to_ltl() + ") & !(" + dest.to_ltl() + ")",
         QueryPolarity::ExpectUnsat);
     if (!sat.has_value()) {
+        // Counted as the FRETISH spec_implies counts it, so the implication
+        // report's timeout figure covers both paths.
+        ImplicationFilterStats::n_timeouts.fetch_add(1,
+                                                     std::memory_order_relaxed);
         return std::nullopt;
     }
     return !sat.value();

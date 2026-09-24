@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <optional>
@@ -119,6 +120,22 @@ TEST(test_spec_implies_weakening_direction) {
            "spec_implies: the original implies the assumption-added weakening");
     expect(!tlsf_spec_implies(weaker, base, checker).value_or(true),
            "spec_implies: the weakening does not imply the original");
+}
+
+// An undecided query counts towards the implication report's timeout figure,
+// as it does on the FRETISH path. 1ms cannot spawn a subprocess, so the query
+// reaches the deadline rather than being decided ahead of it.
+TEST(test_spec_implies_counts_a_timeout) {
+    SatisfiabilityChecker checker;
+    checker.set_timeout(std::chrono::milliseconds(1));
+    const std::size_t before =
+        ImplicationFilterStats::n_timeouts.load(std::memory_order_relaxed);
+    expect(!tlsf_spec_implies(weaker_spec(), base_spec(), checker).has_value(),
+           "spec_implies: a timed-out query is undecided");
+    expect(ImplicationFilterStats::n_timeouts.load(std::memory_order_relaxed) ==
+               before + 1,
+           "spec_implies: an undecided query counts as an implication "
+           "timeout");
 }
 
 // --- assumption satisfiability ---

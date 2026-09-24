@@ -65,6 +65,8 @@ The probability is read before the `RandomSource` is touched, so at 0 it costs n
 
 ## Assumption construction
 
+On both paths an appended assumption obliges an *input* literal, and only its guard may draw an output. An assumption obliging an output is one the system defeats by never raising its own signal, and well-separation passes the guarded form `G(<lit> -> F <output>)`, because an environment that never raises the guard satisfies it. A guard equal to the obliged literal is negated at no extra draw, which keeps the tautology `G(l -> F l)` out. With no input, nothing is appended: FRETISH skips the operator's draw, and TLSF can still clone. The FRETISH path (`add_assumption` in `src/genetic/mutation.cpp`) caught up with TLSF on 2026-09-24, which moved its draw stream; `experiments/README.md` records the break.
+
 Two keys remain, each at a no-op default (campaign-armed value in brackets):
 
 - `[tlsf.mutation] max_assumption_width` (1, armed 3): an appended body is drawn from `term := [F](literal & ... & literal)`, `body := term | ... | term`.

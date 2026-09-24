@@ -303,7 +303,10 @@ TEST(test_trace_hash_distinguishes_order_and_bounds) {
 
 TEST(test_generation_draw_sequence_is_pinned) {
     constexpr std::size_t k_expected_draws = 187;
-    constexpr std::uint64_t k_expected_hash = 6958607742440809774ULL;
+    // Re-pinned when add_assumption began drawing its response from the inputs
+    // alone: the draw count is unchanged, but the response index is now bounded
+    // by the input count rather than by inputs plus outputs.
+    constexpr std::uint64_t k_expected_hash = 785307073646445480ULL;
 
     const GoldenRun run = run_golden_evolution();
     const std::uint64_t hash = fnv1a(render_trace(*run.trace));
