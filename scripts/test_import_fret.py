@@ -73,7 +73,7 @@ def load(export, **kw):
                       kw.get("as_output", []), kw.get("all_components", False),
                       kw.get("atomise", False), kw.get("from_fulltext", ()),
                       kw.get("skip", ()), kw.get("merge_case", False),
-                      kw.get("domains", True))
+                      kw.get("domains", True), kw.get("exclusive", ()))
 
 
 spec, conv = load(EXPORT)
@@ -386,5 +386,65 @@ check({"a_lt_b", "b_gt_5"} <= set(spec["in_atoms"]), True,
 rejects_with({"requirements": across, "variables": [var("b", "Output")]},
              "forced to the other side", "an atom forced against its "
              "variables is rejected", as_output=["a"], as_input=["a_lt_b"])
+
+# Scopes and modes.
+scoped = [req("F", scope={"type": "in"}, scope_mode="((a | b))",
+              timing="always", post_condition="(x)"),
+          req("SET", condition="regular", regular_condition="(go)",
+              timing="next", post_condition="(standbyMode)"),
+          req("S", scope={"type": "in"}, scope_mode="standbyMode",
+              timing="always", post_condition="(y)"),
+          req("P", scope={"type": "before"}, scope_mode="(pureMode)",
+              timing="always", post_condition="(z)"),
+          req("L", scope={"type": "after"}, scope_mode="labelledMode",
+              timing="always", post_condition="(measureO2% & y)")]
+spec, conv = load({"requirements": scoped,
+                   "variables": [var("labelledMode", "Output"),
+                                 var("pureMode", "Input")]})
+check(spec["guarantees"][0]["scope"], {"type": "In", "mode": "mode_a_or_b"},
+      "a formula mode is named by a fresh atom")
+check(spec["guarantees"][-1], {"condition": "true",
+                               "condition-type": "continual",
+                               "response": "mode_a_or_b <-> (a | b)",
+                               "timing": {"type": "Always"},
+                               "weakenable": False},
+      "the fresh atom's definition is a non-weakenable guarantee")
+check(conv.reqids[-1], ["mode definition"], "--ids names the definition")
+check(spec["modes"], ["labelled_mode", "mode_a_or_b", "pure_mode",
+                      "standby_mode"], "every scope's mode is declared")
+check({"mode_a_or_b", "standby_mode", "labelled_mode"}
+      <= set(spec["out_atoms"]), True,
+      "the fresh atom, a mode a response sets and a mode labelled Output are "
+      "outputs")
+check({"a", "b"} <= set(spec["in_atoms"]), True,
+      "a formula mode's atoms are read, so inputs by the role rule")
+check("pure_mode" in spec["in_atoms"] + spec["out_atoms"], False,
+      "a mode only scopes name stays a pure mode, even labelled Input")
+check(spec["guarantees"][4]["scope"], {"type": "After",
+                                       "mode": "labelled_mode"},
+      "after keeps its kind")
+check(spec["guarantees"][4]["response"], "measure_o2_pct & y",
+      "% in a name becomes _pct")
+rejects_with({"requirements": [
+    req("G1", scope={"type": "in"}, scope_mode="((a | b) & c)",
+        timing="always", post_condition="(x)"),
+    req("G2", scope={"type": "in"}, scope_mode="(a | (b & c))",
+        timing="always", post_condition="(y)")], "variables": []},
+    "which is taken", "two groupings with one fresh name are rejected")
+
+spec, conv = load({"requirements": scoped,
+                   "variables": [var("labelledMode", "Output")]},
+                  exclusive=["standbyMode,labelledMode", "pureMode, a"])
+check(spec["guarantees"][-1]["response"], "!(labelled_mode & standby_mode)",
+      "--exclusive over outputs is a guarantee")
+check(conv.reqids[-1], ["exclusive"], "--ids names the exclusion")
+check(spec["assumptions"][-1]["response"], "!(a & pure_mode)",
+      "--exclusive over inputs and pure modes is an assumption")
+rejects_with({"requirements": scoped, "variables": []}, "mixes inputs",
+             "--exclusive over both sides is rejected",
+             exclusive=["standbyMode,a"])
+rejects_with({"requirements": scoped, "variables": []}, "which no",
+             "--exclusive over an unknown name is rejected",
+             exclusive=["standbyMode,nowhere"])
 
 print("ok: all FRET import checks pass")

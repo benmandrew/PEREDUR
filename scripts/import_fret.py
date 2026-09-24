@@ -24,7 +24,19 @@ rule below matches the formula FRET itself emits (`semantics.ft`):
 - `a = b` is iff when either side is boolean: a formula, a literal, or a name
   used bare somewhere in the exports. Otherwise it is a comparison atom.
 - `=>` becomes `->`, and `TRUE`/`FALSE` become `true`/`false`.
-- Names become snake_case, since SPOT mishandles uppercase inputs.
+- Names become snake_case, since SPOT mishandles uppercase inputs, and `%`
+  becomes `_pct`: `measureO2%` is `measure_o2_pct`.
+- A scope keeps its kind and mode. A formula mode such as `in (a | b)` gets
+  a fresh output atom, `mode_a_or_b`, defined by a non-weakenable guarantee
+  `G(mode_a_or_b <-> (a | b))`. The definition is exact: the system sees each
+  step's inputs before it chooses its outputs.
+- A mode that a requirement also mentions, such as one the controller sets,
+  is declared as an atom too and takes that atom's side. A mode only scopes
+  name is a pure mode, which PEREDUR reads as an input, unless an Output
+  label or `--as-output` makes it an output.
+- FRET keeps mode exclusivity outside the export. `--exclusive a,b,c` adds
+  that at most one of them holds at each step: an assumption when they are
+  inputs or pure modes, a guarantee when they are outputs.
 - Durations are ticks: FRET discards the unit of `within 5 minutes`.
 - Requirements identical after conversion are kept once.
 - Comparison atoms are otherwise free, so a boolean spec could set
@@ -72,7 +84,7 @@ from pathlib import Path
 
 IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 TOKEN = re.compile(r"(\s*)(<->|<=>|->|=>|>=|<=|!=|==|[=<>!~&|()+\-*/^,]|"
-                   r"\d+(?:\.\d+)?|[A-Za-z_]\w*)")
+                   r"\d+(?:\.\d+)?|[A-Za-z_][\w%]*)")
 LITERALS = {"true", "false"}
 SPELLINGS = {"=>": "->", "<=>": "<->"}
 RELATIONS = {">=": "ge", "<=": "le", ">": "gt", "<": "lt",
@@ -100,7 +112,7 @@ class FretImportError(Exception):
 
 def snake(name):
     return re.sub(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", "_",
-                  name).lower()
+                  name).lower().replace("%", "_pct")
 
 
 def split_top(expr, op):
@@ -271,6 +283,8 @@ class Converter:
         self.labels = collections.defaultdict(set)
         self.roles = collections.defaultdict(set)
         self.modes = set()
+        # Each formula mode's fresh atom, mapped to the formula it names.
+        self.defined = {}
         self.original = {}
         self.notes = collections.defaultdict(list)
         self.atomise, self.merge_case = atomise, merge_case
@@ -448,9 +462,31 @@ class Converter:
                                   f"supported: {scope}")
         if SCOPES[kind] is None:
             return None
-        mode = self.name(s["scope_mode"])
+        mode = self.formula(s["scope_mode"], reqid)
+        if not IDENT.fullmatch(mode):
+            mode = self.define(mode, reqid)
         self.modes.add(mode)
         return {"type": SCOPES[kind], "mode": mode}
+
+    def define(self, formula, reqid):
+        """A fresh output atom naming the formula mode `formula`.
+
+        Its definition `G(name <-> formula)` is exact as a guarantee: the
+        system sees each step's inputs before it chooses its outputs, so it
+        can always match the formula, and can never do otherwise.
+        """
+        words = re.sub(r"\s+", "_", formula.replace("|", " or ")
+                       .replace("&", " and ").replace("!", " not ")
+                       .replace("(", " ").replace(")", " ")).strip("_")
+        name = f"mode_{words}"
+        if self.defined.get(name, formula) != formula or name in self.original:
+            raise FretImportError(f"{reqid}: formula mode {formula!r} would "
+                                  f"be named {name!r}, which is taken")
+        self.defined[name] = formula
+        for a in set(IDENT.findall(formula)) - LITERALS:
+            self.roles[a].add("read")
+        self.notes["formula mode"].append(f"{reqid}: {formula} -> {name}")
+        return name
 
     def fields(self, r, component):
         """The FRET fields of `r` to convert, or None to leave `r` out."""
@@ -489,7 +525,7 @@ class Converter:
         if got:
             reqid, s = got
             for key in ("regular_condition", "post_condition",
-                        "stop_condition"):
+                        "stop_condition", "scope_mode"):
                 if s.get(key):
                     self.parse(s[key], reqid)
 
@@ -554,10 +590,10 @@ class Converter:
             self.labels[snake(v["variable_name"])].add(v["idType"])
 
     def partition(self, force_in, force_out):
-        clash = self.modes & set(self.roles)
-        if clash:
-            raise FretImportError(f"modes also used as atoms: {sorted(clash)}")
-
+        taken = set(self.defined) & set(self.original)
+        if taken:
+            raise FretImportError(f"formula mode names {sorted(taken)} are "
+                                  f"also FRET names")
         def forced(a, patterns):
             return any(fnmatch.fnmatchcase(a, pat) for pat in patterns)
 
@@ -592,7 +628,15 @@ class Converter:
                 self.notes[f"{why}, by role"].append(
                     f"{a} -> {'output' if output else 'input'}")
             (outs if output else ins).append(a)
-        return ins, outs
+        # A mode no requirement mentions stays a pure mode, which PEREDUR
+        # already reads as an input, unless a label or a flag makes it an
+        # output. Declaring it an input atom as well would change nothing
+        # but let mutation draw it into conditions and responses.
+        for m in sorted(self.modes - set(self.roles) - set(self.defined)):
+            if side(m):
+                outs.append(m)
+                self.notes["mode made an output by label or flag"].append(m)
+        return ins, sorted(outs + list(self.defined))
 
     def shared_side(self, atom, names, side, forced, force_in, force_out):
         """The side of a comparison over several variables, which only its
@@ -883,17 +927,42 @@ def domain_requirements(comparisons, types, ins, outs):
             how = "z3"
         if not clauses:
             continue
-        req = {"condition": "true", "condition-type": "continual",
-               "response": " & ".join(render(c, atoms) for c in clauses),
-               "timing": {"type": "Always"}, "weakenable": False}
+        req = always(" & ".join(render(c, atoms) for c in clauses))
         (assumptions if sides == {True} else guarantees).append(req)
         notes.append(f"{var} ({how}): {len(clauses)} clause(s)")
     return assumptions, guarantees, notes
 
 
+def always(response):
+    return {"condition": "true", "condition-type": "continual",
+            "response": response, "timing": {"type": "Always"},
+            "weakenable": False}
+
+
+def exclusion(names, ins, outs, modes):
+    """`G` at most one of `names`, as `(requirement, is_assumption)`.
+
+    A pure mode is an environment signal, so it counts as an input.
+    """
+    unknown = [n for n in names if n not in ins and n not in outs
+               and n not in modes]
+    if unknown:
+        raise FretImportError(f"--exclusive names {unknown}, which no "
+                              f"requirement uses")
+    sides = {n in outs for n in names}
+    if len(sides) > 1:
+        raise FretImportError(
+            f"--exclusive mixes inputs "
+            f"{[n for n in names if n not in outs]} with outputs "
+            f"{[n for n in names if n in outs]}")
+    response = " & ".join(f"!({a} & {b})"
+                          for a, b in itertools.combinations(names, 2))
+    return always(response), sides == {False}
+
+
 def load(paths, component, force_in, force_out, all_components=False,
          atomise=False, from_fulltext=(), skip=(), merge_case=False,
-         domains=True):
+         domains=True, exclusive=()):
     conv = Converter(atomise, from_fulltext, skip, merge_case)
     exports = []
     for p in paths:
@@ -920,6 +989,24 @@ def load(paths, component, force_in, force_out, all_components=False,
                                {snake(a) for a in force_out})
     spec = {"assumptions": [], "guarantees": conv.guarantees,
             "in_atoms": ins, "out_atoms": outs}
+    for name, formula in sorted(conv.defined.items()):
+        spec["guarantees"].append(always(f"{name} <-> ({formula})"))
+        conv.reqids.append(["mode definition"])
+    for group in exclusive:
+        names = sorted({snake(n.strip()) for n in group.split(",")
+                        if n.strip()})
+        if len(names) < 2:
+            raise FretImportError(f"--exclusive {group!r} names fewer than "
+                                  f"two signals")
+        requirement, assumed = exclusion(names, set(ins), set(outs),
+                                         conv.modes)
+        if assumed:
+            spec["assumptions"].append(requirement)
+        else:
+            spec["guarantees"].append(requirement)
+            conv.reqids.append(["exclusive"])
+        conv.notes["exclusive"].append(
+            f"{', '.join(names)} ({'assumption' if assumed else 'guarantee'})")
     if domains:
         assumptions, guarantees, notes = domain_requirements(
             conv.comparisons, conv.types, ins, outs)
@@ -957,6 +1044,11 @@ def main(argv=None):
     ap.add_argument("--merge-case", action="store_true",
                     help="read names that differ only in case as one atom "
                          "instead of rejecting them")
+    ap.add_argument("--exclusive", action="append", default=[],
+                    metavar="A,B,...",
+                    help="add that at most one of these signals or modes "
+                         "holds at each step, which FRET keeps outside its "
+                         "export (repeatable)")
     ap.add_argument("--ids", help="also write guarantee index -> FRET reqids")
     ap.add_argument("--as-input", action="append", default=[], metavar="ATOM",
                     help="force ATOM, a name or shell pattern, to be an input "
@@ -969,7 +1061,8 @@ def main(argv=None):
         spec, conv = load(args.exports, args.component, args.as_input,
                           args.as_output, args.all_components,
                           args.atomise_arithmetic, args.from_fulltext,
-                          args.skip, args.merge_case, not args.no_domains)
+                          args.skip, args.merge_case, not args.no_domains,
+                          args.exclusive)
     except FretImportError as e:
         print(f"import_fret: {e}", file=sys.stderr)
         return 1
