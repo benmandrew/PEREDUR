@@ -46,11 +46,14 @@ a placeholder and is skipped; any other one FRET did not formalise is rejected
 unless named by `--skip`.
 
 An atom FRET labels exactly once keeps its label, and a comparison atom takes
-its variable's. An unlabelled atom, or one labelled both ways across exports,
-becomes an output when it appears in a response or a stop condition and an
-input otherwise. `--as-input`/`--as-output` override both, and take shell-
-style patterns. Every requirement becomes a guarantee; FRET has no
-assumptions.
+its variable's. A comparison over several variables takes their side and never
+the role rule's: each needs one label, or `--as-input`/`--as-output` naming
+it, and a comparison of an input with an output is rejected. An unlabelled
+atom, or one labelled both ways across exports, becomes an output when it
+appears in a response or a stop condition and an input otherwise.
+`--as-input`/`--as-output` override both, and take shell-style patterns;
+naming a variable also sides every comparison of it. Every requirement becomes
+a guarantee; FRET has no assumptions.
 
 The summary on stderr lists every rule that fired, so a reviewer can check
 each lossy step. `--ids` writes which FRET reqids each guarantee came from.
@@ -558,14 +561,29 @@ class Converter:
         def forced(a, patterns):
             return any(fnmatch.fnmatchcase(a, pat) for pat in patterns)
 
+        def side(v):
+            """Whether variable `v` is an output, from --as-input,
+            --as-output or a single FRET label; None when neither says."""
+            if forced(v, force_in) or forced(v, force_out):
+                return forced(v, force_out)
+            lab = self.labels.get(v, set())
+            return lab == {"Output"} if len(lab) == 1 else None
+
         ins, outs = [], []
         for a in sorted(self.roles):
-            # A comparison atom takes the labels of the variables it compares.
-            lab = set().union(*(self.labels.get(v, set()) for v in
-                                variables(self.comparisons[a])))\
-                if a in self.comparisons else self.labels.get(a, set())
+            names = variables(self.comparisons[a]) \
+                if a in self.comparisons else set()
+            if len(names) > 1:
+                (outs if self.shared_side(a, names, side, forced, force_in,
+                                          force_out) else ins).append(a)
+                continue
+            # A comparison atom takes the side of the variable it compares.
+            var = next(iter(names), a)
+            lab = self.labels.get(var, set())
             if forced(a, force_in) or forced(a, force_out):
                 output = forced(a, force_out)
+            elif forced(var, force_in) or forced(var, force_out):
+                output = forced(var, force_out)
             elif len(lab) == 1:
                 output = lab == {"Output"}
             else:
@@ -575,6 +593,29 @@ class Converter:
                     f"{a} -> {'output' if output else 'input'}")
             (outs if output else ins).append(a)
         return ins, outs
+
+    def shared_side(self, atom, names, side, forced, force_in, force_out):
+        """The side of a comparison over several variables, which only its
+        variables can give: the environment and the system each choose
+        their own values, so a comparison across the two has no exact
+        side, and the role rule would guess one."""
+        sides = {v: side(v) for v in sorted(names)}
+        unknown = [v for v, out in sides.items() if out is None]
+        if unknown:
+            raise FretImportError(
+                f"{atom} compares {unknown}, with no single Input/Output "
+                f"label; name the side with --as-input or --as-output")
+        if len(set(sides.values())) > 1:
+            raise FretImportError(
+                f"{atom} compares inputs "
+                f"{[v for v, out in sides.items() if not out]} with outputs "
+                f"{[v for v, out in sides.items() if out]}; neither side "
+                f"of it is exact")
+        output = next(iter(sides.values()))
+        if forced(atom, force_out if not output else force_in):
+            raise FretImportError(
+                f"{atom} is forced to the other side from its variables")
+        return output
 
 
 HOLDS = {"lt": lambda x, c: x < c, "le": lambda x, c: x <= c,

@@ -159,7 +159,7 @@ got, spec, _ = responses([
     req("LIT", timing="always", post_condition="(ridgeOn = TRUE)"),
     req("IMP", timing="always", post_condition="(IMUFail => ( Stop ))"),
     req("LIST", timing="for", duration=["3"], post_condition="(u)"),
-])
+], as_output=["s", "t"])
 check(got, ["(a | b) <-> x", "(u <-> v) & w", "s_eq_t", "ridge_on",
             "imu_fail -> ( stop )", "u"],
       "= is iff beside a formula or a bare name, else an atom; => is ->; "
@@ -169,7 +169,7 @@ check(spec["guarantees"][5]["timing"], {"type": "ForTicks", "ticks": 3},
 
 got, _, _ = responses({"requirements": [
     req("ARITH", timing="always", post_condition="(abs(x) < y + 1)")],
-    "variables": []}, atomise=True)
+    "variables": []}, atomise=True, as_output=["x", "y"])
 check(got, ["abs_x_lt_y_plus_1"],
       "--atomise-arithmetic turns an arithmetic comparison into an atom")
 rejects(req("X", timing="always", post_condition="(abs(x) => y)"), "abs",
@@ -228,7 +228,8 @@ spec, conv = load({"requirements": [
                   var("fast", "Output"), var("faster", "Output"),
                   var("moving", "Output"), var("idle", "Output"),
                   var("busy", "Output"), var("slow", "Output"),
-                  var("level", "Output"),
+                  var("level", "Output"), var("a", "Output"),
+                  var("b", "Output"),
                   dict(var("gust", "Input"), dataType="integer"),
                   dict(var("mode", "Input"), dataType="integer")]},
     atomise=True)
@@ -348,8 +349,42 @@ check([r["response"] for r in spec["assumptions"]],
 check(sorted(conv.notes["domain constraint"]),
       ["a, b, c (z3): 2 clause(s)", "x, y (z3): 2 clause(s)"],
       "the summary names the solver")
-rejects(req("X", condition="regular", regular_condition="(u < 1 & v < u)",
-            timing="immediately", post_condition="(v < 0)"),
-        "both inputs", "a group spanning inputs and outputs is rejected")
+
+
+def rejects_with(export, fragment, msg, **kw):
+    try:
+        load(export, **kw)
+    except I.FretImportError as e:
+        check(fragment in str(e), True, f"{msg}: {e}")
+        return
+    print(f"FAIL: {msg}: accepted")
+    sys.exit(1)
+
+
+across = [req("A", condition="regular", regular_condition="(p)",
+              timing="immediately", post_condition="(a < b & !(b > 5))")]
+rejects_with({"requirements": across,
+              "variables": [var("a", "Input"), var("b", "Output")]},
+             "compares inputs ['a'] with outputs ['b']",
+             "a comparison of an input with an output is rejected")
+rejects_with({"requirements": across, "variables": [var("b", "Output")]},
+             "compares ['a'], with no single Input/Output label",
+             "a comparison over an unlabelled variable is rejected")
+rejects_with({"requirements": across,
+              "variables": [var("a", "Input"), var("a", "Output"),
+                            var("b", "Output")]},
+             "compares ['a'], with no single Input/Output label",
+             "a variable labelled both ways is not guessed")
+spec, _ = load({"requirements": across, "variables": [var("b", "Output")]},
+               as_output=["a"])
+check("a_lt_b" in spec["out_atoms"], True,
+      "--as-output on a variable gives its comparisons their side")
+spec, _ = load({"requirements": across, "variables": []},
+               as_input=["a", "b"])
+check({"a_lt_b", "b_gt_5"} <= set(spec["in_atoms"]), True,
+      "comparisons take their variables' side, not the role rule's")
+rejects_with({"requirements": across, "variables": [var("b", "Output")]},
+             "forced to the other side", "an atom forced against its "
+             "variables is rejected", as_output=["a"], as_input=["a_lt_b"])
 
 print("ok: all FRET import checks pass")
