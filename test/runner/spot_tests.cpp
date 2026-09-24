@@ -10,6 +10,7 @@
 #include "runner/atom_names.hpp"
 #include "runner/spot.hpp"
 #include "runner/tool_paths.hpp"
+#include "serialisation.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
 
@@ -138,6 +139,35 @@ TEST(test_tool_path_unset_env_falls_back) {
     expect(!resolved.m_from_env,
            "tool-paths: a fallback path should not report the environment as "
            "its source");
+}
+
+// A mode's side reaches ltlsynt. `always m` is out of the system's hands when
+// m is a pure mode or an input, and the system's to hold when m is declared an
+// output. The scoped guarantee makes m a scope mode as well as a response atom.
+TEST(test_mode_declared_as_an_atom_takes_its_side) {
+    RealizabilityChecker checker;
+    const auto spec =
+        [](const std::string& in_atoms, const std::string& out_atoms) {
+            return parse_specification_json(R"({
+            "assumptions": [],
+            "guarantees": [
+                {"condition": "true", "condition-type": "continual",
+                 "response": "m", "timing": {"type": "Always"}},
+                {"condition": "c", "condition-type": "continual",
+                 "response": "r", "timing": {"type": "Immediately"},
+                 "scope": {"type": "In", "mode": "m"}}
+            ],
+            "in_atoms": [)" + in_atoms + R"(],
+            "out_atoms": [)" + out_atoms + R"(],
+            "modes": ["m"]
+        })");
+        };
+    expect(!realizable(checker, spec(R"("c")", R"("r")")),
+           "spot-runner: always m must be unrealizable for a pure mode m");
+    expect(!realizable(checker, spec(R"("c", "m")", R"("r")")),
+           "spot-runner: always m must be unrealizable for an input mode m");
+    expect(realizable(checker, spec(R"("c")", R"("r", "m")")),
+           "spot-runner: always m must be realizable for an output mode m");
 }
 
 // Realizability is monotone in both sides, and the subsumption table answers

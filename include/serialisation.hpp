@@ -400,10 +400,9 @@ inline std::optional<std::string> validate_requirement_json(
     return std::nullopt;
 }
 
-/// Checks the declared modes against the scopes that use them, and against the
-/// two atom lists. Modes are their own namespace, so a name in both is
-/// ambiguous rather than merely redundant: the lowering would emit one atom
-/// while ltlsynt was told about two different signals.
+/// Checks the declared modes against the scopes that use them. A mode may also
+/// be declared in `in_atoms` or `out_atoms`, and then takes that side (see
+/// `Specification::m_modes`).
 ///
 /// This is the one cross-field check in the file. Nothing validates that a
 /// condition or response mentions only declared atoms, but a scope's mode has
@@ -420,14 +419,6 @@ inline std::optional<std::string> validate_modes_json(
         return std::find(declared.begin(), declared.end(), name) !=
                declared.end();
     };
-    for (const char* field : {"in_atoms", "out_atoms"}) {
-        for (const auto& atom : jobj.at(field)) {
-            if (atom.is_string() && is_declared(atom.get<std::string>())) {
-                return std::string("modes: '") + atom.get<std::string>() +
-                       "' is also declared in " + field;
-            }
-        }
-    }
     for (const char* field : {"assumptions", "guarantees"}) {
         const nlohmann::json& reqs = jobj.at(field);
         for (std::size_t i = 0; i < reqs.size(); ++i) {

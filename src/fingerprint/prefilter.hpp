@@ -44,7 +44,7 @@ std::vector<PackedFingerprint> fingerprints_of(
     const std::vector<tlsf::Specification>& specs);
 
 /// The FRETISH twin. Modes join the sampled signals: a scoped requirement's
-/// mode is an atom of the lowered formula that sits in no atom list
+/// mode is an atom of the lowered formula that may sit in no atom list
 /// (`Specification::m_modes`), and a signal no word names is false at every
 /// position, so leaving it out would evaluate every scope against a trace
 /// where its mode never holds.

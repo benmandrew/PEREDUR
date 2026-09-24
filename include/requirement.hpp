@@ -210,18 +210,23 @@ struct Specification {
 
     std::vector<std::string> m_in_atoms;
     std::vector<std::string> m_out_atoms;
-    /// Names of the modes a requirement's scope may be relative to. Its own
-    /// namespace: disjoint from `m_in_atoms` and `m_out_atoms`, and never drawn
-    /// from by the mutation atom pools, so no rewrite can put a mode into a
-    /// condition or a response.
+    /// Names of the modes a requirement's scope may be relative to.
     ///
-    /// Modes are environment-driven — they join ltlsynt's input side. A mode on
-    /// the output side would let the synthesised system choose its own scope:
-    /// an `In`-scoped guarantee is implied by `G !mode`, and a `Before`-scoped
-    /// one is discharged by holding the mode at t=0, so every scope would have
-    /// a free gutting move. Nothing constrains the modes against each other;
-    /// mutual exclusion is written as an ordinary non-weakenable requirement,
-    /// as `examples/fsm-combined/spec.json` already does for its enum atoms.
+    /// A mode declared only here is environment-driven: it joins ltlsynt's
+    /// input side and no mutation atom pool draws it, so no rewrite can put it
+    /// into a condition or a response. A mode also declared in `m_in_atoms` or
+    /// `m_out_atoms` is that atom, takes its side, and is drawn like any other
+    /// atom. FRET modes the controller sets, such as a ventilator's operating
+    /// mode, need the output side.
+    ///
+    /// An output mode lets the synthesised system choose its own scope: an
+    /// `In`-scoped guarantee is implied by `G !mode`, and a `Before`-scoped one
+    /// is discharged by holding the mode at t=0. Only the specification's other
+    /// requirements stop that, and nothing in the search guards against a
+    /// repair that removes them. Nothing constrains the modes against each
+    /// other either; mutual exclusion is written as an ordinary non-weakenable
+    /// requirement, as `examples/fsm-combined/spec.json` already does for its
+    /// enum atoms.
     std::vector<std::string> m_modes;
 
     explicit Specification(std::vector<Requirement> assumptions = {},
@@ -252,9 +257,10 @@ struct Specification {
 };
 
 /// The signals ltlsynt plays as the environment: the declared inputs followed
-/// by the declared modes. A mode is environment-driven (see
-/// `Specification::m_modes`), so every query that partitions a specification's
-/// alphabet goes through this rather than reading `m_in_atoms` directly.
+/// by the modes declared in neither atom list. Such a mode is
+/// environment-driven (see `Specification::m_modes`), so every query that
+/// partitions a specification's alphabet goes through this rather than reading
+/// `m_in_atoms` directly.
 /// Returns `m_in_atoms` unchanged when no modes are declared, so a
 /// specification without them keeps the cache and subsumption keys it had.
 std::vector<std::string> environment_signals(

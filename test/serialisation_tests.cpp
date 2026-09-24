@@ -499,16 +499,19 @@ TEST(test_never_loads_as_always_over_a_negated_response) {
            "validate_specification_json: a Never timing must be accepted");
 }
 
-TEST(test_mode_shared_with_an_atom_is_rejected) {
-    const nlohmann::json jobj = {{"assumptions", nlohmann::json::array()},
-                                 {"guarantees", nlohmann::json::array()},
-                                 {"in_atoms", {"roll_hold"}},
-                                 {"out_atoms", {"b"}},
-                                 {"modes", {"roll_hold"}}};
-    const auto err = validate_specification_json(jobj);
-    expect(err.has_value(),
-           "validate_specification_json: a name declared as both a mode and an "
-           "atom must be rejected");
+TEST(test_mode_shared_with_an_atom_is_accepted) {
+    for (const char* side : {"in_atoms", "out_atoms"}) {
+        nlohmann::json jobj = {{"assumptions", nlohmann::json::array()},
+                               {"guarantees", nlohmann::json::array()},
+                               {"in_atoms", {"a"}},
+                               {"out_atoms", {"b"}},
+                               {"modes", {"roll_hold"}}};
+        jobj[side].push_back("roll_hold");
+        expect(!validate_specification_json(jobj).has_value(),
+               std::string("validate_specification_json: a mode also "
+                           "declared in ") +
+                   side + " must be accepted");
+    }
 }
 
 TEST(test_global_scope_with_a_mode_is_rejected) {
