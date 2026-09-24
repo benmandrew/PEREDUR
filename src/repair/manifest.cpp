@@ -176,7 +176,10 @@ namespace {
 // 29 added mutation.p_stop, the FRETISH arm rewriting the stop condition of an
 // `until` or `before` timing. It draws nothing on a specification without one,
 // so an earlier run's search is what it would have been at any value.
-constexpr int k_schema_version = 29;
+//
+// 30 counts implication.timeouts on TLSF, where tlsf_spec_implies counted none
+// and the field read 0 on every earlier TLSF manifest.
+constexpr int k_schema_version = 30;
 
 std::string utc_timestamp() {
     const std::time_t now =
