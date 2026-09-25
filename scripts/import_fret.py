@@ -48,19 +48,28 @@ rule below matches the formula FRET itself emits (`semantics.ft`):
   constrained together; where one compares two names or carries arithmetic
   (`--atomise-arithmetic`), z3 decides which vectors some values realise,
   and a group it cannot decide is rejected.
+- A comparison of an input with an output, such as `rr = rr_ap` with `rr_ap`
+  an input, is an output: the system sees each step's inputs before it
+  chooses its outputs. Its group's guarantee admits an output vector for an
+  input vector when every input value giving the latter leaves some output
+  value giving the former, which z3 decides as a forall-exists query. Where
+  some input values leave the system more choice than that, the guarantee
+  instead admits every vector some values realise, over-approximating the
+  system's choice, and the summary says so.
 
 FRET's parser silently drops the `= X` of `(a | b) = X`, so a name in the
 fulltext's response that the parsed response lacks is rejected;
 `--from-fulltext REQID` parses that requirement's response from its fulltext
 instead. Names colliding after snake_case are rejected, unless they differ
-only in case and `--merge-case` is given. A requirement with empty fulltext is
+only in case and `--merge-case` is given; `--rename RAW=ATOM` keeps two such
+names apart by naming one explicitly. A requirement with empty fulltext is
 a placeholder and is skipped; any other one FRET did not formalise is rejected
 unless named by `--skip`.
 
 An atom FRET labels exactly once keeps its label, and a comparison atom takes
 its variable's. A comparison over several variables takes their side and never
 the role rule's: each needs one label, or `--as-input`/`--as-output` naming
-it, and a comparison of an input with an output is rejected. An unlabelled
+it, and a comparison of an input with an output is an output. An unlabelled
 atom, or one labelled both ways across exports, becomes an output when it
 appears in a response or a stop condition and an input otherwise.
 `--as-input`/`--as-output` override both, and take shell-style patterns;
@@ -278,7 +287,7 @@ def is_bool(node):
 
 class Converter:
     def __init__(self, atomise=False, from_fulltext=(), skip=(),
-                 merge_case=False):
+                 merge_case=False, rename=None):
         self.guarantees, self.reqids = [], []
         self.labels = collections.defaultdict(set)
         self.roles = collections.defaultdict(set)
@@ -289,15 +298,22 @@ class Converter:
         self.notes = collections.defaultdict(list)
         self.atomise, self.merge_case = atomise, merge_case
         self.from_fulltext, self.skip = set(from_fulltext), set(skip)
+        self.rename = dict(rename or {})
         # Names used as booleans somewhere, and name pairs compared by `=`,
         # which are iff when either side is in the set.
         self.boolean, self.equated = set(), []
         # Each comparison atom as (op, lhs, rhs) over term trees, and each
         # variable's FRET dataType.
         self.comparisons, self.types = {}, {}
+        # Each compared variable's side, True for an output, as partition
+        # settles it; a variable given both sides maps to None.
+        self.var_output = {}
+
+    def atom(self, raw):
+        return self.rename.get(raw) or snake(raw)
 
     def name(self, raw):
-        new = snake(raw)
+        new = self.atom(raw)
         prev = self.original.setdefault(new, raw)
         if prev != raw and self.merge_case and prev.lower() == raw.lower():
             self.notes["case variants merged"].append(f"{raw} = {prev}")
@@ -402,7 +418,7 @@ class Converter:
         `(func, t, ...)` for abs, absReal, min and max."""
         node = unwrap(node)
         if node.kind == "ident":
-            return ("var", snake(node.text))
+            return ("var", self.atom(node.text))
         if node.kind == "num":
             return ("num", Fraction(node.text))
         if node.kind == "minus":
@@ -585,9 +601,9 @@ class Converter:
 
     def label(self, v):
         if v.get("dataType"):
-            self.types[snake(v["variable_name"])] = v["dataType"]
+            self.types[self.atom(v["variable_name"])] = v["dataType"]
         if v.get("idType"):
-            self.labels[snake(v["variable_name"])].add(v["idType"])
+            self.labels[self.atom(v["variable_name"])].add(v["idType"])
 
     def partition(self, force_in, force_out):
         taken = set(self.defined) & set(self.original)
@@ -605,13 +621,21 @@ class Converter:
             lab = self.labels.get(v, set())
             return lab == {"Output"} if len(lab) == 1 else None
 
+        def settle(v, output):
+            prev = self.var_output.setdefault(v, output)
+            if prev is not None and prev != output:
+                self.var_output[v] = None
+
         ins, outs = [], []
         for a in sorted(self.roles):
             names = variables(self.comparisons[a]) \
                 if a in self.comparisons else set()
             if len(names) > 1:
-                (outs if self.shared_side(a, names, side, forced, force_in,
-                                          force_out) else ins).append(a)
+                output = self.shared_side(a, names, side, forced, force_in,
+                                          force_out)
+                for v in names:
+                    settle(v, side(v))
+                (outs if output else ins).append(a)
                 continue
             # A comparison atom takes the side of the variable it compares.
             var = next(iter(names), a)
@@ -627,6 +651,8 @@ class Converter:
                 why = "labelled both ways" if lab else "unlabelled"
                 self.notes[f"{why}, by role"].append(
                     f"{a} -> {'output' if output else 'input'}")
+            if names:
+                settle(var, output)
             (outs if output else ins).append(a)
         # A mode no requirement mentions stays a pure mode, which PEREDUR
         # already reads as an input, unless a label or a flag makes it an
@@ -642,20 +668,23 @@ class Converter:
         """The side of a comparison over several variables, which only its
         variables can give: the environment and the system each choose
         their own values, so a comparison across the two has no exact
-        side, and the role rule would guess one."""
+        side, and the role rule would guess one. One across both sides is an
+        output, since the system chooses its outputs knowing the inputs."""
         sides = {v: side(v) for v in sorted(names)}
         unknown = [v for v, out in sides.items() if out is None]
         if unknown:
             raise FretImportError(
                 f"{atom} compares {unknown}, with no single Input/Output "
                 f"label; name the side with --as-input or --as-output")
-        if len(set(sides.values())) > 1:
-            raise FretImportError(
-                f"{atom} compares inputs "
-                f"{[v for v, out in sides.items() if not out]} with outputs "
-                f"{[v for v, out in sides.items() if out]}; neither side "
-                f"of it is exact")
-        output = next(iter(sides.values()))
+        output = any(sides.values())
+        if not all(sides.values()) and output:
+            if forced(atom, force_in):
+                raise FretImportError(
+                    f"{atom} compares outputs "
+                    f"{[v for v, out in sides.items() if out]}, so cannot be "
+                    f"an input")
+            self.notes["input/output comparison, as output"].append(atom)
+            return True
         if forced(atom, force_out if not output else force_in):
             raise FretImportError(
                 f"{atom} is forced to the other side from its variables")
@@ -749,9 +778,9 @@ def sampled_vectors(preds, integer=False, unsigned=False):
             for x in samples([c for _, c in preds], integer, unsigned)}
 
 
-def smt_vectors(comparisons, types):
-    """The truth vectors of `comparisons` that some values of their
-    variables realise, enumerated by z3 one blocked vector at a time."""
+def z3_comparisons(comparisons, types):
+    """`(z3, zvars, exprs, domain)`: each variable as a z3 constant, each
+    comparison as a z3 boolean over them, and each variable's own bound."""
     try:
         import z3
     except ImportError:
@@ -784,17 +813,26 @@ def smt_vectors(comparisons, types):
         return {"+": lambda a, b: a + b, "-": lambda a, b: a - b,
                 "*": lambda a, b: a * b, "^": lambda a, b: a ** b}[head](*args)
 
-    solver = z3.Solver()
-    solver.set("timeout", 10000)
-    for v in names:
-        if types.get(v) == "unsigned integer":
-            solver.add(zvars[v] >= 0)
-    flags = [z3.Bool(f"cmp!{i}") for i in range(len(comparisons))]
     ops = {"lt": lambda a, b: a < b, "le": lambda a, b: a <= b,
            "gt": lambda a, b: a > b, "ge": lambda a, b: a >= b,
            "eq": lambda a, b: a == b, "ne": lambda a, b: a != b}
-    for flag, (op, a, b) in zip(flags, comparisons):
-        solver.add(flag == ops[op](term(a), term(b)))
+    exprs = [ops[op](term(a), term(b)) for op, a, b in comparisons]
+    domain = {v: zvars[v] >= 0 for v in names
+              if types.get(v) == "unsigned integer"}
+    return z3, zvars, exprs, domain
+
+
+def smt_vectors(comparisons, types):
+    """The truth vectors of `comparisons` that some values of their
+    variables realise, enumerated by z3 one blocked vector at a time."""
+    z3, zvars, exprs, domain = z3_comparisons(comparisons, types)
+    names = sorted(zvars)
+    solver = z3.Solver()
+    solver.set("timeout", 10000)
+    solver.add(*domain.values())
+    flags = [z3.Bool(f"cmp!{i}") for i in range(len(comparisons))]
+    for flag, e in zip(flags, exprs):
+        solver.add(flag == e)
     vectors = set()
     while True:
         verdict = solver.check()
@@ -809,6 +847,51 @@ def smt_vectors(comparisons, types):
                        for f in flags)
         vectors.add(vector)
         solver.add(z3.Or([f != val for f, val in zip(flags, vector)]))
+
+
+def forall_exists_vectors(ins, outs, types, out_vars):
+    """The vectors `(i, o)` over input comparisons `ins` then output
+    comparisons `outs` such that every input value giving `i` leaves some
+    value of `out_vars` giving `o`, as `(vectors, loose)`.
+
+    An `i` no input value gives admits every `o`, so the clauses built from
+    the vectors constrain only the outputs. `loose` is whether some input
+    values leave more output vectors than every one does, where the
+    vectors under-approximate the system's choice.
+    """
+    both = smt_vectors(ins + outs, types)
+    real_in = {v[:len(ins)] for v in both}
+    z3, zvars, exprs, domain = z3_comparisons(ins + outs, types)
+    ys = [zvars[v] for v in sorted(out_vars) if v in zvars]
+    y_domain = [domain[v] for v in sorted(out_vars) if v in domain]
+    x_domain = [b for v, b in domain.items() if v not in out_vars]
+    vectors, loose = set(), False
+    for vec in sorted(both):
+        i, o = vec[:len(ins)], vec[len(ins):]
+        # Eliminating the quantifier first decides the ventilator's
+        # nonlinear groups at once; the default solver times out on them.
+        solver = z3.Then("simplify", "qe", "smt").solver()
+        solver.set("timeout", 10000)
+        solver.add(*x_domain)
+        solver.add(*[e == z3.BoolVal(b) for e, b in zip(exprs, i)])
+        reach = z3.And(*y_domain, *[e == z3.BoolVal(b)
+                                    for e, b in zip(exprs[len(ins):], o)])
+        solver.add(z3.Not(z3.Exists(ys, reach)) if ys else z3.Not(reach))
+        verdict = solver.check()
+        if verdict == z3.unknown:
+            raise FretImportError(
+                f"z3 cannot decide whether the system always reaches {vec} "
+                f"over {sorted(zvars)}: {solver.reason_unknown()}; "
+                f"--no-domains skips them")
+        if verdict == z3.unsat:
+            vectors.add(vec)
+        else:
+            loose = True
+    for i in itertools.product((True, False), repeat=len(ins)):
+        if i not in real_in:
+            vectors |= {i + o for o in itertools.product(
+                (True, False), repeat=len(outs))}
+    return vectors, loose
 
 
 def exact_clauses(real, k, span=lambda c: 0):
@@ -887,25 +970,38 @@ def groups(comparisons):
     return sorted(by_root.values())
 
 
-def domain_requirements(comparisons, types, ins, outs):
+def domain_requirements(comparisons, types, ins, outs, var_output=None):
     """One non-weakenable Always requirement per group of comparison atoms
     sharing variables, as `(assumptions, guarantees, notes)`.
 
     `comparisons` maps an atom to `(op, lhs, rhs)` over term trees, and
     `types` a variable to its FRET `dataType`. A group of comparisons of
     one variable with numbers is solved by sampling; any other group by z3.
-    A group whose atoms are all inputs constrains the environment, one whose
-    atoms are all outputs the system; one with both has no side that is
-    exact, so it is rejected.
+    A group whose atoms are all inputs constrains the environment, one over
+    output variables alone the system. A group comparing an input with an
+    output gets an assumption over its input atoms and a guarantee from
+    `forall_exists_vectors` over all of them, with `var_output` giving each
+    variable's side; where those under-approximate the system, from the
+    vectors some values realise instead. A variable compared on both sides has no exact side,
+    so it is rejected.
     """
     ins, outs = set(ins), set(outs)
+    var_output = var_output or {}
     assumptions, guarantees, notes = [], [], []
     for atoms in groups(comparisons):
         names = sorted(set().union(*(variables(comparisons[a])
                                      for a in atoms)))
         var = ", ".join(names)
         sides = {a in ins for a in atoms}
-        if len(sides) > 1:
+        in_atoms = [a for a in atoms if a in ins]
+        out_vars = {v for v in names if var_output.get(v)}
+        # A group mixes sides when an output atom compares an input.
+        mixed = len(sides) > 1 or (sides == {False} and any(
+            var_output.get(v) is False for v in names))
+        split = mixed and all(
+            var_output.get(v) is not None for v in names) and all(
+            not variables(comparisons[a]) & out_vars for a in in_atoms)
+        if mixed and not split:
             raise FretImportError(
                 f"comparisons on {var} are both inputs "
                 f"{sorted(a for a in atoms if a in ins)} and outputs "
@@ -913,6 +1009,26 @@ def domain_requirements(comparisons, types, ins, outs):
         if len(atoms) > MAX_GROUP:
             raise FretImportError(f"{len(atoms)} comparisons on {var}; the "
                                   f"exactness check stops at {MAX_GROUP}")
+        if split:
+            out_atoms = [a for a in atoms if a not in ins]
+            a, _, n = domain_requirements(
+                {x: comparisons[x] for x in in_atoms}, types, in_atoms, [])
+            assumptions += a
+            notes += n
+            order = in_atoms + out_atoms
+            vectors, loose = forall_exists_vectors(
+                [comparisons[x] for x in in_atoms],
+                [comparisons[x] for x in out_atoms], types, out_vars)
+            if loose:
+                vectors = smt_vectors([comparisons[x] for x in order], types)
+            clauses = exact_clauses(vectors, len(order))
+            if clauses:
+                guarantees.append(always(" & ".join(render(c, order)
+                                                    for c in clauses)))
+            how = "exists-exists fallback" if loose else "forall-exists"
+            notes.append(f"{var} (z3, {how}): "
+                         f"{len(clauses)} clause(s)")
+            continue
         plain = [against_constant(comparisons[a]) for a in atoms]
         if all(plain) and len(names) == 1:
             dtype = types.get(var)
@@ -962,8 +1078,8 @@ def exclusion(names, ins, outs, modes):
 
 def load(paths, component, force_in, force_out, all_components=False,
          atomise=False, from_fulltext=(), skip=(), merge_case=False,
-         domains=True, exclusive=()):
-    conv = Converter(atomise, from_fulltext, skip, merge_case)
+         domains=True, exclusive=(), rename=None):
+    conv = Converter(atomise, from_fulltext, skip, merge_case, rename)
     exports = []
     for p in paths:
         e = json.loads(Path(p).read_text())
@@ -985,15 +1101,15 @@ def load(paths, component, force_in, force_out, all_components=False,
             conv.label(v)
         for r in e["requirements"]:
             conv.add(r, component)
-    ins, outs = conv.partition({snake(a) for a in force_in},
-                               {snake(a) for a in force_out})
+    ins, outs = conv.partition({conv.atom(a) for a in force_in},
+                               {conv.atom(a) for a in force_out})
     spec = {"assumptions": [], "guarantees": conv.guarantees,
             "in_atoms": ins, "out_atoms": outs}
     for name, formula in sorted(conv.defined.items()):
         spec["guarantees"].append(always(f"{name} <-> ({formula})"))
         conv.reqids.append(["mode definition"])
     for group in exclusive:
-        names = sorted({snake(n.strip()) for n in group.split(",")
+        names = sorted({conv.atom(n.strip()) for n in group.split(",")
                         if n.strip()})
         if len(names) < 2:
             raise FretImportError(f"--exclusive {group!r} names fewer than "
@@ -1009,7 +1125,7 @@ def load(paths, component, force_in, force_out, all_components=False,
             f"{', '.join(names)} ({'assumption' if assumed else 'guarantee'})")
     if domains:
         assumptions, guarantees, notes = domain_requirements(
-            conv.comparisons, conv.types, ins, outs)
+            conv.comparisons, conv.types, ins, outs, conv.var_output)
         spec["assumptions"] += assumptions
         spec["guarantees"] += guarantees
         conv.reqids += [["domain"] for _ in guarantees]
@@ -1044,6 +1160,11 @@ def main(argv=None):
     ap.add_argument("--merge-case", action="store_true",
                     help="read names that differ only in case as one atom "
                          "instead of rejecting them")
+    ap.add_argument("--rename", action="append", default=[],
+                    metavar="RAW=ATOM",
+                    help="name FRET variable RAW as ATOM instead of its "
+                         "snake_case form, to keep apart names that collide "
+                         "after snake_case (repeatable)")
     ap.add_argument("--exclusive", action="append", default=[],
                     metavar="A,B,...",
                     help="add that at most one of these signals or modes "
@@ -1057,12 +1178,16 @@ def main(argv=None):
                     help="force ATOM, a name or shell pattern, to be an "
                          "output (repeatable)")
     args = ap.parse_args(argv)
+    bad = [r for r in args.rename if "=" not in r]
+    if bad:
+        ap.error(f"--rename takes RAW=ATOM, not {bad[0]!r}")
+    rename = dict(r.split("=", 1) for r in args.rename)
     try:
         spec, conv = load(args.exports, args.component, args.as_input,
                           args.as_output, args.all_components,
                           args.atomise_arithmetic, args.from_fulltext,
                           args.skip, args.merge_case, not args.no_domains,
-                          args.exclusive)
+                          args.exclusive, rename)
     except FretImportError as e:
         print(f"import_fret: {e}", file=sys.stderr)
         return 1
