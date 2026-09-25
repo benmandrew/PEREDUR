@@ -3,6 +3,7 @@ add_executable(peredur_tests
     runner/formaliser_tests.cpp
     runner/ganak_tests.cpp
     runner/ltlfilt_tests.cpp
+    runner/long_formula_tests.cpp
     runner/process_tests.cpp
     runner/spot_tests.cpp
     filter/correctness_tests.cpp
@@ -86,6 +87,7 @@ set(peredur_test_suites
     formaliser_runner
     ganak_runner
     ltlfilt_runner
+    long_formula_runner
     process_runner
     spot_runner
     accumulator

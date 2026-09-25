@@ -287,11 +287,14 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
             return decided;
         }
     }
-    const std::vector<std::string> command = {black, "solve",
-                                              "-t",  std::to_string(timeout_s),
-                                              "-f",  to_black_constants(query)};
+    // On stdin (`-` names it) rather than as `-f`, for the argv limit
+    // execute_and_capture_with_input describes. black reads the whole input
+    // as one formula, so line breaks need no treatment here.
+    const std::vector<std::string> command = {black, "solve", "-t",
+                                              std::to_string(timeout_s), "-"};
     n_black_calls++;
-    const ProcessResult result = execute_and_capture(command, m_timeout);
+    const ProcessResult result = execute_and_capture_with_input(
+        command, to_black_constants(query), m_timeout);
     std::scoped_lock lock(m_cache_mutex);
     record_exec<SatisfiabilityChecker>(result);
     if (result.m_timed_out) {

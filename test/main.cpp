@@ -32,6 +32,7 @@ const std::vector<Suite>& suites() {
         suite_named("formaliser_runner"),
         suite_named("ganak_runner"),
         suite_named("ltlfilt_runner"),
+        suite_named("long_formula_runner"),
         suite_named("process_runner"),
         suite_named("spot_runner"),
         suite_named("accumulator"),

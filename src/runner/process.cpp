@@ -2,6 +2,7 @@
 
 #include <fcntl.h>
 #include <poll.h>
+#include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -29,7 +30,9 @@
 #include <iterator>
 #include <limits>
 #include <optional>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -504,6 +507,40 @@ std::vector<char*> exec_argv(const std::vector<std::string>& arguments) {
     return argv;
 }
 
+// Writes "peredur: cannot exec <path>: errno <n>" to stderr. A failed exec
+// otherwise surfaces only as exit status 127 and empty output, which every
+// runner reads as unrecognised tool output rather than as a tool that never
+// ran. Runs between fork and exec, so it formats the number by hand: write is
+// async-signal-safe and snprintf is not.
+void report_exec_failure(const char* path, int error_number) {
+    constexpr std::string_view k_prefix = "peredur: cannot exec ";
+    constexpr std::string_view k_errno = ": errno ";
+    // E2BIG is named because it is the one a caller can cause: one argument
+    // over MAX_ARG_STRLEN (128 KiB on Linux), which is why formulas travel on
+    // stdin rather than in argv.
+    constexpr std::string_view k_e2big = " (E2BIG, argument list too long)";
+    std::array<char, 16> digits{};
+    std::size_t start = digits.size();
+    int remaining = error_number < 0 ? 0 : error_number;
+    do {
+        --start;
+        digits[start] = static_cast<char>('0' + (remaining % 10));
+        remaining /= 10;
+    } while (remaining > 0 && start > 0);
+    std::size_t path_length = 0;
+    while (path[path_length] != '\0') {
+        ++path_length;
+    }
+    write_all(STDERR_FILENO, k_prefix.data(), k_prefix.size());
+    write_all(STDERR_FILENO, path, path_length);
+    write_all(STDERR_FILENO, k_errno.data(), k_errno.size());
+    write_all(STDERR_FILENO, &digits[start], digits.size() - start);
+    if (error_number == E2BIG) {
+        write_all(STDERR_FILENO, k_e2big.data(), k_e2big.size());
+    }
+    write_all(STDERR_FILENO, "\n", 1);
+}
+
 // The child's side of both forks once its descriptors are in place: the
 // containment policy, then the exec, with 127 as the exit status of a failed
 // one.
@@ -516,7 +553,45 @@ std::vector<char*> exec_argv(const std::vector<std::string>& arguments) {
     } else {
         execv(argv[0], argv.data());
     }
+    report_exec_failure(argv[0], errno);
     _exit(127);
+}
+
+// A close-on-exec descriptor holding `content`, positioned at its start, for
+// the child to take as its stdin. A file rather than a pipe, so the whole
+// payload is in place before the fork: nothing is written while the child's
+// output is being read, so a large payload can neither deadlock against a
+// full stdout pipe nor raise SIGPIPE when a child exits without reading it,
+// and the deadline and kill paths are unchanged.
+//
+// Linux uses memfd_create, which touches no filesystem and needs no cleanup.
+// macOS has no memfd, so it takes an unlinked temporary file whose
+// FD_CLOEXEC is set after the open, which is why the caller holds the
+// SpawnGuard.
+int input_file_holding(const std::string& content) {
+#ifdef __APPLE__
+    std::string name = "/tmp/peredur-input-XXXXXX";
+    const int input_fd = mkstemp(name.data());
+    if (input_fd >= 0) {
+        unlink(name.c_str());
+        if (fcntl(input_fd, F_SETFD, FD_CLOEXEC) != 0) {
+            close(input_fd);
+            throw std::runtime_error(
+                "cannot mark the child's input file close-on-exec");
+        }
+    }
+#else
+    const int input_fd = memfd_create("peredur-input", MFD_CLOEXEC);
+#endif
+    if (input_fd < 0) {
+        throw std::runtime_error("cannot create the child's input file");
+    }
+    if (!write_all(input_fd, content.data(), content.size()) ||
+        lseek(input_fd, 0, SEEK_SET) != 0) {
+        close(input_fd);
+        throw std::runtime_error("cannot write the child's input file");
+    }
+    return input_fd;
 }
 
 std::optional<Clock::time_point> deadline_after(
@@ -721,9 +796,14 @@ double reap_with_grace(pid_t pid, std::chrono::milliseconds grace,
     return cpu_s;
 }
 
-ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
-                                  std::chrono::milliseconds timeout,
-                                  ExecutableLookup lookup) {
+namespace {
+
+// execute_and_capture, with `input` as the child's stdin when it is non-null.
+// Without one the child inherits this process's stdin, as it always has.
+ProcessResult run_and_capture(const std::vector<std::string>& arguments,
+                              const std::string* input,
+                              std::chrono::milliseconds timeout,
+                              ExecutableLookup lookup) {
     assert(!arguments.empty());
     const Clock::time_point start = Clock::now();
     const std::vector<char*> argv = exec_argv(arguments);
@@ -749,6 +829,7 @@ ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
         // lets the child keep those two.
         const SpawnGuard spawn_guard;
         start_reaper_once();
+        const int input_fd = input == nullptr ? -1 : input_file_holding(*input);
         [[maybe_unused]] const int pipe_result = make_cloexec_pipe(pipe_fds);
         assert(pipe_result == 0);
         // The near side of the floor; widen_rss_floor takes the far side once
@@ -766,7 +847,8 @@ ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
         if (child_pid == 0) {
             close(pipe_fds[0]);
             if (dup2(pipe_fds[1], STDOUT_FILENO) < 0 ||
-                dup2(pipe_fds[1], STDERR_FILENO) < 0) {
+                dup2(pipe_fds[1], STDERR_FILENO) < 0 ||
+                (input_fd >= 0 && dup2(input_fd, STDIN_FILENO) < 0)) {
                 _exit(127);
             }
             close(pipe_fds[1]);
@@ -775,6 +857,9 @@ ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
         }
         adopt_child_process_group(child_pid);
         close(pipe_fds[1]);
+        if (input_fd >= 0) {
+            close(input_fd);
+        }
         rss_floor_kb = widen_rss_floor(rss_floor_kb);
     }
     const std::optional<Clock::time_point> deadline = deadline_after(timeout);
@@ -797,4 +882,18 @@ ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
         std::chrono::duration<double>(Clock::now() - start).count();
     return {exit_code,   std::move(output), cpu_s,    wall_s,
             peak_rss_kb, rss_floor_kb,      timed_out};
+}
+
+}  // namespace
+
+ProcessResult execute_and_capture(const std::vector<std::string>& arguments,
+                                  std::chrono::milliseconds timeout,
+                                  ExecutableLookup lookup) {
+    return run_and_capture(arguments, nullptr, timeout, lookup);
+}
+
+ProcessResult execute_and_capture_with_input(
+    const std::vector<std::string>& arguments, const std::string& input,
+    std::chrono::milliseconds timeout, ExecutableLookup lookup) {
+    return run_and_capture(arguments, &input, timeout, lookup);
 }

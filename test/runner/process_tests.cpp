@@ -288,4 +288,52 @@ TEST(test_parent_death_guard_compares_the_recorded_parent_pid) {
            "refuse to exec on a dead parent either");
 }
 
+// Past both the 64 KiB pipe buffer and MAX_ARG_STRLEN: the input must arrive
+// whole, and the child must see end of file after it.
+TEST(test_input_reaches_the_child_stdin_whole) {
+    const std::string input(300'000, 'a');
+    const ProcessResult result = execute_and_capture_with_input(
+        {"/bin/sh", "-c", "wc -c"}, input, milliseconds{10'000});
+    expect(result.m_exit_code == 0 && !result.m_timed_out,
+           "process: reading a large stdin should succeed");
+    expect(result.m_output.find("300000") != std::string::npos,
+           "process: the child should read every input byte, got \"" +
+               result.m_output + "\"");
+}
+
+// A child that exits without reading its input must not stall the call or
+// raise SIGPIPE here, which a streamed pipe would.
+TEST(test_unread_input_is_harmless) {
+    const std::string input(300'000, 'a');
+    const ProcessResult result = execute_and_capture_with_input(
+        {"/bin/sh", "-c", "printf done"}, input, milliseconds{10'000});
+    expect(result.m_exit_code == 0 && result.m_output == "done",
+           "process: a child that ignores its input should still finish");
+}
+
+// A failed exec used to be exit 127 with empty output, which the runners read
+// as an unrecognised answer. It now says what failed, and names E2BIG, the
+// failure an oversized formula argument produces.
+TEST(test_exec_failure_is_reported) {
+    const ProcessResult missing =
+        execute_and_capture({"/nonexistent/peredur-no-such-tool"});
+    expect(missing.m_exit_code == 127,
+           "process: a failed exec should exit 127, got " +
+               std::to_string(missing.m_exit_code));
+    expect(missing.m_output.find("cannot exec /nonexistent/peredur-no-such-"
+                                 "tool: errno") != std::string::npos,
+           "process: a failed exec should say so, got \"" + missing.m_output +
+               "\"");
+#ifdef __linux__
+    // MAX_ARG_STRLEN is Linux's; macOS bounds only the argv total.
+    const ProcessResult too_long = execute_and_capture(
+        {"/bin/sh", "-c", "true", std::string(200'000, 'a')});
+    expect(too_long.m_exit_code == 127 &&
+               too_long.m_output.find("E2BIG") != std::string::npos,
+           "process: an argument over MAX_ARG_STRLEN should report E2BIG, got "
+           "\"" +
+               too_long.m_output + "\"");
+#endif
+}
+
 }  // namespace
