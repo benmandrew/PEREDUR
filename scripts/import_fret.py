@@ -53,7 +53,8 @@ FRET's parser silently drops the `= X` of `(a | b) = X`, so a name in the
 fulltext's response that the parsed response lacks is rejected;
 `--from-fulltext REQID` parses that requirement's response from its fulltext
 instead. Names colliding after snake_case are rejected, unless they differ
-only in case and `--merge-case` is given. A requirement with empty fulltext is
+only in case and `--merge-case` is given; `--rename RAW=ATOM` keeps two such
+names apart by naming one explicitly. A requirement with empty fulltext is
 a placeholder and is skipped; any other one FRET did not formalise is rejected
 unless named by `--skip`.
 
@@ -278,7 +279,7 @@ def is_bool(node):
 
 class Converter:
     def __init__(self, atomise=False, from_fulltext=(), skip=(),
-                 merge_case=False):
+                 merge_case=False, rename=None):
         self.guarantees, self.reqids = [], []
         self.labels = collections.defaultdict(set)
         self.roles = collections.defaultdict(set)
@@ -289,6 +290,7 @@ class Converter:
         self.notes = collections.defaultdict(list)
         self.atomise, self.merge_case = atomise, merge_case
         self.from_fulltext, self.skip = set(from_fulltext), set(skip)
+        self.rename = dict(rename or {})
         # Names used as booleans somewhere, and name pairs compared by `=`,
         # which are iff when either side is in the set.
         self.boolean, self.equated = set(), []
@@ -296,8 +298,11 @@ class Converter:
         # variable's FRET dataType.
         self.comparisons, self.types = {}, {}
 
+    def atom(self, raw):
+        return self.rename.get(raw) or snake(raw)
+
     def name(self, raw):
-        new = snake(raw)
+        new = self.atom(raw)
         prev = self.original.setdefault(new, raw)
         if prev != raw and self.merge_case and prev.lower() == raw.lower():
             self.notes["case variants merged"].append(f"{raw} = {prev}")
@@ -402,7 +407,7 @@ class Converter:
         `(func, t, ...)` for abs, absReal, min and max."""
         node = unwrap(node)
         if node.kind == "ident":
-            return ("var", snake(node.text))
+            return ("var", self.atom(node.text))
         if node.kind == "num":
             return ("num", Fraction(node.text))
         if node.kind == "minus":
@@ -585,9 +590,9 @@ class Converter:
 
     def label(self, v):
         if v.get("dataType"):
-            self.types[snake(v["variable_name"])] = v["dataType"]
+            self.types[self.atom(v["variable_name"])] = v["dataType"]
         if v.get("idType"):
-            self.labels[snake(v["variable_name"])].add(v["idType"])
+            self.labels[self.atom(v["variable_name"])].add(v["idType"])
 
     def partition(self, force_in, force_out):
         taken = set(self.defined) & set(self.original)
@@ -962,8 +967,8 @@ def exclusion(names, ins, outs, modes):
 
 def load(paths, component, force_in, force_out, all_components=False,
          atomise=False, from_fulltext=(), skip=(), merge_case=False,
-         domains=True, exclusive=()):
-    conv = Converter(atomise, from_fulltext, skip, merge_case)
+         domains=True, exclusive=(), rename=None):
+    conv = Converter(atomise, from_fulltext, skip, merge_case, rename)
     exports = []
     for p in paths:
         e = json.loads(Path(p).read_text())
@@ -985,15 +990,15 @@ def load(paths, component, force_in, force_out, all_components=False,
             conv.label(v)
         for r in e["requirements"]:
             conv.add(r, component)
-    ins, outs = conv.partition({snake(a) for a in force_in},
-                               {snake(a) for a in force_out})
+    ins, outs = conv.partition({conv.atom(a) for a in force_in},
+                               {conv.atom(a) for a in force_out})
     spec = {"assumptions": [], "guarantees": conv.guarantees,
             "in_atoms": ins, "out_atoms": outs}
     for name, formula in sorted(conv.defined.items()):
         spec["guarantees"].append(always(f"{name} <-> ({formula})"))
         conv.reqids.append(["mode definition"])
     for group in exclusive:
-        names = sorted({snake(n.strip()) for n in group.split(",")
+        names = sorted({conv.atom(n.strip()) for n in group.split(",")
                         if n.strip()})
         if len(names) < 2:
             raise FretImportError(f"--exclusive {group!r} names fewer than "
@@ -1044,6 +1049,11 @@ def main(argv=None):
     ap.add_argument("--merge-case", action="store_true",
                     help="read names that differ only in case as one atom "
                          "instead of rejecting them")
+    ap.add_argument("--rename", action="append", default=[],
+                    metavar="RAW=ATOM",
+                    help="name FRET variable RAW as ATOM instead of its "
+                         "snake_case form, to keep apart names that collide "
+                         "after snake_case (repeatable)")
     ap.add_argument("--exclusive", action="append", default=[],
                     metavar="A,B,...",
                     help="add that at most one of these signals or modes "
@@ -1057,12 +1067,16 @@ def main(argv=None):
                     help="force ATOM, a name or shell pattern, to be an "
                          "output (repeatable)")
     args = ap.parse_args(argv)
+    bad = [r for r in args.rename if "=" not in r]
+    if bad:
+        ap.error(f"--rename takes RAW=ATOM, not {bad[0]!r}")
+    rename = dict(r.split("=", 1) for r in args.rename)
     try:
         spec, conv = load(args.exports, args.component, args.as_input,
                           args.as_output, args.all_components,
                           args.atomise_arithmetic, args.from_fulltext,
                           args.skip, args.merge_case, not args.no_domains,
-                          args.exclusive)
+                          args.exclusive, rename)
     except FretImportError as e:
         print(f"import_fret: {e}", file=sys.stderr)
         return 1

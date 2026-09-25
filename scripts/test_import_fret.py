@@ -73,7 +73,8 @@ def load(export, **kw):
                       kw.get("as_output", []), kw.get("all_components", False),
                       kw.get("atomise", False), kw.get("from_fulltext", ()),
                       kw.get("skip", ()), kw.get("merge_case", False),
-                      kw.get("domains", True), kw.get("exclusive", ()))
+                      kw.get("domains", True), kw.get("exclusive", ()),
+                      kw.get("rename"))
 
 
 spec, conv = load(EXPORT)
@@ -201,6 +202,13 @@ except I.FretImportError:
     pass
 got, _, _ = responses(cased, merge_case=True)
 check(got, ["explain"], "--merge-case reads case variants as one atom")
+spec, _ = load({"requirements": cased,
+                "variables": [{"variable_name": "Explain", "idType": "Input"},
+                              {"variable_name": "explain",
+                               "idType": "Output"}]},
+               rename={"Explain": "explain_in"})
+check((spec["in_atoms"], spec["out_atoms"]), (["explain_in"], ["explain"]),
+      "--rename keeps case variants apart, each with its own label")
 
 spec, _ = load([req("A", timing="always",
                     post_condition="(uiBypass0 & uiBypass1)"),
