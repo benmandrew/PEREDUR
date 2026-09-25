@@ -22,6 +22,7 @@
 
 #include "formula_key.hpp"
 #include "requirement.hpp"
+#include "runner/formula_input.hpp"
 #include "runner/ltlfilt.hpp"
 #include "runner/process.hpp"
 #include "runner/tool_stats.hpp"
@@ -184,8 +185,8 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
     assert(access(binary.c_str(), F_OK) == 0);
     const auto timeout =
         std::chrono::milliseconds(g_ltl2tgba_timeout_ms.load());
-    const ProcessResult result =
-        execute_and_capture({binary, "-D", "-S", "-H", "-f", key}, timeout);
+    const ProcessResult result = execute_and_capture_with_input(
+        {binary, "-D", "-S", "-H", "-F", "-"}, spot_formula_line(key), timeout);
     if (result.m_timed_out) {
         // The determinization did not finish within budget; drop the individual
         // (counted against max_scoring_failure_rate) rather than caching a
@@ -387,15 +388,15 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
     }
     const std::string ltlsynt = ltlsynt_path();
     assert(access(ltlsynt.c_str(), F_OK) == 0);
-    std::vector<std::string> command = {ltlsynt, "--realizability", "-f",
-                                        conj_ltl};
+    std::vector<std::string> command = {ltlsynt, "--realizability", "-F", "-"};
     if (!inputs.empty()) {
         command.push_back("--ins=" + join_comma(inputs));
     } else if (!outputs.empty()) {
         command.push_back("--outs=" + join_comma(outputs));
     }
     const auto timeout = std::chrono::milliseconds(g_ltlsynt_timeout_ms.load());
-    const ProcessResult result = execute_and_capture(command, timeout);
+    const ProcessResult result = execute_and_capture_with_input(
+        command, spot_formula_line(conj_ltl), timeout);
     // A timed-out query is undecided, not unrealizable. Which of the two is
     // the safe reading depends on the question being asked -- admitting a
     // repair wants "unrealizable", the well-separation check wants

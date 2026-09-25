@@ -73,6 +73,7 @@ Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves w
 - A cache storing a verdict or count keys on `formula_key::renamed()`; one storing a formula or automaton keys on `canonical()`.
 - Pipes are created with `pipe2(..., O_CLOEXEC)`, and nothing forks outside `src/runner/process.cpp`.
 - Tool paths come from `tool_path_from_env`, held in a function-local `static`.
+- Formulas reach tools on stdin (`execute_and_capture_with_input`, `-F -`), never as a `-f` argument: one argv string over 128 KiB fails the exec with `E2BIG`.
 - Atom names are screened at load (`src/runner/atom_names.hpp`), and an unsafe one exits 1 on every driver: `ltlsynt --ins` never matches a name containing an uppercase letter, and since only `--ins` is passed, such an *input* silently becomes an output and the verdict errs towards realizable; separately, a name starting with `F`, `G` or `X` followed by a letter or `_` loses that letter to the operator (`Fail` reads as `F(ail)`). Uppercase outputs are safe, and the FRETISH path's `k_atom_prefix` (`iap_`) already blocks the second case.
 - Always run `black` with a timeout (`-t <seconds>`).
 - Wall-time A/B comparisons on the shared box interleave the arms per case and read a median.

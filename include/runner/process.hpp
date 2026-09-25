@@ -84,6 +84,21 @@ ProcessResult execute_and_capture(
     std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
     ExecutableLookup lookup = ExecutableLookup::AbsolutePath);
 
+/// As execute_and_capture, with `input` as the child's stdin.
+///
+/// This is how a formula reaches a tool. Linux caps any single argv string at
+/// MAX_ARG_STRLEN (128 KiB), and an exec over it fails with E2BIG before the
+/// tool runs, so a formula passed with `-f` stops working at that size. The
+/// input is written to an in-memory file before the fork, not streamed
+/// through a pipe, so it can be any size without deadlocking against the
+/// output this call reads, and the timeout behaves exactly as above.
+///
+/// Throws std::runtime_error if the input file cannot be created or written.
+ProcessResult execute_and_capture_with_input(
+    const std::vector<std::string>& arguments, const std::string& input,
+    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+    ExecutableLookup lookup = ExecutableLookup::AbsolutePath);
+
 /// Whether the child should be killed when the thread that forked it goes
 /// away. PR_SET_PDEATHSIG is tied to the forking *thread*, not to the process,
 /// which makes it safe for a call that forks and waits in one place and wrong
@@ -135,11 +150,12 @@ struct PipedChild {
 /// scoring thread would inherit them and hold this call's ends open past its
 /// own exec, so its reader never sees end of file.
 ///
-/// This and execute_and_capture are the only two forks a caller can reach, and
-/// nothing may add a third outside process.cpp — which holds one more, for the
-/// macOS reaper. posix_spawn would be the cheaper primitive, but it has no
-/// attribute for PR_SET_PDEATHSIG — the one mechanism that stops a killed run
-/// from stranding multi-GB tool processes (PR #47).
+/// This and execute_and_capture (which execute_and_capture_with_input shares)
+/// are the only two forks a caller can reach, and nothing may add a third
+/// outside process.cpp — which holds one more, for the macOS reaper.
+/// posix_spawn would be the cheaper primitive, but it has no attribute for
+/// PR_SET_PDEATHSIG — the one mechanism that stops a killed run from stranding
+/// multi-GB tool processes (PR #47).
 PipedChild spawn_piped_child(const std::vector<std::string>& arguments,
                              ParentDeathPolicy policy, ExecutableLookup lookup);
 

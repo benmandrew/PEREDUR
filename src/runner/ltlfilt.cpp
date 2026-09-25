@@ -11,10 +11,12 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "formula_key.hpp"
 #include "profile.hpp"
 #include "prop_formula/identifier.hpp"
+#include "runner/formula_input.hpp"
 #include "runner/process.hpp"
 #include "runner/spot.hpp"
 #include "runner/tool_stats.hpp"
@@ -53,8 +55,9 @@ std::chrono::milliseconds ltlfilt_timeout() {
 std::pair<std::string, ProcessResult> one_shot_simplify(
     const std::string& binary, const std::string& formula) {
     PEREDUR_PROFILE_SCOPE("ltlfilt/one-shot-exec");
-    ProcessResult result = execute_and_capture(
-        {binary, "--simplify", "-f", formula}, ltlfilt_timeout());
+    ProcessResult result = execute_and_capture_with_input(
+        {binary, "--simplify", "-F", "-"}, spot_formula_line(formula),
+        ltlfilt_timeout());
     std::string simplified = formula;
     if (result.m_exit_code == 0 && !result.m_output.empty()) {
         simplified = result.m_output;
@@ -161,8 +164,9 @@ std::optional<std::string> rewrite_weak_operators(const std::string& formula) {
     if (access(binary.c_str(), F_OK) != 0) {
         return remember(std::nullopt);
     }
-    const ProcessResult result = execute_and_capture(
-        {binary, "--remove-wm", "-p", "-f", key}, ltlfilt_timeout());
+    const ProcessResult result = execute_and_capture_with_input(
+        {binary, "--remove-wm", "-p", "-F", "-"}, spot_formula_line(key),
+        ltlfilt_timeout());
     {
         std::scoped_lock lock(g_ltlfilt_mutex);
         record_exec<LtlfiltStats>(result);
@@ -195,7 +199,8 @@ std::optional<bool> spot_satisfiable(const std::string& formula,
         LtlfiltStats::n_satisfiable_execs++;
     }
     const ProcessResult result =
-        execute_and_capture({binary, "--satisfiable", "-f", formula}, timeout);
+        execute_and_capture_with_input({binary, "--satisfiable", "-F", "-"},
+                                       spot_formula_line(formula), timeout);
     {
         std::scoped_lock lock(g_ltlfilt_mutex);
         record_exec<LtlfiltStats>(result);
@@ -223,8 +228,29 @@ bool ltl_equivalent(const std::string& lhs, const std::string& rhs) {
     if (access(binary.c_str(), F_OK) != 0) {
         return true;
     }
-    const ProcessResult result = execute_and_capture(
-        {binary, "--equivalent-to=" + rhs, "-f", lhs}, ltlfilt_timeout());
+    // Equivalence is symmetric, so the smaller side takes --equivalent-to,
+    // which accepts only an argv string, and the larger goes on stdin. When
+    // even the smaller would crowd MAX_ARG_STRLEN (see
+    // execute_and_capture_with_input), both sides go on stdin as one query:
+    // their exclusive or is unsatisfiable exactly when they are equivalent,
+    // and -v keeps the exit-status convention below, printing (exit 0) only
+    // an unsatisfiable formula.
+    constexpr std::size_t k_argv_formula_limit = std::size_t{64} * 1024;
+    const bool rhs_is_smaller = rhs.size() <= lhs.size();
+    const std::string& argv_side = rhs_is_smaller ? rhs : lhs;
+    const std::string& stdin_side = rhs_is_smaller ? lhs : rhs;
+    const bool fits_argv = argv_side.size() <= k_argv_formula_limit;
+    const std::vector<std::string> command =
+        fits_argv
+            ? std::vector<std::string>{binary, "--equivalent-to=" + argv_side,
+                                       "-F", "-"}
+            : std::vector<std::string>{binary, "-v", "--satisfiable", "-F",
+                                       "-"};
+    const std::string input =
+        fits_argv ? spot_formula_line(stdin_side)
+                  : spot_formula_line("(" + lhs + ") xor (" + rhs + ")");
+    const ProcessResult result =
+        execute_and_capture_with_input(command, input, ltlfilt_timeout());
     if (result.m_timed_out) {
         std::scoped_lock lock(g_ltlfilt_mutex);
         LtlfiltStats::n_timeouts++;
