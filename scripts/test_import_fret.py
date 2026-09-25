@@ -371,10 +371,43 @@ def rejects_with(export, fragment, msg, **kw):
 
 across = [req("A", condition="regular", regular_condition="(p)",
               timing="immediately", post_condition="(a < b & !(b > 5))")]
+spec, conv = load({"requirements": across,
+                   "variables": [var("a", "Input"), var("b", "Output")]})
+check("a_lt_b" in spec["out_atoms"], True,
+      "a comparison of an input with an output is an output")
+check(conv.notes["domain constraint"],
+      ["a, b (z3, exists-exists fallback): 0 clause(s)"],
+      "where forall-exists would forbid what some value of `a` allows, the "
+      "guarantee falls back to the vectors some values realise")
 rejects_with({"requirements": across,
               "variables": [var("a", "Input"), var("b", "Output")]},
-             "compares inputs ['a'] with outputs ['b']",
-             "a comparison of an input with an output is rejected")
+             "so cannot be an input", "an input/output comparison forced "
+             "to an input is rejected", as_input=["a_lt_b"])
+
+rr, rr_ap = ("var", "rr"), ("var", "rr_ap")
+five = ("num", Fraction(5))
+vectors, loose = I.forall_exists_vectors(
+    [("gt", rr_ap, five)], [("eq", rr, rr_ap), ("gt", rr, five)], {}, {"rr"})
+check((vectors, loose), ({(True, True, True), (True, False, True),
+                          (True, False, False), (False, True, False),
+                          (False, False, True), (False, False, False)}, False),
+      "an input atom that fixes what the system can reach makes the "
+      "guarantee exact")
+vectors, _ = I.forall_exists_vectors(
+    [("gt", rr_ap, five), ("lt", rr_ap, five)], [("gt", rr, five)], {},
+    {"rr"})
+check({v for v in vectors if v[:2] == (True, True)},
+      {(True, True, True), (True, True, False)},
+      "an input vector no value gives admits every output vector")
+spec, conv = load({"requirements": [
+    req("AP", condition="regular", regular_condition="(rrAP > 5)",
+        timing="immediately", post_condition="(rr = rrAP & rr > 5)")],
+    "variables": [var("rrAP", "Input"), var("rr", "Output")]})
+check((spec["assumptions"], spec["guarantees"][-1]["response"]),
+      ([], "(rr_ap_gt_5 & rr_eq_rr_ap -> rr_gt_5) & "
+           "(rr_eq_rr_ap & rr_gt_5 -> rr_ap_gt_5)"),
+      "a group with input atoms is split into an assumption and a "
+      "forall-exists guarantee")
 rejects_with({"requirements": across, "variables": [var("b", "Output")]},
              "compares ['a'], with no single Input/Output label",
              "a comparison over an unlabelled variable is rejected")
