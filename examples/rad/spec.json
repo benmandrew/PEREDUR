@@ -122,7 +122,7 @@
       "response": "user_interaction_initiated | ( user_interaction_delay_detected & interaction_recovery_initiated )",
       "timing": {
         "type": "WithinTicks",
-        "ticks": 60
+        "ticks": 2
       }
     },
     {
@@ -291,7 +291,7 @@
       "response": "task_or_response_processing_in_progress -> ( user_notified_of_delay & current_task_status_provided )",
       "timing": {
         "type": "AfterTicks",
-        "ticks": 60
+        "ticks": 2
       }
     },
     {
@@ -525,7 +525,7 @@
       "response": "pose_update_need_recognised | ( pose_update_recognition_delay_detected & user_notified_of_pose_update_delay )",
       "timing": {
         "type": "WithinTicks",
-        "ticks": 30
+        "ticks": 1
       }
     },
     {
@@ -534,7 +534,7 @@
       "response": "pose_detected",
       "timing": {
         "type": "WithinTicks",
-        "ticks": 30
+        "ticks": 1
       }
     },
     {
@@ -552,7 +552,7 @@
       "response": "trajectory_information_available | ( trajectory_information_delay_detected & user_notified_of_trajectory_delay )",
       "timing": {
         "type": "WithinTicks",
-        "ticks": 60
+        "ticks": 2
       }
     },
     {
@@ -561,7 +561,7 @@
       "response": "corrective_action_applied",
       "timing": {
         "type": "WithinTicks",
-        "ticks": 30
+        "ticks": 1
       }
     },
     {
