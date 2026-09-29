@@ -1,0 +1,16 @@
+name = "2026-09-29-lpc-smoke"
+branch = "campaign/lpc-smoke"
+profile = "lpc-smoke"
+description = "Smoke test: does monolithic repair fix either Lift-Plus-Cruise spec, or do they need per-core repair like the ventilator and RAD? One cell at the shipping configuration, 10 seeds per spec."
+
+# Both specs on av3 alone. The seed list must equal the lpc-smoke profile's.
+hosts = { av3 = "0-9" }
+
+# gradsel-fret's generator line with each factor narrowed to its shipping
+# level: nsga2-apportion, mrs, gen10/pop200, log metric. --weights is inert
+# under nsga2-apportion and kept only so the tree matches gradsel-fret's.
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion --sweeps K --levels mrs --metric log --weakening off --weights 0.1 0.2 0.7 --generations 10 --population-size 200 --max-wall-s 1800 --out-dir experiments/configs-lpc-smoke --pin-vintage"
+
+# 20 runs at jobs = 4. realize decides both specs in 1.3 s at most; the run cost
+# is unmeasured, so read it off the first rows.
+phases = [ { profile = "lpc-smoke", jobs = 4 } ]

@@ -77,6 +77,11 @@ FRETISH_SPECS: dict[str, dict[str, Path]] = {
     "fsm-timing": _spec("fsm-timing", "json"),
     "fsm-combined": _spec("fsm-combined", "json"),
     "mode-arbiter": _spec("mode-arbiter", "json"),
+    # Lift-Plus-Cruise (REFSQ 2023 and its NASA technical report), registered
+    # for the 2026-09-29 lpc-smoke campaign. Both carry the paper's own fix as
+    # their ideal, so implies_ideal is readable.
+    "lift-plus-cruise-mini": _spec("lift-plus-cruise-mini", "json"),
+    "lift-plus-cruise-full": _spec("lift-plus-cruise-full", "json"),
 }
 
 # The four-family corpus every FRETISH profile before 2026-09-09 ran, frozen as
@@ -1798,7 +1803,9 @@ PROFILES: dict[str, dict] = {
         # implies_ideal = 0 by construction (see FRETISH_SPECS) and is carried
         # for found_repair and n_repairs, being the only scoped family and so
         # the only run that exercises the scope machinery at all.
-        "specs": list(FRETISH_SPECS),
+        # Spelled out since lpc-smoke widened FRETISH_SPECS past this corpus.
+        "specs": ["takeoff", "fsm", "fsm-timing", "fsm-combined",
+                  "mode-arbiter"],
         "seeds": list(range(30)),
         # 2.25x the 1800 s deadline, which the deadline itself does not bound:
         # the final gate and the implication filter both run past it, and the
@@ -1817,6 +1824,34 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-gradsel-fret-m.csv",
         # 4 as on every FRETISH profile; ltlsynt is not in play here, so the
         # per-call RAM ceiling that pins the TLSF profiles to 1 does not bind.
+        "default_jobs": 4,
+    },
+
+    # The 2026-09-29 Lift-Plus-Cruise smoke test: can monolithic repair fix
+    # either LPC spec, or do they need per-core repair like the ventilator and
+    # RAD? One cell, the shipping configuration (nsga2-apportion, mrs,
+    # gen10/pop200), over 10 seeds. Generate with
+    #   python3 scripts/gen_configs.py --schemes nsga2-apportion --sweeps K \
+    #       --levels mrs --metric log --weakening off --weights 0.1 0.2 0.7 \
+    #       --generations 10 --population-size 200 --max-wall-s 1800 \
+    #       --out-dir experiments/configs-lpc-smoke --pin-vintage
+    "lpc-smoke": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["mrs"]},
+        "specs": ["lift-plus-cruise-mini", "lift-plus-cruise-full"],
+        "seeds": list(range(10)),
+        # gradsel-fret's 2.25x margin over the 1800 s deadline, which bounds
+        # neither the final gate nor the implication filter.
+        "timeout_caps": {"lift-plus-cruise-mini": 4050,
+                         "lift-plus-cruise-full": 4050},
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-lpc-smoke",
+        "results_dir": EXPERIMENTS_DIR / "results-lpc-smoke",
+        "results_csv": EXPERIMENTS_DIR / "results-lpc-smoke.csv",
         "default_jobs": 4,
     },
 
