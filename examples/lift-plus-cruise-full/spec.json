@@ -22,7 +22,8 @@
       "response": "wind_ge_m30",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "wind_ge_m10",
@@ -30,7 +31,8 @@
       "response": "wind_ge_m20",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "wind_ge_0",
@@ -38,7 +40,8 @@
       "response": "wind_ge_m10",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "wind_ge_10",
@@ -46,7 +49,8 @@
       "response": "wind_ge_0",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "wind_ge_20",
@@ -54,7 +58,8 @@
       "response": "wind_ge_10",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "wind_ge_30",
@@ -62,7 +67,8 @@
       "response": "wind_ge_20",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "wind_ge_40",
@@ -70,7 +76,8 @@
       "response": "wind_ge_30",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!wind_ge_m30",
@@ -78,7 +85,8 @@
       "response": "!wind_ge_m20",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!wind_ge_m20",
@@ -86,7 +94,8 @@
       "response": "!wind_ge_m10",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!wind_ge_m10",
@@ -94,7 +103,8 @@
       "response": "!wind_ge_0",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!wind_ge_0",
@@ -102,7 +112,8 @@
       "response": "!wind_ge_10",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!wind_ge_10",
@@ -110,7 +121,8 @@
       "response": "!wind_ge_20",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!wind_ge_20",
@@ -118,7 +130,8 @@
       "response": "!wind_ge_30",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!wind_ge_30",
@@ -126,7 +139,8 @@
       "response": "!wind_ge_40",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "true",
@@ -297,7 +311,8 @@
       "response": "kias_ge_0",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "kias_ge_20",
@@ -305,7 +320,8 @@
       "response": "kias_ge_10",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "kias_ge_30",
@@ -313,7 +329,8 @@
       "response": "kias_ge_20",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "kias_ge_40",
@@ -321,7 +338,8 @@
       "response": "kias_ge_30",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "kias_ge_50",
@@ -329,7 +347,8 @@
       "response": "kias_ge_40",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "kias_ge_60",
@@ -337,7 +356,8 @@
       "response": "kias_ge_50",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "kias_ge_70",
@@ -345,7 +365,8 @@
       "response": "kias_ge_60",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "kias_ge_80",
@@ -353,7 +374,8 @@
       "response": "kias_ge_70",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "kias_ge_90",
@@ -361,7 +383,8 @@
       "response": "kias_ge_80",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "kias_ge_100",
@@ -369,7 +392,8 @@
       "response": "kias_ge_90",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "kias_ge_110",
@@ -377,7 +401,8 @@
       "response": "kias_ge_100",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "kias_ge_120",
@@ -385,7 +410,8 @@
       "response": "kias_ge_110",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_0",
@@ -393,7 +419,8 @@
       "response": "!kias_ge_10",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_10",
@@ -401,7 +428,8 @@
       "response": "!kias_ge_20",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_20",
@@ -409,7 +437,8 @@
       "response": "!kias_ge_30",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_30",
@@ -417,7 +446,8 @@
       "response": "!kias_ge_40",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_40",
@@ -425,7 +455,8 @@
       "response": "!kias_ge_50",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_50",
@@ -433,7 +464,8 @@
       "response": "!kias_ge_60",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_60",
@@ -441,7 +473,8 @@
       "response": "!kias_ge_70",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_70",
@@ -449,7 +482,8 @@
       "response": "!kias_ge_80",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_80",
@@ -457,7 +491,8 @@
       "response": "!kias_ge_90",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_90",
@@ -465,7 +500,8 @@
       "response": "!kias_ge_100",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_100",
@@ -473,7 +509,8 @@
       "response": "!kias_ge_110",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "!kias_ge_110",
@@ -481,7 +518,8 @@
       "response": "!kias_ge_120",
       "timing": {
         "type": "NextTimepoint"
-      }
+      },
+      "weakenable": false
     },
     {
       "condition": "true",
