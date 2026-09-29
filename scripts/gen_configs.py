@@ -150,6 +150,10 @@ DEFAULTS: dict = {
     # specification carries a stop timing, so the arm draws nothing on any of
     # them. Emitted into [mutation] only when a sweep overrides it.
     "p_stop": 0.15,
+    # FRETISH only: "directed" or "uniform" (see config.hpp). Emitted into
+    # [mutation] only when a sweep overrides it, so every existing grid stays
+    # byte-identical.
+    "ordered_fields": "directed",
     # Probability a mutation appends a new environment (fairness) assumption
     # rather than rewriting an existing requirement/section. Emitted into
     # [mutation] only when a sweep overrides it (see make_toml), so the standard
@@ -329,6 +333,8 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         if "p_scope" in overrides else []) + (
         [f"p_stop = {_fmt(d['p_stop'])}"]
         if "p_stop" in overrides else []) + (
+        [f'ordered_fields = "{d["ordered_fields"]}"']
+        if "ordered_fields" in overrides else []) + (
         [f"p_monotone = {_fmt(d['p_monotone'])}"]
         if "p_monotone" in overrides else []) + (
         [f"p_add_assumption = {_fmt(d['p_add_assumption'])}"]

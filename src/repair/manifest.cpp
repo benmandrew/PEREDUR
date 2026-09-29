@@ -186,7 +186,11 @@ namespace {
 // FRETISH-only [mutation] rewrite arms on a TLSF run, and [tlsf]
 // muc_max_iterations and [tlsf.mutation] on a FRETISH run. An earlier
 // manifest records whatever the config said, which the search ignored.
-constexpr int k_schema_version = 31;
+//
+// 32 added mutation.ordered_fields, which selects between the directed and
+// the uniform FRETISH timing, condition-type and scope arms. The two draw
+// different streams, so two runs of one seed agree only where it agrees.
+constexpr int k_schema_version = 32;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -197,13 +201,14 @@ struct SinglePathKey {
     RepairInput reader;
 };
 
-constexpr std::array<SinglePathKey, 12> k_single_path_keys{{
+constexpr std::array<SinglePathKey, 13> k_single_path_keys{{
     {"/mutation/p_trigger", RepairInput::Fretish},
     {"/mutation/p_response", RepairInput::Fretish},
     {"/mutation/p_timing", RepairInput::Fretish},
     {"/mutation/p_condition_type", RepairInput::Fretish},
     {"/mutation/p_scope", RepairInput::Fretish},
     {"/mutation/p_stop", RepairInput::Fretish},
+    {"/mutation/ordered_fields", RepairInput::Fretish},
     {"/tlsf/muc_max_iterations", RepairInput::Tlsf},
     {"/tlsf/mutation/p_assumption", RepairInput::Tlsf},
     {"/tlsf/mutation/p_temporal", RepairInput::Tlsf},

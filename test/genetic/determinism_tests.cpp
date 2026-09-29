@@ -140,6 +140,8 @@ Config golden_config() {
     // arm returns before the RandomSource at any value. Pinned so a golden that
     // gains one fails here rather than re-recording.
     cfg.p_stop = 0.15;
+    // The uniform arm draws a different stream wherever the timing arm fires.
+    cfg.ordered_fields = OrderedFieldMutation::Directed;
     cfg.parallel = 1;
     return cfg;
 }
@@ -193,14 +195,15 @@ struct GoldenRun {
     std::vector<ScoredSpecification> population;
 };
 
-GoldenRun run_golden_evolution() {
-    const Config cfg = golden_config();
+GoldenRun run_golden_evolution(
+    const Config& cfg = golden_config(),
+    const std::vector<Specification>& seeds = golden_population()) {
     const AggregateWeightedFitnessFunction fns = golden_fitness();
     auto trace = std::make_shared<DrawTrace>();
     const RandomSource source = make_recording_source(k_seed, trace);
 
     std::vector<ScoredSpecification> population =
-        score_population(cfg, golden_population(), fns);
+        score_population(cfg, seeds, fns);
     for (std::size_t gen = 0; gen < k_generations; ++gen) {
         population = evolve_generation(cfg, population, k_target_size,
                                        k_elitism_size, fns, {}, source);
@@ -446,6 +449,51 @@ TEST(test_same_seed_reproduces_evolution) {
     expect(first == second,
            "golden population: two runs from the same seed should produce an "
            "identical population");
+}
+
+// The uniform ordered-field arm, with all three of its arms on and a declared
+// mode so the scope redraw has somewhere to go. Pinned as well as compared run
+// to run: a campaign crossing the two arms must reproduce on the lab hosts'
+// gcc build as it does under clang here.
+TEST(test_uniform_ordered_fields_reproduce) {
+    constexpr std::size_t k_expected_draws = 231;
+    constexpr std::uint64_t k_expected_hash = 7710833064127376925ULL;
+
+    Config cfg = golden_config();
+    cfg.ordered_fields = OrderedFieldMutation::Uniform;
+    cfg.p_timing = 0.5;
+    cfg.p_condition_type = 0.5;
+    cfg.p_scope = 0.5;
+    std::vector<Specification> seeds;
+    for (const Specification& spec : golden_population()) {
+        seeds.emplace_back(spec.m_assumptions, spec.m_guarantees,
+                           spec.m_in_atoms, spec.m_out_atoms,
+                           std::vector<std::string>{"m"});
+    }
+    const GoldenRun first = run_golden_evolution(cfg, seeds);
+    const GoldenRun second = run_golden_evolution(cfg, seeds);
+    expect(render_trace(*first.trace) == render_trace(*second.trace) &&
+               render_population(first.population) ==
+                   render_population(second.population),
+           "uniform ordered fields: two runs from the same seed should draw "
+           "the same stream and produce an identical population");
+
+    Config directed = cfg;
+    directed.ordered_fields = OrderedFieldMutation::Directed;
+    expect(render_trace(*run_golden_evolution(directed, seeds).trace) !=
+               render_trace(*first.trace),
+           "uniform ordered fields: the uniform arm should draw a different "
+           "stream from the directed one");
+
+    const std::uint64_t hash = fnv1a(render_trace(*first.trace));
+    expect(
+        first.trace->draws.size() == k_expected_draws &&
+            hash == k_expected_hash,
+        "uniform ordered fields: " + std::to_string(first.trace->draws.size()) +
+            " draws with trace hash " + std::to_string(hash) + ", pinned " +
+            std::to_string(k_expected_draws) + " and " +
+            std::to_string(k_expected_hash) +
+            "; the uniform arm no longer reproduces an earlier run");
 }
 
 }  // namespace
