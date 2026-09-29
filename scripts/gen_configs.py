@@ -523,6 +523,14 @@ SWEEP_K: list[tuple[str, dict]] = [
     ("aurus",  {"status_grading": "aurus"}),
 ]
 
+# Sweep O: how mutation moves the ordered FRETISH fields (timing, condition
+# type, scope). "directed" is the default and the control; "uniform" is the
+# ablation arm. Both levels state the key, so each config names its arm.
+SWEEP_O: list[tuple[str, dict]] = [
+    ("directed", {"ordered_fields": "directed"}),
+    ("uniform",  {"ordered_fields": "uniform"}),
+]
+
 # Sweep R: vary elitism, for the nsga2-vs-nsga2-replicate campaign. Elitism
 # carries the top fraction over verbatim, which re-injects exact duplicates into
 # the pool -- the mechanism nsga2-replicate deduplicates away. The scheme's
@@ -595,6 +603,7 @@ SWEEPS: list[tuple[str, list]] = [
     ("H", SWEEP_H),
     ("I", SWEEP_I),
     ("K", SWEEP_K),
+    ("O", SWEEP_O),
     ("R", SWEEP_R),
     # Placeholder levels at the default operating point and match factor: main()
     # rebuilds this entry from --generations/--compute-match-factor. It is
