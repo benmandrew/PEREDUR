@@ -40,7 +40,7 @@ from pathlib import Path
 # Keys whose accepted values are a closed set, checked against the schema's
 # "enum". Names are unique across sections, so the section need not be given.
 ENUM_KEYS = ("selection_scheme", "metric", "repair_mode", "status_grading",
-             "mrs_admission_order")
+             "mrs_admission_order", "ordered_fields")
 
 
 # --- src/config/keys.hpp -----------------------------------------------------
@@ -233,6 +233,7 @@ UNPINNED_KEYS = {
     "model_counting.metric",
     "fitness.status_grading",
     "fitness.mrs_admission_order",
+    "mutation.ordered_fields",
     "runtime.parallel",
 }
 
@@ -305,6 +306,7 @@ GEN_CONFIGS_FIELDS = {
     "black_timeout_ms": "black_timeout",
     "status_grading": "status_grading",
     "mrs_admission_order": "mrs_admission_order",
+    "ordered_fields": "ordered_fields",
     "repair_mode": "repair_mode",
     "p_assumption": "tlsf_p_assumption",
     "p_temporal": "tlsf_p_temporal",

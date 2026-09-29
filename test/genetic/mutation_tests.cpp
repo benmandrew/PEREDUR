@@ -947,4 +947,200 @@ TEST(test_add_assumption_disabled_by_zero_probability) {
            "add-assumption: none added when p_add_assumption is zero");
 }
 
+// --- ordered_fields = "uniform" -------------------------------------------
+
+/// Only the arms given a probability fire, and they redraw uniformly.
+Config uniform_config(double p_timing, double p_condition_type,
+                      double p_scope) {
+    Config cfg;
+    cfg.ordered_fields = OrderedFieldMutation::Uniform;
+    cfg.p_response = 0.0;
+    cfg.p_trigger = 0.0;
+    cfg.p_stop = 0.0;
+    cfg.p_monotone = 0.0;
+    cfg.p_timing = p_timing;
+    cfg.p_condition_type = p_condition_type;
+    cfg.p_scope = p_scope;
+    return cfg;
+}
+
+/// The distinct values of @p field over @p n_seeds seeded mutations, sorted.
+template <typename Field>
+std::vector<std::string> redraws(const Requirement& req, Direction direction,
+                                 const std::vector<Timing>& pool,
+                                 const std::vector<std::string>& modes,
+                                 const Config& cfg, Field field,
+                                 std::size_t n_seeds = 400) {
+    std::vector<std::string> seen;
+    for (std::size_t seed = 0; seed < n_seeds; ++seed) {
+        const Requirement mutated =
+            mutate_requirement(req, {"a", "x"}, {"a"}, direction, pool, modes,
+                               make_random_source_from_seed(seed), cfg);
+        const std::string value = field(mutated);
+        if (std::find(seen.begin(), seen.end(), value) == seen.end()) {
+            seen.push_back(value);
+        }
+    }
+    std::sort(seen.begin(), seen.end());
+    return seen;
+}
+
+std::string render_timing(const Requirement& req) {
+    return to_string(req.m_timing);
+}
+
+std::string render_scope(const Requirement& req) {
+    return to_string(req.m_scope);
+}
+
+std::vector<std::string> rendered(const std::vector<Timing>& timings) {
+    std::vector<std::string> out;
+    out.reserve(timings.size());
+    for (const Timing& tim : timings) {
+        out.push_back(to_string(tim));
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+bool contains(const std::vector<std::string>& seen, const std::string& want) {
+    return std::find(seen.begin(), seen.end(), want) != seen.end();
+}
+
+// The redraw reaches exactly the timings the specification can instantiate:
+// the qualitative kinds, the quantified kinds at its one count, and `until`
+// and `before` at its one stop, less the current value. No count or stop
+// appears that the specification does not already use.
+TEST(test_uniform_timing_redraws_over_the_specification_vocabulary) {
+    const Requirement req(Formula("a"), Formula("x"), timing::within_ticks(3),
+                          ConditionType::Continual, true);
+    const std::vector<Timing> pool = {timing::within_ticks(3),
+                                      timing::until(Formula("a"))};
+    const std::vector<std::string> seen =
+        redraws(req, Direction::Weaken, pool, {}, uniform_config(1.0, 0.0, 0.0),
+                render_timing);
+    const std::vector<std::string> want = rendered(
+        {timing::immediately(), timing::next_timepoint(), timing::eventually(),
+         timing::always(), timing::for_ticks(3), timing::after_ticks(3),
+         timing::until(Formula("a")), timing::before(Formula("a"))});
+    expect(seen == want,
+           "uniform timing: the redraw must reach every instantiable timing "
+           "but the current one, and nothing else");
+}
+
+// Immediately and NextTimepoint lend count 1, the count the directed arm's
+// one-step moves off them reach. The qualitative kinds lend nothing else.
+TEST(test_uniform_timing_count_one_comes_from_immediately) {
+    const Requirement req(Formula("a"), Formula("x"), timing::eventually(),
+                          ConditionType::Continual, true);
+    const std::vector<std::string> with_immediately =
+        redraws(req, Direction::Weaken, {timing::immediately()}, {},
+                uniform_config(1.0, 0.0, 0.0), render_timing);
+    expect(with_immediately ==
+               rendered({timing::immediately(), timing::next_timepoint(),
+                         timing::always(), timing::within_ticks(1),
+                         timing::for_ticks(1), timing::after_ticks(1)}),
+           "uniform timing: an immediate timing in the pool lends count 1");
+    const std::vector<std::string> qualitative_only =
+        redraws(req, Direction::Weaken, {timing::always()}, {},
+                uniform_config(1.0, 0.0, 0.0), render_timing);
+    expect(qualitative_only ==
+               rendered({timing::immediately(), timing::next_timepoint(),
+                         timing::always()}),
+           "uniform timing: with no count or stop in the specification only "
+           "the qualitative kinds are reachable");
+}
+
+// A guarantee's directed arms only weaken; the uniform ones move it either way
+// along each field's order.
+TEST(test_uniform_arm_moves_a_guarantee_both_ways) {
+    const Requirement timed(Formula("a"), Formula("x"), timing::within_ticks(3),
+                            ConditionType::Continual, true);
+    const std::vector<std::string> timings =
+        redraws(timed, Direction::Weaken, {timing::within_ticks(3)}, {},
+                uniform_config(1.0, 0.0, 0.0), render_timing);
+    expect(contains(timings, to_string(timing::eventually())) &&
+               contains(timings, to_string(timing::always())),
+           "uniform timing: a guarantee must reach both a weaker (eventually) "
+           "and a stronger (always) timing");
+
+    // Continual implies Trigger, so a guarantee going Trigger -> Continual
+    // strengthens, which the directed arm never does.
+    Requirement trigger = timed;
+    trigger.m_condition_type = ConditionType::Trigger;
+    expect(mutate_requirement(trigger, {"a", "x"}, {"a"}, Direction::Weaken, {},
+                              {}, make_source({}, 0),
+                              uniform_config(0.0, 1.0, 0.0))
+                   .m_condition_type == ConditionType::Continual,
+           "uniform condition type: a guarantee's trigger must flip to "
+           "continual");
+    expect(mutate_requirement(timed, {"a", "x"}, {"a"}, Direction::Strengthen,
+                              {}, {}, make_source({}, 0),
+                              uniform_config(0.0, 1.0, 0.0))
+                   .m_condition_type == ConditionType::Trigger,
+           "uniform condition type: an assumption's continual must flip to "
+           "trigger");
+
+    // `global` implies `except in m`, which implies `before m`.
+    Requirement scoped = timed;
+    scoped.m_timing = timing::immediately();
+    scoped.m_scope = Scope{ScopeKind::NotIn, "m"};
+    const std::vector<std::string> scopes =
+        redraws(scoped, Direction::Weaken, {}, {"m"},
+                uniform_config(0.0, 0.0, 1.0), render_scope);
+    expect(contains(scopes, to_string(Scope{})) &&
+               contains(scopes, to_string(Scope{ScopeKind::Before, "m"})),
+           "uniform scope: a guarantee must reach both a stronger (global) "
+           "and a weaker (before) scope");
+}
+
+// Every kind, over the declared modes only, less the current value: an `in m1`
+// requirement can move to `in m2` but never to a mode nobody declared.
+TEST(test_uniform_scope_redraws_over_declared_modes) {
+    Requirement req(Formula("a"), Formula("x"), timing::immediately(),
+                    ConditionType::Continual, true);
+    req.m_scope = Scope{ScopeKind::In, "m1"};
+    const std::vector<std::string> modes = {"m1", "m2"};
+    const std::vector<std::string> seen =
+        redraws(req, Direction::Weaken, {}, modes,
+                uniform_config(0.0, 0.0, 1.0), render_scope, 1000);
+    std::vector<std::string> want = {to_string(Scope{})};
+    for (const ScopeKind kind :
+         {ScopeKind::In, ScopeKind::NotIn, ScopeKind::Before, ScopeKind::After,
+          ScopeKind::OnlyIn, ScopeKind::OnlyBefore, ScopeKind::OnlyAfter}) {
+        for (const std::string& mode : modes) {
+            if (kind != ScopeKind::In || mode != "m1") {
+                want.push_back(to_string(Scope{kind, mode}));
+            }
+        }
+    }
+    std::sort(want.begin(), want.end());
+    expect(seen == want,
+           "uniform scope: the redraw must reach every scope over the "
+           "declared modes but the current one, and nothing else");
+}
+
+// With no declared mode a Global requirement has nowhere to go: the scope
+// stays Global and the arm spends only its probability draw.
+TEST(test_uniform_scope_without_modes_is_unchanged_at_no_draw) {
+    const Requirement req(Formula("a"), Formula("x"), timing::immediately(),
+                          ConditionType::Continual, true);
+    const auto count_draws = [&req](const Config& cfg) {
+        std::size_t n_draws = 0;
+        const RandomSource source([&n_draws](std::size_t upper_bound) {
+            ++n_draws;
+            return (n_draws * 7) % upper_bound;
+        });
+        const Requirement mutated = mutate_requirement(
+            req, {"a", "x"}, {"a"}, Direction::Weaken, {}, {}, source, cfg);
+        expect(mutated.m_scope.is_global(),
+               "uniform scope: with no declared mode the scope stays global");
+        return n_draws;
+    };
+    expect(count_draws(uniform_config(0.0, 0.0, 1.0)) ==
+               count_draws(uniform_config(0.0, 0.0, 0.0)) + 1,
+           "uniform scope: an empty candidate set must cost no draw beyond "
+           "the arm's probability check");
+}
+
 }  // namespace

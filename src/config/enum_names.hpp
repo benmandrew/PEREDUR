@@ -59,6 +59,13 @@ struct EnumNames<TerminationMode> {
                  {TerminationMode::Individuals, "individuals"}}};
 };
 
+template <>
+struct EnumNames<OrderedFieldMutation> {
+    static constexpr std::array<std::pair<OrderedFieldMutation, const char*>, 2>
+        k_names{{{OrderedFieldMutation::Directed, "directed"},
+                 {OrderedFieldMutation::Uniform, "uniform"}}};
+};
+
 template <typename Enum>
 const char* enum_name(Enum value) {
     for (const auto& [candidate, name] : EnumNames<Enum>::k_names) {

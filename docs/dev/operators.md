@@ -92,6 +92,16 @@ A weaker guarantee timing helps realizability and costs nothing on similarity, s
 
 `move_off_extreme` reads the pool before touching the `RandomSource`, so an empty pool costs no draw, and no golden specification has an Always guarantee.
 
+## Uniform ordered fields
+
+`[mutation] ordered_fields` (`Config::ordered_fields`, FRETISH only) selects how the timing, condition-type and scope arms pick a new value once `p_timing`, `p_condition_type` or `p_scope` fires. `"directed"`, the default, is everything above: one step along the field's implication order, weakening a guarantee and strengthening an assumption. `"uniform"` is the paper's "random" arm, kept for the directed-versus-random ablation. It redraws the field uniformly from the values the specification makes available, excluding the current one, and reads neither the order nor the direction. Crossover, the condition and response rewrites, `p_stop` and the monotone arm are the same under both, and the monotone arm stays role-directed.
+
+- **Timing** (`uniform_timing_candidates`): the four qualitative kinds, `within n`, `for n` and `after n` for every count, and `until s` and `before s` for every stop. Counts and stops come from the pool and the current timing, as donations do, so none is invented. Immediately and NextTimepoint lend count 1, the count the directed arm's one-step moves off them reach (`within 1`, `for 1`); without one of them in the specification, count 1 is unreachable unless some quantified timing already uses it. A zero count, which only `after` admits, is skipped. The qualitative kinds keep the set non-empty.
+- **Condition type**: the other value, at no draw, as the directed arm spends none.
+- **Scope** (`redraw_scope`): a kind drawn uniformly over the kinds that offer a value other than the current one, then a mode drawn uniformly over the declared modes. Every kind but Global needs a mode, so with none declared a Global requirement keeps its scope at no draw.
+
+Both arms spend the same probability draws in the same order, so `"directed"` leaves the stream byte-identical to the one before the key existed; `golden_config()` pins it. `test_uniform_ordered_fields_reproduce` pins the uniform stream over the golden population with a declared mode. A TLSF run warns about a non-default value and records the key as null, like the other single-path keys.
+
 ## Removable guarantees
 
 `p_remove_guarantee` (default 0.05, matching `p_add_assumption`) deletes one FRETISH guarantee or one TLSF conjunct from PRESET, ASSERT and GUARANTEE. Some ideals need it: amba, full-arbiter, load-balancer, prioritized-arbiter and round-robin-arbiter have only `drop-*` ideals. `lint-ideals`' `reachable` check asserts a guarantee side may shrink, never grow, to a floor of one.

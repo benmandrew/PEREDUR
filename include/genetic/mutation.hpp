@@ -79,6 +79,12 @@ std::vector<Timing> collect_timing_pool(const Specification& specification);
 /// before touching @p random_source, so at 0 neither costs a draw and the
 /// breeding stream is byte-identical to the one before they existed.
 ///
+/// Under `cfg.ordered_fields = Uniform` the timing, condition-type and scope
+/// arms instead redraw their field uniformly from the values the
+/// specification makes available, excluding the current one, and ignore
+/// @p direction. The monotone arm inside the response and condition rewrites
+/// follows @p direction under both.
+///
 /// @param requirement     The requirement to mutate
 /// @param atoms           Pool of atom names for response mutation
 /// @param condition_atoms Pool of atom names for trigger mutation (inputs only)
