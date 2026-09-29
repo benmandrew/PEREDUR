@@ -71,12 +71,24 @@ def _spec(name: str, ext: str) -> dict[str, Path]:
 # n_repairs rather than for the quality endpoint. lint-ideals reports
 # `reachable ok` here, which is not evidence: check_fretish_reachable compares
 # list lengths only, and its comment predates m_scope.
+FRETISH_CORES: list[str] = [
+    "rad-core-1-18", "rad-core-10", "rad-core-12-18", "rad-core-17-18",
+    "rad-core-33", "rad-core-45", "rad-core-55", "rad-core-61", "rad-core-65",
+    "rad-core-68", "lpc-mini-core1", "lpc-full-core1",
+]
+
 FRETISH_SPECS: dict[str, dict[str, Path]] = {
     "takeoff": _spec("takeoff", "json"),
     "fsm": _spec("fsm", "json"),
     "fsm-timing": _spec("fsm-timing", "json"),
     "fsm-combined": _spec("fsm-combined", "json"),
     "mode-arbiter": _spec("mode-arbiter", "json"),
+    "fsm-lmcps": _spec("fsm-lmcps", "json"),
+    "liquid-mixer": _spec("liquid-mixer", "json"),
+    "valu3s-uc6": _spec("valu3s-uc6", "json"),
+    # Unrealisable cores of rad and the two Lift-Plus-Cruise specs, each its own
+    # spec (scripts/make_core_specs.py). No ideals: implies_ideal reads 0.
+    **{name: _spec(name, "json") for name in FRETISH_CORES},
 }
 
 # The four-family corpus every FRETISH profile before 2026-09-09 ran, frozen as
@@ -87,6 +99,14 @@ FRETISH_SPECS: dict[str, dict[str, Path]] = {
 # record of. New profiles name the corpus they want.
 FRETISH_SPECS_2026_07: list[str] = [
     "takeoff", "fsm", "fsm-timing", "fsm-combined",
+]
+
+# The FRETISH ablation corpus: every FRETISH example small enough to repair
+# whole, then the cores of the ones that are not. ventilator-controller has no
+# confirmed core yet and joins in a follow-up campaign.
+FRETISH_ABLATION_SPECS: list[str] = [
+    "takeoff", "fsm", "fsm-timing", "fsm-combined", "fsm-lmcps",
+    "liquid-mixer", "mode-arbiter", "valu3s-uc6", *FRETISH_CORES,
 ]
 
 # Basic-TLSF specs with ideal fixes. PEREDUR infers the TLSF format from the
@@ -1819,7 +1839,32 @@ PROFILES: dict[str, dict] = {
         # per-call RAM ceiling that pins the TLSF profiles to 1 does not bind.
         "default_jobs": 4,
     },
-
+    # Directed vs uniform redraw of the ordered FRETISH fields (timing,
+    # condition type, scope) at the paper-rerun budget: 1000 individuals,
+    # pop100, 7200 s runner cap, parallel 1, jobs 16. The large specs enter as
+    # their cores only. Generate with
+    #   python3 scripts/gen_configs.py --schemes nsga2-apportion --sweeps O \
+    #       --metric log --weakening off --weights 0.1 0.2 0.7 \
+    #       --termination individuals --max-individuals 1000 --generations 500 \
+    #       --population-size 100 --parallel 1 \
+    #       --out-dir experiments/configs-fretish-ablation --pin-vintage
+    "fretish-ablation": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["directed", "uniform"]},
+        "specs": FRETISH_ABLATION_SPECS,
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ABLATION_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-ablation",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-ablation",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-ablation.csv",
+        "default_jobs": 16,
+    },
 }
 
 

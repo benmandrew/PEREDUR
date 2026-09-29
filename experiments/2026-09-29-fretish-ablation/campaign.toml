@@ -1,0 +1,38 @@
+name = "2026-09-29-fretish-ablation"
+branch = "campaign/fretish-ablation"
+profile = "fretish-ablation"
+description = "Directed against uniform-redraw mutation of the ordered FRETISH fields (timing, condition type, scope) at the paper-rerun budget, over the eight whole FRETISH specs and the cores of rad and both Lift-Plus-Cruise specs, 30 seeds. Pre-registered in PLAN.md."
+
+# The paper-rerun split. Both arms run on each host, so a host difference
+# cancels inside every (subject, seed) pair the McNemar test reads. av2 is
+# enqueued only once the hand-run overlap sampling chain there has finished.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+# The paper-rerun flags, FRETISH side: no --tlsf, and sweep O in place of G.
+# No --max-wall-s, as in paper-rerun: the runner's 7200 s cap is the censoring
+# point, and the score phase reads censored runs off their accumulated set.
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion --sweeps O --metric log --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 1 --out-dir experiments/configs-fretish-ablation --pin-vintage"
+
+# Calibration (seed 0, directed arm, av3, 2026-09-29): every subject but
+# lpc-full-core1 finishes in 4.5 s to 19.6 min, 0.93 core-hours a seed in all,
+# and peak RSS is 2.5 GB (mode-arbiter), so 16 jobs sit far inside 125 GB.
+# lpc-full-core1 sets the spread: 98 to 177 core-hours for the 1200 runs.
+[[phases]]
+name = "search"
+profile = "fretish-ablation"
+jobs = 16
+
+# Found at 10 s / 100 s / cap and the Maximal count, as paper-rerun-curves
+# scored the TLSF arm. Cores and valu3s-uc6 carry no ideals; score_curves.py
+# warns and writes the curve without relations.
+[[phases]]
+name = "curve"
+kind = "score"
+results = "experiments/results-fretish-ablation"
+out = "experiments/curves-fretish-ablation"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 3000
+deadline_s = 7500
