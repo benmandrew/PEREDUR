@@ -1,0 +1,138 @@
+{
+  "campaign": "2026-09-22-aurus-rerun-curves",
+  "attribution": "recorded",
+  "generated_on": "2026-10-01",
+  "status": "closed",
+  "kind": "score",
+  "kind_note": "Two kind = \"score\" phases run through campaign.py over the AuRUS arm of 2026-09-22-aurus-rerun, materialised as experiments/results-aurus-rerun on each host. No search ran here, and no PEREDUR run directory was read: the PEREDUR curves these are read against are 2026-09-14-paper-rerun-curves', scored at 0cfd14a.",
+  "question": "How the un-censored AuRUS arm builds its accumulated set over time, counted as raw solutions, as an epsilon-separated net, as a maximal antichain and as ideal-implying solutions, at the binaries and budgets that scored the PEREDUR side.",
+  "endpoint": "None pre-registered. The curves are the output. 2026-09-22-aurus-rerun/PLAN.md section 8 fixes the budgets as 2026-09-14-paper-rerun-curves' unchanged.",
+  "decision_rule_firing": "None registered and none taken. A measurement pass feeding the paper; the search campaign's decision does not read these curves.",
+  "source_campaign": {
+    "name": "2026-09-22-aurus-rerun",
+    "results": "experiments/results-aurus-rerun",
+    "runs": 780,
+    "materialised_runs": 708,
+    "not_materialised": "72 runs with no solution, which aurus_adapt.py skips by name; the paper enters them as flat zeros",
+    "aurus_commit": "e1cfadf"
+  },
+  "profile_commit": {
+    "sha": "3cd6efbaf9055a289c04356280ac8b617f2fc41a",
+    "short": "3cd6efb",
+    "branch": "campaign/aurus-rerun-curves",
+    "subject": "feat(experiments): declare the scoring passes for the AuRUS re-run",
+    "queue_entries": {"av2": "034-2026-09-22-aurus-rerun-curves, state done", "av3": "032-2026-09-22-aurus-rerun-curves, state done"},
+    "cancelled_entries": "av2 032 and av3 030 also name 3cd6efb and are recorded `state = \"cancelled\"` with 0 attempts.",
+    "reachable_from_main": false,
+    "contained_in": "campaign/aurus-rerun-anytime, which descends from 3cd6efb (git merge-base --is-ancestor, checked 2026-10-01). This archive is written on that branch.",
+    "held_by_tag": "provenance/aurus-rerun-curves",
+    "held_by_tag_note": "Annotated tag cut at 3cd6efb on 2026-10-01, before the close commit was written, and pushed the same minute. Never delete it."
+  },
+  "scoring_binaries": {
+    "fingerprint": {"commit": "3cd6efbaf9055a289c04356280ac8b617f2fc41a", "dirty": "0", "phase": "separation-aurus"},
+    "maximal": {"commit": "3cd6efbaf9055a289c04356280ac8b617f2fc41a", "dirty": "0", "phase": "maximality-aurus"},
+    "compare": {"commit": "3cd6efbaf9055a289c04356280ac8b617f2fc41a", "dirty": "0", "phase": "maximality-aurus"},
+    "source": "the `binaries` block of score-manifest-avlab12.json and score-manifest-av3.json in each phase's output directory",
+    "same_scorer_as_the_peredur_side": "git diff --stat 0cfd14a 3cd6efb lists one file, experiments/2026-09-22-aurus-rerun-curves/campaign.toml. The PEREDUR curves of 2026-09-14-paper-rerun-curves were scored at 0cfd14a, so both arms come from source-identical binaries."
+  },
+  "hosts": {
+    "av2": {"machine": "avlab12", "seeds": "0-14", "curves": {"separation": 354, "maximality": 354}},
+    "av3": {"machine": "av3", "seeds": "15-29", "curves": {"separation": 354, "maximality": 354}},
+    "note": "Each host scored only the repeats it ran. av3's clock runs fast with network time off."
+  },
+  "separation_pass": {
+    "phase": "separation-aurus",
+    "out": "experiments/separation-aurus-uncensored",
+    "invocation": "python3 scripts/score_curves.py --skip-ideals --epsilon 0.05,0.2,0.5 --fingerprint-words 256 --fingerprint-seed 0 --cuts 20 --jobs 1 --deadline-s 900 --maximal-timeout 900 --compare-timeout 600 --out <out>/<run>.csv.part <run-dir>",
+    "budgets": {"cuts": 20, "maximal_timeout_s": 900, "compare_timeout_s": 600, "deadline_s": 900, "wall_cap_s": 1200, "workers": 8, "cores": 1},
+    "pinning": "taskset -c <slot*cores>-<slot*cores+cores-1> per worker; the wall cap is coreutils timeout over the scorer's process group",
+    "seeds": {"av2": "0-14", "av3": "15-29"},
+    "started": {"av2": "2026-09-23T12:07:05+0100", "av3": "2026-09-23T11:57:07+0100"},
+    "finished": {"av2": "2026-09-23T12:07:18+0100", "av3": "2026-09-23T11:57:19+0100"},
+    "counts": {"av2": {"queued": 354, "already_scored": 0, "scored": 354, "failed": 0}, "av3": {"queued": 354, "already_scored": 0, "scored": 354, "failed": 0}},
+    "failures_txt": {"av2": 0, "av3": 0},
+    "timings_txt": {"av2": {"attempts": 354, "nonzero_rc": 0, "elapsed_s_sum": 17}, "av3": {"attempts": 354, "nonzero_rc": 0, "elapsed_s_sum": 16}},
+    "partial_curves": 0,
+    "warnings": "warnings.log holds 354 lines a host and no WARN line.",
+    "note": "The word count, fingerprint seed and epsilon list are 2026-09-14-paper-rerun-curves' exactly; a fingerprint compares only against one drawn from an identical sampling."
+  },
+  "maximality_pass": {
+    "phase": "maximality-aurus",
+    "out": "experiments/curves-aurus-uncensored",
+    "invocation": "python3 scripts/score_curves.py --maximality --cuts 20 --jobs 4 --deadline-s 7500 --maximal-timeout 900 --compare-timeout 3000 --out <out>/<run>.csv.part <run-dir>",
+    "budgets": {"cuts": 20, "maximal_timeout_s": 900, "compare_timeout_s": 3000, "deadline_s": 7500, "wall_cap_s": 8400, "workers": 8, "cores": 4},
+    "pinning": "taskset -c <slot*cores>-<slot*cores+cores-1> per worker; the wall cap is coreutils timeout over the scorer's process group",
+    "seeds": {"av2": "0-14", "av3": "15-29"},
+    "started": {"av2": "2026-09-23T12:10:01+0100", "av3": "2026-09-23T12:00:01+0100"},
+    "finished": {"av2": "2026-09-23T20:36:16+0100", "av3": "2026-09-23T19:51:35+0100"},
+    "counts": {"av2": {"queued": 354, "already_scored": 0, "scored": 354, "failed": 0}, "av3": {"queued": 354, "already_scored": 0, "scored": 354, "failed": 0}},
+    "failures_txt": {"av2": 0, "av3": 0},
+    "timings_txt": {"av2": {"attempts": 354, "nonzero_rc": 0, "elapsed_s_sum": 203221, "worker_h": 56.45, "median_s": 7, "max_s": 7500}, "av3": {"attempts": 354, "nonzero_rc": 0, "elapsed_s_sum": 199512, "worker_h": 55.42, "median_s": 6, "max_s": 7499}},
+    "partial_curves": {
+      "total": 48,
+      "per_host": {"av2": 25, "av3": 23},
+      "per_family": {"humanoid-742": {"av2": 15, "av3": 15}, "humanoid-741": {"av2": 10, "av3": 8}},
+      "rows_kept": "61 to 546 a curve",
+      "source": "warnings.log carries `the antichain walk exceeded <n>s; keeping the <k> row(s) it had written` 25 times on av2 and 23 on av3. Family attribution comes from timings.txt, the 48 attempts with elapsed_s at 7499 or 7500, because warnings.log interleaves the output of eight workers and its run headers do not bind the lines that follow them.",
+      "for_comparison": "2026-09-14-paper-rerun-curves left 30 of 596 archived AuRUS curves partial, and 115 of 3000 PEREDUR curves."
+    },
+    "no_ideals": "warnings.log carries `no ideals directory at .../examples/humanoid-741/fixes` 30 times, 15 a host. humanoid-741's 30 curves have solution and maximal metrics and no ideal ones.",
+    "note": "111.9 worker-hours over 708 runs; the pass over the 596 archived AuRUS runs took 67.1. Every run that took over 300 s is one of the 30 humanoid-741 or 30 humanoid-742 runs."
+  },
+  "rows": {
+    "separation-aurus-uncensored.csv": {"rows": 339875, "curves": 708, "per_host_rows": {"av2": 170393, "av3": 169482}, "per_host_curves": {"av2": 354, "av3": 354}, "humanoid-741": {"curves": 30, "rows": 7357}},
+    "curves-aurus-uncensored.csv": {"rows": 328856, "curves": 708, "per_host_rows": {"av2": 164713, "av3": 164143}, "per_host_curves": {"av2": 354, "av3": 354}, "humanoid-741": {"curves": 30, "rows": 6299}},
+    "duplicates": "0 identical rows in either file",
+    "collected_with": "campaign.py collect --curves <name> for each phase, on 2026-09-24 (joined-file mtimes 13:51), pulling each host's directory into <name>/<host>/ and joining the per-run CSVs into <name>.csv. Recorded by the paper's PROVENANCE.txt as every curve present exactly once."
+  },
+  "results": {
+    "source": "paper/generated/numbers.tex in ~/projects/writing/counter-paper at 1fc2134 against 1fc2134^, after the paper's staging drops humanoid-741 (708 to 678 curves) and adds the 72 no-solutions runs as zeros (750)",
+    "aurus_curve_runs": {"archive": 678, "now": 750},
+    "aurus_mean_solutions_at_cap": {"archive": 423.3, "now": 387.9},
+    "aurus_mean_maximal_solutions_at_cap": {"archive": 38.6, "now": 35.6},
+    "note": "Both means fell as the denominator grew. The 72 added runs score zero and the recovered capped runs hold few solutions: the six capped families hold 5,908 of 296,300 candidates (2026-09-22-aurus-rerun per_family)."
+  },
+  "consumer_rules": [
+    "Filter humanoid-741 out of both files before reading them against PEREDUR's 25 families. It has no ideals, its maximality curves carry no ideal metrics, and leaving it in puts the denominator at 780 rather than 750.",
+    "The 72 runs with no solution have no curve here. Enter them as flat zeros, or the denominator is 678.",
+    "Read cap status from 2026-09-22-aurus-rerun's aurus_results-<host>.csv `killed` column. A curve exists for 118 of the 175 killed runs, and its run_wall_s for those reads 7500.0 or 7500.01 s, the cap plus the harness grace."
+  ],
+  "caveats": [
+    "Post-hoc throughout. No decision rule is registered here.",
+    "PEREDUR's curve counts gate-passing candidates flushed by the accumulator; AuRUS's counts accepted solutions. AuRUS's are now dated to the microsecond by the fork, where the archived arm's were dated to the second.",
+    "An implication that times out reads as a non-implication, so every ideal count is a lower bound at the 3000 s budget.",
+    "48 maximality curves are partial: their maximal counts stop where the walk hit its 7500 s deadline.",
+    "ideal_solutions counts candidates implying one of the ideals under examples/*/fixes at 3cd6efb."
+  ],
+  "vendored_scripts": {
+    "note": "Verbatim copies of scripts/ at 3cd6efb, the commit the hosts ran, extracted with git show and checked with git hash-object. score_campaign.py ran each phase on the host and score_curves.py scored each run; both import run_experiments.py. campaign.py staged and drove the phases and imports merge_experiments.py. gen_configs.py is vendored because the close procedure requires it; no config was generated.",
+    "source_commit": "3cd6efbaf9055a289c04356280ac8b617f2fc41a",
+    "blobs": {
+      "campaign.py": "35fd84d53586f509c6cb98d9f36dee62ebb6af7b",
+      "gen_configs.py": "5aa29ede0a886caaf84d449a2d800506385da959",
+      "merge_experiments.py": "2ba1ebc9f91c7ea0e93c571c70fd7c2bbebb1a44",
+      "run_experiments.py": "10680a87a77d4e043388c61a531c7b1455c58bbb",
+      "score_campaign.py": "6dac6e4ab1f24bf88b2c4bcb02aa3d3355b0b5ae",
+      "score_curves.py": "0368cb1d0cf3905e9b87e4ff41caebc69a904aa6"
+    },
+    "identical_to": "campaign.py, merge_experiments.py, score_campaign.py and score_curves.py carry the same blobs as 2026-09-14-paper-rerun-curves/scripts."
+  },
+  "not_vendored": {
+    "score_aurus_anytime.py": "At 3cd6efb this file (blob 187d64d) predates the fork and has no solution-times reader. It ran nothing here. The anytime pass used the port in a2da7bb, vendored by 2026-09-23-aurus-rerun-anytime."
+  },
+  "config_vintage": "Not applicable. A score pass reads no config.",
+  "not_recorded": {
+    "per_family_worker_hours": "timings.txt gives per-run elapsed time and was summed per host only.",
+    "warnings_per_curve": "warnings.log interleaves eight workers, so a WARN line cannot be bound to a run from the log alone."
+  },
+  "files": {
+    "campaign.toml": "The declaration both hosts read, with the two phases and their budgets.",
+    "REPORT.md": "The write-up, closed 2026-10-01.",
+    "PROVENANCE.json": "This file.",
+    "scripts/": "The six vendored scripts, with blob shas above.",
+    "separation-aurus-uncensored.csv, curves-aurus-uncensored.csv": "The joined curves, 339,875 and 328,856 rows. Untracked, in experiments/ of the campaign/aurus-rerun-anytime worktree.",
+    "separation-aurus-uncensored/, curves-aurus-uncensored/": "Per-run CSVs under <host>/, beside which the maximality pass also wrote 354 <run>.members.tsv antichain-membership sidecars a host, with each host's score-manifest-<hostname>.json, timings.txt, failures.txt and warnings.log. Untracked."
+  },
+  "reproduce": "With 2026-09-22-aurus-rerun's experiments/results-aurus-rerun in place on both hosts, check out 3cd6efb, build the release preset, and run this campaign.toml through campaign.py.",
+  "closed_on": "2026-10-01"
+}

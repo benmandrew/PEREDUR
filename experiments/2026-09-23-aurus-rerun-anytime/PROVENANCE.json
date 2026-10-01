@@ -1,0 +1,132 @@
+{
+  "campaign": "2026-09-23-aurus-rerun-anytime",
+  "attribution": "recorded",
+  "generated_on": "2026-10-01",
+  "status": "closed",
+  "kind": "score (aurus-score phases)",
+  "kind_note": "Two kind = \"aurus-score\" phases run through campaign.py over the AuRUS arm of 2026-09-22-aurus-rerun. The anytime pass reads the raw tree experiments/aurus-rerun-out and writes one row per solution with its compare verdict against the ideals and its discovery time. The well-separation pass reads the adapted tree experiments/results-aurus-rerun and writes one row per candidate file. No search ran here.",
+  "question": "Per-solution ideal verdicts and discovery times for the un-censored AuRUS arm, and a well-separation verdict for each of its solutions, so that the paper's AuRUS found and ideal flags can be screened as the PEREDUR side's are.",
+  "endpoint": "None pre-registered. These rows feed the paper's aurus_full.csv equivalent and its well-separation screen, through ~/projects/writing/counter-paper/data/rerun-2026-09-uncensored.",
+  "decision_rule_firing": "None registered and none taken. 2026-09-22-aurus-rerun's decision reads the reference built from the anytime rows; see that archive.",
+  "source_campaign": {"name": "2026-09-22-aurus-rerun", "aurus_commit": "e1cfadf", "runs": 780, "materialised_runs": 708, "candidate_files": 296300},
+  "profile_commit": {
+    "sha": "5891b06e81d860ad8197c40ce3a43b017e70d811",
+    "short": "5891b06",
+    "branch": "campaign/aurus-rerun-anytime",
+    "subject": "feat(experiments): declare the anytime/wellsep scoring passes for the AuRUS re-run",
+    "queue_entries": {"av2": "035-2026-09-23-aurus-rerun-anytime, state done", "av3": "033-2026-09-23-aurus-rerun-anytime, state done"},
+    "parent_history": "Four commits on top of 3cd6efb (2026-09-22-aurus-rerun-curves): 5da7d00 keeps compare's relation map beside each curve, b81df3e adds the aurus-score phase kind and its host runner, a2da7bb dates AuRUS solutions from the fork's solution-times.csv, and 5891b06 declares this campaign. None touches src/, include/ or CMakeLists.txt (git diff --stat 3cd6efb 5891b06).",
+    "reachable_from_main": false,
+    "held_by_tag": "provenance/aurus-rerun-anytime",
+    "held_by_tag_note": "Annotated tag cut at 5891b06 on 2026-10-01, before the close commit was written, and pushed the same minute. Never delete it."
+  },
+  "scoring_binaries": {
+    "compare": {"commit": "5891b06e81d860ad8197c40ce3a43b017e70d811", "dirty": "0", "phase": "anytime-aurus", "note": "Source-identical to 3cd6efb's compare and to 0cfd14a's, no C++ having changed between them."},
+    "ltlsynt": {"version": "ltlsynt (spot) 2.15.1", "path": "build-release/third_party/spot/bin/ltlsynt", "phase": "wellsep-aurus"},
+    "source": "the `binaries` block of aurus-score-manifest-avlab12.json and aurus-score-manifest-av3.json in each phase's output directory"
+  },
+  "hosts": {
+    "av2": {"machine": "avlab12", "seeds": "0-14", "anytime_units": 390, "wellsep_units": 354},
+    "av3": {"machine": "av3", "seeds": "15-29", "anytime_units": 390, "wellsep_units": 354},
+    "note": "Each host scored only the repeats it ran. av3's clock runs fast with network time off."
+  },
+  "anytime_pass": {
+    "phase": "anytime-aurus",
+    "results": "experiments/aurus-rerun-out",
+    "out": "experiments/anytime-aurus-uncensored",
+    "invocation": "python3 scripts/score_aurus_anytime.py --binary <repo>/build-release/compare --examples <repo>/examples --timeout 3000 --jobs 1 --out <out>/<unit>.csv.part --dirs <unit-dir>",
+    "budgets": {"compare_timeout_s": 3000, "jobs": 8},
+    "seeds": {"av2": "0-14", "av3": "15-29"},
+    "started": {"av2": "2026-09-23T20:40:04+0100", "av3": "2026-09-23T19:55:04+0100"},
+    "finished": {"av2": "2026-09-23T21:12:23+0100", "av3": "2026-09-23T20:27:05+0100"},
+    "counts": {"av2": {"queued": 390, "already_scored": 0, "scored": 390, "failed": 0}, "av3": {"queued": 390, "already_scored": 0, "scored": 390, "failed": 0}},
+    "failures_txt": {"av2": 0, "av3": 0},
+    "timings_txt": {"av2": {"attempts": 390, "nonzero_rc": 0, "elapsed_s_sum": 14261, "worker_h": 3.96, "longest": "humanoid-742 repeat-13, 794 s"}, "av3": {"attempts": 390, "nonzero_rc": 0, "elapsed_s_sum": 14287, "worker_h": 3.97, "longest": "humanoid-742 repeat-21, 798 s"}},
+    "warnings": "warnings.log holds 1170 lines a host, progress and run headers, with no warning or error line.",
+    "scorer_vintage": "score_aurus_anytime.py at 5891b06 (blob 68c3329, last changed a2da7bb) reads the fork's solution-times.csv and falls back to run.log. The copy at 3cd6efb on campaign/aurus-rerun-curves (blob 187d64d) predates the fork and has no solution-times reader; it ran nothing."
+  },
+  "wellsep_pass": {
+    "phase": "wellsep-aurus",
+    "results": "experiments/results-aurus-rerun",
+    "out": "experiments/wellsep-aurus-uncensored",
+    "invocation": "python3 scripts/check_well_separated.py --ltlsynt <repo>/build-release/third_party/spot/bin/ltlsynt --pattern *.tlsf --timeout 60 --jobs 1 --out <out>/<unit>.csv.part <unit-dir>",
+    "budgets": {"ltlsynt_timeout_s": 60, "pattern": "*.tlsf", "fast_path": "off", "jobs": 8},
+    "seeds": {"av2": "0-14", "av3": "15-29"},
+    "started": {"av2": "2026-09-23T21:15:01+0100", "av3": "2026-09-23T20:30:01+0100"},
+    "finished": {"av2": "2026-09-23T21:18:01+0100", "av3": "2026-09-23T20:32:53+0100"},
+    "counts": {"av2": {"queued": 354, "already_scored": 0, "scored": 354, "failed": 0}, "av3": {"queued": 354, "already_scored": 0, "scored": 354, "failed": 0}},
+    "failures_txt": {"av2": 0, "av3": 0},
+    "timings_txt": {"av2": {"attempts": 354, "nonzero_rc": 0, "elapsed_s_sum": 1247, "worker_h": 0.35}, "av3": {"attempts": 354, "nonzero_rc": 0, "elapsed_s_sum": 1190, "worker_h": 0.33}},
+    "warnings": "warnings.log holds 354 run headers a host and no warning or error line."
+  },
+  "rows": {
+    "anytime-aurus-uncensored.csv": {
+      "rows": 291037,
+      "per_host_rows": {"av2": 145873, "av3": 145164},
+      "units": 780,
+      "by_status": {"ok": {"rows": 290935, "units": 678}, "no-solutions": {"rows": 72, "units": 72}, "no-ideals-dir": {"rows": 30, "units": 30, "family": "humanoid-741"}},
+      "by_dated_by": {"solution-times": 290965, "run-log": 72},
+      "dated_by_note": "The 72 run-log rows are the 72 no-solutions units, which carry no solution to date. Every scorable row is dated from solution-times.csv.",
+      "by_verdict": {"incomparable": 217848, "strictly weaker": 46484, "timeout": 18574, "strictly stronger": 6495, "equivalent": 1534, "blank": 102},
+      "hits": 8029,
+      "timeout_note": "All 18,574 timeout verdicts are humanoid-742's, out of its 18,988 solutions: compare's own per-candidate timeout verdict, inside units that finished in at most 798 s, not the 3000 s subprocess timeout."
+    },
+    "wellsep-aurus-uncensored.csv": {
+      "rows": 296300,
+      "per_host_rows": {"av2": 148652, "av3": 147648},
+      "units": 708,
+      "by_verdict": {"well-separated": 174774, "not-well-separated": 121526},
+      "undecided": 0,
+      "by_refs_output": {"false/well-separated": 103503, "true/well-separated": 71271, "true/not-well-separated": 121526},
+      "excluding_humanoid-741": {"rows": 290935, "not-well-separated": 116325},
+      "blank_columns": "sweep, arm, scheme, spec and seed are blank on all 296,300 rows: check_well_separated.py's parse_run_id did not populate them on this tree, contrary to campaign.toml's expectation. Recover spec, seed and index from `path` with aurus_(.+)_seed(\\d+)/.*?/spec(\\d+)\\.tlsf$, which matches every row."
+    },
+    "join": "Outside humanoid-741 the well-separation rows (290,935) equal the anytime pass's ok rows (290,935). The paper's PROVENANCE.txt records the (spec, repeat, index) join as exact with no orphan on either side.",
+    "collected_with": "campaign.py collect --curves <name> for each phase, on 2026-09-24 (joined-file mtimes 13:49), into <name>/<host>/ and <name>.csv."
+  },
+  "consumer_rules": [
+    "Parse spec and seed for well-separation rows off `path`; the columns are blank.",
+    "Drop humanoid-741's 5,365 well-separation verdicts before joining: the anytime pass grades none of its solutions, having no ideals, so they would join to nothing.",
+    "The 30 no-ideals-dir and 72 no-solutions anytime rows are one per unit with blank verdict, index and time."
+  ],
+  "results": {
+    "source": "~/projects/writing/counter-paper/data/rerun-2026-09-uncensored/PROVENANCE.txt and paper/generated at 1fc2134 and 29a1712",
+    "screened": "116,325 of 291,007 AuRUS solutions are not well-separated (40.0%), and 987 of the 8,029 ideal hits are among them.",
+    "archive_for_comparison": "2026-08-14-aurus-h2h's sweep found 113,958 of 287,006 ill-separated (39.71%), 0 undecided (experiments/README.md).",
+    "decision": "These rows feed the reference behind 2026-09-22-aurus-rerun's decision: Outcome 3, parity at p = 0.7214."
+  },
+  "caveats": [
+    "Post-hoc throughout. No decision rule is registered here.",
+    "On humanoid-742 compare returned `timeout` for 18,574 of 18,988 solutions, so that family's AuRUS ideal count rests on 414 decided verdicts and is a lower bound. AuRUS still reads 0.833 there in the registered table.",
+    "The anytime pass's discovery times are the fork's own clock, which starts after JVM start-up and spec parsing. The paper adds a measured per-run offset of 0.127 s to 1.457 s (aurus-offsets.csv); the rows here carry no offset."
+  ],
+  "vendored_scripts": {
+    "note": "Verbatim copies of scripts/ at 5891b06, the commit the hosts ran, extracted with git show and checked with git hash-object. aurus_score_campaign.py ran each phase on the host and imports run_experiments.py; score_aurus_anytime.py and check_well_separated.py scored each unit; campaign.py staged and drove the phases and imports merge_experiments.py. gen_configs.py is vendored because the close procedure requires it; no config was generated.",
+    "source_commit": "5891b06e81d860ad8197c40ce3a43b017e70d811",
+    "blobs": {
+      "aurus_score_campaign.py": "b77a95c33426a27bef07aa4dfeb92f1979c9b6bb",
+      "campaign.py": "84790663d0c43fd2ba005c967f476f252e823c00",
+      "check_well_separated.py": "16db359b292e5486616607a0385911148ff087c6",
+      "gen_configs.py": "5aa29ede0a886caaf84d449a2d800506385da959",
+      "merge_experiments.py": "2ba1ebc9f91c7ea0e93c571c70fd7c2bbebb1a44",
+      "run_experiments.py": "10680a87a77d4e043388c61a531c7b1455c58bbb",
+      "score_aurus_anytime.py": "68c332929224679e7f9bf2b12c8b54669badc4c0"
+    },
+    "last_changed": {"aurus_score_campaign.py": "a2da7bb", "campaign.py": "b81df3e", "check_well_separated.py": "5378177", "score_aurus_anytime.py": "a2da7bb"}
+  },
+  "config_vintage": "Not applicable. A score pass reads no config.",
+  "not_recorded": {
+    "per_family_worker_hours": "timings.txt gives per-unit elapsed time and was summed per host only.",
+    "relations_sidecar": "5da7d00 keeps compare's relation map beside each curve from that commit on; 2026-09-22-aurus-rerun-curves ran at 3cd6efb, before it, so no relations.tsv exists for this arm's curves."
+  },
+  "files": {
+    "campaign.toml": "The declaration both hosts read, with the two phases and their budgets.",
+    "REPORT.md": "The write-up, closed 2026-10-01.",
+    "PROVENANCE.json": "This file.",
+    "scripts/": "The seven vendored scripts, with blob shas above.",
+    "anytime-aurus-uncensored.csv, wellsep-aurus-uncensored.csv": "The joined rows, 291,037 and 296,300. Untracked, in experiments/ of the campaign/aurus-rerun-anytime worktree.",
+    "anytime-aurus-uncensored/, wellsep-aurus-uncensored/": "Per-unit CSVs under <host>/, each with its aurus-score-manifest-<hostname>.json, timings.txt, failures.txt and warnings.log. Untracked."
+  },
+  "reproduce": "With 2026-09-22-aurus-rerun's experiments/aurus-rerun-out and experiments/results-aurus-rerun in place on both hosts, check out 5891b06, build the release preset, and run this campaign.toml through campaign.py.",
+  "closed_on": "2026-10-01"
+}
