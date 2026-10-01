@@ -72,12 +72,25 @@ def test_short_arms_keeps_the_varying_tokens():
     assert E.short_arms(["only"]) == {"only": "only"}
 
 
+HEAD = E.resolve("HEAD")
+# The ablation campaign's commit: rad-core-10 exists there, rad's spec is
+# unchanged since, and reqids.json does not exist yet.
+CAMPAIGN = E.resolve("dc3e276")
+
+
 def test_core_labels_carry_parent_index_and_reqid():
-    labels = E.label_requirements("rad-core-10", ORIGINAL)
+    labels = E.label_requirements(E.subject_context("rad-core-10", HEAD))
     assert labels["guarantees"] == ["G1 (rad #10, S01_a)"], labels
 
 
-def write_run(root: Path, arm: str, seed: int, repairs, finished=True):
+def test_reqids_fall_back_to_the_working_tree_when_the_parent_is_unchanged():
+    context = E.subject_context("rad-core-10", CAMPAIGN)
+    assert E.label_requirements(context)["guarantees"] == \
+        ["G1 (rad #10, S01_a)"], context
+
+
+def write_run(root: Path, arm: str, seed: int, repairs, finished=True,
+              commit=HEAD, implication=True):
     run = root / f"sweep_O_{arm}_nsga2-apportion_log_rad-core-10_seed{seed:02d}"
     (run / "accumulated").mkdir(parents=True)
     for n, guarantee in enumerate(repairs):
@@ -89,33 +102,50 @@ def write_run(root: Path, arm: str, seed: int, repairs, finished=True):
             (run / "accumulated" / f"gen01_{n:04d}.json").write_text(
                 json.dumps(body))
     if finished:
-        (run / "run.json").write_text("{}")
+        (run / "run.json").write_text(json.dumps({
+            "commit": commit, "dirty": 0,
+            "config": {"filters": {"run_implication": implication}}}))
     else:
         names = "".join(f"gen01_{n:04d}.json\n" for n in range(len(repairs)))
         (run / "accumulated" / "maximal.tsv").write_text("file\n" + names)
 
 
+def export(results: Path, out: Path, *extra):
+    sys.argv = ["export_repairs.py", str(results), "--out", str(out),
+                "--subjects", "rad-core-10", *extra]
+    E.main()
+
+
+def exits(results: Path, out: Path, *extra) -> str:
+    try:
+        export(results, out, *extra)
+    except SystemExit as exc:
+        return str(exc)
+    raise AssertionError("export did not exit")
+
+
+WEAKER = {**G1, "timing": {"type": "Eventually"}}
+OTHER = {**G1, "response": "!(confirm_task_request)"}
+
+
 def test_end_to_end():
-    weaker = {**G1, "timing": {"type": "Eventually"}}
-    other = {**G1, "response": "!(confirm_task_request)"}
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         results, out = tmp / "results", tmp / "out"
-        write_run(results, "directed", 0, [weaker, other])
-        write_run(results, "uniform", 0, [weaker])
+        write_run(results, "directed", 0, [WEAKER, OTHER])
+        write_run(results, "uniform", 0, [WEAKER])
         # Killed before run.json: its maximal set comes from the accumulator.
-        write_run(results, "uniform", 1, [other], finished=False)
+        write_run(results, "uniform", 1, [OTHER], finished=False)
         write_run(results, "directed", 1, [])
-        sys.argv = ["export_repairs.py", str(results), "--out", str(out),
-                    "--subjects", "rad-core-10"]
-        E.main()
+        export(results, out)
 
         bundle = out / "rad-core-10"
         files = sorted(p.name for p in (bundle / "repairs").iterdir())
         assert files == ["r0001.json", "r0002.json"], files
         md = (bundle / "repairs.md").read_text()
-        assert "2 distinct repairs, found by 3 of 4 runs" in md, md
-        # `other` has the higher fitness (0.6), so it comes first.
+        assert "2 distinct repairs, found by 3 of 4 runs. Each is maximal " \
+            "within a run that found it" in md, md
+        # `OTHER` has the higher fitness (0.6), so it comes first.
         assert md.index("changed (response)") < md.index("changed (timing)")
         rows = (bundle / "repairs.csv").read_text().splitlines()
         assert rows[0] == ("repair,runs,runs_directed,runs_uniform,seeds,"
@@ -125,9 +155,43 @@ def test_end_to_end():
         assert "fitness" not in r1, r1
         assert [f["censored"] for f in r1["found_by"]] == [False, True], r1
         core = (bundle / "core.md").read_text()
+        assert f"at {HEAD[:7]}, the commit" in core, core
         assert "FRET S01_a: Robot shall before" in core, core
-        assert "| rad-core-10 | 3 of 4 | 2 |" in \
-            (out / "README.md").read_text()
+        readme = (out / "README.md").read_text()
+        assert "| rad-core-10 | 3 of 4 | 2 |" in readme, readme
+        assert "Each repair is maximal within its run" in readme, readme
+
+
+def test_unfiltered_runs_are_not_called_maximal():
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        write_run(tmp / "results", "directed", 0, [WEAKER])
+        write_run(tmp / "results", "uniform", 0, [OTHER], implication=False)
+        export(tmp / "results", tmp / "out")
+        md = (tmp / "out" / "rad-core-10" / "repairs.md").read_text()
+        assert "Some runs did not filter by implication" in md, md
+        readme = (tmp / "out" / "README.md").read_text()
+        assert "Not every run filtered" in readme, readme
+
+
+def test_the_original_comes_from_the_recorded_commit():
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        results = tmp / "results"
+        # 4ccc04e predates the core examples.
+        write_run(results, "directed", 0, [WEAKER], commit=E.resolve("4ccc04e"))
+        assert "does not exist at" in exits(results, tmp / "out")
+        write_run(results, "uniform", 0, [WEAKER])
+        assert "runs record different commits" in exits(results, tmp / "out")
+
+
+def test_censored_runs_alone_need_a_commit():
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        write_run(tmp / "results", "uniform", 0, [OTHER], finished=False)
+        assert "pass --commit" in exits(tmp / "results", tmp / "out")
+        export(tmp / "results", tmp / "out", "--commit", "HEAD")
+        assert (tmp / "out" / "rad-core-10" / "repairs" / "r0001.json").exists()
 
 
 def main():

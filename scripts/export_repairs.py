@@ -6,10 +6,15 @@
 For each subject (default: the cores in `make_core_specs.py`) it reads every
 run directory, taking `repair_*.json` from a finished run and the files
 `accumulated/maximal.tsv` names from one killed before writing `run.json`.
-Either way that is the run's maximal set: no other repair *that run* found
-implies one of them. Runs are not filtered against each other, so a repair
-from one seed may be implied by a repair from another. Repairs found by
-several runs are merged, keeping a record of every run that found them.
+Under the implication filter that is the run's maximal set: no other repair
+*that run* found implies one of them. Each run's `run.json` says whether the
+filter was on, and the bundle words itself to match. Runs are not filtered
+against each other. Repairs found by several runs are merged, keeping a record
+of every run that found them.
+
+The original specification is read at the commit the runs recorded, not from
+the working tree, so an example edited since the campaign cannot be diffed
+against by mistake. Pass `--commit` when no run wrote `run.json`.
 
 The bundle holds, per subject, the original specification as FRETISH text with
 each guarantee's index in its parent and its FRET requirement ids where
@@ -23,6 +28,7 @@ import difflib
 import json
 import re
 import shutil
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -218,15 +224,28 @@ def align(original: list[dict], repaired: list[dict]):
 
 # --- Collection ---
 
-def run_sources(run_dir: Path) -> tuple[list[Path], bool]:
-    """Return a run's maximal files, and whether the run was killed early."""
-    if (run_dir / "run.json").exists():
-        return sorted(run_dir.glob("repair_*.json")), False
+def run_sources(run_dir: Path) -> dict:
+    """Return a run's repair files and what the run recorded about them.
+
+    A finished run's `repair_N.json` files are its maximal set only if the
+    run had the implication filter on; otherwise they are everything that
+    passed its output gate. A run killed before writing `run.json` keeps its
+    streaming maximal set in `accumulated/maximal.tsv`, which exists only
+    under the filter.
+    """
+    manifest = run_dir / "run.json"
+    if manifest.exists():
+        data = json.loads(manifest.read_text())
+        return {"files": sorted(run_dir.glob("repair_*.json")),
+                "censored": False, "commit": data.get("commit"),
+                "dirty": bool(data.get("dirty")),
+                "maximal": data.get("config", {}).get("filters", {})
+                .get("run_implication")}
     index = run_dir / "accumulated" / "maximal.tsv"
-    if not index.exists():
-        return [], True
-    names = index.read_text().split("\n")[1:]
-    return [run_dir / "accumulated" / n for n in names if n.strip()], True
+    names = index.read_text().split("\n")[1:] if index.exists() else []
+    return {"files": [run_dir / "accumulated" / n for n in names if n.strip()],
+            "censored": True, "commit": None, "dirty": False,
+            "maximal": True if index.exists() else None}
 
 
 def runs_by_subject(results: Path, subjects: list[str]) -> dict:
@@ -234,19 +253,58 @@ def runs_by_subject(results: Path, subjects: list[str]) -> dict:
     for run_dir in sorted(p for p in results.iterdir() if p.is_dir()):
         match = RUN_DIR.match(run_dir.name)
         if match and match["subject"] in subjects:
-            runs[match["subject"]].append((run_dir, match))
+            runs[match["subject"]].append(
+                (run_dir, match, run_sources(run_dir)))
     missing = [s for s in subjects if s not in runs]
     if missing:
         sys.exit(f"no run directories for: {' '.join(missing)}")
     return runs
 
 
+def campaign_commit(runs: dict, override: str | None) -> str:
+    """Return the one commit every run recorded, or `override`.
+
+    The original specification is read at this commit, because an example
+    edited since the campaign would otherwise be diffed against silently.
+    """
+    recorded = {s["commit"] for subject in runs.values()
+                for _, _, s in subject if s["commit"]}
+    if any(s["dirty"] for subject in runs.values() for _, _, s in subject):
+        print("warning: some runs were built from a dirty tree, so the "
+              "examples at their commit may not be what they ran",
+              file=sys.stderr)
+    if override:
+        if recorded and recorded != {resolve(override)}:
+            print(f"warning: --commit {override} overrides the recorded "
+                  f"{', '.join(sorted(recorded))}", file=sys.stderr)
+        return resolve(override)
+    if len(recorded) > 1:
+        sys.exit(f"runs record different commits ({', '.join(sorted(recorded))}); "
+                 "export them separately or pass --commit")
+    if not recorded:
+        sys.exit("no run recorded its commit (every run was killed before "
+                 "writing run.json); pass --commit")
+    return recorded.pop()
+
+
+def resolve(commit: str) -> str:
+    return subprocess.run(["git", "-C", str(REPO_ROOT), "rev-parse", commit],
+                          check=True, capture_output=True,
+                          text=True).stdout.strip()
+
+
+def git_json(commit: str, path: str):
+    result = subprocess.run(["git", "-C", str(REPO_ROOT), "show",
+                             f"{commit}:{path}"], capture_output=True,
+                            text=True)
+    return json.loads(result.stdout) if result.returncode == 0 else None
+
+
 def collect(runs: list) -> list[dict]:
     """Merge the runs' repairs, one entry per distinct specification."""
     found = {}
-    for run_dir, match in runs:
-        files, censored = run_sources(run_dir)
-        for path in files:
+    for run_dir, match, source in runs:
+        for path in source["files"]:
             data = json.loads(path.read_text())
             spec = normalise_spec(
                 {k: data[k] for k in SPEC_FIELDS if k in data})
@@ -257,45 +315,68 @@ def collect(runs: list) -> list[dict]:
                 "run": run_dir.name, "arm": match["arm"],
                 "seed": int(match["seed"]), "file": path.name,
                 "fitness": data.get("fitness", {}).get("total"),
-                "censored": censored})
+                "censored": source["censored"],
+                "maximal_in_run": source["maximal"]})
     return list(found.values())
 
 
-# --- render ---
+# --- The original and its parent ---
 
-def parent_of(subject: str):
-    """Return (parent name, parent index of each subject guarantee)."""
-    if subject not in CORES:
-        n = len(json.loads((EXAMPLES / subject / "spec.json").read_text())
-                ["guarantees"])
-        return subject, list(range(n))
-    parent, core = CORES[subject]
-    guarantees = json.loads(
-        (EXAMPLES / parent / "spec.json").read_text())["guarantees"]
-    keep = set(core) | {i for i, g in enumerate(guarantees)
-                        if g.get("weakenable") is False}
-    return parent, sorted(keep)
+def subject_context(subject: str, commit: str) -> dict:
+    """Read the subject at `commit` and work out where its guarantees came from.
+
+    A core's guarantees are labelled with their parent indices only when the
+    parent at the same commit reproduces them, so a stale `CORES` row cannot
+    mislabel anything. FRET ids come from `reqids.json` at that commit, or from
+    the working tree's when the parent is unchanged since.
+    """
+    raw = git_json(commit, f"examples/{subject}/spec.json")
+    if raw is None:
+        sys.exit(f"examples/{subject}/spec.json does not exist at {commit[:7]}")
+    context = {"subject": subject, "raw": raw, "parent": None,
+               "indices": None, "fret": [{}] * len(raw["guarantees"])}
+    parent, core = CORES.get(subject, (subject, None))
+    parent_spec = raw if core is None else git_json(
+        commit, f"examples/{parent}/spec.json")
+    if core is not None:
+        if parent_spec is None:
+            print(f"warning: {subject}: parent {parent} missing at "
+                  f"{commit[:7]}; no parent labels", file=sys.stderr)
+            return context
+        guarantees = parent_spec["guarantees"]
+        indices = sorted(set(core) | {i for i, g in enumerate(guarantees)
+                                      if g.get("weakenable") is False})
+        if [guarantees[i] for i in indices] != raw["guarantees"]:
+            print(f"warning: {subject} is not guarantees {core} of {parent} "
+                  f"at {commit[:7]}; no parent labels", file=sys.stderr)
+            return context
+    else:
+        indices = list(range(len(raw["guarantees"])))
+    context.update(parent=parent, indices=indices)
+
+    reqids = git_json(commit, f"examples/{parent}/reqids.json")
+    if reqids is None:
+        here = EXAMPLES / parent
+        if (here / "reqids.json").exists() and json.loads(
+                (here / "spec.json").read_text()) == parent_spec:
+            reqids = json.loads((here / "reqids.json").read_text())
+    if reqids:
+        rows = {row["guarantee"]: row for row in reqids}
+        context["fret"] = [rows.get(i, {}) for i in indices]
+    return context
 
 
-def fret_sources(subject: str) -> list[dict]:
-    """Return the FRET source row of each subject guarantee, or {} if none."""
-    parent, indices = parent_of(subject)
-    path = EXAMPLES / parent / "reqids.json"
-    rows = ({row["guarantee"]: row for row in json.loads(path.read_text())}
-            if path.exists() else {})
-    return [rows.get(i, {}) for i in indices]
-
-
-def label_requirements(subject: str, spec: dict) -> dict[str, list[str]]:
-    parent, indices = parent_of(subject)
+def label_requirements(context: dict) -> dict[str, list[str]]:
+    raw = context["raw"]
     labels = {"assumptions": [f"A{i + 1}" for i in
-                              range(len(spec["assumptions"]))],
+                              range(len(raw["assumptions"]))],
               "guarantees": []}
-    for j, (parent_index, source) in enumerate(
-            zip(indices, fret_sources(subject))):
-        tag = ", ".join([f"{parent} #{parent_index}"] +
-                        source.get("reqids", []))
-        labels["guarantees"].append(f"G{j + 1} ({tag})")
+    for j in range(len(raw["guarantees"])):
+        tags = context["fret"][j].get("reqids", [])
+        if context["indices"] is not None:
+            tags = [f"{context['parent']} #{context['indices'][j]}"] + tags
+        labels["guarantees"].append(
+            f"G{j + 1} ({', '.join(tags)})" if tags else f"G{j + 1}")
     return labels
 
 
@@ -309,18 +390,21 @@ def short_arms(arms: list[str]) -> dict[str, str]:
     return {a: "_".join(t[k] for k in varying) for a, t in split.items()}
 
 
-def render_core(subject: str, spec: dict, labels: dict) -> str:
-    parent, _ = parent_of(subject)
-    lines = [f"# {subject}: original specification", ""]
-    if subject in CORES:
-        lines += [f"An unrealisable core of `{parent}`: the guarantees "
-                  f"{CORES[subject][1]} (0-based) of `examples/{parent}/"
-                  "spec.json`, plus every guarantee locked against weakening, "
-                  "which the search may not change.", ""]
+def render_core(context: dict, spec: dict, labels: dict,
+                commit: str) -> str:
+    subject, parent = context["subject"], context["parent"]
+    lines = [f"# {subject}: original specification", "",
+             f"`examples/{subject}/spec.json` at {commit[:7]}, the commit the "
+             "runs were built from.", ""]
+    if subject in CORES and context["indices"] is not None:
+        lines += [f"An unrealisable core of `{parent}`: its guarantees "
+                  f"{CORES[subject][1]} (0-based), plus every guarantee "
+                  "locked against weakening, which the search may not "
+                  "change.", ""]
     lines += ["`C` stands for the component. `[locked]` marks a requirement "
               "the search may not weaken.", ""]
     sources = {"assumptions": [{}] * len(spec["assumptions"]),
-               "guarantees": fret_sources(subject)}
+               "guarantees": context["fret"]}
     if any(sources["guarantees"]):
         lines += ["Under each guarantee is the FRET sentence it was imported "
                   "from. Where the two differ, the import changed it; "
@@ -396,17 +480,33 @@ def diff_lines(original: dict, repaired: dict, labels: dict) -> tuple:
     return lines, counts
 
 
-def render_subject(subject: str, runs: list, out: Path) -> tuple:
+def maximality_note(runs: list) -> tuple[str, bool]:
+    """Say what a subject's repair files are, from what its runs recorded."""
+    flags = {s["maximal"] for _, _, s in runs if s["files"]}
+    if flags <= {True}:
+        return ("Each is maximal within a run that found it: no other repair "
+                "from that run implies it.", True)
+    if None in flags:
+        return ("Some runs did not record whether they filtered by "
+                "implication, so a repair may be implied by another from its "
+                "own run.", False)
+    return ("Some runs did not filter by implication, so a repair may be "
+            "implied by another from its own run.", False)
+
+
+def render_subject(subject: str, runs: list, out: Path, commit: str) -> tuple:
     repairs = collect(runs)
-    original = normalise_spec(
-        json.loads((EXAMPLES / subject / "spec.json").read_text()))
-    labels = label_requirements(subject, original)
-    arms = short_arms(sorted({m["arm"] for _, m in runs}))
+    context = subject_context(subject, commit)
+    original = normalise_spec(context["raw"])
+    labels = label_requirements(context)
+    arms = short_arms(sorted({m["arm"] for _, m, _ in runs}))
     if out.exists():
         shutil.rmtree(out)
     (out / "repairs").mkdir(parents=True)
-    shutil.copy(EXAMPLES / subject / "spec.json", out / "core.json")
-    (out / "core.md").write_text(render_core(subject, original, labels))
+    (out / "core.json").write_text(json.dumps(context["raw"], indent=2) + "\n")
+    (out / "core.md").write_text(
+        render_core(context, original, labels, commit))
+    note, maximal = maximality_note(runs)
 
     for repair in repairs:
         fitness = [f["fitness"] for f in repair["found_by"]
@@ -421,8 +521,7 @@ def render_subject(subject: str, runs: list, out: Path) -> tuple:
     n_found = len({f["run"] for r in repairs for f in r["found_by"]})
     md = [f"# {subject}: repairs", "",
           f"{len(repairs)} distinct repairs, found by {n_found} of "
-          f"{len(runs)} runs. Each is maximal within a run that found it. "
-          "Each is shown as its changes to `core.md`, closest to the "
+          f"{len(runs)} runs. {note} Each is shown as its changes to `core.md`, closest to the "
           "original first.", ""]
     if all(r["best_fitness"] is None for r in repairs):
         md[-2] += (" Every run was killed at its time limit before scoring "
@@ -460,7 +559,7 @@ def render_subject(subject: str, runs: list, out: Path) -> tuple:
             "seeds", "best_fitness", "changed", "removed", "added"])
         writer.writeheader()
         writer.writerows(csv_rows)
-    return subject, len(runs), n_found, len(repairs)
+    return subject, len(runs), n_found, len(repairs), maximal
 
 
 def bundle_readme(rows) -> str:
@@ -476,14 +575,18 @@ def bundle_readme(rows) -> str:
         "- `repairs.csv`: one row per repair.",
         "- `repairs/`: each repair as JSON, with the runs that found it.", "",
         "Each repair is maximal within its run: no other repair from that run "
-        "implies it. Runs are not filtered against each other.", "",
+        "implies it. Runs are not filtered against each other."
+        if all(row[4] for row in rows) else
+        "Not every run filtered its repairs by implication; each "
+        "`repairs.md` says which applies. Runs are not filtered against each "
+        "other.", "",
         "Requirements read `[scope] [upon|whenever condition] C shall timing "
         "satisfy response`. `upon` fires when the condition becomes true, "
         "`whenever` at every step it holds. `[locked]` requirements may not "
         "be weakened.", "",
         "| Specification | Runs with a repair | Repairs |",
         "|---|---:|---:|"]
-    for subject, n_runs, n_found, n_repairs in rows:
+    for subject, n_runs, n_found, n_repairs, _ in rows:
         lines.append(f"| {subject} | {n_found} of {n_runs} | {n_repairs} |")
     return "\n".join(lines) + "\n"
 
@@ -495,14 +598,18 @@ def main() -> None:
     parser.add_argument("results", type=Path)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--subjects", nargs="+")
+    parser.add_argument("--commit", help="read the original specifications "
+                        "at this commit rather than the one the runs "
+                        "recorded; needed when no run wrote run.json")
     args = parser.parse_args()
     subjects = args.subjects or list(CORES)
     runs = runs_by_subject(args.results, subjects)
+    commit = campaign_commit(runs, args.commit)
     args.out.mkdir(parents=True, exist_ok=True)
     rows = []
     for subject in subjects:
         rows.append(render_subject(subject, runs[subject],
-                                   args.out / subject))
+                                   args.out / subject, commit))
         print(f"{subject}: {rows[-1][3]} repairs from {rows[-1][1]} runs")
     (args.out / "README.md").write_text(bundle_readme(rows))
 
