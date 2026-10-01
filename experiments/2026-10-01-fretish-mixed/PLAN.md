@@ -1,6 +1,6 @@
 # fretish-mixed
 
-This plan is pre-registered. It fixes the question, design, corpus and cost before any row of the campaign exists; the endpoint is fixed before launch.
+This plan is pre-registered. It fixes the question, design, corpus, endpoints, tests and decision rule before any row of the campaign exists.
 
 ## Question
 
@@ -24,7 +24,15 @@ The campaign is 20 subjects × 1 arm × 30 seeds, or 600 runs.
 
 ## Endpoints and tests
 
-TODO: endpoint to be fixed before launch.
+The primary endpoint is each arm's *share* of a three-way joint frontier. For each (subject, seed), one `maximal` call runs over the union of the directed, uniform and mixed runs' `accumulated/maximal.tsv`, so censored runs count. The joint frontier is counted in classes of equivalent repairs, and an arm *holds* a class when one of its members is in it. An arm's share is the classes it holds over the joint total. `scripts/frontier_triple.py` in this directory computes it, generalising the ablation's `frontier_paired.py` from two arms to three, at a 1800 s cap per triple.
+
+The primary set is the 16 subjects the ablation's frontier pass placed. `liquid-mixer`, `lpc-mini-core1`, `lpc-full-core1` and `valu3s-uc6` are attempted at the same cap and reported descriptively. Triples whose joint frontier is empty, or whose `maximal` call hits the cap, are left out of the test and counted in the report.
+
+The test is two paired Wilcoxon signed-rank tests over the primary triples: mixed's share against directed's, and mixed's share against uniform's. Both are two-sided, Holm-corrected at family-wise alpha 0.05. Mixed wins if both corrected p-values fall below 0.05 and mixed's share is higher in both. Either arm wins over mixed if its test is significant in its favour. Any other outcome is null and is reported as null.
+
+Mixed runs at one arm's budget of 1000 individuals, and the union of the other two had 2000 between them. The test therefore asks whether mixed beats each single arm at equal cost, and does not ask it to match the union.
+
+The secondary endpoints are descriptive. They are the classes held by mixed alone, found at 10 s, 100 s and the cap against each arm under McNemar's exact test, and paired wall time against each arm by the Wilcoxon signed-rank test on pairs where both finished. `rad-core-10`, where directed found a repair on 9 of 30 seeds and uniform on 30, is reported on its own.
 
 ## Cost
 
