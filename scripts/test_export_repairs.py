@@ -94,6 +94,12 @@ def test_assumptions_carry_their_fret_ids():
     context["raw"] = {**context["raw"], "assumptions": [req()]}
     context["fret"]["assumptions"] = [{"reqids": ["A_1"]}]
     assert E.label_requirements(context)["assumptions"] == ["A1 (A_1)"]
+    context["fret"]["assumptions"] = [{"reqids": [], "note": "added"}]
+    assert E.label_requirements(context)["assumptions"] == ["A1"]
+    core = E.render_core(context, context["raw"],
+                         E.label_requirements(context), HEAD)
+    assert "- **A1** `C shall eventually satisfy r`\n  - Note: added" \
+        in core, core
 
 
 def write_run(root: Path, arm: str, seed: int, repairs, finished=True,

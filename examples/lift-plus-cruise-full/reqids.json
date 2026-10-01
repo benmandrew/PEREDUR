@@ -1,0 +1,724 @@
+[
+  {
+    "assumption": 0,
+    "reqids": [
+      "LPC_INIT_WIND_SPEED_assumption"
+    ],
+    "fulltext": {
+      "LPC_INIT_WIND_SPEED_assumption": "The vehicle shall immediately satisfy wind_speed = 10.0"
+    }
+  },
+  {
+    "assumption": 1,
+    "reqids": [
+      "LPC_WIND_SPEED_30_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_30_assumption": "The vehicle shall always satisfy -30.0 <= wind_speed & wind_speed <= 30.0"
+    }
+  },
+  {
+    "assumption": 2,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed >= -20 implies wind_speed >= -30 at the next tick"
+  },
+  {
+    "assumption": 3,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed >= -10 implies wind_speed >= -20 at the next tick"
+  },
+  {
+    "assumption": 4,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed >= 0 implies wind_speed >= -10 at the next tick"
+  },
+  {
+    "assumption": 5,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed >= 10 implies wind_speed >= 0 at the next tick"
+  },
+  {
+    "assumption": 6,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed >= 20 implies wind_speed >= 10 at the next tick"
+  },
+  {
+    "assumption": 7,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed >= 30 implies wind_speed >= 20 at the next tick"
+  },
+  {
+    "assumption": 8,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed >= 40 implies wind_speed >= 30 at the next tick"
+  },
+  {
+    "assumption": 9,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed < -30 implies wind_speed < -20 at the next tick"
+  },
+  {
+    "assumption": 10,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed < -20 implies wind_speed < -10 at the next tick"
+  },
+  {
+    "assumption": 11,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed < -10 implies wind_speed < 0 at the next tick"
+  },
+  {
+    "assumption": 12,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed < 0 implies wind_speed < 10 at the next tick"
+  },
+  {
+    "assumption": 13,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed < 10 implies wind_speed < 20 at the next tick"
+  },
+  {
+    "assumption": 14,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed < 20 implies wind_speed < 30 at the next tick"
+  },
+  {
+    "assumption": 15,
+    "reqids": [
+      "LPC_WIND_SPEED_DERIV_assumption"
+    ],
+    "fulltext": {
+      "LPC_WIND_SPEED_DERIV_assumption": "The vehicle shall always satisfy FTP | absReal(preReal(0.0,wind_speed) - wind_speed) <= 10.0"
+    },
+    "note": "WIND_SPEED_DERIV split per level: wind_speed < 30 implies wind_speed < 40 at the next tick"
+  },
+  {
+    "assumption": 16,
+    "reqids": [],
+    "fulltext": {},
+    "note": "wind threshold encoding: monotonicity of the wind_ge_N atoms; no FRET source"
+  },
+  {
+    "guarantee": 0,
+    "reqids": [
+      "LPC_CR_STAY_OFF"
+    ],
+    "fulltext": {
+      "LPC_CR_STAY_OFF": "The vehicle shall always satisfy if preBool(false, !cr & kias >= 90.0) then !cr"
+    }
+  },
+  {
+    "guarantee": 1,
+    "reqids": [
+      "LPC_CR_STAY_ON"
+    ],
+    "fulltext": {
+      "LPC_CR_STAY_ON": "The vehicle shall always satisfy if preBool(false, cr & kias <= 100.0) then cr"
+    }
+  },
+  {
+    "guarantee": 2,
+    "reqids": [
+      "LPC_CR_TURN_OFF"
+    ],
+    "fulltext": {
+      "LPC_CR_TURN_OFF": "Upon cr & kias > 100.0 the vehicle shall at the next timepoint satisfy !cr"
+    }
+  },
+  {
+    "guarantee": 3,
+    "reqids": [
+      "LPC_CR_TURN_ON"
+    ],
+    "fulltext": {
+      "LPC_CR_TURN_ON": "Upon !cr & kias < 90.0 the vehicle shall at the next timepoint satisfy cr"
+    }
+  },
+  {
+    "guarantee": 4,
+    "reqids": [
+      "LPC_DR_STAY_OFF"
+    ],
+    "fulltext": {
+      "LPC_DR_STAY_OFF": "The vehicle shall always satisfy if preBool(false, !dr & kias >= 60.0) then !dr"
+    }
+  },
+  {
+    "guarantee": 5,
+    "reqids": [
+      "LPC_DR_STAY_ON"
+    ],
+    "fulltext": {
+      "LPC_DR_STAY_ON": "The vehicle shall always satisfy if preBool(false, dr & kias <= 70.0) then dr"
+    }
+  },
+  {
+    "guarantee": 6,
+    "reqids": [
+      "LPC_DR_TURN_OFF"
+    ],
+    "fulltext": {
+      "LPC_DR_TURN_OFF": "Upon dr & kias > 70.0 the vehicle shall at the next timepoint satisfy !dr"
+    }
+  },
+  {
+    "guarantee": 7,
+    "reqids": [
+      "LPC_DR_TURN_ON"
+    ],
+    "fulltext": {
+      "LPC_DR_TURN_ON": "Upon !dr & kias < 60.0 the vehicle shall at the next timepoint satisfy dr"
+    }
+  },
+  {
+    "guarantee": 8,
+    "reqids": [
+      "LPC_FCS_STAY_OFF"
+    ],
+    "fulltext": {
+      "LPC_FCS_STAY_OFF": "The vehicle shall always satisfy if preBool(false, !fcs & kias <= 40.0) then !fcs"
+    }
+  },
+  {
+    "guarantee": 9,
+    "reqids": [
+      "LPC_FCS_STAY_ON"
+    ],
+    "fulltext": {
+      "LPC_FCS_STAY_ON": "The vehicle shall always satisfy if preBool(false, fcs & kias >= 30.0) then fcs"
+    }
+  },
+  {
+    "guarantee": 10,
+    "reqids": [
+      "LPC_FCS_TURN_OFF"
+    ],
+    "fulltext": {
+      "LPC_FCS_TURN_OFF": "Upon fcs & kias < 30.0 the vehicle shall at the next timepoint satisfy !fcs"
+    }
+  },
+  {
+    "guarantee": 11,
+    "reqids": [
+      "LPC_FCS_TURN_ON"
+    ],
+    "fulltext": {
+      "LPC_FCS_TURN_ON": "Upon !fcs & kias > 40.0 the vehicle shall at the next timepoint satisfy fcs"
+    }
+  },
+  {
+    "guarantee": 12,
+    "reqids": [
+      "LPC_INIT_CR"
+    ],
+    "fulltext": {
+      "LPC_INIT_CR": "The vehicle shall immediately satisfy cr <=> (kias < 90.0)"
+    }
+  },
+  {
+    "guarantee": 13,
+    "reqids": [
+      "LPC_INIT_DR"
+    ],
+    "fulltext": {
+      "LPC_INIT_DR": "The vehicle shall immediately satisfy dr <=> (kias < 60.0)"
+    }
+  },
+  {
+    "guarantee": 14,
+    "reqids": [
+      "LPC_INIT_FCS"
+    ],
+    "fulltext": {
+      "LPC_INIT_FCS": "The vehicle shall immediately satisfy fcs <=> (kias > 40.0)"
+    }
+  },
+  {
+    "guarantee": 15,
+    "reqids": [
+      "LPC_INIT_HOVER_MODE"
+    ],
+    "fulltext": {
+      "LPC_INIT_HOVER_MODE": "The vehicle shall immediately satisfy hover_control_mode <=> kgs < 20.0"
+    }
+  },
+  {
+    "guarantee": 16,
+    "reqids": [
+      "LPC_INIT_KIAS"
+    ],
+    "fulltext": {
+      "LPC_INIT_KIAS": "The vehicle shall immediately satisfy kias = 120.0"
+    }
+  },
+  {
+    "guarantee": 17,
+    "reqids": [
+      "LPC_INIT_LIFT_MODE"
+    ],
+    "fulltext": {
+      "LPC_INIT_LIFT_MODE": "The vehicle shall immediately satisfy lift_mode = wing_borne <=> kias >= 90.0"
+    }
+  },
+  {
+    "guarantee": 18,
+    "reqids": [
+      "LPC_KIAS_0"
+    ],
+    "fulltext": {
+      "LPC_KIAS_0": "The vehicle shall always satisfy kias >= 0.0"
+    }
+  },
+  {
+    "guarantee": 19,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 10 implies kias >= 0 at the next tick"
+  },
+  {
+    "guarantee": 20,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 20 implies kias >= 10 at the next tick"
+  },
+  {
+    "guarantee": 21,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 30 implies kias >= 20 at the next tick"
+  },
+  {
+    "guarantee": 22,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 40 implies kias >= 30 at the next tick"
+  },
+  {
+    "guarantee": 23,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 50 implies kias >= 40 at the next tick"
+  },
+  {
+    "guarantee": 24,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 60 implies kias >= 50 at the next tick"
+  },
+  {
+    "guarantee": 25,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 70 implies kias >= 60 at the next tick"
+  },
+  {
+    "guarantee": 26,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 80 implies kias >= 70 at the next tick"
+  },
+  {
+    "guarantee": 27,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 90 implies kias >= 80 at the next tick"
+  },
+  {
+    "guarantee": 28,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 100 implies kias >= 90 at the next tick"
+  },
+  {
+    "guarantee": 29,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 110 implies kias >= 100 at the next tick"
+  },
+  {
+    "guarantee": 30,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias >= 120 implies kias >= 110 at the next tick"
+  },
+  {
+    "guarantee": 31,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 0 implies kias < 10 at the next tick"
+  },
+  {
+    "guarantee": 32,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 10 implies kias < 20 at the next tick"
+  },
+  {
+    "guarantee": 33,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 20 implies kias < 30 at the next tick"
+  },
+  {
+    "guarantee": 34,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 30 implies kias < 40 at the next tick"
+  },
+  {
+    "guarantee": 35,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 40 implies kias < 50 at the next tick"
+  },
+  {
+    "guarantee": 36,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 50 implies kias < 60 at the next tick"
+  },
+  {
+    "guarantee": 37,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 60 implies kias < 70 at the next tick"
+  },
+  {
+    "guarantee": 38,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 70 implies kias < 80 at the next tick"
+  },
+  {
+    "guarantee": 39,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 80 implies kias < 90 at the next tick"
+  },
+  {
+    "guarantee": 40,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 90 implies kias < 100 at the next tick"
+  },
+  {
+    "guarantee": 41,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 100 implies kias < 110 at the next tick"
+  },
+  {
+    "guarantee": 42,
+    "reqids": [
+      "LPC_KIAS_DERIVATIVE"
+    ],
+    "fulltext": {
+      "LPC_KIAS_DERIVATIVE": "The vehicle shall always satisfy FTP | absReal(preReal(0.0, kias) - kias) <= 10.0"
+    },
+    "note": "KIAS_DERIVATIVE split per level: kias < 110 implies kias < 120 at the next tick"
+  },
+  {
+    "guarantee": 43,
+    "reqids": [
+      "LPC_KIAS_KGS_WIND_SPEED"
+    ],
+    "fulltext": {
+      "LPC_KIAS_KGS_WIND_SPEED": "The vehicle shall always satisfy kgs = kias + wind_speed"
+    },
+    "note": "kgs = kias + wind_speed encoded as outputs kgs_ge_20 and kgs_ge_30, each a disjunction over wind levels"
+  },
+  {
+    "guarantee": 44,
+    "reqids": [
+      "LPC_LIFT_MODE"
+    ],
+    "fulltext": {
+      "LPC_LIFT_MODE": "The vehicle shall always satisfy lift_mode = thrust_borne | lift_mode = semi_thrust_borne | lift_mode = semi_wing_borne | lift_mode = wing_borne"
+    }
+  },
+  {
+    "guarantee": 45,
+    "reqids": [
+      "LPC_REACH_HOVER_16"
+    ],
+    "fulltext": {
+      "LPC_REACH_HOVER_16": "The vehicle shall within 16 ticks satisfy lift_mode = thrust_borne"
+    }
+  },
+  {
+    "guarantee": 46,
+    "reqids": [
+      "LPC_REARPROP"
+    ],
+    "fulltext": {
+      "LPC_REARPROP": "The vehicle shall always satisfy rearprop xor hover_control_mode"
+    }
+  },
+  {
+    "guarantee": 47,
+    "reqids": [
+      "LPC_STB_STAY_ON_NEXT",
+      "LPC_STB_STAY_ON_pre"
+    ],
+    "fulltext": {
+      "LPC_STB_STAY_ON_NEXT": "Whenever lift_mode = semi_thrust_borne & kias <= 40.0 & (kgs > 20.0 | !hover_control_mode) the vehicle shall at the next timepoint satisfy lift_mode = semi_thrust_borne",
+      "LPC_STB_STAY_ON_pre": "The vehicle shall always satisfy if preBool(false, lift_mode = semi_thrust_borne & kias <= 40.0 & (kgs > 20.0 | !hover_control_mode)) then lift_mode = semi_thrust_borne"
+    }
+  },
+  {
+    "guarantee": 48,
+    "reqids": [
+      "LPC_STB_TO_SWB"
+    ],
+    "fulltext": {
+      "LPC_STB_TO_SWB": "Upon lift_mode = semi_thrust_borne & kias > 40.0 the vehicle shall at the next timepoint satisfy lift_mode = semi_wing_borne"
+    }
+  },
+  {
+    "guarantee": 49,
+    "reqids": [
+      "LPC_STB_TO_TB"
+    ],
+    "fulltext": {
+      "LPC_STB_TO_TB": "Upon lift_mode = semi_thrust_borne & hover_control_mode & kgs <= 20.0 the vehicle shall at the next timepoint satisfy lift_mode = thrust_borne"
+    }
+  },
+  {
+    "guarantee": 50,
+    "reqids": [
+      "LPC_SWB_STAY_ON_NEXT",
+      "LPC_SWB_STAY_ON_pre"
+    ],
+    "fulltext": {
+      "LPC_SWB_STAY_ON_NEXT": "Whenever lift_mode = semi_wing_borne & kias <= 100.0 & kias > 30.0 the vehicle shall at the next timepoint satisfy lift_mode = semi_wing_borne",
+      "LPC_SWB_STAY_ON_pre": "The vehicle shall always satisfy if preBool(false, lift_mode = semi_wing_borne & kias <= 100.0 & kias > 30.0) then lift_mode = semi_wing_borne"
+    }
+  },
+  {
+    "guarantee": 51,
+    "reqids": [
+      "LPC_SWB_TO_STB"
+    ],
+    "fulltext": {
+      "LPC_SWB_TO_STB": "Upon lift_mode = semi_wing_borne & kias <= 30.0 the vehicle shall at  the next timepoint satisfy lift_mode = semi_thrust_borne"
+    }
+  },
+  {
+    "guarantee": 52,
+    "reqids": [
+      "LPC_SWB_TO_WB"
+    ],
+    "fulltext": {
+      "LPC_SWB_TO_WB": "Upon lift_mode = semi_wing_borne & kias > 100.0 the vehicle shall at the next timepoint satisfy lift_mode = wing_borne"
+    }
+  },
+  {
+    "guarantee": 53,
+    "reqids": [
+      "LPC_TB_STAY_ON_NEXT",
+      "LPC_TB_STAY_ON_pre"
+    ],
+    "fulltext": {
+      "LPC_TB_STAY_ON_NEXT": "Whenever lift_mode = thrust_borne & kgs <= 20.0 & hover_control_mode the vehicle shall at the next timepoint satisfy lift_mode = thrust_borne",
+      "LPC_TB_STAY_ON_pre": "The vehicle shall always satisfy if preBool(false, lift_mode = thrust_borne & kgs <= 20.0 & hover_control_mode) then lift_mode = thrust_borne"
+    }
+  },
+  {
+    "guarantee": 54,
+    "reqids": [
+      "LPC_TB_TO_STB"
+    ],
+    "fulltext": {
+      "LPC_TB_TO_STB": "Upon lift_mode = thrust_borne & (!hover_control_mode |  kgs > 20.0) the vehicle shall at the next timepoint satisfy lift_mode = semi_thrust_borne"
+    }
+  },
+  {
+    "guarantee": 55,
+    "reqids": [
+      "LPC_WB_STAY_ON_NEXT",
+      "LPC_WB_STAY_ON_pre"
+    ],
+    "fulltext": {
+      "LPC_WB_STAY_ON_NEXT": "Whenever  lift_mode = wing_borne & kias > 90.0 the vehicle shall at the next timepoint satisfy lift_mode = wing_borne",
+      "LPC_WB_STAY_ON_pre": "The vehicle shall always satisfy if preBool(false, lift_mode = wing_borne & kias > 90.0) then lift_mode = wing_borne"
+    }
+  },
+  {
+    "guarantee": 56,
+    "reqids": [
+      "LPC_WB_TO_SWB"
+    ],
+    "fulltext": {
+      "LPC_WB_TO_SWB": "Upon  lift_mode = wing_borne & kias <= 90.0 the vehicle shall at the next timepoint satisfy lift_mode = semi_wing_borne"
+    }
+  },
+  {
+    "guarantee": 57,
+    "reqids": [],
+    "fulltext": {},
+    "note": "lift_mode one-hot encoding: mutual exclusion of the lm_* atoms; no FRET source"
+  },
+  {
+    "guarantee": 58,
+    "reqids": [],
+    "fulltext": {},
+    "note": "kias threshold encoding: monotonicity of the kias_ge_N atoms; no FRET source"
+  }
+]

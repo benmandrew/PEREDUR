@@ -416,7 +416,8 @@ def render_core(context: dict, spec: dict, labels: dict,
     sources = context["fret"]
     if any(sources["guarantees"]) or any(sources["assumptions"]):
         lines += ["Under each requirement is the FRET sentence it came "
-                  "from. Where the two differ, the import changed it; "
+                  "from, and a note where the transcription departs from it "
+                  "or added the requirement itself. Where the two differ, "
                   "`examples/<parent>`'s git history says how.", ""]
     for part in ("assumptions", "guarantees"):
         if not spec[part]:
@@ -427,6 +428,8 @@ def render_core(context: dict, spec: dict, labels: dict,
             lines.append(f"- **{label}** `{requirement_text(req)}`")
             for reqid, text in source.get("fulltext", {}).items():
                 lines.append(f"  - FRET {reqid}: {text}")
+            if source.get("note"):
+                lines.append(f"  - Note: {source['note']}")
         lines.append("")
     if spec.get("modes"):
         lines += ["## Modes", "", ", ".join(f"`{m}`" for m in spec["modes"]),
