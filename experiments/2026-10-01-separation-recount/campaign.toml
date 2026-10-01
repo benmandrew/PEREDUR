@@ -1,0 +1,114 @@
+# A recount of the paper's maximal-set separation figures under a longer,
+# denser word sampling and the union distance.
+#
+# No search and no implication sweep run here. experiments/separation-maximal
+# recorded each run's maximal antichain at every cut in
+# <run>.members.tsv sidecars, on the host that scored it; members_from reads
+# those, and each phase fingerprints the candidates afresh. The antichains
+# are the ones the solver already decided, so this pass inherits that pass's
+# budgets, including its compare-timeout asymmetry between the arms.
+#
+# Sampling. The archived counts used stems of at most 2 and loops of at most 3
+# (five positions) at 256 words under `hamming`, which divides a pair's
+# disagreement by every sampled word. This uses stems and loops of at most 8,
+# twice the deepest nested-X chain in the corpus specifications (4, in
+# full-arbiter and prioritized-arbiter), and `union`, which divides by the
+# words either candidate satisfies. On 8 archived runs at the 75th size
+# percentile of their family, 8/8 left no candidate with an empty fingerprint
+# from 4096 words up, and its maximal nets moved by at most 1 between 16384
+# and 65536 words; 32/32 still left 69 of humanoid-458's candidates empty at
+# 16384. Each length is its own measure rather than a closer estimate of one,
+# so 8/8 is a stated choice and the paper says so.
+#
+# Cost. A full recount at 8/8 and 65536 words took a mean of 18.7 s a run on
+# the local box over that sample, fingerprinting rather than the nets
+# dominating. 3528 runs (2932 counter, 596 AuRUS; 833k candidates, at most 741
+# in one run) make about 18 core-hours a seed, so the four phases are about
+# 37 core-hours, or 35 minutes of wall over 64 cores before any host
+# slowdown. The budget is three hours across both hosts.
+#
+# The seed-1 phases measure sampling noise: the same recount on an
+# independent draw of words.
+name = "2026-10-01-separation-recount"
+branch = "campaign/separation-recount"
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+[[phases]]
+name = "counter-s0"
+kind = "score"
+results = "experiments/results-rematch"
+out = "experiments/separation-recount-rematch-s0"
+members_from = "experiments/separation-maximal-rematch"
+workers = 32
+cores = 1
+maximality = "off"
+ideals = "off"
+epsilon = "0.05,0.2,0.5"
+fingerprint_words = 65536
+fingerprint_seed = 0
+fingerprint_max_prefix = 8
+fingerprint_max_cycle = 8
+fingerprint_distance = "union"
+cuts = 20
+deadline_s = 900
+wall_cap_s = 1200
+
+[[phases]]
+name = "aurus-s0"
+kind = "score"
+results = "experiments/results-aurus-curves"
+out = "experiments/separation-recount-aurus-s0"
+members_from = "experiments/separation-maximal-aurus"
+workers = 32
+cores = 1
+maximality = "off"
+ideals = "off"
+epsilon = "0.05,0.2,0.5"
+fingerprint_words = 65536
+fingerprint_seed = 0
+fingerprint_max_prefix = 8
+fingerprint_max_cycle = 8
+fingerprint_distance = "union"
+cuts = 20
+deadline_s = 900
+wall_cap_s = 1200
+
+[[phases]]
+name = "counter-s1"
+kind = "score"
+results = "experiments/results-rematch"
+out = "experiments/separation-recount-rematch-s1"
+members_from = "experiments/separation-maximal-rematch"
+workers = 32
+cores = 1
+maximality = "off"
+ideals = "off"
+epsilon = "0.05,0.2,0.5"
+fingerprint_words = 65536
+fingerprint_seed = 1
+fingerprint_max_prefix = 8
+fingerprint_max_cycle = 8
+fingerprint_distance = "union"
+cuts = 20
+deadline_s = 900
+wall_cap_s = 1200
+
+[[phases]]
+name = "aurus-s1"
+kind = "score"
+results = "experiments/results-aurus-curves"
+out = "experiments/separation-recount-aurus-s1"
+members_from = "experiments/separation-maximal-aurus"
+workers = 32
+cores = 1
+maximality = "off"
+ideals = "off"
+epsilon = "0.05,0.2,0.5"
+fingerprint_words = 65536
+fingerprint_seed = 1
+fingerprint_max_prefix = 8
+fingerprint_max_cycle = 8
+fingerprint_distance = "union"
+cuts = 20
+deadline_s = 900
+wall_cap_s = 1200
