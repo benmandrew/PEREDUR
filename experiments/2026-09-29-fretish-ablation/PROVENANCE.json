@@ -1,0 +1,198 @@
+{
+  "campaign": "2026-09-29-fretish-ablation",
+  "attribution": "recorded",
+  "generated_on": "2026-10-01",
+  "status": "closed",
+  "kind": "pre-registered ablation (FRETISH), two arms of one binary, with a score phase",
+  "kind_note": "Sweep O, ordered_fields = directed against uniform, over 20 FRETISH subjects at 30 seeds. The curve phase was declared in campaign.toml as phase 2. On av2 it was split off into the companion declaration 2026-09-29-fretish-ablation-score, which this archive folds in as campaign-score.toml; see score_campaign_folded.",
+  "question": "On FRETISH, does directed mutation of the three ordered requirement fields (timing, condition type, scope) find repairs more often or sooner than a uniform redraw of the same fields? (PLAN.md, Question.)",
+  "endpoint": "Primary: found at the cap, anytime, McNemar exact two-sided at alpha 0.05 over the 600 (subject, seed) pairs. Secondary: found at 10 s and at 100 s under the same test; paired wall time by the Wilcoxon signed-rank test on pairs where both arms finished. implies_ideal descriptive on 6 subjects. (PLAN.md, Endpoints and tests.)",
+  "decision_rule": "Directed wins if McNemar's p < 0.05 and more discordant pairs favour directed. Uniform wins under the symmetric condition. Any other outcome is null. (PLAN.md.)",
+  "decision_rule_firing": "Uniform wins. At the cap the directed arm holds a repair on 550 of 600 runs and the uniform arm on 570; 1 discordant pair favours directed and 21 favour uniform, exact McNemar p = 1.1e-05. 21 of the 22 discordant pairs are rad-core-10 (directed 9 of 30, uniform 30 of 30) and the other is fsm-lmcps (directed 1 of 30, uniform 0 of 30). The other 18 subjects tie at 30 of 30 on both arms.",
+  "arms": {
+    "directed": "[mutation] ordered_fields = \"directed\", the shipping default",
+    "uniform": "[mutation] ordered_fields = \"uniform\"",
+    "shared": "selection nsga2-apportion, status grading mrs, weights 0.1/0.2/0.7, log metric, weakening off, termination individuals at 1000, population 100, generations 500 (ceiling), parallel 1, gen_configs.py --pin-vintage, 7200 s runner cap, no max_wall_s"
+  },
+  "corpus": "20 subjects: 8 whole specs (takeoff, fsm, fsm-timing, fsm-combined, fsm-lmcps, liquid-mixer, mode-arbiter, valu3s-uc6) and 12 unrealisable cores (rad-core-1-18, -10, -12-18, -17-18, -33, -45, -55, -61, -65, -68; lpc-mini-core1; lpc-full-core1). 20 x 2 arms x 30 seeds = 1200 runs.",
+  "profile_commit": {
+    "sha": "dc3e2762bc8ab1e4ede0822130df263b21ddb3d4",
+    "short": "dc3e276",
+    "branch": "campaign/fretish-ablation",
+    "subject": "feat(experiments): add sweep O, directed against uniform ordered fields",
+    "reachable_from_main": "no; the branch is pushed",
+    "held_by_tag": "provenance/fretish-ablation",
+    "held_by_tag_note": "Annotated tag, object b2598ae, pointing at dc3e276 and present on origin (checked with git ls-remote on 2026-10-01). It holds the search commit only. The scoring commit f3cd190 and the paired-pass commit 78cae62 are held by the pushed branch alone."
+  },
+  "binary_commit": {
+    "sha": "dc3e2762bc8ab1e4ede0822130df263b21ddb3d4",
+    "dirty": "0 on all 1200 rows",
+    "source": "the commit and dirty columns of results-fretish-ablation.csv, and the binaries block of results-fretish-ablation-manifest-avlab12.json and -av3.json (peredur and compare both dc3e276, dirty 0)",
+    "describe": "provenance/aurus-rematch-126-gdc3e276 on both hosts' run manifests"
+  },
+  "hosts": {
+    "av2": {
+      "machine": "avlab12",
+      "seeds": "0-14",
+      "rows": 600,
+      "search_started": "2026-09-30T08:42:22+0100",
+      "search_finished": "2026-09-30T16:30:31",
+      "search_wall_min": 468.2,
+      "run_wall_h_sum": 107.35,
+      "queue_entry": "036-2026-09-29-fretish-ablation, state cancelled after phase 0 finished, with last_error \"curve pass split across hosts: 2026-09-29-fretish-ablation-score\""
+    },
+    "av3": {
+      "machine": "av3",
+      "seeds": "15-29",
+      "rows": 600,
+      "search_started": "2026-09-29T21:41:43+0100",
+      "search_finished": "2026-09-30T05:21:25",
+      "search_wall_min": 459.7,
+      "run_wall_h_sum": 105.12,
+      "queue_entry": "035-2026-09-29-fretish-ablation, state done after both phases"
+    },
+    "note": "Start stamps come from the run manifests, finish stamps and wall minutes from the queue entries' logs. av3's clock runs about 17 minutes fast with NTP off. Both arms of every (subject, seed) pair ran on the same host in the same launch."
+  },
+  "rows": {
+    "merged_total": 1200,
+    "planned_total": 1200,
+    "per_host": {"av2": 600, "av3": 600},
+    "runs_per_arm": {"directed": 600, "uniform": 600},
+    "duplicates": 0,
+    "collected_with": "campaign.py collect --profile fretish-ablation on 2026-10-01 (dry run 600 + 600, then 1200 merged, 1200 distinct keys, OK: every source row is present exactly once), and campaign.py collect --curves curves-fretish-ablation (av2 280, av3 920, 1200 curves, 187,340 rows, OK: every curve is present exactly once). Neither printed MISMATCH or INCOMPLETE."
+  },
+  "verification": {
+    "stopped_by": "individuals on all 1140 run.json manifests; the 60 lpc-full-core1 runs killed at the 7200 s cap wrote none",
+    "individuals_bred": "exactly 1000 on all 1140 manifests",
+    "killed_at_cap": "60 of 1200, all lpc-full-core1, 30 per arm",
+    "compare_timed_out": "0 rows",
+    "curve_coverage": "1200 of 1200 runs have a curve"
+  },
+  "cost": {
+    "search_run_wall_h_sum": 212.47,
+    "plan_estimate_core_h": "98-177",
+    "note": "parallel = 1 throughout, so the sum of run wall times is the search's core-hours to a close approximation. It sits 20% above the top of the PLAN.md estimate. lpc-full-core1 alone is 120 h of it, its 60 runs all killed at 7200 s, where calibration had put that subject at 2500 s to the cap."
+  },
+  "registered_primary": {
+    "endpoint": "found at the cap (7200 s), anytime, from the curves' time_to_first_repair",
+    "pairs": 600,
+    "found": {"directed": 550, "uniform": 570},
+    "discordant": {"directed_only": 1, "uniform_only": 21},
+    "by_subject": {"rad-core-10": {"directed": 9, "uniform": 30, "uniform_only": 21}, "fsm-lmcps": {"directed": 1, "uniform": 0, "directed_only": 1}},
+    "mcnemar_exact_two_sided_p": 1.1e-05,
+    "decision": "uniform wins"
+  },
+  "secondaries": {
+    "found_at_10s": {"found": {"directed": 516, "uniform": 527}, "directed_only": 11, "uniform_only": 22, "mcnemar_exact_p": 0.0801, "by_subject": "directed-only: fsm-combined 3, liquid-mixer 5, valu3s-uc6 3; uniform-only: rad-core-10 21, fsm-combined 1"},
+    "found_at_100s": {"found": {"directed": 536, "uniform": 556}, "directed_only": 5, "uniform_only": 25, "mcnemar_exact_p": 0.000325, "by_subject": "directed-only: fsm-lmcps 1, lpc-full-core1 4; uniform-only: rad-core-10 21, lpc-full-core1 4"},
+    "paired_wall_time": {"pairs_both_finished": 570, "directed_faster": 377, "uniform_faster": 193, "ties": 0, "median_difference_directed_minus_uniform_s": -2.51, "w_plus_uniform_faster": 64516.5, "w_minus_directed_faster": 98218.5, "z": 4.284, "p": 1.84e-05, "method": "Wilcoxon signed-rank, normal approximation with tie and continuity corrections, as the paper's tables.py computes it above 300 pairs"},
+    "wall_per_arm_all_runs": {"directed": {"median_s": 40.08, "mean_s": 628.6}, "uniform": {"median_s": 38.85, "mean_s": 646.3}},
+    "note": "The secondaries carry no decision. rad-core-10's directed runs finish faster on 30 of 30 pairs, mostly by ending without a repair, so part of the wall-time difference is the primary's failure seen from the other side."
+  },
+  "implies_ideal_descriptive": {
+    "subjects": {"takeoff": [30, 30], "fsm": [25, 29], "fsm-timing": [30, 27], "fsm-combined": [5, 1], "fsm-lmcps": [0, 0], "liquid-mixer": [1, 1]},
+    "order": "[directed, uniform] of 30",
+    "total": {"directed": 91, "uniform": 88, "of": 180}
+  },
+  "repairs_descriptive": {
+    "n_repairs_mean": {"directed": 64.59, "uniform": 62.86},
+    "maximal_solutions_last_cut_mean": {"directed": 55.66, "uniform": 53.76},
+    "solutions_last_cut_mean": {"directed": 127.4, "uniform": 122.7},
+    "note": "maximal_solutions is a lower bound on the 147 partial curves (maximality_pass.partial_curves)."
+  },
+  "score_campaign_folded": {
+    "name": "2026-09-29-fretish-ablation-score",
+    "now_at": "campaign-score.toml in this directory",
+    "why": "It is this campaign's own curve phase with the same budgets, the same results directory and the same out directory, split across hosts because av3 finished its half about 9 h ahead of av2. Its curves are disjoint by seed from the parent's and join into one CSV, and the primary endpoint reads all 1200 of them, so a separate archive would split one endpoint across two folders. The declaration is kept verbatim so the seed split stays reproducible."
+  },
+  "maximality_pass": {
+    "source": "score-manifest-avlab12.json and score-manifest-av3.json under experiments/curves-fretish-ablation/<host>/, copied verbatim into score-manifests/ here; failures.txt and timings.txt beside them",
+    "invocation": "python3 scripts/score_curves.py --maximality --cuts 20 --jobs 4 --deadline-s 7500 --maximal-timeout 900 --compare-timeout 3000 --out <out>/<run>.csv.part <run-dir>",
+    "budgets": {"cuts": 20, "maximal_timeout_s": 900, "compare_timeout_s": 3000, "deadline_s": 7500, "wall_cap_s": 8400, "workers": 8, "cores": 4, "pinned": true},
+    "passes": {
+      "av2 (avlab12), 2026-09-29-fretish-ablation-score": {"seeds": "0-6", "started": "2026-09-30T16:35:04+0100", "finished": "2026-09-30T21:44:13+0100", "binaries": {"maximal": "f3cd190 dirty 0", "compare": "f3cd190 dirty 0"}, "counts": {"queued": 280, "already_scored": 0, "scored": 280, "failed": 0}},
+      "av3, 2026-09-29-fretish-ablation-score": {"seeds": "7-14", "started": "2026-09-30T16:35:03+0100", "finished": "2026-09-30T22:11:47+0100", "binaries": {"maximal": "f3cd190 dirty 0", "compare": "f3cd190 dirty 0"}, "counts": {"queued": 320, "already_scored": 0, "scored": 320, "failed": 0}}
+    },
+    "failed": "failures.txt is empty on both hosts",
+    "partial_curves": {"av2 seeds 0-6": 30, "av3 seeds 7-14": 39, "av3 seeds 15-29": 78, "total": 147, "read_from": "warnings.log, runs carrying at least one 'maximal exceeded 900s ... this cut is skipped' line"},
+    "worker_h_from_timings": {"av2 seeds 0-6": 37.04, "av3 seeds 7-14": 41.74, "av3 seeds 15-29": 79.26, "total": 158.05},
+    "scoring_source_identity": "f3cd190 differs from dc3e276 only in experiments/2026-09-29-fretish-ablation-score/campaign.toml, so all three passes compiled maximal and compare from one source tree."
+  },
+  "not_recorded": {
+    "av3 seeds 15-29 score manifest": "The parent campaign's curve phase on av3 (seeds 15-29) wrote score-manifest-av3.json, and the companion pass for seeds 7-14 overwrote it at 2026-09-30T16:35 because score_campaign.py names the manifest by hostname alone and both passes shared one out directory. The maximality_pass block above therefore lists two passes. The av3 queue log 035-2026-09-29-fretish-ablation.log is the surviving record of the third: phase 1 (curve) started 2026-09-30T05:25:01 and finished 15:51:16, 600 queued, 600 scored, 0 failed, binaries maximal dc3e276 and compare dc3e276, the same budgets and command template. Its timings.txt lines (600) and curves survived, since both files append.",
+    "av2 run directories copied to av3": "The copy of av2's seed 7-14 run directories into av3's results-fretish-ablation before the companion pass was made by hand; no record of the command or a checksum survives. The curves for seeds 7-14 were scored from those copies."
+  },
+  "paired_frontier_pass": {
+    "status": "post hoc, not pre-registered, incomplete: 480 of 600 pairs placed",
+    "purpose": "Feeds overlap.csv in the paper's data/fretish-ablation-2026-09/ through prepare.py --paired. For each (subject, seed), one maximal call over the union of the two runs' accumulated/maximal.tsv frontiers gives the joint frontier and the directed-only, uniform-only and shared classes.",
+    "drivers": "scripts/frontier_paired.py, frontier_sample_paired.py and frontier_go.sh (host driver), and frontier_paired_local.sh (local driver), renamed from paired.py, sample_paired.py, go.sh and paired.sh. Never committed to scripts/ on any branch.",
+    "where_it_ran": {
+      "local": "seeds 15-29, 16 subjects, maximal at dc3e276, CAP 1800 s, killed with rc 143 at 2026-09-30T18:44:56 after 8 lpc-full-core1 pairs all hit the 1800 s cap: 225 ok, 15 empty, 8 cap",
+      "av2": "seeds 0-6, the 16 subjects other than liquid-mixer, lpc-mini-core1, lpc-full-core1 and valu3s-uc6, maximal at 78cae62, finished 2026-09-30 23:00: 106 ok, 6 empty",
+      "av3": "seeds 7-14, the same 16 subjects, maximal at 78cae62, finished 2026-09-30 23:24 (av3 clock): 120 ok, 8 empty"
+    },
+    "placed": {"pairs": 480, "ok": 451, "empty": 29, "subjects": 16},
+    "unplaced": "liquid-mixer, lpc-mini-core1, lpc-full-core1 and valu3s-uc6, 120 pairs. lpc-full-core1 capped at 1800 s on 8 of 8 attempted pairs.",
+    "sampled": "sample_paired.py drew 200 frontier members each for liquid-mixer (av2) and lpc-mini-core1 (av3) and placed each against the other arm's frontier with compare at a 120 s per-query budget. The paper's prepare.py does not read these.",
+    "maximal_source_identity": "78cae62 changes src/compare.cpp only, so maximal compiled from the same source at dc3e276 and 78cae62.",
+    "outputs": "experiments/frontier-fretish-ablation/ (untracked): local.csv, av2.csv, av3.csv, merged.csv, sample-av2/, sample-av3/, driver copies and the four queue entries with their logs"
+  },
+  "paper": {
+    "repo": "~/projects/writing/counter-paper, data/fretish-ablation-2026-09/",
+    "interim_commit": "8deef6e, built on 336 of 600 scored pairs and 240 placed",
+    "regenerated_on": "2026-10-01, uncommitted, from this archive's per-host results CSVs, both hosts' curve directories and merged.csv; prepare.py wrote 1200 runs, 1200 scored and 480 overlap pairs. tables.py without --interim refuses on the 120 unplaced pairs, so the numbers were written with --interim: every found and outlier number is final, and the frontier numbers still print \\tbd."
+  },
+  "deviations": [
+    "The curve phase for av2's seeds was split off into a second declaration and run across both hosts (f3cd190), after av3 finished its half about 9 h ahead. The budgets and command were unchanged.",
+    "The av3 score manifest of the parent's curve phase was overwritten; see not_recorded."
+  ],
+  "caveats": [
+    "One subject carries the primary. rad-core-10 supplies 21 of the 22 discordant pairs at the cap, and without it the arms differ by one run in 570 pairs. The decision is the registered reading, and it describes a corpus-level effect concentrated on one core.",
+    "rad-core-10's directed arm found a repair on 2 of 15 seeds on av2 and 7 of 15 on av3; both arms of each pair ran on the same host, so the host difference does not bias the paired test.",
+    "Found is anytime, read from accumulated candidates that have passed the realisability and well-separation gate. The results CSV's found_repair, read at run end, gives 520 against 540.",
+    "Cores, valu3s-uc6 and mode-arbiter carry no reachable ideal, so implies_ideal reads on 6 subjects only.",
+    "av3's clock runs about 17 minutes fast with NTP off."
+  ],
+  "vendored_scripts": {
+    "note": "Verbatim copies of scripts/ at dc3e276, extracted with git show and checked with git hash-object. All six blobs are identical at f3cd190 and at 78cae62.",
+    "source_commit": "dc3e2762bc8ab1e4ede0822130df263b21ddb3d4",
+    "blobs": {
+      "campaign.py": "6966f1569020a019d02fc75e8401ca847ee10328",
+      "gen_configs.py": "bbac6a3cb23b6cdc6ada7046c284da5fd563699b",
+      "merge_experiments.py": "4602efd1c1dc3b2e6004c747a1dcf8948ff250cb",
+      "run_experiments.py": "76fbf5eedad9434772a6ca509b986f23adfa88dd",
+      "score_campaign.py": "304fcf42a78e0b04ccdbe37a8a4c540f71e56137",
+      "score_curves.py": "b7607686c8e6d463c7030de964f4d69ad9dea70b"
+    },
+    "untracked_sources": {
+      "note": "Never in git. Copied from ~/fa-front on av2 and checked identical by git hash-object against av3's ~/fa-front and the local driver directory.",
+      "frontier_paired.py": "f3237f18cdbd79c7a7474683d70f22d3f3d61772",
+      "frontier_sample_paired.py": "0e42697aedf31ad9f99ca2beeafddfe1a5b108dc",
+      "frontier_go.sh": "b973df69da66f5717467d5fdd7f90e77076de039",
+      "frontier_paired_local.sh": "ec666661dbdde43473a87f9dee5aab9e70f65a1a"
+    },
+    "written_at_close": {"analyse_ablation.py": "computes every figure in registered_primary, secondaries and implies_ideal_descriptive; its output is analysis-output.txt"}
+  },
+  "config_vintage": "No entry owed. Between dc3e276 and the branch tip 78cae62 the only C++ change is src/compare.cpp, which adds a --timeout flag whose default stays 20 s. The ordered_fields key is new on this branch and defaults to directed, the behaviour every earlier archive ran under, so an archived config that omits it means what it always meant.",
+  "owed": [
+    "The paired frontier pass for liquid-mixer, lpc-mini-core1, lpc-full-core1 and valu3s-uc6 (120 pairs), or a decision that RQ5 reports overlap over 16 subjects. lpc-full-core1 did not finish one pair in 1800 s.",
+    "A look at why directed mutation misses rad-core-10's repair on 21 of 30 seeds.",
+    "score_campaign.py should not overwrite a score manifest when a second pass writes to the same out directory."
+  ],
+  "files": {
+    "PLAN.md": "The pre-registration.",
+    "campaign.toml": "The declaration both hosts ran.",
+    "campaign-score.toml": "The companion declaration 2026-09-29-fretish-ablation-score, verbatim.",
+    "REPORT.md": "The write-up, closed 2026-10-01.",
+    "PROVENANCE.json": "This file.",
+    "analysis-output.txt": "The output of scripts/analyse_ablation.py over the collected data.",
+    "score-manifests/": "The two surviving score manifests, verbatim.",
+    "run-manifests/": "Both hosts' results-fretish-ablation-manifest-<host>.json, verbatim.",
+    "scripts/": "The vendored scripts with blob shas above.",
+    "results-fretish-ablation.csv, results-fretish-ablation/": "1200 rows and 1200 run directories. Untracked, beside experiments/ in the checkout that collected them.",
+    "curves-fretish-ablation.csv, curves-fretish-ablation/": "187,340 rows over 1200 curves, per host under <host>/ with failures.txt, timings.txt and warnings.log. Untracked.",
+    "frontier-fretish-ablation/": "The paired frontier pass's outputs. Untracked."
+  },
+  "reproduce": "Check out dc3e276, build the release preset, and run campaign.toml through campaign.py on two hosts; then run the curve phase as declared, or campaign-score.toml for a split. scripts/analyse_ablation.py <experiments-dir> recomputes the tests.",
+  "closed_on": "2026-10-01"
+}
