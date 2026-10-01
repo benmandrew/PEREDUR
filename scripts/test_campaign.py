@@ -1204,7 +1204,9 @@ hosts = { av2 = "0-4" }
           {"workers": 8, "cores": 4, "cuts": 20, "maximal_timeout": 900,
            "compare_timeout": 600, "deadline_s": 4500, "wall_cap_s": 5400,
            "maximality": "on", "ideals": "on", "epsilon": "",
-           "fingerprint_words": 256, "fingerprint_seed": 0},
+           "fingerprint_words": 256, "fingerprint_seed": 0,
+           "fingerprint_max_prefix": 2, "fingerprint_max_cycle": 3,
+           "fingerprint_distance": "hamming", "members_from": ""},
           "every budget defaults to the scorer's own value, and the wall cap "
           "sits 900s past the deadline")
     check(C.score_defaults(),
@@ -1218,7 +1220,9 @@ hosts = { av2 = "0-4" }
           {"workers": 2, "cores": 8, "cuts": 5, "maximal_timeout": 60,
            "compare_timeout": 30, "deadline_s": 100, "wall_cap_s": 1000,
            "maximality": "on", "ideals": "on", "epsilon": "",
-           "fingerprint_words": 256, "fingerprint_seed": 0},
+           "fingerprint_words": 256, "fingerprint_seed": 0,
+           "fingerprint_max_prefix": 2, "fingerprint_max_cycle": 3,
+           "fingerprint_distance": "hamming", "members_from": ""},
           "and so is every budget it states")
     check(old["hosts"], {"av2": list(range(5))},
           "a score phase narrows the split exactly as a run phase does")
@@ -1284,6 +1288,20 @@ phases = [ { kind = "score", results = "experiments/results-rematch" } ]
          "a negative fingerprint seed"),
         ('phases = [ { kind = "score", results = "x", maximality = "off" } ]',
          "would score nothing", "a phase with both stages off"),
+        ('phases = [ { kind = "score", results = "x", epsilon = "0.05", '
+         'members_from = "experiments/m" } ]',
+         "needs maximality off", "members_from beside the maximality stage"),
+        ('phases = [ { kind = "score", results = "x", maximality = "off", '
+         'epsilon = "0.05", fingerprint_distance = "jaccard" } ]',
+         "fingerprint_distance must be one of", "an unknown distance"),
+        ('phases = [ { kind = "score", results = "x", maximality = "off", '
+         'epsilon = "0.05", fingerprint_max_prefix = 32, '
+         'fingerprint_max_cycle = 33 } ]',
+         "must not exceed 64", "a lasso longer than 64 positions"),
+        ('phases = [ { kind = "score", results = "x", maximality = "off", '
+         'epsilon = "0.05", fingerprint_max_cycle = 0 } ]',
+         "fingerprint_max_cycle must be a positive integer",
+         "an empty lasso loop"),
     ):
         got = declaration_error(decl_root, "badscore", f"""
 name = "badscore"
@@ -1324,6 +1342,8 @@ check(C.phase_args(score_phase, [0, 1]),
        "--deadline-s", "100", "--wall-cap-s", "1000",
        "--maximality", "on", "--ideals", "on", "--epsilon", "",
        "--fingerprint-words", "256", "--fingerprint-seed", "0",
+       "--fingerprint-max-prefix", "2", "--fingerprint-max-cycle", "3",
+       "--fingerprint-distance", "hamming", "--members-from", "",
        "--seeds", "0", "1"],
       "a score phase becomes scorer arguments, every budget stated, seeds last")
 check(C.phase_command(score_phase, [0, 1]),
@@ -1331,7 +1351,9 @@ check(C.phase_command(score_phase, [0, 1]),
       "experiments/curves-x --workers 3 --cores 2 --cuts 5 "
       "--maximal-timeout 60 --compare-timeout 30 --deadline-s 100 "
       "--wall-cap-s 1000 --maximality on --ideals on --epsilon '' "
-      "--fingerprint-words 256 --fingerprint-seed 0 --seeds 0 1",
+      "--fingerprint-words 256 --fingerprint-seed 0 "
+      "--fingerprint-max-prefix 2 --fingerprint-max-cycle 3 "
+      "--fingerprint-distance hamming --members-from '' --seeds 0 1",
       "and its command is the scorer's, not the runner's")
 check(C.phase_launcher({"profile": "tlsf"}), C.RUNNER_CMD,
       "a phase record with no kind at all launches the runner")
@@ -2828,6 +2850,8 @@ try:
                f"--maximal-timeout 900 --compare-timeout 600 --deadline-s 10 "
                f"--wall-cap-s 910 --maximality on --ideals on --epsilon '' "
                f"--fingerprint-words 256 --fingerprint-seed 0 "
+               f"--fingerprint-max-prefix 2 --fingerprint-max-cycle 3 "
+               f"--fingerprint-distance hamming --members-from '' "
                f"--seeds 6 7" in printed,
                f"printing the scorer command it would run: {printed!r}")
     check_true("blocked: no results directory" in printed,
@@ -2861,7 +2885,9 @@ try:
           "--workers 2 --cores 1 --cuts 20 --maximal-timeout 900 "
           "--compare-timeout 600 --deadline-s 10 --wall-cap-s 910 "
           "--maximality on --ideals on --epsilon  --fingerprint-words 256 "
-          "--fingerprint-seed 0 --seeds 6 7",
+          "--fingerprint-seed 0 --fingerprint-max-prefix 2 "
+          "--fingerprint-max-cycle 3 --fingerprint-distance hamming "
+          "--members-from  --seeds 6 7",
           "the scorer got every budget and this host's seeds, and nothing "
           "from the runner's vocabulary")
     check(calls.read_text().count("\n"), 1,

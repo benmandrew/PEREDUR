@@ -94,6 +94,8 @@ The runner's freshness gate covers `build-release/maximal` and `build-release/co
 
 The pass exits 0 only when every run has a curve; otherwise the tick spends an attempt and requeues it, and the resume skips existing non-empty CSVs. To raise a budget, commit to `campaign.toml` and `enqueue` again.
 
+A separation recount never re-runs the maximality sweep. `maximality = "off"` with `members_from` naming an earlier pass's `out` reads each run's antichains from that pass's `<run>.members.tsv` sidecars and fingerprints the candidates afresh, so the word count, lasso shape (`fingerprint_max_prefix`, `fingerprint_max_cycle`) and distance (`fingerprint_distance`) can all move at the cost of one `fingerprint` call a run. The scripts/README.md score-phase section has the keys and their defaults.
+
 `stage` and the tick refuse a score phase whose results directory is missing, unless an earlier run phase of the campaign writes it. To reproduce an archived pass, declare a campaign of one score phase.
 
 ## Reading a run
