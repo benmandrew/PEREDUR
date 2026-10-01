@@ -496,4 +496,51 @@ TEST(test_uniform_ordered_fields_reproduce) {
             "; the uniform arm no longer reproduces an earlier run");
 }
 
+// The mixed ordered-field arm over the uniform golden's configuration and
+// population. Its coin is drawn only under Mixed, so the two goldens above stay
+// as they were; this one pins the stream with the coin in it.
+TEST(test_mixed_ordered_fields_reproduce) {
+    constexpr std::size_t k_expected_draws = 253;
+    constexpr std::uint64_t k_expected_hash = 6431447873914110965ULL;
+
+    Config cfg = golden_config();
+    cfg.ordered_fields = OrderedFieldMutation::Mixed;
+    cfg.p_timing = 0.5;
+    cfg.p_condition_type = 0.5;
+    cfg.p_scope = 0.5;
+    std::vector<Specification> seeds;
+    for (const Specification& spec : golden_population()) {
+        seeds.emplace_back(spec.m_assumptions, spec.m_guarantees,
+                           spec.m_in_atoms, spec.m_out_atoms,
+                           std::vector<std::string>{"m"});
+    }
+    const GoldenRun first = run_golden_evolution(cfg, seeds);
+    const GoldenRun second = run_golden_evolution(cfg, seeds);
+    expect(render_trace(*first.trace) == render_trace(*second.trace) &&
+               render_population(first.population) ==
+                   render_population(second.population),
+           "mixed ordered fields: two runs from the same seed should draw "
+           "the same stream and produce an identical population");
+
+    for (const OrderedFieldMutation other :
+         {OrderedFieldMutation::Directed, OrderedFieldMutation::Uniform}) {
+        Config pure = cfg;
+        pure.ordered_fields = other;
+        expect(render_trace(*run_golden_evolution(pure, seeds).trace) !=
+                   render_trace(*first.trace),
+               "mixed ordered fields: the mixed arm should draw a different "
+               "stream from both pure arms");
+    }
+
+    const std::uint64_t hash = fnv1a(render_trace(*first.trace));
+    expect(
+        first.trace->draws.size() == k_expected_draws &&
+            hash == k_expected_hash,
+        "mixed ordered fields: " + std::to_string(first.trace->draws.size()) +
+            " draws with trace hash " + std::to_string(hash) + ", pinned " +
+            std::to_string(k_expected_draws) + " and " +
+            std::to_string(k_expected_hash) +
+            "; the mixed arm no longer reproduces an earlier run");
+}
+
 }  // namespace

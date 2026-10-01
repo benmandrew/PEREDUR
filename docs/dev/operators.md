@@ -102,6 +102,8 @@ A weaker guarantee timing helps realizability and costs nothing on similarity, s
 
 Both arms spend the same probability draws in the same order, so `"directed"` leaves the stream byte-identical to the one before the key existed; `golden_config()` pins it. `test_uniform_ordered_fields_reproduce` pins the uniform stream over the golden population with a declared mode. A TLSF run warns about a non-default value and records the key as null, like the other single-path keys.
 
+`"mixed"` asks whether one search can reach the union of both arms' repair frontiers. Each time the timing, condition-type or scope arm fires, a fair coin (`next_real() < 0.5`) picks the directed rule or the uniform one for that field, and the three arms flip independently. The coin is drawn after the arm's probability draw and before the rule's own draws, and only under `"mixed"`, so `"directed"` and `"uniform"` draw the streams they drew before the value existed; the archived rows of both arms stay reproducible at the new commit. The condition-type arm, which spends no draw under either rule, still spends its coin. `test_mixed_ordered_fields_reproduce` pins the mixed stream over the same population as the uniform golden.
+
 ## Removable guarantees
 
 `p_remove_guarantee` (default 0.05, matching `p_add_assumption`) deletes one FRETISH guarantee or one TLSF conjunct from PRESET, ASSERT and GUARANTEE. Some ideals need it: amba, full-arbiter, load-balancer, prioritized-arbiter and round-robin-arbiter have only `drop-*` ideals. `lint-ideals`' `reachable` check asserts a guarantee side may shrink, never grow, to a floor of one.

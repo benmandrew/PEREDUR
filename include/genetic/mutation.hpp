@@ -82,8 +82,10 @@ std::vector<Timing> collect_timing_pool(const Specification& specification);
 /// Under `cfg.ordered_fields = Uniform` the timing, condition-type and scope
 /// arms instead redraw their field uniformly from the values the
 /// specification makes available, excluding the current one, and ignore
-/// @p direction. The monotone arm inside the response and condition rewrites
-/// follows @p direction under both.
+/// @p direction. Under `Mixed` each of those arms, once it fires, draws a fair
+/// coin before its own draws and takes the directed or the uniform rule by it.
+/// The monotone arm inside the response and condition rewrites follows
+/// @p direction under all three.
 ///
 /// @param requirement     The requirement to mutate
 /// @param atoms           Pool of atom names for response mutation

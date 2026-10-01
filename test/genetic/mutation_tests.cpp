@@ -1143,4 +1143,99 @@ TEST(test_uniform_scope_without_modes_is_unchanged_at_no_draw) {
            "the arm's probability check");
 }
 
+// --- ordered_fields = "mixed" ---------------------------------------------
+
+Config ordered_config(OrderedFieldMutation rule, double p_timing,
+                      double p_condition_type, double p_scope) {
+    Config cfg = uniform_config(p_timing, p_condition_type, p_scope);
+    cfg.ordered_fields = rule;
+    return cfg;
+}
+
+std::string render_condition_type(const Requirement& req) {
+    return req.m_condition_type == ConditionType::Trigger ? "trigger"
+                                                          : "continual";
+}
+
+// A guarantee's directed condition-type arm leaves a trigger a trigger, since
+// it can only weaken; the uniform arm flips it to continual. Under mixed both
+// outcomes occur across seeds, while each pure rule gives only its own.
+TEST(test_mixed_condition_type_takes_both_rules) {
+    Requirement req(Formula("a"), Formula("x"), timing::within_ticks(3),
+                    ConditionType::Trigger, true);
+    const auto seen = [&req](OrderedFieldMutation rule) {
+        return redraws(req, Direction::Weaken, {}, {},
+                       ordered_config(rule, 0.0, 1.0, 0.0),
+                       render_condition_type);
+    };
+    expect(seen(OrderedFieldMutation::Directed) ==
+               std::vector<std::string>{"trigger"},
+           "directed condition type: a guarantee's trigger stays a trigger");
+    expect(seen(OrderedFieldMutation::Uniform) ==
+               std::vector<std::string>{"continual"},
+           "uniform condition type: a guarantee's trigger becomes continual");
+    expect(seen(OrderedFieldMutation::Mixed) ==
+               std::vector<std::string>{"continual", "trigger"},
+           "mixed condition type: both the directed and the uniform outcome "
+           "should occur across seeds");
+}
+
+// The directed timing arm only weakens a guarantee, so `always` is reachable
+// from `within 3` only by the uniform rule; mixed reaches it, and also reaches
+// every value the directed arm does.
+TEST(test_mixed_timing_reaches_both_rules_values) {
+    const Requirement req(Formula("a"), Formula("x"), timing::within_ticks(3),
+                          ConditionType::Continual, true);
+    const std::vector<Timing> pool = {timing::within_ticks(3)};
+    const auto seen = [&req, &pool](OrderedFieldMutation rule) {
+        return redraws(req, Direction::Weaken, pool, {},
+                       ordered_config(rule, 1.0, 0.0, 0.0), render_timing);
+    };
+    const std::vector<std::string> directed =
+        seen(OrderedFieldMutation::Directed);
+    const std::vector<std::string> mixed = seen(OrderedFieldMutation::Mixed);
+    const std::string always = to_string(timing::always());
+    expect(!contains(directed, always) && contains(mixed, always),
+           "mixed timing: a guarantee should reach the uniform-only `always`");
+    bool covers_directed = true;
+    for (const std::string& value : directed) {
+        covers_directed = covers_directed && contains(mixed, value);
+    }
+    expect(covers_directed,
+           "mixed timing: every directed outcome should also occur under "
+           "mixed");
+}
+
+// The coin costs one draw per fired arm under mixed and none otherwise, so the
+// directed and uniform streams are the ones they drew before mixed existed.
+TEST(test_mixed_coin_is_drawn_only_under_mixed) {
+    const Requirement req(Formula("a"), Formula("x"), timing::within_ticks(3),
+                          ConditionType::Continual, true);
+    const auto count_draws = [&req](const Config& cfg) {
+        std::size_t n_draws = 0;
+        const RandomSource source([&n_draws](std::size_t upper_bound) {
+            ++n_draws;
+            return (n_draws * 7) % upper_bound;
+        });
+        static_cast<void>(mutate_requirement(
+            req, {"a", "x"}, {"a"}, Direction::Weaken, {}, {}, source, cfg));
+        return n_draws;
+    };
+    // The condition-type arm spends no draw under either rule, so only its
+    // probability check and, under mixed, the coin are counted.
+    const std::size_t idle =
+        count_draws(ordered_config(OrderedFieldMutation::Directed, 0, 0, 0));
+    expect(count_draws(ordered_config(OrderedFieldMutation::Directed, 0, 1,
+                                      0)) == idle + 1 &&
+               count_draws(ordered_config(OrderedFieldMutation::Uniform, 0, 1,
+                                          0)) == idle + 1,
+           "ordered fields: directed and uniform should spend no coin");
+    expect(count_draws(ordered_config(OrderedFieldMutation::Mixed, 0, 1, 0)) ==
+               idle + 2,
+           "mixed ordered fields: a fired arm should spend exactly one coin");
+    expect(count_draws(ordered_config(OrderedFieldMutation::Mixed, 0, 0, 0)) ==
+               idle,
+           "mixed ordered fields: an arm that does not fire spends no coin");
+}
+
 }  // namespace

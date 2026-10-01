@@ -61,9 +61,10 @@ struct EnumNames<TerminationMode> {
 
 template <>
 struct EnumNames<OrderedFieldMutation> {
-    static constexpr std::array<std::pair<OrderedFieldMutation, const char*>, 2>
+    static constexpr std::array<std::pair<OrderedFieldMutation, const char*>, 3>
         k_names{{{OrderedFieldMutation::Directed, "directed"},
-                 {OrderedFieldMutation::Uniform, "uniform"}}};
+                 {OrderedFieldMutation::Uniform, "uniform"},
+                 {OrderedFieldMutation::Mixed, "mixed"}}};
 };
 
 template <typename Enum>

@@ -100,8 +100,10 @@ enum class TerminationMode : std::uint8_t { Generations, Individuals };
 /// each field one step along its implication order, in the direction the
 /// requirement's role gives. Uniform redraws it from the values the
 /// specification makes available, ignoring order and direction; it is the
-/// "random" arm of the directed-versus-random ablation.
-enum class OrderedFieldMutation : std::uint8_t { Directed, Uniform };
+/// "random" arm of the directed-versus-random ablation. Mixed flips a fair coin
+/// each time one of the three arms fires and applies the directed rule on
+/// heads, the uniform rule on tails, independently per arm.
+enum class OrderedFieldMutation : std::uint8_t { Directed, Uniform, Mixed };
 
 struct Config {
     std::size_t generations = 10;
@@ -401,9 +403,12 @@ struct Config {
     /// the specification makes available, excluding the current one: the
     /// qualitative timings, the quantified and stop timings over the counts and
     /// stops the specification uses, the other condition type, and any other
-    /// scope kind over the declared modes. The p_monotone arm stays directed
-    /// under both. Exists for the directed-versus-random ablation; at Directed
-    /// the draw stream is the one before the key existed.
+    /// scope kind over the declared modes. Mixed draws a fair coin once an arm
+    /// has fired, before the rule's own draws, and applies Directed or Uniform
+    /// by it; the three arms flip independently. The p_monotone arm stays
+    /// directed under all three. Exists for the directed-versus-random
+    /// ablation; at Directed the draw stream is the one before the key existed,
+    /// and Uniform's is the one before Mixed existed.
     OrderedFieldMutation ordered_fields = OrderedFieldMutation::Directed;
     /// Probability that a rewrite is a *monotone* one (monotone_rewrite,
     /// include/genetic/monotone.hpp), whose result is comparable to the formula

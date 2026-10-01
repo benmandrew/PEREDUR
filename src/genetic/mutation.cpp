@@ -790,10 +790,18 @@ Requirement mutate_requirement(const Requirement& requirement,
             requirement.m_condition, condition_atoms,
             condition_direction(requirement, direction), cfg, random_source);
     }
-    // Only the rule picking the new value differs between the two, so both
-    // spend the same probability draws in the same order.
-    const bool uniform = cfg.ordered_fields == OrderedFieldMutation::Uniform;
+    // Only the rule picking the new value differs between the settings, so all
+    // three spend the same probability draws in the same order. Mixed adds one
+    // fair coin per fired arm, drawn before the rule's own draws; Directed and
+    // Uniform never reach it, so their streams are the ones they always drew.
+    const auto pick_uniform = [&cfg, &random_source]() {
+        if (cfg.ordered_fields == OrderedFieldMutation::Mixed) {
+            return random_source.next_real() < 0.5;
+        }
+        return cfg.ordered_fields == OrderedFieldMutation::Uniform;
+    };
     if (random_source.next_real() < cfg.p_timing) {
+        const bool uniform = pick_uniform();
         mutated.m_timing = uniform
                                ? redraw_timing(requirement.m_timing,
                                                timing_pool, random_source)
@@ -817,6 +825,7 @@ Requirement mutate_requirement(const Requirement& requirement,
     // determinism goldens are recorded at that default and pin both keys.
     if (cfg.p_condition_type > 0.0 &&
         random_source.next_real() < cfg.p_condition_type) {
+        const bool uniform = pick_uniform();
         mutated.m_condition_type =
             uniform ? redraw_condition_type(requirement.m_condition_type)
                     : mutate_condition_type(direction);
@@ -825,6 +834,7 @@ Requirement mutate_requirement(const Requirement& requirement,
         // Read off the mutated timing and condition type, not the original's:
         // the order table is a fact about the requirement being written, and an
         // arm above may have just moved either of them.
+        const bool uniform = pick_uniform();
         mutated.m_scope =
             uniform
                 ? redraw_scope(requirement.m_scope, mode_pool, random_source)
