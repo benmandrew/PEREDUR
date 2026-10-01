@@ -216,11 +216,9 @@ struct Config {
     /// leak orphaned processes across a long run.
     std::chrono::milliseconds ltl2tgba_timeout{60'000};
     /// Per-call wall-clock budget for each ltlfilt exec. Unlike the budgets
-    /// above this defaults to a real value rather than to "off": `--simplify`
-    /// is
-    /// super-exponential on the deep nested-X conjunctions the search builds,
-    /// and an abandoned call costs only a missed simplification, never an
-    /// individual.
+    /// above this defaults to a real value rather than to "off": its passes
+    /// can blow up on the deep nested-X conjunctions the search builds, and an
+    /// abandoned call costs one undecided query, never an individual.
     std::chrono::milliseconds ltlfilt_timeout{10'000};
     /// When true, print the CPU-attribution report (your code vs. the external
     /// CLI tools, via getrusage + per-tool wait4). Set by `peredur

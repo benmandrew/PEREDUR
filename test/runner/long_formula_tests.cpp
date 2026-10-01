@@ -130,10 +130,9 @@ TEST(test_black_decides_a_formula_over_the_argv_limit) {
     const std::string formula = conjunction(atoms);
     SatisfiabilityChecker checker;
     checker.set_timeout(k_generous_timeout);
-    // A SPOT budget no exec can meet and no simplification pass, so each query
-    // falls through to black itself.
+    // A SPOT budget no exec can meet, so each query falls through to black
+    // itself.
     checker.set_spot_budget(std::chrono::milliseconds{1});
-    checker.set_simplify(false);
     const std::size_t calls_before = SatisfiabilityChecker::n_black_calls;
     std::optional<bool> sat;
     std::optional<bool> unsat;

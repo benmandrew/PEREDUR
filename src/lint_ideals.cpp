@@ -372,8 +372,7 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    // Unlike compare and maximal, keeps the simplify pass and the search's SPOT
-    // budget.
+    // Unlike compare and maximal, keeps the search's SPOT budget.
     SatisfiabilityChecker& sat =
         configure_offline_checkers(std::chrono::milliseconds{20'000}, false);
     RealizabilityChecker real;
