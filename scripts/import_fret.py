@@ -77,7 +77,9 @@ naming a variable also sides every comparison of it. Every requirement becomes
 a guarantee; FRET has no assumptions.
 
 The summary on stderr lists every rule that fired, so a reviewer can check
-each lossy step. `--ids` writes which FRET reqids each guarantee came from.
+each lossy step. `reqids.json`, written beside the output, records which FRET
+reqids each guarantee came from and their FRET sentences, so a reader can trace
+a guarantee back to its source.
 """
 
 import argparse
@@ -289,6 +291,8 @@ class Converter:
     def __init__(self, atomise=False, from_fulltext=(), skip=(),
                  merge_case=False, rename=None):
         self.guarantees, self.reqids = [], []
+        self.fulltext = {}
+        self.assumption_reqids = []
         self.labels = collections.defaultdict(set)
         self.roles = collections.defaultdict(set)
         self.modes = set()
@@ -550,6 +554,7 @@ class Converter:
         if not got:
             return
         reqid, s = got
+        self.fulltext[reqid] = r.get("fulltext", "").strip()
         kind = s.get("condition") or "null"
         if kind == "regular":
             cond, ctype = self.formula(s["regular_condition"], reqid), "trigger"
@@ -1118,6 +1123,7 @@ def load(paths, component, force_in, force_out, all_components=False,
                                          conv.modes)
         if assumed:
             spec["assumptions"].append(requirement)
+            conv.assumption_reqids.append(["exclusive"])
         else:
             spec["guarantees"].append(requirement)
             conv.reqids.append(["exclusive"])
@@ -1128,12 +1134,27 @@ def load(paths, component, force_in, force_out, all_components=False,
             conv.comparisons, conv.types, ins, outs, conv.var_output)
         spec["assumptions"] += assumptions
         spec["guarantees"] += guarantees
+        conv.assumption_reqids += [["domain"] for _ in assumptions]
         conv.reqids += [["domain"] for _ in guarantees]
         if notes:
             conv.notes["domain constraint"] += notes
     if conv.modes:
         spec["modes"] = sorted(conv.modes)
     return spec, conv
+
+
+def reqid_rows(conv):
+    """Each requirement's FRET reqids and their sentences.
+
+    Rows the import made itself (mode definitions, exclusions, domain
+    constraints) carry a description in place of a reqid and no sentence.
+    """
+    def row(key, i, r):
+        return {key: i, "reqids": r, "fulltext": {
+            x: conv.fulltext[x] for x in r if conv.fulltext.get(x)}}
+    return ([row("assumption", i, r)
+             for i, r in enumerate(conv.assumption_reqids)]
+            + [row("guarantee", i, r) for i, r in enumerate(conv.reqids)])
 
 
 def main(argv=None):
@@ -1170,7 +1191,6 @@ def main(argv=None):
                     help="add that at most one of these signals or modes "
                          "holds at each step, which FRET keeps outside its "
                          "export (repeatable)")
-    ap.add_argument("--ids", help="also write guarantee index -> FRET reqids")
     ap.add_argument("--as-input", action="append", default=[], metavar="ATOM",
                     help="force ATOM, a name or shell pattern, to be an input "
                          "(repeatable)")
@@ -1192,10 +1212,8 @@ def main(argv=None):
         print(f"import_fret: {e}", file=sys.stderr)
         return 1
     Path(args.output).write_text(json.dumps(spec, indent=2) + "\n")
-    if args.ids:
-        Path(args.ids).write_text(json.dumps(
-            [{"guarantee": i, "reqids": r} for i, r in enumerate(conv.reqids)],
-            indent=2) + "\n")
+    Path(args.output).with_name("reqids.json").write_text(
+        json.dumps(reqid_rows(conv), indent=2) + "\n")
     print(f"{len(spec['guarantees'])} guarantees, {len(spec['in_atoms'])} "
           f"inputs, {len(spec['out_atoms'])} outputs, "
           f"{len(spec.get('modes', []))} modes", file=sys.stderr)

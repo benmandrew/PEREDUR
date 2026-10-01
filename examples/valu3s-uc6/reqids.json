@@ -1,0 +1,110 @@
+[
+  {
+    "guarantee": 0,
+    "reqids": [
+      "UC6_R_2"
+    ],
+    "fulltext": {
+      "UC6_R_2": "when parallelGuidanceRequested System shall satisfy checkIMUConnection -> ParallelGuidanceMode"
+    }
+  },
+  {
+    "guarantee": 1,
+    "reqids": [
+      "UC6_R_20"
+    ],
+    "fulltext": {
+      "UC6_R_20": "if IMUFail Vehicle shall satisfy stop"
+    }
+  },
+  {
+    "guarantee": 2,
+    "reqids": [
+      "UC6_R_14"
+    ],
+    "fulltext": {
+      "UC6_R_14": "when manualModeRequestd Vehicle shall satisfy stop -> ManualMode"
+    }
+  },
+  {
+    "guarantee": 3,
+    "reqids": [
+      "UC6_R_8"
+    ],
+    "fulltext": {
+      "UC6_R_8": "System shall within 200 milliseconds satisfy controlCycle"
+    }
+  },
+  {
+    "guarantee": 4,
+    "reqids": [
+      "UC6_R_5"
+    ],
+    "fulltext": {
+      "UC6_R_5": "Vehicle shall within 9 hours satisfy drivingCycleComplete"
+    }
+  },
+  {
+    "guarantee": 5,
+    "reqids": [
+      "UC6_R_16"
+    ],
+    "fulltext": {
+      "UC6_R_16": "if unwantedManualModeRequested System shall satisfy dropRequest"
+    }
+  },
+  {
+    "guarantee": 6,
+    "reqids": [
+      "UC6_R_9"
+    ],
+    "fulltext": {
+      "UC6_R_9": "if rcDisconnectDetected Vehicle shall satisfy rcDisconnectedWarning"
+    }
+  },
+  {
+    "guarantee": 7,
+    "reqids": [
+      "UC6_R_3"
+    ],
+    "fulltext": {
+      "UC6_R_3": "if unrecoverablError Vehicle shall satisfy stop"
+    }
+  },
+  {
+    "guarantee": 8,
+    "reqids": [
+      "UC6_R_6"
+    ],
+    "fulltext": {
+      "UC6_R_6": "if unwantedParallelGuidanceRequest System shall satisfy dropRequest"
+    }
+  },
+  {
+    "guarantee": 9,
+    "reqids": [
+      "UC6_R_12"
+    ],
+    "fulltext": {
+      "UC6_R_12": "System shall always satisfy rcConnected | !rcConnected & rcConnectRequest -> rcConnected"
+    }
+  },
+  {
+    "guarantee": 10,
+    "reqids": [
+      "UC6_R_11"
+    ],
+    "fulltext": {
+      "UC6_R_11": "when commRequest System shall satisfy authentication -> communication"
+    }
+  },
+  {
+    "guarantee": 11,
+    "reqids": [
+      "UC6_R_1"
+    ],
+    "fulltext": {
+      "UC6_R_1": "when parallelGuidanceRequested System shall satisfy checkGPS -> parallelGuidanceMode"
+    }
+  }
+]

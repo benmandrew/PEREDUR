@@ -89,6 +89,13 @@ def test_reqids_fall_back_to_the_working_tree_when_the_parent_is_unchanged():
         ["G1 (rad #10, S01_a)"], context
 
 
+def test_assumptions_carry_their_fret_ids():
+    context = E.subject_context("rad-core-10", HEAD)
+    context["raw"] = {**context["raw"], "assumptions": [req()]}
+    context["fret"]["assumptions"] = [{"reqids": ["A_1"]}]
+    assert E.label_requirements(context)["assumptions"] == ["A1 (A_1)"]
+
+
 def write_run(root: Path, arm: str, seed: int, repairs, finished=True,
               commit=HEAD, implication=True):
     run = root / f"sweep_O_{arm}_nsga2-apportion_log_rad-core-10_seed{seed:02d}"

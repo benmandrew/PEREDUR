@@ -181,6 +181,19 @@ lossy = dict(req("DROP", timing="always", post_condition="((a | b))"),
 rejects(lossy, "lacks ['x']", "a name FRET's parse dropped is rejected")
 got, _, conv = responses([lossy], from_fulltext=["DROP"])
 check(got, ["(a | b) <-> x"], "--from-fulltext reads the response itself")
+check(I.reqid_rows(conv), [{"guarantee": 0, "reqids": ["DROP"], "fulltext":
+                              {"DROP": "R shall always satisfy (a | b) = x"}}],
+      "reqids.json carries each reqid's FRET sentence")
+
+with tempfile.TemporaryDirectory() as tmp:
+    export = Path(tmp) / "export.json"
+    export.write_text(json.dumps({"requirements": [lossy], "variables": []}))
+    out = Path(tmp) / "x" / "spec.json"
+    out.parent.mkdir()
+    check(I.main([str(export), "-o", str(out), "--from-fulltext", "DROP",
+                  "--as-output", "x"]), 0, "main imports the export")
+    check(json.loads((out.parent / "reqids.json").read_text()),
+          I.reqid_rows(conv), "main writes reqids.json beside the spec")
 
 placeholder = {"reqid": "EMPTY", "fulltext": "", "semantics": {}}
 prose = {"reqid": "PROSE", "fulltext": "The system shall be good.",
@@ -259,7 +272,7 @@ check(spec["guarantees"][-1]["weakenable"], False,
       "domain constraints are not weakenable")
 check("a" in domain, False,
       "a lone comparison of two names allows both values, so adds nothing")
-check(conv.reqids[-1], ["domain"], "--ids marks a domain constraint")
+check(conv.reqids[-1], ["domain"], "reqids marks a domain constraint")
 spec, _ = load({"requirements": [
     req("LO", timing="always", post_condition="(speed >= 10 -> fast)"),
     req("HI", timing="always", post_condition="(speed >= 20 -> faster)")],
@@ -450,7 +463,7 @@ check(spec["guarantees"][-1], {"condition": "true",
                                "timing": {"type": "Always"},
                                "weakenable": False},
       "the fresh atom's definition is a non-weakenable guarantee")
-check(conv.reqids[-1], ["mode definition"], "--ids names the definition")
+check(conv.reqids[-1], ["mode definition"], "reqids names the definition")
 check(spec["modes"], ["labelled_mode", "mode_a_or_b", "pure_mode",
                       "standby_mode"], "every scope's mode is declared")
 check({"mode_a_or_b", "standby_mode", "labelled_mode"}
@@ -478,9 +491,12 @@ spec, conv = load({"requirements": scoped,
                   exclusive=["standbyMode,labelledMode", "pureMode, a"])
 check(spec["guarantees"][-1]["response"], "!(labelled_mode & standby_mode)",
       "--exclusive over outputs is a guarantee")
-check(conv.reqids[-1], ["exclusive"], "--ids names the exclusion")
+check(conv.reqids[-1], ["exclusive"], "reqids names the exclusion")
 check(spec["assumptions"][-1]["response"], "!(a & pure_mode)",
       "--exclusive over inputs and pure modes is an assumption")
+check(I.reqid_rows(conv)[-len(spec["guarantees"]) - 1],
+      {"assumption": len(spec["assumptions"]) - 1, "reqids": ["exclusive"],
+       "fulltext": {}}, "reqids.json names an assumed exclusion")
 rejects_with({"requirements": scoped, "variables": []}, "mixes inputs",
              "--exclusive over both sides is rejected",
              exclusive=["standbyMode,a"])

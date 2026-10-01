@@ -334,7 +334,9 @@ def subject_context(subject: str, commit: str) -> dict:
     if raw is None:
         sys.exit(f"examples/{subject}/spec.json does not exist at {commit[:7]}")
     context = {"subject": subject, "raw": raw, "parent": None,
-               "indices": None, "fret": [{}] * len(raw["guarantees"])}
+               "indices": None,
+               "fret": {part: [{}] * len(raw[part])
+                        for part in ("assumptions", "guarantees")}}
     parent, core = CORES.get(subject, (subject, None))
     parent_spec = raw if core is None else git_json(
         commit, f"examples/{parent}/spec.json")
@@ -346,7 +348,8 @@ def subject_context(subject: str, commit: str) -> dict:
         guarantees = parent_spec["guarantees"]
         indices = sorted(set(core) | {i for i, g in enumerate(guarantees)
                                       if g.get("weakenable") is False})
-        if [guarantees[i] for i in indices] != raw["guarantees"]:
+        if ([guarantees[i] for i in indices] != raw["guarantees"]
+                or parent_spec["assumptions"] != raw["assumptions"]):
             print(f"warning: {subject} is not guarantees {core} of {parent} "
                   f"at {commit[:7]}; no parent labels", file=sys.stderr)
             return context
@@ -361,18 +364,25 @@ def subject_context(subject: str, commit: str) -> dict:
                 (here / "spec.json").read_text()) == parent_spec:
             reqids = json.loads((here / "reqids.json").read_text())
     if reqids:
-        rows = {row["guarantee"]: row for row in reqids}
-        context["fret"] = [rows.get(i, {}) for i in indices]
+        # A core keeps every assumption of its parent, in order.
+        for part, key, wanted in (
+                ("guarantees", "guarantee", indices),
+                ("assumptions", "assumption",
+                 range(len(raw["assumptions"])))):
+            rows = {row[key]: row for row in reqids if key in row}
+            context["fret"][part] = [rows.get(i, {}) for i in wanted]
     return context
 
 
 def label_requirements(context: dict) -> dict[str, list[str]]:
     raw = context["raw"]
-    labels = {"assumptions": [f"A{i + 1}" for i in
-                              range(len(raw["assumptions"]))],
-              "guarantees": []}
+    labels = {"assumptions": [], "guarantees": []}
+    for i in range(len(raw["assumptions"])):
+        tags = context["fret"]["assumptions"][i].get("reqids", [])
+        labels["assumptions"].append(
+            f"A{i + 1} ({', '.join(tags)})" if tags else f"A{i + 1}")
     for j in range(len(raw["guarantees"])):
-        tags = context["fret"][j].get("reqids", [])
+        tags = context["fret"]["guarantees"][j].get("reqids", [])
         if context["indices"] is not None:
             tags = [f"{context['parent']} #{context['indices'][j]}"] + tags
         labels["guarantees"].append(
@@ -403,10 +413,9 @@ def render_core(context: dict, spec: dict, labels: dict,
                   "change.", ""]
     lines += ["`C` stands for the component. `[locked]` marks a requirement "
               "the search may not weaken.", ""]
-    sources = {"assumptions": [{}] * len(spec["assumptions"]),
-               "guarantees": context["fret"]}
-    if any(sources["guarantees"]):
-        lines += ["Under each guarantee is the FRET sentence it was imported "
+    sources = context["fret"]
+    if any(sources["guarantees"]) or any(sources["assumptions"]):
+        lines += ["Under each requirement is the FRET sentence it came "
                   "from. Where the two differ, the import changed it; "
                   "`examples/<parent>`'s git history says how.", ""]
     for part in ("assumptions", "guarantees"):
