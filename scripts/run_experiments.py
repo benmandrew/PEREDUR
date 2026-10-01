@@ -1865,6 +1865,27 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-ablation.csv",
         "default_jobs": 16,
     },
+    # The mixed arm of the same ablation: a fair coin per fired arm between the
+    # directed and the uniform rule. Directed and uniform rows are reused from
+    # fretish-ablation, so only the one level runs. Generate as fretish-ablation
+    # with --levels mixed and --out-dir experiments/configs-fretish-mixed.
+    "fretish-mixed": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["mixed"]},
+        "specs": FRETISH_ABLATION_SPECS,
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ABLATION_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-mixed",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-mixed",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-mixed.csv",
+        "default_jobs": 16,
+    },
 }
 
 

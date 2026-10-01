@@ -1,0 +1,32 @@
+name = "2026-10-01-fretish-mixed"
+branch = "campaign/fretish-mixed"
+profile = "fretish-mixed"
+description = "The mixed arm of the FRETISH ordered-field ablation: a fair coin per fired timing, condition-type or scope arm between the directed and the uniform rule, at the paper-rerun budget over the same 20 subjects, 30 seeds. Directed and uniform rows are reused from 2026-09-29-fretish-ablation. Pre-registered in PLAN.md."
+
+# The ablation's split, so every reused (subject, seed) pair meets its mixed
+# run on the host that ran the other two arms.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+# The ablation's flags with --levels mixed, so the configs directory holds the
+# one arm this campaign runs.
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion --sweeps O --levels mixed --metric log --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 1 --out-dir experiments/configs-fretish-mixed --pin-vintage"
+
+# Half the ablation's 1200 runs. Its calibration put that campaign at 98-177
+# core-hours; it cost 212.5, almost all lpc-full-core1 at the 7200 s cap.
+[[phases]]
+name = "search"
+profile = "fretish-mixed"
+jobs = 16
+
+# The ablation's curve settings, so the three arms read off one scorer.
+[[phases]]
+name = "curve"
+kind = "score"
+results = "experiments/results-fretish-mixed"
+out = "experiments/curves-fretish-mixed"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 3000
+deadline_s = 7500
