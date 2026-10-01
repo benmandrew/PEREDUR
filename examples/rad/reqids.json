@@ -1,0 +1,750 @@
+[
+  {
+    "guarantee": 0,
+    "reqids": [
+      "S22"
+    ],
+    "fulltext": {
+      "S22": "if dressing_requested & garment_already_worn Robot shall immediately satisfy notify_already_wearing_garment"
+    }
+  },
+  {
+    "guarantee": 1,
+    "reqids": [
+      "C02_a_fix"
+    ],
+    "fulltext": {
+      "C02_a_fix": "whenever ambiguity_present | risk_present Robot shall before confirm_command satisfy use_multiple_modalities"
+    }
+  },
+  {
+    "guarantee": 2,
+    "reqids": [
+      "S23_b",
+      "S27_b",
+      "S28_b",
+      "S32_b",
+      "S19_b"
+    ],
+    "fulltext": {
+      "S23_b": "Upon user_pose_change_detected Robot shall immediately satisfy advise_pose_improvement",
+      "S27_b": "upon user_pose_change_detected Robot shall immediately satisfy advise_pose_improvement",
+      "S28_b": "upon user_pose_change_detected Robot shall immediately satisfy advise_pose_improvement",
+      "S32_b": "upon user_pose_change_detected Robot shall immediately satisfy advise_pose_improvement",
+      "S19_b": "Upon user_pose_change_detected Robot shall immediately satisfy advise_pose_improvement"
+    }
+  },
+  {
+    "guarantee": 3,
+    "reqids": [
+      "R41"
+    ],
+    "fulltext": {
+      "R41": "upon required_pose_information_still_unavailable Robot shall immediately satisfy user_notified & user_assistance_requested"
+    }
+  },
+  {
+    "guarantee": 4,
+    "reqids": [
+      "R64"
+    ],
+    "fulltext": {
+      "R64": "Upon garment_movement_delay_detected Robot shall before garment_movement_initiated satisfy (user_notified_of_movement_delay & user_confirmation_received)"
+    }
+  },
+  {
+    "guarantee": 5,
+    "reqids": [
+      "R72",
+      "R73"
+    ],
+    "fulltext": {
+      "R72": "Robot shall before action_taken satisfy request_validated",
+      "R73": "Robot shall before action_taken satisfy request_validated"
+    }
+  },
+  {
+    "guarantee": 6,
+    "reqids": [
+      "S26"
+    ],
+    "fulltext": {
+      "S26": "Upon feedback_inconsistency_probability >= 0.9 Robot shall satisfy  (feedback_verified_using_multiple_sensing_modalities &   user_confirmation_requested)"
+    }
+  },
+  {
+    "guarantee": 7,
+    "reqids": [
+      "R75"
+    ],
+    "fulltext": {
+      "R75": "Robot shall before action_taken satisfy user_input_correctly_interpreted"
+    }
+  },
+  {
+    "guarantee": 8,
+    "reqids": [
+      "R96",
+      "R97"
+    ],
+    "fulltext": {
+      "R96": "In task_execution whenever (user_interaction_ongoing & ! interaction_interruption_required) Robot shall always satisfy (user_interaction_supported & ! robot_initiated_interruption)",
+      "R97": "In task_execution whenever (user_interaction_ongoing & ! interaction_interruption_required) Robot shall always satisfy (user_interaction_supported & ! robot_initiated_interruption)"
+    }
+  },
+  {
+    "guarantee": 9,
+    "reqids": [
+      "S31",
+      "S33"
+    ],
+    "fulltext": {
+      "S31": "Upon user_override_attempt_probability >= 0.9 Robot shall satisfy user_clarification_requested",
+      "S33": "Upon user_override_attempt_probability >= 0.9 Robot shall satisfy user_clarification_requested"
+    }
+  },
+  {
+    "guarantee": 10,
+    "reqids": [
+      "S01_a"
+    ],
+    "fulltext": {
+      "S01_a": "Robot shall before dressing_process_initiated satisfy confirm_task_request"
+    }
+  },
+  {
+    "guarantee": 11,
+    "reqids": [
+      "S01_b"
+    ],
+    "fulltext": {
+      "S01_b": "whenever doubt_present Robot shall with probability > 0.9 before task_execution_initiated satisfy use_multiple_modalities"
+    }
+  },
+  {
+    "guarantee": 12,
+    "reqids": [
+      "S02"
+    ],
+    "fulltext": {
+      "S02": "whenever speech_commands_incomplete Robot shall with probability > 0.9 before confirm_command satisfy use_multiple_modalities"
+    }
+  },
+  {
+    "guarantee": 13,
+    "reqids": [
+      "R99",
+      "C04_a_5"
+    ],
+    "fulltext": {
+      "R99": "Upon user_interaction_required Robot shall within 60 seconds satisfy (user_interaction_initiated |  (user_interaction_delay_detected &   interaction_recovery_initiated))",
+      "C04_a_5": "Upon user_interaction_required Robot shall within 60 seconds satisfy (user_interaction_initiated |  (user_interaction_delay_detected &   interaction_recovery_initiated))"
+    }
+  },
+  {
+    "guarantee": 14,
+    "reqids": [
+      "C01"
+    ],
+    "fulltext": {
+      "C01": "Upon user_decision_change_probability >= 0.9 Robot shall before task_transitioned satisfy updated_user_decision_confirmed"
+    }
+  },
+  {
+    "guarantee": 15,
+    "reqids": [
+      "S03_a"
+    ],
+    "fulltext": {
+      "S03_a": "Robot shall before user_request_executed satisfy command_intent_verified"
+    }
+  },
+  {
+    "guarantee": 16,
+    "reqids": [
+      "R100"
+    ],
+    "fulltext": {
+      "R100": "Robot shall always satisfy user_interaction_initiated_successfully"
+    }
+  },
+  {
+    "guarantee": 17,
+    "reqids": [
+      "S03_b"
+    ],
+    "fulltext": {
+      "S03_b": "whenever background_noise_overpowering Robot shall with probability > 0.9 before confirm_command satisfy use_multiple_modalities"
+    }
+  },
+  {
+    "guarantee": 18,
+    "reqids": [
+      "C02_a"
+    ],
+    "fulltext": {
+      "C02_a": "whenever ambiguity_present | risk_present Robot shall immediately satisfy confirm_command"
+    }
+  },
+  {
+    "guarantee": 19,
+    "reqids": [
+      "S05_b"
+    ],
+    "fulltext": {
+      "S05_b": "upon garment_detection_failed Robot shall immediately satisfy query_user_for_garment"
+    }
+  },
+  {
+    "guarantee": 20,
+    "reqids": [
+      "S06"
+    ],
+    "fulltext": {
+      "S06": "upon gesture_command_detected Robot shall immediately satisfy use_multiple_modalities & request_user_confirmation"
+    }
+  },
+  {
+    "guarantee": 21,
+    "reqids": [
+      "S07_c"
+    ],
+    "fulltext": {
+      "S07_c": "Upon dressing_started Robot shall immediately satisfy user_reminded_to_remain_seated"
+    }
+  },
+  {
+    "guarantee": 22,
+    "reqids": [
+      "S09_a"
+    ],
+    "fulltext": {
+      "S09_a": "if user_interference Robot shall immediately satisfy remind_user_to_remain_still & remind_user_not_to_move_garment"
+    }
+  },
+  {
+    "guarantee": 23,
+    "reqids": [
+      "S10_a"
+    ],
+    "fulltext": {
+      "S10_a": "if user_removes_garment Robot shall immediately satisfy remind_user_not_to_move_garment & Nxt(confirm_steps_with_user)"
+    }
+  },
+  {
+    "guarantee": 24,
+    "reqids": [
+      "S10_a"
+    ],
+    "fulltext": {
+      "S10_a": "if user_removes_garment Robot shall immediately satisfy remind_user_not_to_move_garment & Nxt(confirm_steps_with_user)"
+    }
+  },
+  {
+    "guarantee": 25,
+    "reqids": [
+      "C05_b",
+      "C05_a"
+    ],
+    "fulltext": {
+      "C05_b": "Upon user_speech_detected_during_audio_feedback Robot shall immediately satisfy audio_feedback_stopped",
+      "C05_a": "Upon user_speech_detected_during_audio_feedback Robot shall immediately satisfy audio_feedback_stopped"
+    }
+  },
+  {
+    "guarantee": 26,
+    "reqids": [
+      "S12",
+      "S16_a"
+    ],
+    "fulltext": {
+      "S12": "in dressing_mode whenever dressing_stage_active Robot shall eventually satisfy remind_user_to_remain_still",
+      "S16_a": "in dressing_mode whenever dressing_stage_active Robot shall eventually satisfy remind_user_to_remain_still"
+    }
+  },
+  {
+    "guarantee": 27,
+    "reqids": [
+      "S14"
+    ],
+    "fulltext": {
+      "S14": "if unsuitable_user_pose_detected Robot shall immediately satisfy task_paused & request_suitable_pose"
+    }
+  },
+  {
+    "guarantee": 28,
+    "reqids": [
+      "C06"
+    ],
+    "fulltext": {
+      "C06": "Upon (gesture_detected & gesture_detection_confidence <= 0.9) Robot shall before gesture_acted_upon satisfy user_gesture_confirmation_requested"
+    }
+  },
+  {
+    "guarantee": 29,
+    "reqids": [
+      "S15"
+    ],
+    "fulltext": {
+      "S15": "if second_actor_detected Robot shall immediately satisfy task_paused & query_second_person_presence"
+    }
+  },
+  {
+    "guarantee": 30,
+    "reqids": [
+      "C08_a"
+    ],
+    "fulltext": {
+      "C08_a": "Robot shall always satisfy instructions_clear_and_unambiguous"
+    }
+  },
+  {
+    "guarantee": 31,
+    "reqids": [
+      "C08_b"
+    ],
+    "fulltext": {
+      "C08_b": "Robot shall always satisfy multimodal_output_supported"
+    }
+  },
+  {
+    "guarantee": 32,
+    "reqids": [
+      "R09_1"
+    ],
+    "fulltext": {
+      "R09_1": "Upon (task_started | task_continued) Robot shall satisfy current_task_and_robot_motion_announced_to_user"
+    }
+  },
+  {
+    "guarantee": 33,
+    "reqids": [
+      "R09_2"
+    ],
+    "fulltext": {
+      "R09_2": "Upon task_or_response_processing_started Robot shall after 60 seconds satisfy (task_or_response_processing_in_progress ->  (user_notified_of_delay & current_task_status_provided))"
+    }
+  },
+  {
+    "guarantee": 34,
+    "reqids": [
+      "S21"
+    ],
+    "fulltext": {
+      "S21": "In dressing_mode upon wrong_limb_probability >= 0.9 Robot shall satisfy user_advised_to_present_correct_limb"
+    }
+  },
+  {
+    "guarantee": 35,
+    "reqids": [
+      "R10"
+    ],
+    "fulltext": {
+      "R10": "Robot shall before fetch_item satisfy request_garment_verification"
+    }
+  },
+  {
+    "guarantee": 36,
+    "reqids": [
+      "S09_b"
+    ],
+    "fulltext": {
+      "S09_b": "if user_interference & lost_task_segmentation Robot shall immediately satisfy confirm_steps_with_user"
+    }
+  },
+  {
+    "guarantee": 37,
+    "reqids": [
+      "C02_b"
+    ],
+    "fulltext": {
+      "C02_b": "whenever high_risk_command Robot shall before execution satisfy explicit_validation_from_user"
+    }
+  },
+  {
+    "guarantee": 38,
+    "reqids": [
+      "C03_a"
+    ],
+    "fulltext": {
+      "C03_a": "whenever different_garment_requested Robot shall immediately satisfy exit_dressing_sequence & update_garment_selection & initiate_dressing_process"
+    }
+  },
+  {
+    "guarantee": 39,
+    "reqids": [
+      "C03_b"
+    ],
+    "fulltext": {
+      "C03_b": "Robot shall always satisfy able_to_restart_dressing_sequence"
+    }
+  },
+  {
+    "guarantee": 40,
+    "reqids": [
+      "R02"
+    ],
+    "fulltext": {
+      "R02": "Robot shall before task_initiation satisfy request_validated & user_confirmation_received"
+    }
+  },
+  {
+    "guarantee": 41,
+    "reqids": [
+      "R07"
+    ],
+    "fulltext": {
+      "R07": "Robot shall before request_validated satisfy user_confirmation_received & sensor_validation_complete"
+    }
+  },
+  {
+    "guarantee": 42,
+    "reqids": [
+      "R17",
+      "R18"
+    ],
+    "fulltext": {
+      "R17": "Robot shall before movement_initiated satisfy request_validated & user_confirmation_received",
+      "R18": "Robot shall before movement_initiated satisfy request_validated & user_confirmation_received"
+    }
+  },
+  {
+    "guarantee": 43,
+    "reqids": [
+      "S07_d_1"
+    ],
+    "fulltext": {
+      "S07_d_1": "whenever balance_lost Robot shall immediately satisfy issue_balance_assistance_query"
+    }
+  },
+  {
+    "guarantee": 44,
+    "reqids": [
+      "S07_d_2"
+    ],
+    "fulltext": {
+      "S07_d_2": "whenever balance_assistance_requested Robot shall immediately satisfy provide_assistance"
+    }
+  },
+  {
+    "guarantee": 45,
+    "reqids": [
+      "S08_a"
+    ],
+    "fulltext": {
+      "S08_a": "whenever garment_detection_failed Robot shall immediately satisfy task_paused & garment_location_query_issued"
+    }
+  },
+  {
+    "guarantee": 46,
+    "reqids": [
+      "S18_1",
+      "S20_1",
+      "S24_1",
+      "S17_b_1"
+    ],
+    "fulltext": {
+      "S18_1": "Robot shall always satisfy track_user_position",
+      "S20_1": "Robot shall always satisfy track_user_position",
+      "S24_1": "Robot shall always satisfy track_user_position",
+      "S17_b_1": "Robot shall always satisfy track_user_position"
+    }
+  },
+  {
+    "guarantee": 47,
+    "reqids": [
+      "S18_2",
+      "S20_2",
+      "S24_2",
+      "S17_b_2"
+    ],
+    "fulltext": {
+      "S18_2": "whenever user_out_of_range Robot shall immediately satisfy alert_user",
+      "S20_2": "whenever user_out_of_range Robot shall immediately satisfy alert_user",
+      "S24_2": "whenever user_out_of_range Robot shall immediately satisfy alert_user",
+      "S17_b_2": "whenever user_out_of_range Robot shall immediately satisfy alert_user"
+    }
+  },
+  {
+    "guarantee": 48,
+    "reqids": [
+      "S71"
+    ],
+    "fulltext": {
+      "S71": "whenever detect_user_request_not_received Robot shall before continue satisfy request_confirmation"
+    }
+  },
+  {
+    "guarantee": 49,
+    "reqids": [
+      "S03_c"
+    ],
+    "fulltext": {
+      "S03_c": "upon background_noise_overpowering  Robot shall immediately satisfy notify_noise_confusion"
+    }
+  },
+  {
+    "guarantee": 50,
+    "reqids": [
+      "S04_b"
+    ],
+    "fulltext": {
+      "S04_b": "upon vision_occluded Robot shall immediately satisfy notify_user"
+    }
+  },
+  {
+    "guarantee": 51,
+    "reqids": [
+      "S05_c"
+    ],
+    "fulltext": {
+      "S05_c": "in detectionMode Robot shall at the first timepoint satisfy notify_user_of_detection_mode & remind_user_not_to_move_garment"
+    }
+  },
+  {
+    "guarantee": 52,
+    "reqids": [
+      "S08_b"
+    ],
+    "fulltext": {
+      "S08_b": "if user_moves_garment Robot shall immediately satisfy (remind_user_not_to_move_garment & remind_user_to_not_obstruct_camera_view)"
+    }
+  },
+  {
+    "guarantee": 53,
+    "reqids": [
+      "S10_b"
+    ],
+    "fulltext": {
+      "S10_b": "upon (garment_grip_expected & !garment_gripped) Robot shall immediately satisfy alert_user"
+    }
+  },
+  {
+    "guarantee": 54,
+    "reqids": [
+      "S13"
+    ],
+    "fulltext": {
+      "S13": "upon user_tracking_lost Robot shall immediately satisfy notify_user"
+    }
+  },
+  {
+    "guarantee": 55,
+    "reqids": [
+      "R19_1",
+      "C04_a_1",
+      "R61_1",
+      "R11_1",
+      "R14_1",
+      "R16_1"
+    ],
+    "fulltext": {
+      "R19_1": "Upon (task_failure_condition | task_time_bound_exceeded) Robot shall immediately satisfy (task_exception_detected & task_paused)",
+      "C04_a_1": "Upon (task_failure_condition | task_time_bound_exceeded) Robot shall immediately satisfy (task_exception_detected & task_paused)",
+      "R61_1": "Upon (task_failure_condition | task_time_bound_exceeded) Robot shall immediately satisfy (task_exception_detected & task_paused)",
+      "R11_1": "Upon (task_failure_condition | task_time_bound_exceeded) Robot shall immediately satisfy (task_exception_detected & task_paused)",
+      "R14_1": "Upon (task_failure_condition | task_time_bound_exceeded) Robot shall immediately satisfy (task_exception_detected & task_paused)",
+      "R16_1": "Upon (task_failure_condition | task_time_bound_exceeded) Robot shall immediately satisfy (task_exception_detected & task_paused)"
+    }
+  },
+  {
+    "guarantee": 56,
+    "reqids": [
+      "R19_2",
+      "C04_a_2",
+      "R61_2",
+      "R11_2",
+      "R14_2",
+      "R16_2"
+    ],
+    "fulltext": {
+      "R19_2": "Upon task_exception_detected Robot shall before task_continued satisfy (user_notified & appropriate_user_input_requested)",
+      "C04_a_2": "Upon task_exception_detected Robot shall before task_continued satisfy (user_notified & appropriate_user_input_requested)",
+      "R61_2": "Upon task_exception_detected Robot shall before task_continued satisfy (user_notified & appropriate_user_input_requested)",
+      "R11_2": "Upon task_exception_detected Robot shall before task_continued satisfy (user_notified & appropriate_user_input_requested)",
+      "R14_2": "Upon task_exception_detected Robot shall before task_continued satisfy (user_notified & appropriate_user_input_requested)",
+      "R16_2": "Upon task_exception_detected Robot shall before task_continued satisfy (user_notified & appropriate_user_input_requested)"
+    }
+  },
+  {
+    "guarantee": 57,
+    "reqids": [
+      "S32_a",
+      "S19_a",
+      "S23_a",
+      "S27_a",
+      "S28_a"
+    ],
+    "fulltext": {
+      "S32_a": "Upon user_pose_change_detected Robot shall before task_resumed satisfy (user_position_estimate_updated & trajectory_adjusted_to_user_position)",
+      "S19_a": "Upon user_pose_change_detected Robot shall before task_resumed satisfy (user_position_estimate_updated & trajectory_adjusted_to_user_position)",
+      "S23_a": "Upon user_pose_change_detected Robot shall before task_resumed satisfy (user_position_estimate_updated & trajectory_adjusted_to_user_position)",
+      "S27_a": "Upon user_pose_change_detected Robot shall before task_resumed satisfy (user_position_estimate_updated & trajectory_adjusted_to_user_position)",
+      "S28_a": "Upon user_pose_change_detected Robot shall before task_resumed satisfy (user_position_estimate_updated & trajectory_adjusted_to_user_position)"
+    }
+  },
+  {
+    "guarantee": 58,
+    "reqids": [
+      "R36",
+      "R37"
+    ],
+    "fulltext": {
+      "R36": "Robot shall always satisfy ((process_starting | process_continuing) -> user_presence_validated_by_multiple_sensors)",
+      "R37": "Robot shall always satisfy ((process_starting | process_continuing) -> user_presence_validated_by_multiple_sensors)"
+    }
+  },
+  {
+    "guarantee": 59,
+    "reqids": [
+      "R91",
+      "R46",
+      "R56",
+      "R86"
+    ],
+    "fulltext": {
+      "R91": "Upon required_pose_information_unavailable Robot shall before task_resumed satisfy multimodal_pose_detection_active",
+      "R46": "Upon required_pose_information_unavailable Robot shall before task_resumed satisfy multimodal_pose_detection_active",
+      "R56": "Upon required_pose_information_unavailable Robot shall before task_resumed satisfy multimodal_pose_detection_active",
+      "R86": "Upon required_pose_information_unavailable Robot shall before task_resumed satisfy multimodal_pose_detection_active"
+    }
+  },
+  {
+    "guarantee": 60,
+    "reqids": [
+      "R94"
+    ],
+    "fulltext": {
+      "R94": "Upon pose_update_required Robot shall within 30 seconds satisfy (pose_update_need_recognised |  (pose_update_recognition_delay_detected &   user_notified_of_pose_update_delay))"
+    }
+  },
+  {
+    "guarantee": 61,
+    "reqids": [
+      "R39",
+      "R44",
+      "C04_a_3",
+      "R49"
+    ],
+    "fulltext": {
+      "R39": "Upon pose_detection_requested Robot shall within 30 seconds satisfy pose_detected",
+      "R44": "Upon pose_detection_requested Robot shall within 30 seconds satisfy pose_detected",
+      "C04_a_3": "Upon pose_detection_requested Robot shall within 30 seconds satisfy pose_detected",
+      "R49": "Upon pose_detection_requested Robot shall within 30 seconds satisfy pose_detected"
+    }
+  },
+  {
+    "guarantee": 62,
+    "reqids": [
+      "S05_a"
+    ],
+    "fulltext": {
+      "S05_a": "Robot shall before dressing_actions_initiated satisfy  garment_presence_detected"
+    }
+  },
+  {
+    "guarantee": 63,
+    "reqids": [
+      "C04_a_4",
+      "R54",
+      "R59",
+      "R89"
+    ],
+    "fulltext": {
+      "C04_a_4": "Upon trajectory_information_requested Robot shall within 60 seconds satisfy (trajectory_information_available |  (trajectory_information_delay_detected &   user_notified_of_trajectory_delay))",
+      "R54": "Upon trajectory_information_requested Robot shall within 60 seconds satisfy (trajectory_information_available |  (trajectory_information_delay_detected &   user_notified_of_trajectory_delay))",
+      "R59": "Upon trajectory_information_requested Robot shall within 60 seconds satisfy (trajectory_information_available |  (trajectory_information_delay_detected &   user_notified_of_trajectory_delay))",
+      "R89": "Upon trajectory_information_requested Robot shall within 60 seconds satisfy (trajectory_information_available |  (trajectory_information_delay_detected &   user_notified_of_trajectory_delay))"
+    }
+  },
+  {
+    "guarantee": 64,
+    "reqids": [
+      "C04_a_6"
+    ],
+    "fulltext": {
+      "C04_a_6": "Upon corrective_action_required Robot shall within 30 seconds satisfy  corrective_action_applied"
+    }
+  },
+  {
+    "guarantee": 65,
+    "reqids": [
+      "S07_a"
+    ],
+    "fulltext": {
+      "S07_a": "Whenever potential_robot_user_collision Robot shall with probability >= 0.9 immediately satisfy collision_detected"
+    }
+  },
+  {
+    "guarantee": 66,
+    "reqids": [
+      "C04_b"
+    ],
+    "fulltext": {
+      "C04_b": "Upon action_response_time_exceeded Robot shall immediately satisfy (delay_reduction_behaviour_activated | user_informed_of_delay)"
+    }
+  },
+  {
+    "guarantee": 67,
+    "reqids": [
+      "R51"
+    ],
+    "fulltext": {
+      "R51": "Upon required_pose_information_still_unavailable Robot shall before task_resumed satisfy user_notified"
+    }
+  },
+  {
+    "guarantee": 68,
+    "reqids": [
+      "S16_b"
+    ],
+    "fulltext": {
+      "S16_b": "In dressing_mode whenever user_movement_detected Robot shall immediately satisfy (non_rigid_trajectory_active & user_movement_tracked)"
+    }
+  },
+  {
+    "guarantee": 69,
+    "reqids": [
+      "R01"
+    ],
+    "fulltext": {
+      "R01": "Upon command_recognition_failed Robot shall eventually satisfy user_prompted_to_repeat_or_clarify_request"
+    }
+  },
+  {
+    "guarantee": 70,
+    "reqids": [
+      "R04"
+    ],
+    "fulltext": {
+      "R04": "Robot shall always satisfy (timer_checks_active & !long_or_infinite_processing_loop)"
+    }
+  },
+  {
+    "guarantee": 71,
+    "reqids": [
+      "R05"
+    ],
+    "fulltext": {
+      "R05": "Upon (expected_task_duration_exceeded | task_behaviour_inconsistent) Robot shall before task_continued satisfy user_clarification_requested"
+    }
+  },
+  {
+    "guarantee": 72,
+    "reqids": [
+      "R06"
+    ],
+    "fulltext": {
+      "R06": "Upon required_element_missing_or_unobservable_detected Robot shall before task_continued satisfy user_or_external_assistance_requested"
+    }
+  },
+  {
+    "guarantee": 73,
+    "reqids": [
+      "C07_a"
+    ],
+    "fulltext": {
+      "C07_a": "In task_execution Robot shall always satisfy monitor_user_attention & monitor_user_engagement"
+    }
+  }
+]
