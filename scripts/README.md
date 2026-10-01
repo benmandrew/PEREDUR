@@ -524,6 +524,10 @@ ideals = "on"          # label candidates against the family's ideals
 epsilon = ""           # separation thresholds, e.g. "0.05,0.2,0.5"; none if empty
 fingerprint_words = 256
 fingerprint_seed = 0
+fingerprint_max_prefix = 2         # longest lasso stem
+fingerprint_max_cycle = 3          # longest lasso loop; stem + loop <= 64
+fingerprint_distance = "hamming"   # or "union"
+members_from = ""      # an earlier maximality pass's out; recounts its maximal nets
 ```
 
 `maximal_timeout` bounds one `maximal --curve` walk a run, and `deadline_s`
@@ -548,6 +552,25 @@ one sampling. A phase states every budget on the scorer's command line, so
 the manifest records which stages it ran and which binaries decided them --
 an epsilon-only pass names `fingerprint` and neither `maximal` nor
 `compare`.
+
+The lasso shape and the distance are part of that sampling too. Every archived
+separation count was drawn at a stem of at most 2 and a loop of at most 3,
+five positions in all, under `hamming`, which divides a pair's disagreement by
+every sampled word. `union` divides it by the words either candidate
+satisfies. On long lassos the two part company: a typical candidate rejects
+almost every 64-position word, so `hamming` reads every pair as close, and
+over one 8786-candidate rg2 run its net at 0.05 fell from 3499 to 393 between
+five and 64 positions where `union`'s fell from 4441 to 1682.
+
+`members_from` recounts the `eps_maximal_solutions_<e>` nets without the
+maximality sweep. It names an earlier maximality pass's `out`, whose
+`<run>.members.tsv` sidecars record each cut's antichain, and needs
+`maximality = "off"` and a non-empty `epsilon`. The candidates are
+fingerprinted afresh under the phase's sampling, so a change of word count,
+shape or distance costs one `fingerprint` call a run rather than the 311.7
+worker-hours the antichains took. The recount inherits that pass's budgets: a
+run it never scored, or a cut its walk never reached, has no membership and
+writes no maximal row here either.
 
 Either `results` or a profile (the phase's own, or the campaign's) must be
 present. Every budget defaults to `score_campaign.DEFAULTS` and is stated on

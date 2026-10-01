@@ -1889,17 +1889,20 @@ RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts"}
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s",
                      "maximality", "ideals", "epsilon",
-                     "fingerprint_words", "fingerprint_seed")
+                     "fingerprint_words", "fingerprint_seed",
+                     "fingerprint_max_prefix", "fingerprint_max_cycle",
+                     "fingerprint_distance", "members_from")
 # The two of those that are not counts. `maximality` says whether the
 # solver-bound implication sweep runs at all and `epsilon` is the list of
 # separation thresholds, empty for none; both reach the scorer as strings and
 # are checked against what it accepts rather than as positive integers.
-SCORE_CHOICE_KEYS = {"maximality": ("on", "off"), "ideals": ("on", "off")}
-SCORE_STRING_KEYS = ("epsilon",)
+SCORE_CHOICE_KEYS = {"maximality": ("on", "off"), "ideals": ("on", "off"),
+                     "fingerprint_distance": ("hamming", "union")}
+SCORE_STRING_KEYS = ("epsilon", "members_from")
 # Zero is a seed like any other, so this one is bounded below at zero rather
 # than at one. Every other count here is a budget, where zero means nothing
 # runs.
-SCORE_NONNEGATIVE_KEYS = ("fingerprint_seed",)
+SCORE_NONNEGATIVE_KEYS = ("fingerprint_seed", "fingerprint_max_prefix")
 SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
                     *SCORE_BUDGET_KEYS}
 PHASE_KEYS = RUN_PHASE_KEYS | SCORE_PHASE_KEYS
@@ -2232,6 +2235,15 @@ def normalise_score_phase(phase: dict, where: str, profile,
     if budgets["maximality"] == "off" and not budgets["epsilon"]:
         raise CampaignError(f"{where}: maximality is off and epsilon is "
                             f"empty, so this phase would score nothing")
+    if budgets.get("members_from") and budgets["maximality"] == "on":
+        raise CampaignError(f"{where}: members_from reads the membership "
+                            f"the maximality stage would compute, so it "
+                            f"needs maximality off")
+    if budgets.get("fingerprint_max_prefix", 2) + \
+            budgets.get("fingerprint_max_cycle", 3) > 64:
+        raise CampaignError(f"{where}: fingerprint_max_prefix + "
+                            f"fingerprint_max_cycle must not exceed 64, a "
+                            f"lasso's position limit")
     if "wall_cap_s" not in budgets:
         import score_campaign  # noqa: PLC0415
         budgets["wall_cap_s"] = score_campaign.wall_cap_default(

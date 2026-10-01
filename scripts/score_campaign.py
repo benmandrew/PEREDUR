@@ -89,6 +89,14 @@ DEFAULTS = {
     "epsilon": "",
     "fingerprint_words": 256,
     "fingerprint_seed": 0,
+    # The lasso shape and the distance every archived count was drawn under.
+    "fingerprint_max_prefix": 2,
+    "fingerprint_max_cycle": 3,
+    "fingerprint_distance": "hamming",
+    # Empty runs the maximality stage, or none, as `maximality` says. A
+    # directory recounts the maximal nets from that pass's membership
+    # sidecars instead, which needs maximality off.
+    "members_from": "",
 }
 # The outer `timeout` sits this far past score_curves.py's own deadline: the
 # deadline stops new cuts being started, and one cut's maximal call may still
@@ -222,7 +230,14 @@ def scorer_args(args, part: str, run_dir: str) -> list:
     if args.epsilon:
         command += ["--epsilon", args.epsilon,
                     "--fingerprint-words", str(args.fingerprint_words),
-                    "--fingerprint-seed", str(args.fingerprint_seed)]
+                    "--fingerprint-seed", str(args.fingerprint_seed),
+                    "--fingerprint-max-prefix",
+                    str(args.fingerprint_max_prefix),
+                    "--fingerprint-max-cycle",
+                    str(args.fingerprint_max_cycle),
+                    "--fingerprint-distance", args.fingerprint_distance]
+    if args.members_from:
+        command += ["--members-from", str(resolve(args.members_from))]
     return command + [
         "--cuts", str(args.cuts), "--jobs", str(args.cores),
         "--deadline-s", str(args.deadline_s),
@@ -501,6 +516,23 @@ def parse_args(argv=None) -> argparse.Namespace:
                         default=DEFAULTS["fingerprint_seed"],
                         help="word-sampling seed for --epsilon "
                              f"(default: {DEFAULTS['fingerprint_seed']})")
+    parser.add_argument("--fingerprint-max-prefix", type=int,
+                        default=DEFAULTS["fingerprint_max_prefix"],
+                        help="longest lasso stem for --epsilon (default: "
+                             f"{DEFAULTS['fingerprint_max_prefix']})")
+    parser.add_argument("--fingerprint-max-cycle", type=int,
+                        default=DEFAULTS["fingerprint_max_cycle"],
+                        help="longest lasso loop for --epsilon (default: "
+                             f"{DEFAULTS['fingerprint_max_cycle']})")
+    parser.add_argument("--fingerprint-distance", choices=("hamming", "union"),
+                        default=DEFAULTS["fingerprint_distance"],
+                        help="normaliser of the separation distance "
+                             f"(default: {DEFAULTS['fingerprint_distance']})")
+    parser.add_argument("--members-from", default=DEFAULTS["members_from"],
+                        help="an earlier maximality pass's output directory; "
+                             "recounts its maximal nets from the membership "
+                             "sidecars there, with --maximality off "
+                             "(default: none)")
     parser.add_argument("--deadline-s", type=int,
                         default=DEFAULTS["deadline_s"],
                         help=f"score_curves.py stops adding cuts after this "
@@ -518,6 +550,13 @@ def parse_args(argv=None) -> argparse.Namespace:
                  "compare_timeout", "deadline_s"):
         if getattr(args, name) < 1:
             parser.error(f"--{name.replace('_', '-')} must be positive")
+    if args.members_from:
+        if args.maximality == "on":
+            parser.error("--members-from needs --maximality off: it reads "
+                         "the membership that stage would compute")
+        if not args.epsilon:
+            parser.error("--members-from recounts the epsilon nets, so it "
+                         "needs --epsilon")
     if args.wall_cap_s is None:
         args.wall_cap_s = wall_cap_default(args.deadline_s)
     elif args.wall_cap_s < 1:
@@ -536,6 +575,10 @@ def main(argv=None) -> int:
     out = resolve(args.out)
     if not results.is_dir():
         print(f"no results directory at {results}", file=sys.stderr)
+        return 2
+    if args.members_from and not resolve(args.members_from).is_dir():
+        print(f"no membership directory at {resolve(args.members_from)}",
+              file=sys.stderr)
         return 2
     # Refused before the queue is built: an oversized pool is not a slow
     # pass but a fast one, `taskset -c` on a core the host does not have

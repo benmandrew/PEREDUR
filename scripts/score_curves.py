@@ -54,6 +54,14 @@ the size of the curve file that replaced them -- the long format repeats eight
 run-identifying columns on every row, where a member is a name -- and they
 make every one of those questions arithmetic.
 
+--members-from recounts the maximal nets without the maximality stage. It
+reads each run's membership from an earlier pass's `<run>.members.tsv` and
+fingerprints the candidates afresh, so the word count, the lasso shape
+(--fingerprint-max-prefix, --fingerprint-max-cycle) and the distance
+(--fingerprint-distance) can all change while the antichains stay those the
+solver decided. It is a recount of that pass and inherits its budgets: a cut
+the walk never reached has no membership, and so no row here either.
+
 The maximality half is a separate stage behind --maximality, off by default. It
 is computed offline, after and apart from the timed run, and must never be read
 as part of it. It is one `maximal --curve` walk a run: the binary keeps a
@@ -68,6 +76,10 @@ Usage:
     python scripts/score_curves.py <run-dir> --summary       # one row per run
     python scripts/score_curves.py <run-dir> --maximality    # + metrics 5, 6
     python scripts/score_curves.py <run-dir> --cuts 40 --jobs 8
+    python scripts/score_curves.py <run-dir> --epsilon 0.05,0.2 \
+        --members-from experiments/separation-maximal-rematch \
+        --fingerprint-words 4096 --fingerprint-max-prefix 32 \
+        --fingerprint-max-cycle 32 --fingerprint-distance union
     python scripts/score_curves.py <run-dir> --out curves.csv
 
 A run that found nothing has no time to a first repair. Every such value is
@@ -102,6 +114,13 @@ MAXIMAL_BIN = Path(os.environ.get("MAXIMAL_BIN",
                                   REPO_ROOT / "build-release" / "maximal"))
 FINGERPRINT_BIN = Path(os.environ.get(
     "FINGERPRINT_BIN", REPO_ROOT / "build-release" / "fingerprint"))
+# The `fingerprint` binary's own lasso shape defaults, which every archived
+# separation count was drawn under: a stem of at most two positions and a loop
+# of at most three. The two sum to at most 64, one bit per position.
+DEFAULT_MAX_PREFIX = 2
+DEFAULT_MAX_CYCLE = 3
+MAX_POSITIONS = 64
+DISTANCES = ("hamming", "union")
 
 ACCUMULATED_DIR = "accumulated"
 INDEX_NAME = "index.tsv"
@@ -408,8 +427,8 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
                     prints: dict[str, int] | None = None,
                     epsilons: list[float] | None = None,
                     n_words: int = 0,
-                    members: list[tuple[float, str]] | None = None
-                    ) -> list[dict]:
+                    members: list[tuple[float, str]] | None = None,
+                    distance: str = "hamming") -> list[dict]:
     """Report the maximal antichain over prefixes of the accumulated set.
 
     One `maximal --curve` walk answers every cut. What it replaced was a
@@ -480,8 +499,8 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
                 rows.append({
                     **base, "metric": f"eps_maximal_solutions_{epsilon:g}",
                     "elapsed_s": f"{cut:.6f}",
-                    "value": separated_count(ordered,
-                                             int(epsilon * n_words)),
+                    "value": net_count(ordered, epsilon, n_words,
+                                       distance),
                     "censored": 0})
     return rows
 
@@ -503,22 +522,26 @@ def comma_separated_fractions(text: str) -> list[float]:
 
 
 def fingerprints_of(accumulated: Path, spec: str, n_words: int,
-                    seed: int) -> dict[str, int] | None:
+                    seed: int, max_prefix: int = DEFAULT_MAX_PREFIX,
+                    max_cycle: int = DEFAULT_MAX_CYCLE
+                    ) -> dict[str, int] | None:
     """Return each accumulated candidate's fingerprint as an integer bit set.
 
     The words are drawn over the family's *original* specification rather than
     over each candidate's own signal list, so every candidate of a family --
     and every candidate of the other tool's runs on that family -- is measured
     against one word set. `fingerprint` derives the words from that file, the
-    count and the seed alone, so nothing has to travel between the hosts that
-    score the two sides.
+    count, the seed and the two shape bounds alone, so nothing has to travel
+    between the hosts that score the two sides.
     """
     signals = EXAMPLES_DIR / spec / "spec.tlsf"
     if not signals.is_file():
         print(f"WARN: no specification at {signals}", file=sys.stderr)
         return None
     command = [str(FINGERPRINT_BIN), "--signals", str(signals),
-               "--words", str(n_words), "--seed", str(seed), str(accumulated)]
+               "--words", str(n_words), "--seed", str(seed),
+               "--max-prefix", str(max_prefix),
+               "--max-cycle", str(max_cycle), str(accumulated)]
     try:
         result = subprocess.run(command, capture_output=True, text=True,
                                 check=False)
@@ -556,23 +579,97 @@ def separated_count(prints: list[int], threshold: int) -> int:
     return len(kept)
 
 
+def union_separated_count(prints: list[int], epsilon: float) -> int:
+    """The greedy net under the distance normalised by the pair's union.
+
+    Two candidates are apart when they disagree on more than `epsilon` of the
+    words either one satisfies. The `hamming` distance divides by every
+    sampled word instead, and on long lassos, which a typical candidate
+    rejects almost all of, that reads every pair as close: over 8786
+    candidates of one rg2 run, 32-position words left a median candidate
+    satisfying 3.5% of them, and the hamming net at 0.05 fell from 3499 to
+    393 for no change in the candidates. A pair satisfying no word at all is
+    at distance zero.
+    """
+    kept: list[int] = []
+    for value in prints:
+        if all((value ^ other).bit_count() >
+               epsilon * (value | other).bit_count() for other in kept):
+            kept.append(value)
+    return len(kept)
+
+
+def net_count(prints: list[int], epsilon: float, n_words: int,
+              distance: str) -> int:
+    """The greedy net at `epsilon` under the named distance."""
+    if distance == "union":
+        return union_separated_count(prints, epsilon)
+    # Strictly greater than the threshold, so epsilon = 0 keeps one
+    # representative of each distinct fingerprint rather than all of them.
+    return separated_count(prints, int(epsilon * n_words))
+
+
 def epsilon_rows(base: dict, index: list[tuple[str, int, float]],
                  prints: dict[str, int], epsilons: list[float],
-                 n_words: int, n_cuts: int, end_s) -> list[dict]:
+                 n_words: int, n_cuts: int, end_s,
+                 distance: str = "hamming") -> list[dict]:
     """One curve per epsilon, at the cuts the other curves use."""
     by_time = sorted(index, key=lambda row: row[2])
     ordered = [(row[2], prints[row[0]]) for row in by_time
                if row[0] in prints]
     rows: list[dict] = []
     for epsilon in epsilons:
-        # Strictly greater than the threshold, so epsilon = 0 keeps one
-        # representative of each distinct fingerprint rather than all of them.
-        threshold = int(epsilon * n_words)
         points: list[tuple[float, int]] = []
         for cut in time_cuts([moment for moment, _ in ordered], n_cuts):
             prefix = [value for moment, value in ordered if moment <= cut]
-            points.append((cut, separated_count(prefix, threshold)))
+            points.append((cut, net_count(prefix, epsilon, n_words,
+                                          distance)))
         rows += curve_rows(base, f"eps_solutions_{epsilon:g}", points, end_s)
+    return rows
+
+
+def read_members(path: Path) -> list[tuple[float, str]] | None:
+    """The (cut, file) rows of a `.members.tsv` sidecar, in file order.
+
+    File order is admission order within a cut, which is the order the
+    maximality stage fed its own net, so a net read back from here keeps the
+    representatives that one would have kept.
+    """
+    try:
+        with open(path, newline="") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return None
+    members: list[tuple[float, str]] = []
+    for line in lines[1:]:
+        cut, _, name = line.partition("\t")
+        if name:
+            members.append((float(cut), name))
+    return members
+
+
+def members_rows(base: dict, members: list[tuple[float, str]],
+                 prints: dict[str, int], epsilons: list[float],
+                 n_words: int, distance: str) -> list[dict]:
+    """The eps_maximal_solutions rows, from recorded membership.
+
+    The rows `maximality_rows` writes, at the cuts it wrote them, with the
+    maximal antichain read from a sidecar instead of from a `maximal` walk.
+    A member with no fingerprint is left out of the net, as a candidate is
+    there.
+    """
+    by_cut: dict[float, list[str]] = {}
+    for cut, name in members:
+        by_cut.setdefault(cut, []).append(name)
+    rows: list[dict] = []
+    for cut, survivors in by_cut.items():
+        ordered = [prints[name] for name in survivors if name in prints]
+        for epsilon in epsilons:
+            rows.append({
+                **base, "metric": f"eps_maximal_solutions_{epsilon:g}",
+                "elapsed_s": f"{cut:.6f}",
+                "value": net_count(ordered, epsilon, n_words, distance),
+                "censored": 0})
     return rows
 
 
@@ -632,23 +729,42 @@ def score_run(run_dir: Path, args, deadline: float | None = None,
     # curve stage added later must not break one built before it existed.
     epsilons = getattr(args, "epsilon", None)
     n_words = getattr(args, "fingerprint_words", 256)
+    distance = getattr(args, "fingerprint_distance", "hamming")
+    members_from = getattr(args, "members_from", None)
     prints: dict[str, int] | None = None
     if epsilons and index:
-        prints = fingerprints_of(accumulated, spec, n_words,
-                                 getattr(args, "fingerprint_seed", 0))
+        prints = fingerprints_of(
+            accumulated, spec, n_words, getattr(args, "fingerprint_seed", 0),
+            getattr(args, "fingerprint_max_prefix", DEFAULT_MAX_PREFIX),
+            getattr(args, "fingerprint_max_cycle", DEFAULT_MAX_CYCLE))
     members: list[tuple[float, str]] = []
     if args.maximality and index:
         rows += maximality_rows(base, index, accumulated, implying,
                                 args.cuts, args.jobs, args.maximal_timeout,
                                 deadline, prints, epsilons or [], n_words,
-                                members)
+                                members, distance)
+    elif members_from and index:
+        # The membership an earlier maximality pass recorded, so the maximal
+        # nets can be recounted under another sampling without the solver
+        # sweep. A run that pass never scored has no sidecar and gets no
+        # maximal rows, which is how a run it timed out on reads there too.
+        recorded = read_members(sidecar_paths(
+            Path(members_from) / f"{run_dir.name}.csv")[0])
+        if recorded is None:
+            print(f"WARN: no membership for {run_dir.name} in "
+                  f"{members_from}", file=sys.stderr)
+        else:
+            members = recorded
+            if prints:
+                rows += members_rows(base, members, prints, epsilons or [],
+                                     n_words, distance)
     if sidecars is not None:
         sidecars["members"] = members
         sidecars["fingerprints"] = prints or {}
         sidecars["n_words"] = n_words
     if epsilons and index and prints is not None:
         rows += epsilon_rows(base, index, prints, epsilons, n_words,
-                             args.cuts, end_s)
+                             args.cuts, end_s, distance)
     return rows
 
 
@@ -734,6 +850,24 @@ def main() -> int:
                              "(default: 256)")
     parser.add_argument("--fingerprint-seed", type=int, default=0,
                         help="word-sampling seed for --epsilon (default: 0)")
+    parser.add_argument("--fingerprint-max-prefix", type=int,
+                        default=DEFAULT_MAX_PREFIX,
+                        help="longest lasso stem for --epsilon "
+                             f"(default: {DEFAULT_MAX_PREFIX})")
+    parser.add_argument("--fingerprint-max-cycle", type=int,
+                        default=DEFAULT_MAX_CYCLE,
+                        help="longest lasso loop for --epsilon "
+                             f"(default: {DEFAULT_MAX_CYCLE})")
+    parser.add_argument("--fingerprint-distance", choices=DISTANCES,
+                        default="hamming",
+                        help="normalise disagreement by every sampled word "
+                             "(hamming) or by the words either candidate "
+                             "satisfies (union) (default: hamming)")
+    parser.add_argument("--members-from", type=Path,
+                        help="directory of an earlier maximality pass's "
+                             "<run>.members.tsv sidecars; recounts the "
+                             "eps_maximal_solutions nets from that membership "
+                             "without running maximal")
     parser.add_argument("--cuts", type=int, default=20,
                         help="time cuts for --maximality (default: 20)")
     parser.add_argument("--jobs", type=int, default=0,
@@ -761,6 +895,24 @@ def main() -> int:
         parser.error("--cuts expects a positive integer")
     if args.epsilon and args.fingerprint_words < 1:
         parser.error("--fingerprint-words expects a positive integer")
+    if args.fingerprint_max_prefix < 0 or args.fingerprint_max_cycle < 1:
+        parser.error("--fingerprint-max-prefix expects a non-negative and "
+                     "--fingerprint-max-cycle a positive integer")
+    if args.fingerprint_max_prefix + args.fingerprint_max_cycle > \
+            MAX_POSITIONS:
+        parser.error(f"a lasso has at most {MAX_POSITIONS} positions, so "
+                     f"--fingerprint-max-prefix + --fingerprint-max-cycle "
+                     f"must not exceed it")
+    if args.members_from is not None:
+        if args.maximality:
+            parser.error("--members-from replaces --maximality's "
+                         "membership; pass one or the other")
+        if not args.epsilon:
+            parser.error("--members-from recounts the epsilon nets, so it "
+                         "needs --epsilon")
+        if not args.members_from.is_dir():
+            parser.error(f"--members-from: no directory at "
+                         f"{args.members_from}")
 
     # The deadline is per run directory, not per invocation: the launcher
     # feeds one directory at a time, and a budget shared across many would
@@ -781,7 +933,8 @@ def main() -> int:
         # here rather than after the loop keeps a sidecar named for the run it
         # describes. A multi-directory invocation writes the last one's, which
         # is why score_campaign.py passes one at a time.
-        if args.out and args.maximality and sidecars.get("members"):
+        if args.out and (args.maximality or args.members_from) and \
+                sidecars.get("members"):
             write_sidecars(args.out, sidecars)
 
     fields = SUMMARY_FIELDS if args.summary else CURVE_FIELDS

@@ -87,6 +87,8 @@ It exits 0 only when every queued run has a curve, so a pass with failures fails
 
 `stage` checks a score phase's results directory the way it checks a run phase's configs directory, on the hosts the phase runs on, and refuses the host by name where it is absent, except where an earlier run phase of the same campaign writes it there, the common case, since that directory does not exist until the search has run. A tick makes the same check when the phase's turn comes and refuses with the directory in `last_error`, spending an attempt rather than the scorer's whole startup. A score phase over a results directory another campaign produced is the case the stage check is for, and reproducing an archived pass is exactly that: a campaign of one score phase over the archived results.
 
+A separation recount never re-runs the maximality sweep. `maximality = "off"` with `members_from` naming an earlier pass's `out` reads each run's antichains from that pass's `<run>.members.tsv` sidecars and fingerprints the candidates afresh, so the word count, lasso shape (`fingerprint_max_prefix`, `fingerprint_max_cycle`) and distance (`fingerprint_distance`) can all move at the cost of one `fingerprint` call a run. The scripts/README.md score-phase section has the keys and their defaults.
+
 `status` reports a score phase as a `score:<out>` row (see "Reading a run"), and `collect --curves <out>` brings the curves home (see "Collecting and closing").
 
 ## Reading a run
