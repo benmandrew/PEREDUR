@@ -126,7 +126,7 @@ def test_end_to_end():
         assert [f["censored"] for f in r1["found_by"]] == [False, True], r1
         core = (bundle / "core.md").read_text()
         assert "FRET S01_a: Robot shall before" in core, core
-        assert "| rad-core-10 | 4 | 3 | 2 |" in \
+        assert "| rad-core-10 | 3 of 4 | 2 |" in \
             (out / "README.md").read_text()
 
 

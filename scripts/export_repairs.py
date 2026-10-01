@@ -466,31 +466,25 @@ def render_subject(subject: str, runs: list, out: Path) -> tuple:
 def bundle_readme(rows) -> str:
     lines = [
         "# FRETISH repairs", "",
-        "One folder per specification. Each holds:", "",
-        "- `core.md`: the original specification as FRETISH text. Every "
-        "guarantee is labelled `G<n>` with its index in the parent "
-        "specification (0-based) and, where known, its FRET requirement ids.",
-        "- `core.json`: the same specification as PEREDUR reads it.",
-        "- `repairs.md`: every repair, as the requirements it changes, removes "
-        "or adds, closest to the original first: ordered by the best fitness "
-        "any run gave it, which for a repair measures syntactic and semantic "
-        "similarity to the original. A repair from a run killed at its time "
-        "limit has no fitness and sorts after those that do.",
-        "- `repairs.csv`: one row per repair, for sorting and filtering.",
-        "- `repairs/`: each repair as a whole specification in JSON, with "
-        "`found_by` listing the runs that produced it.", "",
-        "Each run keeps only its maximal repairs: those no other repair from "
-        "the same run implies, so they give up the least. Runs are not "
-        "filtered against each other, so a repair here may be implied by one "
-        "another run found.", "",
+        "One folder per specification:", "",
+        "- `core.md`: the original, as FRETISH text. Guarantee `G<n>` is "
+        "labelled with its 0-based index in the parent specification and any "
+        "FRET requirement ids.",
+        "- `core.json`: the original, as PEREDUR reads it.",
+        "- `repairs.md`: each repair as its changes to the original, most "
+        "similar first (by fitness; unscored repairs last).",
+        "- `repairs.csv`: one row per repair.",
+        "- `repairs/`: each repair as JSON, with the runs that found it.", "",
+        "Each repair is maximal within its run: no other repair from that run "
+        "implies it. Runs are not filtered against each other.", "",
         "Requirements read `[scope] [upon|whenever condition] C shall timing "
-        "satisfy response`, where `C` is the component. `upon` fires on the "
-        "condition's rising edge, `whenever` at every step it holds. "
-        "`[locked]` marks a requirement the search may not weaken.", "",
-        "| Specification | Runs | Runs that found a repair | Repairs |",
-        "|---|---:|---:|---:|"]
+        "satisfy response`. `upon` fires when the condition becomes true, "
+        "`whenever` at every step it holds. `[locked]` requirements may not "
+        "be weakened.", "",
+        "| Specification | Runs with a repair | Repairs |",
+        "|---|---:|---:|"]
     for subject, n_runs, n_found, n_repairs in rows:
-        lines.append(f"| {subject} | {n_runs} | {n_found} | {n_repairs} |")
+        lines.append(f"| {subject} | {n_found} of {n_runs} | {n_repairs} |")
     return "\n".join(lines) + "\n"
 
 
