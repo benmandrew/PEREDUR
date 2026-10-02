@@ -1,0 +1,168 @@
+{
+  "campaign": "2026-10-01-fretish-frontier-approx",
+  "attribution": "recorded",
+  "generated_on": "2026-10-02",
+  "status": "open",
+  "kind": "offline-analysis",
+  "kind_note": "Not a campaign.py campaign and no search. An offline placement pass over run frontiers the FRETISH ablation campaign (campaign/fretish-ablation) already wrote, run by hand: locally on 2026-10-01/02 under systemd-run memory caps, and the lpc-full-core1 remainder on av3 as user service fp-lpcw from 2026-10-02 13:50. Driven from the scratch scripts vendored under scripts/.",
+  "question": "Can the paired directed-vs-uniform joint-frontier table (paper RQ fretish, data/fretish-ablation-2026-09/overlap.csv) be filled for the four subjects its exact pass skipped as too costly: liquid-mixer, lpc-mini-core1, lpc-full-core1 and valu3s-uc6?",
+  "method": "Hybrid placement (scripts/hybrid.py). Each frontier member is evaluated on sampled lasso words; a word satisfying x and violating y refutes x => y soundly, so a pair refuted both ways is proven incomparable. Every other pair, within and across arms, goes to compare --timeout 20 (the exact pass's per-query budget); a timeout reads as non-implication, as in maximal. With LTL set, a compare timeout falls back to black text-mode solve on each direction. Placement reproduces paired.py's convention by running maximal on each multi-spelling equivalence class. Words: black models of random frontier repairs with random literal hints (draw_black.py), boundary words A & G\\{g} & !g (lpc-full only), and per-pair witness models of x & !y (pairwit.py); fpdraw eval re-evaluates every word.",
+  "tool_commits": {
+    "compare_maximal": "78cae62 (feat(compare): take the per-query budget from --timeout; campaign/fretish-ablation lineage, not on main)",
+    "fpdraw_fpcal": "scripts/fpdraw.cpp and scripts/fpcal.cpp built against 78cae62 with CMake targets add_executable(<t> src/<t>.cpp), linking peredur_fitness and Threads::Threads, include dir src",
+    "maximal_unglued": "78cae62 plus the start_of_mode fix later committed on main as 5dc3472; used only for data/redo-maximal-unglued.csv",
+    "black": "third_party black 25.09.0 from the counter build-release tree"
+  },
+  "source_data": {
+    "exact_pass": "data/exact.csv, byte-identical to counter-paper data/fretish-ablation-2026-09/overlap.csv at e3d7480",
+    "run_frontiers": "accumulated/maximal.tsv and member JSON of the FRETISH ablation run directories (sweep_O_{directed,uniform}_nsga2-apportion_wkoff_log_<subject>_seedNN), seeds 0-6 from av2 and 7-29 from av3; not copied here"
+  },
+  "results": {
+    "liquid-mixer": {
+      "file": "data/hyb/liquid-mixer.csv",
+      "seeds": 30,
+      "median_pct": {
+        "d_only": 54.6,
+        "u_only": 45.0,
+        "shared": 0.0,
+        "d_dominated": 30.6,
+        "u_dominated": 21.9
+      },
+      "undecided_pairs_pct": 0.006
+    },
+    "lpc-mini-core1": {
+      "file": "data/hyb/lpc-mini-core1.w.csv",
+      "seeds": 30,
+      "median_pct": {
+        "d_only": 47.3,
+        "u_only": 50.9,
+        "shared": 2.0,
+        "d_dominated": 22.7,
+        "u_dominated": 13.2
+      },
+      "undecided_pairs_pct": 0.225
+    },
+    "valu3s-uc6": {
+      "file": "data/hyb/valu3s-uc6.w.csv",
+      "seeds": 30,
+      "median_pct": {
+        "d_only": 51.7,
+        "u_only": 48.1,
+        "shared": 0.0,
+        "d_dominated": 0.0,
+        "u_dominated": 0.0
+      },
+      "undecided_pairs_pct": 0.221
+    },
+    "lpc-full-core1": {
+      "file": "data/hyb/lpc-full-core1.w.csv",
+      "seeds": "13 of 30 at archive time",
+      "median_pct": {
+        "d_only": 49.6,
+        "u_only": 47.2,
+        "shared": 3.6,
+        "d_dominated": 2.9,
+        "u_dominated": 4.5
+      },
+      "undecided_pairs_pct": 1.689
+    }
+  },
+  "validation": {
+    "files": "data/hyb/fix-*.csv (mode-arbiter and RAD cores, unglued fingerprints over clean words) and data/hyb/full-*.csv (other subjects), checked by scripts/check.py against data/exact.csv",
+    "identical_rows": "420 of 429 (subject, seed)",
+    "differences": "1 compare timeout (fsm-timing seed 9); 8 from the start_of_mode glued-X bug in the exact pass (fixed on main in 5dc3472): maximal-unglued reproduces the hybrid on 8/8 (data/redo-maximal-unglued.csv), shipped maximal reproduces exact.csv on 8/8 (data/redo-maximal.csv)",
+    "cost": "2.89% of pairs reached compare; 0.60 h wall against 2.13 h for the exact pass"
+  },
+  "caveats": [
+    "compare timeouts read as non-implication, so dominated shares are lower bounds and move with host load: two lpc-mini-core1 runs differ on 21 of 30 seeds (uniform dominated 16.1% vs 13.2%; the earlier run is data/hyb/lpc-mini-core1.csv).",
+    "valu3s-uc6's zero dominated shares mean no domination is provable: the 0.22% of pairs words leave also time out in compare at 300 s (24/24 sampled) and in black.",
+    "black -o json reports UNSAT at its -t timeout; only black text output is trusted (hybrid.py). pairwit.py's UNSAT tallies include timeouts; its SAT witness words are unaffected.",
+    "black -m models with loop == size are dropped; 1,077 such words reached early RAD/takeoff runs, whose outputs were redone (data/hyb/fixbad, v1 hold superseded outputs).",
+    "shared counts structurally identical members only (paired.py convention); sem_* columns give the semantic reading, median shared 0.52% vs 0% over the 16 validated subjects.",
+    "Vendored scripts hard-code the original scratch paths."
+  ],
+  "owed": [
+    "lpc-full-core1 seeds 13-29 (running on av3 at archive time; collect av3:~/fpcal/lpcfull/hyb/lpc-full-core1.w.csv into data/hyb/ and update results)"
+  ],
+  "vendored_scripts": {
+    "scripts/batch10.sh": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "0f497ae2cf273dc234b7bfd2486e7645085547f1"
+    },
+    "scripts/batch10b.sh": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "65be55e4e4b767cc0dea28c20f1ae3e0be3b7dc4"
+    },
+    "scripts/batch5.sh": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "584677558571d81131fab4834a88dd0c1dfe732f"
+    },
+    "scripts/batch6.sh": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "ce2d42e59c972a1215394e7c294358a049cb4571"
+    },
+    "scripts/batch7.sh": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "ba1d791fafa4e213da3585c137be13f32fe5318e"
+    },
+    "scripts/batch8.sh": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "148d7381b487ce8e0fcd332b9e3218cbaf2e93fd"
+    },
+    "scripts/batch9.sh": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "463218df5583964f804f62b527aced967669d5e5"
+    },
+    "scripts/calib.py": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "80599c61378ec1fe5d6f5184c3a5fe2f0345c5b2"
+    },
+    "scripts/check.py": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "37085bf96957435318b0ad50a8efb3b2468b993c"
+    },
+    "scripts/draw_black.py": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "9aef80cf2f19731dbf1781abd943340038dfdd54"
+    },
+    "scripts/fpcal.cpp": {
+      "source": "worktree counter-wt/fpcal src/, uncommitted, on 78cae62",
+      "blob": "f30d11a17fb8521d3e5a9cd1e48dc3eae11d739e"
+    },
+    "scripts/fpdraw.cpp": {
+      "source": "worktree counter-wt/fpcal src/, uncommitted, on 78cae62",
+      "blob": "61e922fdaaee60ff12aab498a1e708843e961c69"
+    },
+    "scripts/hybrid.py": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "f7d3f27c79db687f9ddd615f88734268606b3cff"
+    },
+    "scripts/longcmp.py": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "6ed8336d60d7f4991a051b0574b32372bc90280f"
+    },
+    "scripts/paired.py": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "f3237f18cdbd79c7a7474683d70f22d3f3d61772"
+    },
+    "scripts/pairwit.py": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "872fea3c43af2ab43eaea3b8194e25a0a21d2d45"
+    },
+    "scripts/summ4.py": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "bc1d95c6e3ae09957864750217a0c89044e04ae9"
+    },
+    "scripts/whydom.py": {
+      "source": "session scratchpad (fpcal), not in git history",
+      "blob": "facc914ea2911a468bc929358d14c705fbee1009"
+    }
+  },
+  "files": {
+    "data/hyb/": "hybrid CSVs and logs per subject; columns documented in scripts/hybrid.py",
+    "data/exact.csv": "the paper's exact pass",
+    "data/words/*.words.zst": "the word sets the final fingerprints were evaluated on (zstd)",
+    "data/ltl/": "fpdraw ltl dumps (zstd) and member lists, the inputs to fpdraw eval and the black fallback"
+  },
+  "reproduce": "Build fpdraw from scripts/fpdraw.cpp against 78cae62; decompress data/words and data/ltl; fpdraw eval <words> <list> <jobs> > <fp-dir>/<subject>.tsv; then MAXIMAL=... COMPARE=... TIMEOUT=20 WORKERS=6 [LTL=<dump>] python3 scripts/hybrid.py <fp-dir> <subject> <out.csv> <run-dirs>... with the run directories in place (paths in the .list and .ltl files must be rewritten to where they sit)."
+}
