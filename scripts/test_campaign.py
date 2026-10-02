@@ -3401,9 +3401,99 @@ try:
 finally:
     C.set_colour(False)
 
+# ── load ──────────────────────────────────────────────────────────────────────
+
+LOAD_OUT = """##NPROC 32
+##LOADAVG 29.64 26.73 34.45 26/1230 2534793
+##UPTIME 1386000.12
+##STAT0 cpu  1000 0 200 8000 100 0 0 0 0 0
+##STAT1 cpu  2600 0 600 9000 300 0 0 0 0 0
+##USERTICKS benandrew 1001 2400
+##USERTICKS root 0 1
+##USERTICKS 4242 600
+##MEM MemTotal 131707948
+##MEM MemAvailable 127091572
+##MEM SwapTotal 2097148
+##MEM SwapFree 2097148
+##DISK 1921208544 300472232 1523070472 /
+##GPU 0, 0, 99, 20475, 37, NVIDIA RTX 4000 SFF Ada Generation
+##GPU 1, [N/A], 0, 0, 0, Some Card
+##WHO alice 2
+##END
+"""
+
+LOAD = C.parse_load(LOAD_OUT)
+check(LOAD["cores"], 32, "core count")
+check(LOAD["loadavg"], [29.64, 26.73, 34.45], "load averages, in order")
+# 3200 ticks elapsed: 2000 busy, 1000 idle and 200 iowait.
+check((LOAD["cpu_pct"], LOAD["iowait_pct"]), (62.5, 6.25),
+      "busy excludes both idle and iowait, and iowait is reported apart")
+# The window is 3200 ticks over 32 cores, so 100 ticks is one core's worth.
+check(LOAD["user_cores"], {"benandrew": 24.0, "uid4242": 6.0},
+      "per-user cores are ticks over the window, an unnamed uid keeps its "
+      "number, and a user under 0.05 cores is dropped")
+check(LOAD["mem"], {"total": 131707948 * 1024,
+                    "used": (131707948 - 127091572) * 1024},
+      "memory used is total less MemAvailable, in bytes")
+check(LOAD["swap"]["used"], 0, "untouched swap reads zero")
+check(LOAD["disk"]["mount"], "/", "disk mount point")
+check([g["name"] for g in LOAD["gpus"]],
+      ["NVIDIA RTX 4000 SFF Ada Generation"],
+      "a GPU line with [N/A] in a numeric field is dropped, not read as zero")
+check(LOAD["sessions"], {"alice": 2}, "sessions per user")
+check(C.parse_load("##STAT0 cpu 1 2 3 4 5\n")["user_cores"], {},
+      "a probe cut off before its second sample yields no CPU figures")
+check("cpu_pct" in C.parse_load("##STAT0 cpu 1 2 3 4 5\n"), False,
+      "and no busy percentage either, rather than a wrong one")
+check(C.cpu_split([1, 0, 0, 1, 0], [1, 0, 0, 1, 0]), None,
+      "a zero-length window divides by nothing")
+
+ASLEEP = C.parse_load("##GPUSLEEP 0000:01:00.0\n##END\n")
+check(C.gpu_rows([{"host": "local", "reachable": True, **ASLEEP}]),
+      [["local", "-", "asleep", "-", "-", "PCI 0000:01:00.0"]],
+      "a suspended card is listed as asleep, named by its PCI address")
+
+LOAD_REPORTS = [{"host": "av3", "reachable": True, "error": None, **LOAD},
+                {"host": "av2", "reachable": False,
+                 "error": "ssh: connect to host av2 port 22: Connection "
+                          "timed out after a long while"}]
+LOAD_ROWS = C.load_rows(LOAD_REPORTS)
+check(LOAD_ROWS[0][:5], ["av3", "32", "29.6 26.7 34.5", "62%", "6%"],
+      "load row's leading cells")
+check(len(LOAD_ROWS[1]), len(C.LOAD_HEADERS),
+      "an unreachable host still fills every column")
+check_true(LOAD_ROWS[1][1].startswith("(unreachable: ")
+           and LOAD_ROWS[1][1].endswith("...)"),
+           "and its reason is truncated so it cannot widen the table")
+check(C.pressure(LOAD, "LOAD 1/5/15"), "yellow",
+      "29.6 on 32 cores is past three quarters of the box")
+check(C.pressure({**LOAD, "cores": 20}, "LOAD 1/5/15"), "red",
+      "the same load on 20 cores is over it")
+check(C.pressure(LOAD, "MEM"), None, "3% memory is unremarkable")
+
+try:
+    C.set_colour(True)
+    painted = C.render_table(LOAD_ROWS, C.LOAD_HEADERS,
+                             C.load_painter(LOAD_REPORTS))
+    C.set_colour(False)
+    check(strip_ansi(painted), C.render_table(LOAD_ROWS, C.LOAD_HEADERS),
+          "the coloured load table strips back to the plain one")
+finally:
+    C.set_colour(False)
+
+# The script itself, run here for real: it is the one part a fixture cannot
+# vouch for, and running it touches nothing but /proc and /sys. The checkout is
+# named directly because the queue tests above leave C.REPO_ROOT pointing at a
+# temporary one they have since deleted.
+LOCAL_LOAD = C.gather_load(C.LOCAL, str(CAMPAIGN_PY.parent.parent))
+check(LOCAL_LOAD["error"], None, "the load probe runs on this machine")
+for key in ("cores", "loadavg", "cpu_pct", "mem", "disk", "uptime_s"):
+    check_true(key in LOCAL_LOAD, f"the live probe reports {key}")
+
+
 parser = C.build_parser()
 for argv in (["status"], ["queue"], ["collect"], ["stage", "c"],
-             ["start", "c"]):
+             ["start", "c"], ["load"]):
     check(parser.parse_args(argv).no_color, False,
           f"`{argv[0]}` prints a table, so it takes --no-color")
     check(parser.parse_args(argv + ["--no-color"]).no_color, True,
