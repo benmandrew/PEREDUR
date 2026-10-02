@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <functional>
+#include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -299,6 +301,50 @@ TEST(test_scope_agrees_with_formaliser) {
                 message += "\n  ours:    " + req.m_ltl;
                 message += "\n  CLI:     " + cli;
                 expect(ltl_equivalent(req.m_ltl, cli), message);
+            }
+        }
+    }
+}
+
+// SPOT, which the formaliser check above goes through, reads `Xm` as X(m). Our
+// own parser, which the fingerprint prefilter evaluates, and black both read it
+// as one atom `Xm`, so the lowering must read the same to all of them. The
+// atoms our parser finds are the check: anything beyond c, r, s and m is a
+// glued operator.
+void collect_atoms(const Formula& formula, std::set<std::string>& atoms) {
+    if (const std::optional<std::string> name = formula.atom_name()) {
+        atoms.insert(*name);
+    } else if (const std::optional<Formula> child = formula.unary_child()) {
+        collect_atoms(*child, atoms);
+    } else if (const auto children = formula.binary_children()) {
+        collect_atoms(children->first, atoms);
+        collect_atoms(children->second, atoms);
+    }
+}
+
+TEST(test_scope_lowering_parses_to_its_own_atoms) {
+    const std::set<std::string> allowed = {"c", "r", "s", "m", "true"};
+    for (const ScopeCase& scope_case : scope_cases()) {
+        for (const ConditionType ctype :
+             {ConditionType::Trigger, ConditionType::Continual}) {
+            for (const Timing& tim : timing_cases()) {
+                const Requirement req =
+                    scoped(make_scope(scope_case.m_kind), tim, ctype);
+                const std::optional<Formula> parsed =
+                    Formula::try_parse(req.m_ltl);
+                if (!parsed.has_value()) {
+                    fail("scope: cannot parse the " +
+                         std::string(scope_case.m_name) +
+                         " lowering: " + req.m_ltl);
+                }
+                std::set<std::string> atoms;
+                collect_atoms(*parsed, atoms);
+                for (const std::string& atom : atoms) {
+                    expect(allowed.count(atom) == 1,
+                           "scope: the " + std::string(scope_case.m_name) +
+                               " lowering parses to a stray atom `" + atom +
+                               "`: " + req.m_ltl);
+                }
             }
         }
     }

@@ -121,8 +121,10 @@ std::string expand_after(const std::string& response, std::size_t ticks) {
 // test_scope_agrees_with_formaliser.
 
 // The point immediately *before* the mode rises. FRET's start-of-mode marker.
+// The operand of X is parenthesised: SPOT reads `Xm` as X(m), but our own
+// parser and black read it as a single atom `Xm` that no trace ever sets.
 std::string start_of_mode(const std::string& mode) {
-    return "((!" + mode + ") & X" + mode + ")";
+    return "((!" + mode + ") & X(" + mode + "))";
 }
 
 // The last point at which the mode still holds. FRET's end-of-mode marker.
