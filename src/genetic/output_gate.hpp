@@ -28,10 +28,17 @@ std::vector<char> gate_verdicts(const std::vector<Scored<Spec>>& population,
                                 const Config& cfg);
 
 // Offers every gate-passing entry of @p population to @p accumulator, in
-// population order, and returns how many passed. Empty, and nothing asked, when
-// the accumulator is disabled.
+// population order, and returns how many passed. Zero, and nothing asked, when
+// the accumulator is disabled; a caller that needs to tell "none passed" from
+// "nothing was counted" reads accumulator.enabled() itself, which is what the
+// only such caller already does to decide whether it has a column to print.
+//
+// A plain count rather than an optional because gcc 11 cannot correlate
+// std::optional's engaged flag with its payload across this explicit
+// instantiation's return, and dereferencing the result raised
+// -Wmaybe-uninitialized under -Werror.
 template <typename Spec>
-std::optional<std::size_t> accumulate_gate_passing(
+std::size_t accumulate_gate_passing(
     const std::vector<Scored<Spec>>& population, const Config& cfg,
     std::size_t generation, RepairAccumulator<Spec>& accumulator);
 

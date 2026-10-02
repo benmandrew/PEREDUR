@@ -1,0 +1,287 @@
+
+==============================================================================
+INTEGRITY
+==============================================================================
+results rows          3000
+  commit 57fcefb dirty=0: 3000 rows
+families              25
+seeds                 30 (0-29)
+  nsga2-apportion/mrs          750 rows
+  nsga2-apportion/aurus        750 rows
+  weighted/mrs                 750 rows
+  weighted/aurus               750 rows
+duplicate (arm, spec, seed) keys: 0
+curve runs covered    3000 of 3000 (100.0%)
+
+==============================================================================
+VERIFICATION -- the five checks of PLAN section 12
+==============================================================================
+run directories absent; checks 1, 2 and 5 skipped
+
+==============================================================================
+COST
+==============================================================================
+
+-- wall time by arm (finished runs only)
+   nsga2-apportion/mrs          mean   516.4s  median     58s  n 750
+   nsga2-apportion/aurus        mean   281.1s  median     47s  n 750
+   weighted/mrs                 mean  1058.0s  median     60s  n 750
+   weighted/aurus               mean   788.7s  median     50s  n 750
+
+-- where the machine time went
+   2875 runs that finished      300.9 core-h  (54.6%)
+   125 killed at the cap       250.0 core-h  (45.4%)
+   total                        550.9 core-h
+   A killed run writes no manifest and scores as a failure in every column, so that share of the machine time bought no scored row.
+
+-- slowest families by mean wall time
+   humanoid-742                     mean  5462.3s  n 120
+   humanoid-531                     mean  4045.9s  n 120
+   pcar-v2-888                      mean  2298.1s  n 120
+   humanoid-503                     mean  1788.7s  n 120
+   prioritized-arbiter-aurus        mean   534.3s  n 120
+   lift                             mean   509.0s  n 120
+   full-arbiter-aurus               mean   416.1s  n 120
+   humanoid-458                     mean   345.4s  n 120
+   gyro-var1                        mean   246.5s  n 120
+   gyro-var2                        mean   238.5s  n 120
+
+==============================================================================
+CURVES -- PEREDUR, by arm
+==============================================================================
+Mean count per run at each cut, carrying a stopped run's last value
+forward: both tools stop at their own budget, and what a stopped run
+found by time t is what it had when it stopped.
+
+-- solutions: mean per run at each cut
+   cut(s)     nsga2-apportion/mrs nsga2-apportion/aurus          weighted/mrs        weighted/aurus
+   runs                       750                   750                   750                   750
+        1                    0.34                  0.05                  0.35                  0.06
+        2                    3.30                  2.75                  3.27                  2.75
+        5                   12.86                 12.12                 16.96                 14.31
+       10                   25.61                 23.22                 50.95                 39.01
+       20                   43.45                 37.31                126.77                 91.70
+       50                   60.94                 51.63                228.83                183.01
+      100                   69.00                 56.19                253.62                199.06
+      200                   75.90                 59.37                276.78                216.24
+      500                   83.44                 62.42                305.58                228.96
+     1000                   88.62                 64.54                322.84                237.40
+     2000                   92.90                 65.43                344.71                249.35
+     5000                   95.46                 65.71                361.50                254.86
+     7200                   95.81                 65.71                365.26                256.51
+
+-- ideal_solutions: mean per run at each cut
+   cut(s)     nsga2-apportion/mrs nsga2-apportion/aurus          weighted/mrs        weighted/aurus
+   runs                       750                   750                   750                   750
+        1                    0.03                  0.01                  0.04                  0.01
+        2                    0.45                  0.37                  0.48                  0.35
+        5                    1.25                  1.19                  1.46                  1.33
+       10                    2.08                  1.99                  2.86                  2.41
+       20                    3.67                  3.20                  5.56                  4.44
+       50                    4.96                  4.69                  9.06                  8.11
+      100                    5.25                  4.82                  9.73                  8.60
+      200                    5.33                  4.86                  9.84                  8.80
+      500                    5.40                  4.91                  9.91                  8.83
+     1000                    5.44                  4.97                  9.93                  8.85
+     2000                    5.50                  5.05                  9.99                  8.88
+     5000                    5.63                  5.08                 10.13                  8.96
+     7200                    5.66                  5.08                 10.22                  8.99
+
+-- maximal_solutions: mean per run at each cut
+   cut(s)     nsga2-apportion/mrs nsga2-apportion/aurus          weighted/mrs        weighted/aurus
+   runs                       750                   705                   749                   715
+   (n) = runs whose maximal curve stopped before this cut
+        1                0.09 (0)              0.01 (0)              0.09 (0)              0.01 (0)
+        2                1.59 (0)              1.44 (0)              1.65 (0)              1.51 (0)
+        5                5.43 (0)              5.81 (0)              6.17 (0)              5.99 (0)
+       10                9.38 (0)              9.60 (0)             13.27 (0)             12.19 (0)
+       20               13.66 (0)             13.01 (0)             24.43 (0)             20.55 (0)
+       50               17.87 (0)             16.19 (0)             39.31 (0)             33.15 (0)
+      100               19.86 (0)             17.42 (0)             45.24 (0)             36.45 (0)
+      200               21.85 (0)             18.44 (0)             50.85 (0)             40.40 (0)
+      500               24.24 (0)             19.49 (0)             57.97 (0)             44.17 (0)
+     1000               25.86 (0)             20.14 (0)             62.77 (3)             46.93 (1)
+     2000               27.16 (0)             20.56 (0)            64.50 (32)            47.28 (25)
+     5000               27.95 (6)             20.73 (0)            66.52 (62)            47.41 (45)
+     7200               28.09 (7)             20.73 (0)            66.58 (63)            47.42 (45)
+
+-- maximal_ideal_solutions: mean per run at each cut
+   cut(s)     nsga2-apportion/mrs nsga2-apportion/aurus          weighted/mrs        weighted/aurus
+   runs                       750                   705                   749                   715
+   (n) = runs whose maximal curve stopped before this cut
+        1                0.02 (0)              0.00 (0)              0.02 (0)              0.00 (0)
+        2                0.22 (0)              0.21 (0)              0.24 (0)              0.22 (0)
+        5                0.57 (0)              0.60 (0)              0.61 (0)              0.64 (0)
+       10                0.85 (0)              0.89 (0)              0.88 (0)              0.88 (0)
+       20                1.28 (0)              1.27 (0)              1.22 (0)              1.12 (0)
+       50                1.69 (0)              1.72 (0)              1.70 (0)              1.59 (0)
+      100                1.77 (0)              1.77 (0)              1.83 (0)              1.65 (0)
+      200                1.80 (0)              1.78 (0)              1.87 (0)              1.68 (0)
+      500                1.82 (0)              1.81 (0)              1.90 (0)              1.69 (0)
+     1000                1.83 (0)              1.83 (0)              1.91 (3)              1.70 (1)
+     2000                1.85 (0)              1.85 (0)             1.99 (32)             1.74 (25)
+     5000                1.90 (6)              1.87 (0)             2.04 (62)             1.76 (45)
+     7200                1.91 (7)              1.87 (0)             2.04 (63)             1.76 (45)
+
+-- AuRUS solutions: mean per run at each cut, shared families only
+   runs 678
+        1        0.26
+        2        1.95
+        5        8.72
+       10       25.97
+       20       80.06
+       50      221.79
+      100      278.61
+      200      328.13
+      500      380.06
+     1000      405.05
+     2000      426.62
+     5000      428.85
+     7200      429.05
+   PEREDUR's cut is sub-second and AuRUS's moves only at a
+   generation boundary, dated to the second. The two columns
+   also count different things: PEREDUR's gate-passing
+   accumulator against AuRUS's accepted solution set.
+
+==============================================================================
+DISCOVERY -- time to first repair, and to first ideal repair
+==============================================================================
+
+-- PEREDUR: time_to_first_repair
+   nsga2-apportion/mrs          reached 750/750 (100.0%)  median among reachers 2.7s
+   nsga2-apportion/aurus        reached 705/750 (94.0%)  median among reachers 2.0s
+   weighted/mrs                 reached 749/750 (99.9%)  median among reachers 2.6s
+   weighted/aurus               reached 715/750 (95.3%)  median among reachers 2.0s
+
+-- PEREDUR: time_to_first_ideal_repair
+   nsga2-apportion/mrs          reached 417/750 (55.6%)  median among reachers 2.8s
+   nsga2-apportion/aurus        reached 401/750 (53.5%)  median among reachers 2.4s
+   weighted/mrs                 reached 379/750 (50.5%)  median among reachers 2.5s
+   weighted/aurus               reached 349/750 (46.5%)  median among reachers 2.1s
+
+-- AuRUS: time to first ideal solution
+   runs 780, of which 0 lost-at-cap and carry no verdict at all
+   reached 403/780 of the usable runs (51.7%)  median among reachers 4.0s
+   Resolution is one iteration, dated to the second; PEREDUR's is sub-second. Read the two at the coarser one.
+
+==============================================================================
+HEAD TO HEAD, POOLED OVER THE FOUR CELLS -- secondary
+==============================================================================
+families PEREDUR covers 25, AuRUS covers 25, shared 25
+AuRUS rates are UNFILTERED -- the well-separation screen's inputs did not survive on either host.
+`all` counts a killed run as a failure on both sides; `sc` drops the killed runs on both sides. k is how many were killed.
+
+   family                          PEREDUR      sc     k      AuRUS      sc     k     d-all    d-sc
+   arbiter-aurus                     0.517   0.517     0      0.867   0.867     0    -0.350  -0.350
+   detector-aurus                    0.975   0.975     0      0.967   0.967     0    +0.008  +0.008
+   full-arbiter-aurus                0.517   0.517     0      0.000   0.000     0    +0.517  +0.517
+   gyro-var1                         0.000   0.000     0      0.100   0.100     0    -0.100  -0.100
+   gyro-var2                         0.142   0.142     0      0.700   0.700     0    -0.558  -0.558
+   humanoid-458                      0.000   0.000     1      0.000   0.000     0    +0.000  +0.000
+   humanoid-503                      0.058   0.059     1      0.000   0.000     0    +0.058  +0.059
+   humanoid-531                      0.067   0.127    57      0.000   0.000     0    +0.067  +0.127
+   humanoid-742                      0.483   0.951    59      0.833   0.833     0    -0.350  +0.117
+   lift                              0.000   0.000     0      0.333   0.333     0    -0.333  -0.333
+   lily02                            0.992   0.992     0      0.867   0.867     0    +0.125  +0.125
+   lily11                            0.542   0.542     0      0.967   0.967     0    -0.425  -0.425
+   lily15                            0.067   0.067     0      0.067   0.067     0    +0.000  +0.000
+   lily16                            0.042   0.042     0      0.000   0.000     0    +0.042  +0.042
+   load-balancer-aurus               0.917   0.917     0      0.867   0.867     0    +0.050  +0.050
+   ltl2dba-r-2                       1.000   1.000     0      1.000   1.000     0    +0.000  +0.000
+   ltl2dba-theta-2                   1.000   1.000     0      0.933   0.933     0    +0.067  +0.067
+   ltl2dba27                         1.000   1.000     0      1.000   1.000     0    +0.000  +0.000
+   minepump                          0.692   0.692     0      1.000   1.000     0    -0.308  -0.308
+   pcar-v2-888                       0.025   0.026     4      0.000   0.000     0    +0.025  +0.026
+   prioritized-arbiter-aurus         0.500   0.513     3      0.000   0.000     0    +0.500  +0.513
+   rg1                               0.042   0.042     0      0.000   0.000     0    +0.042  +0.042
+   rg2                               0.967   0.967     0      1.000   1.000     0    -0.033  -0.033
+   round-robin-arbiter-aurus         0.933   0.933     0      1.000   1.000     0    -0.067  -0.067
+   simple-arbiter-aurus              0.975   0.975     0      0.933   0.933     0    +0.042  +0.042
+
+   SECONDARY (PLAN section 5: the 2x2 and the per-family numbers carry no rule)
+
+   all runs, a kill is a failure: 25 families
+     PEREDUR higher on 12, lower on 9, tied on 4
+     mean difference -0.039, exact two-sided Wilcoxon p = 0.7399
+
+   scorable runs only: 25 families
+     PEREDUR higher on 13, lower on 8, tied on 4
+     mean difference -0.018, exact two-sided Wilcoxon p = 0.8716
+
+   The 2026-08-21 ship campaign read this contrast at PEREDUR's own budget as 0.502 against 0.504, Wilcoxon p = 0.7549.
+   This campaign reads it at AuRUS's budget, which is the whole point of the matched cross.
+
+==============================================================================
+REGISTERED PRIMARY -- nsga2-apportion/mrs against AuRUS, PLAN section 4
+==============================================================================
+families PEREDUR covers 25, AuRUS covers 25, shared 25
+AuRUS rates are UNFILTERED -- the well-separation screen's inputs did not survive on either host.
+`all` counts a killed run as a failure on both sides; `sc` drops the killed runs on both sides. k is how many were killed.
+
+   family                          PEREDUR      sc     k      AuRUS      sc     k     d-all    d-sc
+   arbiter-aurus                     0.667   0.667     0      0.867   0.867     0    -0.200  -0.200
+   detector-aurus                    1.000   1.000     0      0.967   0.967     0    +0.033  +0.033
+   full-arbiter-aurus                0.667   0.667     0      0.000   0.000     0    +0.667  +0.667
+   gyro-var1                         0.000   0.000     0      0.100   0.100     0    -0.100  -0.100
+   gyro-var2                         0.200   0.200     0      0.700   0.700     0    -0.500  -0.500
+   humanoid-458                      0.000   0.000     0      0.000   0.000     0    +0.000  +0.000
+   humanoid-503                      0.067   0.067     0      0.000   0.000     0    +0.067  +0.067
+   humanoid-531                      0.133   0.133     0      0.000   0.000     0    +0.133  +0.133
+   humanoid-742                      0.800   0.960     5      0.833   0.833     0    -0.033  +0.127
+   lift                              0.000   0.000     0      0.333   0.333     0    -0.333  -0.333
+   lily02                            1.000   1.000     0      0.867   0.867     0    +0.133  +0.133
+   lily11                            0.533   0.533     0      0.967   0.967     0    -0.433  -0.433
+   lily15                            0.033   0.033     0      0.067   0.067     0    -0.033  -0.033
+   lily16                            0.100   0.100     0      0.000   0.000     0    +0.100  +0.100
+   load-balancer-aurus               1.000   1.000     0      0.867   0.867     0    +0.133  +0.133
+   ltl2dba-r-2                       1.000   1.000     0      1.000   1.000     0    +0.000  +0.000
+   ltl2dba-theta-2                   1.000   1.000     0      0.933   0.933     0    +0.067  +0.067
+   ltl2dba27                         1.000   1.000     0      1.000   1.000     0    +0.000  +0.000
+   minepump                          0.800   0.800     0      1.000   1.000     0    -0.200  -0.200
+   pcar-v2-888                       0.033   0.033     0      0.000   0.000     0    +0.033  +0.033
+   prioritized-arbiter-aurus         0.667   0.667     0      0.000   0.000     0    +0.667  +0.667
+   rg1                               0.033   0.033     0      0.000   0.000     0    +0.033  +0.033
+   rg2                               1.000   1.000     0      1.000   1.000     0    +0.000  +0.000
+   round-robin-arbiter-aurus         1.000   1.000     0      1.000   1.000     0    +0.000  +0.000
+   simple-arbiter-aurus              1.000   1.000     0      0.933   0.933     0    +0.067  +0.067
+
+   REGISTERED (PLAN section 5): exact two-sided Wilcoxon over families at alpha 0.05, over 750 PEREDUR runs
+
+   all runs, a kill is a failure: 25 families
+     PEREDUR higher on 12, lower on 8, tied on 5
+     mean difference +0.012, exact two-sided Wilcoxon p = 0.7214
+
+   scorable runs only: 25 families
+     PEREDUR higher on 13, lower on 7, tied on 5
+     mean difference +0.018, exact two-sided Wilcoxon p = 0.6280
+
+   The 2026-08-21 ship campaign read this contrast at PEREDUR's own budget as 0.502 against 0.504, Wilcoxon p = 0.7549.
+   This campaign reads it at AuRUS's budget, which is the whole point of the matched cross.
+
+   DECISION RULE (PLAN section 5): Outcome 3: null, reported as parity (p = 0.7214, PEREDUR higher on 12, lower on 8)
+   Registered secondary, scorable runs only: mean +0.018, p = 0.6280, PEREDUR higher on 13, lower on 7; reported beside the primary, never substituted for it.
+
+==============================================================================
+POST-HOC FACTOR CONTRASTS -- the 2x2, read after the fact
+==============================================================================
+PLAN section 5 registers the 2x2 as secondary; nothing below carries a rule.
+Nothing below is a test of a hypothesis; it describes this sample.
+
+   selection: nsga2-apportion against weighted, 1500 pairs
+   SECONDARY (PLAN section 5: the 2x2 and the per-family numbers carry no rule)
+     found_repair     nsga2-apportion only  129, weighted only   23, exact McNemar p = 0.0000
+     implies_ideal    nsga2-apportion only  189, weighted only   57, exact McNemar p = 0.0000
+     wall time        nsga2-apportion faster on 1270/1500; means 398.8s against 923.3s
+
+   status grading: mrs against aurus, 1500 pairs
+   SECONDARY (PLAN section 5: the 2x2 and the per-family numbers carry no rule)
+     found_repair     mrs only   78, aurus only   20, exact McNemar p = 0.0000
+     implies_ideal    mrs only  107, aurus only   77, exact McNemar p = 0.0322
+     wall time        mrs faster on 749/1500; means 787.2s against 534.9s
+
+==============================================================================
+READING THESE NUMBERS
+==============================================================================
+Every p-value above is post-hoc; PLAN section 2 registers no rule.
+AuRUS's ideal rates are unfiltered, its curves move only at a
+generation boundary, and its killed runs carry no verdict at all.

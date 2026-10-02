@@ -111,11 +111,11 @@ std::vector<char> gate_verdicts(const std::vector<Scored<Spec>>& population,
 // off this sweep would be a solver call per candidate the run would not
 // otherwise make. Hence the early return rather than a caller-side branch.
 template <typename Spec>
-std::optional<std::size_t> accumulate_gate_passing(
+std::size_t accumulate_gate_passing(
     const std::vector<Scored<Spec>>& population, const Config& cfg,
     std::size_t generation, RepairAccumulator<Spec>& accumulator) {
     if (!accumulator.enabled()) {
-        return std::nullopt;
+        return 0;
     }
     const std::vector<char> keep = gate_verdicts(population, cfg);
     std::size_t n_gate_passing = 0;
@@ -156,10 +156,10 @@ template std::vector<char> gate_verdicts(
     const std::vector<Scored<Specification>>&, const Config&);
 template std::vector<char> gate_verdicts(
     const std::vector<Scored<tlsf::Specification>>&, const Config&);
-template std::optional<std::size_t> accumulate_gate_passing(
+template std::size_t accumulate_gate_passing(
     const std::vector<Scored<Specification>>&, const Config&, std::size_t,
     RepairAccumulator<Specification>&);
-template std::optional<std::size_t> accumulate_gate_passing(
+template std::size_t accumulate_gate_passing(
     const std::vector<Scored<tlsf::Specification>>&, const Config&, std::size_t,
     RepairAccumulator<tlsf::Specification>&);
 template std::unique_ptr<StreamingMaximalFilter<Specification>>

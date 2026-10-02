@@ -1,0 +1,233 @@
+{
+  "campaign": "2026-09-22-aurus-rerun",
+  "attribution": "recorded",
+  "generated_on": "2026-10-01",
+  "status": "closed",
+  "kind": "re-measurement of the AuRUS baseline arm alone, at an output-only fork",
+  "kind_note": "No PEREDUR search ran here. The PEREDUR side of every contrast is 2026-09-14-paper-rerun's nsga2-apportion/mrs cell, closed on 2026-09-18. The scoring of this arm is two further campaigns, 2026-09-22-aurus-rerun-curves (separation and maximality) and 2026-09-23-aurus-rerun-anytime (per-solution anytime verdicts and the well-separation screen), each with its own archive.",
+  "question": "Whether the paper's AuRUS column survives once AuRUS stops losing the solutions of a run killed at the 7200 s cap, and what its anytime figures become when each solution is dated by the tool's own microsecond clock.",
+  "method": "Recorded at run time, not reconstructed. The arm ran as a `kind = \"aurus\"` phase of the campaign.toml archived beside this file, staged to both hosts through scripts/campaign.py, which verified the AuRUS commit against each host's COMMIT.txt before launch and again in the runner before the first JVM started. Run window, counts, flags and concurrency are read from aurus-manifest-<host>.json; per-run and per-family figures from aurus_results-<host>.csv and aurus-adapt-<host>.json; the decision from analysis-output.txt. On 2026-10-01 all six data files here were checked by md5sum against the copies on av2 and av3 and are identical.",
+
+  "profile_commit": {
+    "sha": "5d2f79696096966d1d4aefa7054d8c6f34e871e7",
+    "short": "5d2f796",
+    "subject": "fix(gate): return the gate-passing count instead of an optional",
+    "branch": "feat/aurus-rerun",
+    "queue_entries": {"av2": "033-2026-09-22-aurus-rerun, state done", "av3": "031-2026-09-22-aurus-rerun, state done"},
+    "cancelled_attempt": "Queue entries av2 031 and av3 029 staged 21feb84 at 2026-09-22T19:40 and are recorded `state = \"cancelled\"` after one attempt. No row of this campaign comes from 21feb84; both manifests and both adapter summaries name 5d2f796.",
+    "reachable_from_main": false,
+    "held_by_tag": "provenance/aurus-rerun",
+    "held_by_tag_note": "Annotated tag cut at 5d2f796 on 2026-10-01, before the close commit was written, and pushed the same minute. Never delete it.",
+    "note": "The PEREDUR checkout the harness ran from. No PEREDUR binary ran in this arm, so this sha determines no result here; the harness is pinned by the blobs under vendored_scripts, and the tool under test by `aurus` below."
+  },
+  "binary_commit": null,
+  "binary_commit_note": "Null by construction. The arm invokes AuRUS and links no PEREDUR binary. `spot_bin` prepended build-release/third_party/spot/bin to PATH so AuRUS's own SPOT calls resolved to the pinned build; that is a dependency of the tool under test.",
+
+  "aurus": {
+    "repo": "git@github.com:benmandrew/AuRUS.git",
+    "commit": "e1cfadf4c0ae29ae429b95f7bcd728b8ecb82a62",
+    "short": "e1cfadf",
+    "subject": "feat: write repair files and timing as solutions are found",
+    "author_date": "2026-09-22",
+    "branch": "output-on-timeout",
+    "commit_reachable": "`git ls-remote origin` on 2026-10-01 lists refs/heads/output-on-timeout at e1cfadf, so the commit is held by a pushed branch.",
+    "host_checkouts": "~/projects/tools/aurus-timeout/COMMIT.txt reads `e1cfadf output-on-timeout` on both av2 and av3.",
+    "parent": {
+      "commit": "3f6f01fad3404724d1cca33ad30ab4c63fe61bad",
+      "short": "3f6f01f",
+      "subject": "minors",
+      "author_date": "2024-05-28",
+      "note": "Upstream AuRUS as published, and what 2026-08-14-aurus-h2h ran."
+    },
+    "what_changed": "Output alone, per PLAN.md section 2. Upstream writes ga.solutions in one batch after the search loop, so a run killed at the cap loses everything with the JVM, and it dates a solution from the run log's per-iteration #Sol column, rounded to the second. The fork writes each solution as it is found and appends its elapsed time to solution-times.csv to the microsecond.",
+    "verified": "aurus_commit = \"e1cfadf\" in campaign.toml. Both manifests record declared_commit = aurus_commit = e1cfadf."
+  },
+
+  "flags": ["-Max=1000", "-Gen=1000", "-Pop=100", "-k=20", "-addA", "-geneNUM=0", "-factors=0.7,0.1,0.2"],
+  "only_inputs_a": ["arbiter-aurus", "gyro-var1", "gyro-var2", "humanoid-458", "humanoid-531", "lift", "minepump", "rg1", "rg2"],
+  "gato_s": 7200,
+  "kill_grace_s": 300,
+  "concurrency": 14,
+
+  "run_window": {
+    "av2": {"hostname": "avlab12", "seeds": "0-14", "started": "2026-09-22T19:51:10+01:00", "finished": "2026-09-23T12:00:21+01:00", "wall_s": 58151.4},
+    "av3": {"hostname": "av3", "seeds": "15-29", "started": "2026-09-22T19:50:02+01:00", "finished": "2026-09-23T11:51:44+01:00", "wall_s": 57701.3},
+    "note": "av3's clock runs ahead of av2's with network time off, so its stamps are not comparable to av2's to the minute. Each host's own elapsed figure is unaffected.",
+    "host_wall_h": {"av2": 16.15, "av3": 16.03},
+    "budget_note": "PLAN.md section 7 estimated 16.4 h a host at concurrency 14."
+  },
+
+  "rows": {
+    "per_host": {"aurus_results-av2.csv": 390, "aurus_results-av3.csv": 390},
+    "total": 780,
+    "planned": 780,
+    "duplicates": 0,
+    "manifest_counts": {"av2": {"planned": 390, "to_run": 390, "backfill": 0, "done": 390}, "av3": {"planned": 390, "to_run": 390, "backfill": 0, "done": 390}},
+    "collected_with": "Copied from each host's experiments/aurus-rerun-out/aurus_results.csv, experiments/aurus-rerun-out/aurus-manifest-<hostname>.json and experiments/results-aurus-rerun/aurus-adapt.json; the local copies carry mtime 2026-09-23 14:28. Re-checked by md5sum against the hosts on 2026-10-01: identical. merge_experiments.py was not involved, AuRUS rows having no PEREDUR key columns."
+  },
+
+  "corpus": {"families": 26, "repeats_per_family": 30, "runs": 780, "endpoint_families": 25, "outside_endpoint": "humanoid-741, which has no examples/humanoid-741/fixes/ directory and so no ideal to imply."},
+
+  "results": {
+    "killed_at_cap": 175,
+    "killed_per_host": {"av2": 88, "av3": 87},
+    "killed_per_family": {"full-arbiter-aurus": 30, "humanoid-531": 30, "pcar-v2-888": 30, "prioritized-arbiter-aurus": 29, "humanoid-503": 29, "humanoid-741": 27},
+    "killed_keeping_output": 118,
+    "killed_producing_nothing": 57,
+    "uncapped_producing_nothing": 15,
+    "run_directories_materialised": 708,
+    "candidate_files": 296300,
+    "candidate_files_per_host": {"av2": 148652, "av3": 147648},
+    "solutions_held_by_killed_runs": 5080,
+    "solutions_held_by_killed_runs_source": "wellsep-aurus-uncensored.csv rows, run parsed off `path`, joined to killed = 1",
+    "dating": {"solution-times": 708, "run-log-inference": 0, "note": "Every materialised run was dated from the fork's own solution-times.csv (aurus-adapt by_dating). The anytime pass's 72 run-log rows are the 72 runs with no solution, which plot no point."},
+    "killed_wall": "171 killed rows record wall_time_s 7500.0 and 4 record 7500.01, all with exit_code -9: the 7200 s budget plus the harness's 300 s grace. A consumer clamps these to 7200 and reads cap status from `killed`, not from wall time.",
+    "n_solutions_column_note": "n_solutions is scraped from out.txt's `Num. of Solutions:` summary, which AuRUS prints only when its search loop returns. It is blank on all 175 killed rows and on no other row. The count for a killed run is its solution-times.csv row count, or the adapter's by_family figures.",
+    "wall_hours": {"total": 426.3, "killed_runs": 364.6, "archive_total": 457.9, "archive_killed_runs": 360.4, "source": "sums of wall_time_s over aurus_results-<host>.csv here and in 2026-08-14-aurus-h2h"},
+    "finished_run_wall_s": {"median": 75.04, "mean": 367.5, "archive_median": 164.55, "archive_mean": 578.1, "note": "Over the 605 rows here and 607 there with killed = 0. Measured, not explained: the fork changes output alone, and the drop was not investigated."}
+  },
+
+  "per_family": {
+    "note": "runs and capped from aurus_results-<host>.csv; materialised and candidates summed over both aurus-adapt-<host>.json. Re-derived from those files on 2026-10-01 with zero mismatches. A family with materialised < runs had the difference produce no solution.",
+    "arbiter-aurus": {"runs": 30, "capped": 0, "materialised": 30, "candidates": 11390},
+    "detector-aurus": {"runs": 30, "capped": 0, "materialised": 29, "candidates": 15516},
+    "full-arbiter-aurus": {"runs": 30, "capped": 30, "materialised": 24, "candidates": 69},
+    "gyro-var1": {"runs": 30, "capped": 0, "materialised": 27, "candidates": 14189},
+    "gyro-var2": {"runs": 30, "capped": 0, "materialised": 29, "candidates": 16693},
+    "humanoid-458": {"runs": 30, "capped": 0, "materialised": 30, "candidates": 11806},
+    "humanoid-503": {"runs": 30, "capped": 29, "materialised": 29, "candidates": 97},
+    "humanoid-531": {"runs": 30, "capped": 30, "materialised": 5, "candidates": 86},
+    "humanoid-741": {"runs": 30, "capped": 27, "materialised": 30, "candidates": 5365},
+    "humanoid-742": {"runs": 30, "capped": 0, "materialised": 30, "candidates": 18988},
+    "lift": {"runs": 30, "capped": 0, "materialised": 29, "candidates": 6873},
+    "lily02": {"runs": 30, "capped": 0, "materialised": 29, "candidates": 10812},
+    "lily11": {"runs": 30, "capped": 0, "materialised": 30, "candidates": 18724},
+    "lily15": {"runs": 30, "capped": 0, "materialised": 30, "candidates": 13396},
+    "lily16": {"runs": 30, "capped": 0, "materialised": 29, "candidates": 11460},
+    "load-balancer-aurus": {"runs": 30, "capped": 0, "materialised": 29, "candidates": 15939},
+    "ltl2dba-r-2": {"runs": 30, "capped": 0, "materialised": 30, "candidates": 19000},
+    "ltl2dba-theta-2": {"runs": 30, "capped": 0, "materialised": 28, "candidates": 17830},
+    "ltl2dba27": {"runs": 30, "capped": 0, "materialised": 30, "candidates": 17265},
+    "minepump": {"runs": 30, "capped": 0, "materialised": 30, "candidates": 14285},
+    "pcar-v2-888": {"runs": 30, "capped": 30, "materialised": 4, "candidates": 6},
+    "prioritized-arbiter-aurus": {"runs": 30, "capped": 29, "materialised": 29, "candidates": 285},
+    "rg1": {"runs": 30, "capped": 0, "materialised": 29, "candidates": 8557},
+    "rg2": {"runs": 30, "capped": 0, "materialised": 30, "candidates": 13144},
+    "round-robin-arbiter-aurus": {"runs": 30, "capped": 0, "materialised": 30, "candidates": 20095},
+    "simple-arbiter-aurus": {"runs": 30, "capped": 0, "materialised": 29, "candidates": 14430}
+  },
+
+  "censoring_against_the_archive": {
+    "archive_killed_per_family": {"humanoid-531": 30, "humanoid-503": 30, "humanoid-741": 30, "prioritized-arbiter-aurus": 29, "full-arbiter-aurus": 28, "pcar-v2-888": 25, "lily02": 1},
+    "archive_killed": 173,
+    "now_killed": 175,
+    "source": "the killed column of aurus_results-<host>.csv in 2026-08-14-aurus-h2h and here",
+    "note": "The same six families carry the kills in both samples. The archive's one other kill was a lily02 repeat; this arm has none outside the six. Here 118 of 175 killed runs keep what they found."
+  },
+
+  "endpoint": "PLAN.md section 4: per-family implies_ideal, PEREDUR's nsga2-apportion/mrs cell of 2026-09-14-paper-rerun against this AuRUS arm, over the 25 families of H2H_TLSF_READY, exact two-sided Wilcoxon signed-rank at alpha 0.05, a capped run counting as a failure on both sides.",
+
+  "registered_primary": {
+    "source": "analysis-output.txt, section REGISTERED PRIMARY, printed by scripts/analyse_matched.py at 57fcefb through scripts/run_analysis.py, against the reference scripts/stage.py built from this arm",
+    "families": 25,
+    "peredur_higher": 12,
+    "peredur_lower": 8,
+    "tied": 5,
+    "mean_difference": 0.012,
+    "wilcoxon_p": 0.7214,
+    "baseline_for_comparison": {"campaign": "2026-09-14-paper-rerun, against the archived 2026-08-14 arm", "peredur_higher": 12, "peredur_lower": 8, "tied": 5, "mean_difference": 0.003, "wilcoxon_p": 0.9345},
+    "largest_differences": "PEREDUR ahead on full-arbiter-aurus and prioritized-arbiter-aurus (+0.667 each, AuRUS 0 of 30 on both), and by +0.133 on humanoid-531, lily02 and load-balancer-aurus; behind on gyro-var2 (-0.500), lily11 (-0.433) and lift (-0.333).",
+    "aurus_rates_unscreened": "analyse_matched prints AuRUS's per-family rates unfiltered by the well-separation screen. The paper applies the screen downstream through prepare.py; the registered test does not."
+  },
+  "registered_secondary": {
+    "definition": "PLAN.md section 4: the same test restricted to the families whose archived repeats were never censored. analyse_matched does not print it; its printed `scorable runs only` read is the rematch's secondary and appears below for completeness.",
+    "computed": "On 2026-10-01 from the per-family table in analysis-output.txt's REGISTERED PRIMARY section, with wilcoxon_exact_p from scripts/analyse_matched.py, differences taken as (PEREDUR hits - AuRUS hits) / 30.",
+    "twenty_families": {"excluded": ["full-arbiter-aurus", "humanoid-503", "humanoid-531", "pcar-v2-888", "prioritized-arbiter-aurus"], "peredur_higher": 7, "peredur_lower": 8, "tied": 5, "mean_difference": -0.063, "wilcoxon_p": 0.3369},
+    "nineteen_families": {"excluded": ["full-arbiter-aurus", "humanoid-503", "humanoid-531", "pcar-v2-888", "prioritized-arbiter-aurus", "lily02"], "peredur_higher": 6, "peredur_lower": 8, "tied": 5, "mean_difference": -0.074, "wilcoxon_p": 0.2235},
+    "count_note": "PLAN.md says 20 families. It counted 26 minus the six censored families, but humanoid-741 is outside the 25, and the archive also killed one lily02 repeat, so strictly 19 of the 25 were never censored. Both reads are null.",
+    "analyser_scorable_runs_only": {"families": 25, "peredur_higher": 13, "peredur_lower": 7, "tied": 5, "mean_difference": 0.018, "wilcoxon_p": 0.628}
+  },
+  "decision_rule": "PLAN.md section 5. Outcome 1, PEREDUR higher at p < 0.05: PEREDUR ahead. Outcome 2, AuRUS higher at p < 0.05: reported as measured and RQ1 rewritten. Outcome 3, null: parity, with the discordant counts. In every outcome the paper reports the archive's censoring, this campaign replaces it, and a supersession row naming 2026-08-14-aurus-h2h goes in experiments/README.md.",
+  "decision": "Outcome 3, null, reported as parity: PEREDUR higher on 12 families, lower on 8, tied on 5, mean difference +0.012, exact two-sided Wilcoxon p = 0.7214. The registered secondary is null too, p = 0.3369 over the plan's 20 families and p = 0.2235 over the 19 strictly never censored. This arm supersedes 2026-08-14-aurus-h2h as the project's AuRUS measurement, and the supersession row is in experiments/README.md as of this close.",
+  "decision_caveat_float_ties": "wilcoxon_exact_p receives differences of float rates, and signed_ranks groups ties with ==, so equal differences reached by different float paths (0.0333...326 against 0.0333...333, 0.0666...665 against 0.0666...667, 0.1333...33 against 0.1333...333, 0.1999...96 against 0.2000...07) rank apart. On exact differences the registered p is 0.7348 rather than 0.7214, the 20-family secondary 0.3369 rather than 0.3370 and the 19-family one 0.2235 rather than 0.2224. No outcome moves. The registered figure is the analyser's printed 0.7214; the defect is in analyse_matched.py at 57fcefb and was not fixed here.",
+
+  "arm_against_the_archive": {
+    "source": "paper/generated/ablation-aurus.csv and paper/generated/numbers.tex in ~/projects/writing/counter-paper, at 1fc2134 (this arm) against 1fc2134^ (the archive), over the 750 runs of the 25 endpoint families",
+    "found": {"archive": 0.777333, "now": 0.824},
+    "ideal": {"archive": 0.544, "now": 0.536},
+    "exhausted": {"archive": 0.205333, "now": 0.096},
+    "wall_median_s": {"archive": 298.2, "now": 179.85},
+    "wall_capped": {"archive": 154, "now": 163},
+    "curve_denominator": {"archive": 678, "now": 750, "note": "Archive: 596 scored plus 82 padded. Now: 678 scored plus 72 no-solutions runs entered as flat zeros."},
+    "lost_at_cap": {"archive": 72, "now": 0},
+    "later_paper_changes": "ablation-aurus.csv gained columns at b3d24cc and 4bfae9d; found, ideal, exhausted, wall_median and wall_capped are unchanged at the paper's HEAD 718a588.",
+    "wall_capped_note": "163 = 148 killed runs in the 25 families plus 15 runs that were not killed. The paper's prepare.py enters every no-solutions run at AURUS_CAP_S with wall_capped = 1, and 15 of the 72 no-solutions runs exited 0 within 0.5 to 40.2 s (see caveats). TimeoutsPrioritised reads 30 where prioritized-arbiter-aurus has 29 killed runs, for the same reason. The paper's PROVENANCE.txt line `capped runs 154 to 72` matches neither file."
+  },
+
+  "supersedes": {
+    "campaign": "2026-08-14-aurus-h2h",
+    "claim": "This arm replaces that one as the project's AuRUS measurement. AuRUS is unseeded, so the two are separate samples of the same tool at different output handling. They are reported beside each other and never merged.",
+    "reused_by": ["2026-08-21-aurus-h2h-ship", "2026-08-29-aurus-matched", "2026-09-04-aurus-rematch", "2026-09-14-paper-rerun", "2026-09-14-paper-rerun-curves"],
+    "reused_by_source": "each campaign's PROVENANCE.json names the 2026-08-14 arm, or ~/aurus-h2h-out, as its AuRUS side",
+    "readme_row": "Added to experiments/README.md, under Results a later campaign has overtaken, in the close commit."
+  },
+
+  "scoring": {
+    "curves": "2026-09-22-aurus-rerun-curves on campaign/aurus-rerun-curves at 3cd6efb, held by provenance/aurus-rerun-curves: separation and maximality over the 708 materialised runs.",
+    "anytime_and_wellsep": "2026-09-23-aurus-rerun-anytime on campaign/aurus-rerun-anytime at 5891b06, held by provenance/aurus-rerun-anytime: per-solution compare verdicts over all 780 repeats and the well-separation screen over the 708 materialised runs.",
+    "paper_staging": "~/projects/writing/counter-paper/data/rerun-2026-09-uncensored, commits 1fc2134 and 29a1712, documented in its PROVENANCE.txt."
+  },
+
+  "caveats": [
+    "The PEREDUR arm is not re-run here. It is 2026-09-14-paper-rerun's, run at 57fcefb eight days earlier. PLAN.md section 6 registers this.",
+    "Every recovered run sits in the six capped families. A swing must be read per family rather than pooled.",
+    "15 runs that were not killed produced nothing: detector-aurus 0, gyro-var1 0, 15 and 24, gyro-var2 21, humanoid-503 15, lift 15, lily02 0, lily16 15, load-balancer-aurus 14, ltl2dba-theta-2 15 and 26, prioritized-arbiter-aurus 5, rg1 0 and simple-arbiter-aurus 3. Each exited 0 with aurus_time_s 0, and each run.log on the hosts reads `Initial specification is: unknown` and then `The specification is inconsistent`. The one read in full, detector-aurus repeat 0, first prints SAT-solver warnings of a DIMACS header mismatch. 9 of the 15 are repeat 0 or repeat 15, the first of a host's split. The cause was not investigated, and they score as failures in every read.",
+    "peak_rss_mb does not measure the JVM. Its maximum over all 780 rows is 3.5 MB against an 8 GB heap reservation, and it reads 0.0 on 14 of the 15 quick exits, so the sampler read some other process. No memory figure in this arm is usable.",
+    "An implication that times out reads as a non-implication, so every ideal count is a lower bound. On humanoid-742 the anytime pass recorded compare's `timeout` verdict for 18,574 of 18,988 solutions (2026-09-23-aurus-rerun-anytime).",
+    "Concurrency rose from 10 to 14 against the archive. Wall time is not an endpoint here."
+  ],
+
+  "vendored_scripts": {
+    "vendored_on": "2026-10-01. The first five were already present untracked, with mtime 2026-09-23 14:28, and were re-verified.",
+    "note": "Verbatim copies, each checked with `git hash-object` against its source. aurus_campaign.py launched every JVM and wrote aurus_results.csv and the manifests; aurus_adapt.py materialised the scorable tree, importing score_aurus_anytime.py; campaign.py staged the hosts and drove the phase. aurus_series.py ran nothing here and is the third reader of solution-times.csv. gen_configs.py, run_experiments.py and merge_experiments.py were not invoked, no PEREDUR run phase existing, and are vendored because the close procedure requires them. analyse_matched.py and analysis_lib.py computed the decision; stage.py and run_analysis.py built its AuRUS reference and ran it, and come from the paper repository.",
+    "files": {
+      "aurus_campaign.py": {"source": "counter", "source_commit": "5d2f79696096966d1d4aefa7054d8c6f34e871e7", "last_changed": "2b9c361", "blob": "158402ff500edc7697546f8d4e9f3aa120eda4cc"},
+      "aurus_adapt.py": {"source": "counter", "source_commit": "5d2f79696096966d1d4aefa7054d8c6f34e871e7", "last_changed": "2b9c361", "blob": "45af278f7cf5ff3327ac7b038aeeb5f6ba718770"},
+      "score_aurus_anytime.py": {"source": "counter", "source_commit": "5d2f79696096966d1d4aefa7054d8c6f34e871e7", "last_changed": "2b9c361", "blob": "988d92dbc456e4ad76490d64407526de4ba7ba9d"},
+      "aurus_series.py": {"source": "counter", "source_commit": "5d2f79696096966d1d4aefa7054d8c6f34e871e7", "last_changed": "2b9c361", "blob": "8c84b4faf80917c3fbe5d175dc03864492b66530"},
+      "campaign.py": {"source": "counter", "source_commit": "5d2f79696096966d1d4aefa7054d8c6f34e871e7", "last_changed": "2b9c361", "blob": "285f9200db335462b8b2893361f3557fb5b0d500"},
+      "gen_configs.py": {"source": "counter", "source_commit": "5d2f79696096966d1d4aefa7054d8c6f34e871e7", "last_changed": "e931051", "blob": "457dd01d9e71fe8f1efbc2e188d0adb5b36c5546"},
+      "run_experiments.py": {"source": "counter", "source_commit": "5d2f79696096966d1d4aefa7054d8c6f34e871e7", "last_changed": "8216c6d", "blob": "8be0eca180c31e3eab17217dc04176d9c2b1f198"},
+      "merge_experiments.py": {"source": "counter", "source_commit": "5d2f79696096966d1d4aefa7054d8c6f34e871e7", "last_changed": "dc2c54e", "blob": "87c7e0d76d9e26b8a55e600007a4c3ced8ab94ba"},
+      "analyse_matched.py": {"source": "counter", "source_commit": "57fcefbea1c972e3e7528926caa5b47e1314d649", "blob": "4637e10b42ac5acfcebe08a8c43521ed55d99613", "note": "Identical to the copy vendored in 2026-09-14-paper-rerun/scripts, which the paper's run_analysis.py command names."},
+      "analysis_lib.py": {"source": "counter", "source_commit": "57fcefbea1c972e3e7528926caa5b47e1314d649", "blob": "5b3db5427a2d3b79ffed048e2f64a9ef9a9435d9"},
+      "stage.py": {"source": "counter-paper data/rerun-2026-09-uncensored", "source_commit": "29a1712", "blob": "006f82b49cb43a485b0e3b13488d2ad3f7faad52"},
+      "run_analysis.py": {"source": "counter-paper data/rerun-2026-09-uncensored", "source_commit": "1fc2134", "blob": "4937b5a8b6065b9d0d13ae26fa6cdf611436748c"}
+    },
+    "basis": "recorded: the counter copies are the files at the commits named, verified with `git hash-object`; the paper copies match the paper repository's HEAD 718a588 blob for blob."
+  },
+
+  "config_vintage": "Not applicable. The arm reads no PEREDUR config.",
+
+  "not_recorded": {
+    "jvm_peak_rss": "peak_rss_mb sampled the wrong process; see caveats.",
+    "cause_of_the_15_quick_exits": "Not investigated.",
+    "core_hours": "No per-run CPU time was recorded. wall_hours above is wall time summed over runs at concurrency 14."
+  },
+
+  "files": {
+    "PLAN.md": "Pre-registered 2026-09-22, amended the same day before any curve existed (section 8).",
+    "campaign.toml": "The declaration both hosts read.",
+    "REPORT.md": "The write-up, closed 2026-10-01.",
+    "PROVENANCE.json": "This file.",
+    "analysis-output.txt": "Copied from ~/projects/writing/counter-paper/data/rerun-2026-09-uncensored at 29a1712, blob 8d35d76e06a4cca4187235256d55c8ab46751f68. Tracked here deliberately, as 2026-09-14-paper-rerun's is.",
+    "scripts/": "The twelve vendored scripts, with blob shas above.",
+    "aurus_results-av2.csv, aurus_results-av3.csv": "390 rows each. Untracked.",
+    "aurus-manifest-av2.json, aurus-manifest-av3.json": "The harness manifests. Untracked.",
+    "aurus-adapt-av2.json, aurus-adapt-av3.json": "The adapter summaries. Untracked.",
+    "candidate files": "The 296,300 solution files stay on the hosts under experiments/aurus-rerun-out/<spec>/repeat-NN/, symlinked into experiments/results-aurus-rerun/. aurus_adapt.py --copy makes that tree self-contained."
+  },
+
+  "reproduce": "Check out AuRUS e1cfadf into ~/projects/tools/aurus-timeout with a Linux Strix binary, check out 5d2f796 here, build the release preset for the SPOT tools, and run this campaign.toml through campaign.py on two hosts split 0-14 and 15-29. The repeats will not reproduce, AuRUS drawing from an unseeded Math.random(). To re-derive the decision, build the reference with scripts/stage.py and run scripts/run_analysis.py with the arguments on the Staging line of the paper's PROVENANCE.txt.",
+  "closed_on": "2026-10-01"
+}
