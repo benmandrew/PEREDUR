@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790933873172,
+  "lastUpdate": 1791018189028,
   "repoUrl": "https://github.com/benmandrew/PEREDUR",
   "entries": {
     "counter benchmarks": [
@@ -7462,6 +7462,100 @@ window.BENCHMARK_DATA = {
             "value": 3653.280630569919,
             "unit": "ns/iter",
             "extra": "iterations: 193222\ncpu: 3653.000884992388 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "benmandrew",
+            "username": "benmandrew",
+            "email": "benmandrew@gmail.com"
+          },
+          "committer": {
+            "name": "benmandrew",
+            "username": "benmandrew",
+            "email": "benmandrew@gmail.com"
+          },
+          "id": "5dc347220ea44393ad032531b1088b54bc385f75",
+          "message": "fix(fretish): parenthesise the operand of X in start_of_mode\n\nSince 0ef4d47, start_of_mode has rendered `Xm`. SPOT reads that as\nX(m), so the formaliser equivalence test passed. PEREDUR's prop_formula\nparser and black read it as one atom `Xiap_<mode>`, which no sampled\ntrace sets. Every consumer of PEREDUR's own parse was therefore wrong\non mode-scoped specs:\n\n- the fingerprint prefilter in `maximal`, the output gate's\n  implication filter and the streaming run-frontier filter could\n  refute a true implication and keep a dominated repair;\n- black's satisfiability fallback and the `formula_key` cache keys\n  also saw the atom reading.\n\nRender the operand as `X(m)` so that SPOT, black and the PEREDUR\nparser all agree. The new test parses every scope lowering with\nPEREDUR's parser and rejects any atom beyond c, r, s, m and true. It\nfails on the old code with the stray atom `Xm`.\n\nMeasured effect: mode-arbiter is affected on every repair, and the ten\nRAD cores on 15-93% of repairs. In the FRETISH ablation paired frontier\npass, 8 of 429 (subject, seed) rows gain 1-2 dominated members. This\nmoves one paper macro from 1.94% to 2.01%.\n\nThe Global-scope lowering is unchanged;\ntest_global_scope_lowering_is_unchanged passes. The LTL bytes of\nmode-scoped specs do change, so cache keys and filter outcomes move on\nthose subjects.",
+          "timestamp": "2026-10-02T13:29:34Z",
+          "url": "https://github.com/benmandrew/PEREDUR/commit/5dc347220ea44393ad032531b1088b54bc385f75"
+        },
+        "date": 1791018187853,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "Copy formula - 8 variables",
+            "value": 5.167013761314633,
+            "unit": "ns/iter",
+            "extra": "iterations: 135471214\ncpu: 5.1665360435907814 ns\nthreads: 1"
+          },
+          {
+            "name": "Copy specification - 3-guarantee takeoff spec",
+            "value": 95.78057999636157,
+            "unit": "ns/iter",
+            "extra": "iterations: 7378598\ncpu: 95.75634260058617 ns\nthreads: 1"
+          },
+          {
+            "name": "Hash specification - 3-guarantee takeoff spec",
+            "value": 76.18726341637169,
+            "unit": "ns/iter",
+            "extra": "iterations: 9195480\ncpu: 76.15829494490772 ns\nthreads: 1"
+          },
+          {
+            "name": "Compare specifications - equal, distinct arenas",
+            "value": 51.91484288209665,
+            "unit": "ns/iter",
+            "extra": "iterations: 13539291\ncpu: 51.91065684310944 ns\nthreads: 1"
+          },
+          {
+            "name": "Syntactic similarity - small formulas (3 variables)",
+            "value": 356.25659749590733,
+            "unit": "ns/iter",
+            "extra": "iterations: 1961426\ncpu: 356.2407467832078 ns\nthreads: 1"
+          },
+          {
+            "name": "Syntactic similarity - large formulas (11 variables, O(n*m) shared_subformulae)",
+            "value": 1425.736426413807,
+            "unit": "ns/iter",
+            "extra": "iterations: 490622\ncpu: 1425.6475188638092 ns\nthreads: 1"
+          },
+          {
+            "name": "Spec implication check - warm black cache",
+            "value": 430.99967179004494,
+            "unit": "ns/iter",
+            "extra": "iterations: 1614820\ncpu: 430.9427861928884 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:5",
+            "value": 121.34770151094708,
+            "unit": "ns/iter",
+            "extra": "iterations: 5778557\ncpu: 121.34251526808514 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:10",
+            "value": 137.2689708959622,
+            "unit": "ns/iter",
+            "extra": "iterations: 5089019\ncpu: 137.2651310596404 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:20",
+            "value": 154.8625340132225,
+            "unit": "ns/iter",
+            "extra": "iterations: 4566606\ncpu: 154.8481469607848 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:50",
+            "value": 190.41167010624326,
+            "unit": "ns/iter",
+            "extra": "iterations: 3668090\ncpu: 190.39999209397823 ns\nthreads: 1"
+          },
+          {
+            "name": "Mutate specification - 3-guarantee takeoff spec",
+            "value": 2273.1097401926013,
+            "unit": "ns/iter",
+            "extra": "iterations: 309768\ncpu: 2272.577512848322 ns\nthreads: 1"
           }
         ]
       }
