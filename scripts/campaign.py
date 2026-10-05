@@ -173,6 +173,10 @@ AURUS_CMD = os.environ.get("PEREDUR_AURUS_CMD",
 # AMT13 from the Maoz, Ringert & Shalom artifact. The same override again.
 MAOZ_CMD = os.environ.get("PEREDUR_MAOZ_CMD",
                           f"{REMOTE_PYTHON} scripts/maoz_campaign.py")
+# Their scoring against PEREDUR, for a `kind = "maoz-score"` phase: one pass
+# of scripts/maoz_score.py. The same override again.
+MAOZ_SCORE_CMD = os.environ.get("PEREDUR_MAOZ_SCORE_CMD",
+                                f"{REMOTE_PYTHON} scripts/maoz_score.py")
 
 # Rebuilt by stage. The lab machines have no Nix, so this is the incremental
 # build against an already-configured preset directory, not a configure step;
@@ -249,7 +253,7 @@ while IFS= read -r m; do
   echo "@M@ENDFILE"
 done
 echo "@M@SCOREMANIFESTS"
-find experiments -mindepth 2 -maxdepth 2 -type f \( -name 'score-manifest-*.json' -o -name 'aurus-manifest-*.json' -o -name 'maoz-manifest-*.json' \) 2>/dev/null |
+find experiments -mindepth 2 -maxdepth 2 -type f \( -name 'score-manifest-*.json' -o -name 'aurus-manifest-*.json' -o -name 'maoz-manifest-*.json' -o -name 'maoz-score-manifest-*.json' \) 2>/dev/null |
 while IFS= read -r m; do
   echo "@M@SFILE $m"
   cat "$m"
@@ -314,6 +318,19 @@ def detail_script(root: str, campaigns: list[dict]) -> str:
                 f'  echo "{MARK}CSVS $(find {q_out} -maxdepth 1 -type f '
                 "-name '*.csv' 2>/dev/null | wc -l)\"",
                 f'  echo "{MARK}OUTMTIME $(find {q_out} -maxdepth 1 -type f '
+                "-printf '%T@\\n' 2>/dev/null | sort -rn | head -1)\"",
+                "fi",
+            ]
+            continue
+        if c.get("kind") == "maoz-score":
+            # A maoz scoring pass rewrites its manifest's done count as it
+            # goes, so progress is read from there; the probe adds only the
+            # newest file under the output directory, for staleness.
+            q_out = shlex.quote(c["out"])
+            lines += [
+                f'echo "{MARK}CAMPAIGN {c["profile"]}"',
+                f"if [ -d {q_out} ]; then",
+                f'  echo "{MARK}OUTMTIME $(find {q_out} -type f '
                 "-printf '%T@\\n' 2>/dev/null | sort -rn | head -1)\"",
                 "fi",
             ]
@@ -404,6 +421,7 @@ def parse_inventory(text: str) -> dict:
     """Split the inventory script's marker-delimited output into fields."""
     out: dict = {"ps": [], "manifests": [], "score_manifests": [],
                  "aurus_manifests": [], "maoz_manifests": [],
+                 "maoz_score_manifests": [],
                  "queue": [], "hostname": "?", "epoch": None, "branch": "?",
                  "head": "?", "dirty": None, "error": None}
     section = None
@@ -444,14 +462,17 @@ def parse_inventory(text: str) -> dict:
             try:
                 manifest = json.loads("\n".join(manifest_lines))
                 manifest["file"] = score_name
-                # One sweep, three kinds: a scoring pass, an AuRUS arm and a
-                # maoz arm all keep their manifest one level down, under the
-                # directory they write, and the stem says which is which.
+                # One sweep, four kinds: a scoring pass, an AuRUS arm, a maoz
+                # arm and a maoz scoring pass all keep their manifest one level
+                # down, under the directory they write, and the stem says
+                # which is which.
                 stem = Path(score_name).name
                 key = ("aurus_manifests"
                        if stem.startswith("aurus-manifest")
                        else "maoz_manifests"
                        if stem.startswith("maoz-manifest")
+                       else "maoz_score_manifests"
+                       if stem.startswith("maoz-score-manifest")
                        else "score_manifests")
                 out[key].append(manifest)
             except (json.JSONDecodeError, TypeError):
@@ -618,6 +639,11 @@ def live_processes(ps_lines: list[str]) -> list[dict]:
             found.append({"comm": comm, "profile": None, "kind": "maoz",
                           "out": option_of_args(args, "--out-root"),
                           "args": args})
+        elif comm.startswith("python") and "maoz_score.py" in args:
+            # A maoz scoring pass, matched on its --out like a scorer.
+            found.append({"comm": comm, "profile": None, "kind": "maoz-score",
+                          "out": option_of_args(args, "--out"),
+                          "args": args})
     return found
 
 
@@ -721,6 +747,44 @@ def campaigns_from_maoz_manifests(manifests: list[dict]) -> list[dict]:
     return campaigns_from_baseline_manifests(manifests, "maoz", "maoz_digest")
 
 
+def campaigns_from_maoz_score_manifests(manifests: list[dict]) -> list[dict]:
+    """One record per maoz scoring pass, in the shape run records take.
+
+    Keyed on the output directory like a scoring pass. BINARY is the commit
+    of the PEREDUR binary the pass runs (realize, maximal or compare), and
+    `-` for the report pass, which runs none.
+    """
+    out = []
+    for m in manifests:
+        git = m.get("git") or {}
+        counts = m.get("counts") or {}
+        out_dir = str(m.get("out") or Path(m.get("file", "?")).parent)
+        name = Path(out_dir).name
+        binaries = [b for b in (m.get("binaries") or {}).values()
+                    if isinstance(b, dict) and "commit" in b]
+        out.append({
+            "kind": "maoz-score",
+            "profile": name,
+            "label": f"maoz-score:{name}",
+            "out": out_dir,
+            "results": m.get("results", ""),
+            "manifest_host": m.get("hostname", "?"),
+            "started": m.get("started"),
+            "finished": m.get("finished"),
+            "branch": git.get("branch", "?"),
+            "head": (git.get("head") or "?")[:7],
+            "binary_commit": (binaries[0].get("commit_short", "?")
+                              if binaries else "-"),
+            "dirty_binary": (any(b.get("dirty") == "1" for b in binaries)
+                             or bool(m.get("allow_stale_binary"))),
+            "rows_planned": counts.get("planned"),
+            "rows_done": counts.get("done"),
+            "seeds": m.get("seeds") or [],
+        })
+    out.sort(key=lambda c: (c.get("started") or "", c["profile"]))
+    return out
+
+
 def campaigns_from_baseline_manifests(manifests: list[dict], kind: str,
                                       build_key: str) -> list[dict]:
     """One record per baseline-arm manifest, in the shape run records take.
@@ -799,7 +863,9 @@ def gather_host(host: str, root: str, only: str | None, want_plan: bool,
     campaigns = (campaigns_from_manifests(inv["manifests"])
                  + campaigns_from_score_manifests(inv["score_manifests"])
                  + campaigns_from_aurus_manifests(inv["aurus_manifests"])
-                 + campaigns_from_maoz_manifests(inv["maoz_manifests"]))
+                 + campaigns_from_maoz_manifests(inv["maoz_manifests"])
+                 + campaigns_from_maoz_score_manifests(
+                     inv["maoz_score_manifests"]))
     if only:
         campaigns = [c for c in campaigns if c["profile"] == only]
     elif not show_all:
@@ -882,12 +948,12 @@ def claims_campaign(proc: dict, c: dict) -> bool:
     """Whether a live process is this campaign's own.
 
     A runner claims the campaign whose profile it names; a scorer and a
-    baseline arm (AuRUS or maoz) each claim the phase whose output directory
-    they name, compared by name since the manifest and the process may spell
+    baseline arm (AuRUS or maoz) and a maoz scoring pass each claim the phase
+    whose output directory they name, compared by name since the manifest and the process may spell
     the path relative or absolute.
     No kind claims another's, and an engine process claims nothing.
     """
-    if c.get("kind") in ("score", "aurus", "maoz"):
+    if c.get("kind") in ("score", "aurus", "maoz", "maoz-score"):
         return (proc.get("kind") == c["kind"] and bool(proc.get("out"))
                 and Path(proc["out"]).name == Path(c.get("out", "")).name)
     return bool(proc.get("profile")) and proc["profile"] == c["profile"]
@@ -1122,7 +1188,7 @@ def status_notes(reports: list[dict]) -> list[str]:
             if p["profile"]:
                 notes.append(f"{r['host']}: runner live on "
                              f"--profile {p['profile']}")
-            elif p.get("kind") == "score":
+            elif p.get("kind") in ("score", "maoz-score"):
                 notes.append(f"{r['host']}: scorer live on "
                              f"--out {p.get('out') or '?'}")
         for c in r["campaigns"]:
@@ -2006,11 +2072,12 @@ CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
 # A phase is a search run (`kind = "run"`, the default and what every phase
 # was before the key existed), an offline scoring pass over a results
 # directory (`kind = "score"`), the AuRUS baseline arm (`kind = "aurus"`), or
-# the GR(1) assumption-repair baselines of Maoz et al. (`kind = "maoz"`).
+# the GR(1) assumption-repair baselines of Maoz et al. (`kind = "maoz"`), or
+# one pass of their scoring against PEREDUR (`kind = "maoz-score"`).
 # Each kind reads its own keys: the runner's selection keys mean nothing to the
 # scorer, and the scorer's budgets mean nothing to the runner, so a key from
 # another kind is refused by name rather than carried along unread.
-PHASE_KINDS = ("run", "score", "aurus", "maoz")
+PHASE_KINDS = ("run", "score", "aurus", "maoz", "maoz-score")
 RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts"}
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s")
@@ -2042,8 +2109,27 @@ MAOZ_PHASE_KEYS = {"name", "kind", "out", "hosts", "specs", "inputs",
 MAOZ_DEFAULTS = {"timeout": 7200, "concurrency": 8, "max_repairs": 1000,
                  "heap_gb": 10}
 MAOZ_ALGORITHMS = ("UF", "BFS", "ALUR")
+# One pass of scripts/maoz_score.py: screen, frontier, coverage or report.
+# `results` is the tool tree maoz_adapt.py wrote, `pool` the PEREDUR pool the
+# local pool pass built, and `screen`, `frontier` and `coverage` the out
+# directories of the earlier passes a later one reads. The pool pass is not a
+# phase: it reads both hosts' halves of the paper re-run, which no one host
+# holds. Budgets default to maoz_score.DEFAULTS and are always stated on the
+# command line, so the manifest names what the declaration meant.
+MAOZ_SCORE_PASSES = ("screen", "frontier", "coverage", "report")
+MAOZ_SCORE_INPUT_KEYS = ("results", "pool", "screen", "frontier", "coverage",
+                         "maoz_out")
+# Which earlier outputs each pass reads, besides `results`.
+MAOZ_SCORE_NEEDS = {"screen": (), "frontier": ("screen",),
+                    "coverage": ("frontier", "pool"),
+                    "report": ("screen", "frontier", "coverage", "pool")}
+MAOZ_SCORE_BUDGET_KEYS = ("jobs", "realize_timeout", "wellsep_timeout",
+                          "maximal_timeout", "maximal_wall_s", "chunk_size",
+                          "chunk_timeout", "pair_timeout", "cores")
+MAOZ_SCORE_PHASE_KEYS = {"name", "kind", "pass", "out", "hosts", "specs",
+                         *MAOZ_SCORE_INPUT_KEYS, *MAOZ_SCORE_BUDGET_KEYS}
 PHASE_KEYS = (RUN_PHASE_KEYS | SCORE_PHASE_KEYS | AURUS_PHASE_KEYS
-              | MAOZ_PHASE_KEYS)
+              | MAOZ_PHASE_KEYS | MAOZ_SCORE_PHASE_KEYS)
 
 # `describe` prints a declaration for a campaign that has already closed. It
 # is not one of these: the factor cross below is what the results CSV carries,
@@ -2249,7 +2335,9 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
                                 f"{', '.join(PHASE_KINDS)}, not {kind!r}")
         allowed = {"score": SCORE_PHASE_KEYS,
                    "aurus": AURUS_PHASE_KEYS,
-                   "maoz": MAOZ_PHASE_KEYS}.get(kind, RUN_PHASE_KEYS)
+                   "maoz": MAOZ_PHASE_KEYS,
+                   "maoz-score": MAOZ_SCORE_PHASE_KEYS}.get(kind,
+                                                            RUN_PHASE_KEYS)
         unknown = sorted(set(phase) - allowed)
         if unknown:
             raise CampaignError(f"{where}: unknown key(s) {', '.join(unknown)} "
@@ -2272,7 +2360,7 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
         # AuRUS or maoz phase never has one: it runs another tool, which this
         # checkout's runner knows nothing about. Every other phase does, and a
         # profile named anywhere must be one this checkout's runner defines.
-        if kind in ("aurus", "maoz"):
+        if kind in ("aurus", "maoz", "maoz-score"):
             profile = None
         if profile is not None or kind == "run":
             if not isinstance(profile, str) or not profile:
@@ -2303,6 +2391,10 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
             continue
         if kind == "maoz":
             normalised.append(normalise_maoz_phase(phase, where, phase_hosts))
+            continue
+        if kind == "maoz-score":
+            normalised.append(normalise_maoz_score_phase(phase, where,
+                                                         phase_hosts))
             continue
         jobs = phase.get("jobs")
         if jobs is not None and (isinstance(jobs, bool) or not isinstance(jobs, int)
@@ -2495,6 +2587,69 @@ def normalise_maoz_phase(phase: dict, where: str, phase_hosts) -> dict:
             "algorithms": list(algorithms), "adapt": adapt, **values}
 
 
+def maoz_score_defaults() -> dict:
+    import maoz_score  # noqa: PLC0415
+    return {key: maoz_score.DEFAULTS[key] for key in MAOZ_SCORE_BUDGET_KEYS}
+
+
+def normalise_maoz_score_phase(phase: dict, where: str, phase_hosts) -> dict:
+    """A maoz-score phase's record: which pass, reading what, writing where.
+
+    Every directory is under the checkout. A pass that reads an earlier
+    pass's output must name it, since the passes are separate phases with
+    separate out directories and nothing else ties them together.
+    """
+    pass_name = phase.get("pass")
+    if pass_name not in MAOZ_SCORE_PASSES:
+        raise CampaignError(
+            f"{where}: a maoz-score phase needs `pass`, one of "
+            f"{', '.join(MAOZ_SCORE_PASSES)}. The pool pass is not a phase: "
+            f"it reads both hosts' halves of the paper re-run, so it runs "
+            f"where both are and its output is copied to the host")
+    out = phase.get("out")
+    if not isinstance(out, str) or not out:
+        raise CampaignError(f"{where}: a maoz-score phase needs `out`, a "
+                            f"directory under the checkout for its CSVs and "
+                            f"its manifest")
+    inputs = {}
+    for key in MAOZ_SCORE_INPUT_KEYS:
+        value = phase.get(key)
+        if value is not None and (not isinstance(value, str) or not value):
+            raise CampaignError(f"{where}: {key} must be a non-empty string "
+                                f"naming a directory under the checkout")
+        inputs[key] = value
+    for key in MAOZ_SCORE_NEEDS[pass_name]:
+        if key != "pool" and inputs[key] is None:
+            raise CampaignError(f"{where}: the {pass_name} pass reads the "
+                                f"{key} pass's output; name it with `{key}`")
+    budgets = maoz_score_defaults()
+    for key in MAOZ_SCORE_BUDGET_KEYS:
+        value = phase.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise CampaignError(f"{where}: {key} must be a positive integer")
+        budgets[key] = value
+    specs = phase.get("specs")
+    if specs is not None and not (isinstance(specs, list)
+                                  and all(isinstance(s, str) for s in specs)):
+        raise CampaignError(f"{where}: specs must be an array of strings")
+    return {"name": phase.get("name", Path(out).name), "kind": "maoz-score",
+            "profile": None, "sweeps": None, "specs": specs,
+            "hosts": phase_hosts, "pass": pass_name, "out": out,
+            **inputs, **budgets}
+
+
+def maoz_score_reads(phase: dict) -> list:
+    """The directories a maoz-score pass reads, defaults filled in."""
+    import maoz_score  # noqa: PLC0415
+    defaults = maoz_score.INPUT_DEFAULTS
+    keys = ["results", *MAOZ_SCORE_NEEDS[phase["pass"]]]
+    if phase["pass"] == "report":
+        keys.append("maoz_out")
+    return [phase.get(key) or defaults[key] for key in keys]
+
+
 def phase_kind(phase: dict) -> str:
     """`run` unless the phase says otherwise. A phase record built before
     the key existed carries none, and every one of those is a run."""
@@ -2563,6 +2718,15 @@ def staged_results_dirs(phases: list, seeds_by_host: dict) -> dict:
                 if phase.get("adapt"):
                     produced.add(phase["adapt"])
                 continue
+            elif phase_kind(phase) == "maoz-score":
+                # It reads the tool tree, the PEREDUR pool copied up by hand,
+                # and the earlier passes' outputs, which a phase before it in
+                # this campaign usually writes.
+                for directory in maoz_score_reads(phase):
+                    if directory not in produced and directory not in wanted:
+                        wanted.append(directory)
+                produced.add(phase["out"])
+                continue
             elif (phase["results"] not in produced
                   and phase["results"] not in wanted):
                 wanted.append(phase["results"])
@@ -2629,6 +2793,8 @@ def phase_args(phase: dict, seeds: list) -> list:
         return aurus_phase_args(phase, seeds)
     if phase_kind(phase) == "maoz":
         return maoz_phase_args(phase, seeds)
+    if phase_kind(phase) == "maoz-score":
+        return maoz_score_phase_args(phase, seeds)
     args = ["--profile", phase["profile"]]
     if phase.get("jobs"):
         args += ["--jobs", str(phase["jobs"])]
@@ -2697,11 +2863,25 @@ def maoz_phase_args(phase: dict, seeds: list) -> list:
     return args + ["--seeds", *[str(s) for s in seeds]]
 
 
+def maoz_score_phase_args(phase: dict, seeds: list) -> list:
+    """One maoz_score.py pass: what it reads, where it writes, every budget
+    stated, then the seed (the tools are deterministic, so one)."""
+    args = ["--pass", phase["pass"], "--out", phase["out"]]
+    for key in MAOZ_SCORE_INPUT_KEYS:
+        if phase.get(key):
+            args += [f"--{key.replace('_', '-')}", phase[key]]
+    for key in MAOZ_SCORE_BUDGET_KEYS:
+        args += [f"--{key.replace('_', '-')}", str(phase[key])]
+    if phase.get("specs"):
+        args += ["--specs", *phase["specs"]]
+    return args + ["--seeds", *[str(s) for s in seeds]]
+
+
 def phase_launcher(phase: dict) -> str:
     """The command a phase's arguments follow: the runner, the scorer, or
     the baseline tool's own runner."""
-    return {"score": SCORER_CMD, "aurus": AURUS_CMD,
-            "maoz": MAOZ_CMD}.get(phase_kind(phase), RUNNER_CMD)
+    return {"score": SCORER_CMD, "aurus": AURUS_CMD, "maoz": MAOZ_CMD,
+            "maoz-score": MAOZ_SCORE_CMD}.get(phase_kind(phase), RUNNER_CMD)
 
 
 def phase_command(phase: dict, seeds: list) -> str:
@@ -3655,7 +3835,7 @@ def start_refusals(probe: HostProbe, campaign: dict, sha: str,
         if proc.get("profile"):
             out.append(f"a runner is already live on --profile "
                        f"{proc['profile']}")
-        elif proc.get("kind") == "score":
+        elif proc.get("kind") in ("score", "maoz-score"):
             out.append(f"a scorer is already live on --out "
                        f"{proc.get('out') or '?'}")
     if not ignore_queue:
@@ -4103,6 +4283,17 @@ def results_dir_missing(root: Path, phase: dict):
             f"directory")
 
 
+def maoz_score_input_missing(root: Path, phase: dict):
+    """Why a maoz-score pass cannot run here, or None: the first directory
+    it reads that the host does not hold."""
+    for directory in maoz_score_reads(phase):
+        if not (root / directory).is_dir():
+            return (f"no directory at {root / directory} for maoz-score "
+                    f"phase {phase['name']} — the phase or the copy that "
+                    f"writes it has not run on this host")
+    return None
+
+
 def entry_log_path(entry: dict, root: Path) -> Path:
     return queue_dir(root) / (Path(entry["file"]).stem + ".log")
 
@@ -4454,7 +4645,9 @@ def tick_entry(entry: dict, campaign: dict, root: Path,
     # run, and the scorer would say so an attempt later; the refusal is here
     # so the entry names the directory rather than an exit status.
     blocked = (results_dir_missing(root, phase)
-               if phase_kind(phase) == "score" else None)
+               if phase_kind(phase) == "score"
+               else maoz_score_input_missing(root, phase)
+               if phase_kind(phase) == "maoz-score" else None)
     if blocked is not None and not args.dry_run:
         fail_or_requeue(entry, blocked)
         write_entry(entry["path"], entry)

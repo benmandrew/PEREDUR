@@ -18,6 +18,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `recompare.py` | Re-runs `compare` over repairs already on disk and rewrites the relation columns. The standing pass whenever an ideal changes. |
 | `check_well_separated.py` | Standalone `ltlsynt` well-separation check that bypasses PEREDUR's cached verdict. Also imported as a library by `aurus_validate.py`. |
 | `aurus_campaign.py` | Drives the AuRUS baseline arm of a head-to-head. |
+| `maoz_score.py` | Scores the Maoz baselines (GLASS, JVTS-Repair, AMT13) against PEREDUR by coverage, in five passes: `pool`, `screen`, `frontier`, `coverage`, `report`. What a `kind = "maoz-score"` phase runs. |
 | `aurus_validate.py` | Re-checks AuRUS's claimed repairs with `realize` and scores them with `compare`. Run it before any AuRUS analysis. |
 | `analysis_lib.py` | Statistics and CSV helpers shared by the analysers. Read its header before vendoring an analyser — importing it means the analyser is no longer standalone. |
 | `analyse_aurus_h2h.py` | Scores a PEREDUR-versus-AuRUS head-to-head, and reads other campaigns against that archived reference. |

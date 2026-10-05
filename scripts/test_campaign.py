@@ -664,6 +664,84 @@ check_true(not C.claims_campaign(maoz_proc, dict(m, kind="aurus")),
            "nor does a maoz runner claim an AuRUS arm")
 
 
+# ── A maoz scoring pass in the status table ───────────────────────────────────
+#
+# Each maoz_score.py pass keeps maoz-score-manifest-<host>.json in its own out
+# directory. Progress is the manifest's done count, which the pass rewrites as
+# it goes, and the process that claims it is maoz_score.py naming its --out.
+
+MAOZ_SCORE_MANIFEST = """{
+  "written_by": "scripts/maoz_score.py",
+  "kind": "maoz-score",
+  "pass": "coverage",
+  "hostname": "av2",
+  "git": {"branch": "feat/maoz-baselines", "head": "def5678abc"},
+  "out": "experiments/maoz-coverage-relations",
+  "binaries": {"compare": {"path": "build-release/compare",
+                           "commit": "abc1234ffff", "commit_short": "abc1234",
+                           "dirty": "0"}},
+  "allow_stale_binary": false,
+  "started": "2026-10-05T10:00:00+0100",
+  "finished": null,
+  "counts": {"planned": 5603, "done": 682},
+  "seeds": [0]
+}"""
+
+MAOZ_SCORE_INVENTORY = f"""##PS
+python3 python3 scripts/maoz_score.py --pass coverage --out experiments/maoz-coverage-relations --seeds 0
+compare compare --repairs /tmp/x --ideals /tmp/y
+##HOST
+av2
+1786460000
+##GIT
+feat/maoz-baselines
+def5678
+0
+##MANIFESTS
+##SCOREMANIFESTS
+##SFILE experiments/maoz-coverage-relations/maoz-score-manifest-av2.json
+{MAOZ_SCORE_MANIFEST}
+##ENDSFILE
+##END
+"""
+
+msinv = C.parse_inventory(MAOZ_SCORE_INVENTORY)
+check(len(msinv["maoz_score_manifests"]), 1,
+      "a maoz scoring manifest is parsed")
+check((msinv["score_manifests"], msinv["maoz_manifests"]), ([], []),
+      "and routed by its stem, not taken for a score or maoz arm manifest")
+check_true("-name 'maoz-score-manifest-*.json'" in C.INVENTORY_SCRIPT,
+           "the inventory sweep looks for maoz scoring manifests")
+msprocs = C.live_processes(msinv["ps"])
+check([(p["comm"], p.get("kind"), p.get("out")) for p in msprocs],
+      [("python3", "maoz-score", "experiments/maoz-coverage-relations"),
+       ("compare", None, None)],
+      "the pass is a live process naming its --out; its compare is engine")
+msrec = C.campaigns_from_maoz_score_manifests(msinv["maoz_score_manifests"])
+ms = msrec[0]
+check((ms["kind"], ms["profile"], ms["label"]),
+      ("maoz-score", "maoz-coverage-relations",
+       "maoz-score:maoz-coverage-relations"),
+      "keyed on the output directory's name, labelled as a maoz scoring pass")
+check((ms["binary_commit"], ms["dirty_binary"], ms["rows_planned"],
+       ms["rows_done"]), ("abc1234", False, 5603, 682),
+      "carrying compare's commit and the manifest's counts")
+check(C.campaigns_from_maoz_score_manifests(
+    [dict(json.loads(MAOZ_SCORE_MANIFEST), binaries={},
+          allow_stale_binary=True)])[0]
+    [("binary_commit")], "-",
+      "a pass that runs no binary reports none")
+msdetail = C.detail_script("/r", msrec)
+check_true("##CAMPAIGN maoz-coverage-relations" in msdetail
+           and "OUTMTIME" in msdetail and "CSVS" not in msdetail
+           and "run_experiments.py" not in msdetail,
+           f"the detail probe reads staleness only: {msdetail}")
+check_true(C.claims_campaign(msprocs[0], ms),
+           "the pass claims its phase, by directory name")
+check_true(not C.claims_campaign(dict(msprocs[0], kind="score"), ms),
+           "a curve scorer on a same-named directory does not")
+
+
 # ── collect: merge and verification against local fixtures ────────────────────
 
 CSV_HEADER = ["sweep", "level_name", "selection", "weakening", "metric",
@@ -1511,6 +1589,80 @@ hosts = { av2 = "0" }
     check_true("DIGEST.txt" not in staged,
                "an AuRUS-only stage carries no maoz check")
 
+    # The fifth phase kind: one pass of the maoz scoring.
+    write_declaration(decl_root, "maozscore", """
+name = "maozscore"
+branch = "feat/maoz-baselines"
+hosts = { av2 = "0", av3 = "1" }
+
+[[phases]]
+kind = "maoz-score"
+pass = "screen"
+out = "experiments/ms-screen"
+hosts = { av2 = "0" }
+
+[[phases]]
+kind = "maoz-score"
+pass = "frontier"
+screen = "experiments/ms-screen"
+out = "experiments/ms-frontier"
+maximal_wall_s = 600
+hosts = { av2 = "0" }
+
+[[phases]]
+kind = "maoz-score"
+pass = "coverage"
+frontier = "experiments/ms-frontier"
+pool = "experiments/ms-pool"
+out = "experiments/ms-relations"
+jobs = 4
+chunk_size = 20
+specs = ["lift"]
+hosts = { av2 = "0" }
+""")
+    import maoz_score as MS  # noqa: E402
+    mscore = C.load_campaign("maozscore", decl_root)
+    sscreen, sfront, scover = mscore["phases"]
+    check((sscreen["kind"], sscreen["pass"], sscreen["name"],
+           sscreen["profile"]),
+          ("maoz-score", "screen", "ms-screen", None),
+          "a maoz-score phase loads as its own kind, named after its out")
+    check({k: sscreen[k] for k in C.MAOZ_SCORE_BUDGET_KEYS},
+          {k: MS.DEFAULTS[k] for k in C.MAOZ_SCORE_BUDGET_KEYS},
+          "its budgets default to maoz_score.DEFAULTS")
+    check((scover["jobs"], scover["chunk_size"], scover["specs"],
+           sfront["maximal_wall_s"]), (4, 20, ["lift"], 600),
+          "and every budget it states is carried through")
+    check(mscore["results_dirs"],
+          {"av2": ["experiments/ms-pool",
+                   "experiments/results-maoz-baselines"], "av3": []},
+          "stage demands the tool tree and the copied pool, not the outputs "
+          "an earlier phase writes, and nothing on a host narrowed away")
+    check(C.phase_args(sscreen, [0])[:4],
+          ["--pass", "screen", "--out", "experiments/ms-screen"],
+          "a maoz-score phase becomes maoz_score.py arguments")
+    cover_args = C.phase_args(scover, [0])
+    check_true(cover_args[-2:] == ["--seeds", "0"]
+               and "--frontier" in cover_args and "--pool" in cover_args
+               and cover_args[cover_args.index("--chunk-size") + 1] == "20"
+               and cover_args[cover_args.index("--pair-timeout") + 1]
+               == str(MS.DEFAULTS["pair_timeout"])
+               and cover_args[cover_args.index("--specs") + 1] == "lift",
+               f"with its inputs, every budget and the seed last: {cover_args}")
+    check_true(C.phase_command(sscreen, [0]).startswith(
+        C.MAOZ_SCORE_CMD + " "), "and its command is the scorer's")
+    parsed = MS.parse_args(cover_args)
+    check((parsed.pass_name, parsed.chunk_size, parsed.frontier, parsed.specs),
+          ("coverage", 20, "experiments/ms-frontier", ["lift"]),
+          "maoz_score.py accepts exactly what campaign.py passes")
+    check(C.maoz_score_input_missing(Path(decl_root), scover) is not None,
+          True, "a tick refuses a pass whose inputs the host lacks")
+    for d in ("experiments/results-maoz-baselines", "experiments/ms-pool",
+              "experiments/ms-frontier"):
+        (Path(decl_root) / d).mkdir(parents=True, exist_ok=True)
+    check(C.maoz_score_input_missing(Path(decl_root), scover), None,
+          "and runs it once they are there")
+
     for text, expect_in, why in (
         ('phases = [ { kind = "aurus", aurus_root = "~/a", '
          'aurus_commit = "e1cfadf" } ]',
@@ -1567,6 +1719,24 @@ hosts = { av2 = "0" }
         ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
          'maoz_root = "~/m", maoz_digest = "d", adapt = "" } ]',
          "adapt must be a non-empty string", "an empty maoz adapted tree"),
+        ('phases = [ { kind = "maoz-score", out = "o" } ]',
+         "needs `pass`", "a maoz-score phase naming no pass"),
+        ('phases = [ { kind = "maoz-score", pass = "pool", out = "o" } ]',
+         "The pool pass is not a phase", "the pool pass as a phase"),
+        ('phases = [ { kind = "maoz-score", pass = "screen" } ]',
+         "needs `out`", "a maoz-score phase with no out"),
+        ('phases = [ { kind = "maoz-score", pass = "frontier", out = "o" } ]',
+         "name it with `screen`", "a frontier pass not told the screen"),
+        ('phases = [ { kind = "maoz-score", pass = "report", out = "o", '
+         'screen = "s", frontier = "f" } ]',
+         "name it with `coverage`", "a report pass not told the coverage"),
+        ('phases = [ { kind = "maoz-score", pass = "screen", out = "o", '
+         'chunk_size = 0 } ]',
+         "chunk_size must be a positive integer", "a zero chunk"),
+        ('phases = [ { kind = "maoz-score", pass = "screen", out = "o", '
+         'timeout = 5 } ]',
+         "unknown key(s) timeout on a maoz-score phase",
+         "a maoz arm key on a maoz-score phase"),
         ('phases = [ { kind = "score" } ]', "neither",
          "a score phase with no results and no profile"),
         ('phases = [ { kind = "score", profile = "nope" } ]',

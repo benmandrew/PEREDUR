@@ -28,7 +28,7 @@ phases = [ { profile = "arbiter-probe", jobs = 4 } ]
 
 `configs` runs on the host during `stage`, after the build and before the version check so a failing generator reports as itself, in a subshell so `&&` behaves as written. It has no default, since no line suits every campaign and config trees are untracked.
 
-A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default), `score`, `aurus` or `maoz`; each of the latter three takes its own keys and refuses the run keys by name.
+A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default), `score`, `aurus`, `maoz` or `maoz-score`; each of the latter four takes its own keys and refuses the run keys by name.
 
 A phase's `hosts` table overrides the campaign split for that phase under the same rules, and may only narrow it, since `stage` staged no other host; an omitted host runs nothing for that phase and a tick advances past it. It exists because `run_experiments.py --seeds` replaces a profile's seed list rather than intersecting it, so paths with different sample sizes cannot share one range without silently changing the row count. `enqueue` freezes these as `phase_seeds`; older entries fall back to the campaign split.
 
@@ -141,6 +141,30 @@ The tools are deterministic, so the split declares one seed. It is still passed 
 `maoz_digest` is mandatory for the same reason as `aurus_commit`. `stage` expands a leading `~/` in `maoz_root` and then checks three things. `DIGEST.txt` must report the declared digest as its first token, and `classes/StreamRepairs.class` and `RepairExporterExec.jar` must exist. If one check fails, `stage` refuses the host. `stage` does not build the artifact and does not check `inputs`, which comes with the checkout.
 
 Progress is one `result.json` per finished (algorithm, spec), at `<out>/<ALG>/<spec>/result.json`. `status` reads `maoz-manifest-<host>.json` under `out`, which has the AuRUS manifest's schema with `maoz_digest` in place of `aurus_commit`. The row reads `maoz:<out>` and its BINARY column is the digest. `adapt` works as it does for AuRUS.
+
+## Maoz scoring phases
+
+A `maoz-score` phase runs one pass of `scripts/maoz_score.py`, which scores the maoz arm's repairs against PEREDUR's by coverage, as section 11 of `experiments/2026-10-02-maoz-baselines/PLAN.md` registers it. The passes are `screen`, `frontier`, `coverage` and `report`, one phase each, and each later pass names the out directory of the pass it reads.
+
+```toml
+[[phases]]
+kind = "maoz-score"
+pass = "coverage"                              # screen, frontier, coverage or report
+frontier = "experiments/maoz-coverage-frontier" # the frontier pass's out
+pool = "experiments/maoz-peredur-pool"          # optional; this is the default
+out = "experiments/maoz-coverage-relations"     # one level under experiments/
+jobs = 16
+cores = 1             # cores each compare worker is pinned to
+chunk_size = 50       # pool files per compare call
+chunk_timeout = 900   # seconds for one call; an overrun re-runs its pairs alone
+pair_timeout = 120    # seconds for one pair re-run alone; then undecided
+```
+
+`results` (default `experiments/results-maoz-baselines`), `screen`, `frontier`, `coverage` and `maoz_out` (default `experiments/maoz-baselines-out`) are the other inputs, and `realize_timeout`, `wellsep_timeout`, `maximal_timeout` and `maximal_wall_s` the other budgets. Budgets default to `maoz_score.DEFAULTS` and are always written to the command line.
+
+The fifth pass, `pool`, is not a phase. It builds the PEREDUR side from both hosts' halves of the paper re-run, which no one host holds, so it runs locally and its output is copied to the host. `stage` and the tick refuse a phase whose input directories are missing, unless an earlier phase of the campaign writes them.
+
+The row reads `maoz-score:<out>`, from `maoz-score-manifest-<host>.json`. ROWS is the manifest's own done count against its planned count, which the pass rewrites as it goes, and BINARY is the commit of the binary the pass runs. `screen` and `coverage` resume from their CSVs.
 
 ## Reading a run
 
