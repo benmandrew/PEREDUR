@@ -169,6 +169,10 @@ SCORER_CMD = os.environ.get("PEREDUR_SCORER_CMD",
 # host's repeats. Overridable for the same reason as the other two.
 AURUS_CMD = os.environ.get("PEREDUR_AURUS_CMD",
                            f"{REMOTE_PYTHON} scripts/aurus_campaign.py")
+# The second baseline, for a `kind = "maoz"` phase: GLASS, JVTS-Repair and
+# AMT13 from the Maoz, Ringert & Shalom artifact. The same override again.
+MAOZ_CMD = os.environ.get("PEREDUR_MAOZ_CMD",
+                          f"{REMOTE_PYTHON} scripts/maoz_campaign.py")
 
 # Rebuilt by stage. The lab machines have no Nix, so this is the incremental
 # build against an already-configured preset directory, not a configure step;
@@ -245,7 +249,7 @@ while IFS= read -r m; do
   echo "@M@ENDFILE"
 done
 echo "@M@SCOREMANIFESTS"
-find experiments -mindepth 2 -maxdepth 2 -type f \( -name 'score-manifest-*.json' -o -name 'aurus-manifest-*.json' \) 2>/dev/null |
+find experiments -mindepth 2 -maxdepth 2 -type f \( -name 'score-manifest-*.json' -o -name 'aurus-manifest-*.json' -o -name 'maoz-manifest-*.json' \) 2>/dev/null |
 while IFS= read -r m; do
   echo "@M@SFILE $m"
   cat "$m"
@@ -281,6 +285,12 @@ def plan_args(campaign: dict) -> str:
     return " ".join(shlex.quote(a) for a in args)
 
 
+# The file a baseline arm writes once per finished unit of work, three levels
+# below its output directory: <spec>/repeat-NN/out.txt for AuRUS,
+# <ALG>/<spec>/result.json for the maoz algorithms.
+BASELINE_DONE_FILES = {"aurus": "out.txt", "maoz": "result.json"}
+
+
 def detail_script(root: str, campaigns: list[dict]) -> str:
     """Shell reporting rows, mtimes and the runner's own plan per campaign.
 
@@ -308,18 +318,20 @@ def detail_script(root: str, campaigns: list[dict]) -> str:
                 "fi",
             ]
             continue
-        if c.get("kind") == "aurus":
+        if c.get("kind") in ("aurus", "maoz"):
             # The arm's progress is one out.txt per finished repeat, two
             # levels down (<spec>/repeat-NN/), counted rather than taken from
             # the manifest so a resumed arm reads what is on disk. Staleness
             # is the newest file anywhere under the tree, which moves while a
-            # run is still writing its log.
+            # run is still writing its log. A maoz arm leaves one result.json
+            # per finished (algorithm, spec) at the same depth.
             q_out = shlex.quote(c["out"])
+            done_file = BASELINE_DONE_FILES[c["kind"]]
             lines += [
                 f'echo "{MARK}CAMPAIGN {c["profile"]}"',
                 f"if [ -d {q_out} ]; then",
                 f'  echo "{MARK}CSVS $(find {q_out} -mindepth 3 -maxdepth 3 '
-                "-type f -name 'out.txt' 2>/dev/null | wc -l)\"",
+                f"-type f -name '{done_file}' 2>/dev/null | wc -l)\"",
                 f'  echo "{MARK}OUTMTIME $(find {q_out} -type f '
                 "-printf '%T@\\n' 2>/dev/null | sort -rn | head -1)\"",
                 "fi",
@@ -391,7 +403,7 @@ def run_shell(host: str, script: str, timeout: int = SSH_TIMEOUT_S,
 def parse_inventory(text: str) -> dict:
     """Split the inventory script's marker-delimited output into fields."""
     out: dict = {"ps": [], "manifests": [], "score_manifests": [],
-                 "aurus_manifests": [],
+                 "aurus_manifests": [], "maoz_manifests": [],
                  "queue": [], "hostname": "?", "epoch": None, "branch": "?",
                  "head": "?", "dirty": None, "error": None}
     section = None
@@ -432,11 +444,14 @@ def parse_inventory(text: str) -> dict:
             try:
                 manifest = json.loads("\n".join(manifest_lines))
                 manifest["file"] = score_name
-                # One sweep, two kinds: a scoring pass and an AuRUS arm both
-                # keep their manifest one level down, under the directory they
-                # write, and the stem says which is which.
+                # One sweep, three kinds: a scoring pass, an AuRUS arm and a
+                # maoz arm all keep their manifest one level down, under the
+                # directory they write, and the stem says which is which.
+                stem = Path(score_name).name
                 key = ("aurus_manifests"
-                       if Path(score_name).name.startswith("aurus-manifest")
+                       if stem.startswith("aurus-manifest")
+                       else "maoz_manifests"
+                       if stem.startswith("maoz-manifest")
                        else "score_manifests")
                 out[key].append(manifest)
             except (json.JSONDecodeError, TypeError):
@@ -597,6 +612,12 @@ def live_processes(ps_lines: list[str]) -> list[dict]:
             found.append({"comm": comm, "profile": None, "kind": "aurus",
                           "out": option_of_args(args, "--out-root"),
                           "args": args})
+        elif comm.startswith("python") and "maoz_campaign.py" in args:
+            # The second baseline arm, matched the same way; its JVMs are
+            # `java` too.
+            found.append({"comm": comm, "profile": None, "kind": "maoz",
+                          "out": option_of_args(args, "--out-root"),
+                          "args": args})
     return found
 
 
@@ -691,14 +712,25 @@ def campaigns_from_score_manifests(manifests: list[dict]) -> list[dict]:
 
 
 def campaigns_from_aurus_manifests(manifests: list[dict]) -> list[dict]:
-    """One record per AuRUS manifest, in the shape the run records take.
+    """One record per AuRUS manifest; see campaigns_from_baseline_manifests."""
+    return campaigns_from_baseline_manifests(manifests, "aurus", "aurus_commit")
+
+
+def campaigns_from_maoz_manifests(manifests: list[dict]) -> list[dict]:
+    """One record per maoz manifest, whose build is named by its digest."""
+    return campaigns_from_baseline_manifests(manifests, "maoz", "maoz_digest")
+
+
+def campaigns_from_baseline_manifests(manifests: list[dict], kind: str,
+                                      build_key: str) -> list[dict]:
+    """One record per baseline-arm manifest, in the shape run records take.
 
     The arm's output directory stands where a profile would, as it does for a
     scoring pass. The planned count is the manifest's own: the arm wrote it
     knowing this host's repeats and what of them was already on disk. The done
     count is rewritten per run, so a poll mid-campaign reads live, and the
-    commit reported is AuRUS's, not this checkout's, since that is the version
-    under measurement.
+    commit reported is the baseline tool's (``build_key`` in the manifest),
+    not this checkout's, since that is the version under measurement.
     """
     out = []
     for m in manifests:
@@ -707,9 +739,9 @@ def campaigns_from_aurus_manifests(manifests: list[dict]) -> list[dict]:
         out_dir = str(m.get("out") or Path(m.get("file", "?")).parent)
         name = Path(out_dir).name
         out.append({
-            "kind": "aurus",
+            "kind": kind,
             "profile": name,
-            "label": f"aurus:{name}",
+            "label": f"{kind}:{name}",
             "out": out_dir,
             "results": "",
             "manifest_host": m.get("hostname", "?"),
@@ -717,9 +749,10 @@ def campaigns_from_aurus_manifests(manifests: list[dict]) -> list[dict]:
             "finished": m.get("finished"),
             "branch": git.get("branch", "?"),
             "head": (git.get("head") or "?")[:7],
-            "binary_commit": m.get("aurus_commit", "?"),
-            # A checkout whose COMMIT.txt did not match is refused outright, so
-            # an arm that ran at all ran the commit it declared.
+            "binary_commit": m.get(build_key, "?"),
+            # A checkout whose COMMIT.txt (or DIGEST.txt) did not match is
+            # refused outright, so an arm that ran at all ran the build it
+            # declared.
             "dirty_binary": False,
             "rows_planned": counts.get("planned"),
             "rows_done": counts.get("done"),
@@ -765,7 +798,8 @@ def gather_host(host: str, root: str, only: str | None, want_plan: bool,
     })
     campaigns = (campaigns_from_manifests(inv["manifests"])
                  + campaigns_from_score_manifests(inv["score_manifests"])
-                 + campaigns_from_aurus_manifests(inv["aurus_manifests"]))
+                 + campaigns_from_aurus_manifests(inv["aurus_manifests"])
+                 + campaigns_from_maoz_manifests(inv["maoz_manifests"]))
     if only:
         campaigns = [c for c in campaigns if c["profile"] == only]
     elif not show_all:
@@ -847,12 +881,13 @@ def annotate(c: dict, host_report: dict) -> None:
 def claims_campaign(proc: dict, c: dict) -> bool:
     """Whether a live process is this campaign's own.
 
-    A runner claims the campaign whose profile it names; a scorer and an AuRUS
-    arm each claim the phase whose output directory they name, compared by name
-    since the manifest and the process may spell the path relative or absolute.
+    A runner claims the campaign whose profile it names; a scorer and a
+    baseline arm (AuRUS or maoz) each claim the phase whose output directory
+    they name, compared by name since the manifest and the process may spell
+    the path relative or absolute.
     No kind claims another's, and an engine process claims nothing.
     """
-    if c.get("kind") in ("score", "aurus"):
+    if c.get("kind") in ("score", "aurus", "maoz"):
         return (proc.get("kind") == c["kind"] and bool(proc.get("out"))
                 and Path(proc["out"]).name == Path(c.get("out", "")).name)
     return bool(proc.get("profile")) and proc["profile"] == c["profile"]
@@ -1970,11 +2005,12 @@ CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
                  "configs", "description"}
 # A phase is a search run (`kind = "run"`, the default and what every phase
 # was before the key existed), an offline scoring pass over a results
-# directory (`kind = "score"`), or the AuRUS baseline arm (`kind = "aurus"`).
+# directory (`kind = "score"`), the AuRUS baseline arm (`kind = "aurus"`), or
+# the GR(1) assumption-repair baselines of Maoz et al. (`kind = "maoz"`).
 # Each kind reads its own keys: the runner's selection keys mean nothing to the
 # scorer, and the scorer's budgets mean nothing to the runner, so a key from
 # another kind is refused by name rather than carried along unread.
-PHASE_KINDS = ("run", "score", "aurus")
+PHASE_KINDS = ("run", "score", "aurus", "maoz")
 RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts"}
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s")
@@ -1988,8 +2024,21 @@ SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
 # a repeat being the AuRUS arm's only replicate dimension.
 AURUS_PHASE_KEYS = {"name", "kind", "out", "hosts", "specs", "aurus_root",
                     "aurus_commit", "gato", "concurrency", "spot_bin", "adapt"}
-PHASE_KEYS = RUN_PHASE_KEYS | SCORE_PHASE_KEYS | AURUS_PHASE_KEYS
 AURUS_DEFAULTS = {"gato": 7200, "concurrency": 10}
+# The second baseline runs GLASS (UF), JVTS-Repair (BFS) and AMT13 (ALUR) from
+# the Maoz, Ringert & Shalom ICSE 2019 artifact, through
+# scripts/maoz_campaign.py.
+# `maoz_root` is the staged artifact directory on the host and `maoz_digest`
+# the first token its DIGEST.txt must report, playing aurus_commit's part.
+# `inputs` is the directory under the checkout holding <spec>.spectra files.
+# The tools are deterministic, so the split declares a single seed.
+MAOZ_PHASE_KEYS = {"name", "kind", "out", "hosts", "specs", "inputs",
+                   "maoz_root", "maoz_digest", "algorithms", "timeout",
+                   "concurrency", "adapt"}
+MAOZ_DEFAULTS = {"timeout": 7200, "concurrency": 8}
+MAOZ_ALGORITHMS = ("UF", "BFS", "ALUR")
+PHASE_KEYS = (RUN_PHASE_KEYS | SCORE_PHASE_KEYS | AURUS_PHASE_KEYS
+              | MAOZ_PHASE_KEYS)
 
 # `describe` prints a declaration for a campaign that has already closed. It
 # is not one of these: the factor cross below is what the results CSV carries,
@@ -2194,7 +2243,8 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
             raise CampaignError(f"{where}: kind must be one of "
                                 f"{', '.join(PHASE_KINDS)}, not {kind!r}")
         allowed = {"score": SCORE_PHASE_KEYS,
-                   "aurus": AURUS_PHASE_KEYS}.get(kind, RUN_PHASE_KEYS)
+                   "aurus": AURUS_PHASE_KEYS,
+                   "maoz": MAOZ_PHASE_KEYS}.get(kind, RUN_PHASE_KEYS)
         unknown = sorted(set(phase) - allowed)
         if unknown:
             raise CampaignError(f"{where}: unknown key(s) {', '.join(unknown)} "
@@ -2214,10 +2264,10 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
                     f"directory) or `profile` (whose results directory it "
                     f"scores), and has neither")
         # A score phase naming a results directory needs no profile, and an
-        # AuRUS phase never has one: it runs another tool, which this
+        # AuRUS or maoz phase never has one: it runs another tool, which this
         # checkout's runner knows nothing about. Every other phase does, and a
         # profile named anywhere must be one this checkout's runner defines.
-        if kind == "aurus":
+        if kind in ("aurus", "maoz"):
             profile = None
         if profile is not None or kind == "run":
             if not isinstance(profile, str) or not profile:
@@ -2245,6 +2295,9 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
             continue
         if kind == "aurus":
             normalised.append(normalise_aurus_phase(phase, where, phase_hosts))
+            continue
+        if kind == "maoz":
+            normalised.append(normalise_maoz_phase(phase, where, phase_hosts))
             continue
         jobs = phase.get("jobs")
         if jobs is not None and (isinstance(jobs, bool) or not isinstance(jobs, int)
@@ -2282,6 +2335,7 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
             "results_dirs": staged_results_dirs(normalised, seeds_by_host),
             "aurus_checkouts": staged_aurus_checkouts(normalised,
                                                       seeds_by_host),
+            "maoz_checkouts": staged_maoz_checkouts(normalised, seeds_by_host),
             "hosts": seeds_by_host, "phases": normalised,
             "description": raw.get("description", "")}
 
@@ -2378,6 +2432,64 @@ def normalise_aurus_phase(phase: dict, where: str, phase_hosts) -> dict:
             **values}
 
 
+def normalise_maoz_phase(phase: dict, where: str, phase_hosts) -> dict:
+    """A maoz phase's record: which artifact build, over what, writing where.
+
+    The aurus phase's twin. ``out`` and ``inputs`` are directories under the
+    checkout; ``maoz_root`` is on the host, outside it, taken verbatim with
+    `~` left for the host's shell. ``maoz_digest`` is mandatory for the same
+    reason ``aurus_commit`` is: the runner refuses an artifact directory whose
+    DIGEST.txt disagrees, and stage checks the same thing before a launch.
+    ``algorithms`` defaults to all three and is always stated on the command
+    line, so the manifest names what the declaration meant.
+    """
+    out = phase.get("out")
+    if not isinstance(out, str) or not out:
+        raise CampaignError(f"{where}: a maoz phase needs `out`, a directory "
+                            f"under the checkout for its run directories and "
+                            f"its manifest")
+    inputs = phase.get("inputs")
+    if not isinstance(inputs, str) or not inputs:
+        raise CampaignError(f"{where}: a maoz phase needs `inputs`, a "
+                            f"directory under the checkout holding the "
+                            f"<spec>.spectra files")
+    root = phase.get("maoz_root")
+    if not isinstance(root, str) or not root:
+        raise CampaignError(f"{where}: a maoz phase needs `maoz_root`, the "
+                            f"artifact directory staged on the host")
+    digest = phase.get("maoz_digest")
+    if not isinstance(digest, str) or not digest:
+        raise CampaignError(
+            f"{where}: a maoz phase needs `maoz_digest`, the digest that "
+            f"directory's DIGEST.txt must report. A baseline arm that does "
+            f"not say which build it ran cannot be read afterwards.")
+    values = dict(MAOZ_DEFAULTS)
+    for key in MAOZ_DEFAULTS:
+        value = phase.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise CampaignError(f"{where}: {key} must be a positive integer")
+        values[key] = value
+    specs = phase.get("specs")
+    if specs is not None and not (isinstance(specs, list)
+                                  and all(isinstance(s, str) for s in specs)):
+        raise CampaignError(f"{where}: specs must be an array of strings")
+    algorithms = phase.get("algorithms", list(MAOZ_ALGORITHMS))
+    if not (isinstance(algorithms, list) and algorithms
+            and all(a in MAOZ_ALGORITHMS for a in algorithms)):
+        raise CampaignError(f"{where}: algorithms must be a non-empty array "
+                            f"drawn from {', '.join(MAOZ_ALGORITHMS)}")
+    adapt = phase.get("adapt")
+    if adapt is not None and (not isinstance(adapt, str) or not adapt):
+        raise CampaignError(f"{where}: adapt must be a non-empty string")
+    return {"name": phase.get("name", Path(out).name), "kind": "maoz",
+            "profile": None, "jobs": None, "sweeps": None, "specs": specs,
+            "hosts": phase_hosts, "out": out, "inputs": inputs,
+            "maoz_root": root, "maoz_digest": digest,
+            "algorithms": list(algorithms), "adapt": adapt, **values}
+
+
 def phase_kind(phase: dict) -> str:
     """`run` unless the phase says otherwise. A phase record built before
     the key existed carries none, and every one of those is a run."""
@@ -2390,15 +2502,28 @@ def staged_aurus_checkouts(phases: list, seeds_by_host: dict) -> dict:
     Only on the hosts a phase actually runs on, as with a results directory:
     a phase narrowed away from a host needs no AuRUS there.
     """
+    return staged_tool_pairs(phases, seeds_by_host, "aurus", "aurus_root",
+                             "aurus_commit")
+
+
+def staged_maoz_checkouts(phases: list, seeds_by_host: dict) -> dict:
+    """Per host, the ``root|digest`` pairs of the maoz artifact stage checks."""
+    return staged_tool_pairs(phases, seeds_by_host, "maoz", "maoz_root",
+                             "maoz_digest")
+
+
+def staged_tool_pairs(phases: list, seeds_by_host: dict, kind: str,
+                      root_key: str, build_key: str) -> dict:
+    """Per host, the ``root|build`` pairs of one baseline kind's phases."""
     out: dict = {}
     for host, seeds in seeds_by_host.items():
         wanted: list = []
         for phase in phases:
-            if phase_kind(phase) != "aurus":
+            if phase_kind(phase) != kind:
                 continue
             if not phase_seeds(phase, host, seeds):
                 continue
-            pair = f"{phase['aurus_root']}|{phase['aurus_commit']}"
+            pair = f"{phase[root_key]}|{phase[build_key]}"
             if pair not in wanted:
                 wanted.append(pair)
         out[host] = wanted
@@ -2426,9 +2551,9 @@ def staged_results_dirs(phases: list, seeds_by_host: dict) -> dict:
                 continue
             if phase_kind(phase) == "run":
                 produced.add(profile_results_dir(phase["profile"]))
-            elif phase_kind(phase) == "aurus":
+            elif phase_kind(phase) in ("aurus", "maoz"):
                 # It reads no results directory at all; what it needs staged
-                # is the AuRUS checkout, which stage checks separately. With
+                # is the baseline tool, which stage checks separately. With
                 # `adapt` it produces one, for a later score phase to read.
                 if phase.get("adapt"):
                     produced.add(phase["adapt"])
@@ -2497,6 +2622,8 @@ def phase_args(phase: dict, seeds: list) -> list:
         return score_phase_args(phase, seeds)
     if phase_kind(phase) == "aurus":
         return aurus_phase_args(phase, seeds)
+    if phase_kind(phase) == "maoz":
+        return maoz_phase_args(phase, seeds)
     args = ["--profile", phase["profile"]]
     if phase.get("jobs"):
         args += ["--jobs", str(phase["jobs"])]
@@ -2542,11 +2669,32 @@ def aurus_phase_args(phase: dict, seeds: list) -> list:
     return args + ["--seeds", *[str(s) for s in seeds]]
 
 
+def maoz_phase_args(phase: dict, seeds: list) -> list:
+    """The maoz arm's arguments: which build, which algorithms, where to.
+
+    Seeds are passed explicitly as for AuRUS, although the tools are
+    deterministic and a declaration gives the arm one seed.
+    """
+    args = ["--maoz-root", phase["maoz_root"],
+            "--maoz-digest", phase["maoz_digest"],
+            "--out-root", phase["out"],
+            "--inputs", phase["inputs"],
+            "--timeout", str(phase["timeout"]),
+            "--concurrency", str(phase["concurrency"])]
+    if phase.get("adapt"):
+        args += ["--adapt", phase["adapt"]]
+    if phase.get("specs"):
+        args += ["--specs", *phase["specs"]]
+    if phase.get("algorithms"):
+        args += ["--algorithms", *phase["algorithms"]]
+    return args + ["--seeds", *[str(s) for s in seeds]]
+
+
 def phase_launcher(phase: dict) -> str:
     """The command a phase's arguments follow: the runner, the scorer, or
-    AuRUS itself."""
-    return {"score": SCORER_CMD, "aurus": AURUS_CMD}.get(phase_kind(phase),
-                                                         RUNNER_CMD)
+    the baseline tool's own runner."""
+    return {"score": SCORER_CMD, "aurus": AURUS_CMD,
+            "maoz": MAOZ_CMD}.get(phase_kind(phase), RUNNER_CMD)
 
 
 def phase_command(phase: dict, seeds: list) -> str:
@@ -3189,9 +3337,38 @@ done
 """
 
 
+# The maoz phase's counterpart of AURUS_CHECK: the artifact directory has to
+# hold a DIGEST.txt reporting the declared digest, the compiled classes and the
+# exporter jar. Pairs are `root|digest`, `~/` expanded as above.
+MAOZ_CHECK = r"""for pair in @MAOZ_ROOTS@; do
+  mroot=${pair%%|*}
+  mwant=${pair##*|}
+  case "$mroot" in "~/"*) mroot="$HOME/${mroot#~/}" ;; esac
+  if [ ! -f "$mroot/DIGEST.txt" ]; then
+    echo "@M@ERR no maoz artifact at $mroot (no DIGEST.txt) — stage one there and write its digest into DIGEST.txt, or fix maoz_root = ... in campaign.toml"
+    exit 13
+  fi
+  mgot=$(awk 'NR==1 {print $1}' "$mroot/DIGEST.txt")
+  if [ "$mgot" != "$mwant" ]; then
+    echo "@M@ERR maoz artifact at $mroot reports digest $mgot, and the campaign declares $mwant"
+    exit 13
+  fi
+  if [ ! -f "$mroot/classes/StreamRepairs.class" ]; then
+    echo "@M@ERR maoz artifact at $mroot has no classes/StreamRepairs.class — compile it there"
+    exit 13
+  fi
+  if [ ! -f "$mroot/RepairExporterExec.jar" ]; then
+    echo "@M@ERR maoz artifact at $mroot has no RepairExporterExec.jar"
+    exit 13
+  fi
+done
+"""
+
+
 def configs_block(configs: str | None, config_dirs: list,
                   results_dirs: list | None = None,
-                  aurus_roots: list | None = None) -> str:
+                  aurus_roots: list | None = None,
+                  maoz_roots: list | None = None) -> str:
     """The configs section: the declared command, then the check, or just the
     check. The check is never conditional — a campaign that declares no command
     is the case that broke, not the case to trust. A score phase's results
@@ -3210,13 +3387,18 @@ def configs_block(configs: str | None, config_dirs: list,
     if aurus_roots:
         aurus = AURUS_CHECK.replace(
             "@AURUS_ROOTS@", " ".join(shlex.quote(p) for p in aurus_roots))
-    return step + check + results + aurus
+    maoz = ""
+    if maoz_roots:
+        maoz = MAOZ_CHECK.replace(
+            "@MAOZ_ROOTS@", " ".join(shlex.quote(p) for p in maoz_roots))
+    return step + check + results + aurus + maoz
 
 
 def stage_apply_script(root: str, branch: str, sha: str, build: str,
                        configs: str | None, config_dirs: list,
                        force: bool, results_dirs: list | None = None,
-                       aurus_roots: list | None = None) -> str:
+                       aurus_roots: list | None = None,
+                       maoz_roots: list | None = None) -> str:
     # CONFIGS first, and the marker last inside render_script: the configs
     # block is itself a script fragment carrying markers of its own.
     # BUILD and BIN go in unquoted -- the first is a command line, the second
@@ -3224,7 +3406,7 @@ def stage_apply_script(root: str, branch: str, sha: str, build: str,
     return render_script(
         STAGE_APPLY_SCRIPT,
         CONFIGS=configs_block(configs, config_dirs, results_dirs,
-                              aurus_roots),
+                              aurus_roots, maoz_roots),
         ROOT=shlex.quote(root),
         BRANCH=shlex.quote(branch),
         SHA=shlex.quote(sha),
@@ -3363,6 +3545,8 @@ def cmd_stage(args: argparse.Namespace) -> int:
                                      (campaign.get("results_dirs") or {})
                                      .get(host),
                                      (campaign.get("aurus_checkouts") or {})
+                                     .get(host),
+                                     (campaign.get("maoz_checkouts") or {})
                                      .get(host)),
             timeout=args.build_timeout)
         result = parse_sections(text or "")

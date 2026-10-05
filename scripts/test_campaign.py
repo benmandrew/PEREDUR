@@ -584,6 +584,86 @@ check(C.status_rows([dict(shost, campaigns=[score_annotated(
       "a pass whose output directory is not there yet has no curve count")
 
 
+# ── A maoz baseline arm in the status table ───────────────────────────────────
+#
+# The maoz arm keeps its manifest one level down, like a scoring pass and an
+# AuRUS arm, and the stem routes it. Its progress is one result.json per
+# finished (algorithm, spec), and the process that claims it is
+# maoz_campaign.py naming its --out-root.
+
+MAOZ_MANIFEST = """{
+  "written_by": "scripts/maoz_campaign.py",
+  "hostname": "av2",
+  "git": {"branch": "feat/maoz-baselines", "head": "def5678abc"},
+  "out": "experiments/maoz-out",
+  "maoz_digest": "9f1c2e7",
+  "started": "2026-10-02T10:00:00+0100",
+  "finished": null,
+  "counts": {"planned": 30, "done": 4},
+  "seeds": [0]
+}"""
+
+MAOZ_INVENTORY = f"""##PS
+zsh -zsh
+python3 python3 scripts/maoz_campaign.py --maoz-root ~/m --out-root experiments/maoz-out --seeds 0
+java java -cp classes StreamRepairs
+##HOST
+av2
+1786460000
+##GIT
+feat/maoz-baselines
+def5678
+0
+##MANIFESTS
+##SCOREMANIFESTS
+##SFILE experiments/maoz-out/maoz-manifest-av2.json
+{MAOZ_MANIFEST}
+##ENDSFILE
+##END
+"""
+
+minv = C.parse_inventory(MAOZ_INVENTORY)
+check(len(minv["maoz_manifests"]), 1, "a maoz manifest is parsed")
+check((minv["score_manifests"], minv["aurus_manifests"]), ([], []),
+      "and routed by its stem, not taken for a score or AuRUS manifest")
+check_true("-name 'maoz-manifest-*.json'" in C.INVENTORY_SCRIPT,
+           "the inventory sweep looks for maoz manifests")
+mprocs = C.live_processes(minv["ps"])
+check([p["comm"] for p in mprocs], ["python3"],
+      "the maoz runner is a live process; its JVM is not a campaign's")
+check((mprocs[0].get("kind"), mprocs[0].get("out"), mprocs[0]["profile"]),
+      ("maoz", "experiments/maoz-out", None),
+      "read as a maoz arm naming its output directory, and no profile")
+mrec = C.campaigns_from_maoz_manifests(minv["maoz_manifests"])
+check(len(mrec), 1, "one record per maoz manifest")
+m = mrec[0]
+check((m["kind"], m["profile"], m["label"], m["out"]),
+      ("maoz", "maoz-out", "maoz:maoz-out", "experiments/maoz-out"),
+      "keyed on the output directory's name, labelled as a maoz arm")
+check((m["branch"], m["binary_commit"], m["rows_planned"], m["rows_done"]),
+      ("feat/maoz-baselines", "9f1c2e7", 30, 4),
+      "carrying the branch, the artifact's digest and the manifest's counts")
+check(C.campaigns_from_aurus_manifests(
+    [dict(json.loads(MAOZ_MANIFEST), aurus_commit="e1cfadf")])[0]
+    ["binary_commit"], "e1cfadf",
+      "the AuRUS record still reads aurus_commit")
+mdetail = C.detail_script("/r", mrec)
+check_true("##CAMPAIGN maoz-out" in mdetail
+           and "experiments/maoz-out -mindepth 3 -maxdepth 3 -type f "
+               "-name 'result.json'" in mdetail,
+           f"the detail probe counts result.json files: {mdetail}")
+check_true("run_experiments.py" not in mdetail,
+           "and asks the runner for no plan on a maoz arm")
+maoz_proc = {"comm": "python3", "profile": None, "kind": "maoz",
+             "out": "/abs/experiments/maoz-out"}
+check_true(C.claims_campaign(maoz_proc, m),
+           "a maoz runner claims its arm, by directory name")
+check_true(not C.claims_campaign(dict(maoz_proc, kind="aurus"), m),
+           "an AuRUS runner on a same-named directory does not")
+check_true(not C.claims_campaign(maoz_proc, dict(m, kind="aurus")),
+           "nor does a maoz runner claim an AuRUS arm")
+
+
 # ── collect: merge and verification against local fixtures ────────────────────
 
 CSV_HEADER = ["sweep", "level_name", "selection", "weakening", "metric",
@@ -1333,6 +1413,96 @@ hosts = { av2 = "0-4" }
                "is not built")
     check(C.staged_aurus_checkouts([wide], {"av2": []}), {"av2": []},
           "a host with no seeds needs no AuRUS staged")
+    check(baseline["maoz_checkouts"], {"av2": [], "av3": []},
+          "and an AuRUS-only campaign stages no maoz artifact")
+
+    # The fourth phase kind: the maoz GR(1) assumption-repair baselines.
+    write_declaration(decl_root, "maozarm", """
+name = "maozarm"
+branch = "feat/maoz-baselines"
+hosts = { av2 = "0", av3 = "1" }
+
+[[phases]]
+kind = "maoz"
+out = "experiments/maoz-out"
+inputs = "experiments/maoz-in"
+maoz_root = "~/projects/tools/maoz"
+maoz_digest = "9f1c2e7"
+hosts = { av2 = "0" }
+
+[[phases]]
+kind = "maoz"
+name = "glass"
+out = "experiments/maoz-glass"
+inputs = "experiments/maoz-in"
+maoz_root = "~/projects/tools/maoz"
+maoz_digest = "9f1c2e7"
+algorithms = ["UF"]
+timeout = 600
+concurrency = 4
+specs = ["lift"]
+adapt = "experiments/results-maoz-glass"
+hosts = { av2 = "0" }
+
+[[phases]]
+kind = "score"
+results = "experiments/results-maoz-glass"
+out = "experiments/curves-maoz-glass"
+hosts = { av2 = "0" }
+""")
+    maozarm = C.load_campaign("maozarm", decl_root)
+    mall, mglass, mscored = maozarm["phases"]
+    check(mall["kind"], "maoz", "a maoz phase loads as its own kind")
+    check((mall["timeout"], mall["concurrency"], mall["algorithms"]),
+          (7200, 8, ["UF", "BFS", "ALUR"]),
+          "2 h, eight at once and all three algorithms are the defaults")
+    check((mall["name"], mall["profile"], mall["specs"], mall["adapt"]),
+          ("maoz-out", None, None, None),
+          "named after its output directory, and with no profile")
+    check((mglass["timeout"], mglass["concurrency"], mglass["algorithms"],
+           mglass["specs"]), (600, 4, ["UF"], ["lift"]),
+          "and every key it states is carried through")
+    check((maozarm["config_dirs"], maozarm["results_dirs"]),
+          ([], {"av2": [], "av3": []}),
+          "a maoz arm reads no configs or results directory, and its "
+          "`adapt` feeds the score phase after it")
+    check(mscored["results"], mglass["adapt"], "which is how it is scored")
+    check(C.phase_args(mall, [0]),
+          ["--maoz-root", "~/projects/tools/maoz", "--maoz-digest", "9f1c2e7",
+           "--out-root", "experiments/maoz-out",
+           "--inputs", "experiments/maoz-in",
+           "--timeout", "7200", "--concurrency", "8",
+           "--algorithms", "UF", "BFS", "ALUR", "--seeds", "0"],
+          "a maoz phase becomes maoz_campaign.py arguments, seeds last")
+    check(C.phase_args(mglass, [0]),
+          ["--maoz-root", "~/projects/tools/maoz", "--maoz-digest", "9f1c2e7",
+           "--out-root", "experiments/maoz-glass",
+           "--inputs", "experiments/maoz-in",
+           "--timeout", "600", "--concurrency", "4",
+           "--adapt", "experiments/results-maoz-glass",
+           "--specs", "lift", "--algorithms", "UF", "--seeds", "0"],
+          "with its adapted tree, its spec subset and its algorithms")
+    check_true(C.phase_command(mall, [0]).startswith(C.MAOZ_CMD + " "),
+               "and its command is the maoz runner's")
+    check(maozarm["maoz_checkouts"],
+          {"av2": ["~/projects/tools/maoz|9f1c2e7"], "av3": []},
+          "stage checks the artifact once per host, and not on a host every "
+          "phase is narrowed away from")
+    check(maozarm["aurus_checkouts"], {"av2": [], "av3": []},
+          "and checks no AuRUS checkout for a maoz arm")
+    mstaged = C.stage_apply_script(
+        "/tmp/root", "feat/maoz-baselines", "abc1234", "true", None, [], False,
+        None, None, maozarm["maoz_checkouts"]["av2"])
+    check_true("'~/projects/tools/maoz|9f1c2e7'" in mstaged,
+               "the declared pair reaches the host-side check")
+    check_true("DIGEST.txt" in mstaged
+               and "classes/StreamRepairs.class" in mstaged
+               and "RepairExporterExec.jar" in mstaged
+               and "COMMIT.txt" not in mstaged,
+               "which reads the digest and the two build products, and not "
+               "the AuRUS check")
+    check_true("DIGEST.txt" not in staged,
+               "an AuRUS-only stage carries no maoz check")
 
     for text, expect_in, why in (
         ('phases = [ { kind = "aurus", aurus_root = "~/a", '
@@ -1357,6 +1527,36 @@ hosts = { av2 = "0-4" }
         ('phases = [ { kind = "aurus", out = "experiments/a", '
          'aurus_root = "~/a", aurus_commit = "e1cfadf", adapt = "" } ]',
          "adapt must be a non-empty string", "an empty adapted tree"),
+        ('phases = [ { kind = "maoz", inputs = "i", maoz_root = "~/m", '
+         'maoz_digest = "d" } ]',
+         "needs `out`", "a maoz phase with no output directory"),
+        ('phases = [ { kind = "maoz", out = "o", maoz_root = "~/m", '
+         'maoz_digest = "d" } ]',
+         "needs `inputs`", "a maoz phase with no inputs"),
+        ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
+         'maoz_digest = "d" } ]',
+         "needs `maoz_root`", "a maoz phase naming no artifact"),
+        ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
+         'maoz_root = "~/m" } ]',
+         "needs `maoz_digest`", "a maoz phase that does not say which build"),
+        ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
+         'maoz_root = "~/m", maoz_digest = "d", gato = 5 } ]',
+         "unknown key(s) gato on a maoz phase", "an AuRUS key on a maoz phase"),
+        ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
+         'maoz_root = "~/m", maoz_digest = "d", timeout = 0 } ]',
+         "timeout must be a positive integer", "a zero maoz timeout"),
+        ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
+         'maoz_root = "~/m", maoz_digest = "d", concurrency = true } ]',
+         "concurrency must be a positive integer", "a boolean concurrency"),
+        ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
+         'maoz_root = "~/m", maoz_digest = "d", algorithms = ["DFS"] } ]',
+         "algorithms must be a non-empty array", "an unknown algorithm"),
+        ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
+         'maoz_root = "~/m", maoz_digest = "d", algorithms = [] } ]',
+         "algorithms must be a non-empty array", "no algorithms at all"),
+        ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
+         'maoz_root = "~/m", maoz_digest = "d", adapt = "" } ]',
+         "adapt must be a non-empty string", "an empty maoz adapted tree"),
         ('phases = [ { kind = "score" } ]', "neither",
          "a score phase with no results and no profile"),
         ('phases = [ { kind = "score", profile = "nope" } ]',

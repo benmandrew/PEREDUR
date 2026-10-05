@@ -28,7 +28,7 @@ phases = [ { profile = "arbiter-probe", jobs = 4 } ]
 
 `configs` runs on the host during `stage`, after the build and before the version check so a failing generator reports as itself, in a subshell so `&&` behaves as written. It has no default, since no line suits every campaign and config trees are untracked.
 
-A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default), `score` or `aurus`; each of the latter two takes its own keys and refuses the run keys by name.
+A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default), `score`, `aurus` or `maoz`; each of the latter three takes its own keys and refuses the run keys by name.
 
 A phase's `hosts` table overrides the campaign split for that phase under the same rules, and may only narrow it, since `stage` staged no other host; an omitted host runs nothing for that phase and a tick advances past it. It exists because `run_experiments.py --seeds` replaces a profile's seed list rather than intersecting it, so paths with different sample sizes cannot share one range without silently changing the row count. `enqueue` freezes these as `phase_seeds`; older entries fall back to the campaign split.
 
@@ -116,6 +116,31 @@ The arm resumes the way the runner does: a repeat whose `out.txt` exists is not 
 
 `adapt` names where `scripts/aurus_adapt.py` materialises the runs as PEREDUR-shaped run directories, which a `score` phase declared after it reads like any other results directory. Both arms of a head-to-head then reduce through one scorer at one set of budgets, which is what makes their curves comparable. The adapter runs inside the AuRUS phase rather than as a phase of its own, the tree being scorable only once every repeat of this host's split has written, and it materialises that split alone. `stage` counts an `adapt` directory as produced by the campaign, so it is not demanded up front.
 
+## Maoz phases
+
+A `maoz` phase runs the second baseline: GLASS (`UF`), JVTS-Repair (`BFS`) and AMT13 (`ALUR`), the three GR(1) assumption-repair algorithms of Maoz, Ringert and Shalom (ICSE 2019). They run from the Java classes of that paper's artifact, through `scripts/maoz_campaign.py`. The phase follows the `aurus` phase in every respect except the keys below.
+
+```toml
+[[phases]]
+kind = "maoz"
+out = "experiments/maoz-baselines-out"        # one level under experiments/, so status finds its manifest
+inputs = "experiments/2026-10-02-maoz-baselines/inputs" # under the checkout: <spec>.spectra
+maoz_root = "~/projects/tools/maoz-icse2019"   # the staged artifact directory on the host
+maoz_digest = "9748cf0d585e"                   # the first token its DIGEST.txt must say
+algorithms = ["UF", "BFS", "ALUR"]             # optional; all three by default
+timeout = 7200                                 # per (algorithm, spec), seconds
+concurrency = 8                                # JVMs in flight
+adapt = "experiments/results-maoz"             # optional; where the scorable tree goes
+specs = ["lift"]                               # optional; every input by default
+hosts = { av2 = "0" }
+```
+
+The tools are deterministic, so the split declares one seed. It is still passed to the runner as `--seeds`, as for AuRUS.
+
+`maoz_digest` is mandatory for the same reason as `aurus_commit`. `stage` expands a leading `~/` in `maoz_root` and then checks three things. `DIGEST.txt` must report the declared digest as its first token, and `classes/StreamRepairs.class` and `RepairExporterExec.jar` must exist. If one check fails, `stage` refuses the host. `stage` does not build the artifact and does not check `inputs`, which comes with the checkout.
+
+Progress is one `result.json` per finished (algorithm, spec), at `<out>/<ALG>/<spec>/result.json`. `status` reads `maoz-manifest-<host>.json` under `out`, which has the AuRUS manifest's schema with `maoz_digest` in place of `aurus_commit`. The row reads `maoz:<out>` and its BINARY column is the digest. `adapt` works as it does for AuRUS.
+
 ## Reading a run
 
 `status` never caches, and progress is never derived from a CSV's length. It prints each host's checkout, one row per campaign, and the queue.
@@ -133,7 +158,7 @@ A `~` before ROWS means the whole CSV was counted because the runner returned no
 
 A score phase appears as `score:<out>`, read from `score-manifest-<host>.json`: ROWS counts curves against the frozen queue, STALE is the newest file's age, BINARY is `maximal`'s commit, and the same three-hour rule applies. `--campaign <out>` selects it.
 
-An AuRUS phase appears as `aurus:<out>`, read from `aurus-manifest-<host>.json` the same way. ROWS counts finished repeats against the frozen queue, and BINARY is the AuRUS commit the runner verified. A repeat may hold the processor for the full 7200-second cap, so the three-hour staleness rule reads a working arm as fresh.
+An AuRUS phase appears as `aurus:<out>`, read from `aurus-manifest-<host>.json` the same way. ROWS counts finished repeats against the frozen queue, and BINARY is the AuRUS commit the runner verified. A repeat may hold the processor for the full 7200-second cap, so the three-hour staleness rule reads a working arm as fresh. A maoz phase appears as `maoz:<out>` in the same way, with ROWS counting `result.json` files and BINARY the verified digest.
 
 ## The binary freshness gate
 
