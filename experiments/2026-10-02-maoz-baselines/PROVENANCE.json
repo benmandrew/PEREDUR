@@ -1,0 +1,579 @@
+{
+ "campaign": "2026-10-02-maoz-baselines",
+ "attribution": "recorded",
+ "generated_on": "2026-10-05",
+ "status": "closed",
+ "kind": "baseline arm: GLASS (UF), JVTS-Repair (BFS) and AMT13 (ALUR) from the Maoz, Ringert and Shalom ICSE 2019 artifact, on the 10 GR(1) subjects PEREDUR shares with Brizzio et al. (2023) Table 3",
+ "kind_note": "No PEREDUR search ran here. The PEREDUR side of every contrast is 2026-09-14-paper-rerun's. This archive holds the tool runs and their translation to TLSF; the admissibility screen and the coverage pass against PEREDUR are later steps with their own archive.",
+ "profile_commit": {
+  "sha": "4bd8996bebc14af37ee2af4a588a56ad80b3af4f",
+  "short": "4bd8996",
+  "subject": "feat(scripts): re-run Maoz jobs that ran out of heap with a larger one",
+  "branch": "feat/maoz-baselines",
+  "queue_entries": {
+   "av2": "040-2026-10-02-maoz-baselines at 866bdbe, state done; 041-2026-10-02-maoz-baselines at 4bd8996, state done"
+  },
+  "earlier_launch": "Entry 040 staged 866bdbe (docs(experiments): register the Maoz repair cap and dedup rule), the direct parent of 4bd8996. 26 of the 30 final jobs come from 040.",
+  "reachable_from_main": false,
+  "held_by_tag": "provenance/maoz-baselines",
+  "held_by_tag_note": "Annotated tag cut at 4bd8996 on 2026-10-05, before the close commit, and pushed the same minute. Its message calls 866bdbe 4bd8996's parent's parent; 866bdbe is its direct parent. Never delete it.",
+  "note": "The PEREDUR checkout the harness ran from. No PEREDUR binary ran, so this sha determines only the harness scripts."
+ },
+ "binary_commit": null,
+ "maoz_artifact": {
+  "zip_sha256": "2643d353a86cbdcffb1c6fdc0fc99700670cff406d416b2f6e1b3b2365d0b6ce",
+  "staged_root": "av2:~/projects/tools/maoz-icse2019",
+  "digest": "2212f3c7c209",
+  "digest_definition": "First 12 hex digits of the SHA-256 of RepairExporterExec.jar's bytes followed by driver/StreamRepairs.java's bytes. Both launches checked it.",
+  "driver": "driver/StreamRepairs.java in this directory, compiled on av2 with javac --release 8",
+  "bdd_package": "JTLVJavaFactory (pure Java; no CUDD), OpenJDK 21"
+ },
+ "design": {
+  "algorithms": [
+   "UF",
+   "BFS",
+   "ALUR"
+  ],
+  "subjects": 10,
+  "seed": 0,
+  "timeout_s": 7200,
+  "max_repairs": 1000,
+  "jobs": 30,
+  "note": "Deterministic tools, one run per (algorithm, subject), as PLAN.md section 4 registered."
+ },
+ "launches": {
+  "040": {
+   "commit": "866bdbe",
+   "heap_gb": 10,
+   "concurrency": 10,
+   "jobs_run": 30,
+   "phase_started": "2026-10-05T13:11:48+01:00",
+   "phase_finished": "2026-10-05T15:11:51+01:00",
+   "window_source": "phase-040.log (the queue entry's log, copied here) and the queue entry's updated stamp. maoz-manifest-avlab12.json was rewritten by launch 041 and no longer describes 040."
+  },
+  "041": {
+   "commit": "4bd8996",
+   "heap_gb": 25,
+   "concurrency": 4,
+   "jobs_run": 4,
+   "jobs": [
+    "ALUR/humanoid-503",
+    "ALUR/humanoid-531",
+    "ALUR/humanoid-742",
+    "ALUR/pcar-v2-888"
+   ],
+   "phase_started": "2026-10-05T15:55:05+01:00",
+   "phase_finished": "2026-10-05T16:57:35+01:00",
+   "wall_s": 3750.3,
+   "why": "Under 040 AMT13 ran out of the 10 GB heap on these four subjects with no repairs. 4bd8996 added heap_gb and re-runs a job whose JVM died of OutOfMemoryError under a smaller heap, after moving its directory to maoz-baselines-out.oom-10g/.",
+   "window_source": "maoz-baselines-out/maoz-manifest-avlab12.json"
+  },
+  "campaign_toml_note": "campaign.toml holds the final declaration (heap_gb = 25, concurrency = 4). Launch 040's 26 kept jobs ran at 10 GB and concurrency 10; each result.json without a heap_gb field ran at 10 GB."
+ },
+ "results": {
+  "per_job": {
+   "GLASS": {
+    "gyro-var1": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 1.22,
+     "first_repair_s": 0.048,
+     "last_repair_s": 0.048,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    },
+    "gyro-var2": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 1.22,
+     "first_repair_s": 0.055,
+     "last_repair_s": 0.055,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    },
+    "humanoid-458": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 1.12,
+     "first_repair_s": 0.022,
+     "last_repair_s": 0.022,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    },
+    "humanoid-503": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 1.22,
+     "first_repair_s": 0.044,
+     "last_repair_s": 0.044,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    },
+    "humanoid-531": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 1.23,
+     "first_repair_s": 0.058,
+     "last_repair_s": 0.058,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    },
+    "humanoid-742": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 1.27,
+     "first_repair_s": 0.032,
+     "last_repair_s": 0.032,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    },
+    "lift": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 1.22,
+     "first_repair_s": 0.046,
+     "last_repair_s": 0.046,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    },
+    "pcar-v2-888": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 1.27,
+     "first_repair_s": 0.044,
+     "last_repair_s": 0.044,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    },
+    "rg1": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 1.27,
+     "first_repair_s": 0.018,
+     "last_repair_s": 0.018,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    },
+    "rg2": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 1.27,
+     "first_repair_s": 0.013,
+     "last_repair_s": 0.013,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    }
+   },
+   "JVTS-Repair": {
+    "gyro-var1": {
+     "outcome": "finished",
+     "distinct_repairs": 7,
+     "raw_repairs": 15,
+     "wall_s": 1.32,
+     "first_repair_s": 0.101,
+     "last_repair_s": 0.15,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 7,
+     "untranslatable": 0
+    },
+    "gyro-var2": {
+     "outcome": "finished",
+     "distinct_repairs": 12,
+     "raw_repairs": 24,
+     "wall_s": 1.67,
+     "first_repair_s": 0.138,
+     "last_repair_s": 0.492,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 12,
+     "untranslatable": 0
+    },
+    "humanoid-458": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 1.12,
+     "first_repair_s": 0.029,
+     "last_repair_s": 0.029,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    },
+    "humanoid-503": {
+     "outcome": "killed at the 7200 s cap",
+     "distinct_repairs": 0,
+     "raw_repairs": null,
+     "wall_s": 7200.33,
+     "first_repair_s": null,
+     "last_repair_s": null,
+     "heap_gb": 10,
+     "peak_rss_mb": 10621.0,
+     "launch": "040",
+     "translated": 0,
+     "untranslatable": 0
+    },
+    "humanoid-531": {
+     "outcome": "killed at the 7200 s cap",
+     "distinct_repairs": 13,
+     "raw_repairs": null,
+     "wall_s": 7200.32,
+     "first_repair_s": 0.542,
+     "last_repair_s": 21.415,
+     "heap_gb": 10,
+     "peak_rss_mb": 10633.2,
+     "launch": "040",
+     "translated": 13,
+     "untranslatable": 0
+    },
+    "humanoid-742": {
+     "outcome": "finished",
+     "distinct_repairs": 3,
+     "raw_repairs": 3,
+     "wall_s": 1.42,
+     "first_repair_s": 0.121,
+     "last_repair_s": 0.209,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 3,
+     "untranslatable": 0
+    },
+    "lift": {
+     "outcome": "finished",
+     "distinct_repairs": 221,
+     "raw_repairs": 805,
+     "wall_s": 7.82,
+     "first_repair_s": 0.143,
+     "last_repair_s": 6.449,
+     "heap_gb": 10,
+     "peak_rss_mb": 719.4,
+     "launch": "040",
+     "translated": 221,
+     "untranslatable": 0
+    },
+    "pcar-v2-888": {
+     "outcome": "finished",
+     "distinct_repairs": 135,
+     "raw_repairs": 289,
+     "wall_s": 19.86,
+     "first_repair_s": 0.298,
+     "last_repair_s": 15.984,
+     "heap_gb": 10,
+     "peak_rss_mb": 1422.7,
+     "launch": "040",
+     "translated": 135,
+     "untranslatable": 0
+    },
+    "rg1": {
+     "outcome": "finished",
+     "distinct_repairs": 49,
+     "raw_repairs": 106,
+     "wall_s": 2.23,
+     "first_repair_s": 0.199,
+     "last_repair_s": 0.772,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 49,
+     "untranslatable": 0
+    },
+    "rg2": {
+     "outcome": "finished",
+     "distinct_repairs": 12,
+     "raw_repairs": 15,
+     "wall_s": 1.78,
+     "first_repair_s": 0.204,
+     "last_repair_s": 0.292,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 12,
+     "untranslatable": 0
+    }
+   },
+   "AMT13": {
+    "gyro-var1": {
+     "outcome": "killed at the 7200 s cap",
+     "distinct_repairs": 114,
+     "raw_repairs": null,
+     "wall_s": 7200.05,
+     "first_repair_s": 0.21,
+     "last_repair_s": 458.12,
+     "heap_gb": 10,
+     "peak_rss_mb": 2032.0,
+     "launch": "040",
+     "translated": 114,
+     "untranslatable": 0
+    },
+    "gyro-var2": {
+     "outcome": "finished",
+     "distinct_repairs": 35,
+     "raw_repairs": 35,
+     "wall_s": 2861.37,
+     "first_repair_s": 34.542,
+     "last_repair_s": 2858.903,
+     "heap_gb": 10,
+     "peak_rss_mb": 5035.6,
+     "launch": "040",
+     "translated": 35,
+     "untranslatable": 0
+    },
+    "humanoid-458": {
+     "outcome": "finished",
+     "distinct_repairs": 1,
+     "raw_repairs": 1,
+     "wall_s": 2.39,
+     "first_repair_s": 0.259,
+     "last_repair_s": 0.259,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 1,
+     "untranslatable": 0
+    },
+    "humanoid-503": {
+     "outcome": "crashed: java.lang.OutOfMemoryError",
+     "distinct_repairs": 0,
+     "raw_repairs": null,
+     "wall_s": 3750.29,
+     "first_repair_s": null,
+     "last_repair_s": null,
+     "heap_gb": 25,
+     "peak_rss_mb": 26427.8,
+     "launch": "041",
+     "translated": 0,
+     "untranslatable": 0
+    },
+    "humanoid-531": {
+     "outcome": "crashed: java.lang.StackOverflowError",
+     "distinct_repairs": 0,
+     "raw_repairs": null,
+     "wall_s": 156.51,
+     "first_repair_s": null,
+     "last_repair_s": null,
+     "heap_gb": 25,
+     "peak_rss_mb": 25829.0,
+     "launch": "041",
+     "translated": 0,
+     "untranslatable": 0
+    },
+    "humanoid-742": {
+     "outcome": "crashed: java.lang.OutOfMemoryError",
+     "distinct_repairs": 0,
+     "raw_repairs": null,
+     "wall_s": 3490.87,
+     "first_repair_s": null,
+     "last_repair_s": null,
+     "heap_gb": 25,
+     "peak_rss_mb": 26531.0,
+     "launch": "041",
+     "translated": 0,
+     "untranslatable": 0
+    },
+    "lift": {
+     "outcome": "finished",
+     "distinct_repairs": 2,
+     "raw_repairs": 2,
+     "wall_s": 1.58,
+     "first_repair_s": 0.034,
+     "last_repair_s": 0.042,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 2,
+     "untranslatable": 0
+    },
+    "pcar-v2-888": {
+     "outcome": "crashed: java.lang.OutOfMemoryError",
+     "distinct_repairs": 0,
+     "raw_repairs": null,
+     "wall_s": 2913.0,
+     "first_repair_s": null,
+     "last_repair_s": null,
+     "heap_gb": 25,
+     "peak_rss_mb": 26486.1,
+     "launch": "041",
+     "translated": 0,
+     "untranslatable": 0
+    },
+    "rg1": {
+     "outcome": "capped at 1000 distinct repairs",
+     "distinct_repairs": 1000,
+     "raw_repairs": 1919,
+     "wall_s": 40.18,
+     "first_repair_s": 0.364,
+     "last_repair_s": 38.599,
+     "heap_gb": 10,
+     "peak_rss_mb": 2541.2,
+     "launch": "040",
+     "translated": 1000,
+     "untranslatable": 0
+    },
+    "rg2": {
+     "outcome": "finished",
+     "distinct_repairs": 37,
+     "raw_repairs": 69,
+     "wall_s": 2.05,
+     "first_repair_s": 0.057,
+     "last_repair_s": 0.176,
+     "heap_gb": 10,
+     "peak_rss_mb": 0.0,
+     "launch": "040",
+     "translated": 37,
+     "untranslatable": 0
+    }
+   }
+  },
+  "failed_first_attempts_10gb": {
+   "humanoid-503": {
+    "outcome": "crashed: java.lang.OutOfMemoryError",
+    "wall_s": 3243.09,
+    "distinct_repairs": 0,
+    "peak_rss_mb": 10936.0
+   },
+   "humanoid-531": {
+    "outcome": "crashed: java.lang.OutOfMemoryError",
+    "wall_s": 194.89,
+    "distinct_repairs": 0,
+    "peak_rss_mb": 11183.8
+   },
+   "humanoid-742": {
+    "outcome": "crashed: java.lang.OutOfMemoryError",
+    "wall_s": 5176.65,
+    "distinct_repairs": 0,
+    "peak_rss_mb": 11036.7
+   },
+   "pcar-v2-888": {
+    "outcome": "crashed: java.lang.OutOfMemoryError",
+    "wall_s": 3244.48,
+    "distinct_repairs": 0,
+    "peak_rss_mb": 10678.4
+   }
+  },
+  "distinct_repairs_per_tool": {
+   "GLASS": 10,
+   "JVTS-Repair": 453,
+   "AMT13": 1189
+  },
+  "summary": {
+   "GLASS": "10 of 10 finished, 1 repair each, 1.1-1.3 s.",
+   "JVTS-Repair": "8 of 10 finished. humanoid-503 (0 repairs) and humanoid-531 (13) were killed at the 7200 s cap.",
+   "AMT13": "4 of 10 finished, rg1 capped at 1000 repairs in 40 s, gyro-var1 killed at the cap with 114. Four crashed with no repairs at both heaps: humanoid-531 of StackOverflowError at 25 GB (OutOfMemoryError at 10 GB), and humanoid-503, humanoid-742 and pcar-v2-888 of OutOfMemoryError at both."
+  },
+  "translation": "Every printed repair translated: maoz-adapt.json reports 0 untranslatable over all 30 jobs. maoz-translation.csv has one row per repair."
+ },
+ "decision": null,
+ "decision_note": "Not derived here. PLAN.md section 5's endpoints need the admissibility screen (realize, check_well_separated.py) and a comparison with PEREDUR's maximal frontiers, which are later steps. On 2026-10-05 the paper's PLAN.md replaced section 5's overlap classes and ε-separation secondary with coverage by implication; section 5-6 of PLAN.md here is to be amended, dated, before that pass runs. The four AMT13 crashes are final: on 2026-10-05 it was decided that they get no third attempt and are reported as failed under Outcome 3, with the error named.",
+ "registered_hazards_met": {
+  "jvm_out_of_heap": "PLAN.md section 7 registered it. It met AMT13 on four subjects, and a 25 GB heap did not clear any of them.",
+  "repair_cap": "One job capped: AMT13 on rg1, at 1000 distinct of 1000 raw."
+ },
+ "files": {
+  "PLAN.md": "Pre-registered 2026-10-05 before any row existed.",
+  "campaign.toml": "The final declaration; see launches.campaign_toml_note.",
+  "PROVENANCE.json": "This file.",
+  "inputs/, patterns/, driver/, inputs-check.txt": "The Spectra inputs, Dwyer patterns, StreamRepairs driver and the input equivalence check, as PLAN.md section 3 describes.",
+  "scripts/": "Vendored scripts with blob shas below.",
+  "phase-040.log, phase-041.log": "The queue entries' logs from av2: staging, build and the maoz_campaign.py stdout. Untracked.",
+  "../maoz-baselines-out/": "Per job result.json, stream.txt and stderr.log, plus maoz-manifest-avlab12.json (launch 041). 11 MB. Untracked, md5-identical to av2 on 2026-10-05.",
+  "../maoz-baselines-out.oom-10g/": "The four AMT13 jobs' 10 GB attempts. Untracked.",
+  "../results-maoz-baselines/": "maoz_adapt.py output: 30 PEREDUR-shaped run directories, maoz-adapt.json and maoz-translation.csv. 8.3 MB. Untracked."
+ },
+ "vendored_scripts": {
+  "vendored_on": "2026-10-05",
+  "note": "Verbatim copies, each checked with git hash-object. maoz_campaign.py (4bd8996) ran launch 041 and maoz_campaign-866bdbe.py ran launch 040; they differ only in heap_gb and the out-of-heap retry. maoz_adapt.py and spectra_ltl.py translated the repairs, campaign.py drove both launches, maoz_inputs_check.py and check_well_separated.py made inputs-check.txt. gen_configs.py, run_experiments.py and merge_experiments.py were not invoked and are vendored because the close procedure requires them. campaign.py at 866bdbe has blob ac00782b; launch 040 ran that version, which lacks heap_gb.",
+  "files": {
+   "campaign.py": {
+    "source": "counter scripts/campaign.py at 4bd8996",
+    "blob": "29bb9743e4c54916fefb87022adb6e0996cd89f4"
+   },
+   "check_well_separated.py": {
+    "source": "counter scripts/check_well_separated.py at 4bd8996",
+    "blob": "de9b6687b3bfd0f693812377360b3f8532abebb8"
+   },
+   "gen_configs.py": {
+    "source": "counter scripts/gen_configs.py at 4bd8996",
+    "blob": "457dd01d9e71fe8f1efbc2e188d0adb5b36c5546"
+   },
+   "maoz_adapt.py": {
+    "source": "counter scripts/maoz_adapt.py at 4bd8996",
+    "blob": "c299b456dca14dcea64795be9fc0c411174bda3a"
+   },
+   "maoz_campaign-866bdbe.py": {
+    "source": "counter scripts/maoz_campaign.py at 866bdbe",
+    "blob": "d65c9a85645937531f6ba8b1d353ed415af1caf7"
+   },
+   "maoz_campaign.py": {
+    "source": "counter scripts/maoz_campaign.py at 4bd8996",
+    "blob": "da1bcb54061c6eeb7afebf9d687ccc3ad44c9efe"
+   },
+   "maoz_inputs_check.py": {
+    "source": "counter scripts/maoz_inputs_check.py at 4bd8996",
+    "blob": "70dfbb8494896035d27b14db8e358d49f4f5d5c9"
+   },
+   "merge_experiments.py": {
+    "source": "counter scripts/merge_experiments.py at 4bd8996",
+    "blob": "87c7e0d76d9e26b8a55e600007a4c3ced8ab94ba"
+   },
+   "run_experiments.py": {
+    "source": "counter scripts/run_experiments.py at 4bd8996",
+    "blob": "8be0eca180c31e3eab17217dc04176d9c2b1f198"
+   },
+   "spectra_ltl.py": {
+    "source": "counter scripts/spectra_ltl.py at 4bd8996",
+    "blob": "9399c6b20a8facbdfe867375a5e16c478a1bbaa3"
+   }
+  }
+ },
+ "reproduce": "Stage SymbolicRepairsArtifact.zip (sha256 above) with driver/StreamRepairs.java compiled beside it and a DIGEST.txt reading 2212f3c7c209, check out 4bd8996 here, and run campaign.toml through campaign.py on one host. The tools are deterministic; an AMT13 crash depends on the heap, and launch 040's 26 jobs ran at 10 GB.",
+ "not_recorded": {
+  "core_hours": "No per-job CPU time was recorded.",
+  "launch_040_manifest": "Overwritten by launch 041; 040's window comes from its queue log."
+ },
+ "closed_on": "2026-10-05"
+}
