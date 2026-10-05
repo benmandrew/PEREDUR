@@ -2034,11 +2034,13 @@ AURUS_DEFAULTS = {"gato": 7200, "concurrency": 10}
 # The tools are deterministic, so the split declares a single seed.
 MAOZ_PHASE_KEYS = {"name", "kind", "out", "hosts", "specs", "inputs",
                    "maoz_root", "maoz_digest", "algorithms", "timeout",
-                   "max_repairs",
+                   "max_repairs", "heap_gb",
                    "concurrency", "adapt"}
 # A job stops at `max_repairs` distinct repairs or at `timeout` seconds,
-# whichever comes first; 1000 matches AuRUS's 1000-individual stop.
-MAOZ_DEFAULTS = {"timeout": 7200, "concurrency": 8, "max_repairs": 1000}
+# whichever comes first; 1000 matches AuRUS's 1000-individual stop. Each JVM
+# gets `heap_gb` GB, so concurrency x heap_gb is the arm's memory reservation.
+MAOZ_DEFAULTS = {"timeout": 7200, "concurrency": 8, "max_repairs": 1000,
+                 "heap_gb": 10}
 MAOZ_ALGORITHMS = ("UF", "BFS", "ALUR")
 PHASE_KEYS = (RUN_PHASE_KEYS | SCORE_PHASE_KEYS | AURUS_PHASE_KEYS
               | MAOZ_PHASE_KEYS)
@@ -2684,6 +2686,7 @@ def maoz_phase_args(phase: dict, seeds: list) -> list:
             "--inputs", phase["inputs"],
             "--timeout", str(phase["timeout"]),
             "--max-repairs", str(phase["max_repairs"]),
+            "--heap-gb", str(phase["heap_gb"]),
             "--concurrency", str(phase["concurrency"])]
     if phase.get("adapt"):
         args += ["--adapt", phase["adapt"]]

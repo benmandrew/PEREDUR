@@ -30,9 +30,13 @@ timeout = 7200
 # A job also stops at 1000 distinct repairs, AuRUS's 1000-individual stop,
 # whichever comes first. The driver prints each assumption set once.
 max_repairs = 1000
-# Each JVM may take a 10 GB heap, so 10 reserve 100 GB of av2's 122 GB free.
-# GLASS finishes in seconds, so this is two waves of at most 7200 s: about 4 h.
-concurrency = 10
+# The first pass gave each JVM a 10 GB heap, ten at once. AMT13 ran out of it
+# on humanoid-503, humanoid-531, humanoid-742 and pcar-v2-888 after 195 s to
+# 5177 s, with no repairs. Those four now run again with 25 GB each, four at
+# once: 100 GB of av2's 122 GB free. The other 26 jobs keep their results, and
+# the four failed attempts move to maoz-baselines-out.oom-10g/.
+heap_gb = 25
+concurrency = 4
 # Translated into PEREDUR-shaped run directories once every job has finished,
 # for the screens and the overlap pass that follow.
 adapt = "experiments/results-maoz-baselines"

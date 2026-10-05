@@ -1440,6 +1440,7 @@ maoz_digest = "9f1c2e7"
 algorithms = ["UF"]
 timeout = 600
 max_repairs = 50
+heap_gb = 24
 concurrency = 4
 specs = ["lift"]
 adapt = "experiments/results-maoz-glass"
@@ -1462,9 +1463,9 @@ hosts = { av2 = "0" }
     check((mall["name"], mall["profile"], mall["specs"], mall["adapt"]),
           ("maoz-out", None, None, None),
           "named after its output directory, and with no profile")
-    check((mglass["timeout"], mglass["max_repairs"], mglass["concurrency"],
-           mglass["algorithms"], mglass["specs"]),
-          (600, 50, 4, ["UF"], ["lift"]),
+    check((mglass["timeout"], mglass["max_repairs"], mglass["heap_gb"],
+           mglass["concurrency"], mglass["algorithms"], mglass["specs"]),
+          (600, 50, 24, 4, ["UF"], ["lift"]),
           "and every key it states is carried through")
     check((maozarm["config_dirs"], maozarm["results_dirs"]),
           ([], {"av2": [], "av3": []}),
@@ -1476,14 +1477,15 @@ hosts = { av2 = "0" }
            "--out-root", "experiments/maoz-out",
            "--inputs", "experiments/maoz-in",
            "--timeout", "7200", "--max-repairs", "1000",
-           "--concurrency", "8",
+           "--heap-gb", "10", "--concurrency", "8",
            "--algorithms", "UF", "BFS", "ALUR", "--seeds", "0"],
           "a maoz phase becomes maoz_campaign.py arguments, seeds last")
     check(C.phase_args(mglass, [0]),
           ["--maoz-root", "~/projects/tools/maoz", "--maoz-digest", "9f1c2e7",
            "--out-root", "experiments/maoz-glass",
            "--inputs", "experiments/maoz-in",
-           "--timeout", "600", "--max-repairs", "50", "--concurrency", "4",
+           "--timeout", "600", "--max-repairs", "50", "--heap-gb", "24",
+           "--concurrency", "4",
            "--adapt", "experiments/results-maoz-glass",
            "--specs", "lift", "--algorithms", "UF", "--seeds", "0"],
           "with its adapted tree, its spec subset and its algorithms")

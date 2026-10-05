@@ -23,7 +23,9 @@ DIGEST.txt or the campaign's `--maoz-digest`.
 All three algorithms are deterministic, so one run per job is the design and
 the only seed is 0. Each job writes <out-root>/<ALG>/<spec>/: stream.txt (the
 driver's stdout), stderr.log and result.json. A job with a result.json is not
-re-run. The campaign's facts go to <out-root>/maoz-manifest-<host>.json,
+re-run, unless the JVM ran out of heap and `--heap-gb` is now larger than the
+heap that job had. Such a job's directory moves to <out-root>.oom-<N>g/ first,
+so the failed attempt is kept and the adapter never sees it. The campaign's facts go to <out-root>/maoz-manifest-<host>.json,
 which is what `campaign.py status` reads.
 
 The driver prints a repair only when its assumption set is new, and stops by
@@ -62,9 +64,11 @@ DIGEST_FILE = "DIGEST.txt"
 MANIFEST_STEM = "maoz-manifest"
 RESULT = "result.json"
 STREAM = "stream.txt"
-# The heap each JVM may take. Ten at once stay under 110 GB on av2 and av3,
-# which have 125 GB each.
-HEAP = "-Xmx10g"
+# The heap each JVM may take, in GB. Ten at once stay under 110 GB on av2
+# and av3, which have 125 GB each. A result.json written before the flag
+# existed ran with this heap.
+HEAP_GB = 10
+OOM_MARK = "java.lang.OutOfMemoryError"
 RSS_SAMPLE_S = 5.0
 
 REPAIR_RE = re.compile(r"^@@REPAIR (\d+) (\d+) (-?\d+)$", re.MULTILINE)
@@ -124,11 +128,24 @@ def parse_stream(text: str) -> dict:
             "search_s": int(end.group(3)) / 1000.0 if end else None}
 
 
+def out_of_heap(job: Path) -> int | None:
+    """The heap in GB a finished job ran out of, or None if it did not."""
+    try:
+        record = json.loads((job / RESULT).read_text())
+        stderr = (job / "stderr.log").read_text(errors="replace")
+    except (OSError, ValueError):
+        return None
+    if record.get("killed") or record.get("exit_code") == 0 \
+            or OOM_MARK not in stderr:
+        return None
+    return int(record.get("heap_gb", HEAP_GB))
+
+
 def run_one(root: Path, alg: str, spectra: Path, job: Path,
-            timeout: int, max_repairs: int) -> dict:
+            timeout: int, max_repairs: int, heap_gb: int) -> dict:
     """Run one job; return its result record."""
     job.mkdir(parents=True, exist_ok=True)
-    cmd = ["java", HEAP, "-cp", f"classes{os.pathsep}{JAR}",
+    cmd = ["java", f"-Xmx{heap_gb}g", "-cp", f"classes{os.pathsep}{JAR}",
            "StreamRepairs", str(spectra), alg, "-1", str(max_repairs)]
     killed = 0
     rss = {"peak": 0.0}
@@ -158,7 +175,7 @@ def run_one(root: Path, alg: str, spectra: Path, job: Path,
               "spec": spectra.stem, "input": str(spectra),
               "wall_s": wall, "killed": killed, "exit_code": proc.returncode,
               "timeout_s": timeout, "max_repairs": max_repairs,
-              "peak_rss_mb": round(rss["peak"], 1)}
+              "heap_gb": heap_gb, "peak_rss_mb": round(rss["peak"], 1)}
     record.update(parse_stream((job / STREAM).read_text(errors="replace")))
     return record
 
@@ -185,6 +202,9 @@ def main() -> None:
     parser.add_argument("--max-repairs", type=int, default=1000, metavar="N",
                         help="stop a job at this many distinct repairs "
                              "(AuRUS stops at 1000 individuals)")
+    parser.add_argument("--heap-gb", type=int, default=HEAP_GB, metavar="N",
+                        help="each JVM's -Xmx; a job that ran out of a "
+                             "smaller heap is run again")
     parser.add_argument("--seeds", nargs="+", type=int, default=[0],
                         metavar="N",
                         help="accepted from campaign.py; the algorithms are "
@@ -196,8 +216,10 @@ def main() -> None:
 
     if args.seeds != [0]:
         sys.exit("the three algorithms are deterministic: declare seed 0 only")
-    if args.concurrency < 1 or args.timeout < 1 or args.max_repairs < 1:
-        sys.exit("--concurrency, --timeout and --max-repairs must be positive")
+    if min(args.concurrency, args.timeout, args.max_repairs,
+           args.heap_gb) < 1:
+        sys.exit("--concurrency, --timeout, --max-repairs and --heap-gb "
+                 "must be positive")
     root = args.maoz_root.expanduser().resolve()
     for need in (JAR, DRIVER, "classes/StreamRepairs.class"):
         if not (root / need).exists():
@@ -215,12 +237,23 @@ def main() -> None:
     # Algorithm-major with GLASS first: it takes milliseconds per spec, so a
     # status poll sees a whole tool's column early.
     tasks = [(a, s) for a in args.algorithms for s in specs]
+    retry = []
+    for a, s in tasks:
+        old = out_of_heap(args.out_root / a / s)
+        if old is not None and old < args.heap_gb:
+            retry.append((a, s, old))
+    for a, s, old in retry:
+        aside = args.out_root.with_name(f"{args.out_root.name}.oom-{old}g")
+        (aside / a).mkdir(parents=True, exist_ok=True)
+        (args.out_root / a / s).rename(aside / a / s)
+        print(f"[retry] {a}/{s} ran out of a {old} GB heap; moved to "
+              f"{aside / a / s}", flush=True)
     to_run = [(a, s) for a, s in tasks
               if not (args.out_root / a / s / RESULT).exists()]
 
     print(f"Maoz baselines: {len(args.algorithms)} algorithms x {len(specs)} "
           f"specs, {len(to_run)} to run, timeout {args.timeout}s, "
-          f"concurrency {args.concurrency}, artifact {actual}", flush=True)
+          f"concurrency {args.concurrency}, heap {args.heap_gb} GB, artifact {actual}", flush=True)
 
     args.out_root.mkdir(parents=True, exist_ok=True)
     host = os.uname().nodename
@@ -235,7 +268,8 @@ def main() -> None:
         "inputs": str(args.inputs),
         "timeout_s": args.timeout,
         "max_repairs": args.max_repairs,
-        "heap": HEAP,
+        "heap_gb": args.heap_gb,
+        "retried_out_of_heap": [f"{a}/{s}" for a, s, _ in retry],
         "concurrency": args.concurrency,
         "algorithms": list(args.algorithms),
         "specs": specs,
@@ -260,7 +294,7 @@ def main() -> None:
         with lock:
             print(f"[start] {alg}/{spec}", flush=True)
         record = run_one(root, alg, args.inputs / f"{spec}.spectra", job,
-                         args.timeout, args.max_repairs)
+                         args.timeout, args.max_repairs, args.heap_gb)
         (job / RESULT).write_text(json.dumps(record, indent=2) + "\n")
         with lock:
             manifest["counts"]["done"] += 1
