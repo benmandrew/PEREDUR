@@ -1,0 +1,66 @@
+# Scores GLASS, JVTS-Repair and AMT13 against PEREDUR by coverage, as section
+# 11 of experiments/2026-10-02-maoz-baselines/PLAN.md registers it. Each phase
+# is one pass of scripts/maoz_score.py; see PLAN.md here.
+#
+# No search runs here. The tool side is 2026-10-02-maoz-baselines's adapted
+# tree, experiments/results-maoz-baselines, which av2 holds already. The
+# PEREDUR side is the pool of 2026-09-14-paper-rerun's final frontiers, which
+# no one host holds: each has half of that campaign's seeds. The pool is built
+# locally with `maoz_score.py --pass pool` and copied to av2 before staging,
+# and `stage` refuses av2 until it is there.
+name = "2026-10-05-maoz-coverage"
+branch = "feat/maoz-baselines"
+
+# The tools are deterministic, so one seed, and av2 alone takes it.
+hosts = { av2 = "0" }
+
+# Section 11.1: realize within 600 s, the well-separation ltlsynt within 60 s
+# with the fast path off. A repair either leaves undecided is not admitted.
+[[phases]]
+kind = "maoz-score"
+pass = "screen"
+out = "experiments/maoz-coverage-screen"
+jobs = 16
+realize_timeout = 600
+wellsep_timeout = 60
+
+# Section 11.2: maximal over each (tool, subject)'s admissible repairs, one
+# representative per mutual-implication class. 20 s per solver call, as
+# maximal's default and the curves' scoring had; a wall cap of 4 h on one
+# (tool, subject).
+[[phases]]
+kind = "maoz-score"
+pass = "frontier"
+screen = "experiments/maoz-coverage-screen"
+out = "experiments/maoz-coverage-frontier"
+jobs = 16
+maximal_timeout = 20
+maximal_wall_s = 14400
+
+# Section 11.3: every (PEREDUR pool repair, tool frontier repair) pair through
+# compare. A unit is one tool repair against 50 pool files under 900 s; a
+# unit that overruns is re-run pair by pair under 120 s, and a pair that
+# overruns that is undecided. Sixteen workers, one core each.
+[[phases]]
+kind = "maoz-score"
+pass = "coverage"
+frontier = "experiments/maoz-coverage-frontier"
+pool = "experiments/maoz-peredur-pool"
+out = "experiments/maoz-coverage-relations"
+jobs = 16
+cores = 1
+chunk_size = 50
+chunk_timeout = 900
+pair_timeout = 120
+
+# Sections 11.3 and 11.5: the figures under both readings of an undecided
+# pair, and the verdict. Runs no solver.
+[[phases]]
+kind = "maoz-score"
+pass = "report"
+screen = "experiments/maoz-coverage-screen"
+frontier = "experiments/maoz-coverage-frontier"
+coverage = "experiments/maoz-coverage-relations"
+pool = "experiments/maoz-peredur-pool"
+maoz_out = "experiments/maoz-baselines-out"
+out = "experiments/maoz-coverage-report"
