@@ -1,0 +1,27 @@
+import "../patterns/DwyerPatterns.spectra"
+
+// RG1 from the ICSE 2019 artifact (EfficacyTest/Simple/RG1.spectra), with two
+// changes that make it mean what examples/rg1/spec.tlsf means:
+// - the atoms carry that file's names (r, c, g, v there);
+// - the TLSF's one assumption, G F !request, is added. The artifact's RG1 has
+//   no assumption at all.
+
+module Alur
+env boolean request;
+env boolean cancel_signal_high;
+
+sys boolean grant_high;
+sys boolean valid_signal_high;
+
+asm
+	GF !request;
+
+gar
+pRespondsToS(request, next(grant_high));
+
+gar ungrant:
+	G ((cancel_signal_high | grant_high) ->next(!grant_high));
+gar cnv:
+	G (cancel_signal_high -> !valid_signal_high);
+gar gnv:
+	GF grant_high & valid_signal_high;

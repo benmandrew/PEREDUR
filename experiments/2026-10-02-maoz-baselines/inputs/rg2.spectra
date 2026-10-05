@@ -1,0 +1,17 @@
+import "../patterns/DwyerPatterns.spectra"
+
+// RG2 from the ICSE 2019 artifact (EfficacyTest/Simple/RG2.spectra), with the
+// atoms renamed to examples/rg2/spec.tlsf's (r, c, g there). Nothing else
+// differs.
+
+module Chatt
+
+env boolean req;
+env boolean cancel;
+sys boolean grant;
+
+gar
+	pRespondsToS(req, next(grant));
+
+gar
+	G ((cancel | grant) -> next(!grant));
