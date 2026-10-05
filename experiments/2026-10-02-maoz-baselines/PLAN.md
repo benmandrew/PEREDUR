@@ -79,3 +79,39 @@ GLASS costs seconds. JVTS-Repair and AMT13 take at most 20 jobs × 7200 s, which
 ## 10. What follows
 
 The screens (section 5, part 1), the N-tool overlap pass and the ε-separation recount are separate steps. They run once this campaign's rows are in. The paper then adds the three tools to RQ3's tables through `tables.py`, on the GR(1) subset only.
+
+## 11. Amendment, 2026-10-05
+
+Written after the tool runs closed and before any screen or comparison with PEREDUR ran. The only results seen were the tools' own repair counts and exit states in `PROVENANCE.json`. The paper's evaluation plan of 2026-10-05 removed joint-frontier overlap and ε-separation counts from every research question. Joint-frontier shares have no baseline: two seeds of one FRETISH arm share 0.0–2.5% of their repairs. The greedy ε-separated count never falls as a set grows, so it measures output size as much as spread. This amendment replaces section 5 part 2, the secondary endpoint and section 6 to match. Part 1 of section 5 stands, with the realisability budget fixed below.
+
+### 11.1 Admissibility
+
+A tool repair is *admissible* when `realize` reports its TLSF file realisable within 600 s and `scripts/check_well_separated.py` reports it well-separated within its 60 s `ltlsynt` budget, with the fast path off as in the AuRUS screen. A repair either check leaves undecided is counted as undecided, not admitted, and reported per (tool, subject).
+
+### 11.2 Frontiers
+
+A tool's frontier on a subject is `maximal` over its admissible repairs: the repairs no other admissible repair strictly implies, one per mutual-implication class. PEREDUR's frontier for one run is the set its maximality curve holds at the run's last cut, read from the `.members.tsv` sidecar of `2026-09-14-paper-rerun-curves`, for the shipping arm `sweep_G_mrs_nsga2-apportion_wkoff_log` at seeds 0–29.
+
+### 11.3 Primary endpoint, part 2: coverage
+
+A PEREDUR repair *covers* a tool repair when `compare` finds it equivalent to the tool repair or strictly stronger. It then concedes no more of the original specification. Per (tool, subject):
+
+- **Coverage per run.** For each of PEREDUR's 30 runs, the share of the tool's frontier that the run's frontier covers. The figure is the mean over runs. One run is the budget the tools are matched on.
+- **Coverage by the pool.** The share of the tool's frontier that some run's frontier covers. It names the tool repairs PEREDUR never reaches.
+- **Converse.** For each run, the share of its frontier that no repair on the tool's frontier covers, in the same sense with the sides swapped, as a mean over runs. Among those uncovered repairs, the count whose `GUARANTEES` section differs from `examples/<spec>/spec.tlsf` after whitespace normalisation, which is PEREDUR weakening a guarantee somewhere no assumption-only repair reaches.
+
+A pair `compare` cannot decide inside its budget is *undecided*. Each figure is reported twice, with undecided pairs counted first as non-coverage and then as coverage, and the undecided share of pairs per (tool, subject) beside them.
+
+### 11.4 Secondary endpoint
+
+None. The ε-separation count is withdrawn.
+
+### 11.5 Decision rule
+
+Replaces section 6. A verdict is stated only where it holds under both readings of undecided pairs.
+
+- **Outcome 1.** On some subject, a tool frontier repair is covered by no PEREDUR run. The subject and the repair are named, and RQ3's text reports them.
+- **Outcome 2.** Every tool frontier repair on every subject is covered by the pool. It is reported as coverage on the GR(1) subset, with per-run coverage beside it.
+- **Outcome 3.** A tool has no admissible repair on a subject. It is reported as zero with its reason: no repair found, crashed with none printed (AMT13 on `humanoid-503`, `humanoid-531`, `humanoid-742` and `pcar-v2-888`, recorded in `PROVENANCE.json`), killed with none printed, unrealisable, or not well-separated.
+
+No significance test is run, as section 5 already registered. The scoring is its own campaign, `2026-10-05-maoz-coverage`, with its own archive.
