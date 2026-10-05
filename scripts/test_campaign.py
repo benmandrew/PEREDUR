@@ -1439,6 +1439,7 @@ maoz_root = "~/projects/tools/maoz"
 maoz_digest = "9f1c2e7"
 algorithms = ["UF"]
 timeout = 600
+max_repairs = 50
 concurrency = 4
 specs = ["lift"]
 adapt = "experiments/results-maoz-glass"
@@ -1453,14 +1454,17 @@ hosts = { av2 = "0" }
     maozarm = C.load_campaign("maozarm", decl_root)
     mall, mglass, mscored = maozarm["phases"]
     check(mall["kind"], "maoz", "a maoz phase loads as its own kind")
-    check((mall["timeout"], mall["concurrency"], mall["algorithms"]),
-          (7200, 8, ["UF", "BFS", "ALUR"]),
-          "2 h, eight at once and all three algorithms are the defaults")
+    check((mall["timeout"], mall["max_repairs"], mall["concurrency"],
+           mall["algorithms"]),
+          (7200, 1000, 8, ["UF", "BFS", "ALUR"]),
+          "2 h, 1000 distinct repairs, eight at once and all three algorithms "
+          "are the defaults")
     check((mall["name"], mall["profile"], mall["specs"], mall["adapt"]),
           ("maoz-out", None, None, None),
           "named after its output directory, and with no profile")
-    check((mglass["timeout"], mglass["concurrency"], mglass["algorithms"],
-           mglass["specs"]), (600, 4, ["UF"], ["lift"]),
+    check((mglass["timeout"], mglass["max_repairs"], mglass["concurrency"],
+           mglass["algorithms"], mglass["specs"]),
+          (600, 50, 4, ["UF"], ["lift"]),
           "and every key it states is carried through")
     check((maozarm["config_dirs"], maozarm["results_dirs"]),
           ([], {"av2": [], "av3": []}),
@@ -1471,14 +1475,15 @@ hosts = { av2 = "0" }
           ["--maoz-root", "~/projects/tools/maoz", "--maoz-digest", "9f1c2e7",
            "--out-root", "experiments/maoz-out",
            "--inputs", "experiments/maoz-in",
-           "--timeout", "7200", "--concurrency", "8",
+           "--timeout", "7200", "--max-repairs", "1000",
+           "--concurrency", "8",
            "--algorithms", "UF", "BFS", "ALUR", "--seeds", "0"],
           "a maoz phase becomes maoz_campaign.py arguments, seeds last")
     check(C.phase_args(mglass, [0]),
           ["--maoz-root", "~/projects/tools/maoz", "--maoz-digest", "9f1c2e7",
            "--out-root", "experiments/maoz-glass",
            "--inputs", "experiments/maoz-in",
-           "--timeout", "600", "--concurrency", "4",
+           "--timeout", "600", "--max-repairs", "50", "--concurrency", "4",
            "--adapt", "experiments/results-maoz-glass",
            "--specs", "lift", "--algorithms", "UF", "--seeds", "0"],
           "with its adapted tree, its spec subset and its algorithms")
@@ -1545,6 +1550,9 @@ hosts = { av2 = "0" }
         ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
          'maoz_root = "~/m", maoz_digest = "d", timeout = 0 } ]',
          "timeout must be a positive integer", "a zero maoz timeout"),
+        ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
+         'maoz_root = "~/m", maoz_digest = "d", max_repairs = 0 } ]',
+         "max_repairs must be a positive integer", "a zero repair cap"),
         ('phases = [ { kind = "maoz", out = "o", inputs = "i", '
          'maoz_root = "~/m", maoz_digest = "d", concurrency = true } ]',
          "concurrency must be a positive integer", "a boolean concurrency"),

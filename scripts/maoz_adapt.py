@@ -127,7 +127,8 @@ def adapt_one(alg: str, spec: str, job: Path, inputs: Path, out: Path,
     record = {"algorithm": alg, "tool": ALGORITHMS[alg], "spec": spec}
     result = json.loads((job / RESULT).read_text())
     record.update({k: result.get(k) for k in
-                   ("n_repairs", "killed", "finished", "wall_s")})
+                   ("n_repairs", "n_raw", "capped", "killed", "finished",
+                    "wall_s")})
     run_dir = out / run_dir_name(alg, spec)
     accumulated = run_dir / ACCUMULATED_DIR
     if (accumulated / INDEX_NAME).exists() and not force:
@@ -139,9 +140,17 @@ def adapt_one(alg: str, spec: str, job: Path, inputs: Path, out: Path,
 
     sspec = parse_spec((inputs / f"{spec}.spectra").read_text())
     base = (REPO_ROOT / "examples" / spec / "spec.tlsf").read_text()
-    written, untranslatable = [], 0
+    written, untranslatable, duplicates = [], 0, 0
+    seen: set[frozenset[str]] = set()
     found = repairs((job / STREAM).read_text(errors="replace"))
     for index, (elapsed, bodies) in enumerate(found, start=1):
+        # The driver already prints each assumption set once; this guards a
+        # stream written by a driver that did not.
+        key = frozenset(" ".join(b.split()) for b in bodies)
+        if key in seen:
+            duplicates += 1
+            continue
+        seen.add(key)
         added: dict[str, list[str]] = {k: [] for k in ALIASES}
         try:
             for body in bodies:
@@ -180,6 +189,7 @@ def adapt_one(alg: str, spec: str, job: Path, inputs: Path, out: Path,
     (run_dir / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2) + "\n")
     record.update({"status": "written", "n_written": len(written),
                    "n_untranslatable": untranslatable,
+                   "n_duplicate": duplicates,
                    "run_dir": run_dir.name})
     return record
 

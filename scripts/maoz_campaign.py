@@ -26,15 +26,17 @@ driver's stdout), stderr.log and result.json. A job with a result.json is not
 re-run. The campaign's facts go to <out-root>/maoz-manifest-<host>.json,
 which is what `campaign.py status` reads.
 
-A job is stopped at `--timeout` seconds by killing its process group. Every
-repair printed before that is kept, which is what the found-repair rule
-counts: a repair held at the stop.
+The driver prints a repair only when its assumption set is new, and stops by
+itself at `--max-repairs` distinct repairs (default 1000, AuRUS's
+1000-individual stop). A job still running at `--timeout` seconds is stopped
+by killing its process group. Every repair printed before either stop is
+kept, which is what the found-repair rule counts: a repair held at the stop.
 
 Usage:
     python scripts/maoz_campaign.py --maoz-root ~/tools/maoz-icse2019 \\
         --maoz-digest 0123456789ab --out-root OUT \\
         --inputs experiments/2026-10-02-maoz-baselines/inputs \\
-        --specs lift --algorithms UF --timeout 60     # smoke test
+        --specs lift --algorithms UF --timeout 60 --max-repairs 50  # smoke test
 """
 
 from __future__ import annotations
@@ -66,7 +68,10 @@ HEAP = "-Xmx10g"
 RSS_SAMPLE_S = 5.0
 
 REPAIR_RE = re.compile(r"^@@REPAIR (\d+) (\d+) (-?\d+)$", re.MULTILINE)
-DONE_RE = re.compile(r"^@@DONE (\d+) (\d+)$", re.MULTILINE)
+# @@DONE and @@CAP carry <distinct> <raw> <ms>: the repairs printed, the
+# recordRepair calls behind them, and the search time.
+DONE_RE = re.compile(r"^@@DONE (\d+) (\d+) (\d+)$", re.MULTILINE)
+CAP_RE = re.compile(r"^@@CAP (\d+) (\d+) (\d+)$", re.MULTILINE)
 
 
 def digest(root: Path) -> str:
@@ -105,20 +110,26 @@ def parse_stream(text: str) -> dict:
     """The counts and times a job's stream records."""
     times = [int(m.group(2)) / 1000.0 for m in REPAIR_RE.finditer(text)]
     done = DONE_RE.search(text)
+    cap = CAP_RE.search(text)
+    end = done or cap
     return {"n_repairs": len(times),
+            "n_distinct": len(times),
+            # Only an ending line knows the raw count; a killed job has none.
+            "n_raw": int(end.group(2)) if end else None,
+            "capped": cap is not None,
             "first_repair_s": times[0] if times else None,
             "last_repair_s": times[-1] if times else None,
             "finished": done is not None,
             "realizable": "@@REALIZABLE" in text,
-            "search_s": int(done.group(2)) / 1000.0 if done else None}
+            "search_s": int(end.group(3)) / 1000.0 if end else None}
 
 
 def run_one(root: Path, alg: str, spectra: Path, job: Path,
-            timeout: int) -> dict:
+            timeout: int, max_repairs: int) -> dict:
     """Run one job; return its result record."""
     job.mkdir(parents=True, exist_ok=True)
     cmd = ["java", HEAP, "-cp", f"classes{os.pathsep}{JAR}",
-           "StreamRepairs", str(spectra), alg, "-1"]
+           "StreamRepairs", str(spectra), alg, "-1", str(max_repairs)]
     killed = 0
     rss = {"peak": 0.0}
     stop = threading.Event()
@@ -146,7 +157,8 @@ def run_one(root: Path, alg: str, spectra: Path, job: Path,
     record = {"algorithm": alg, "tool": ALGORITHMS[alg],
               "spec": spectra.stem, "input": str(spectra),
               "wall_s": wall, "killed": killed, "exit_code": proc.returncode,
-              "timeout_s": timeout, "peak_rss_mb": round(rss["peak"], 1)}
+              "timeout_s": timeout, "max_repairs": max_repairs,
+              "peak_rss_mb": round(rss["peak"], 1)}
     record.update(parse_stream((job / STREAM).read_text(errors="replace")))
     return record
 
@@ -170,6 +182,9 @@ def main() -> None:
                         default=list(ALGORITHMS), metavar="ALG")
     parser.add_argument("--timeout", type=int, default=7200, metavar="S")
     parser.add_argument("--concurrency", type=int, default=8, metavar="N")
+    parser.add_argument("--max-repairs", type=int, default=1000, metavar="N",
+                        help="stop a job at this many distinct repairs "
+                             "(AuRUS stops at 1000 individuals)")
     parser.add_argument("--seeds", nargs="+", type=int, default=[0],
                         metavar="N",
                         help="accepted from campaign.py; the algorithms are "
@@ -181,8 +196,8 @@ def main() -> None:
 
     if args.seeds != [0]:
         sys.exit("the three algorithms are deterministic: declare seed 0 only")
-    if args.concurrency < 1 or args.timeout < 1:
-        sys.exit("--concurrency and --timeout must be positive")
+    if args.concurrency < 1 or args.timeout < 1 or args.max_repairs < 1:
+        sys.exit("--concurrency, --timeout and --max-repairs must be positive")
     root = args.maoz_root.expanduser().resolve()
     for need in (JAR, DRIVER, "classes/StreamRepairs.class"):
         if not (root / need).exists():
@@ -219,6 +234,7 @@ def main() -> None:
         "out": str(args.out_root),
         "inputs": str(args.inputs),
         "timeout_s": args.timeout,
+        "max_repairs": args.max_repairs,
         "heap": HEAP,
         "concurrency": args.concurrency,
         "algorithms": list(args.algorithms),
@@ -244,12 +260,13 @@ def main() -> None:
         with lock:
             print(f"[start] {alg}/{spec}", flush=True)
         record = run_one(root, alg, args.inputs / f"{spec}.spectra", job,
-                         args.timeout)
+                         args.timeout, args.max_repairs)
         (job / RESULT).write_text(json.dumps(record, indent=2) + "\n")
         with lock:
             manifest["counts"]["done"] += 1
             write_manifest()
-            note = " KILLED" if record["killed"] else ""
+            note = (" KILLED" if record["killed"]
+                    else " CAPPED" if record["capped"] else "")
             print(f"[{manifest['counts']['done']}/{len(to_run)}] {alg}/{spec} "
                   f"{record['n_repairs']} repairs in {record['wall_s']}s{note}",
                   flush=True)
