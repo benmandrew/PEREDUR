@@ -1,6 +1,6 @@
 # 2026-10-02-maoz-baselines
 
-Pre-registered 2026-10-05, before any row of this campaign existed. Only the smoke test in section 8 had run.
+Pre-registered 2026-10-05, before any row of this campaign existed. Only the smoke tests in section 8 had run.
 
 ## 1. Why this campaign exists
 
@@ -14,9 +14,11 @@ The tools are the Java classes of `SymbolicRepairsArtifact.zip` (sha256 `2643d35
 
 The artifact's `RepairExporterExec` prints repairs only when a search ends, so a run stopped at a cap prints nothing. `driver/StreamRepairs.java` builds each algorithm with the exporter's own arguments and prints each repair when the algorithm records it, dated in milliseconds from the start of the search. The arguments are `TheUltimateFixer(gi, true, true)`, `BFSModelRepair(gi, -1, false, false, false, true)` and `SpecificationRefinement(gi, {P1..P4 empty}, -1, 3, true)`, with depth -1 (no bound). On `lift` the driver gave the exporter's counts and text: GLASS 1 repair, JVTS-Repair 805 and AMT13 2.
 
+The driver prints a repair only the first time its assumption set appears. A repair's set is its `asm` statements with whitespace collapsed, in any order. JVTS-Repair records one set many times: on `lift` its 805 repairs are 221 distinct sets, and 7 of those differ from another only in the order of their assumptions. A repeat adds nothing to any endpoint in section 5, and without this rule it would also count towards the cap below. A printed repair's index counts distinct repairs, and its time is the first time its set was seen. `@@DONE` and `@@CAP` also report the raw count of recorded repairs, repeats included. `scripts/maoz_adapt.py` applies the same rule again as a guard.
+
 The artifact expects Windows and a CUDD library. Without them it falls back to its pure-Java BDD package, `JTLVJavaFactory`, which runs on Linux under OpenJDK 21. Every run here uses that package.
 
-av2 holds the staged directory `~/projects/tools/maoz-icse2019`: the exporter jar and its lib directory unchanged, the driver compiled there with `javac --release 8`, and `DIGEST.txt`. The digest `9748cf0d585e` is the first 12 hex digits of the SHA-256 of the jar's bytes followed by the driver source's bytes. `stage` and `scripts/maoz_campaign.py` both refuse a directory whose digest differs from `campaign.toml`.
+av2 holds the staged directory `~/projects/tools/maoz-icse2019`: the exporter jar and its lib directory unchanged, the driver compiled there with `javac --release 8`, and `DIGEST.txt`. The digest `2212f3c7c209` is the first 12 hex digits of the SHA-256 of the jar's bytes followed by the driver source's bytes. `stage` and `scripts/maoz_campaign.py` both refuse a directory whose digest differs from `campaign.toml`.
 
 ## 3. Inputs
 
@@ -30,7 +32,7 @@ av2 holds the staged directory `~/projects/tools/maoz-icse2019`: the exporter ja
 
 ## 4. Design
 
-Three algorithms over ten subjects is 30 jobs. All three algorithms are deterministic, so each job runs once, and seed 0 is the only seed. Each job has the 7200 s cap that PEREDUR and AuRUS have, enforced by killing its process group. Every repair printed before the kill is kept.
+Three algorithms over ten subjects is 30 jobs. All three algorithms are deterministic, so each job runs once, and seed 0 is the only seed. A job ends at 1000 distinct repairs or at 7200 s, whichever comes first. The 7200 s cap is the one PEREDUR and AuRUS have, enforced by killing the process group. The repair cap matches AuRUS's stop at 1000 individuals. The driver enforces it by exiting after the 1000th distinct repair. The search is deterministic, so a capped job keeps the same 1000 repairs on every run. Every repair printed before either stop is kept, and `result.json` records the distinct count, the raw count and whether the job was capped.
 
 The campaign runs as a `kind = "maoz"` phase on av2 alone, at concurrency 10 with a 10 GB heap per *Java virtual machine* (JVM).
 
@@ -59,7 +61,7 @@ In every outcome the paper restricts these columns to the ten GR(1) subjects, an
 
 - **Spectra and ltlsynt disagree on realisability.** Spectra sees an enum's declared values. ltlsynt sees the bits, and a 7-valued enum in 3 bits leaves one code unused. A repair Spectra calls realisable can fail `realize`, and the screen in section 5 decides.
 - **The BDD package is slower than CUDD.** Brizzio et al. ran on CUDD with a 10-minute cap and report JVTS-Repair timeouts on 503 and 531, and AMT13 timeouts on 503, 531, 742 and pcar. Timeouts here run on a different engine at a different cap, so they are not compared with Table 3.
-- **JVTS-Repair can produce very many repairs.** It gave 805 on `lift` in 8 s. Over 7200 s a subject can give 10⁵ or more, each one a TLSF file. The screens and the overlap pass read the tool's maximal frontier, and the cost of computing that frontier is recorded rather than estimated now.
+- **The repair cap truncates a search.** A capped job reports the first 1000 distinct repairs in the algorithm's own order, which is not a sample of all its repairs. Each capped job is reported as capped, with its raw count. Without the cap, JVTS-Repair's output had no bound: 805 recorded repairs on `lift` in under 4 s, each one a TLSF file to screen.
 - **A repair can name a system variable.** GLASS's repairs on `humanoid-531`, `humanoid-742` and `pcar-v2-888` constrain `state`, `turnState`, `specState` and `spec_policy`. Each is declared in both the Spectra file and the TLSF file, so each translates, and the well-separation screen judges it.
 - **A kill can cut a repair mid-write.** The adapter drops a block with no `@@END`. A repair's date is the driver's clock from the start of the search, which excludes JVM start-up and parsing.
 - **A JVM can run out of heap.** It then exits non-zero before the cap. `result.json` records the exit code, and the repairs printed before the exit are kept.
@@ -68,9 +70,11 @@ In every outcome the paper restricts these columns to the ten GR(1) subjects, an
 
 GLASS ran over all ten inputs on av2 with a 120 s cap, from a copy of this branch's scripts. Each subject gave one repair in 1.2–1.3 s of wall time, JVM included. The first adapter pass could not read three of them (`humanoid-458`, `humanoid-742`, `pcar-v2-888`), because the tools print `v!={}` for a variable they leave free. With the empty set read as no value, all ten translated, and `realize` reported all ten translated files `REALIZABLE`.
 
+After the deduplication rule and the cap were added, JVTS-Repair ran on `lift` with the driver at `2212f3c7c209`. It finished by itself in 3.8 s of search with 221 distinct repairs from 805 raw, uncapped, and all 221 translated. With `max_repairs = 50` it stopped at `@@CAP 50 156`, exit 0, and its 50 repairs were the first 50 of the uncapped run, byte for byte.
+
 ## 9. Budget
 
-GLASS costs seconds. JVTS-Repair and AMT13 take at most 20 jobs × 7200 s, which is 40 JVM-hours. At concurrency 10 that is two waves of at most 2 h, so the phase takes about 4 h of wall time on av2. The adapter's cost grows with JVTS-Repair's repair count and is not bounded in advance.
+GLASS costs seconds. JVTS-Repair and AMT13 take at most 20 jobs × 7200 s, which is 40 JVM-hours. At concurrency 10 that is two waves of at most 2 h, so the phase takes about 4 h of wall time on av2. The repair cap bounds the adapter at 30,000 TLSF files.
 
 ## 10. What follows
 

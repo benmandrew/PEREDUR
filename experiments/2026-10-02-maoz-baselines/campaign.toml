@@ -23,10 +23,13 @@ kind = "maoz"
 out = "experiments/maoz-baselines-out"
 inputs = "experiments/2026-10-02-maoz-baselines/inputs"
 maoz_root = "~/projects/tools/maoz-icse2019"
-maoz_digest = "9748cf0d585e"
+maoz_digest = "2212f3c7c209"
 algorithms = ["UF", "BFS", "ALUR"]
 # PEREDUR's and AuRUS's budget, per (algorithm, spec).
 timeout = 7200
+# A job also stops at 1000 distinct repairs, AuRUS's 1000-individual stop,
+# whichever comes first. The driver prints each assumption set once.
+max_repairs = 1000
 # Each JVM may take a 10 GB heap, so 10 reserve 100 GB of av2's 122 GB free.
 # GLASS finishes in seconds, so this is two waves of at most 7200 s: about 4 h.
 concurrency = 10
