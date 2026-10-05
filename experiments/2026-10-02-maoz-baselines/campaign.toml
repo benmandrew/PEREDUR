@@ -1,0 +1,35 @@
+# The GR(1) assumption-repair baselines: GLASS (UF), JVTS-Repair (BFS) and
+# AMT13 (ALUR), from the Maoz, Ringert & Shalom ICSE 2019 artifact, over the
+# ten subjects PEREDUR shares with Brizzio et al. (2023) Table 3.
+#
+# No PEREDUR search runs here. The PEREDUR side is 2026-09-14-paper-rerun's,
+# and the AuRUS side 2026-09-22-aurus-rerun's; this campaign adds three tool
+# columns beside them on the GR(1) subset. See PLAN.md.
+#
+# The artifact is a separate download and `stage` does not build it. av2 holds
+# ~/projects/tools/maoz-icse2019: RepairExporterExec.jar and its lib directory
+# from SymbolicRepairsArtifact.zip (sha256 2643d353...d0b6ce), the driver
+# driver/StreamRepairs.java compiled there, and DIGEST.txt. `stage` checks the
+# digest and refuses a host that disagrees.
+name = "2026-10-02-maoz-baselines"
+branch = "feat/maoz-baselines"
+
+# The three algorithms are deterministic, so one run per (algorithm, spec) is
+# the whole design and seed 0 the only seed. av2 alone takes it.
+hosts = { av2 = "0" }
+
+[[phases]]
+kind = "maoz"
+out = "experiments/maoz-baselines-out"
+inputs = "experiments/2026-10-02-maoz-baselines/inputs"
+maoz_root = "~/projects/tools/maoz-icse2019"
+maoz_digest = "9748cf0d585e"
+algorithms = ["UF", "BFS", "ALUR"]
+# PEREDUR's and AuRUS's budget, per (algorithm, spec).
+timeout = 7200
+# Each JVM may take a 10 GB heap, so 10 reserve 100 GB of av2's 122 GB free.
+# GLASS finishes in seconds, so this is two waves of at most 7200 s: about 4 h.
+concurrency = 10
+# Translated into PEREDUR-shaped run directories once every job has finished,
+# for the screens and the overlap pass that follow.
+adapt = "experiments/results-maoz-baselines"
