@@ -1,0 +1,28 @@
+
+== mrs-nsga2-apportion (X) vs aurus (Y): 596 paired runs over 21 families
+  precision: Y inside X's region vs X inside Y's: 0.551 vs 0.423, first larger 16/21 p=0.0174
+  coverage: X's balls hit by Y vs Y's hit by X: 0.315 vs 0.267, first larger 17/21 p=0.0088
+  symmetric precision cross 0.487 vs control mrs-nsga2-apportion 0.555: cross larger 1/21 p=0.0000
+  symmetric precision cross 0.487 vs control aurus 0.588: cross larger 1/21 p=0.0000
+  per family (Y in X / X in Y): arbiter-aurus 0.40/0.47, detector-aurus 0.60/0.56, gyro-var1 0.51/0.41, gyro-var2 0.52/0.60, humanoid-458 0.64/0.31, humanoid-742 0.42/0.19, lift 0.89/0.17, lily02 0.59/0.48, lily11 0.56/0.40, lily15 0.52/0.38, lily16 0.62/0.34, load-balancer-aurus 0.18/0.52, ltl2dba-r-2 0.69/0.38, ltl2dba-theta-2 0.51/0.46, ltl2dba27 0.63/0.54, minepump 0.53/0.48, pcar-v2-888 0.85/0.09, rg1 0.56/0.55, rg2 0.67/0.68, round-robin-arbiter-aurus 0.25/0.52, simple-arbiter-aurus 0.45/0.36
+
+== mrs-nsga2-apportion (X) vs aurus-nsga2-apportion (Y): 688 paired runs over 25 families
+  precision: Y inside X's region vs X inside Y's: 0.689 vs 0.605, first larger 20/25 p=0.0002
+  coverage: X's balls hit by Y vs Y's hit by X: 0.608 vs 0.544, first larger 17/25 p=0.0013
+  symmetric precision cross 0.647 vs control mrs-nsga2-apportion 0.548: cross larger 25/25 p=0.0000
+  symmetric precision cross 0.649 vs control aurus-nsga2-apportion 0.583: cross larger 19/24 p=0.0000
+  per family (Y in X / X in Y): arbiter-aurus 0.60/0.54, detector-aurus 0.70/0.69, full-arbiter-aurus 0.71/0.61, gyro-var1 0.74/0.57, gyro-var2 0.71/0.69, humanoid-458 0.58/0.58, humanoid-503 0.66/0.35, humanoid-531 0.78/0.78, humanoid-742 0.57/0.62, lift 0.68/0.66, lily02 0.67/0.58, lily11 0.76/0.74, lily15 0.64/0.63, lily16 0.80/0.40, load-balancer-aurus 0.71/0.46, ltl2dba-r-2 0.80/0.82, ltl2dba-theta-2 0.76/0.71, ltl2dba27 0.75/0.70, minepump 0.64/0.67, pcar-v2-888 0.59/0.58, prioritized-arbiter-aurus 0.78/0.27, rg1 0.61/0.58, rg2 0.75/0.73, round-robin-arbiter-aurus 0.58/0.54, simple-arbiter-aurus 0.67/0.62
+
+== mrs-nsga2-apportion (X) vs mrs-weighted (Y): 743 paired runs over 25 families
+  precision: Y inside X's region vs X inside Y's: 0.480 vs 0.609, first larger 3/25 p=0.0000
+  coverage: X's balls hit by Y vs Y's hit by X: 0.373 vs 0.429, first larger 5/25 p=0.0014
+  symmetric precision cross 0.545 vs control mrs-nsga2-apportion 0.543: cross larger 12/25 p=0.7109
+  symmetric precision cross 0.545 vs control mrs-weighted 0.513: cross larger 17/25 p=0.0333
+  per family (Y in X / X in Y): arbiter-aurus 0.42/0.56, detector-aurus 0.53/0.68, full-arbiter-aurus 0.57/0.53, gyro-var1 0.49/0.65, gyro-var2 0.51/0.73, humanoid-458 0.44/0.65, humanoid-503 0.36/0.37, humanoid-531 0.59/0.74, humanoid-742 0.47/0.60, lift 0.56/0.56, lily02 0.49/0.62, lily11 0.40/0.63, lily15 0.52/0.62, lily16 0.62/0.44, load-balancer-aurus 0.40/0.47, ltl2dba-r-2 0.58/0.70, ltl2dba-theta-2 0.45/0.61, ltl2dba27 0.53/0.75, minepump 0.42/0.57, pcar-v2-888 0.50/0.69, prioritized-arbiter-aurus 0.34/0.51, rg1 0.40/0.62, rg2 0.57/0.66, round-robin-arbiter-aurus 0.34/0.59, simple-arbiter-aurus 0.50/0.66
+
+== aurus-nsga2-apportion (X) vs aurus (Y): 569 paired runs over 21 families
+  precision: Y inside X's region vs X inside Y's: 0.548 vs 0.448, first larger 14/21 p=0.0967
+  coverage: X's balls hit by Y vs Y's hit by X: 0.329 vs 0.309, first larger 13/21 p=0.2173
+  symmetric precision cross 0.506 vs control aurus-nsga2-apportion 0.585: cross larger 3/20 p=0.0001
+  symmetric precision cross 0.498 vs control aurus 0.589: cross larger 3/21 p=0.0003
+  per family (Y in X / X in Y): arbiter-aurus 0.42/0.49, detector-aurus 0.62/0.51, gyro-var1 0.49/0.54, gyro-var2 0.51/0.61, humanoid-458 0.60/0.42, humanoid-742 0.51/0.19, lift 0.87/0.18, lily02 0.62/0.52, lily11 0.53/0.41, lily15 0.61/0.35, lily16 0.40/0.30, load-balancer-aurus 0.20/0.75, ltl2dba-r-2 0.68/0.39, ltl2dba-theta-2 0.51/0.45, ltl2dba27 0.64/0.57, minepump 0.62/0.51, pcar-v2-888 1.00/0.05, rg1 0.43/0.53, rg2 0.66/0.73, round-robin-arbiter-aurus 0.23/0.60, simple-arbiter-aurus 0.38/0.32

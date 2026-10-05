@@ -1,0 +1,28 @@
+
+== mrs-nsga2-apportion (X) vs aurus (Y): 580 paired runs over 21 families
+  precision: Y inside X's region vs X inside Y's: 0.801 vs 0.658, first larger 17/21 p=0.0126
+  coverage: X's balls hit by Y vs Y's hit by X: 0.614 vs 0.570, first larger 15/21 p=0.0764
+  symmetric precision cross 0.729 vs control mrs-nsga2-apportion 0.806: cross larger 4/21 p=0.0001
+  symmetric precision cross 0.729 vs control aurus 0.855: cross larger 2/21 p=0.0000
+  per family (Y in X / X in Y): arbiter-aurus 0.70/0.67, detector-aurus 0.89/0.84, gyro-var1 0.80/0.62, gyro-var2 0.69/0.78, humanoid-458 0.82/0.63, humanoid-742 0.69/0.25, lift 0.96/0.26, lily02 0.91/0.86, lily11 0.75/0.60, lily15 0.91/0.77, lily16 0.94/0.62, load-balancer-aurus 0.40/0.88, ltl2dba-r-2 0.89/0.60, ltl2dba-theta-2 0.73/0.73, ltl2dba27 0.91/0.82, minepump 0.84/0.78, pcar-v2-888 1.00/0.00, rg1 0.83/0.79, rg2 0.91/0.89, round-robin-arbiter-aurus 0.49/0.80, simple-arbiter-aurus 0.76/0.60
+
+== mrs-nsga2-apportion (X) vs aurus-nsga2-apportion (Y): 620 paired runs over 23 families
+  precision: Y inside X's region vs X inside Y's: 0.871 vs 0.852, first larger 16/22 p=0.1134
+  coverage: X's balls hit by Y vs Y's hit by X: 0.902 vs 0.886, first larger 16/22 p=0.0913
+  symmetric precision cross 0.862 vs control mrs-nsga2-apportion 0.804: cross larger 20/23 p=0.0003
+  symmetric precision cross 0.862 vs control aurus-nsga2-apportion 0.819: cross larger 20/23 p=0.0010
+  per family (Y in X / X in Y): arbiter-aurus 0.84/0.82, detector-aurus 0.93/0.90, full-arbiter-aurus 0.84/0.83, gyro-var1 0.85/0.80, gyro-var2 0.84/0.81, humanoid-458 0.82/0.73, humanoid-531 0.89/0.88, humanoid-742 0.72/0.80, lift 0.79/0.83, lily02 0.90/0.86, lily11 0.85/0.83, lily15 0.90/0.93, load-balancer-aurus 0.91/0.71, ltl2dba-r-2 0.93/0.93, ltl2dba-theta-2 0.90/0.90, ltl2dba27 0.92/0.92, minepump 0.89/0.90, pcar-v2-888 0.82/0.74, prioritized-arbiter-aurus 1.00/1.00, rg1 0.83/0.89, rg2 0.94/0.91, round-robin-arbiter-aurus 0.82/0.82, simple-arbiter-aurus 0.90/0.86
+
+== mrs-nsga2-apportion (X) vs mrs-weighted (Y): 724 paired runs over 25 families
+  precision: Y inside X's region vs X inside Y's: 0.733 vs 0.847, first larger 2/25 p=0.0000
+  coverage: X's balls hit by Y vs Y's hit by X: 0.678 vs 0.746, first larger 5/25 p=0.0003
+  symmetric precision cross 0.790 vs control mrs-nsga2-apportion 0.794: cross larger 9/25 p=0.2992
+  symmetric precision cross 0.790 vs control mrs-weighted 0.784: cross larger 13/25 p=0.7318
+  per family (Y in X / X in Y): arbiter-aurus 0.71/0.80, detector-aurus 0.79/0.85, full-arbiter-aurus 0.81/0.96, gyro-var1 0.68/0.88, gyro-var2 0.63/0.89, humanoid-458 0.68/0.84, humanoid-503 0.59/0.65, humanoid-531 0.78/0.88, humanoid-742 0.70/0.74, lift 0.75/0.74, lily02 0.86/0.90, lily11 0.60/0.86, lily15 0.83/0.87, lily16 0.80/0.75, load-balancer-aurus 0.68/0.79, ltl2dba-r-2 0.78/0.90, ltl2dba-theta-2 0.75/0.83, ltl2dba27 0.79/0.99, minepump 0.73/0.84, pcar-v2-888 0.72/0.88, prioritized-arbiter-aurus 0.66/0.82, rg1 0.71/0.87, rg2 0.90/0.93, round-robin-arbiter-aurus 0.60/0.84, simple-arbiter-aurus 0.80/0.89
+
+== aurus-nsga2-apportion (X) vs aurus (Y): 538 paired runs over 20 families
+  precision: Y inside X's region vs X inside Y's: 0.789 vs 0.692, first larger 15/20 p=0.1351
+  coverage: X's balls hit by Y vs Y's hit by X: 0.667 vs 0.649, first larger 11/20 p=0.5728
+  symmetric precision cross 0.740 vs control aurus-nsga2-apportion 0.813: cross larger 5/20 p=0.0017
+  symmetric precision cross 0.740 vs control aurus 0.863: cross larger 2/20 p=0.0001
+  per family (Y in X / X in Y): arbiter-aurus 0.78/0.69, detector-aurus 0.92/0.87, gyro-var1 0.72/0.72, gyro-var2 0.63/0.79, humanoid-458 0.77/0.72, humanoid-742 0.80/0.26, lift 1.00/0.27, lily02 0.86/0.84, lily11 0.73/0.62, lily15 0.93/0.81, load-balancer-aurus 0.34/0.95, ltl2dba-r-2 0.91/0.61, ltl2dba-theta-2 0.79/0.67, ltl2dba27 0.92/0.87, minepump 0.82/0.80, pcar-v2-888 1.00/0.06, rg1 0.77/0.90, rg2 0.90/0.95, round-robin-arbiter-aurus 0.49/0.84, simple-arbiter-aurus 0.69/0.61
