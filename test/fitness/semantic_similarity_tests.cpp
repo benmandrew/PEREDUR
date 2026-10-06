@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstddef>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -7,6 +8,7 @@
 
 #include "config.hpp"
 #include "fitness/semantic_similarity.hpp"
+#include "fitness/syntactic_similarity.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
 #include "test_registry.hpp"
@@ -375,6 +377,102 @@ TEST(test_semantic_similarity_terms_are_empty_when_nothing_differs) {
                .empty(),
            "semantic-similarity: identical specifications should yield no "
            "terms, which the fold reads as a perfect match");
+}
+
+// --- keyword placement ---
+
+Config semantic_keywords(double trace_weight, std::size_t bound) {
+    Config cfg;
+    cfg.keyword_similarity = KeywordSimilarity::Semantic;
+    cfg.semantic_trace_weight = trace_weight;
+    cfg.default_model_counting_bound = bound;
+    return cfg;
+}
+
+// Slot 0 unchanged, slot 1 differs in timing and condition type, slot 2 in its
+// response alone, so the score averages two changed pairs. Every slot within a
+// side is distinct, because the constructor drops a repeated requirement.
+struct KeywordFixture {
+    Specification m_original;
+    Specification m_moved;
+    double m_keyword_mean = 0.0;
+};
+
+KeywordFixture keyword_fixture() {
+    const Requirement same{Formula("P"), Formula("Q"), timing::immediately()};
+    const Requirement timed(Formula("P"), Formula("Q"), timing::within_ticks(3),
+                            ConditionType::Continual);
+    const Requirement retimed(Formula("P"), Formula("Q"),
+                              timing::within_ticks(4), ConditionType::Trigger);
+    const Requirement narrow{Formula("P"), Formula("Q"), timing::always()};
+    const Requirement wider{Formula("P"), Formula("P|Q"), timing::always()};
+    KeywordFixture fixture{
+        Specification({}, {same, timed, narrow}, {"P"}, {"Q"}),
+        Specification({}, {same, retimed, wider}, {"P"}, {"Q"}),
+        0.0,
+    };
+    fixture.m_keyword_mean = (keyword_order_similarity(timed, retimed) +
+                              keyword_order_similarity(narrow, wider)) /
+                             2.0;
+    return fixture;
+}
+
+TEST(test_keyword_similarity_trace_weight_one_is_the_trace_score) {
+    const KeywordFixture fixture = keyword_fixture();
+    const Config cfg = semantic_keywords(1.0, 5);
+    const double trace_only = semantic_similarity(
+        fixture.m_original, fixture.m_moved, 5, cfg.similarity_metric);
+    expect(semantic_similarity(fixture.m_original, fixture.m_moved, cfg) ==
+               trace_only,
+           "keyword-similarity: at w = 1 the semantic score is the trace "
+           "count alone");
+    expect(semantic_similarity(fixture.m_original, fixture.m_moved,
+                               semantic_keywords(0.3, 5)) != trace_only,
+           "keyword-similarity: below w = 1 the keyword orders move the score");
+    Config syntactic_mode = cfg;
+    syntactic_mode.keyword_similarity = KeywordSimilarity::Syntactic;
+    syntactic_mode.semantic_trace_weight = 0.0;
+    expect(semantic_similarity(fixture.m_original, fixture.m_moved,
+                               syntactic_mode) == trace_only,
+           "keyword-similarity: syntactic mode ignores the weight and scores "
+           "the trace count alone");
+}
+
+TEST(test_keyword_similarity_trace_weight_zero_is_the_keyword_mean) {
+    const KeywordFixture fixture = keyword_fixture();
+    const double at_five = semantic_similarity(
+        fixture.m_original, fixture.m_moved, semantic_keywords(0.0, 5));
+    const double at_twenty = semantic_similarity(
+        fixture.m_original, fixture.m_moved, semantic_keywords(0.0, 20));
+    expect(std::fabs(at_five - fixture.m_keyword_mean) < 1e-12,
+           "keyword-similarity: at w = 0 the score is the mean of the "
+           "keyword orders over the changed pairs");
+    expect(at_five == at_twenty,
+           "keyword-similarity: at w = 0 nothing is counted, so the bound "
+           "cannot move the score");
+}
+
+TEST(test_keyword_similarity_trace_weight_half_averages_the_two) {
+    const KeywordFixture fixture = keyword_fixture();
+    const Config cfg = semantic_keywords(0.5, 5);
+    const double trace_only = semantic_similarity(
+        fixture.m_original, fixture.m_moved, 5, cfg.similarity_metric);
+    const double mixed =
+        semantic_similarity(fixture.m_original, fixture.m_moved, cfg);
+    expect(std::fabs(mixed - ((trace_only + fixture.m_keyword_mean) / 2.0)) <
+               1e-12,
+           "keyword-similarity: at w = 1/2 the score averages the trace count "
+           "and the keyword orders");
+    const std::vector<std::function<double()>> terms =
+        semantic_similarity_terms(fixture.m_original, fixture.m_moved, 5,
+                                  cfg.similarity_metric, cfg.keyword_similarity,
+                                  cfg.semantic_trace_weight);
+    double total = 0.0;
+    for (const std::function<double()>& term : terms) {
+        total += term();
+    }
+    expect(terms.size() == 2 && std::fabs((total / 2.0) - mixed) < 1e-12,
+           "keyword-similarity: the split scoring path must mix the same way");
 }
 
 }  // namespace

@@ -53,6 +53,13 @@ struct EnumNames<MrsAdmissionOrder> {
 };
 
 template <>
+struct EnumNames<KeywordSimilarity> {
+    static constexpr std::array<std::pair<KeywordSimilarity, const char*>, 2>
+        k_names{{{KeywordSimilarity::Syntactic, "syntactic"},
+                 {KeywordSimilarity::Semantic, "semantic"}}};
+};
+
+template <>
 struct EnumNames<TerminationMode> {
     static constexpr std::array<std::pair<TerminationMode, const char*>, 2>
         k_names{{{TerminationMode::Generations, "generations"},

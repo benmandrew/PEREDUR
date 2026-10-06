@@ -470,4 +470,112 @@ TEST(test_spec_condition_type_similarity_pairs_by_index) {
            "must lower the specification-level score");
 }
 
+// --- keyword placement ---
+
+Config keywords_in(KeywordSimilarity mode) {
+    Config cfg;
+    cfg.keyword_similarity = mode;
+    return cfg;
+}
+
+// The default keeps the order measures in the syntactic objective, so a pair
+// differing only in timing scores exactly what it did before the key existed.
+TEST(test_keyword_similarity_syntactic_is_the_order_measure) {
+    expect(Config{}.keyword_similarity == KeywordSimilarity::Syntactic,
+           "keyword-similarity: the default must stay syntactic, or every "
+           "archived FRETISH config changes meaning");
+    const Requirement strong{Formula("p"), Formula("p"), timing::for_ticks(2)};
+    const Requirement weak{Formula("p"), Formula("p"), timing::for_ticks(1)};
+    const double expected = (4.0 + (1.53 / 1.78)) / 5.0;
+    expect(std::fabs(syntactic_similarity(strong, weak, Config{}) - expected) <
+                   1e-9 &&
+               std::fabs(syntactic_similarity(
+                             strong, weak,
+                             keywords_in(KeywordSimilarity::Syntactic)) -
+                         expected) < 1e-9,
+           "keyword-similarity: syntactic mode should score the timing by its "
+           "downset Jaccard, as before");
+    expect(std::fabs(timing_order_similarity(timing::for_ticks(2),
+                                             timing::for_ticks(1)) -
+                     (1.53 / 1.78)) < 1e-9,
+           "keyword-similarity: the exposed order measure is the one the "
+           "syntactic mode reads");
+}
+
+TEST(test_timing_token_similarity_compares_keyword_and_argument) {
+    const auto token = timing_token_similarity;
+    expect(token(timing::always(), timing::always()) == 1.0,
+           "timing-token: the same argument-free keyword scores 1");
+    expect(token(timing::always(), timing::eventually()) == 0.0,
+           "timing-token: two different argument-free keywords score 0");
+    expect(token(timing::within_ticks(5), timing::within_ticks(5)) == 1.0,
+           "timing-token: the same keyword and ticks score 1");
+    expect(token(timing::within_ticks(5), timing::after_ticks(5)) == 0.5,
+           "timing-token: within 5 against after 5 matches the argument only");
+    expect(token(timing::within_ticks(5), timing::within_ticks(6)) == 0.5,
+           "timing-token: within 5 against within 6 matches the keyword only");
+    expect(token(timing::within_ticks(5), timing::always()) == 0.0,
+           "timing-token: a ticked timing against an argument-free one shares "
+           "nothing");
+    expect(token(timing::always(), timing::within_ticks(5)) == 0.0,
+           "timing-token: should be symmetric");
+    const double stops = Formula("s").syntactic_similarity(Formula("t"));
+    expect(std::fabs(
+               token(timing::until(Formula("s")), timing::until(Formula("t"))) -
+               ((1.0 + stops) / 2.0)) < 1e-12,
+           "timing-token: two untils average the keyword match with the stops' "
+           "syntactic similarity");
+    expect(
+        token(timing::until(Formula("s")), timing::before(Formula("s"))) == 0.5,
+        "timing-token: until s against before s matches the stop only");
+    expect(token(timing::until(Formula("s")), timing::within_ticks(5)) == 0.0,
+           "timing-token: a stop against a tick count matches nothing");
+}
+
+TEST(test_scope_and_condition_type_token_similarity) {
+    const Scope in_m{ScopeKind::In, "m"};
+    expect(scope_token_similarity(in_m, in_m) == 1.0,
+           "scope-token: an equal scope scores 1");
+    expect(scope_token_similarity(in_m, Scope{ScopeKind::In, "n"}) == 0.5,
+           "scope-token: the same kind over another mode scores 1/2");
+    expect(scope_token_similarity(in_m, Scope{ScopeKind::NotIn, "m"}) == 0.5,
+           "scope-token: another kind over the same mode scores 1/2, with no "
+           "credit for overlapping regions");
+    expect(scope_token_similarity(Scope{}, in_m) == 0.0,
+           "scope-token: Global against `in m` shares neither kind nor mode");
+    expect(condition_type_token_similarity(ConditionType::Continual,
+                                           ConditionType::Continual) == 1.0,
+           "condition-type-token: equal values score 1");
+    expect(condition_type_token_similarity(ConditionType::Continual,
+                                           ConditionType::Trigger) == 0.0,
+           "condition-type-token: differing values score 0, not the order's "
+           "1/2");
+}
+
+// Under the semantic placement the syntactic objective reads the tokens, at
+// both levels.
+TEST(test_keyword_similarity_semantic_reads_tokens) {
+    const Config semantic = keywords_in(KeywordSimilarity::Semantic);
+    const Requirement within5(Formula("p"), Formula("q"),
+                              timing::within_ticks(5), ConditionType::Continual,
+                              true, false, Scope{ScopeKind::In, "m"});
+    const Requirement within6(Formula("p"), Formula("q"),
+                              timing::within_ticks(6), ConditionType::Trigger,
+                              true, false, Scope{ScopeKind::In, "n"});
+    // trigger 1, response 1, timing 1/2, scope 1/2, condition type 0.
+    expect(std::fabs(syntactic_similarity(within5, within6, semantic) - 0.6) <
+               1e-12,
+           "keyword-similarity: semantic mode should score each keyword as a "
+           "token");
+    const Specification original({}, {within5}, {"p"}, {"q"}, {"m", "n"});
+    const Specification moved({}, {within6}, {"p"}, {"q"}, {"m", "n"});
+    expect(std::fabs(syntactic_similarity(original, moved, semantic) - 0.6) <
+               1e-12,
+           "keyword-similarity: the specification level should read the same "
+           "tokens per slot");
+    expect(
+        std::fabs(syntactic_similarity(original, moved, Config{}) - 0.6) > 1e-6,
+        "keyword-similarity: syntactic mode should not read tokens");
+}
+
 }  // namespace

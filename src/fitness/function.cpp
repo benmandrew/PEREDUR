@@ -32,9 +32,10 @@ struct FretishScorers {
     static std::vector<std::function<double()>> semantic_terms(
         const Specification& spec, const Specification& original,
         const Config& cfg) {
-        return semantic_similarity_terms(spec, original,
-                                         cfg.default_model_counting_bound,
-                                         cfg.similarity_metric);
+        return semantic_similarity_terms(
+            spec, original, cfg.default_model_counting_bound,
+            cfg.similarity_metric, cfg.keyword_similarity,
+            cfg.semantic_trace_weight);
     }
 
     static double status(const Specification& spec, const Config& cfg,

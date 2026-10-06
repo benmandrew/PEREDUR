@@ -29,7 +29,7 @@ using ConfigMember =
                  std::chrono::milliseconds Config::*, SelectionScheme Config::*,
                  TerminationMode Config::*, StatusGrading Config::*,
                  MrsAdmissionOrder Config::*, SimilarityMetric Config::*,
-                 RepairMode Config::*>;
+                 RepairMode Config::*, KeywordSimilarity Config::*>;
 
 struct ConfigKey {
     const char* section;  // dotted, as in "tlsf.mutation"
@@ -44,7 +44,7 @@ struct ConfigKey {
 // more than one. A new key also needs schemas/config-schema.json and
 // example-config.toml; scripts/check_config_schema.py reads this table to hold
 // them to it.
-inline constexpr std::array<ConfigKey, 43> k_config_keys{{
+inline constexpr std::array<ConfigKey, 45> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive},
     {"genetic", "population_size", &Config::population_size,
      KeyCheck::Positive},
@@ -70,6 +70,10 @@ inline constexpr std::array<ConfigKey, 43> k_config_keys{{
     {"fitness", "status_grading", &Config::status_grading, KeyCheck::None},
     {"fitness", "mrs_admission_order", &Config::mrs_admission_order,
      KeyCheck::None},
+    {"fitness", "keyword_similarity", &Config::keyword_similarity,
+     KeyCheck::None},
+    {"fitness", "semantic_trace_weight", &Config::semantic_trace_weight,
+     KeyCheck::Probability},
     {"mutation", "p_trigger", &Config::p_trigger, KeyCheck::Probability},
     {"mutation", "p_response", &Config::p_response, KeyCheck::Probability},
     {"mutation", "p_timing", &Config::p_timing, KeyCheck::Probability},

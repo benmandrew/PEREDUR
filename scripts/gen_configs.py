@@ -193,6 +193,12 @@ DEFAULTS: dict = {
     # is a config-vintage change for every campaign archived before it, none of
     # which could state a key their binary had never heard of.
     "mrs_admission_order": "degree",
+    # FRETISH keyword placement (see config.hpp). Both mirror the C++ defaults
+    # and are emitted into [fitness] only when a sweep overrides them, so every
+    # existing grid stays byte-identical. The default reproduces every run from
+    # before the keys existed, so neither is a config-vintage change.
+    "keyword_similarity": "syntactic",
+    "semantic_trace_weight": 0.5,
     # TLSF-only [tlsf.mutation] split (see config.hpp). Emitted only when a sweep
     # overrides one of them (see make_toml), so the FRETISH and A/B TLSF grids
     # stay byte-identical to the pre-factor output; the mutation-split sweep sets
@@ -317,7 +323,11 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         f'status_grading   = "{d["status_grading"]}"',
     ] if "status_grading" in overrides else []) + ([
         f'mrs_admission_order = "{d["mrs_admission_order"]}"',
-    ] if "mrs_admission_order" in overrides else []) + [
+    ] if "mrs_admission_order" in overrides else []) + ([
+        f'keyword_similarity = "{d["keyword_similarity"]}"',
+    ] if "keyword_similarity" in overrides else []) + ([
+        f"semantic_trace_weight = {_fmt(d['semantic_trace_weight'])}",
+    ] if "semantic_trace_weight" in overrides else []) + [
         "",
         "[mutation]",
         f"p_trigger  = {_fmt(d['p_trigger'])}",

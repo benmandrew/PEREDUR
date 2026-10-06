@@ -78,6 +78,26 @@ enum class StatusGrading : std::uint8_t { Tiered, Mrs, Aurus };
 /// subset queries once.
 enum class MrsAdmissionOrder : std::uint8_t { Spec, Degree };
 
+/// Where the FRETISH keyword fields -- timing, scope and condition type --
+/// are scored for how close a candidate stays to the original.
+///
+/// Syntactic (the default) scores them inside the syntactic objective through
+/// their implication orders: timing by the Jaccard overlap of downsets, scope
+/// by the overlap of the timepoint regions it enforces over (averaged with
+/// whether the mode matches), and condition type by its two-element order.
+///
+/// Semantic moves those order-based measures into the semantic objective,
+/// mixed per requirement pair with the trace-count score as
+/// `w * trace + (1 - w) * keyword` for w = @ref Config::semantic_trace_weight.
+/// The syntactic objective then compares the keywords as tokens only: equal or
+/// not, and for a timing that carries a tick count or a stop formula, whether
+/// that argument matches too. Under it the syntactic objective rests on syntax
+/// alone, and everything that reads meaning into a keyword sits in the
+/// semantic one.
+///
+/// The TLSF path has no keyword fields and ignores the choice.
+enum class KeywordSimilarity : std::uint8_t { Syntactic, Semantic };
+
 /// What ends the search (see @ref Config::termination).
 ///
 /// Generations is PEREDUR's own budget: `Config::generations` rounds, whatever
@@ -163,6 +183,16 @@ struct Config {
     /// vintage" in experiments/README.md, and VINTAGE_KEYS in
     /// scripts/gen_configs.py.
     MrsAdmissionOrder mrs_admission_order = MrsAdmissionOrder::Degree;
+    /// Which objective scores the FRETISH keyword fields (see
+    /// KeywordSimilarity). Syntactic reproduces every run before the key
+    /// existed. Ignored on the TLSF path.
+    KeywordSimilarity keyword_similarity = KeywordSimilarity::Syntactic;
+    /// The weight w of the trace-count score in the per-requirement semantic
+    /// term `w * trace + (1 - w) * keyword`, read only under
+    /// KeywordSimilarity::Semantic. At 1 the term is the trace count alone and
+    /// at 0 the keyword orders alone, and neither computes the side it gives no
+    /// weight. Ignored on the TLSF path.
+    double semantic_trace_weight = 0.5;
     std::size_t default_model_counting_bound = 20;
     SimilarityMetric similarity_metric = SimilarityMetric::Logarithmic;
     bool run_implication_filter = true;

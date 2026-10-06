@@ -15,6 +15,7 @@
 
 #include "fitness/mean_or_perfect.hpp"
 #include "fitness/model_counter.hpp"
+#include "fitness/syntactic_similarity.hpp"
 #include "fitness/transfer_matrix.hpp"
 #include "formula_key.hpp"
 
@@ -200,15 +201,43 @@ double semantic_similarity(const Requirement& requirement,
 double semantic_similarity(const Requirement& requirement,
                            const Requirement& other_requirement,
                            const Config& cfg) {
-    return semantic_similarity(requirement, other_requirement,
-                               cfg.default_model_counting_bound,
-                               cfg.similarity_metric);
+    return semantic_pair_similarity(
+        requirement, other_requirement, cfg.default_model_counting_bound,
+        cfg.similarity_metric, cfg.keyword_similarity,
+        cfg.semantic_trace_weight);
+}
+
+double semantic_pair_similarity(const Requirement& requirement,
+                                const Requirement& other_requirement,
+                                std::size_t step_count, SimilarityMetric metric,
+                                KeywordSimilarity keyword_similarity,
+                                double trace_weight) {
+    if (keyword_similarity == KeywordSimilarity::Syntactic) {
+        return semantic_similarity(requirement, other_requirement, step_count,
+                                   metric);
+    }
+    assert(trace_weight >= 0.0 && trace_weight <= 1.0);
+    // Each side is computed only when it carries weight: at w = 1 no keyword
+    // order is read, and at w = 0 no trace is counted, so a pure-keyword arm
+    // pays for no model counting.
+    double score = 0.0;
+    if (trace_weight > 0.0) {
+        score +=
+            trace_weight * semantic_similarity(requirement, other_requirement,
+                                               step_count, metric);
+    }
+    if (trace_weight < 1.0) {
+        score += (1.0 - trace_weight) *
+                 keyword_order_similarity(requirement, other_requirement);
+    }
+    return score;
 }
 
 std::vector<std::function<double()>> semantic_similarity_terms(
     const Specification& specification,
     const Specification& other_specification, std::size_t step_count,
-    SimilarityMetric metric) {
+    SimilarityMetric metric, KeywordSimilarity keyword_similarity,
+    double trace_weight) {
     assert(!specification.m_assumptions.empty() ||
            !specification.m_guarantees.empty());
     assert(!other_specification.m_assumptions.empty() ||
@@ -227,9 +256,9 @@ std::vector<std::function<double()>> semantic_similarity_terms(
     // lockstep to reqs1.end() (as before) would run it past reqs2.end()
     // whenever reqs1 is longer, which is undefined behaviour once NDEBUG
     // disables the asserts that used to guard it.
-    const auto collect = [&terms, step_count, metric](
-                             const std::vector<Requirement>& reqs1,
-                             const std::vector<Requirement>& reqs2) {
+    const auto collect = [&terms, step_count, metric, keyword_similarity,
+                          trace_weight](const std::vector<Requirement>& reqs1,
+                                        const std::vector<Requirement>& reqs2) {
         const std::size_t common = std::min(reqs1.size(), reqs2.size());
         for (std::size_t i = 0; i < common; ++i) {
             if (reqs1[i] == reqs2[i]) {
@@ -245,8 +274,11 @@ std::vector<std::function<double()>> semantic_similarity_terms(
                 continue;
             }
             terms.emplace_back([&first = reqs1[i], &second = reqs2[i],
-                                step_count, metric] {
-                return semantic_similarity(first, second, step_count, metric);
+                                step_count, metric, keyword_similarity,
+                                trace_weight] {
+                return semantic_pair_similarity(first, second, step_count,
+                                                metric, keyword_similarity,
+                                                trace_weight);
             });
         }
     };
@@ -257,10 +289,13 @@ std::vector<std::function<double()>> semantic_similarity_terms(
 
 double semantic_similarity(const Specification& specification,
                            const Specification& other_specification,
-                           std::size_t step_count, SimilarityMetric metric) {
+                           std::size_t step_count, SimilarityMetric metric,
+                           KeywordSimilarity keyword_similarity,
+                           double trace_weight) {
     const std::vector<std::function<double()>> terms =
         semantic_similarity_terms(specification, other_specification,
-                                  step_count, metric);
+                                  step_count, metric, keyword_similarity,
+                                  trace_weight);
     std::vector<double> values;
     values.reserve(terms.size());
     for (const std::function<double()>& term : terms) {
@@ -274,5 +309,6 @@ double semantic_similarity(const Specification& specification,
                            const Config& cfg) {
     return semantic_similarity(specification, other_specification,
                                cfg.default_model_counting_bound,
-                               cfg.similarity_metric);
+                               cfg.similarity_metric, cfg.keyword_similarity,
+                               cfg.semantic_trace_weight);
 }

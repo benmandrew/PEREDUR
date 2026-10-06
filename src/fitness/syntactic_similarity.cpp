@@ -195,9 +195,11 @@ double stop_timing_similarity(const Timing& tim, const Timing& tim_other) {
     return 0.0;
 }
 
+}  // namespace
+
 // Jaccard similarity on downward closures:
 //   synSim_time(tim, tim') = μ(↓tim ∩ ↓tim') / μ(↓tim ∪ ↓tim')
-double timing_syntactic_similarity(const Timing& tim, const Timing& tim_other) {
+double timing_order_similarity(const Timing& tim, const Timing& tim_other) {
     if (timing_stop(tim) != nullptr || timing_stop(tim_other) != nullptr) {
         return stop_timing_similarity(tim, tim_other);
     }
@@ -219,8 +221,7 @@ double timing_syntactic_similarity(const Timing& tim, const Timing& tim_other) {
 // special-case either. So down-Continual is both values
 // and down-Trigger is itself alone, giving 1/2 for a pair that differs and 1
 // for a pair that agrees. Nothing is chosen here: the order fixes both values.
-double condition_type_syntactic_similarity(ConditionType lhs,
-                                           ConditionType rhs) {
+double condition_type_order_similarity(ConditionType lhs, ConditionType rhs) {
     return lhs == rhs ? 1.0 : 0.5;
 }
 
@@ -237,6 +238,8 @@ double condition_type_syntactic_similarity(ConditionType lhs,
 // boundary relaxes a bounded obligation and tightens an unbounded one, so it is
 // a property of the scope *and* the timing. A similarity between two scopes has
 // to be a property of the scopes alone, and their regions are exactly that.
+namespace {
+
 enum ScopeRegion : std::uint8_t {
     k_region_before = 1U << 0U,   // before the mode first holds
     k_region_in = 1U << 1U,       // where the mode holds
@@ -303,14 +306,139 @@ double region_similarity(const Scope& lhs, const Scope& rhs) {
            static_cast<double>(union_size);
 }
 
+}  // namespace
+
 // Jaccard on regions, averaged with whether the two scopes are relative to the
 // same mode. The mode is an opaque atom, so it is compared for equality rather
 // than for structure — there is nothing inside it to be partly similar to. Two
 // Global scopes name no mode and agree trivially, which is what makes this
 // read 1.0 across a specification that uses no scopes.
-double scope_syntactic_similarity(const Scope& lhs, const Scope& rhs) {
+double scope_order_similarity(const Scope& lhs, const Scope& rhs) {
     const double same_mode = lhs.m_mode == rhs.m_mode ? 1.0 : 0.0;
     return (region_similarity(lhs, rhs) + same_mode) / 2.0;
+}
+
+double keyword_order_similarity(const Requirement& requirement,
+                                const Requirement& other_requirement) {
+    return (timing_order_similarity(requirement.m_timing,
+                                    other_requirement.m_timing) +
+            scope_order_similarity(requirement.m_scope,
+                                   other_requirement.m_scope) +
+            condition_type_order_similarity(
+                requirement.m_condition_type,
+                other_requirement.m_condition_type)) /
+           3.0;
+}
+
+// --- Keyword tokens --------------------------------------------------------
+//
+// The pure-syntax counterparts of the order measures above, scored under
+// KeywordSimilarity::Semantic, where the orders move to the semantic objective
+// and the syntactic one may read nothing into a keyword but its spelling.
+
+namespace {
+
+// What a timing carries besides its keyword: nothing, a tick count, or a stop.
+using TimingArgument =
+    std::variant<std::monostate, std::size_t, const Formula*>;
+
+TimingArgument timing_argument(const Timing& tim) {
+    return std::visit(
+        [](const auto& val) -> TimingArgument {
+            using T = std::decay_t<decltype(val)>;
+            constexpr bool carries_ticks =
+                std::is_same_v<T, timing::WithinTicks> ||
+                std::is_same_v<T, timing::ForTicks> ||
+                std::is_same_v<T, timing::AfterTicks>;
+            constexpr bool bare = std::is_same_v<T, timing::Immediately> ||
+                                  std::is_same_v<T, timing::NextTimepoint> ||
+                                  std::is_same_v<T, timing::Eventually> ||
+                                  std::is_same_v<T, timing::Always>;
+            if constexpr (carries_ticks) {
+                return val.m_ticks;
+            } else if constexpr (timing::k_carries_stop<T>) {
+                return &val.m_stop;
+            } else if constexpr (bare) {
+                return std::monostate{};
+            } else {
+                static_assert(timing::k_unhandled_timing<T>);
+            }
+        },
+        tim);
+}
+
+// Two tick counts match when equal; two stops score their formulas' syntactic
+// similarity; an argument of one kind against another, or against none,
+// matches not at all.
+double argument_similarity(const TimingArgument& lhs,
+                           const TimingArgument& rhs) {
+    return std::visit(
+        [](const auto& left, const auto& right) -> double {
+            using L = std::decay_t<decltype(left)>;
+            using R = std::decay_t<decltype(right)>;
+            constexpr bool both_ticks = std::is_same_v<L, std::size_t> &&
+                                        std::is_same_v<R, std::size_t>;
+            constexpr bool both_stops = std::is_same_v<L, const Formula*> &&
+                                        std::is_same_v<R, const Formula*>;
+            if constexpr (both_ticks) {
+                return left == right ? 1.0 : 0.0;
+            } else if constexpr (both_stops) {
+                return left->syntactic_similarity(*right);
+            } else {
+                return 0.0;
+            }
+        },
+        lhs, rhs);
+}
+
+}  // namespace
+
+double timing_token_similarity(const Timing& tim, const Timing& tim_other) {
+    const double same_keyword = tim.index() == tim_other.index() ? 1.0 : 0.0;
+    const TimingArgument argument = timing_argument(tim);
+    const TimingArgument argument_other = timing_argument(tim_other);
+    if (std::holds_alternative<std::monostate>(argument) &&
+        std::holds_alternative<std::monostate>(argument_other)) {
+        return same_keyword;
+    }
+    return (same_keyword + argument_similarity(argument, argument_other)) / 2.0;
+}
+
+double scope_token_similarity(const Scope& lhs, const Scope& rhs) {
+    const double same_kind = lhs.m_kind == rhs.m_kind ? 1.0 : 0.0;
+    const double same_mode = lhs.m_mode == rhs.m_mode ? 1.0 : 0.0;
+    return (same_kind + same_mode) / 2.0;
+}
+
+double condition_type_token_similarity(ConditionType lhs, ConditionType rhs) {
+    return lhs == rhs ? 1.0 : 0.0;
+}
+
+namespace {
+
+enum class KeywordField : std::uint8_t { Timing, Scope, ConditionType };
+
+// One keyword term of a requirement pair, by the measure @p mode assigns the
+// syntactic objective: the implication order under Syntactic, the token alone
+// under Semantic.
+double keyword_term(const Requirement& lhs, const Requirement& rhs,
+                    KeywordSimilarity mode, KeywordField field) {
+    const bool tokens = mode == KeywordSimilarity::Semantic;
+    switch (field) {
+        case KeywordField::Timing:
+            return tokens ? timing_token_similarity(lhs.m_timing, rhs.m_timing)
+                          : timing_order_similarity(lhs.m_timing, rhs.m_timing);
+        case KeywordField::Scope:
+            return tokens ? scope_token_similarity(lhs.m_scope, rhs.m_scope)
+                          : scope_order_similarity(lhs.m_scope, rhs.m_scope);
+        case KeywordField::ConditionType:
+            return tokens ? condition_type_token_similarity(
+                                lhs.m_condition_type, rhs.m_condition_type)
+                          : condition_type_order_similarity(
+                                lhs.m_condition_type, rhs.m_condition_type);
+    }
+    assert(false);
+    __builtin_unreachable();
 }
 
 Formula conjoin_field(const Specification& spec, Formula Requirement::* field) {
@@ -347,18 +475,22 @@ Formula conjoin_responses(const Specification& spec) {
     return conjoin_field(spec, &Requirement::m_response);
 }
 
-double average_timing_similarity(const Specification& spec1,
-                                 const Specification& spec2) {
-    // The two specifications need not have the same number of assumptions or
-    // guarantees: the p_add_assumption mutation grows a candidate's assumption
-    // list relative to the original it is scored against. Pair requirements by
-    // index over the counts they share, treat each unmatched surplus
-    // requirement as contributing zero similarity, and normalise by the larger
-    // structure so a size difference lowers the score. This reduces to the
-    // exact per-index average when the counts match. Indexing by spec1's counts
-    // (as before) would read past the end of spec2 whenever spec1 has more
-    // requirements, which is undefined behaviour once NDEBUG disables the
-    // asserts that used to guard it.
+// The per-index average of one keyword term over two specifications. The two
+// need not have the same number of assumptions or guarantees: the
+// p_add_assumption mutation grows a candidate's assumption list relative to the
+// original it is scored against. Pair requirements by index over the counts
+// they share, treat each unmatched surplus requirement as contributing zero
+// similarity, and normalise by the larger structure so a size difference lowers
+// the score. This reduces to the exact per-index average when the counts match.
+// Indexing by spec1's counts (as before) would read past the end of spec2
+// whenever spec1 has more requirements, which is undefined behaviour once
+// NDEBUG disables the asserts that used to guard it.
+//
+// Pairing by index is the only pairing that compares a requirement with what it
+// came from, slot i of a candidate descending from slot i of the original.
+double average_keyword_similarity(const Specification& spec1,
+                                  const Specification& spec2,
+                                  KeywordSimilarity mode, KeywordField field) {
     const std::size_t common_assumptions =
         std::min(spec1.m_assumptions.size(), spec2.m_assumptions.size());
     const std::size_t common_guarantees =
@@ -369,15 +501,15 @@ double average_timing_similarity(const Specification& spec1,
     if (total == 0) {
         return 0.0;
     }
-    // A slot removed on one side alone has no timing to compare against, and
+    // A slot removed on one side alone has no keyword to compare against, and
     // removal is the largest change that slot can undergo, so it scores zero.
     // Removed on both sides, the slot matches.
-    const auto pair_similarity = [](const Requirement& lhs,
-                                    const Requirement& rhs) {
+    const auto pair_similarity = [mode, field](const Requirement& lhs,
+                                               const Requirement& rhs) {
         if (lhs.m_removed || rhs.m_removed) {
             return lhs.m_removed && rhs.m_removed ? 1.0 : 0.0;
         }
-        return timing_syntactic_similarity(lhs.m_timing, rhs.m_timing);
+        return keyword_term(lhs, rhs, mode, field);
     };
     double sum = 0.0;
     for (std::size_t i = 0; i < common_assumptions; ++i) {
@@ -391,84 +523,20 @@ double average_timing_similarity(const Specification& spec1,
 
 }  // namespace
 
-// The scope counterpart of average_timing_similarity, pairing by index on the
-// same terms and for the same reason: slot i of a candidate descends from slot
-// i of the original, so that is the only pairing that compares a requirement
-// with what it came from.
-double average_scope_similarity(const Specification& spec1,
-                                const Specification& spec2) {
-    const std::size_t common_assumptions =
-        std::min(spec1.m_assumptions.size(), spec2.m_assumptions.size());
-    const std::size_t common_guarantees =
-        std::min(spec1.m_guarantees.size(), spec2.m_guarantees.size());
-    const std::size_t total =
-        std::max(spec1.m_assumptions.size(), spec2.m_assumptions.size()) +
-        std::max(spec1.m_guarantees.size(), spec2.m_guarantees.size());
-    if (total == 0) {
-        return 0.0;
-    }
-    const auto pair_similarity = [](const Requirement& lhs,
-                                    const Requirement& rhs) {
-        if (lhs.m_removed || rhs.m_removed) {
-            return lhs.m_removed && rhs.m_removed ? 1.0 : 0.0;
-        }
-        return scope_syntactic_similarity(lhs.m_scope, rhs.m_scope);
-    };
-    double sum = 0.0;
-    for (std::size_t i = 0; i < common_assumptions; ++i) {
-        sum += pair_similarity(spec1.m_assumptions[i], spec2.m_assumptions[i]);
-    }
-    for (std::size_t i = 0; i < common_guarantees; ++i) {
-        sum += pair_similarity(spec1.m_guarantees[i], spec2.m_guarantees[i]);
-    }
-    return sum / static_cast<double>(total);
-}
-
-// The condition-type counterpart of average_timing_similarity, pairing by index
-// on the same terms and for the same reason.
-double average_condition_type_similarity(const Specification& spec1,
-                                         const Specification& spec2) {
-    const std::size_t common_assumptions =
-        std::min(spec1.m_assumptions.size(), spec2.m_assumptions.size());
-    const std::size_t common_guarantees =
-        std::min(spec1.m_guarantees.size(), spec2.m_guarantees.size());
-    const std::size_t total =
-        std::max(spec1.m_assumptions.size(), spec2.m_assumptions.size()) +
-        std::max(spec1.m_guarantees.size(), spec2.m_guarantees.size());
-    if (total == 0) {
-        return 0.0;
-    }
-    const auto pair_similarity = [](const Requirement& lhs,
-                                    const Requirement& rhs) {
-        if (lhs.m_removed || rhs.m_removed) {
-            return lhs.m_removed && rhs.m_removed ? 1.0 : 0.0;
-        }
-        return condition_type_syntactic_similarity(lhs.m_condition_type,
-                                                   rhs.m_condition_type);
-    };
-    double sum = 0.0;
-    for (std::size_t i = 0; i < common_assumptions; ++i) {
-        sum += pair_similarity(spec1.m_assumptions[i], spec2.m_assumptions[i]);
-    }
-    for (std::size_t i = 0; i < common_guarantees; ++i) {
-        sum += pair_similarity(spec1.m_guarantees[i], spec2.m_guarantees[i]);
-    }
-    return sum / static_cast<double>(total);
-}
-
 double syntactic_similarity(const Requirement& requirement,
                             const Requirement& other_requirement,
-                            [[maybe_unused]] const Config& cfg) {
+                            const Config& cfg) {
     double condition_similarity = requirement.m_condition.syntactic_similarity(
         other_requirement.m_condition);
     double response_similarity = requirement.m_response.syntactic_similarity(
         other_requirement.m_response);
-    double timing_similarity = timing_syntactic_similarity(
-        requirement.m_timing, other_requirement.m_timing);
-    double scope_similarity = scope_syntactic_similarity(
-        requirement.m_scope, other_requirement.m_scope);
-    double condition_type_similarity = condition_type_syntactic_similarity(
-        requirement.m_condition_type, other_requirement.m_condition_type);
+    const KeywordSimilarity mode = cfg.keyword_similarity;
+    double timing_similarity = keyword_term(requirement, other_requirement,
+                                            mode, KeywordField::Timing);
+    double scope_similarity =
+        keyword_term(requirement, other_requirement, mode, KeywordField::Scope);
+    double condition_type_similarity = keyword_term(
+        requirement, other_requirement, mode, KeywordField::ConditionType);
     return (condition_similarity + response_similarity + timing_similarity +
             scope_similarity + condition_type_similarity) /
            5.0;
@@ -476,7 +544,7 @@ double syntactic_similarity(const Requirement& requirement,
 
 double syntactic_similarity(const Specification& specification,
                             const Specification& other_specification,
-                            [[maybe_unused]] const Config& cfg) {
+                            const Config& cfg) {
     PEREDUR_PROFILE_SCOPE("fitness/syntactic_similarity_spec");
     assert((!specification.m_assumptions.empty() ||
             !specification.m_guarantees.empty()) &&
@@ -488,12 +556,13 @@ double syntactic_similarity(const Specification& specification,
     const double response_similarity =
         conjoin_responses(specification)
             .syntactic_similarity(conjoin_responses(other_specification));
-    double timing_similarity =
-        average_timing_similarity(specification, other_specification);
-    double scope_similarity =
-        average_scope_similarity(specification, other_specification);
-    double condition_type_similarity =
-        average_condition_type_similarity(specification, other_specification);
+    const KeywordSimilarity mode = cfg.keyword_similarity;
+    double timing_similarity = average_keyword_similarity(
+        specification, other_specification, mode, KeywordField::Timing);
+    double scope_similarity = average_keyword_similarity(
+        specification, other_specification, mode, KeywordField::Scope);
+    double condition_type_similarity = average_keyword_similarity(
+        specification, other_specification, mode, KeywordField::ConditionType);
     return (trigger_similarity + response_similarity + timing_similarity +
             scope_similarity + condition_type_similarity) /
            5.0;

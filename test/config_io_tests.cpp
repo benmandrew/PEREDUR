@@ -145,6 +145,23 @@ TEST(test_config_io_out_of_range_probability_throws) {
         "config_io: out-of-range probability should throw", "p_trigger");
 }
 
+TEST(test_config_io_semantic_trace_weight) {
+    expect(Config{}.semantic_trace_weight == 0.5,
+           "config_io: fitness.semantic_trace_weight should default to 0.5");
+    const Config cfg = config_from_toml_string(
+        "[fitness]\nkeyword_similarity = \"semantic\"\n"
+        "semantic_trace_weight = 0.25\n");
+    expect(cfg.keyword_similarity == KeywordSimilarity::Semantic &&
+               cfg.semantic_trace_weight == 0.25,
+           "config_io: fitness.semantic_trace_weight should be parsed");
+    expect_throws(
+        [&] {
+            config_from_toml_string("[fitness]\nsemantic_trace_weight = 1.5\n");
+        },
+        "config_io: an out-of-range semantic_trace_weight should throw",
+        "semantic_trace_weight");
+}
+
 TEST(test_config_io_elitism_rate_parsed) {
     const Config cfg = config_from_toml_string(
         "[genetic]\nselection_rate = 0.6\nelitism_rate = 0.2\n");
@@ -237,6 +254,17 @@ TEST(test_config_io_enum_keys) {
                                          {"degree", MrsAdmissionOrder::Degree}},
                                         "rotate",
                                         false});
+    // Pinned because the default is what every archived config inherits, and
+    // Syntactic is the placement every run before the key used.
+    expect_enum_key<KeywordSimilarity>(
+        {"fitness",
+         "keyword_similarity",
+         &Config::keyword_similarity,
+         KeywordSimilarity::Syntactic,
+         {{"syntactic", KeywordSimilarity::Syntactic},
+          {"semantic", KeywordSimilarity::Semantic}},
+         "lexical",
+         false});
     expect_enum_key<SimilarityMetric>(
         {"model_counting",
          "metric",
@@ -383,6 +411,8 @@ accumulate_repairs = true
 weight_syntactic = 0.3
 weight_semantic  = 0.4
 weight_status    = 0.6
+keyword_similarity    = "semantic"
+semantic_trace_weight = 0.25
 
 [mutation]
 p_trigger                = 0.3

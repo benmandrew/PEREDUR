@@ -48,6 +48,12 @@ Three components are combined into each candidate's score, and realisability sta
    * - ``fitness.status_grading``
      - ``"mrs"``
      - Scale the status component grades on: ``"tiered"``, ``"mrs"`` or ``"aurus"``
+   * - ``fitness.keyword_similarity``
+     - ``"syntactic"``
+     - Objective that scores the FRETISH timing, scope and condition type: ``"syntactic"`` or ``"semantic"``
+   * - ``fitness.semantic_trace_weight``
+     - 0.5
+     - Weight w of the trace count in the ``"semantic"`` mix ``w * trace + (1 - w) * keyword``
 
 ``fitness.status_grading`` decides how finely the status component grades the region below realizability. ``"tiered"`` is the three-point scale above. ``"mrs"`` replaces its middle tier with the greedy maximal-realizable-subset fraction: the guarantee side is split into parts, and the score is the fraction of them that can be kept while the accumulated subset stays realizable against the full, unchanged environment side. Both keep 1.0 meaning realizable and well-separated.
 
@@ -62,6 +68,8 @@ The divergence to know about is that ``"aurus"`` does **not** fold well-separati
 Greedy returns a maximal subset rather than a maximum one, so the order decides the score. Index order is measurably biased by one structure, a single early part conflicting with the rest of the guarantee side. On ``detector`` index order keeps 1 part of 7, where deferring that part keeps 6. Cost turns on the order being the *same* for every candidate in a run, which is what seed reproducibility and the memoised realizability checker both need. Measured over populations of mutants across six TLSF specifications, every fixed order costs 1.02x to 1.07x index order's ``ltlsynt`` execs, against 1.48x for a fresh order per candidate.
 
 ``"degree"`` scores 0.587 against index order's 0.529 at 1.02x the execs, and scored no lower than index order on any of the six specifications. Choosing it costs ``n(n-1)/2 + n`` subset queries once, before the search starts. That is 28 on a 7-part specification and 136 on a 16-part one, against a run that scores tens of thousands of candidates. ``"degree"`` is the default from that measurement on. That is weaker evidence than the paired campaign that settled ``status_grading``, since everything measured so far scores mutants in isolation with no selection pressure, so nothing yet says what the finer gradient does to yield or ``implies_ideal``. A campaign reading both is still owed. The measurements are TLSF-path only. The FRETISH path accepts the same key, where its parts are whole guarantees.
+
+``fitness.keyword_similarity`` decides where a FRETISH requirement's keyword fields are scored. Under ``"syntactic"`` (the default) the syntactic component compares them through their implication orders: the timing by the overlap of its downset, the scope by the overlap of the timepoint regions it covers averaged with whether the modes match, and the condition type by its two-element order. Under ``"semantic"`` those order measures move into the semantic component. Each changed requirement pair then scores ``w * trace + (1 - w) * keyword``, where ``trace`` is the trace-count score, ``keyword`` is the mean of the three order measures and ``w`` is ``fitness.semantic_trace_weight``. The syntactic component keeps the three fields but compares them as tokens only: equal or not, and for a timing with a tick count or a stop formula, whether that argument matches too. The TLSF path has no keyword fields and ignores both keys.
 
 Semantic similarity is the expensive one: it counts the satisfying traces of a candidate up to ``model_counting.default_bound`` (default 20) using Ganak over the transition matrices of SPOT-generated automata. Raising the bound sharpens the measure and costs time.
 

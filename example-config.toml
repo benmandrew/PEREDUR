@@ -72,6 +72,14 @@ status_grading   = "mrs"  # or "tiered", "aurus"
 # conflict with most others, costing one pairwise pass over the input before the
 # search starts; "spec" is the specification's own index order.
 mrs_admission_order = "degree"  # or "spec"
+# FRETISH only. "syntactic" scores the timing, scope and condition-type
+# keywords in the syntactic objective through their implication orders;
+# "semantic" moves those order measures into the semantic objective, mixed per
+# requirement with the trace count as w * trace + (1 - w) * keyword, and leaves
+# the syntactic objective comparing keywords as tokens only.
+keyword_similarity    = "syntactic"  # or "semantic"
+# w above, read only under "semantic".
+semantic_trace_weight = 0.5
 
 [mutation]
 # Per-requirement probabilities of rewriting each part of a FRETISH requirement.
