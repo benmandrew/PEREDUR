@@ -538,6 +538,32 @@ the scorer's command line whatever the declaration said, so the manifest the
 host writes records the declaration's values. `hosts` narrows a score phase
 as it narrows a run phase, and each host scores its own seeds alone.
 
+A `compare` phase runs `compare` over a pair list planned in advance, through
+`compare_pairs.py`. It is not seed-split: each host runs the pair file its own
+`pairs` path names, so it refuses `profile`, `sweeps`, `specs` and every other
+key not shown here. `{host}` in `pairs` or `out` becomes the host's name, and
+either path may be absolute or relative to the checkout:
+
+```toml
+hosts = { av1 = "", av2 = "", av3 = "" }   # "" = no seeds on that host
+
+[[phases]]
+name = "subsumption"                      # default: compare
+kind = "compare"
+pairs = "experiments/rq2/pairs-{host}.csv"   # id,a_path,b_path
+out = "experiments/rq2/subsumption-{host}.csv"
+jobs = 28              # pairs in flight
+black_timeout = 300    # compare --timeout, per solver call
+wall_timeout = 700     # outer timeout per pair
+vmem_kb = 8000000      # ulimit -v per pair
+hosts = ["av1", "av3"] # optional; an array of host names, not a seed table
+```
+
+The empty string is accepted only at the campaign level, and only where every
+seeded phase gives that host its own range; a run or score phase that would
+fall back on `""` is refused. The budgets default to `compare_pairs.DEFAULTS`
+and are stated on the command line, as a score phase's are.
+
 A phase's own `hosts` table overrides the campaign-level split for that phase
 alone, and may only narrow it — every host it names must already be declared at
 the top level, since `stage` staged no other one. A host the table omits runs
@@ -604,7 +630,8 @@ is racing. Each launch is appended to `experiments/<name>/launches.jsonl`.
 Neither `start` nor `enqueue` accepts a seed range: both read the split from
 `campaign.toml`, which is the only place it is written down. A score phase
 joins the chain like any other phase, as a `score_campaign.py` command over
-the same seeds, and `start --dry-run` and `tick --dry-run` print it.
+the same seeds, and a compare phase as a `compare_pairs.py` command over that
+host's pair list; `start --dry-run` and `tick --dry-run` print both.
 
 ### Scoring a finished search
 
@@ -639,6 +666,28 @@ budgets and the wall cap are the two campaigns' values: 900 s per `maximal`
 call, 600 s for `compare`, a 4500 s deadline and a cap 900 s past it.
 `PEREDUR_SCORE_CURVES_CMD`, `PEREDUR_BIN_DIR`, `MAXIMAL_BIN` and
 `COMPARE_BIN` override what it runs, for a worktree or a test.
+
+### Comparing planned pairs
+
+```sh
+# What a compare phase runs on av1
+python3 scripts/compare_pairs.py experiments/rq2/pairs-av1.csv \
+    experiments/rq2/subsumption-av1.csv --jobs 28 --black-timeout 300 \
+    --wall-timeout 700 --vmem-kb 8000000 \
+    --manifest experiments/compare-manifests/<campaign>.subsumption.json
+```
+
+One `compare --repairs <a> --ideals <b> --timeout <black>` call per pair, each
+through two temporary directories of one symlink, under `ulimit -v` and
+`timeout <wall>`. It appends `id,relation,rc,secs` per pair, where `relation`
+is `a` relative to `b` (`weaker` means `b` strictly implies `a`), `undecided`
+for a solver or wall timeout, and `error` where no relation was printed. An id
+already in the output is skipped. It exits 0 only when every id in the pair
+list has a row, so a killed or partial pass is retried rather than marked done.
+`compare` and the black and Spot paths default to this checkout's
+`build-release`, which is the build the tick has just verified. A tick refuses
+the phase by name where the host's pair list is missing.
+`PEREDUR_COMPARE_PAIRS_CMD` overrides the command, for a test.
 
 ### The queue
 
@@ -785,6 +834,11 @@ the newest file under it, BINARY is `maximal`'s commit (flagged `*` where the
 gate was overridden), and STATE follows the same three-hour rule with a
 `score_campaign.py` naming that directory in place of a runner naming a
 profile. `--campaign <out>` selects it.
+
+A compare phase is a `compare:<campaign>.<phase>` row, read from its manifest
+under `experiments/compare-manifests/`. ROWS is the output CSV's rows against
+the pair list's length, STALE is the output's age, BINARY is `compare`'s commit,
+and a `compare_pairs.py` naming that manifest counts as running.
 
 An unreachable host prints a row saying so rather than aborting the poll, and
 sets a non-zero exit status, so a wrapper can tell a full poll from a partial
