@@ -152,6 +152,31 @@ double semantic_similarity(const Specification& specification,
                            const Specification& other_specification,
                            const Config& cfg);
 
+/// One requirement pair the specification-level score averages over: slot
+/// @c m_slot of the assumptions (@c m_is_guarantee false) or the guarantees.
+/// The pointers refer into the two specifications passed to
+/// @ref changed_requirement_pairs, which must outlive the pair.
+struct ChangedRequirementPair {
+    bool m_is_guarantee;
+    std::size_t m_slot;
+    const Requirement* m_requirement;
+    const Requirement* m_other_requirement;
+    /// Tombstoned on exactly one side. Such a pair scores 0 without being
+    /// counted, as the largest change a slot admits.
+    bool m_removed;
+};
+
+/// The pairs @ref semantic_similarity_terms scores, in the same order:
+/// assumptions by index, then guarantees, over the count the two sides share.
+/// Identical pairs and surplus slots on either side are left out.
+///
+/// @param specification       The first specification to compare (non-empty)
+/// @param other_specification The second specification to compare (non-empty)
+/// @return                    One entry per changed pair
+std::vector<ChangedRequirementPair> changed_requirement_pairs(
+    const Specification& specification,
+    const Specification& other_specification);
+
 /// The changed requirement pairs of the specification-level score, one callable
 /// per pair, in the order the score sums them: assumptions by index, then
 /// guarantees.

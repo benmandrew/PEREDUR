@@ -689,4 +689,160 @@ TEST_IN("driver_lint_ideals", test_lint_ideals_reports_its_version) {
     expect_reports_version("lint-ideals");
 }
 
+// k_fretish with its first guarantee's window shortened, so exactly one slot
+// pair differs and its trace and keyword terms both fall below 1.
+const char* const k_fretish_retimed = R"({
+  "assumptions": [],
+  "guarantees": [
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "takeoff_roll",
+      "timing": { "type": "ForTicks", "ticks": 3 }
+    },
+    {
+      "condition": "!takeoff_roll",
+      "condition-type": "trigger",
+      "response": "lift_off",
+      "timing": { "type": "AfterTicks", "ticks": 1 }
+    }
+  ],
+  "in_atoms": [],
+  "out_atoms": ["takeoff_roll", "lift_off"]
+}
+)";
+
+std::vector<std::string> tsv_lines(const std::string& text) {
+    std::vector<std::string> lines;
+    std::string line;
+    for (const char character : text) {
+        if (character == '\n') {
+            lines.push_back(line);
+            line.clear();
+        } else {
+            line.push_back(character);
+        }
+    }
+    return lines;
+}
+
+TEST_IN("driver_keyword_terms", test_keyword_terms_prints_the_pair_terms) {
+    const TempDir dir("e2e_keyword_terms");
+    const std::filesystem::path original =
+        write_text(dir.path() / "spec.json", k_fretish);
+    const std::filesystem::path retimed =
+        write_text(dir.path() / "b_retimed.json", k_fretish_retimed);
+    const std::filesystem::path same =
+        write_text(dir.path() / "a_same.json", k_fretish);
+    const std::filesystem::path pairs = dir.path() / "pairs.tsv";
+    const std::filesystem::path specs = dir.path() / "specs.tsv";
+
+    const std::vector<std::string> argv{
+        std::string(PEREDUR_DRIVER_DIR) + "/keyword-terms",
+        "--original",
+        original.string(),
+        "--pairs",
+        pairs.string(),
+        "--specs",
+        specs.string(),
+        "--bound",
+        "5",
+        "--jobs",
+        "2"};
+    const ProcessResult result = execute_and_capture_with_input(
+        argv, retimed.string() + "\n" + same.string() + "\n", k_deadline);
+    expect(!result.m_timed_out && result.m_exit_code == 0,
+           "keyword-terms: scoring two candidates exits zero");
+
+    const std::vector<std::string> pair_lines = tsv_lines(read_text(pairs));
+    expect(pair_lines.size() == 2 &&
+               pair_lines[0] ==
+                   "candidate\tside\tslot\tremoved\ttrace\ttiming_order\t"
+                   "scope_order\tcondition_type_order\tkeyword",
+           "keyword-terms: one header and one row for the one changed slot");
+    expect(pair_lines.size() == 2 &&
+               pair_lines[1].rfind(retimed.string() + "\tG\t0\t0\t", 0) == 0,
+           "keyword-terms: the row names the candidate, side and slot");
+
+    const std::vector<std::string> spec_lines = tsv_lines(read_text(specs));
+    expect(spec_lines.size() == 3 &&
+               spec_lines[0] ==
+                   "candidate\tn_pairs\tsyntactic_order\tsyntactic_token\t"
+                   "restored",
+           "keyword-terms: one header and one row per candidate");
+    expect(spec_lines.size() == 3 &&
+               spec_lines[1] == same.string() + "\t0\t1\t1\t0" &&
+               spec_lines[2].rfind(retimed.string() + "\t1\t", 0) == 0,
+           "keyword-terms: rows sort by candidate, and an unchanged one "
+           "scores 1 on both syntactic measures");
+
+    const DriverRun missing = run_driver(
+        "keyword-terms",
+        {"--original", original.string(), "--pairs", pairs.string()});
+    expect(missing.m_exit_code == 1,
+           "keyword-terms: a missing output path is refused");
+    const DriverRun bad_metric =
+        run_driver("keyword-terms",
+                   {"--original", original.string(), "--pairs", pairs.string(),
+                    "--specs", specs.string(), "--metric", "cubic"});
+    expect(bad_metric.m_exit_code == 1,
+           "keyword-terms: an unknown metric is refused");
+}
+
+// k_fretish with its first guarantee removed, as the archive writes it: the
+// tombstone is dropped rather than kept, so the survivor sits at index 0.
+const char* const k_fretish_first_removed = R"({
+  "assumptions": [],
+  "guarantees": [
+    {
+      "condition": "!takeoff_roll",
+      "condition-type": "trigger",
+      "response": "lift_off",
+      "timing": { "type": "AfterTicks", "ticks": 1 }
+    }
+  ],
+  "in_atoms": [],
+  "out_atoms": ["takeoff_roll", "lift_off"]
+}
+)";
+
+TEST_IN("driver_keyword_terms",
+        test_keyword_terms_restores_a_dropped_tombstone) {
+    // Paired by index, the survivor would be compared with guarantee 0.
+    // Aligned, it is unchanged in slot 1, so the only row is slot 0 as removed.
+    const TempDir dir("e2e_keyword_terms_realign");
+    const std::filesystem::path original =
+        write_text(dir.path() / "spec.json", k_fretish);
+    const std::filesystem::path candidate =
+        write_text(dir.path() / "first_removed.json", k_fretish_first_removed);
+    const std::filesystem::path pairs = dir.path() / "pairs.tsv";
+    const std::filesystem::path specs = dir.path() / "specs.tsv";
+    const std::vector<std::string> argv{
+        std::string(PEREDUR_DRIVER_DIR) + "/keyword-terms",
+        "--original",
+        original.string(),
+        "--pairs",
+        pairs.string(),
+        "--specs",
+        specs.string(),
+        "--bound",
+        "5"};
+    const ProcessResult result = execute_and_capture_with_input(
+        argv, candidate.string() + "\n", k_deadline);
+    expect(!result.m_timed_out && result.m_exit_code == 0,
+           "keyword-terms: a candidate missing a requirement exits zero");
+    const std::vector<std::string> pair_lines = tsv_lines(read_text(pairs));
+    expect(pair_lines.size() == 2 &&
+               pair_lines[1] == candidate.string() + "\tG\t0\t1\t0\t\t\t\t0",
+           "keyword-terms: the removed slot is restored where it was");
+    const std::vector<std::string> spec_lines = tsv_lines(read_text(specs));
+    expect(spec_lines.size() == 2 &&
+               spec_lines[1].substr(spec_lines[1].rfind('\t') + 1) == "1",
+           "keyword-terms: one tombstone is reported as restored");
+}
+
+TEST_IN("driver_keyword_terms", test_keyword_terms_reports_its_version) {
+    expect_reports_version("keyword-terms");
+}
+
 }  // namespace

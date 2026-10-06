@@ -209,6 +209,9 @@ target_link_libraries(compare PRIVATE peredur_fitness)
 add_executable(lint-ideals src/lint_ideals.cpp)
 target_link_libraries(lint-ideals PRIVATE peredur_fitness)
 
+add_executable(keyword-terms src/keyword_terms.cpp)
+target_link_libraries(keyword-terms PRIVATE peredur_fitness)
+
 add_executable(realize src/realize.cpp)
 target_link_libraries(realize PRIVATE peredur_fitness)
 

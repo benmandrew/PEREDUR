@@ -82,6 +82,7 @@ const std::vector<Suite>& suites() {
         suite_named("driver_compare"),
         suite_named("driver_maximal"),
         suite_named("driver_lint_ideals"),
+        suite_named("driver_keyword_terms"),
         suite_named("driver_signal_tracer"),
         Suite{"thread_pool", false, {}},
     };

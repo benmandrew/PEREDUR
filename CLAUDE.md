@@ -1,6 +1,6 @@
 # PEREDUR
 
-C++17 genetic algorithm for repairing unrealizable FRETISH and TLSF specifications, using bounded model counting (SPOT + Ganak) for semantic similarity. Binaries: `peredur`, `realize`, `compare`, `ltl`, `mucs`, `maximal`, `lint-ideals` (run each with `--help`).
+C++17 genetic algorithm for repairing unrealizable FRETISH and TLSF specifications, using bounded model counting (SPOT + Ganak) for semantic similarity. Binaries: `peredur`, `realize`, `compare`, `ltl`, `mucs`, `maximal`, `lint-ideals`, `keyword-terms` (run each with `--help`).
 
 A run loads a spec, breeds offspring, filters them (dedup, bloat cap, vacuity), scores the survivors (syntactic + semantic + status), selects under NSGA-II, re-checks realizability at the output gate, applies final filters (dedup, implication), and writes `repair_N.json` plus `run.json`.
 

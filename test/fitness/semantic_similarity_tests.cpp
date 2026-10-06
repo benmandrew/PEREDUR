@@ -475,4 +475,60 @@ TEST(test_keyword_similarity_trace_weight_half_averages_the_two) {
            "keyword-similarity: the split scoring path must mix the same way");
 }
 
+// The keyword-terms driver prints one row per changed_requirement_pairs entry
+// and an analysis forms every weight from those rows. That holds only if the
+// mean of w * trace + (1 - w) * keyword over the rows, a removed slot scoring 0
+// and no rows scoring 1, is the semantic score a run computes.
+TEST(test_changed_requirement_pairs_rebuild_the_weighted_score) {
+    const Scope in_mode{ScopeKind::In, "m"};
+    const Requirement same{Formula("P"), Formula("Q"), timing::immediately()};
+    const Requirement timed{Formula("P"), Formula("Q"),
+                            timing::within_ticks(3)};
+    const Requirement retimed{Formula("P"), Formula("Q"),
+                              timing::within_ticks(5)};
+    const Requirement global{Formula("P"), Formula("Q"), timing::always()};
+    const Requirement scoped(Formula("P"), Formula("Q"), timing::always(),
+                             ConditionType::Continual, true, false, in_mode);
+    const Requirement kept{Formula("Q"), Formula("P"), timing::eventually()};
+    Requirement dropped = kept;
+    dropped.m_removed = true;
+    const Specification original({}, {same, timed, global, kept}, {"P", "m"},
+                                 {"Q"}, {"m"});
+    const Specification moved({}, {same, retimed, scoped, dropped}, {"P", "m"},
+                              {"Q"}, {"m"});
+    const std::vector<ChangedRequirementPair> pairs =
+        changed_requirement_pairs(moved, original);
+    expect(pairs.size() == 3 && pairs[0].m_slot == 1 && pairs[1].m_slot == 2 &&
+               pairs[2].m_removed && pairs[2].m_is_guarantee,
+           "changed-pairs: the unchanged slot is skipped and the tombstoned "
+           "one is marked removed");
+    constexpr std::size_t bound = 5;
+    constexpr SimilarityMetric metric = SimilarityMetric::Logarithmic;
+    for (const double weight : {0.0, 0.5, 1.0}) {
+        double total = 0.0;
+        for (const ChangedRequirementPair& pair : pairs) {
+            if (pair.m_removed) {
+                continue;
+            }
+            const double trace = semantic_similarity(
+                *pair.m_requirement, *pair.m_other_requirement, bound, metric);
+            const double keyword = keyword_order_similarity(
+                *pair.m_requirement, *pair.m_other_requirement);
+            total += (weight * trace) + ((1.0 - weight) * keyword);
+        }
+        const double rebuilt = total / static_cast<double>(pairs.size());
+        const double scored =
+            semantic_similarity(moved, original, bound, metric,
+                                KeywordSimilarity::Semantic, weight);
+        expect(std::fabs(rebuilt - scored) < 1e-12,
+               "changed-pairs: the weighted mean over the pairs is the "
+               "semantic score at w = " +
+                   std::to_string(weight));
+    }
+    expect(changed_requirement_pairs(original, original).empty() &&
+               semantic_similarity(original, original, bound, metric,
+                                   KeywordSimilarity::Semantic, 0.5) == 1.0,
+           "changed-pairs: no pair differs, and the score is 1");
+}
+
 }  // namespace

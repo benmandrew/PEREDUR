@@ -233,16 +233,14 @@ double semantic_pair_similarity(const Requirement& requirement,
     return score;
 }
 
-std::vector<std::function<double()>> semantic_similarity_terms(
+std::vector<ChangedRequirementPair> changed_requirement_pairs(
     const Specification& specification,
-    const Specification& other_specification, std::size_t step_count,
-    SimilarityMetric metric, KeywordSimilarity keyword_similarity,
-    double trace_weight) {
+    const Specification& other_specification) {
     assert(!specification.m_assumptions.empty() ||
            !specification.m_guarantees.empty());
     assert(!other_specification.m_assumptions.empty() ||
            !other_specification.m_guarantees.empty());
-    std::vector<std::function<double()>> terms;
+    std::vector<ChangedRequirementPair> pairs;
     // Requirement pairs that are identical contribute a trivial 1.0 and
     // dilute the average toward 1 as the specification grows, drowning out
     // the pairs that actually differ. Excluding them keeps the score
@@ -256,34 +254,48 @@ std::vector<std::function<double()>> semantic_similarity_terms(
     // lockstep to reqs1.end() (as before) would run it past reqs2.end()
     // whenever reqs1 is longer, which is undefined behaviour once NDEBUG
     // disables the asserts that used to guard it.
-    const auto collect = [&terms, step_count, metric, keyword_similarity,
-                          trace_weight](const std::vector<Requirement>& reqs1,
-                                        const std::vector<Requirement>& reqs2) {
+    const auto collect = [&pairs](bool is_guarantee,
+                                  const std::vector<Requirement>& reqs1,
+                                  const std::vector<Requirement>& reqs2) {
         const std::size_t common = std::min(reqs1.size(), reqs2.size());
         for (std::size_t i = 0; i < common; ++i) {
             if (reqs1[i] == reqs2[i]) {
                 continue;
             }
-            // Removed on one side only: a real change, and the largest one the
-            // slot admits, so it scores zero. There is no formula left to
-            // count, and counting the survivor against nothing would charge a
-            // model count for an answer already known. It is still a term
-            // rather than a skipped pair, because it counts toward the mean.
-            if (reqs1[i].m_removed || reqs2[i].m_removed) {
-                terms.emplace_back([] { return 0.0; });
-                continue;
-            }
-            terms.emplace_back([&first = reqs1[i], &second = reqs2[i],
-                                step_count, metric, keyword_similarity,
-                                trace_weight] {
-                return semantic_pair_similarity(first, second, step_count,
-                                                metric, keyword_similarity,
-                                                trace_weight);
-            });
+            pairs.push_back({is_guarantee, i, &reqs1[i], &reqs2[i],
+                             reqs1[i].m_removed || reqs2[i].m_removed});
         }
     };
-    collect(specification.m_assumptions, other_specification.m_assumptions);
-    collect(specification.m_guarantees, other_specification.m_guarantees);
+    collect(false, specification.m_assumptions,
+            other_specification.m_assumptions);
+    collect(true, specification.m_guarantees, other_specification.m_guarantees);
+    return pairs;
+}
+
+std::vector<std::function<double()>> semantic_similarity_terms(
+    const Specification& specification,
+    const Specification& other_specification, std::size_t step_count,
+    SimilarityMetric metric, KeywordSimilarity keyword_similarity,
+    double trace_weight) {
+    std::vector<std::function<double()>> terms;
+    for (const ChangedRequirementPair& pair :
+         changed_requirement_pairs(specification, other_specification)) {
+        // Removed on one side only: a real change, and the largest one the
+        // slot admits, so it scores zero. There is no formula left to count,
+        // and counting the survivor against nothing would charge a model count
+        // for an answer already known. It is still a term rather than a
+        // skipped pair, because it counts toward the mean.
+        if (pair.m_removed) {
+            terms.emplace_back([] { return 0.0; });
+            continue;
+        }
+        terms.emplace_back([&first = *pair.m_requirement,
+                            &second = *pair.m_other_requirement, step_count,
+                            metric, keyword_similarity, trace_weight] {
+            return semantic_pair_similarity(first, second, step_count, metric,
+                                            keyword_similarity, trace_weight);
+        });
+    }
     return terms;
 }
 
