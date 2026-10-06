@@ -88,7 +88,7 @@ REPO_ROOT = Path(__file__).parent.parent
 
 # The lab machines, by ssh-config alias. Bare aliases deliberately: see the
 # module docstring. The repo path on each is merge_experiments.REMOTE_ROOT.
-HOSTS: tuple[str, ...] = ("av2", "av3")
+HOSTS: tuple[str, ...] = ("av1", "av2", "av3")
 LOCAL = "local"
 
 SSH_OPTS = ["-o", "ConnectTimeout=8", "-o", "BatchMode=yes"]

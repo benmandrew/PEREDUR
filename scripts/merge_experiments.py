@@ -34,6 +34,7 @@ REPO_ROOT = Path(__file__).parent.parent
 # Each entry is an ssh destination as accepted by ssh/rsync. A bare host uses
 # REMOTE_ROOT as the repo path; append ":/custom/path/to/peredur" to override.
 REMOTES: dict[str, str] = {
+    "av1": "benandrew@av1.cs.man.ac.uk",
     "av2": "benandrew@av2.cs.man.ac.uk",
     "av3": "benandrew@av3.cs.man.ac.uk",
 }
