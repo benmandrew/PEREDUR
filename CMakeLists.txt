@@ -206,6 +206,15 @@ target_link_libraries(signal_tracer PRIVATE cpptrace::cpptrace)
 add_executable(compare src/compare.cpp)
 target_link_libraries(compare PRIVATE peredur_fitness)
 
+# The FRETISH fingerprint tool of 2026-10-01-fretish-frontier-approx, built for
+# the 2026-10-08-fretish-rerun-analysis campaign's draw phase. Out of `all`, so
+# the default build and the version check never depend on it; the campaign's
+# build command names the target.
+add_executable(fpdraw EXCLUDE_FROM_ALL
+               experiments/2026-10-01-fretish-frontier-approx/scripts/fpdraw.cpp)
+target_include_directories(fpdraw PRIVATE src)
+target_link_libraries(fpdraw PRIVATE peredur_fitness)
+
 add_executable(lint-ideals src/lint_ideals.cpp)
 target_link_libraries(lint-ideals PRIVATE peredur_fitness)
 

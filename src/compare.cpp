@@ -3,10 +3,12 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <utility>
@@ -410,16 +412,39 @@ int run_fretish(const Args& args, SatisfiabilityChecker& checker) {
         ideal_names.push_back(ideal.first);
     }
 
-    run_and_report(repair_meta, ideal_names,
-                   [&](std::size_t rep, std::size_t ide) {
-                       return [&, rep, ide] {
-                           return classify(
-                               spec_implies(repairs[rep].second.spec,
-                                            ideals[ide].second, checker),
-                               spec_implies(ideals[ide].second,
-                                            repairs[rep].second.spec, checker));
-                       };
-                   });
+    // COMPARE_DIRECTIONS=fwd|rev skips the other direction, which the caller
+    // (scripts/compare_pairs.py's dirs column) has already refuted on a
+    // sampled word; a skipped direction reports 0. Every pair's per-direction
+    // verdicts go to stderr as DIR lines, since the relation alone cannot say
+    // which direction an undecided pair lacks.
+    const char* dirs_env = std::getenv("COMPARE_DIRECTIONS");
+    const std::string dirs = dirs_env != nullptr ? dirs_env : "both";
+    const bool do_fwd = dirs != "rev";
+    const bool do_rev = dirs != "fwd";
+    static std::mutex dir_mutex;
+    const auto tri = [](std::optional<bool> v) {
+        return v.has_value() ? (*v ? "1" : "0") : "?";
+    };
+    run_and_report(
+        repair_meta, ideal_names, [&](std::size_t rep, std::size_t ide) {
+            return [&, rep, ide] {
+                const std::optional<bool> fwd =
+                    do_fwd ? spec_implies(repairs[rep].second.spec,
+                                          ideals[ide].second, checker)
+                           : std::optional<bool>(false);
+                const std::optional<bool> rev =
+                    do_rev ? spec_implies(ideals[ide].second,
+                                          repairs[rep].second.spec, checker)
+                           : std::optional<bool>(false);
+                {
+                    const std::lock_guard<std::mutex> lock(dir_mutex);
+                    std::cerr << "DIR\t" << repairs[rep].first << "\t"
+                              << ideals[ide].first << "\t" << tri(fwd) << "\t"
+                              << tri(rev) << "\n";
+                }
+                return classify(fwd, rev);
+            };
+        });
     return 0;
 }
 
