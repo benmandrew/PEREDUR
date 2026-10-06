@@ -245,6 +245,8 @@ A twelfth change removes `runtime.max_concurrent_realizability` in the same comm
 
 `mutation.p_stop` arrived on 2026-09-15 at `0.15`, from a standing start like `p_remove_guarantee`, and exposes nothing. It rewrites the stop condition of an `until` or `before` timing, and it tests whether the requirement holds one before it reads its probability or draws, so on a requirement without a stop timing it costs no draw at any value. No specification any archived campaign ran carries one, those timings having entered the grammar the same day, so every archive here reproduces seed-for-seed with the key omitted.
 
+`fitness.keyword_similarity` crossed the line on 2026-10-06, moving from `"syntactic"` to `"semantic"` the day the key arrived. Every FRETISH campaign archived here ran the syntactic placement, and none states the key, so reproducing one means writing `keyword_similarity = "syntactic"` into its `[fitness]` table. Omitting it moves the timing, scope and condition-type order measures out of the syntactic objective and into the semantic one, mixed with the trace count at `semantic_trace_weight = 0.5`, and compares the keyword fields in the syntactic objective as tokens alone. Both objectives change, so selection changes and no FRETISH archive reproduces seed for seed without the key. `2026-10-06-keyword-weight` fixed the weight: re-scoring 4,694 archived candidates, the weights 0.25, 0.5 and 0.75 select the same first front in the median run. TLSF ignores both keys and is unaffected. `gen_configs.py --pin-vintage` writes both from this commit on, and `golden_config()` pins the syntactic placement so the determinism goldens hold.
+
 ## Commit attribution
 
 Every campaign directory carries a `PROVENANCE.json`. For campaigns closed

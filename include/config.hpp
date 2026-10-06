@@ -184,9 +184,9 @@ struct Config {
     /// scripts/gen_configs.py.
     MrsAdmissionOrder mrs_admission_order = MrsAdmissionOrder::Degree;
     /// Which objective scores the FRETISH keyword fields (see
-    /// KeywordSimilarity). Syntactic reproduces every run before the key
-    /// existed. Ignored on the TLSF path.
-    KeywordSimilarity keyword_similarity = KeywordSimilarity::Syntactic;
+    /// KeywordSimilarity). Semantic since 2026-10-06; Syntactic reproduces
+    /// every run before then. Ignored on the TLSF path.
+    KeywordSimilarity keyword_similarity = KeywordSimilarity::Semantic;
     /// The weight w of the trace-count score in the per-requirement semantic
     /// term `w * trace + (1 - w) * keyword`, read only under
     /// KeywordSimilarity::Semantic. At 1 the term is the trace count alone and

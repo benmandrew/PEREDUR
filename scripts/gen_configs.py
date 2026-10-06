@@ -197,7 +197,7 @@ DEFAULTS: dict = {
     # and are emitted into [fitness] only when a sweep overrides them, so every
     # existing grid stays byte-identical. The default reproduces every run from
     # before the keys existed, so neither is a config-vintage change.
-    "keyword_similarity": "syntactic",
+    "keyword_similarity": "semantic",
     "semantic_trace_weight": 0.5,
     # TLSF-only [tlsf.mutation] split (see config.hpp). Emitted only when a sweep
     # overrides one of them (see make_toml), so the FRETISH and A/B TLSF grids
@@ -579,6 +579,7 @@ DEFAULT_COMPUTE_MATCH_FACTOR = 1.5
 VINTAGE_KEYS: tuple[str, ...] = (
     "status_grading", "mrs_admission_order",
     "p_condition_type", "p_scope", "p_monotone",
+    "keyword_similarity", "semantic_trace_weight",
 )
 
 
