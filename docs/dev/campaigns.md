@@ -28,7 +28,7 @@ phases = [ { profile = "arbiter-probe", jobs = 4 } ]
 
 `configs` runs on the host during `stage`, after the build and before the version check so a failing generator reports as itself, in a subshell so `&&` behaves as written. It has no default, since no line suits every campaign and config trees are untracked.
 
-A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default) or `score`, which takes its own keys and refuses `jobs`, `sweeps` and `specs` by name.
+A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. The lab hosts are `av1`, `av2` and `av3`. `kind` is `run` (the default) or `score`, which takes its own keys and refuses `jobs`, `sweeps` and `specs` by name.
 
 A phase's `hosts` table overrides the campaign split for that phase under the same rules, and may only narrow it, since `stage` staged no other host; an omitted host runs nothing for that phase and a tick advances past it. It exists because `run_experiments.py --seeds` replaces a profile's seed list rather than intersecting it, so paths with different sample sizes cannot share one range without silently changing the row count. `enqueue` freezes these as `phase_seeds`; older entries fall back to the campaign split.
 
@@ -207,4 +207,4 @@ python3 scripts/test_campaign.py
 
 A plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. It never touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `PEREDUR_RUNNER_CMD` and `PEREDUR_SCORER_CMD` stubs that record their arguments. `score_campaign.py` uses a fake results tree, a `PEREDUR_SCORE_CURVES_CMD` stub, and stub binaries under `PEREDUR_BIN_DIR`. New launch-path code must be tested the same way.
 
-`campaign.py` parses TOML itself because av2 and av3 run python3 3.10.12 with neither `tomllib` nor `tomli`. Its subset is checked against `tomllib` on every fixture wherever that exists. Remote shell scripts never use bare globs, since zsh's `NOMATCH` aborts on an unmatched pattern and every later section vanishes in silence.
+`campaign.py` parses TOML itself because the lab hosts run python3 3.10.12 with neither `tomllib` nor `tomli`. Its subset is checked against `tomllib` on every fixture wherever that exists. Remote shell scripts never use bare globs, since zsh's `NOMATCH` aborts on an unmatched pattern and every later section vanishes in silence.

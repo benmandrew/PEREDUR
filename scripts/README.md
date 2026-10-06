@@ -562,7 +562,7 @@ key, so the campaign costs more machine time and returns fewer rows than the
 plan says without anything looking wrong.
 
 `campaign.py` reads this TOML with a parser of its own rather than `tomllib`,
-because `tick` runs on av2 and av3, whose python3 is 3.10.12 with neither
+because `tick` runs on the lab hosts, whose python3 is 3.10.12 with neither
 `tomllib` (3.11) nor `tomli` present. `test_campaign.py` checks that parser
 against `tomllib` on every fixture.
 
@@ -690,13 +690,13 @@ before.
 
 ```sh
 python scripts/campaign.py status                   # every host, plus this checkout
-python scripts/campaign.py status --host av3        # one host (av2, av3 or local)
+python scripts/campaign.py status --host av3        # one host (av1, av2, av3 or local)
 python scripts/campaign.py status --campaign tlsf   # one profile
 python scripts/campaign.py status --json            # machine-readable
 python scripts/campaign.py status --all             # include older manifests
 ```
 
-A read-only poll of av2, av3 and the local checkout, taking about a second. It
+A read-only poll of av1, av2, av3 and the local checkout, taking about a second. It
 prints two tables. The first is the checkout each host is sitting on — branch,
 head, whether the working tree is clean, and which runner or engine processes
 are alive. The second is one row per campaign: rows done against rows planned,
