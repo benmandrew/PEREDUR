@@ -165,9 +165,14 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     src, out = args.pairs, args.out
     env = dict(os.environ)
-    env.setdefault("PEREDUR_BLACK_PATH",
-                   str(THIRD_PARTY / "black" / "install" / "bin" / "black"))
-    env.setdefault("PEREDUR_SPOT_BIN_DIR", str(THIRD_PARTY / "spot" / "bin"))
+    # Point compare at the checkout's solvers only where they sit at the
+    # source-built layout. Where they do not (av1 unpacks black from a .deb
+    # into third_party/black/black), compare's built-in paths already name
+    # this build's copies.
+    for var, path in (("PEREDUR_BLACK_PATH", THIRD_PARTY / "black" / "install" / "bin" / "black"),
+                      ("PEREDUR_SPOT_BIN_DIR", THIRD_PARTY / "spot" / "bin")):
+        if path.exists():
+            env.setdefault(var, str(path))
     tmp = os.environ.get("COMPARE_PAIRS_TMP") or tempfile.gettempdir()
     os.makedirs(tmp, exist_ok=True)
 
