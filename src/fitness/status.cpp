@@ -109,12 +109,21 @@ std::vector<std::size_t> project_admission_order(
 double status_score_mrs(const std::vector<std::string>& components,
                         std::size_t n_parts, SatisfiabilityChecker& sat,
                         const SubsetRealizability& subset_realizable,
-                        const std::vector<std::size_t>& admission_order) {
+                        const std::vector<std::size_t>& admission_order,
+                        const std::string& whole) {
     if (!all_components_satisfiable(components, sat)) {
         return k_status_component_unsatisfiable;
     }
     if (n_parts == 0) {
         return k_status_realizable;
+    }
+    // After the components, which are cheaper and catch most of what this
+    // does, and before the walk it exists to spare. An undecided query passes:
+    // the whole specification is the query most likely to exhaust the budget,
+    // and reading a timeout as unsatisfiable would zero exactly the largest
+    // candidates, where the walk can still grade them.
+    if (!whole.empty() && !sat.check_satisfiability(whole).value_or(true)) {
+        return k_status_component_unsatisfiable;
     }
     // Grown once and reused across the walk; the oracle reads it and does not
     // retain it. A rejected part is erased, so `kept` is exactly the accepted
@@ -237,9 +246,8 @@ Specification with_guarantee_subset(const Specification& specification,
 // dropped. An empty side is `true` rather than the empty string, which is what
 // an absent side means and what black would refuse to parse.
 //
-// AuRUS's status ladder asks about a whole side at a time, where every other
-// scale here asks per requirement, so this conjunction exists only for
-// status_score_aurus.
+// AuRUS's status ladder asks about a whole side at a time, and the MRS walk's
+// whole-specification screen conjoins the two sides.
 std::string side_conjunction(const std::vector<Requirement>& requirements) {
     std::string conjunction;
     for (const Requirement& req : requirements) {
@@ -365,7 +373,9 @@ double specification_status(const Specification& specification,
                 return real.check_realizability(subset).value_or(false) &&
                        !specification_is_not_well_separated(subset, real);
             },
-            position_order_from_slots(slot_order, slots));
+            position_order_from_slots(slot_order, slots),
+            "(" + side_conjunction(specification.m_assumptions) + ") & (" +
+                side_conjunction(specification.m_guarantees) + ")");
     }
 
     return status_score(components, sat, [&specification, &real] {

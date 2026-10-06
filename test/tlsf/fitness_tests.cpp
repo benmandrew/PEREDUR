@@ -81,13 +81,26 @@ TEST(test_status_jointly_unsatisfiable_guarantees_are_unrealizable) {
     // `g` and `!g` are each satisfiable alone, so no component tier fires.
     // Their conjunction is not realizable, which the realizability query
     // reports -- the guarantee-side satisfiability tier this used to occupy
-    // was dropped as unpopulated.
-    const Config cfg;
+    // was dropped as unpopulated. Pinned to the tiered scale, since the MRS
+    // default screens the whole specification first.
+    Config cfg;
+    cfg.status_grading = StatusGrading::Tiered;
     const tlsf::Specification spec =
         parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { g; !g; }");
     expect(tlsf_status(spec, cfg) == k_status_unrealizable,
            "status: jointly contradictory guarantees score the unrealizable "
            "tier");
+}
+
+TEST(test_status_mrs_jointly_unsatisfiable_guarantees_are_zero) {
+    // The same pair under the MRS walk, which screens the whole specification
+    // for satisfiability first, so the pair never reaches the walk.
+    Config cfg;
+    cfg.status_grading = StatusGrading::Mrs;
+    const tlsf::Specification spec =
+        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { g; !g; }");
+    expect(tlsf_status(spec, cfg) == k_status_component_unsatisfiable,
+           "status: jointly contradictory guarantees score 0 under MRS");
 }
 
 // The ladder is a shared scale, so this pins that the TLSF front end reaches
