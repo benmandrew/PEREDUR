@@ -1865,6 +1865,46 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-ablation.csv",
         "default_jobs": 16,
     },
+    # fretish-ablation again after three FRETISH engine changes (5dc3472,
+    # #205, #206), in fresh directories so that no host resumes against the
+    # archived rows. The calibration profile is seed 0 alone and keeps its own
+    # CSV, since the main campaign also runs seed 0. Generate with the
+    # fretish-ablation line above, with --out-dir
+    # experiments/configs-fretish-rerun.
+    "fretish-rerun": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["directed", "uniform"]},
+        "specs": FRETISH_ABLATION_SPECS,
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ABLATION_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-rerun",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-rerun",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-rerun.csv",
+        "default_jobs": 16,
+    },
+    "fretish-rerun-calib": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["directed", "uniform"]},
+        "specs": FRETISH_ABLATION_SPECS,
+        "seeds": [0],
+        "timeout_caps": {s: 7200 for s in FRETISH_ABLATION_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-rerun",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-rerun-calib",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-rerun-calib.csv",
+        "default_jobs": 16,
+    },
 }
 
 

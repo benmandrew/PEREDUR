@@ -1,0 +1,16 @@
+name = "2026-10-06-fretish-rerun-calib"
+branch = "campaign/fretish-rerun"
+profile = "fretish-rerun-calib"
+description = "Seed 0 of 2026-10-06-fretish-rerun on av1: cost under #206, the first campaign build on gcc 13, and a diff against the archived seed 0. See ../2026-10-06-fretish-rerun/PLAN.md."
+
+hosts = { av1 = "0" }
+
+build = "sh -c 'cmake --build build-release'"
+
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion --sweeps O --metric log --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 1 --out-dir experiments/configs-fretish-rerun --pin-vintage"
+
+# 40 runs. lpc-full-core1 reaches the 7200 s cap, so about 2.2 h of wall.
+[[phases]]
+name = "search"
+profile = "fretish-rerun-calib"
+jobs = 16

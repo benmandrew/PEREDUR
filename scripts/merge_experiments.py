@@ -150,6 +150,8 @@ PROFILE_CSVS: dict[str, str] = {
     # the key.
     "gradsel-fret": "results-gradsel-fret-m.csv",
     "fretish-ablation": "results-fretish-ablation.csv",
+    "fretish-rerun": "results-fretish-rerun.csv",
+    "fretish-rerun-calib": "results-fretish-rerun-calib.csv",
 }
 
 # Per-run output directory each profile writes under experiments/. Most profiles
@@ -200,6 +202,8 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
     "rematch-calib": "results-rematch-calib",
     "gradsel-fret": "results-gradsel-fret-m",
     "fretish-ablation": "results-fretish-ablation",
+    "fretish-rerun": "results-fretish-rerun",
+    "fretish-rerun-calib": "results-fretish-rerun-calib",
 }
 
 # Natural key of a results row: one run per (sweep, level_name, selection,

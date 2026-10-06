@@ -1,0 +1,36 @@
+name = "2026-10-06-fretish-rerun"
+branch = "campaign/fretish-rerun"
+profile = "fretish-rerun"
+description = "2026-09-29-fretish-ablation again, unchanged in design, after three FRETISH engine changes (5dc3472, #205, #206), to regenerate the paper's RQ4 data. Pre-registered in PLAN.md."
+
+# Both arms of a seed run on one host, so a host difference cancels inside
+# every (subject, seed) pair. av3 takes seed 0 so that its seed-0 runs can be
+# diffed against av1's calibration, the one gcc 13 build.
+hosts = { av3 = "0-9", av1 = "10-19", av2 = "20-29" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# The fretish-ablation flags, with a fresh config tree pinned at this commit.
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion --sweeps O --metric log --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 1 --out-dir experiments/configs-fretish-rerun --pin-vintage"
+
+# 212.5 core-hours in the archive, 120 of them lpc-full-core1 at the cap;
+# av2 took 7.9 h for 600 runs, so about 5.3 h for 400 here.
+[[phases]]
+name = "search"
+profile = "fretish-rerun"
+jobs = 16
+
+# The archive's curve phase at the same budgets. It writes the maximal.tsv
+# sidecars that the pooled strength and ball-radii passes read. The archive's
+# passes ran at 0.30-0.59 core-hours a run, 158.1 worker-hours in all.
+[[phases]]
+name = "curve"
+kind = "score"
+results = "experiments/results-fretish-rerun"
+out = "experiments/curves-fretish-rerun"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 3000
+deadline_s = 7500
