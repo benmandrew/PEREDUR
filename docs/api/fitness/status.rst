@@ -15,7 +15,7 @@ fitness/status.hpp
    * - 0.0
      - Some component formula is unsatisfiable on its own
 
-Both front ends score on this scale, and differ only in how a candidate decomposes into components and in how realisability is queried. ``specification_status`` uses the per-requirement conjunction ``condition & response``; ``tlsf_status`` uses the individual formulae of the six TLSF sections.
+Both front ends score on this scale, and differ only in how a candidate decomposes into components and in how realisability is queried. ``specification_status`` tests each requirement's condition and response apart, as a screen ahead of the realisability walk rather than a satisfiability test of the specification; ``tlsf_status`` uses the individual formulae of the six TLSF sections.
 
 The scale was previously five-point, grading the region below realisability by whether the guarantee side or the assumption side was jointly unsatisfiable. Instrumenting both front ends over 887k scored candidates put under 0.32% of the population into those tiers, and both were removed --- for different reasons. The guarantee-side tier was measured: nothing filters a jointly unsatisfiable guarantee side, and it fired on 46 candidates out of 15,115 on the TLSF path, all on one specification. The assumption-side tier never fired at all, and could not have. Its predicate is exactly the satisfiability half of the vacuity filter's, and candidate filters run on offspring *before* those offspring are scored, so such a candidate never reaches the objective. That tier was unreachable whenever the vacuity stage ran, which it did by default and, since its ``run_vacuity`` key was removed on 2026-09-11, does in every run.
 

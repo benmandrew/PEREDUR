@@ -20,8 +20,8 @@ namespace {
 constexpr std::string_view k_test_suite = "status";
 
 // make_spec derives each requirement's LTL from trigger, response and timing;
-// these tests only exercise specification_status's propositional pre-checks
-// (trigger and response satisfiability), which never look at the LTL string.
+// the component tests only exercise specification_status's propositional
+// screen (condition and response satisfiability), which never looks at it.
 
 // --- specification_status ---
 
@@ -48,15 +48,8 @@ TEST(test_status_scores_each_shape_at_its_tier) {
         // Condition p & !p is unsatisfiable, so is `condition & response`.
         {"unsatisfiable condition", make_spec("p & !p", "q"), std::nullopt,
          k_status_component_unsatisfiable},
-        // An unsatisfiable response makes `condition & response`
-        // unsatisfiable, so the single component tier catches it without a
-        // check of its own.
         {"unsatisfiable response", make_spec("p", "q & !q"), std::nullopt,
          k_status_component_unsatisfiable},
-        // Condition p and response !p are individually satisfiable but cannot
-        // hold together, which is what makes the requirement incoherent.
-        {"condition and response that cannot hold together",
-         make_spec("p", "!p"), std::nullopt, k_status_component_unsatisfiable},
         // G(i -> o): controller mirrors the input. Strategy o := i always
         // works.
         {"realizable", realizable, std::nullopt, k_status_realizable},
@@ -117,6 +110,38 @@ TEST(test_status_jointly_unsat_responses_pass_individual_checks) {
     expect(specification_status(spec, sat, real) == k_status_realizable,
            "status: jointly unsat responses that are individually coherent "
            "should still reach the realizability tier");
+}
+
+TEST(test_status_screen_tests_condition_and_response_apart) {
+    // `whenever p, within 2 ticks !p` over the output p: realizable, since the
+    // system can drop p on the tick after raising it, although `p & !p` is
+    // unsatisfiable. A screen on the conjunction scored it 0, and the output
+    // gate, which asks the same status, could never emit it.
+    const Specification spec({}, {make_req("p", "!p", timing::within_ticks(2))},
+                             {"i"}, {"p"});
+    expect(specification_status_components(spec) ==
+               std::vector<std::string>{"p", "!(p)"},
+           "status: condition and response should be separate components");
+    SatisfiabilityChecker sat;
+    RealizabilityChecker real;
+    expect(specification_status(spec, sat, real) == k_status_realizable,
+           "status: a response the timing holds off past the condition "
+           "should reach the realizability tier");
+}
+
+TEST(test_status_screen_skips_the_response_under_a_stop_condition) {
+    // A stop condition holding as p fires discharges `until` at once, and one
+    // that never holds discharges `before`, so an unsatisfiable response is no
+    // defect under either and the screen leaves it to the walk.
+    for (const Timing& tim :
+         {timing::until(Formula("s")), timing::before(Formula("s"))}) {
+        const Specification spec({}, {make_req("p", "q & !q", tim)}, {"p"},
+                                 {"q", "s"});
+        expect(specification_status_components(spec) ==
+                   std::vector<std::string>{"p"},
+               "status: the response should not be screened under a stop "
+               "condition");
+    }
 }
 
 TEST(test_status_unrealizable_returns_point_five) {

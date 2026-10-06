@@ -274,12 +274,13 @@ std::vector<std::size_t> project_admission_order(
 std::vector<std::size_t> conflict_degree_order(
     std::size_t n_parts, const SubsetRealizability& subset_realizable);
 
-/// Status score of a FRETISH specification. Its components are the
-/// per-requirement conjunctions `condition & response`: a requirement is
-/// incoherent when its own condition and response cannot hold together, which
-/// already covers either half being unsatisfiable alone. Requirements are
-/// checked separately rather than conjoined across the specification, since
-/// they fire at different times and need not hold simultaneously.
+/// Status score of a FRETISH specification. Its components are each
+/// requirement's condition and response, tested apart (see
+/// specification_status_components). They are a screen that spares the
+/// realizability walk a candidate holding a requirement that can never fire or
+/// never be honoured, and not a satisfiability test: every conflict they miss,
+/// within a requirement or across several through their timings, is left to
+/// the walk, which lowers the whole specification.
 ///
 /// Under StatusGrading::Mrs the guarantee-side parts are the guarantees
 /// themselves, one part each. They are not split further, as the TLSF path
@@ -317,10 +318,17 @@ double specification_status(
     const std::vector<std::size_t>& slot_order = {},
     ComponentCheck component_check = ComponentCheck::Included);
 
-/// The components @ref specification_status tests individually: one
-/// `condition & response` conjunction per live requirement, assumptions before
-/// guarantees. Tombstoned requirements are skipped, being no longer part of the
-/// specification.
+/// The components @ref specification_status tests individually: the condition
+/// and the response of each live requirement as two formulae, assumptions
+/// before guarantees. Tombstoned requirements are skipped, being no longer part
+/// of the specification.
+///
+/// They are tested apart because a timing can hold the response off past the
+/// instant the condition fires: `upon p, within 2 ticks !p` is realizable,
+/// though `p & !p` is unsatisfiable. An unsatisfiable condition never fires,
+/// and an unsatisfiable response can never be honoured once it does, except
+/// under `until` and `before`, whose stop condition can discharge it before it
+/// is owed; under those two the response is left out.
 ///
 /// Exposed because each component is one independent `black` call, so a scoring
 /// pool can run them concurrently rather than leaving them to the sequential
