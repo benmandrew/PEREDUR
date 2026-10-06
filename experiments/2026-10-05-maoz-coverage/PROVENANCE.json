@@ -1,0 +1,848 @@
+{
+  "campaign": "2026-10-05-maoz-coverage",
+  "attribution": "recorded",
+  "generated_on": "2026-10-06",
+  "status": "closed",
+  "kind": "score-only: GLASS, JVTS-Repair and AMT13 repairs from 2026-10-02-maoz-baselines scored against PEREDUR's paper-rerun frontiers by coverage under implication",
+  "kind_note": "No search ran here. The tool side is 2026-10-02-maoz-baselines's adapted tree (experiments/results-maoz-baselines); the PEREDUR side is the pool of 2026-09-14-paper-rerun's final frontiers. Registration is section 11 of experiments/2026-10-02-maoz-baselines/PLAN.md; this directory's PLAN.md records only how it ran.",
+  "profile_commit": {
+    "sha": "085b5e6306fac5fbb5f91dc831d3139275335442",
+    "short": "085b5e6",
+    "subject": "docs(experiments): record the converse's blind spot for half-decided pairs",
+    "branch": "feat/maoz-baselines",
+    "queue_entries": {
+      "av2": "042-2026-10-05-maoz-coverage at 085b5e6, state done"
+    },
+    "reachable_from_main": false,
+    "held_by_tag": "provenance/maoz-coverage",
+    "held_by_tag_note": "Annotated tag cut at 085b5e6 on 2026-10-06, before the close commit, and pushed at once.",
+    "note": "Every pass ran from the av2 checkout staged at this sha by campaign.py stage, and each pass's binaries report this commit with dirty 0."
+  },
+  "binary_commit": "085b5e6306fac5fbb5f91dc831d3139275335442",
+  "launch": {
+    "host": "av2",
+    "failed_attempts": "The entry failed twice before it ran, with no rows written: 3 ticks on 2026-10-05 up to 18:10 and 3 on 2026-10-06 up to 15:15, each refused by stage because a compare process was live on av2. The second was ~/subsum/run.py, an ad hoc compare sweep launched outside the queue at 15:02. Requeued by hand at 15:21 once it had stopped; ~/.peredur-queue.log on av2 holds the tick lines.",
+    "staged": "2026-10-06T15:25:01+01:00",
+    "phase_started": "2026-10-06T15:25:04+01:00",
+    "phase_finished": "2026-10-06T16:10:09+01:00",
+    "window_source": "The four score manifests (maoz-score-manifest-avlab12.json in each out directory) and phase-042.log, the queue entry's log from the successful attempt."
+  },
+  "pool": {
+    "out": "experiments/maoz-peredur-pool",
+    "built_on": "local host 'ben', 2026-10-05T17:39, rsynced to av2 before staging",
+    "built_at_commit": "a2c44f96000aa8f242ebf7e3e999f28ed64bdb0f",
+    "arm": "sweep_G_mrs_nsga2-apportion_wkoff_log",
+    "sources": {
+      "curves": "curves-paper-rerun (from a local agent worktree, .claude/worktrees/agent-a1a7f56e34a7cc540)",
+      "rerun": "experiments/results-paper-rerun"
+    },
+    "counts": {
+      "planned": 300,
+      "done": 300,
+      "frontier_rows": 9281,
+      "unique": 9178,
+      "unique_per_spec": {
+        "rg1": 836,
+        "rg2": 540,
+        "lift": 431,
+        "gyro-var1": 733,
+        "gyro-var2": 697,
+        "humanoid-458": 732,
+        "humanoid-503": 870,
+        "humanoid-531": 1473,
+        "humanoid-742": 2159,
+        "pcar-v2-888": 707
+      }
+    },
+    "rebuild_check": "The manifest names a2c44f9, which predates maoz_score.py's commit (749f004), so the build ran an uncommitted copy. On 2026-10-06 the pool was rebuilt at 085b5e6 from the same sources, and diff -r against the shipped pool found no difference outside the manifest. pool.tsv and runs.tsv md5s also match between local and av2."
+  },
+  "budgets": {
+    "jobs": 16,
+    "realize_timeout": 600,
+    "wellsep_timeout": 60,
+    "maximal_timeout": 20,
+    "maximal_wall_s": 14400,
+    "chunk_size": 50,
+    "chunk_timeout": 900,
+    "pair_timeout": 120,
+    "cores": 1
+  },
+  "passes": {
+    "screen": {
+      "out": "experiments/maoz-coverage-screen",
+      "argv": "scripts/maoz_score.py --pass screen --out experiments/maoz-coverage-screen --jobs 16 --realize-timeout 600 --wellsep-timeout 60 --maximal-timeout 20 --maximal-wall-s 14400 --chunk-size 50 --chunk-timeout 900 --pair-timeout 120 --cores 1 --seeds 0",
+      "started": "2026-10-06T15:25:04+01:00",
+      "finished": "2026-10-06T15:25:09+01:00",
+      "wall_s": 5.3,
+      "binaries": {
+        "realize": {
+          "path": "/home/benandrew/projects/counter/build-release/realize",
+          "commit": "085b5e6306fac5fbb5f91dc831d3139275335442",
+          "commit_short": "085b5e6",
+          "dirty": "0"
+        },
+        "ltlsynt": {
+          "path": "/home/benandrew/projects/counter/build-release/third_party/spot/bin/ltlsynt",
+          "version": "/home/benandrew/projects/counter/build-release/third_party/spot/bin/ltlsynt (spot) 2.15.1"
+        }
+      },
+      "counts": {
+        "planned": 1652,
+        "done": 1652,
+        "already": 0,
+        "admissible": {
+          "yes": 1459,
+          "no": 193
+        }
+      },
+      "python_version": "3.10.12",
+      "allow_stale_binary": false
+    },
+    "frontier": {
+      "out": "experiments/maoz-coverage-frontier",
+      "argv": "scripts/maoz_score.py --pass frontier --out experiments/maoz-coverage-frontier --screen experiments/maoz-coverage-screen --jobs 16 --realize-timeout 600 --wellsep-timeout 60 --maximal-timeout 20 --maximal-wall-s 14400 --chunk-size 50 --chunk-timeout 900 --pair-timeout 120 --cores 1 --seeds 0",
+      "started": "2026-10-06T15:30:02+01:00",
+      "finished": "2026-10-06T15:30:18+01:00",
+      "wall_s": 16.2,
+      "binaries": {
+        "maximal": {
+          "path": "/home/benandrew/projects/counter/build-release/maximal",
+          "commit": "085b5e6306fac5fbb5f91dc831d3139275335442",
+          "commit_short": "085b5e6",
+          "dirty": "0"
+        }
+      },
+      "counts": {
+        "planned": 30,
+        "done": 30,
+        "failed": 0,
+        "representatives": 55
+      },
+      "python_version": "3.10.12",
+      "allow_stale_binary": false
+    },
+    "coverage": {
+      "out": "experiments/maoz-coverage-relations",
+      "argv": "scripts/maoz_score.py --pass coverage --out experiments/maoz-coverage-relations --pool experiments/maoz-peredur-pool --frontier experiments/maoz-coverage-frontier --jobs 16 --realize-timeout 600 --wellsep-timeout 60 --maximal-timeout 20 --maximal-wall-s 14400 --chunk-size 50 --chunk-timeout 900 --pair-timeout 120 --cores 1 --seeds 0",
+      "started": "2026-10-06T15:35:01+01:00",
+      "finished": "2026-10-06T16:05:11+01:00",
+      "wall_s": 1809.6,
+      "binaries": {
+        "compare": {
+          "path": "/home/benandrew/projects/counter/build-release/compare",
+          "commit": "085b5e6306fac5fbb5f91dc831d3139275335442",
+          "commit_short": "085b5e6",
+          "dirty": "0"
+        }
+      },
+      "counts": {
+        "planned": 39034,
+        "done": 39034,
+        "units": 797,
+        "relations": {
+          "incomparable": 37819,
+          "stronger": 813,
+          "equivalent": 11,
+          "weaker": 187,
+          "undecided": 204
+        }
+      },
+      "python_version": "3.10.12",
+      "allow_stale_binary": false
+    },
+    "report": {
+      "out": "experiments/maoz-coverage-report",
+      "argv": "scripts/maoz_score.py --pass report --out experiments/maoz-coverage-report --pool experiments/maoz-peredur-pool --screen experiments/maoz-coverage-screen --frontier experiments/maoz-coverage-frontier --coverage experiments/maoz-coverage-relations --maoz-out experiments/maoz-baselines-out --jobs 16 --realize-timeout 600 --wellsep-timeout 60 --maximal-timeout 20 --maximal-wall-s 14400 --chunk-size 50 --chunk-timeout 900 --pair-timeout 120 --cores 1 --seeds 0",
+      "started": "2026-10-06T16:10:01+01:00",
+      "finished": "2026-10-06T16:10:09+01:00",
+      "wall_s": 8.6,
+      "binaries": {},
+      "counts": {
+        "planned": 30,
+        "done": 30
+      },
+      "python_version": "3.10.12",
+      "allow_stale_binary": false
+    }
+  },
+  "results": {
+    "screen": {
+      "tool_repairs": 1652,
+      "admissible": 1459,
+      "rejected": 193,
+      "rejected_note": "All 193 failed well-separation; 31 of them were also unrealisable. No repair was left undecided by either check."
+    },
+    "frontier": {
+      "cells": 30,
+      "representatives": 55,
+      "failed": 0
+    },
+    "coverage": {
+      "pairs": 39034,
+      "relations": {
+        "incomparable": 37819,
+        "stronger": 813,
+        "equivalent": 11,
+        "weaker": 187,
+        "undecided": 204
+      },
+      "units": 797,
+      "pair_reruns": 0,
+      "undecided_by_spec": {
+        "humanoid-742": 199,
+        "humanoid-503": 5
+      }
+    },
+    "outcome_counts": {
+      "1": 9,
+      "covered": 6,
+      "undetermined": 2,
+      "3": 13
+    },
+    "cells": [
+      {
+        "tool": "glass",
+        "spec": "rg1",
+        "outcome": "3",
+        "n_repairs": 1,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "glass",
+        "spec": "rg2",
+        "outcome": "3",
+        "n_repairs": 1,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "glass",
+        "spec": "lift",
+        "outcome": "1",
+        "n_repairs": 1,
+        "n_admissible": 1,
+        "n_frontier": 1,
+        "strict": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec0.tlsf"
+          ],
+          "converse_per_run": 0.9304,
+          "converse_guarantee_weakening": 405
+        },
+        "lenient": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec0.tlsf"
+          ],
+          "converse_per_run": 0.9304,
+          "converse_guarantee_weakening": 405
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "glass",
+        "spec": "gyro-var1",
+        "outcome": "3",
+        "n_repairs": 1,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "glass",
+        "spec": "gyro-var2",
+        "outcome": "covered",
+        "n_repairs": 1,
+        "n_admissible": 1,
+        "n_frontier": 1,
+        "strict": {
+          "coverage_per_run": 1.0,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 697
+        },
+        "lenient": {
+          "coverage_per_run": 1.0,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 697
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "glass",
+        "spec": "humanoid-458",
+        "outcome": "1",
+        "n_repairs": 1,
+        "n_admissible": 1,
+        "n_frontier": 1,
+        "strict": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec0.tlsf"
+          ],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 732
+        },
+        "lenient": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec0.tlsf"
+          ],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 732
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "glass",
+        "spec": "humanoid-503",
+        "outcome": "undetermined",
+        "n_repairs": 1,
+        "n_admissible": 1,
+        "n_frontier": 1,
+        "strict": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec0.tlsf"
+          ],
+          "converse_per_run": 0.9794,
+          "converse_guarantee_weakening": 860
+        },
+        "lenient": {
+          "coverage_per_run": 0.1667,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 0.9736,
+          "converse_guarantee_weakening": 855
+        },
+        "undecided_share": 0.0057
+      },
+      {
+        "tool": "glass",
+        "spec": "humanoid-531",
+        "outcome": "3",
+        "n_repairs": 1,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "glass",
+        "spec": "humanoid-742",
+        "outcome": "3",
+        "n_repairs": 1,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "glass",
+        "spec": "pcar-v2-888",
+        "outcome": "3",
+        "n_repairs": 1,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "rg1",
+        "outcome": "1",
+        "n_repairs": 49,
+        "n_admissible": 45,
+        "n_frontier": 15,
+        "strict": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec1.tlsf",
+            "spec12.tlsf",
+            "spec13.tlsf",
+            "spec19.tlsf",
+            "spec2.tlsf",
+            "spec20.tlsf",
+            "spec21.tlsf",
+            "spec27.tlsf",
+            "spec30.tlsf",
+            "spec33.tlsf",
+            "spec34.tlsf",
+            "spec40.tlsf",
+            "spec46.tlsf",
+            "spec48.tlsf",
+            "spec6.tlsf"
+          ],
+          "converse_per_run": 0.9932,
+          "converse_guarantee_weakening": 831
+        },
+        "lenient": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec1.tlsf",
+            "spec12.tlsf",
+            "spec13.tlsf",
+            "spec19.tlsf",
+            "spec2.tlsf",
+            "spec20.tlsf",
+            "spec21.tlsf",
+            "spec27.tlsf",
+            "spec30.tlsf",
+            "spec33.tlsf",
+            "spec34.tlsf",
+            "spec40.tlsf",
+            "spec46.tlsf",
+            "spec48.tlsf",
+            "spec6.tlsf"
+          ],
+          "converse_per_run": 0.9932,
+          "converse_guarantee_weakening": 831
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "rg2",
+        "outcome": "1",
+        "n_repairs": 12,
+        "n_admissible": 12,
+        "n_frontier": 3,
+        "strict": {
+          "coverage_per_run": 0.0444,
+          "coverage_by_pool": 0.6667,
+          "uncovered_tool": [
+            "spec4.tlsf"
+          ],
+          "converse_per_run": 0.9755,
+          "converse_guarantee_weakening": 529
+        },
+        "lenient": {
+          "coverage_per_run": 0.0444,
+          "coverage_by_pool": 0.6667,
+          "uncovered_tool": [
+            "spec4.tlsf"
+          ],
+          "converse_per_run": 0.9755,
+          "converse_guarantee_weakening": 529
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "lift",
+        "outcome": "1",
+        "n_repairs": 221,
+        "n_admissible": 195,
+        "n_frontier": 11,
+        "strict": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec14.tlsf",
+            "spec160.tlsf",
+            "spec161.tlsf",
+            "spec162.tlsf",
+            "spec217.tlsf",
+            "spec22.tlsf",
+            "spec7.tlsf",
+            "spec74.tlsf",
+            "spec8.tlsf",
+            "spec9.tlsf",
+            "spec93.tlsf"
+          ],
+          "converse_per_run": 0.8797,
+          "converse_guarantee_weakening": 384
+        },
+        "lenient": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec14.tlsf",
+            "spec160.tlsf",
+            "spec161.tlsf",
+            "spec162.tlsf",
+            "spec217.tlsf",
+            "spec22.tlsf",
+            "spec7.tlsf",
+            "spec74.tlsf",
+            "spec8.tlsf",
+            "spec9.tlsf",
+            "spec93.tlsf"
+          ],
+          "converse_per_run": 0.8797,
+          "converse_guarantee_weakening": 384
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "gyro-var1",
+        "outcome": "1",
+        "n_repairs": 7,
+        "n_admissible": 6,
+        "n_frontier": 2,
+        "strict": {
+          "coverage_per_run": 0.0667,
+          "coverage_by_pool": 0.5,
+          "uncovered_tool": [
+            "spec5.tlsf"
+          ],
+          "converse_per_run": 0.9802,
+          "converse_guarantee_weakening": 720
+        },
+        "lenient": {
+          "coverage_per_run": 0.0667,
+          "coverage_by_pool": 0.5,
+          "uncovered_tool": [
+            "spec5.tlsf"
+          ],
+          "converse_per_run": 0.9802,
+          "converse_guarantee_weakening": 720
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "gyro-var2",
+        "outcome": "covered",
+        "n_repairs": 12,
+        "n_admissible": 6,
+        "n_frontier": 2,
+        "strict": {
+          "coverage_per_run": 0.65,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 697
+        },
+        "lenient": {
+          "coverage_per_run": 0.65,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 697
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "humanoid-458",
+        "outcome": "covered",
+        "n_repairs": 1,
+        "n_admissible": 1,
+        "n_frontier": 1,
+        "strict": {
+          "coverage_per_run": 0.9667,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 732
+        },
+        "lenient": {
+          "coverage_per_run": 0.9667,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 732
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "humanoid-503",
+        "outcome": "3",
+        "n_repairs": 0,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "killed with none printed"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "humanoid-531",
+        "outcome": "3",
+        "n_repairs": 13,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "not well-separated 13"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "humanoid-742",
+        "outcome": "undetermined",
+        "n_repairs": 3,
+        "n_admissible": 1,
+        "n_frontier": 1,
+        "strict": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec0.tlsf"
+          ],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 2159
+        },
+        "lenient": {
+          "coverage_per_run": 1.0,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 0.9082,
+          "converse_guarantee_weakening": 1960
+        },
+        "undecided_share": 0.0922
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "pcar-v2-888",
+        "outcome": "3",
+        "n_repairs": 135,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "unrealisable 30, not well-separated 135"
+      },
+      {
+        "tool": "amt13",
+        "spec": "rg1",
+        "outcome": "1",
+        "n_repairs": 1000,
+        "n_admissible": 1000,
+        "n_frontier": 7,
+        "strict": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec160.tlsf",
+            "spec18.tlsf",
+            "spec203.tlsf",
+            "spec319.tlsf",
+            "spec320.tlsf",
+            "spec37.tlsf",
+            "spec387.tlsf"
+          ],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 836
+        },
+        "lenient": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec160.tlsf",
+            "spec18.tlsf",
+            "spec203.tlsf",
+            "spec319.tlsf",
+            "spec320.tlsf",
+            "spec37.tlsf",
+            "spec387.tlsf"
+          ],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 836
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "amt13",
+        "spec": "rg2",
+        "outcome": "1",
+        "n_repairs": 37,
+        "n_admissible": 37,
+        "n_frontier": 2,
+        "strict": {
+          "coverage_per_run": 0.3667,
+          "coverage_by_pool": 0.5,
+          "uncovered_tool": [
+            "spec21.tlsf"
+          ],
+          "converse_per_run": 0.9782,
+          "converse_guarantee_weakening": 531
+        },
+        "lenient": {
+          "coverage_per_run": 0.3667,
+          "coverage_by_pool": 0.5,
+          "uncovered_tool": [
+            "spec21.tlsf"
+          ],
+          "converse_per_run": 0.9782,
+          "converse_guarantee_weakening": 531
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "amt13",
+        "spec": "lift",
+        "outcome": "1",
+        "n_repairs": 2,
+        "n_admissible": 2,
+        "n_frontier": 1,
+        "strict": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec0.tlsf"
+          ],
+          "converse_per_run": 0.8897,
+          "converse_guarantee_weakening": 389
+        },
+        "lenient": {
+          "coverage_per_run": 0.0,
+          "coverage_by_pool": 0.0,
+          "uncovered_tool": [
+            "spec0.tlsf"
+          ],
+          "converse_per_run": 0.8897,
+          "converse_guarantee_weakening": 389
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "amt13",
+        "spec": "gyro-var1",
+        "outcome": "covered",
+        "n_repairs": 114,
+        "n_admissible": 114,
+        "n_frontier": 2,
+        "strict": {
+          "coverage_per_run": 0.4833,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 0.9861,
+          "converse_guarantee_weakening": 724
+        },
+        "lenient": {
+          "coverage_per_run": 0.4833,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 0.9861,
+          "converse_guarantee_weakening": 724
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "amt13",
+        "spec": "gyro-var2",
+        "outcome": "covered",
+        "n_repairs": 35,
+        "n_admissible": 35,
+        "n_frontier": 3,
+        "strict": {
+          "coverage_per_run": 0.5889,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 697
+        },
+        "lenient": {
+          "coverage_per_run": 0.5889,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 697
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "amt13",
+        "spec": "humanoid-458",
+        "outcome": "covered",
+        "n_repairs": 1,
+        "n_admissible": 1,
+        "n_frontier": 1,
+        "strict": {
+          "coverage_per_run": 0.9667,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 732
+        },
+        "lenient": {
+          "coverage_per_run": 0.9667,
+          "coverage_by_pool": 1.0,
+          "uncovered_tool": [],
+          "converse_per_run": 1.0,
+          "converse_guarantee_weakening": 732
+        },
+        "undecided_share": 0.0
+      },
+      {
+        "tool": "amt13",
+        "spec": "humanoid-503",
+        "outcome": "3",
+        "n_repairs": 0,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "crashed with none printed (exit 1)"
+      },
+      {
+        "tool": "amt13",
+        "spec": "humanoid-531",
+        "outcome": "3",
+        "n_repairs": 0,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "crashed with none printed (exit 1)"
+      },
+      {
+        "tool": "amt13",
+        "spec": "humanoid-742",
+        "outcome": "3",
+        "n_repairs": 0,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "crashed with none printed (exit 1)"
+      },
+      {
+        "tool": "amt13",
+        "spec": "pcar-v2-888",
+        "outcome": "3",
+        "n_repairs": 0,
+        "n_admissible": 0,
+        "n_frontier": 0,
+        "reason": "crashed with none printed (exit 1)"
+      }
+    ]
+  },
+  "decision": "Outcome 1 (section 11.5), under both readings of undecided pairs.",
+  "decision_note": "On 9 (tool, subject) cells some tool frontier repair is covered by no PEREDUR run: GLASS on lift and humanoid-458, JVTS-Repair on rg1 (15 of 15), rg2, lift (11 of 11) and gyro-var1, AMT13 on rg1 (7 of 7), rg2 and lift. 6 cells are covered in full by the pool. GLASS on humanoid-503 and JVTS-Repair on humanoid-742 are undetermined: each has one tool repair covered only if undecided pairs count as coverage, so no verdict is stated there. 13 cells are Outcome 3: 8 with no admissible repair, 5 where the tool crashed or was killed with none printed. Converse: 88-100% of each run's frontier is covered by no tool repair on every decided cell; these are upper bounds, see PLAN.md 'Known limit of the converse'.",
+  "files": {
+    "PLAN.md": "How section 11 of the baselines plan was run: passes, budgets, the pool, readings, cost.",
+    "campaign.toml": "The declaration the queue ran.",
+    "PROVENANCE.json": "This file.",
+    "scripts/": "Vendored scripts at 085b5e6, blob shas below. The run/merge scripts the procedure names are not vendored: no run phase ran, and the score passes do not import them.",
+    "phase-042.log": "The queue entry's log from av2 for the attempt that ran. Untracked.",
+    "../maoz-coverage-screen/, ../maoz-coverage-frontier/, ../maoz-coverage-relations/, ../maoz-coverage-report/": "The four passes' outputs, 3.2 MB. Untracked, md5-identical to av2 on 2026-10-06; md5s below.",
+    "../maoz-peredur-pool/": "The PEREDUR pool, 9,178 TLSF files. Untracked."
+  },
+  "output_md5": {
+    "maoz-coverage-screen/maoz-score-manifest-avlab12.json": "f6ead08554ad46c967ea0a5e40ce97d0",
+    "maoz-coverage-screen/screen.csv": "8f4a9cc1fe3eccd80376b110fc116b0c",
+    "maoz-coverage-frontier/frontier-summary.csv": "e336c68dcc5021b1117faf6921de6b4a",
+    "maoz-coverage-frontier/frontier.csv": "d79d10097231e4190f5d8d5b6624c27b",
+    "maoz-coverage-frontier/maoz-score-manifest-avlab12.json": "acc5b593a8cb8def2e570ccd6e5ae955",
+    "maoz-coverage-relations/maoz-score-manifest-avlab12.json": "3cfc1dbb70ae675a475d9a11eedff2ce",
+    "maoz-coverage-relations/relations.csv": "53f99682ab149a0274c6b9ff5497d35d",
+    "maoz-coverage-relations/timings.csv": "5256f5b0b7751595587fa3566c4fbc3c",
+    "maoz-coverage-report/maoz-score-manifest-avlab12.json": "e0d6c234da63837cc2a84ab49cd7721c",
+    "maoz-coverage-report/report.csv": "e63c56508e2d548fd574c6519ce3aba8",
+    "maoz-coverage-report/report.txt": "eae6c838fe0abf6fc587966d71522aa6",
+    "maoz-peredur-pool/pool.tsv": "4e73afe4c071d7cebd693aaf54754a59",
+    "maoz-peredur-pool/runs.tsv": "39438a6e6dcb2588fda79a591cfa751f"
+  },
+  "vendored_scripts": {
+    "vendored_on": "2026-10-06",
+    "source_commit": "085b5e6",
+    "files": {
+      "campaign.py": "f41278e4a98677b0a09b0f25734a982db030ca3e",
+      "maoz_score.py": "86825038a46f5ed96a36b734285601305180bd8b",
+      "check_well_separated.py": "de9b6687b3bfd0f693812377360b3f8532abebb8"
+    }
+  }
+}
