@@ -15,3 +15,22 @@ python3 tlsf_prc_report.py out.csv
 | `out/match_k{1,3,5}.csv`, `out/report_match_k{1,3,5}.txt` | size-matched, K = 1, 3, 5 |
 
 Cross pairs compare two configurations at the same seed, while controls compare seeds 2j and 2j+1 of one configuration. Two PEREDUR configurations at the same seed share an RNG stream, so their cross figure can exceed the control for that reason alone; the MRS-vs-AuRUS-grading row does so at every K, matched or not.
+
+## FRETISH
+
+`fretish/fp_prc.py` is the same measure on the fretish-mixed frontiers: directed, uniform and mixed mutation, seeds 0–29, on 15 FRETISH subjects. Inputs are the per-subject fingerprint files (`<subject>.tsv`, one row per member: run path and hex fingerprint), one directory per host. Runs were on av3 in `~/fret-prc` on 2026-10-05.
+
+```sh
+DIST=jaccard K=3 MATCH=0 python3 fp_prc.py j3m.csv av2/*.tsv av3/*.tsv
+python3 fp_prc_report.py j3m.csv
+```
+
+A `triple` unit holds the three arms at one seed. An `xtriple` unit draws each arm from a different seed of one control block, so no cross pair shares an RNG stream. `MATCH=<seed>` subsamples each unit to its smallest group. `DIST=jaccard` is the union distance, and the default is the Hamming count.
+
+| File | Run |
+|---|---|
+| `fretish/out/j{1,3,5}m.csv`, `fretish/out/report_j{1,3,5}m.txt` | Jaccard, size-matched, K = 1, 3, 5 |
+| `fretish/out/j3.csv`, `fretish/out/report_j3.txt` | Jaccard, unmatched, K = 3 |
+| `fretish/out/h3m.csv`, `fretish/out/report_h3m.txt` | Hamming, size-matched, K = 3 |
+
+At K = 3, matched and cross-seed, directed and uniform overlap by 0.607 against a same-arm control of 0.613 (p = 0.45). Coverage puts the cross figure below the control, 0.584 against 0.638 (p = 0.003). Directed's repairs sit inside uniform's region more often than the reverse: 0.680 against 0.534, with uniform-in-directed larger on 3 of 15 subjects (p = 0.010). Mixed reads like uniform. Same-seed triples raise the cross figures by about 0.02. The asymmetry and the coverage gap hold at K = 1 and 5 and under the Hamming count. Precision's cross figure matches the control at K = 1 and under Hamming, but falls below it at K = 5 (0.688 against 0.708, p = 0.049). `fsm-lmcps` has 7 fingerprints and fills no unit. The permutation null and the P-precision pass have not been run on these frontiers.

@@ -1,0 +1,46 @@
+
+== prec: cross against same-arm control (symmetric, both directions)
+  triple  d<->u: cross 0.423 vs control 0.399, cross larger 13/15 p=0.0151
+  triple  d<->m: cross 0.422 vs control 0.399, cross larger 13/15 p=0.0125
+  triple  u<->m: cross 0.411 vs control 0.399, cross larger 9/15 p=0.1688
+  xtriple d<->u: cross 0.407 vs control 0.399, cross larger 7/15 p=0.8040
+  xtriple d<->m: cross 0.407 vs control 0.399, cross larger 10/15 p=0.1205
+  xtriple u<->m: cross 0.407 vs control 0.399, cross larger 9/15 p=0.1876
+
+== cov: cross against same-arm control (symmetric, both directions)
+  triple  d<->u: cross 0.332 vs control 0.326, cross larger 7/15 p=0.9341
+  triple  d<->m: cross 0.328 vs control 0.326, cross larger 7/15 p=0.9341
+  triple  u<->m: cross 0.353 vs control 0.326, cross larger 11/15 p=0.0215
+  xtriple d<->u: cross 0.307 vs control 0.326, cross larger 5/15 p=0.0479
+  xtriple d<->m: cross 0.315 vs control 0.326, cross larger 4/15 p=0.0833
+  xtriple u<->m: cross 0.335 vs control 0.326, cross larger 10/15 p=0.6387
+
+== asymmetry: precision of B inside A's region
+  triple  u-in-d 0.368 vs d-in-u 0.477: first larger 3/15 p=0.0554
+  triple  m-in-d 0.371 vs d-in-m 0.473: first larger 3/15 p=0.0125
+  triple  m-in-u 0.423 vs u-in-m 0.399: first larger 9/15 p=0.2293
+  xtriple u-in-d 0.346 vs d-in-u 0.467: first larger 3/15 p=0.0353
+  xtriple m-in-d 0.355 vs d-in-m 0.458: first larger 4/15 p=0.0215
+  xtriple m-in-u 0.420 vs u-in-m 0.394: first larger 8/15 p=0.2769
+
+== same-arm control by arm
+  directed 0.402 over 14 subjects
+  uniform  0.397 over 15 subjects
+  mixed    0.400 over 15 subjects
+
+== per subject: xtriple u-in-d / d-in-u | control
+  fsm             0.656 / 0.607 | 0.653
+  fsm-combined    0.247 / 0.385 | 0.383
+  fsm-timing      0.414 / 0.508 | 0.466
+  mode-arbiter    0.468 / 0.677 | 0.585
+  rad-core-1-18   0.281 / 0.351 | 0.320
+  rad-core-10     0.042 / 0.958 | 0.372
+  rad-core-12-18  0.337 / 0.363 | 0.320
+  rad-core-17-18  0.289 / 0.354 | 0.334
+  rad-core-33     0.457 / 0.175 | 0.266
+  rad-core-45     0.302 / 0.332 | 0.309
+  rad-core-55     0.187 / 0.401 | 0.297
+  rad-core-61     0.099 / 0.321 | 0.188
+  rad-core-65     0.142 / 0.302 | 0.221
+  rad-core-68     0.359 / 0.316 | 0.330
+  takeoff         0.918 / 0.952 | 0.938
