@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "bounded_async.hpp"
@@ -297,15 +298,11 @@ std::vector<std::size_t> position_order_from_slots(
 
 std::vector<std::string> specification_status_components(
     const Specification& specification) {
-    // Requirements are checked one at a time rather than conjoined across the
-    // specification: they fire at different times (different conditions,
-    // Trigger vs Continual), so their conditions and responses need not be
-    // simultaneously satisfiable. Testing `condition & response` per
-    // requirement also subsumes testing either half alone, since an
-    // unsatisfiable half makes the conjunction unsatisfiable.
+    // A screen ahead of the realizability walk, not a satisfiability test;
+    // the header says why condition and response are tested apart.
     std::vector<std::string> components;
-    components.reserve(specification.m_assumptions.size() +
-                       specification.m_guarantees.size());
+    components.reserve(2 * (specification.m_assumptions.size() +
+                            specification.m_guarantees.size()));
     const auto add = [&components](const std::vector<Requirement>& reqs) {
         for (const Requirement& req : reqs) {
             // A removed requirement is not a component of the specification;
@@ -314,8 +311,11 @@ std::vector<std::string> specification_status_components(
             if (req.m_removed) {
                 continue;
             }
-            components.push_back("(" + req.m_condition.to_string() + ") & (" +
-                                 req.m_response.to_string() + ")");
+            components.push_back(req.m_condition.to_string());
+            if (!std::holds_alternative<timing::Until>(req.m_timing) &&
+                !std::holds_alternative<timing::Before>(req.m_timing)) {
+                components.push_back(req.m_response.to_string());
+            }
         }
     };
     add(specification.m_assumptions);
