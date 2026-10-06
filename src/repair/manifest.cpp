@@ -25,6 +25,7 @@
 #include "filter/well_separation.hpp"
 #include "fitness/function.hpp"
 #include "fitness/semantic_similarity.hpp"
+#include "fitness/status.hpp"
 #include "genetic/accumulator.hpp"
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
@@ -192,7 +193,11 @@ namespace {
 // or the semantic objective. The default reproduces every earlier run, so an
 // older manifest reads as keyword_similarity = "syntactic". Both are
 // FRETISH-only and read null on a TLSF run.
-constexpr int k_schema_version = 32;
+//
+// 33 added mrs_screen: how often the MRS walk's whole-specification
+// satisfiability screen ran, fired and was left undecided. Zero under any
+// other status grading, and absent before the screen existed.
+constexpr int k_schema_version = 33;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -472,6 +477,10 @@ void write_run_manifest(const std::string& output_dir,
         {"n_weak_operator_unresolved",
          SatisfiabilityChecker::n_weak_operator_unresolved.load()},
         {"n_tautology_substitutions", Ltl2tgbaStats::n_tautology_substitutions},
+        {"mrs_screen",
+         {{"screened", MrsScreenStats::n_screened.load()},
+          {"unsatisfiable", MrsScreenStats::n_unsatisfiable.load()},
+          {"undecided", MrsScreenStats::n_undecided.load()}}},
         // Repairs the cross-generation accumulator added that the final
         // population's own collection did not already hold. Zero when
         // genetic.accumulate_repairs is off, and also when every accumulated

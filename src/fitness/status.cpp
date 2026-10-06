@@ -122,8 +122,15 @@ double status_score_mrs(const std::vector<std::string>& components,
     // the whole specification is the query most likely to exhaust the budget,
     // and reading a timeout as unsatisfiable would zero exactly the largest
     // candidates, where the walk can still grade them.
-    if (!whole.empty() && !sat.check_satisfiability(whole).value_or(true)) {
-        return k_status_component_unsatisfiable;
+    if (!whole.empty()) {
+        MrsScreenStats::n_screened++;
+        const std::optional<bool> satisfiable = sat.check_satisfiability(whole);
+        if (!satisfiable.has_value()) {
+            MrsScreenStats::n_undecided++;
+        } else if (!*satisfiable) {
+            MrsScreenStats::n_unsatisfiable++;
+            return k_status_component_unsatisfiable;
+        }
     }
     // Grown once and reused across the walk; the oracle reads it and does not
     // retain it. A rejected part is erased, so `kept` is exactly the accepted

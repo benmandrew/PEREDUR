@@ -4,6 +4,7 @@
 /// @brief Realizability status fitness score, on the three-point scale shared
 ///        by the FRETISH and TLSF front ends.
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -168,6 +169,22 @@ double status_score_aurus(const std::string& assumptions,
 /// was decided.
 using SubsetRealizability =
     std::function<bool(const std::vector<std::size_t>& indices)>;
+
+/// How often the MRS walk's whole-specification screen ran and what it found,
+/// over a run. Every MRS scoring counts, and a fitness-cache hit does not. The
+/// output gate re-scores each accumulated and final candidate past the fitness
+/// cache, so a candidate the search scored can be counted twice. Reported
+/// under `--diagnostics` and in run.json.
+struct MrsScreenStats {
+    /// Whole-specification queries asked: candidates that passed the
+    /// components and had a walk to spare.
+    inline static std::atomic<std::size_t> n_screened{0};
+    /// Of those, the queries that found the specification unsatisfiable, each
+    /// scoring 0 where the walk would have graded it.
+    inline static std::atomic<std::size_t> n_unsatisfiable{0};
+    /// Of those, the queries left undecided, which pass to the walk.
+    inline static std::atomic<std::size_t> n_undecided{0};
+};
 
 /// Scores a candidate on the greedy maximal-realizable-subset (MRS) scale,
 /// selected by Config::status_grading. Below realizability the score is the

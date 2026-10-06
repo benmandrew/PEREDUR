@@ -9,6 +9,7 @@
 #include "filter/well_separation.hpp"
 #include "fitness/function.hpp"
 #include "fitness/semantic_similarity.hpp"
+#include "fitness/status.hpp"
 #include "genetic/accumulator.hpp"
 #include "genetic/generation.hpp"
 #include "runner/black.hpp"
@@ -143,6 +144,10 @@ void print_diagnostics_report() {
     std::cout << "Weak-operator queries left unresolved (ltlfilt could not "
                  "rewrite W/M, black is unsound on them): "
               << SatisfiabilityChecker::n_weak_operator_unresolved << "\n";
+    std::cout << "\nMRS whole-specification screen: "
+              << MrsScreenStats::n_screened << " screened, "
+              << MrsScreenStats::n_unsatisfiable << " unsatisfiable, "
+              << MrsScreenStats::n_undecided << " undecided\n";
     std::cout << "\nRepairs contributed by the cross-generation accumulator "
                  "(0 unless genetic.accumulate_repairs is set): "
               << AccumulatorStats::n_contributed << "\n";

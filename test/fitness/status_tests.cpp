@@ -379,6 +379,19 @@ TEST(test_mrs_short_circuits_on_an_unsatisfiable_whole_specification) {
            "mrs: the whole-specification screen should short-circuit the walk");
 }
 
+TEST(test_mrs_screen_counts_what_it_finds) {
+    SatisfiabilityChecker sat;
+    const std::size_t screened = MrsScreenStats::n_screened;
+    const std::size_t unsatisfiable = MrsScreenStats::n_unsatisfiable;
+    const auto admit_all = [](const std::vector<std::size_t>&) { return true; };
+    status_score_mrs({"p"}, 1, sat, admit_all, {}, "(p) & (!p)");
+    status_score_mrs({"p"}, 1, sat, admit_all, {}, "(p) & (q)");
+    expect(MrsScreenStats::n_screened == screened + 2,
+           "mrs: every whole-specification query should be counted");
+    expect(MrsScreenStats::n_unsatisfiable == unsatisfiable + 1,
+           "mrs: only the unsatisfiable one should count as fired");
+}
+
 TEST(test_mrs_satisfiable_whole_specification_reaches_the_walk) {
     SatisfiabilityChecker sat;
     RecordingOracle oracle{
