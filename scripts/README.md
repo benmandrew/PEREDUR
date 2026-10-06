@@ -8,7 +8,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 
 | Script | Role |
 |---|---|
-| `campaign.py` | The operating surface for a campaign: `stage`, `start`, `enqueue`, `tick`, `status`, `queue`, `collect`, `describe`. Everything that acts on a campaign goes through it. See `docs/dev/campaigns.md` for the state each verb leaves behind. |
+| `campaign.py` | The operating surface for a campaign: `stage`, `start`, `enqueue`, `tick`, `status`, `load`, `queue`, `collect`, `describe`. Everything that acts on a campaign goes through it. See `docs/dev/campaigns.md` for the state each verb leaves behind. |
 | `run_experiments.py` | Runs one phase of a sweep on one host and appends rows to the results CSV. Vendored into every campaign archive. |
 | `score_campaign.py` | The runner's scoring twin: one `score_curves.py --maximality` per run directory over one host's seeds, under a pinned worker pool, with a manifest of the budgets and binaries. What a `kind = "score"` phase runs. |
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
@@ -793,6 +793,29 @@ poll and the cron tick's log stay readable. `--no-color`, on every verb that
 prints a table, and a non-empty `NO_COLOR` in the environment both turn it off;
 `CLICOLOR_FORCE=1` forces it on down a pipe, which is what `less -R` wants.
 `--json` is never coloured.
+
+### Machine load
+
+```sh
+python scripts/campaign.py load                     # av2, av3 and this machine
+python scripts/campaign.py load --host av3          # one host
+python scripts/campaign.py load --json              # machine-readable
+watch -c -n 2 'CLICOLOR_FORCE=1 python3 scripts/campaign.py load --no-legend'
+```
+
+A read-only poll of each machine's resources. The first table holds cores, the
+1/5/15-minute load average, CPU and iowait over a one-second sample, memory
+(total less `MemAvailable`), swap, free space on the filesystem holding the
+checkout, and uptime. A cell turns yellow or red as it nears saturation, with
+load judged against the core count. The second table lists each GPU's
+utilisation, memory and temperature. A last line per host gives cores used by
+each user over the same second, and who is logged in.
+
+One poll costs about 1.2s of wall time, nearly all of it the CPU sample, and
+under 0.1s of CPU on each host. ssh reuses a master connection for two minutes,
+so only the first poll pays the handshake. `nvidia-smi` is skipped when the
+card is runtime-suspended, since querying it would wake the card at a cost of
+about a second of system time; such a card is listed as `asleep`.
 
 ### Collecting a finished one
 

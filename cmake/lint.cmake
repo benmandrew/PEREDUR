@@ -41,9 +41,15 @@ set(PEREDUR_LINT_FILES_OVERRIDE "" CACHE STRING
     "Absolute paths of files to lint; empty means lint all sources")
 
 if(PEREDUR_LINT_FILES_OVERRIDE)
-    set(PEREDUR_LINT_FILES ${PEREDUR_LINT_FILES_OVERRIDE})
+    # The override is every changed C++ file in the branch, so it is cut back
+    # to the directories the full sweep globs: vendored experiment scripts
+    # under experiments/ are never linted.
+    set(PEREDUR_LINT_FILES "")
     set(PEREDUR_LINT_CPP_FILES "")
     foreach(lint_file IN LISTS PEREDUR_LINT_FILES_OVERRIDE)
+        if(lint_file MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}/(src|test|bench|fuzz|include)/")
+            list(APPEND PEREDUR_LINT_FILES ${lint_file})
+        endif()
         if(lint_file MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}/(src|test|bench)/.*\\.cpp$")
             list(APPEND PEREDUR_LINT_CPP_FILES ${lint_file})
         endif()
@@ -55,7 +61,13 @@ endif()
 
 # --- cpplint ---
 
-if(CPPLINT_EXE)
+if(PEREDUR_LINT_FILES_OVERRIDE AND NOT PEREDUR_LINT_FILES)
+    add_custom_target(lint-cpplint
+        COMMAND ${CMAKE_COMMAND} -E echo "cpplint: no changed source files, skipping"
+        COMMENT "cpplint: nothing to do"
+        VERBATIM
+    )
+elseif(CPPLINT_EXE)
     add_custom_target(lint-cpplint
         COMMAND ${CPPLINT_EXE}
             --config=.cpplint.cfg
@@ -128,7 +140,13 @@ endif()
 
 # --- cppcheck ---
 
-if(CPPCHECK_EXE)
+if(PEREDUR_LINT_FILES_OVERRIDE AND NOT PEREDUR_LINT_FILES)
+    add_custom_target(lint-cppcheck
+        COMMAND ${CMAKE_COMMAND} -E echo "cppcheck: no changed source files, skipping"
+        COMMENT "cppcheck: nothing to do"
+        VERBATIM
+    )
+elseif(CPPCHECK_EXE)
     add_custom_target(lint-cppcheck
         COMMAND ${CPPCHECK_EXE}
             --enable=warning,style,performance,portability

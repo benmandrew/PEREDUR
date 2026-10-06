@@ -6,7 +6,7 @@ The campaign declaration, the verbs that act on it, and what each reading means;
 
 A campaign is declared once, in `experiments/<name>/campaign.toml`: its branch, the seed range each lab host takes, and its phases. Everything that acts on a campaign goes through `scripts/campaign.py`, so the seed split exists in one place. Never hand-roll an `ssh … nohup … run_experiments.py` line and never choose a seed range at the prompt; two hosts sharing a seed run it twice and the merge keeps one row per key, which costs machine time and yields nothing. `campaign.toml` is tracked (a `.gitignore` negation), because the hosts get it by checking out the campaign's branch.
 
-The verbs are `stage` (put a host on the branch and rebuild it), `start` (launch the phases detached), `enqueue` plus the cron-driven `tick` (the unattended path), `dequeue` (take an entry back out, killing the tick holding it), `status`, `queue`, `collect` and `describe` (derive a declaration for an archived campaign).
+The verbs are `stage` (put a host on the branch and rebuild it), `start` (launch the phases detached), `enqueue` plus the cron-driven `tick` (the unattended path), `dequeue` (take an entry back out, killing the tick holding it), `status`, `load` (CPU, memory, disk and GPU use per host, cheap enough for `watch`), `queue`, `collect` and `describe` (derive a declaration for an archived campaign).
 
 `campaign.py status` is the source of truth, read-only, and costs about a second. Never carry campaign state in conversation context; re-run the poll later rather than predicting what it will say. Never poll in a loop, and never spawn an agent to watch a run: `enqueue` the campaign and let the five-minute tick drive it.
 

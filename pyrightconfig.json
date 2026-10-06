@@ -1,0 +1,4 @@
+{
+  "include": ["scripts"],
+  "exclude": ["**/__pycache__"]
+}

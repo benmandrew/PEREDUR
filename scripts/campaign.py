@@ -3,6 +3,7 @@
 
     python scripts/campaign.py status            # one table of live state
     python scripts/campaign.py status --json     # the same, machine-readable
+    python scripts/campaign.py load              # CPU, memory, disk, GPU
     python scripts/campaign.py collect --profile tlsf --dry-run
     python scripts/campaign.py collect --profile tlsf
     python scripts/campaign.py stage arbiter-probe --dry-run
@@ -87,10 +88,18 @@ REPO_ROOT = Path(__file__).parent.parent
 
 # The lab machines, by ssh-config alias. Bare aliases deliberately: see the
 # module docstring. The repo path on each is merge_experiments.REMOTE_ROOT.
-HOSTS: tuple[str, ...] = ("av2", "av3")
+HOSTS: tuple[str, ...] = ("av1", "av2", "av3")
 LOCAL = "local"
 
 SSH_OPTS = ["-o", "ConnectTimeout=8", "-o", "BatchMode=yes"]
+# `load` is meant to sit under `watch`, where the handshake would be most of
+# each poll's cost. A master connection that outlives the call for two minutes
+# makes every poll after the first a channel on an open session. Kept to
+# `load`: the other verbs run rarely, and a stale master is one more thing to
+# reason about when a launch misbehaves.
+SSH_MUX_OPTS = [*SSH_OPTS, "-o", "ControlMaster=auto",
+                "-o", "ControlPath=~/.ssh/campaign-load-%C",
+                "-o", "ControlPersist=120"]
 SSH_TIMEOUT_S = 45
 # collect --dry-run's measure step walks a whole result tree with du and find.
 # On a cold cache over the 29GB experiments dir that outlasts the status
@@ -329,7 +338,8 @@ def is_timeout(error: str | None) -> bool:
     return bool(error) and error.startswith(TIMEOUT_PREFIX)
 
 
-def run_shell(host: str, script: str, timeout: int = SSH_TIMEOUT_S):
+def run_shell(host: str, script: str, timeout: int = SSH_TIMEOUT_S,
+              ssh_opts: list[str] = SSH_OPTS):
     """Run a shell script on ``host`` (or locally). Returns (stdout, error).
 
     A timeout returns whatever had already arrived alongside the error, rather
@@ -340,7 +350,7 @@ def run_shell(host: str, script: str, timeout: int = SSH_TIMEOUT_S):
     if host == LOCAL:
         cmd = ["sh", "-c", script]
     else:
-        cmd = ["ssh", *SSH_OPTS, host, script]
+        cmd = ["ssh", *ssh_opts, host, script]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True,
                               timeout=timeout)
@@ -4355,6 +4365,297 @@ def cmd_cron(args: argparse.Namespace) -> int:
     return 0
 
 
+# -- load ---------------------------------------------------------------------
+
+# Cheap enough to sit under `watch`: no top, no ps, one sleep. Per-process
+# CPU ticks are read straight out of /proc/<pid>/stat on either side of the
+# second the /proc/stat delta covers, and summed per owning uid. The comm field
+# is parenthesised and may hold spaces, so it is squashed to one token before
+# fields are counted (utime and stime are fields 14 and 15). A process that
+# starts or exits inside the second is missed, which undercounts a box full of
+# short solver calls but never misattributes one. The /proc globs are the one
+# exception to never globbing remotely: /proc always holds pid 1, so zsh's
+# NOMATCH cannot fire.
+#
+# nvidia-smi wakes a runtime-suspended card, which on the laptop costs 1.9s
+# and a second of system time per call and keeps the card from ever powering
+# down under `watch`. A suspended card is idle by definition, so the probe
+# reads its power state out of sysfs and only asks nvidia-smi when every
+# NVIDIA display device is awake. The lab hosts' cards never suspend.
+LOAD_SCRIPT = r"""
+export LC_ALL=C
+ticks() { cat /proc/[0-9]*/stat 2>/dev/null | sed 's/ (.*) / c /' \
+  | awk '{ print $1, $14 + $15 }'; }
+echo "@M@NPROC $(nproc)"
+echo "@M@LOADAVG $(cat /proc/loadavg)"
+echo "@M@UPTIME $(cut -d' ' -f1 /proc/uptime)"
+T0=$(ticks)
+echo "@M@STAT0 $(head -1 /proc/stat)"
+sleep 1
+echo "@M@STAT1 $(head -1 /proc/stat)"
+T1=$(ticks)
+{ echo "$T0" | sed 's/^/0 /'; echo "$T1" | sed 's/^/1 /'
+  stat -c 'u %n %u' /proc/[0-9]* 2>/dev/null | sed 's|/proc/||'; } \
+  | awk '$1 == 0 { t0[$2] = $3 } $1 == 1 { t1[$2] = $3 } $1 == "u" { uid[$2] = $3 }
+    END { for (p in t1) if ((p in t0) && (p in uid)) d[uid[p]] += t1[p] - t0[p]
+          for (u in d) if (d[u] > 0) print u, d[u] }' \
+  | while read -r u d; do
+      echo "@M@USERTICKS $(getent passwd "$u" | cut -d: -f1 || true) $u $d"
+    done
+awk '/^(MemTotal|MemAvailable|SwapTotal|SwapFree):/ {
+       sub(":", "", $1); print "@M@MEM", $1, $2 }' /proc/meminfo
+df -Pk @ROOT@ 2>/dev/null | awk 'NR == 2 { print "@M@DISK", $2, $3, $4, $6 }'
+asleep=
+for v in $(grep -l 0x10de /sys/bus/pci/devices/*/vendor 2>/dev/null); do
+  d=${v%/vendor}
+  case "$(cat "$d/class")" in 0x03*) ;; *) continue ;; esac
+  if [ "$(cat "$d/power/runtime_status" 2>/dev/null)" = suspended ]; then
+    asleep=1; echo "@M@GPUSLEEP ${d##*/}"
+  fi
+done
+if [ -z "$asleep" ] && command -v nvidia-smi >/dev/null 2>&1; then
+  nvidia-smi --query-gpu=index,utilization.gpu,memory.used,memory.total,temperature.gpu,name \
+    --format=csv,noheader,nounits 2>/dev/null | sed 's/^/@M@GPU /'
+fi
+who 2>/dev/null | awk '{ print $1 }' | sort | uniq -c \
+  | awk '{ print "@M@WHO", $2, $1 }'
+echo "@M@END"
+"""
+
+
+def cpu_split(stat0: list[int], stat1: list[int]) -> tuple[float, float] | None:
+    """Busy and iowait percentages between two /proc/stat ``cpu`` lines.
+
+    iowait is idle time with a disk request outstanding, so it is taken out of
+    busy and reported on its own: a box stuck on I/O reads as idle otherwise.
+    Guest time is already inside user and nice, and is not counted twice.
+    """
+    if len(stat0) < 5 or len(stat1) < 5:
+        return None
+    delta = [b - a for a, b in zip(stat0[:8], stat1[:8])]
+    total = sum(delta)
+    if total <= 0:
+        return None
+    idle, iowait = delta[3], delta[4]
+    return (100.0 * (total - idle - iowait) / total, 100.0 * iowait / total)
+
+
+def parse_load(text: str) -> dict:
+    """Marker output of LOAD_SCRIPT. Byte counts are bytes, not kB."""
+    out: dict = {"gpus": [], "gpus_asleep": [], "user_cores": {},
+                 "sessions": {}}
+    stats: dict = {}
+    mem: dict = {}
+    user_ticks: dict = {}
+    for line in text.splitlines():
+        if not line.startswith(MARK):
+            continue
+        tag, _, rest = line[len(MARK):].partition(" ")
+        fields = rest.split()
+        try:
+            if tag == "NPROC" and fields:
+                out["cores"] = int(fields[0])
+            elif tag == "LOADAVG" and len(fields) >= 3:
+                out["loadavg"] = [float(f) for f in fields[:3]]
+            elif tag == "UPTIME" and fields:
+                out["uptime_s"] = float(fields[0])
+            elif tag in ("STAT0", "STAT1") and len(fields) > 1:
+                stats[tag] = [int(f) for f in fields[1:]]
+            elif tag == "USERTICKS" and len(fields) in (2, 3):
+                # A uid with no passwd entry arrives without a name.
+                name = fields[0] if len(fields) == 3 else f"uid{fields[0]}"
+                user_ticks[name] = user_ticks.get(name, 0) + int(fields[-1])
+            elif tag == "MEM" and len(fields) == 2:
+                mem[fields[0]] = int(fields[1]) * 1024
+            elif tag == "DISK" and len(fields) >= 4:
+                out["disk"] = {"total": int(fields[0]) * 1024,
+                               "used": int(fields[1]) * 1024,
+                               "free": int(fields[2]) * 1024,
+                               "mount": fields[3] if len(fields) > 3 else "?"}
+            elif tag == "GPU":
+                # The name goes last because it is the one field that can
+                # carry a comma-free run of spaces; split on the first five.
+                parts = [p.strip() for p in rest.split(",", 5)]
+                if len(parts) == 6:
+                    out["gpus"].append({
+                        "index": int(parts[0]), "util_pct": float(parts[1]),
+                        "mem_used": int(float(parts[2])) * 1024 * 1024,
+                        "mem_total": int(float(parts[3])) * 1024 * 1024,
+                        "temp_c": float(parts[4]), "name": parts[5]})
+            elif tag == "GPUSLEEP" and fields:
+                out["gpus_asleep"].append(fields[0])
+            elif tag == "WHO" and len(fields) == 2:
+                out["sessions"][fields[0]] = int(fields[1])
+        except ValueError:
+            # nvidia-smi prints "[N/A]" for a field a card cannot report; a
+            # line that does not parse is dropped rather than read as zero.
+            continue
+    split = cpu_split(stats.get("STAT0", []), stats.get("STAT1", []))
+    if split:
+        out["cpu_pct"], out["iowait_pct"] = split
+    # The window's length in ticks is the /proc/stat delta over all cores
+    # divided by the core count, which spares assuming sleep took exactly 1s
+    # or that CLK_TCK is 100.
+    if user_ticks and out.get("cores") and "STAT0" in stats and "STAT1" in stats:
+        window = (sum(stats["STAT1"][:8]) - sum(stats["STAT0"][:8])) / out["cores"]
+        if window > 0:
+            out["user_cores"] = {u: t / window for u, t in user_ticks.items()
+                                 if t / window >= 0.05}
+    if "MemTotal" in mem and "MemAvailable" in mem:
+        out["mem"] = {"total": mem["MemTotal"],
+                      "used": mem["MemTotal"] - mem["MemAvailable"]}
+    if "SwapTotal" in mem and "SwapFree" in mem:
+        out["swap"] = {"total": mem["SwapTotal"],
+                       "used": mem["SwapTotal"] - mem["SwapFree"]}
+    return out
+
+
+def gather_load(host: str, root: str) -> dict:
+    text, error = run_shell(host, render_script(LOAD_SCRIPT,
+                                                ROOT=shlex.quote(root)),
+                            ssh_opts=SSH_MUX_OPTS)
+    report = {"host": host, "reachable": text is not None, "error": error}
+    if text is not None:
+        report.update(parse_load(text))
+    return report
+
+
+LOAD_HEADERS = ["HOST", "CORES", "LOAD 1/5/15", "CPU", "IOWAIT", "MEM",
+                "SWAP", "DISK FREE", "UP"]
+GPU_HEADERS = ["HOST", "GPU", "UTIL", "MEM", "TEMP", "NAME"]
+
+
+def fraction_cell(part: dict | None) -> str:
+    if not part or not part.get("total"):
+        return "-"
+    return (f"{human_bytes(part['used'])}/{human_bytes(part['total'])} "
+            f"{int(100 * part['used'] / part['total'])}%")
+
+
+def load_rows(reports: list[dict]) -> list[list[str]]:
+    rows = []
+    for r in reports:
+        if not r["reachable"]:
+            why = (r["error"] or "?").replace("\t", " ")
+            if len(why) > 44:
+                why = why[:41] + "..."
+            label = "no answer" if is_timeout(r["error"]) else "unreachable"
+            rows.append([r["host"], f"({label}: {why})", *["-"] * 7])
+            continue
+        disk = r.get("disk")
+        rows.append([
+            r["host"],
+            str(r.get("cores", "?")),
+            " ".join(f"{x:.1f}" for x in r["loadavg"]) if r.get("loadavg")
+            else "-",
+            f"{r['cpu_pct']:.0f}%" if "cpu_pct" in r else "-",
+            f"{r['iowait_pct']:.0f}%" if "iowait_pct" in r else "-",
+            fraction_cell(r.get("mem")),
+            fraction_cell(r.get("swap")),
+            (f"{human_bytes(disk['free'])} "
+             f"{int(100 * disk['free'] / disk['total'])}%")
+            if disk and disk.get("total") else "-",
+            human_duration(r.get("uptime_s")),
+        ])
+    return rows
+
+
+def gpu_rows(reports: list[dict]) -> list[list[str]]:
+    rows = []
+    for r in reports:
+        if not r["reachable"]:
+            continue
+        rows += [[r["host"], str(g["index"]), f"{g['util_pct']:.0f}%",
+                  fraction_cell({"used": g["mem_used"],
+                                 "total": g["mem_total"]}),
+                  f"{g['temp_c']:.0f}C", g["name"]] for g in r["gpus"]]
+        # Named by PCI address: the index is nvidia-smi's, which was not asked.
+        rows += [[r["host"], "-", "asleep", "-", "-", f"PCI {addr}"]
+                 for addr in r.get("gpus_asleep", [])]
+    return rows
+
+
+def pressure(r: dict, header: str) -> str | None:
+    """``"red"``, ``"yellow"`` or None for one load-table cell's reading.
+
+    Read from the report rather than the cell text, which is rounded. Load is
+    judged against the core count, since 30 is saturation on a 32-core host
+    and overload on the laptop.
+    """
+    def grade(x: float, warn: float, bad: float) -> str | None:
+        return "red" if x >= bad else "yellow" if x >= warn else None
+
+    if header == "LOAD 1/5/15" and r.get("loadavg") and r.get("cores"):
+        return grade(r["loadavg"][0] / r["cores"], 0.75, 1.0)
+    if header == "CPU" and "cpu_pct" in r:
+        return grade(r["cpu_pct"], 75, 95)
+    if header == "IOWAIT" and "iowait_pct" in r:
+        return grade(r["iowait_pct"], 10, 25)
+    if header in ("MEM", "SWAP"):
+        part = r.get(header.lower())
+        if part and part.get("total"):
+            return grade(part["used"] / part["total"], 0.75, 0.9)
+    if header == "DISK FREE" and r.get("disk", {}).get("total"):
+        free = r["disk"]["free"] / r["disk"]["total"]
+        return "red" if free < 0.05 else "yellow" if free < 0.15 else None
+    return None
+
+
+def load_painter(reports: list[dict]):
+    def paint(row: int, col: int, cell: str, style: Style) -> str:
+        r = reports[row]
+        if not r["reachable"]:
+            return style(cell, "red") if col == 1 else cell
+        colour = pressure(r, LOAD_HEADERS[col])
+        return style(cell, colour) if colour else cell
+    return paint
+
+
+def load_notes(reports: list[dict]) -> list[str]:
+    """Who is using each host: CPU by user over the sample, then sessions."""
+    notes = []
+    for r in reports:
+        if not r["reachable"]:
+            continue
+        top = sorted(r.get("user_cores", {}).items(), key=lambda kv: -kv[1])
+        busy = ", ".join(f"{u} {c:.1f}" for u, c in top[:4]) or "nobody"
+        who = ", ".join(f"{u}" + (f" x{n}" if n > 1 else "")
+                        for u, n in sorted(r.get("sessions", {}).items()))
+        notes.append(f"{r['host']}: cores by user: {busy}; "
+                     f"logged in: {who or 'nobody'}")
+    return notes
+
+
+def cmd_load(args: argparse.Namespace) -> int:
+    hosts = [args.host] if args.host else list(HOSTS)
+    targets = [(h, source_path(h)) for h in hosts if h != LOCAL]
+    if not args.host or args.host == LOCAL:
+        targets.append((LOCAL, str(REPO_ROOT)))
+    with ThreadPoolExecutor(max_workers=max(1, len(targets))) as pool:
+        reports = list(pool.map(lambda t: gather_load(*t), targets))
+    if args.json:
+        print(json.dumps({"generated": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                          "hosts": reports}, indent=2))
+    else:
+        print(render_table(load_rows(reports), LOAD_HEADERS,
+                           load_painter(reports)))
+        gpus = gpu_rows(reports)
+        if gpus:
+            print()
+            print(render_table(gpus, GPU_HEADERS))
+        notes = load_notes(reports)
+        if notes:
+            print()
+            print("\n".join(notes))
+        if not args.no_legend:
+            print("\nCPU, IOWAIT and cores by user cover one second sampled "
+                  "now; LOAD is the kernel's\n1/5/15-minute average, against "
+                  "CORES. MEM counts what MemAvailable says cannot\nbe "
+                  "reclaimed. DISK FREE is the filesystem holding the "
+                  "checkout.")
+    return 0 if all(r["reachable"] for r in reports) else 1
+
+
 # -- Entry point --------------------------------------------------------------
 
 def add_colour_flag(parser: argparse.ArgumentParser) -> None:
@@ -4387,6 +4688,18 @@ def build_parser() -> argparse.ArgumentParser:
                              "planned totals then read as unknown.")
     add_colour_flag(status)
     status.set_defaults(func=cmd_status)
+
+    load = sub.add_parser(
+        "load", help="CPU, memory, disk and GPU use, per host.")
+    load.add_argument("--host", choices=[*HOSTS, LOCAL],
+                      help="Only this host (default: every host plus this "
+                           "machine).")
+    load.add_argument("--json", action="store_true",
+                      help="Machine-readable output.")
+    load.add_argument("--no-legend", action="store_true",
+                      help="Drop the closing explanation, for `watch`.")
+    add_colour_flag(load)
+    load.set_defaults(func=cmd_load)
 
     collect = sub.add_parser(
         "collect", help="rsync each host's results back, merge and verify.")
