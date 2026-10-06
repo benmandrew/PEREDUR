@@ -584,6 +584,87 @@ check(C.status_rows([dict(shost, campaigns=[score_annotated(
       "a pass whose output directory is not there yet has no curve count")
 
 
+# ── status for a compare phase ────────────────────────────────────────────────
+#
+# compare_pairs.py writes its manifest under one fixed directory, and the
+# detail probe counts rows in the output CSV it names; the planned count is the
+# pair list's length from the manifest.
+
+COMPARE_MANIFEST = """{
+  "kind": "compare",
+  "hostname": "av1",
+  "started": "2026-10-06T10:00:00+0100",
+  "finished": null,
+  "pairs": "experiments/pairs-av1.csv",
+  "out": "experiments/out-av1.csv",
+  "pairs_total": 50,
+  "git": {"branch": "campaign/pooled-rq2", "head": "abc1234def"},
+  "binaries": {"compare": {"commit_short": "abc1234", "dirty": "0"}}
+}"""
+
+COMPARE_INVENTORY = f"""##PS
+python3 python3 scripts/compare_pairs.py experiments/pairs-av1.csv experiments/out-av1.csv --jobs 28 --manifest experiments/compare-manifests/rq2.subsumption.json
+##HOST
+av1
+1786460000
+##GIT
+campaign/pooled-rq2
+abc1234
+0
+##MANIFESTS
+##SCOREMANIFESTS
+##COMPAREMANIFESTS
+##CFILE experiments/compare-manifests/rq2.subsumption.json
+{COMPARE_MANIFEST}
+##ENDCFILE
+##END
+"""
+
+check_true("experiments/compare-manifests -maxdepth 1" in
+           C.inventory_script("/r") and "*.json" in C.inventory_script("/r"),
+           "the inventory sweeps the compare manifest directory with find")
+cinv = C.parse_inventory(COMPARE_INVENTORY)
+check(len(cinv["compare_manifests"]), 1, "a compare manifest is parsed")
+check((cinv["manifests"], cinv["score_manifests"]), ([], []),
+      "and is mistaken for neither other kind")
+cprocs = C.live_processes(cinv["ps"])
+check((cprocs[0].get("kind"), cprocs[0].get("manifest")),
+      ("compare", "experiments/compare-manifests/rq2.subsumption.json"),
+      "compare_pairs.py is read as a comparer naming its manifest")
+crec = C.campaigns_from_compare_manifests(cinv["compare_manifests"])
+cr = crec[0]
+check((cr["kind"], cr["label"], cr["out"], cr["rows_planned"],
+       cr["binary_commit"]),
+      ("compare", "compare:rq2.subsumption", "experiments/out-av1.csv", 50,
+       "abc1234"),
+      "one record per manifest, planned from the pair list's length")
+cdetail = C.detail_script("/r", crec)
+check_true("##CAMPAIGN compare:rq2.subsumption" in cdetail
+           and "wc -l < experiments/out-av1.csv" in cdetail
+           and "run_experiments.py" not in cdetail,
+           f"the detail probe counts the output's rows: {cdetail}")
+cparsed = C.parse_detail("##CAMPAIGN compare:rq2.subsumption\n##CSVROWS 21\n"
+                         "##OUTMTIME 1786459940\n##END\n")[
+    "compare:rq2.subsumption"]
+check((cparsed["rows_done"], cparsed.get("rows_from_csv")), (20, None),
+      "the header is not a row, and the count is not marked as a fallback")
+cann = dict(cr, **cparsed)
+C.annotate(cann, {"epoch": 1786460000, "processes": cprocs})
+check(cann["state"], "running", "the comparer naming the manifest claims it")
+crow = C.status_rows([{"host": "av1", "reachable": True,
+                       "branch": "campaign/pooled-rq2", "processes": cprocs,
+                       "campaigns": [cann]}])[0]
+check(crow[1:5], ["compare:rq2.subsumption", "20/50", "40%", "running"],
+      "and status reports rows done against pairs planned")
+cdone = dict(cr, rows_done=50, log_mtime=1786459940)
+C.annotate(cdone, {"epoch": 1786460000, "processes": []})
+check(cdone["state"], "done", "every pair with a row is done")
+check_true(any("already live" in r for r in C.start_refusals(
+    C.HostProbe(branch="b", head="h", binary={"commit": "h", "dirty": "0"},
+                processes=cprocs), {"branch": "b", "name": "x"}, "h")),
+           "and a live comparer blocks a start")
+
+
 # ── collect: merge and verification against local fixtures ────────────────────
 
 CSV_HEADER = ["sweep", "level_name", "selection", "weakening", "metric",
@@ -1029,7 +1110,8 @@ phases = [ { profile = "full", jobs = 1 } ]
         ('hosts = { av2 = "0-" }', "not a seed", "an open-ended range"),
         ('hosts = { av2 = "9-0" }', "backwards", "a range counting backwards"),
         ('hosts = { av2 = "amba" }', "not a seed", "a non-numeric range"),
-        ('hosts = { av2 = "" }', "non-empty", "an empty range"),
+        ('hosts = { av2 = "" }', "declare no seeds",
+         "an empty range under a seeded phase"),
         ('hosts = { av2 = "0-2,1-3" }', "repeats", "a range repeating itself"),
         ('hosts = { nowhere = "0-1" }', "unknown host", "an unknown host"),
     ):
@@ -1084,6 +1166,96 @@ phases = [ { profile = "no-such-profile", jobs = 1 } ]
         missing = str(exc)
     check_true("no campaign declaration" in missing,
                "and a campaign with no declaration at all names the path")
+
+    # ── a compare phase ───────────────────────────────────────────────────────
+    #
+    # Not seed-split: each host runs its own pair list, named by a path with
+    # {host} in it. The campaign-level table may give a host "" for that, and
+    # av1 is a host like the other two.
+    write_declaration(decl_root, "pairs", """
+name = "pairs"
+branch = "campaign/pooled-rq2"
+hosts = { av1 = "", av2 = "", av3 = "" }
+
+[[phases]]
+name = "subsumption"
+kind = "compare"
+pairs = "experiments/pairs/pairs-{host}.csv"
+out = "/abs/out-{host}.csv"
+jobs = 28
+""")
+    pairs = C.load_campaign("pairs", decl_root)
+    check(pairs["hosts"], {"av1": [], "av2": [], "av3": []},
+          "av1 is accepted, and \"\" declares a host with no seeds")
+    cmp_phase = pairs["phases"][0]
+    check((cmp_phase["kind"], cmp_phase["name"], cmp_phase["jobs"],
+           cmp_phase["black_timeout"], cmp_phase["wall_timeout"],
+           cmp_phase["vmem_kb"], cmp_phase["hosts"]),
+          ("compare", "subsumption", 28, 300, 700, 8000000, None),
+          "a compare phase parses, its budgets defaulting to compare_pairs.py's")
+    check(pairs["config_dirs"], [], "and reads no configs directory")
+    check(pairs["results_dirs"], {"av1": [], "av2": [], "av3": []},
+          "nor any results directory")
+    check(C.phase_args(cmp_phase, [], "av1"),
+          ["experiments/pairs/pairs-av1.csv", "/abs/out-av1.csv",
+           "--jobs", "28", "--black-timeout", "300", "--wall-timeout", "700",
+           "--vmem-kb", "8000000",
+           "--manifest", "experiments/compare-manifests/pairs.subsumption.json"],
+          "{host} is expanded per host, and every budget is stated")
+    check(C.phase_command(cmp_phase, [], "av3"),
+          C.COMPARE_PAIRS_CMD + " experiments/pairs/pairs-av3.csv "
+          "/abs/out-av3.csv --jobs 28 --black-timeout 300 --wall-timeout 700 "
+          "--vmem-kb 8000000 --manifest "
+          "experiments/compare-manifests/pairs.subsumption.json",
+          "and its command is compare_pairs.py's")
+    check(C.phase_seeds(cmp_phase, "av1", [0, 1]), [],
+          "a compare phase takes no seeds")
+    check_true(all(C.phase_runs_on(cmp_phase, h, []) for h in C.HOSTS),
+               "and runs on every declared host when it narrows none")
+    av1_entry = C.new_entry(pairs, "av1", 3, "a" * 40)
+    check((av1_entry["seeds"], av1_entry["phase_seeds"]), ("", [""]),
+          "an entry for it freezes no seeds")
+
+    write_declaration(decl_root, "narrowpairs", """
+name = "narrowpairs"
+branch = "b"
+hosts = { av1 = "", av2 = "0-9" }
+phases = [ { kind = "compare", pairs = "p.csv", out = "o.csv", hosts = ["av1"] },
+           { profile = "full", jobs = 1, hosts = { av2 = "0-9" } } ]
+""")
+    narrow = C.load_campaign("narrowpairs", decl_root)
+    check((C.phase_runs_on(narrow["phases"][0], "av1", []),
+           C.phase_runs_on(narrow["phases"][0], "av2", list(range(10)))),
+          (True, False), "a compare phase's hosts array narrows the host list")
+    check(narrow["phases"][0]["name"], "compare", "and the name defaults")
+
+    for body, expect_in, why in (
+        ('pairs = "p.csv", out = "o.csv", bogus = 1', "unknown key(s) bogus",
+         "an unknown key"),
+        ('pairs = "p.csv", out = "o.csv", profile = "full"',
+         "unknown key(s) profile", "a profile"),
+        ('pairs = "p.csv", out = "o.csv", sweeps = ["A"], specs = ["x"]',
+         "unknown key(s) specs, sweeps", "selection keys"),
+        ('out = "o.csv"', "needs pairs", "a missing pair list"),
+        ('pairs = "p.csv"', "needs out", "a missing output"),
+        ('pairs = "p-{seed}.csv", out = "o.csv"', "only {host}",
+         "a placeholder other than {host}"),
+        ('pairs = "p.csv", out = "o.csv", jobs = 0', "positive integer",
+         "a job count of zero"),
+        ('pairs = "p.csv", out = "o.csv", wall_timeout = true',
+         "positive integer", "a flag for a budget"),
+        ('pairs = "p.csv", out = "o.csv", hosts = { av1 = "0-1" }',
+         "array of host names", "a seed table for hosts"),
+        ('pairs = "p.csv", out = "o.csv", hosts = ["av3"]',
+         "not declared at the campaign level", "a host the campaign lacks"),
+    ):
+        got = declaration_error(decl_root, "badpairs", f"""
+name = "badpairs"
+branch = "b"
+hosts = {{ av1 = "", av2 = "" }}
+phases = [ {{ kind = "compare", {body} }} ]
+""")
+        check_true(expect_in in got, f"{why} must be refused ({got!r})")
 
     # A phase may narrow the split. Two paths whose sample sizes come from
     # separate power calculations cannot share one range: the wider one
@@ -2107,6 +2279,28 @@ try:
                "with av2's seeds on both of av2's phases")
     write_declaration(repo, "fixture", FIXTURE_DECL)
 
+    # A compare phase joins the chain with its paths expanded for each host
+    # and no seeds; narrowed to av3, it is absent from av2's chain.
+    write_declaration(repo, "fixture", FIXTURE_DECL.replace(
+        'phases = [ { profile = "full", jobs = 2 } ]',
+        'phases = [ { profile = "full", jobs = 2 }, '
+        '{ kind = "compare", name = "sub", pairs = "p-{host}.csv", '
+        'out = "o-{host}.csv", jobs = 3, hosts = ["av3"] } ]'))
+    started = io.StringIO()
+    with contextlib.redirect_stdout(started):
+        code = C.cmd_start(start_args())
+    printed = started.getvalue()
+    check(code, 0, f"a campaign with a compare phase is launchable: {printed}")
+    want_cmp = (f"{C.COMPARE_PAIRS_CMD} p-av3.csv o-av3.csv --jobs 3 "
+                f"--black-timeout 300 --wall-timeout 700 --vmem-kb 8000000 "
+                f"--manifest experiments/compare-manifests/fixture.sub.json")
+    check_true(any(ln.strip().endswith(" && " + want_cmp)
+                   for ln in printed.splitlines()),
+               f"the dry run prints av3's compare command: {printed}")
+    check_true("p-av2.csv" not in printed,
+               "and av2, narrowed away, gets none")
+    write_declaration(repo, "fixture", FIXTURE_DECL)
+
     # The runner's own freshness gate, asked one step early: a launch that
     # dies on the far side of a nohup leaves its message in a log nobody is
     # reading yet.
@@ -2823,6 +3017,85 @@ try:
     check(calls.read_text().count("\n"), 1,
           "and the runner was not invoked a second time")
 
+    # ── a compare phase in the queue ──────────────────────────────────────────
+    #
+    # Not seed-split: the host's own pair list, {host} expanded to the entry's
+    # host, refused by name where that list is not on the host.
+    cmp_dir = queue_root / "comparer"
+    cmp_dir.mkdir()
+    stub_cmp = cmp_dir / "stub_compare_pairs.py"
+    stub_cmp.write_text(STUB_RUNNER)
+    cmp_calls = cmp_dir / "calls.txt"
+    C.COMPARE_PAIRS_CMD = f"{sys.executable} {stub_cmp}"
+    git(repo, "checkout", "-q", "-b", "feat/compared")
+    write_declaration(repo, "compared", """
+name = "compared"
+branch = "feat/compared"
+build = "true"
+hosts = { local = "" }
+
+[[phases]]
+kind = "compare"
+name = "sub"
+pairs = "experiments/p-{host}.csv"
+out = "experiments/o-{host}.csv"
+jobs = 2
+wall_timeout = 9
+""")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "--no-verify", "-m", "compared campaign")
+    enqueued = io.StringIO()
+    with contextlib.redirect_stdout(enqueued):
+        code = C.cmd_enqueue(argparse.Namespace(
+            campaign="compared", host=["local"], max_attempts=3, again=False,
+            dry_run=False))
+    check(code, 0, f"a campaign of a compare phase alone is enqueued: "
+                   f"{enqueued.getvalue()}")
+    check((last_entry()["seeds"], last_entry()["phase_seeds"]), ("", [""]),
+          "with no seeds frozen")
+
+    want_args = ("experiments/p-local.csv experiments/o-local.csv --jobs 2 "
+                 "--black-timeout 300 --wall-timeout 9 --vmem-kb 8000000 "
+                 "--manifest experiments/compare-manifests/compared.sub.json")
+    code, printed = tick(dry_run=True)
+    check(code, 0, f"a dry run of the compare phase exits 0: {printed}")
+    check_true(f"would run: {C.COMPARE_PAIRS_CMD} {want_args}" in printed,
+               f"printing the command it would run: {printed!r}")
+    check_true("blocked: no pair list" in printed,
+               "and the missing pair list that blocks it")
+    check((last_entry()["state"], last_entry()["attempts"]), ("queued", 0),
+          "without spending an attempt")
+
+    code, printed = tick()
+    check(code, 1, "a compare phase whose pair list is missing fails fast")
+    entry = last_entry()
+    check_true("no pair list" in entry["last_error"]
+               and "p-local.csv" in entry["last_error"],
+               f"naming the expanded path: {entry['last_error']!r}")
+    check((entry["state"], entry["attempts"], entry["phase"]),
+          ("queued", 1, 0), "costing an attempt")
+    check_true(not cmp_calls.exists(), "with compare_pairs.py never reached")
+
+    (repo / "experiments" / "p-local.csv").write_text("id,a_path,b_path\n")
+    code, printed = tick()
+    check(code, 0, f"with the pair list in place the phase runs: {printed}")
+    check(last_entry()["state"], "done", "and finishes the entry")
+    check(cmp_calls.read_text().strip(), want_args,
+          "compare_pairs.py got the host's paths and every budget")
+
+    (cmp_dir / "exit-code").write_text("1")
+    entry = last_entry()
+    entry.update({"state": "queued", "phase": 0, "attempts": 0})
+    C.write_entry(entry["path"], entry)
+    code, printed = tick()
+    check((code, last_entry()["state"], last_entry()["phase"]),
+          (1, "queued", 0),
+          "a pass that exits non-zero, as a partial one does, is not done")
+    (cmp_dir / "exit-code").unlink()
+
+    check_true("tick --host av1" in C.cron_line("av1", "/x"),
+               "av1 gets a crontab line like the others")
+
     line = C.cron_line("av2", "/home/benandrew/projects/counter")
     check_true("tick --host av2" in line, "the crontab line names its host")
     # Regression: the line carried `flock -n` on the queue lock until
@@ -3517,6 +3790,104 @@ finally:
     os.environ.update(SAVED_ENV)
     C.set_colour(False)
 
+
+# ── compare_pairs.py ──────────────────────────────────────────────────────────
+#
+# The pairwise pass, against a stub compare that answers from the repair's
+# file name, run as the tick runs it: a subprocess. The output format is the
+# hand-written runner's, which analyses already read; the exit status is what
+# the tick advances on, so a pass with any pair unanswered must not exit 0.
+
+COMPARE_PAIRS_PY = Path(__file__).resolve().parent / "compare_pairs.py"
+STUB_COMPARE = """#!/bin/sh
+# --repairs DIR --ideals DIR --timeout S: answer from the repair's name.
+name=$(ls "$2")
+case "$name" in
+  eq*) echo "$name : equivalent to ideal" ;;
+  weak*) echo "$name : strictly weaker than ideal" ;;
+  strong*) echo "$name : strictly stronger than ideal" ;;
+  inc*) echo "$name : incomparable with ideal" ;;
+  to*) echo "$name : timeout" ;;
+  hang*) sleep 10 ;;
+  *) echo "nothing useful" ;;
+esac
+echo "Summary : 1 repair(s)"
+"""
+
+cp_root = Path(tempfile.mkdtemp(prefix="compare-pairs-"))
+try:
+    stub_bin = cp_root / "compare"
+    stub_bin.write_text(STUB_COMPARE)
+    stub_bin.chmod(0o755)
+    names = ["eq.json", "weak.json", "strong.json", "inc.json", "to.json",
+             "hang.json", "junk.json"]
+    for n in names + ["ideal.json"]:
+        (cp_root / n).write_text("{}")
+    pairs_csv = cp_root / "pairs.csv"
+    pairs_csv.write_text("id,a_path,b_path\n" + "".join(
+        f"p{i},{cp_root / n},{cp_root / 'ideal.json'}\n"
+        for i, n in enumerate(names)))
+    out_csv = cp_root / "out" / "o.csv"
+    manifest = cp_root / "m" / "x.json"
+
+    def run_pairs(*extra) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(COMPARE_PAIRS_PY), str(pairs_csv),
+             str(out_csv), "--jobs", "3", "--wall-timeout", "1",
+             "--compare", str(stub_bin), "--manifest", str(manifest), *extra],
+            capture_output=True, text=True,
+            env=dict(os.environ, COMPARE_PAIRS_TMP=str(cp_root / "tmp")))
+
+    proc = run_pairs()
+    check(proc.returncode, 0, f"a complete pass exits 0: {proc.stderr}")
+    with open(out_csv, newline="") as handle:
+        got = {r["id"]: r for r in csv.DictReader(handle)}
+    check(out_csv.read_text().splitlines()[0], "id,relation,rc,secs",
+          "the output keeps run.py's header")
+    check({k: got[k]["relation"] for k in sorted(got)},
+          {"p0": "equivalent", "p1": "weaker", "p2": "stronger",
+           "p3": "incomparable", "p4": "undecided", "p5": "undecided",
+           "p6": "error"},
+          "relations map as run.py maps them, the wall timeout to undecided")
+    check(got["p5"]["rc"], "124", "with timeout's own exit status recorded")
+    check_true(proc.stdout.startswith("7 pairs to run, 0 done")
+               and re.search(r"^done \d+s$", proc.stdout, re.M) is not None,
+               f"and run.py's progress lines: {proc.stdout!r}")
+    meta = json.loads(manifest.read_text())
+    check((meta["kind"], meta["pairs_total"], meta["missing"]),
+          ("compare", 7, 0), "the manifest records the planned and missing")
+    check_true(not any((cp_root / "tmp").iterdir()),
+               "and the symlink directories are removed")
+
+    proc = run_pairs()
+    check((proc.returncode, proc.stdout.splitlines()[0]),
+          (0, "0 pairs to run, 7 done"), "a rerun skips every id present")
+    check(len(out_csv.read_text().splitlines()), 8, "and appends nothing")
+
+    # A pass missing an id -- a killed one, or a pair that raised -- is not
+    # done. Simulated by a new id whose temporary directory cannot be made.
+    with open(pairs_csv, "a") as handle:
+        handle.write(f"p7,{cp_root / 'eq.json'},{cp_root / 'ideal.json'}\n")
+    proc = subprocess.run(
+        [sys.executable, str(COMPARE_PAIRS_PY), str(pairs_csv), str(out_csv),
+         "--compare", str(stub_bin)], capture_output=True, text=True,
+        env=dict(os.environ, COMPARE_PAIRS_TMP=str(cp_root / "nowhere" / "x")))
+    check(proc.returncode, 0, "the tmp directory is created when absent")
+    (cp_root / "ro").mkdir()
+    (cp_root / "ro").chmod(0o500)
+    with open(pairs_csv, "a") as handle:
+        handle.write(f"p8,{cp_root / 'eq.json'},{cp_root / 'ideal.json'}\n")
+    proc = subprocess.run(
+        [sys.executable, str(COMPARE_PAIRS_PY), str(pairs_csv), str(out_csv),
+         "--compare", str(stub_bin)], capture_output=True, text=True,
+        env=dict(os.environ, COMPARE_PAIRS_TMP=str(cp_root / "ro")))
+    if os.geteuid() != 0:
+        check(proc.returncode, 1,
+              f"a pass with an id still missing exits non-zero: {proc.stderr}")
+        check_true("incomplete: 1 of 9" in proc.stderr, "and says how many")
+    (cp_root / "ro").chmod(0o700)
+finally:
+    shutil.rmtree(cp_root, ignore_errors=True)
 
 if FAILURES:
     print(f"\n{len(FAILURES)} campaign.py test(s) failed.")

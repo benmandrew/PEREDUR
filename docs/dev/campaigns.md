@@ -28,7 +28,7 @@ phases = [ { profile = "arbiter-probe", jobs = 4 } ]
 
 `configs` runs on the host during `stage`, after the build and before the version check so a failing generator reports as itself, in a subshell so `&&` behaves as written. It has no default, since no line suits every campaign and config trees are untracked.
 
-A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default) or `score`, which takes its own keys and refuses `jobs`, `sweeps` and `specs` by name.
+A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default), `score` or `compare`; the last two take their own keys and refuse the others by name. The lab hosts are `av1`, `av2` and `av3`.
 
 A phase's `hosts` table overrides the campaign split for that phase under the same rules, and may only narrow it, since `stage` staged no other host; an omitted host runs nothing for that phase and a tick advances past it. It exists because `run_experiments.py --seeds` replaces a profile's seed list rather than intersecting it, so paths with different sample sizes cannot share one range without silently changing the row count. `enqueue` freezes these as `phase_seeds`; older entries fall back to the campaign split.
 
@@ -86,6 +86,28 @@ The runner's freshness gate covers `build-release/maximal` and `build-release/co
 The pass exits 0 only when every run has a curve; otherwise the tick spends an attempt and requeues it, and the resume skips existing non-empty CSVs. To raise a budget, commit to `campaign.toml` and `enqueue` again.
 
 `stage` and the tick refuse a score phase whose results directory is missing, unless an earlier run phase of the campaign writes it. To reproduce an archived pass, declare a campaign of one score phase.
+
+## Compare phases
+
+A `compare` phase runs `compare` once per row of a pair list planned elsewhere, through `scripts/compare_pairs.py`. It is not seed-split, so a campaign of compare phases alone gives each host `""` at the campaign level. The load refuses `""` wherever a run or score phase would fall back on it.
+
+```toml
+hosts = { av1 = "", av2 = "", av3 = "" }
+
+[[phases]]
+name = "subsumption"
+kind = "compare"
+pairs = "experiments/rq2/pairs-{host}.csv"      # id,a_path,b_path, on the host
+out = "experiments/rq2/subsumption-{host}.csv"  # id,relation,rc,secs, appended
+jobs = 28                # defaults: 28, 300, 700, 8000000
+black_timeout = 300      # compare --timeout, per solver call
+wall_timeout = 700       # outer timeout per pair
+vmem_kb = 8000000        # ulimit -v per pair
+```
+
+`{host}` becomes the host's name, and a path may be absolute or relative to the checkout. `hosts`, when present, is an array of host names that narrows the campaign's list. The phase takes no `profile`, `sweeps`, `specs` or seeds.
+
+The output resumes by id. The pass exits 0 only when every id in the pair list has a row, so a killed pass spends an attempt and the next tick resumes it. `compare` and its solvers come from the checkout's `build-release`, which the tick has just built at the frozen commit. The tick refuses the phase by name when the host's pair list is missing, and `status` shows it as `compare:<campaign>.<phase>`, with output rows against the pair count from its manifest under `experiments/compare-manifests/`.
 
 ## Reading a run
 
@@ -151,7 +173,7 @@ It stages for the branch alone and still refuses, spending an attempt with the r
 - **A live `peredur` or `run_experiments.py`.** A checkout would rebuild the binary its remaining rows name.
 - **A HEAD no remote branch contains.** An unpushed commit cannot be reconstructed.
 
-When staging moves `scripts/`, the tick re-execs once, since the old `campaign.py` would misread a newer declaration as a bad one. It passes the queue lock descriptor to the new process, spends no attempt, and sets `PEREDUR_TICK_RESTARTED` to prevent loops. The check diffs the two commits under `scripts/`, so a branch on the same scripts runs in the tick that staged it.
+When staging moves `scripts/`, the tick re-execs once, since the old `campaign.py` would misread a newer declaration as a bad one. It passes the queue lock descriptor to the new process, spends no attempt, and sets `PEREDUR_TICK_RESTARTED` to prevent loops. The check diffs the two commits under `scripts/`, so a branch on the same scripts runs in the tick that staged it. A tick reads no declaration before it stages, so a host whose current branch predates a phase kind still runs it, provided that branch has the restart (`f0e4723`, 2026-09-08).
 
 `stage --force` is the only way past the refusals. `tick --no-stage` restores manual staging for a host driven by hand.
 
@@ -205,6 +227,6 @@ The output is not runnable, naming retired profiles (`wellsep-timing`) and rejec
 python3 scripts/test_campaign.py
 ```
 
-A plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. It never touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `PEREDUR_RUNNER_CMD` and `PEREDUR_SCORER_CMD` stubs that record their arguments. `score_campaign.py` uses a fake results tree, a `PEREDUR_SCORE_CURVES_CMD` stub, and stub binaries under `PEREDUR_BIN_DIR`. New launch-path code must be tested the same way.
+A plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. It never touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `PEREDUR_RUNNER_CMD`, `PEREDUR_SCORER_CMD` and `PEREDUR_COMPARE_PAIRS_CMD` stubs that record their arguments. `compare_pairs.py` runs against a stub `compare`. `score_campaign.py` uses a fake results tree, a `PEREDUR_SCORE_CURVES_CMD` stub, and stub binaries under `PEREDUR_BIN_DIR`. New launch-path code must be tested the same way.
 
 `campaign.py` parses TOML itself because av2 and av3 run python3 3.10.12 with neither `tomllib` nor `tomli`. Its subset is checked against `tomllib` on every fixture wherever that exists. Remote shell scripts never use bare globs, since zsh's `NOMATCH` aborts on an unmatched pattern and every later section vanishes in silence.
