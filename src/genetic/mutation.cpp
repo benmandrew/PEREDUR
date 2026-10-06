@@ -12,6 +12,7 @@
 
 #include "genetic/monotone.hpp"
 #include "prop_formula.hpp"
+#include "serialisation.hpp"
 
 namespace {
 
@@ -537,6 +538,126 @@ Scope move_scope(const Scope& scope, Direction direction, const Timing& timing,
     return candidates[random_source.next_index(candidates.size())];
 }
 
+// --- Uniform redraw (Config::ordered_fields = Uniform) --------------------
+//
+// The ablation arm for the three moves above: each field is redrawn from the
+// values the specification makes available, excluding its current value, with
+// no reference to the order or the direction.
+
+// Every timing instantiable from the specification: the four qualitative
+// kinds, each quantified kind at every tick count, and `until`/`before` at
+// every stop. Counts and stops come from @p timing_pool and @p current, as the
+// directed arm's donations do, so none is invented. Immediately and
+// NextTimepoint lend count 1, the count the directed arm's one-step moves off
+// them reach (`within 1`, `for 1`). A zero count is skipped: only `after`
+// admits one, and `within 0` and `for 0` are not timings.
+std::vector<Timing> uniform_timing_candidates(
+    const Timing& current, const std::vector<Timing>& timing_pool) {
+    std::vector<std::size_t> counts;
+    std::vector<Formula> stops;
+    const auto harvest = [&counts, &stops](const Timing& donor) {
+        std::visit(
+            [&counts, &stops](const auto& value) {
+                using T = std::decay_t<decltype(value)>;
+                constexpr bool lends_one =
+                    std::is_same_v<T, timing::Immediately> ||
+                    std::is_same_v<T, timing::NextTimepoint>;
+                if constexpr (std::is_same_v<T, timing::WithinTicks> ||
+                              std::is_same_v<T, timing::ForTicks> ||
+                              std::is_same_v<T, timing::AfterTicks>) {
+                    if (value.m_ticks > 0) {
+                        counts.push_back(value.m_ticks);
+                    }
+                } else if constexpr (lends_one) {
+                    counts.push_back(1);
+                } else if constexpr (timing::k_carries_stop<T>) {
+                    stops.push_back(value.m_stop);
+                } else {
+                    static_assert(std::is_same_v<T, timing::Eventually> ||
+                                  std::is_same_v<T, timing::Always>);
+                }
+            },
+            donor);
+    };
+    for (const Timing& donor : timing_pool) {
+        harvest(donor);
+    }
+    harvest(current);
+    std::vector<Timing> candidates = {timing::immediately(),
+                                      timing::next_timepoint(),
+                                      timing::eventually(), timing::always()};
+    for (const std::size_t count : counts) {
+        candidates.push_back(timing::within_ticks(count));
+        candidates.push_back(timing::for_ticks(count));
+        candidates.push_back(timing::after_ticks(count));
+    }
+    for (const Formula& stop : stops) {
+        candidates.push_back(timing::until(stop));
+        candidates.push_back(timing::before(stop));
+    }
+    sort_unique_timings(candidates);
+    candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
+                                    [&current](const Timing& candidate) {
+                                        return candidate == current;
+                                    }),
+                     candidates.end());
+    return candidates;
+}
+
+Timing redraw_timing(const Timing& timing,
+                     const std::vector<Timing>& timing_pool,
+                     const RandomSource& random_source) {
+    const std::vector<Timing> candidates =
+        uniform_timing_candidates(timing, timing_pool);
+    if (candidates.empty()) {
+        return timing;
+    }
+    return candidates[random_source.next_index(candidates.size())];
+}
+
+// Two values, so excluding the current one leaves the other and no draw.
+ConditionType redraw_condition_type(ConditionType condition_type) {
+    return condition_type == ConditionType::Continual
+               ? ConditionType::Trigger
+               : ConditionType::Continual;
+}
+
+// Draws a kind, then a mode for it, so each open kind is equally likely however
+// many modes it has. A kind is open when it offers some value other than
+// @p scope; with no declared mode only Global can be, and a Global requirement
+// then keeps its scope at no draw.
+Scope redraw_scope(const Scope& scope,
+                   const std::vector<std::string>& mode_pool,
+                   const RandomSource& random_source) {
+    const auto modes_for = [&scope, &mode_pool](ScopeKind kind) {
+        std::vector<std::string> modes;
+        for (const std::string& mode : mode_pool) {
+            if (kind != scope.m_kind || mode != scope.m_mode) {
+                modes.push_back(mode);
+            }
+        }
+        return modes;
+    };
+    std::vector<ScopeKind> kinds;
+    for (const ScopeKind kind : scope_kinds()) {
+        const bool open = kind == ScopeKind::Global ? !scope.is_global()
+                                                    : !modes_for(kind).empty();
+        if (open) {
+            kinds.push_back(kind);
+        }
+    }
+    if (kinds.empty()) {
+        return scope;
+    }
+    const ScopeKind kind = kinds[random_source.next_index(kinds.size())];
+    if (kind == ScopeKind::Global) {
+        return Scope{};
+    }
+    const std::vector<std::string> modes = modes_for(kind);
+    const std::string& mode = modes[random_source.next_index(modes.size())];
+    return Scope{kind, mode};
+}
+
 // Which way a monotone rewrite of a field has to move for the requirement to
 // move @p direction, given whether the field sits under a negation.
 MonotoneDirection monotone_of(Direction direction, bool flipped) {
@@ -669,9 +790,15 @@ Requirement mutate_requirement(const Requirement& requirement,
             requirement.m_condition, condition_atoms,
             condition_direction(requirement, direction), cfg, random_source);
     }
+    // Only the rule picking the new value differs between the two, so both
+    // spend the same probability draws in the same order.
+    const bool uniform = cfg.ordered_fields == OrderedFieldMutation::Uniform;
     if (random_source.next_real() < cfg.p_timing) {
-        mutated.m_timing = mutate_timing(requirement.m_timing, direction,
-                                         timing_pool, random_source);
+        mutated.m_timing = uniform
+                               ? redraw_timing(requirement.m_timing,
+                                               timing_pool, random_source)
+                               : mutate_timing(requirement.m_timing, direction,
+                                               timing_pool, random_source);
     }
     // Read off the mutated timing, which the arm above may have just moved onto
     // or off a stop. A requirement without one returns before the draw, so no
@@ -690,15 +817,20 @@ Requirement mutate_requirement(const Requirement& requirement,
     // determinism goldens are recorded at that default and pin both keys.
     if (cfg.p_condition_type > 0.0 &&
         random_source.next_real() < cfg.p_condition_type) {
-        mutated.m_condition_type = mutate_condition_type(direction);
+        mutated.m_condition_type =
+            uniform ? redraw_condition_type(requirement.m_condition_type)
+                    : mutate_condition_type(direction);
     }
     if (cfg.p_scope > 0.0 && random_source.next_real() < cfg.p_scope) {
         // Read off the mutated timing and condition type, not the original's:
         // the order table is a fact about the requirement being written, and an
         // arm above may have just moved either of them.
         mutated.m_scope =
-            move_scope(requirement.m_scope, direction, mutated.m_timing,
-                       mutated.m_condition_type, mode_pool, random_source);
+            uniform
+                ? redraw_scope(requirement.m_scope, mode_pool, random_source)
+                : move_scope(requirement.m_scope, direction, mutated.m_timing,
+                             mutated.m_condition_type, mode_pool,
+                             random_source);
     }
     mutated.m_ltl = requirement_to_ltl(mutated);
     return mutated;

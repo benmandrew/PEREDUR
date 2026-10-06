@@ -1,0 +1,24 @@
+name = "2026-09-29-fretish-ablation-score"
+branch = "campaign/fretish-ablation"
+profile = "fretish-ablation"
+description = "The curve phase of 2026-09-29-fretish-ablation for av2's seeds 0-14, split across both hosts because av3 finished its own half about 9 h ahead of av2."
+
+# av2 ran the search for seeds 0-14 (entry 036), dequeued once its search phase
+# ended. Its run directories for seeds 7-14 are copied into av3's
+# experiments/results-fretish-ablation beside av3's own 15-29, so each host
+# scores its seeds here and the curves land in the same out directory as the
+# parent campaign's. The union over both hosts is disjoint by seed: av2 0-6,
+# av3 7-14 here and 15-29 in the parent.
+hosts = { av2 = "0-6", av3 = "7-14" }
+
+[[phases]]
+name = "curve"
+kind = "score"
+results = "experiments/results-fretish-ablation"
+out = "experiments/curves-fretish-ablation"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 3000
+deadline_s = 7500

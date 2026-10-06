@@ -29,7 +29,8 @@ using ConfigMember =
                  std::chrono::milliseconds Config::*, SelectionScheme Config::*,
                  TerminationMode Config::*, StatusGrading Config::*,
                  MrsAdmissionOrder Config::*, SimilarityMetric Config::*,
-                 RepairMode Config::*, KeywordSimilarity Config::*>;
+                 RepairMode Config::*, KeywordSimilarity Config::*,
+                 OrderedFieldMutation Config::*>;
 
 struct ConfigKey {
     const char* section;  // dotted, as in "tlsf.mutation"
@@ -44,7 +45,7 @@ struct ConfigKey {
 // more than one. A new key also needs schemas/config-schema.json and
 // example-config.toml; scripts/check_config_schema.py reads this table to hold
 // them to it.
-inline constexpr std::array<ConfigKey, 45> k_config_keys{{
+inline constexpr std::array<ConfigKey, 46> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive},
     {"genetic", "population_size", &Config::population_size,
      KeyCheck::Positive},
@@ -81,6 +82,7 @@ inline constexpr std::array<ConfigKey, 45> k_config_keys{{
      KeyCheck::Probability},
     {"mutation", "p_scope", &Config::p_scope, KeyCheck::Probability},
     {"mutation", "p_stop", &Config::p_stop, KeyCheck::Probability},
+    {"mutation", "ordered_fields", &Config::ordered_fields, KeyCheck::None},
     {"mutation", "p_monotone", &Config::p_monotone, KeyCheck::Probability},
     {"mutation", "p_add_assumption", &Config::p_add_assumption,
      KeyCheck::Probability},

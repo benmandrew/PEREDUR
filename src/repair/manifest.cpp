@@ -197,7 +197,11 @@ namespace {
 // 33 added mrs_screen: how often the MRS walk's whole-specification
 // satisfiability screen ran, fired and was left undecided. Zero under any
 // other status grading, and absent before the screen existed.
-constexpr int k_schema_version = 33;
+//
+// 34 added mutation.ordered_fields, which selects between the directed and
+// the uniform FRETISH timing, condition-type and scope arms. The two draw
+// different streams, so two runs of one seed agree only where it agrees.
+constexpr int k_schema_version = 34;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -208,7 +212,7 @@ struct SinglePathKey {
     RepairInput reader;
 };
 
-constexpr std::array<SinglePathKey, 14> k_single_path_keys{{
+constexpr std::array<SinglePathKey, 15> k_single_path_keys{{
     {"/mutation/p_trigger", RepairInput::Fretish},
     {"/mutation/p_response", RepairInput::Fretish},
     {"/mutation/p_timing", RepairInput::Fretish},
@@ -217,6 +221,7 @@ constexpr std::array<SinglePathKey, 14> k_single_path_keys{{
     {"/mutation/p_stop", RepairInput::Fretish},
     {"/fitness/keyword_similarity", RepairInput::Fretish},
     {"/fitness/semantic_trace_weight", RepairInput::Fretish},
+    {"/mutation/ordered_fields", RepairInput::Fretish},
     {"/tlsf/muc_max_iterations", RepairInput::Tlsf},
     {"/tlsf/mutation/p_assumption", RepairInput::Tlsf},
     {"/tlsf/mutation/p_temporal", RepairInput::Tlsf},

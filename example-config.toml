@@ -94,6 +94,10 @@ p_scope          = 0.15
 # FRETISH only: rewrites the stop condition of an `until` or `before` timing,
 # and draws nothing on a requirement without one.
 p_stop           = 0.15
+# FRETISH only: "directed" moves timing, condition type and scope along their
+# implication order, in the requirement's direction; "uniform" redraws each
+# from the values the specification makes available, ignoring the order.
+ordered_fields   = "directed"  # or "uniform"
 # Both modes: the share of rewrites that take the monotone form, moving a
 # formula along the implication order rather than rewriting it freely. On the
 # FRETISH path it is offered inside the condition and response rewrites, on the

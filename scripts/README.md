@@ -25,8 +25,10 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `analyse.ipynb` | Generic notebook over a sweep's `results.csv`; `RESULTS_CSV` overrides the path. |
 | `drop_censored_rows.py` | Deletes timeout-censored rows and their run directories so a resume re-runs them under a looser cap. Used once, on the replicate recap. |
 | `import_fret.py` | Converts FRET project exports into a FRETISH `spec.json` for `examples/`. Its docstring lists every conversion rule, and its stderr summary names each requirement a lossy rule touched. Comparisons over several variables or arithmetic need z3's Python bindings, which `nix develop` provides. |
+| `export_repairs.py` | Writes a campaign's maximal repairs of each FRETISH core as a bundle a person can read: the original as FRETISH text, then each repair as a diff against it, with the JSON alongside. Pools every run of a subject and filters the pool with `maximal`; the steps share a work directory, so that step can run on a lab host. |
 | `maximality_sweep.py` | Runs the `maximal` binary over both arms of a head-to-head. Hard-wired to two directory layouts. |
 | `test_campaign.py` | Covers `campaign.py`. No pytest; run it directly. |
+| `test_export_repairs.py` | Covers `export_repairs.py`, standing a shell stub in for `maximal`. No pytest; run it directly. |
 | `test_experiment_paths.py` | Covers the factor-path parsers and the resume-key invariants in `run_experiments.py` and `gen_configs.py`. |
 | `test_import_fret.py` | Covers `import_fret.py` over a synthetic export, including property tests of its domain constraints. No pytest; run it directly inside `nix develop`, which provides z3's Python bindings. |
 | `test_domain_constraints_lpc.py` | Checks `import_fret.py`'s domain constraints against the hand-written ones in the two Lift-Plus-Cruise examples, then runs `realize` to confirm they reproduce every realizability claim of the paper. Needs a built `realize` (`PEREDUR_REALIZE`, default `build-release/realize`). |

@@ -266,6 +266,15 @@ TEST(test_config_io_enum_keys) {
           {"semantic", KeywordSimilarity::Semantic}},
          "lexical",
          false});
+    expect_enum_key<OrderedFieldMutation>(
+        {"mutation",
+         "ordered_fields",
+         &Config::ordered_fields,
+         OrderedFieldMutation::Directed,
+         {{"directed", OrderedFieldMutation::Directed},
+          {"uniform", OrderedFieldMutation::Uniform}},
+         "random",
+         true});
     expect_enum_key<SimilarityMetric>(
         {"model_counting",
          "metric",
@@ -423,6 +432,7 @@ p_add_assumption         = 0.05
 p_conditional_assumption = 0.25
 p_remove_guarantee       = 0.05
 p_monotone               = 0.25
+ordered_fields           = "uniform"
 
 [tlsf]
 repair_mode        = "muc"

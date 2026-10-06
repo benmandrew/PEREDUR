@@ -31,11 +31,13 @@ namespace {
 struct Args {
     std::string repairs_dir;
     std::string ideals_dir;
+    std::int64_t timeout_s{20};
 };
 
 void print_usage(const char* prog) {
     std::cerr
-        << "Usage: " << prog << " --repairs <dir> --ideals <dir>\n"
+        << "Usage: " << prog
+        << " --repairs <dir> --ideals <dir> [--timeout S]\n"
         << "\n"
         << "Compares each repair in the repairs directory against every\n"
         << "ideal in the ideals directory and reports whether the found\n"
@@ -44,7 +46,8 @@ void print_usage(const char* prog) {
         << "assume-guarantee implication order. Both directories must hold\n"
         << "the same format: FRETISH JSON (.json) or basic-TLSF (.tlsf).\n"
         << "\n"
-        << "  --version  Print the git commit this binary was built from.\n";
+        << "  --timeout S  Per-black-call budget in seconds (default: 20).\n"
+        << "  --version    Print the git commit this binary was built from.\n";
 }
 
 std::optional<Args> parse_args(int argc, const char* const* argv) {
@@ -59,6 +62,17 @@ std::optional<Args> parse_args(int argc, const char* const* argv) {
         } else if (arg == "--ideals" && i + 1 < argc &&
                    argv[i + 1] != nullptr) {
             args.ideals_dir = argv[++i];
+        } else if (arg == "--timeout") {
+            if (i + 1 >= argc || argv[i + 1] == nullptr) {
+                std::cerr << arg << " expects a value\n";
+                return std::nullopt;
+            }
+            const std::optional<std::size_t> value = parse_seed(argv[++i]);
+            if (!value.has_value() || *value == 0) {
+                std::cerr << arg << " expects a positive integer\n";
+                return std::nullopt;
+            }
+            args.timeout_s = static_cast<std::int64_t>(*value);
         } else {
             std::cerr << "Unknown argument: " << arg << "\n";
             return std::nullopt;
@@ -425,8 +439,8 @@ int main(int argc, const char* const argv[]) {
     }
     const Args& args = *maybe_args;
 
-    SatisfiabilityChecker& checker =
-        configure_offline_checkers(std::chrono::milliseconds{20'000}, true);
+    SatisfiabilityChecker& checker = configure_offline_checkers(
+        std::chrono::milliseconds{args.timeout_s * 1000}, true);
 
     // Route by input format. A .tlsf extension on either directory path, or any
     // .tlsf file in either directory, selects the TLSF path; otherwise FRETISH

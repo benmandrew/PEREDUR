@@ -1,0 +1,597 @@
+[
+  {
+    "assumption": 0,
+    "reqids": [
+      "domain"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 0,
+    "reqids": [
+      "CONT13"
+    ],
+    "fulltext": {
+      "CONT13": "in StartUpMode Controller shall eventually satisfy checkCommsSensors & checkCommsValves"
+    }
+  },
+  {
+    "guarantee": 1,
+    "reqids": [
+      "CONT33"
+    ],
+    "fulltext": {
+      "CONT33": "in PSVMode when V_E<ExpiratoryTriggerSensitivity*PeakV_E Controller shall at the next timepoint satisfy expirationPhaseStart"
+    }
+  },
+  {
+    "guarantee": 2,
+    "reqids": [
+      "CONT19"
+    ],
+    "fulltext": {
+      "CONT19": "in SelfTestMode if SelfTestFail Controller shall until off satisfy !StandbyMode & !ventilating"
+    }
+  },
+  {
+    "guarantee": 3,
+    "reqids": [
+      "CONT36_2"
+    ],
+    "fulltext": {
+      "CONT36_2": "while PSVMode when expiratoryPauseButton & expClock <= apneaLagTime & !patientBreathingRequest Controller shall until buttonUnPressOr60Seconds satisfy expirationPhaseEnd & inValveClose & outValveClose"
+    }
+  },
+  {
+    "guarantee": 4,
+    "reqids": [
+      "CONT14"
+    ],
+    "fulltext": {
+      "CONT14": "in StartUpMode Controller shall eventually satisfy checkCommsGUI"
+    }
+  },
+  {
+    "guarantee": 5,
+    "reqids": [
+      "CONT21"
+    ],
+    "fulltext": {
+      "CONT21": "in PCVMode when BreathingCycleStart Controller shall at the next timepoint satisfy inspiratoryPhaseStart"
+    }
+  },
+  {
+    "guarantee": 6,
+    "reqids": [
+      "CONT26"
+    ],
+    "fulltext": {
+      "CONT26": "while PCVMode when dropPAW > ITS_PCV Controller shall at the next timepoint satisfy patientBreathingRequest"
+    }
+  },
+  {
+    "guarantee": 7,
+    "reqids": [
+      "CONT1"
+    ],
+    "fulltext": {
+      "CONT1": "Controller shall always satisfy StartUpMode | SelfTestMode | StandbyMode | PCVMode | PSVMode | FailSafeMode"
+    }
+  },
+  {
+    "guarantee": 8,
+    "reqids": [
+      "CONT34"
+    ],
+    "fulltext": {
+      "CONT34": "while PSVMode & inspiratoryPauseButton when inspiratoryPhaseEnd Controller shall for 40 seconds satisfy (inspiratoryPauseButton => inValveClose & outValveClose)"
+    }
+  },
+  {
+    "guarantee": 9,
+    "reqids": [
+      "CONT38"
+    ],
+    "fulltext": {
+      "CONT38": "while StartUpMode | StandbyMode Controller shall always satisfy inValveClose & outValveOpen"
+    }
+  },
+  {
+    "guarantee": 10,
+    "reqids": [
+      "CONT41"
+    ],
+    "fulltext": {
+      "CONT41": "while (PCVMode | PSVMode) when inspiratoryPauseButton Controller shall eventually satisfy inspiratoryPause | !inspiratoryPauseButton"
+    }
+  },
+  {
+    "guarantee": 11,
+    "reqids": [
+      "CONT32"
+    ],
+    "fulltext": {
+      "CONT32": "in PSVMode Controller shall until (P_insp >= MaxP_insp | inspClock >= inspiratoryTime) satisfy inspiratoryPhase"
+    }
+  },
+  {
+    "guarantee": 12,
+    "reqids": [
+      "CONT12"
+    ],
+    "fulltext": {
+      "CONT12": "in StartUpMode Controller shall eventually satisfy defaultParamsLoaded"
+    }
+  },
+  {
+    "guarantee": 13,
+    "reqids": [
+      "CONT45"
+    ],
+    "fulltext": {
+      "CONT45": "when expirationPhaseStart Controller shall after 700 milliseconds satisfy monitorInhaleTrigger"
+    }
+  },
+  {
+    "guarantee": 14,
+    "reqids": [
+      "CONT4"
+    ],
+    "fulltext": {
+      "CONT4": "in SelfTestMode if selfTestPassed | GUIResumeRequest Controller shall at the next timepoint satisfy StandbyMode"
+    }
+  },
+  {
+    "guarantee": 15,
+    "reqids": [
+      "CONT3"
+    ],
+    "fulltext": {
+      "CONT3": "in StartUpMode when initDone Controller shall at the next timepoint satisfy SelfTestMode"
+    }
+  },
+  {
+    "guarantee": 16,
+    "reqids": [
+      "CONT35"
+    ],
+    "fulltext": {
+      "CONT35": "while PSVMode & RMButton when inspiratoryPhaseEnd Controller shall at the next timepoint satisfy RM"
+    }
+  },
+  {
+    "guarantee": 17,
+    "reqids": [
+      "CONT46"
+    ],
+    "fulltext": {
+      "CONT46": "after FailSafeMode Controller shall until off satisfy !(StartUpMode | SelfTestMode | StandbyMode | PCVMode | PSVMode)"
+    }
+  },
+  {
+    "guarantee": 18,
+    "reqids": [
+      "CONT23"
+    ],
+    "fulltext": {
+      "CONT23": "while PCVMode & inspiratoryPauseButton when inspiratoryPhaseEnd Controller shall for 40 seconds satisfy (inspiratoryPauseButton => inValveClose & outValveClose)"
+    }
+  },
+  {
+    "guarantee": 19,
+    "reqids": [
+      "CONT43_2"
+    ],
+    "fulltext": {
+      "CONT43_2": "when RM Controller shall after 10 seconds satisfy !RM & expirationPhaseStart"
+    }
+  },
+  {
+    "guarantee": 20,
+    "reqids": [
+      "CONT1_6"
+    ],
+    "fulltext": {
+      "CONT1_6": "in FailSafeMode Controller shall always satisfy inValveClose & outValveOpen"
+    }
+  },
+  {
+    "guarantee": 21,
+    "reqids": [
+      "CONT42"
+    ],
+    "fulltext": {
+      "CONT42": "while (PCVMode | PSVMode) when expiratoryPauseButton Controller shall eventually satisfy expiratoryPause | !expiratoryPauseButton"
+    }
+  },
+  {
+    "guarantee": 22,
+    "reqids": [
+      "CONT39"
+    ],
+    "fulltext": {
+      "CONT39": "while inspiratoryPhase Controller shall always satisfy outValveClose & (PCVMode & !apnea => P_insp = P_isnpPCV) & (PSVMode => P_insp = P_inspPSV) & (PCVMode & apnea => P_insp = P_inspAP)"
+    }
+  },
+  {
+    "guarantee": 23,
+    "reqids": [
+      "CONT5"
+    ],
+    "fulltext": {
+      "CONT5": "in StandbyMode if PSVModeSelected Controller shall at the next timepoint satisfy PSVMode"
+    }
+  },
+  {
+    "guarantee": 24,
+    "reqids": [
+      "CONT28"
+    ],
+    "fulltext": {
+      "CONT28": "in PCVMode Controller shall always satisfy P_insp = P_inspPCV"
+    }
+  },
+  {
+    "guarantee": 25,
+    "reqids": [
+      "CONT43"
+    ],
+    "fulltext": {
+      "CONT43": "while (PCVMode | PSVMode) & RMButton & !inspiratoryPauseButton when inspiratoryPhaseEnd Controller shall at the next timepoint satisfy RM"
+    }
+  },
+  {
+    "guarantee": 26,
+    "reqids": [
+      "CONT10"
+    ],
+    "fulltext": {
+      "CONT10": "in PSVMode if stopVentilation Controller shall at the next timepoint satisfy StandbyMode"
+    }
+  },
+  {
+    "guarantee": 27,
+    "reqids": [
+      "CONT24"
+    ],
+    "fulltext": {
+      "CONT24": "while PCVMode & RMButton when inspiratoryPhaseEnd Controller shall at the next timepoint satisfy RM"
+    }
+  },
+  {
+    "guarantee": 28,
+    "reqids": [
+      "CONT42_1"
+    ],
+    "fulltext": {
+      "CONT42_1": "while (PCVMode | PSVMode) & expiratoryPauseButton when expiratoryPhaseEnd Controller shall at the next timepoint satisfy (expiratoryPauseButton => expiratoryPause & inValveClose & outValveClose)"
+    }
+  },
+  {
+    "guarantee": 29,
+    "reqids": [
+      "CONT6"
+    ],
+    "fulltext": {
+      "CONT6": "in StandbyMode if PCVModeSelected Controller shall at the next timepoint satisfy PCVMode"
+    }
+  },
+  {
+    "guarantee": 30,
+    "reqids": [
+      "CONT43_3"
+    ],
+    "fulltext": {
+      "CONT43_3": "while RM Controller shall always satisfy outValveClose & inValveOpen"
+    }
+  },
+  {
+    "guarantee": 31,
+    "reqids": [
+      "CONT41_1"
+    ],
+    "fulltext": {
+      "CONT41_1": "while (PCVMode | PSVMode) & inspiratoryPauseButton when inspiratoryPhaseEnd Controller shall at the next timepoint satisfy (inspiratoryPauseButton => inspiratoryPause & inValveClose & outValveClose)"
+    }
+  },
+  {
+    "guarantee": 32,
+    "reqids": [
+      "CONT18"
+    ],
+    "fulltext": {
+      "CONT18": "in SelfTestMode Controller shall eventually satisfy selfTestPassed | selfTestFailed"
+    }
+  },
+  {
+    "guarantee": 33,
+    "reqids": [
+      "CONT25"
+    ],
+    "fulltext": {
+      "CONT25": "in PCVMode Controller shall always satisfy (breathingCycleDone | patientBreathingRequest) => (breathingCycleStart & inspiratoryPhaseStart)"
+    }
+  },
+  {
+    "guarantee": 34,
+    "reqids": [
+      "CONT15"
+    ],
+    "fulltext": {
+      "CONT15": "in StartUpMode if pressureSensorRetries >= 5 & (pressureSensorConnFailure | pressureSensorError) Controller shall at the next timepoint satisfy FailSafeMode"
+    }
+  },
+  {
+    "guarantee": 35,
+    "reqids": [
+      "CONT42_2"
+    ],
+    "fulltext": {
+      "CONT42_2": "when expiratoryPause Controller shall after 40 seconds satisfy !expiratoryPause & inspiratoryPhaseStart"
+    }
+  },
+  {
+    "guarantee": 36,
+    "reqids": [
+      "CONT1_3"
+    ],
+    "fulltext": {
+      "CONT1_3": "in StandbyMode Controller shall always satisfy ventilationOff & inValveClose & outValveOpen"
+    }
+  },
+  {
+    "guarantee": 37,
+    "reqids": [
+      "CONT9"
+    ],
+    "fulltext": {
+      "CONT9": "in PSVMode when breathingTime >= apneaLagTime Controller shall at the next timepoint satisfy PCVMode & RR = RR_AP & P_insp = P_inspAP & ItoE = ItoE_AP"
+    }
+  },
+  {
+    "guarantee": 38,
+    "reqids": [
+      "CONT1_1"
+    ],
+    "fulltext": {
+      "CONT1_1": "in StartUpMode Controller shall eventually satisfy initStart & (initDone | (initFail & OutOfServiceWarning & FailSafeMode))"
+    }
+  },
+  {
+    "guarantee": 39,
+    "reqids": [
+      "CONT20"
+    ],
+    "fulltext": {
+      "CONT20": "in PCVMode Controller shall always satisfy breathingCycleTime = 1/RR_PCV & ExpiratoryTime = breathingCycleTime / (1+ItoE_PCV)"
+    }
+  },
+  {
+    "guarantee": 40,
+    "reqids": [
+      "CONT22"
+    ],
+    "fulltext": {
+      "CONT22": "in PCVMode Controller shall always satisfy inspiratoryTime = 60*(ItoE_PCV/(RR_PCV * (1 + ItoE_PCV )) )"
+    }
+  },
+  {
+    "guarantee": 41,
+    "reqids": [
+      "CONT27"
+    ],
+    "fulltext": {
+      "CONT27": "in PCVMode when expiratoryPauseButton & ExpiratoryPhaseEnd & !patientBreathingRequest Controller shall until buttonUnPressOr60Seconds satisfy expirationPhaseEnd & inValveClose & outValveClose"
+    }
+  },
+  {
+    "guarantee": 42,
+    "reqids": [
+      "CONT43_1"
+    ],
+    "fulltext": {
+      "CONT43_1": "while RM if !RMButton Controller shall at the next timepoint satisfy !RM & expirationPhaseStart"
+    }
+  },
+  {
+    "guarantee": 43,
+    "reqids": [
+      "CONT40"
+    ],
+    "fulltext": {
+      "CONT40": "while expiratoryState Controller shall always satisfy inValveClose & outValveOpen"
+    }
+  },
+  {
+    "guarantee": 44,
+    "reqids": [
+      "CONT2"
+    ],
+    "fulltext": {
+      "CONT2": "if powerOff & !powerButton Controller shall always satisfy !StartUpMode"
+    }
+  },
+  {
+    "guarantee": 45,
+    "reqids": [
+      "CONT41_2"
+    ],
+    "fulltext": {
+      "CONT41_2": "when inspiratoryPause Controller shall after 40 seconds satisfy !inspiratoryPause & expirationPhaseStart"
+    }
+  },
+  {
+    "guarantee": 46,
+    "reqids": [
+      "CONT36_3"
+    ],
+    "fulltext": {
+      "CONT36_3": "in PSVMode Controller shall always satisfy minExpiratoryTime >= 0.4 & minExpiratoryTime <= 2 & (expiratoryPhase => minExpiratoryTime = inspClock/2)"
+    }
+  },
+  {
+    "guarantee": 47,
+    "reqids": [
+      "CONT16"
+    ],
+    "fulltext": {
+      "CONT16": "in StartUpMode if ADCRetries >= 5 & (ADCConnFailure | ADCError) Controller shall at the next timepoint satisfy FailSafeMode"
+    }
+  },
+  {
+    "guarantee": 48,
+    "reqids": [
+      "CONT37"
+    ],
+    "fulltext": {
+      "CONT37": "in PSVMode when expClock >= apneaLagTime Controller shall at the next timepoint satisfy apnea & PCVMode & RR = RR_AP & P_insp = P_inspAP & ItoE = ItoE_AP"
+    }
+  },
+  {
+    "guarantee": 49,
+    "reqids": [
+      "CONT36_1"
+    ],
+    "fulltext": {
+      "CONT36_1": "while PSVMode & expiratoryPhase when dropPAW > ITS_PSV Controller shall at the next timepoint satisfy patientBreathingRequest"
+    }
+  },
+  {
+    "guarantee": 50,
+    "reqids": [
+      "CONT7"
+    ],
+    "fulltext": {
+      "CONT7": "in PCVMode if inspiratoryPhaseEnd & PSVModeSelected Controller shall at the next timepoint satisfy ventilating & PSVMode"
+    }
+  },
+  {
+    "guarantee": 51,
+    "reqids": [
+      "CONT8"
+    ],
+    "fulltext": {
+      "CONT8": "in PCVMode if stopVentilation Controller shall at the next timepoint satisfy StandbyMode"
+    }
+  },
+  {
+    "guarantee": 52,
+    "reqids": [
+      "CONT30"
+    ],
+    "fulltext": {
+      "CONT30": "in PSVMode when BreathingCycleStart Controller shall at the next timepoint satisfy inspiratoryPhaseStart"
+    }
+  },
+  {
+    "guarantee": 53,
+    "reqids": [
+      "CONT44"
+    ],
+    "fulltext": {
+      "CONT44": "if P_insp > MaxP_insp Controller shall at the next timepoint satisfy inspiratoryPhaseEnd & expirationPhaseStart"
+    }
+  },
+  {
+    "guarantee": 54,
+    "reqids": [
+      "CONT11"
+    ],
+    "fulltext": {
+      "CONT11": "if powerOff Controller shall at the next timepoint satisfy FinalState"
+    }
+  },
+  {
+    "guarantee": 55,
+    "reqids": [
+      "CONT11_1"
+    ],
+    "fulltext": {
+      "CONT11_1": "in FinalState Controller shall eventually satisfy parametersStored & off"
+    }
+  },
+  {
+    "guarantee": 56,
+    "reqids": [
+      "mode definition"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 57,
+    "reqids": [
+      "mode definition"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 58,
+    "reqids": [
+      "mode definition"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 59,
+    "reqids": [
+      "mode definition"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 60,
+    "reqids": [
+      "mode definition"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 61,
+    "reqids": [
+      "mode definition"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 62,
+    "reqids": [
+      "mode definition"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 63,
+    "reqids": [
+      "mode definition"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 64,
+    "reqids": [
+      "mode definition"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 65,
+    "reqids": [
+      "mode definition"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 66,
+    "reqids": [
+      "domain"
+    ],
+    "fulltext": {}
+  },
+  {
+    "guarantee": 67,
+    "reqids": [
+      "domain"
+    ],
+    "fulltext": {}
+  }
+]

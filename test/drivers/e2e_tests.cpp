@@ -305,7 +305,8 @@ TEST_IN("driver_peredur", test_peredur_repairs_tlsf) {
            "about");
     const nlohmann::json& config_block = manifest.at("config");
     expect(config_block.at("mutation").at("p_trigger").is_null() &&
-               config_block.at("mutation").at("p_stop").is_null(),
+               config_block.at("mutation").at("p_stop").is_null() &&
+               config_block.at("mutation").at("ordered_fields").is_null(),
            "peredur: a TLSF manifest records FRETISH-only keys as null");
     expect(config_block.at("tlsf").at("mutation").at("p_temporal").is_number(),
            "peredur: a TLSF manifest records the TLSF keys");
