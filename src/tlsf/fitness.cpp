@@ -215,7 +215,8 @@ double tlsf_status(const tlsf::Specification& spec, const Config& cfg,
                            .value_or(false) &&
                        !specification_is_not_well_separated(subset, real);
             },
-            admission_order);
+            admission_order,
+            "(" + spec.assumption_ltl() + ") & (" + spec.guarantee_ltl() + ")");
     }
 
     return status_score(components, sat, [&spec, &real] {

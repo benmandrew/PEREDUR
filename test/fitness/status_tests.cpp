@@ -363,6 +363,36 @@ TEST(test_mrs_short_circuits_on_an_unsatisfiable_component) {
            "mrs: the component tier should short-circuit the walk entirely");
 }
 
+TEST(test_mrs_short_circuits_on_an_unsatisfiable_whole_specification) {
+    // Every component is satisfiable alone, but they contradict together. The
+    // whole-specification query catches that before the walk asks anything.
+    SatisfiabilityChecker sat;
+    RecordingOracle oracle{
+        {}, [](const std::vector<std::size_t>&) { return true; }};
+    const double score = status_score_mrs(
+        {"p", "!p"}, 2, sat,
+        [&oracle](const std::vector<std::size_t>& idx) { return oracle(idx); },
+        {}, "(p) & (!p)");
+    expect(score == k_status_component_unsatisfiable,
+           "mrs: an unsatisfiable whole specification should score 0");
+    expect(oracle.queries.empty(),
+           "mrs: the whole-specification screen should short-circuit the walk");
+}
+
+TEST(test_mrs_satisfiable_whole_specification_reaches_the_walk) {
+    SatisfiabilityChecker sat;
+    RecordingOracle oracle{
+        {}, [](const std::vector<std::size_t>&) { return true; }};
+    const double score = status_score_mrs(
+        {"p", "q"}, 2, sat,
+        [&oracle](const std::vector<std::size_t>& idx) { return oracle(idx); },
+        {}, "(p) & (q)");
+    expect(score == k_status_realizable,
+           "mrs: a satisfiable whole specification should be walked as before");
+    expect(oracle.queries.size() == 2,
+           "mrs: a satisfiable whole specification should be walked in full");
+}
+
 TEST(test_mrs_empty_guarantee_side_scores_realizable) {
     SatisfiabilityChecker sat;
     const double score =
@@ -398,6 +428,25 @@ TEST(test_mrs_grades_an_unrealizable_spec_between_the_tiers) {
     expect(
         specification_status(spec, sat, real, StatusGrading::Mrs) == 2.0 / 3.0,
         "mrs: two of three guarantees kept should score 2/3");
+}
+
+TEST(test_mrs_scores_zero_when_requirements_contradict_through_timing) {
+    // Each requirement is satisfiable on its own, condition and response
+    // alike, so the component tier passes. Together they demand o always and
+    // o eventually false, which only the whole-specification query sees. The
+    // tiered scale has no such query and grades the spec as unrealizable.
+    SatisfiabilityChecker sat;
+    RealizabilityChecker real;
+    const Specification spec(
+        {},
+        {Requirement(Formula("true"), Formula("o"), timing::always()),
+         Requirement(Formula("true"), Formula("!o"), timing::eventually())},
+        {"i"}, {"o"});
+    expect(specification_status(spec, sat, real) == k_status_unrealizable,
+           "mrs: the tiered scale should score this spec 0.5");
+    expect(specification_status(spec, sat, real, StatusGrading::Mrs) ==
+               k_status_component_unsatisfiable,
+           "mrs: jointly contradictory requirements should score 0");
 }
 
 TEST(test_mrs_ill_separated_spec_does_not_score_one) {

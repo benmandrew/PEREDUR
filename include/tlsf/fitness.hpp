@@ -53,6 +53,9 @@ double tlsf_semantic_similarity(const tlsf::Specification& spec,
 /// and is read only under StatusGrading::Mrs; empty means index order. It is
 /// projected onto the candidate's own part count, since mutation rewrites a
 /// formula into a different number of conjuncts.
+/// Before that walk, the conjunction `assumption_ltl() & guarantee_ltl()` is
+/// tested for satisfiability once the components pass, and scores 0.0 when it
+/// fails.
 ///
 /// @p component_check says whether the score tests its own components; the
 /// split scoring path runs each of those queries as a dispatch item of its own

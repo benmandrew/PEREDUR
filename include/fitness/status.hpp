@@ -212,6 +212,16 @@ using SubsetRealizability =
 /// rather than synthesis ones, and it fires exactly where the greedy walk would
 /// otherwise pay @p n_parts realizability queries to learn nothing.
 ///
+/// A satisfiability query over the whole specification runs after the
+/// components and before the walk, and also scores
+/// k_status_component_unsatisfiable. It catches requirements that are each
+/// satisfiable but contradict one another, which the walk would otherwise pay
+/// @p n_parts realizability queries to grade. The per-component queries stay
+/// in front of it: they are cheaper, they recur across a population that
+/// mostly shares its requirements, and an unsatisfiable component spares the
+/// larger query. An undecided whole-specification query passes to the walk;
+/// see the definition for why it is read the opposite way to a component.
+///
 /// An empty guarantee side scores k_status_realizable, matching the shortcut
 /// both front ends already apply: no guarantees leaves the implication with a
 /// `true` consequent, which is realizable whatever the assumptions say.
@@ -223,12 +233,15 @@ using SubsetRealizability =
 /// @param admission_order   Order to admit parts in, projected onto @p n_parts
 ///                          by @ref project_admission_order; empty means index
 ///                          order
+/// @param whole             The whole specification as one LTL formula, tested
+///                          once the components pass; empty skips the query
 /// @return                  k_status_component_unsatisfiable, or |kept|/n_parts
 ///                          in [0, 1]; 1.0 exactly when every part is kept
 double status_score_mrs(const std::vector<std::string>& components,
                         std::size_t n_parts, SatisfiabilityChecker& sat,
                         const SubsetRealizability& subset_realizable,
-                        const std::vector<std::size_t>& admission_order = {});
+                        const std::vector<std::size_t>& admission_order = {},
+                        const std::string& whole = {});
 
 /// @p reference restricted to a walk over @p n_parts parts: entries addressing
 /// a part that no longer exists are dropped, and parts the reference does not
@@ -281,6 +294,10 @@ std::vector<std::size_t> conflict_degree_order(
 /// never be honoured, and not a satisfiability test: every conflict they miss,
 /// within a requirement or across several through their timings, is left to
 /// the walk, which lowers the whole specification.
+///
+/// Under StatusGrading::Mrs the walk is also screened by the conjunction of
+/// every live requirement's lowered formula. Unlike the components, that query
+/// does see requirements interact through their timing and scope.
 ///
 /// Under StatusGrading::Mrs the guarantee-side parts are the guarantees
 /// themselves, one part each. They are not split further, as the TLSF path
