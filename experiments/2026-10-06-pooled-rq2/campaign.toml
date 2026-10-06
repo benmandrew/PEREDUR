@@ -1,0 +1,19 @@
+name = "2026-10-06-pooled-rq2"
+branch = "campaign/pooled-rq2"
+description = "Pooled net-subsumption strength for RQ2: selection (Pareto mrs-nsga2-apportion against scalarised mrs-weighted) and grading (MRS against the ladder, aurus-nsga2-apportion), on the rematch runs' last-cut frontiers pooled over 30 seeds, in the design of PLAN.md and the pooled RQ3 and FRETISH passes. One pre-planned pair list per host from analysis/repair-diversity's diversity/subsumption/pooled.py: within-side pairs that build each side's frontier and Pareto-against-other cross pairs over whole pools, for 23 families, and 100 sampled draws per side for humanoid-531 and humanoid-742. Pairs the per-run pass and the hand-run start of this pass decided are left out."
+
+# Not seed-split: each host runs its own third of the pair list.
+hosts = { av1 = "", av2 = "", av3 = "" }
+
+# 4,676,559 pairs, 1,558,853 per host. Stage-1 pairs averaged about 0.6 s on
+# 28 jobs, so roughly 260 CPU hours a host, about 9-10 hours wall; the
+# humanoid-742 sample pairs take 14-34 s each and add to that.
+[[phases]]
+name = "subsumption"
+kind = "compare"
+pairs = "experiments/2026-10-06-pooled-rq2/pairs-{host}.csv"
+out = "experiments/2026-10-06-pooled-rq2/subsumption-{host}.csv"
+jobs = 28
+black_timeout = 300
+wall_timeout = 700
+vmem_kb = 8000000
