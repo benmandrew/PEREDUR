@@ -2710,6 +2710,27 @@ try:
     check(only_entry()["attempts"], 1, "one attempt spent")
     check_true(not calls.exists(), "and the phase never ran")
 
+    # The checkout landed before the build failed, so HEAD is already at the
+    # entry's commit and only the binaries are stale. The next tick must still
+    # build rather than take HEAD as proof: av3 ran a whole campaign's phase on
+    # the previous commit's compare after exactly this.
+    check(git(repo, "rev-parse", "HEAD"), only_entry()["commit"],
+          "the failed staging left HEAD at the entry's commit")
+    code, printed = tick()
+    check(code, 1, "and the next tick rebuilds, which fails again")
+    check_true("rebuilding feat/queued" in only_entry()["last_error"],
+               "naming the rebuild as the step that failed")
+    check(only_entry()["attempts"], 2, "spending a second attempt")
+    check_true(not calls.exists(), "and still running no phase")
+
+    entry = only_entry()
+    entry.update({"state": "queued", "attempts": 0, "build": "true"})
+    C.write_entry(entry["path"], entry)
+    code, printed = tick()
+    check(code, 0, "once the build passes, the phase runs")
+    check_true("--profile full" in calls.read_text(), "on the rebuilt binary")
+    calls.unlink()
+
     entry = only_entry()
     entry.update({"state": "queued", "attempts": 0, "build": "true",
                   "commit": "0" * 40})

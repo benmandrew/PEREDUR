@@ -152,7 +152,7 @@ A tick takes the lock at `~/.peredur-queue.lock`, recovers any `running` entry, 
 
 ## A tick stages its own branch
 
-With nobody at a terminal to confirm `--force`, a tick on the wrong branch stages itself: it fetches the entry's commit, checks it out, builds, and reads `build-release/peredur --version` before the phase.
+With nobody at a terminal to confirm `--force`, a tick on the wrong branch stages itself: it fetches the entry's commit, checks it out, builds, and reads `build-release/peredur --version` before the phase. A tick whose checkout is already at the entry's commit still builds and reads the binary back, because a staging that checked out and then failed its build leaves HEAD there over the previous commit's binaries. `--no-stage` skips that build too.
 
 It stages for the branch alone and still refuses, spending an attempt with the reason in `last_error`:
 
