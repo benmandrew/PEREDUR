@@ -57,6 +57,8 @@ jobs:
       # A build input moved, so build-and-test has something to re-derive.
       build: ${{ steps.plan.outputs.build }}
       matrix: ${{ steps.plan.outputs.matrix }}
+      # A script or its tests moved, so python-tests has something to run.
+      python: ${{ steps.plan.outputs.python }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -85,6 +87,7 @@ jobs:
               emit run false
               emit heavy false
               emit build false
+              emit python false
               # Never read -- every consumer is gated on run -- but a matrix
               # output that does not parse as JSON is an error rather than a
               # skip if anything downstream ever evaluates it.
@@ -117,6 +120,7 @@ jobs:
           docs=true
           config=true
           build=true
+          python=true
 
           if [ "$full" = false ]; then
             changed() {
@@ -164,6 +168,14 @@ jobs:
                        scripts/coverage_badge.py | grep -q .; then
               build=true
             fi
+
+            # The Python tests import the scripts beside them and nothing
+            # else in the tree, so only a script or this workflow can move
+            # their result.
+            python=false
+            if changed scripts .github | grep -q .; then
+              python=true
+            fi
           fi
 
           # "heavy" gates the whole check job -- the Nix install, the caches and
@@ -182,6 +194,7 @@ jobs:
           emit docs "$docs"
           emit config "$config"
           emit build "$build"
+          emit python "$python"
           emit heavy "$heavy"
 
           # Pull requests run debug, release and tsan; a push to main runs gcc
@@ -197,6 +210,10 @@ jobs:
           # concurrently and tsan finishes inside debug's time (182s against
           # 186s on the last warm-cache run), so a pull request waits as long as
           # it did.
+          #
+          # The Python tests are not in this matrix. They import the scripts
+          # and run no binary, so a second leg would re-derive the same answer
+          # under another compiler; python-tests runs them once.
           #
           # A push to main runs gcc and coverage. actions/checkout resolves a
           # pull_request event to refs/pull/N/merge, so the pull request already
@@ -467,3 +484,48 @@ jobs:
               echo "::endgroup::"
             fi
           '
+
+  # The tests for scripts/, run once on a plain runner. They import the
+  # scripts and run no binary, so they need neither the Nix shell nor a
+  # build, and putting them in the build matrix would run the same Python
+  # once per compiler.
+  #
+  # 3.10 because it is the oldest interpreter a campaign host runs these
+  # scripts under (av2 and av3 are Ubuntu 22.04). z3-solver is the one
+  # package outside the standard library they reach: import_fret.py asks it
+  # which comparison atoms some values realise.
+  #
+  # test_domain_constraints_lpc.py is left out. It runs the built `realize`
+  # binary over the LPC specifications for up to half an hour, which makes it
+  # a reproduction of a paper claim rather than a unit test.
+  python-tests:
+    needs: setup
+    if: >-
+      needs.setup.outputs.run == 'true' && needs.setup.outputs.python == 'true'
+      && github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install z3
+        run: python -m pip install z3-solver
+
+      - name: Run the script tests
+        run: |
+          status=0
+          for test in scripts/test_*.py; do
+            case "$test" in
+              scripts/test_domain_constraints_lpc.py) continue ;;
+            esac
+            echo "::group::$test"
+            python "$test" || { echo "::error file=$test::$test failed"; status=1; }
+            echo "::endgroup::"
+          done
+          exit "$status"

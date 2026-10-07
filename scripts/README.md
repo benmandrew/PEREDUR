@@ -26,7 +26,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `drop_censored_rows.py` | Deletes timeout-censored rows and their run directories so a resume re-runs them under a looser cap. Used once, on the replicate recap. |
 | `import_fret.py` | Converts FRET project exports into a FRETISH `spec.json` for `examples/`. Its docstring lists every conversion rule, and its stderr summary names each requirement a lossy rule touched. Comparisons over several variables or arithmetic need z3's Python bindings, which `nix develop` provides. |
 | `maximality_sweep.py` | Runs the `maximal` binary over both arms of a head-to-head. Hard-wired to two directory layouts. |
-| `test_campaign.py` | Covers `campaign.py`. No pytest; run it directly. |
+| `test_campaign.py` | Covers `campaign.py`. No pytest; run it directly. CI's `python-tests` job runs every `test_*.py` here but `test_domain_constraints_lpc.py`. |
 | `test_experiment_paths.py` | Covers the factor-path parsers and the resume-key invariants in `run_experiments.py` and `gen_configs.py`. |
 | `test_import_fret.py` | Covers `import_fret.py` over a synthetic export, including property tests of its domain constraints. No pytest; run it directly inside `nix develop`, which provides z3's Python bindings. |
 | `test_domain_constraints_lpc.py` | Checks `import_fret.py`'s domain constraints against the hand-written ones in the two Lift-Plus-Cruise examples, then runs `realize` to confirm they reproduce every realizability claim of the paper. Needs a built `realize` (`PEREDUR_REALIZE`, default `build-release/realize`). |

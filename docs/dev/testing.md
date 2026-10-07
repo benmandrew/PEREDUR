@@ -15,6 +15,10 @@ Test binaries land at `build/test/peredur_tests`. Tests use `expect(bool, messag
 
 `test/drivers/e2e_tests.cpp` holds one suite per driver, spawning the binary through `execute_and_capture`; they alone cover `src/main.cpp`, `src/repair/`, `src/crash/` and argument handling. A new driver needs its tests registered with `TEST_IN` under a new suite, that suite in the table in `test/main.cpp` and in `peredur_test_suites`, and an `add_dependencies` entry in `test/CMakeLists.txt`, or nothing covers it. The suites assert the driver's contract (exit status, stdout markers, `run.json` fields, `n_repairs` against the `repair_N` files) rather than which repairs are found, which `determinism` pins and every operator change would break. Fixtures are inline, independent of `examples/`. A TLSF run writes a `repair_N.fitness.json` sidecar per repair, so a `repair_` prefix filter double-counts.
 
+## Python tests
+
+`scripts/test_*.py` are plain scripts with no pytest, each exiting non-zero on a failure. The `python-tests` job in `.github/workflows/ci.yml` runs them once on a pull request or push that touches `scripts/` or `.github/`, under Python 3.10 with `z3-solver` as the only installed package. It sits outside the compiler matrix because the tests import the scripts and run no binary, so each leg would re-derive the same answer. 3.10 is the oldest interpreter a campaign host runs (av2 and av3), which keeps the `tomllib` fallback tested. `test_domain_constraints_lpc.py` stays out of CI: it runs the built `realize` over the LPC specifications for up to half an hour.
+
 ## Coverage
 
 `python scripts/coverage_badge.py` builds the clang-only `coverage` preset into `build-coverage/`, runs its ctest, merges and exports the profiles over `src/` and `include/`, and writes `docs/coverage.svg`. Only `ctest --preset coverage` sets `LLVM_PROFILE_FILE`. Stale profiles are deleted first, an old one crediting lines this build may lack, and a failing suite writes no badge. `llvm-profdata` and `llvm-cov` must match the clang release, the profile format being versioned, which is why `llvmPackages.llvm` is in the dev shell.
