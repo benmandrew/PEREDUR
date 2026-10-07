@@ -1034,12 +1034,12 @@ TEST_IN("driver_peredur", test_peredur_format_overrides_the_extension) {
 // drew and record the same one, or the run cannot be reproduced.
 std::size_t printed_seed(const std::string& output) {
     const std::string marker = "Seed: ";
-    const std::size_t at = output.find(marker);
-    expect(at != std::string::npos, "peredur: the run prints its seed");
-    if (at == std::string::npos) {
+    const std::size_t position = output.find(marker);
+    expect(position != std::string::npos, "peredur: the run prints its seed");
+    if (position == std::string::npos) {
         return 0;
     }
-    return std::stoull(output.substr(at + marker.size()));
+    return std::stoull(output.substr(position + marker.size()));
 }
 
 TEST_IN("driver_peredur", test_peredur_reports_on_request) {
