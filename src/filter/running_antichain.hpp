@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -64,6 +65,8 @@ struct AntichainStats {
     // Comparisons among the survivors of one wave: the price of scanning
     // concurrently rather than one arrival at a time.
     std::size_t m_reconciled_pairs{0};
+    // Wall time spent fingerprinting the arrivals before the walk.
+    double m_fingerprint_s{0.0};
 };
 
 using AntichainRowCallback = std::function<void(const AntichainRow&)>;
@@ -406,7 +409,8 @@ std::vector<AntichainRow> running_antichain(
     std::size_t wave_size = 0,
     const std::function<void(std::size_t, std::size_t)>& on_progress = nullptr,
     const AntichainRowCallback& on_row = nullptr,
-    AntichainStats* stats = nullptr) {
+    AntichainStats* stats = nullptr,
+    const fingerprint::prefilter::Sampling& sampling = {}) {
     if (arrivals.empty()) {
         return {};
     }
@@ -415,9 +419,15 @@ std::vector<AntichainRow> running_antichain(
     for (const Arrival<Spec>& arrival : arrivals) {
         specs.push_back(arrival.m_specification);
     }
-    detail::Walk<Spec, Implies> walk(
-        arrivals, fingerprint::prefilter::fingerprints_of(specs), implies,
-        on_row);
+    const auto fingerprint_start = std::chrono::steady_clock::now();
+    std::vector<fingerprint::PackedFingerprint> prints =
+        fingerprint::prefilter::fingerprints_of(specs, sampling);
+    const double fingerprint_s =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() -
+                                      fingerprint_start)
+            .count();
+    detail::Walk<Spec, Implies> walk(arrivals, std::move(prints), implies,
+                                     on_row);
     const std::size_t wave = wave_size > 0 ? wave_size : dispatch_window();
     for (std::size_t begin = 0; begin < arrivals.size(); begin += wave) {
         const std::size_t end = std::min(begin + wave, arrivals.size());
@@ -435,6 +445,7 @@ std::vector<AntichainRow> running_antichain(
         stats->m_solver_queries =
             counters.m_solver_queries.load(std::memory_order_relaxed);
         stats->m_refuted_directions = refuted;
+        stats->m_fingerprint_s = fingerprint_s;
         stats->m_short_circuited =
             counters.m_short_circuited.load(std::memory_order_relaxed);
         stats->m_reconciled_pairs =

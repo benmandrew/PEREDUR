@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "filter/running_antichain.hpp"
+#include "fingerprint/prefilter.hpp"
 #include "runner/black.hpp"
 #include "test_suite.hpp"
 #include "test_support.hpp"
@@ -62,7 +63,9 @@ std::vector<tlsf::Specification> corpus() {
     return {chain(2), chain(1), off_axis(), chain(0), restated()};
 }
 
-Rows walk(const Arrivals& arrivals, std::size_t wave_size = 0) {
+Rows walk(const Arrivals& arrivals, std::size_t wave_size = 0,
+          const fingerprint::prefilter::Sampling& sampling = {},
+          antichain::AntichainStats* stats = nullptr) {
     SatisfiabilityChecker& checker = global_sat_checker();
     return antichain::running_antichain(
         arrivals,
@@ -70,7 +73,7 @@ Rows walk(const Arrivals& arrivals, std::size_t wave_size = 0) {
                    const tlsf::Specification& dest) {
             return tlsf_spec_implies(from, dest, checker).value_or(false);
         },
-        wave_size);
+        wave_size, nullptr, nullptr, stats, sampling);
 }
 
 std::vector<std::string> final_members(const Rows& rows) {
@@ -149,6 +152,29 @@ void test_membership_replays_at_every_prefix() {
     }
 }
 
+// A wider word set refutes more directions without a solver call, but every
+// refutation is exact, so the log is the default sampling's to the row.
+void test_sampling_moves_cost_not_the_log() {
+    const Arrivals arrivals = arrivals_of(corpus());
+    antichain::AntichainStats narrow_stats;
+    const Rows narrow = walk(arrivals, 1, {}, &narrow_stats);
+    fingerprint::prefilter::Sampling wide;
+    wide.m_words = 4096;
+    wide.m_max_prefix = 8;
+    wide.m_max_cycle = 8;
+    antichain::AntichainStats wide_stats;
+    const Rows wider = walk(arrivals, 1, wide, &wide_stats);
+    bool same = narrow.size() == wider.size();
+    for (std::size_t i = 0; same && i < narrow.size(); ++i) {
+        same = narrow[i].m_name == wider[i].m_name &&
+               narrow[i].m_event == wider[i].m_event &&
+               narrow[i].m_size == wider[i].m_size;
+    }
+    expect(same, "running_antichain: a wider sampling reproduces the log");
+    expect(wide_stats.m_solver_queries <= narrow_stats.m_solver_queries,
+           "running_antichain: a wider sampling asks the solver no more");
+}
+
 }  // namespace
 
 void run_running_antichain_tests() {
@@ -156,4 +182,5 @@ void run_running_antichain_tests() {
     test_wave_size_does_not_change_the_log();
     test_a_strengthening_evicts_what_it_dominates();
     test_membership_replays_at_every_prefix();
+    test_sampling_moves_cost_not_the_log();
 }

@@ -12,6 +12,7 @@ namespace {
 // from, and both have to draw from one word set, so the walk is written once.
 template <typename Spec, typename Signals, typename Lower>
 std::vector<PackedFingerprint> fingerprints_over(const std::vector<Spec>& specs,
+                                                 const Sampling& sampling,
                                                  Signals signals_of,
                                                  Lower lower) {
     if (specs.empty()) {
@@ -22,7 +23,8 @@ std::vector<PackedFingerprint> fingerprints_over(const std::vector<Spec>& specs,
         return {};
     }
     const std::vector<LassoWord> words =
-        sample_words(signals, k_words, k_seed, k_max_prefix, k_max_cycle);
+        sample_words(signals, sampling.m_words, sampling.m_seed,
+                     sampling.m_max_prefix, sampling.m_max_cycle);
     std::vector<PackedFingerprint> prints;
     prints.reserve(specs.size());
     for (const Spec& spec : specs) {
@@ -38,9 +40,9 @@ std::vector<PackedFingerprint> fingerprints_over(const std::vector<Spec>& specs,
 }  // namespace
 
 std::vector<PackedFingerprint> fingerprints_of(
-    const std::vector<tlsf::Specification>& specs) {
+    const std::vector<tlsf::Specification>& specs, const Sampling& sampling) {
     return fingerprints_over(
-        specs,
+        specs, sampling,
         [](const tlsf::Specification& spec) {
             std::vector<std::string> signals = spec.m_inputs;
             signals.insert(signals.end(), spec.m_outputs.begin(),
@@ -51,9 +53,9 @@ std::vector<PackedFingerprint> fingerprints_of(
 }
 
 std::vector<PackedFingerprint> fingerprints_of(
-    const std::vector<Specification>& specs) {
+    const std::vector<Specification>& specs, const Sampling& sampling) {
     return fingerprints_over(
-        specs,
+        specs, sampling,
         [](const Specification& spec) {
             std::vector<std::string> signals = environment_signals(spec);
             signals.insert(signals.end(), spec.m_out_atoms.begin(),

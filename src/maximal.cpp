@@ -65,6 +65,7 @@ struct Args {
     std::size_t jobs{0};
     std::size_t wave{0};
     std::int64_t timeout_s{20};
+    fingerprint::prefilter::Sampling sampling;
 };
 
 void print_usage(const char* prog) {
@@ -90,6 +91,15 @@ void print_usage(const char* prog) {
         << "  --wave W     Arrivals scanned concurrently under --curve\n"
            "               (default: twice the pool; 1 walks serially).\n"
         << "  --timeout S  Per-black-call budget in seconds (default: 20).\n"
+        << "  --prefilter-words N       Words the fingerprint prefilter\n"
+           "                            samples (default: "
+        << fingerprint::prefilter::k_words << ").\n"
+        << "  --prefilter-max-prefix N  Longest sampled lasso stem\n"
+           "                            (default: "
+        << fingerprint::prefilter::k_max_prefix << ").\n"
+        << "  --prefilter-max-cycle N   Longest sampled lasso cycle\n"
+           "                            (default: "
+        << fingerprint::prefilter::k_max_cycle << ").\n"
         << "  --version    Print the git commit this binary was built from.\n";
 }
 
@@ -100,8 +110,14 @@ enum class FlagStatus : std::uint8_t { NotAFlag, Consumed, Bad };
 // rejects once the flag table grows past a couple of entries.
 FlagStatus take_valued_flag(const std::string& arg, int& index, int argc,
                             const char* const* argv, Args& args) {
-    static const std::array<const char*, 4> k_valued = {"--jobs", "--timeout",
-                                                        "--wave", "--curve"};
+    static const std::array<const char*, 7> k_valued = {
+        "--jobs",
+        "--timeout",
+        "--wave",
+        "--curve",
+        "--prefilter-words",
+        "--prefilter-max-prefix",
+        "--prefilter-max-cycle"};
     if (std::none_of(k_valued.begin(), k_valued.end(),
                      [&arg](const char* name) { return arg == name; })) {
         return FlagStatus::NotAFlag;
@@ -116,6 +132,11 @@ FlagStatus take_valued_flag(const std::string& arg, int& index, int argc,
         return FlagStatus::Consumed;
     }
     const std::optional<std::size_t> count = parse_seed(value);
+    // A lasso with no stem is a word that loops from its first position.
+    if (arg == "--prefilter-max-prefix" && count.has_value()) {
+        args.sampling.m_max_prefix = *count;
+        return FlagStatus::Consumed;
+    }
     if (!count.has_value() || *count == 0) {
         std::cerr << arg << " expects a positive integer\n";
         return FlagStatus::Bad;
@@ -124,6 +145,10 @@ FlagStatus take_valued_flag(const std::string& arg, int& index, int argc,
         args.jobs = *count;
     } else if (arg == "--wave") {
         args.wave = *count;
+    } else if (arg == "--prefilter-words") {
+        args.sampling.m_words = *count;
+    } else if (arg == "--prefilter-max-cycle") {
+        args.sampling.m_max_cycle = *count;
     } else {
         args.timeout_s = static_cast<std::int64_t>(*count);
     }
@@ -154,6 +179,13 @@ std::optional<Args> parse_args(int argc, const char* const* argv) {
             return std::nullopt;
         }
         args.paths.push_back(arg);
+    }
+    if (args.sampling.m_max_prefix + args.sampling.m_max_cycle >
+        fingerprint::k_max_positions) {
+        std::cerr << "--prefilter-max-prefix plus --prefilter-max-cycle must "
+                     "not exceed "
+                  << fingerprint::k_max_positions << "\n";
+        return std::nullopt;
     }
     // Curve mode takes its files from the index, so a positional there names a
     // set nothing reads; the batch mode has nothing to read without one.
@@ -451,7 +483,8 @@ int run(const Args& args, SatisfiabilityChecker& checker) {
     }
 
     const Quotient quotient = quotient_by_equivalence<Spec>(
-        maximal, checker, fingerprint::prefilter::fingerprints_of(maximal));
+        maximal, checker,
+        fingerprint::prefilter::fingerprints_of(maximal, args.sampling));
     print_report(maximal, quotient, corpus);
     return 0;
 }
@@ -580,7 +613,7 @@ int run_curve(const Args& args, const std::vector<IndexRow>& index,
                           << event_name(row.m_event) << "\t" << row.m_size
                           << "\n";
             },
-            &stats);
+            &stats, args.sampling);
     std::cout << std::flush;
     std::cerr << "\n"
               << "arrivals   " << arrivals.size() << "\n"
@@ -591,6 +624,8 @@ int run_curve(const Args& args, const std::vector<IndexRow>& index,
               << "refuted    " << stats.m_refuted_directions << "\n"
               << "shortcut   " << stats.m_short_circuited << "\n"
               << "reconciled " << stats.m_reconciled_pairs << "\n"
+              << "printing   " << std::fixed << std::setprecision(3)
+              << stats.m_fingerprint_s << " s\n"
               << "probe sat  " << SatisfiabilityChecker::n_model_probe_sat
               << "\n"
               << "undecided  " << SatisfiabilityChecker::n_escalations_declined
