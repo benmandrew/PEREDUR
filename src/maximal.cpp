@@ -590,7 +590,11 @@ int run_curve(const Args& args, const std::vector<IndexRow>& index,
               << "queries    " << stats.m_solver_queries << "\n"
               << "refuted    " << stats.m_refuted_directions << "\n"
               << "shortcut   " << stats.m_short_circuited << "\n"
-              << "reconciled " << stats.m_reconciled_pairs << "\n";
+              << "reconciled " << stats.m_reconciled_pairs << "\n"
+              << "probe sat  " << SatisfiabilityChecker::n_model_probe_sat
+              << "\n"
+              << "undecided  " << SatisfiabilityChecker::n_escalations_declined
+              << "\n";
     if (parse_failures > 0) {
         std::cerr << "unparsed   " << parse_failures << "\n";
     }
