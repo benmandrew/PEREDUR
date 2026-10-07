@@ -1,8 +1,13 @@
+#include <unistd.h>
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <csignal>
+#include <cstddef>
 #include <filesystem>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -145,6 +150,20 @@ p_temporal = 0.4
 [runtime]
 parallel = 1
 )";
+
+std::vector<std::string> tsv_lines(const std::string& text) {
+    std::vector<std::string> lines;
+    std::string line;
+    for (const char character : text) {
+        if (character == '\n') {
+            lines.push_back(line);
+            line.clear();
+        } else {
+            line.push_back(character);
+        }
+    }
+    return lines;
+}
 
 bool contains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;
@@ -659,6 +678,790 @@ TEST_IN("driver_maximal", test_maximal_reports_both_formats) {
            "maximal: the refusal says which extension it wanted");
 }
 
+// A FRETISH specification that is unrealizable over an input: the environment
+// can raise `req`, which demands a `grant` the second guarantee forbids. The
+// FRETISH k_fretish above is realizable, so the FRETISH halves of realize,
+// compare and lint-ideals need this one to see both verdicts.
+const char* const k_fretish_unrealizable = R"({
+  "assumptions": [],
+  "guarantees": [
+    {
+      "condition": "req",
+      "condition-type": "trigger",
+      "response": "grant",
+      "timing": { "type": "Immediately" }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "!grant",
+      "timing": { "type": "Always" }
+    }
+  ],
+  "in_atoms": ["req"],
+  "out_atoms": ["grant"]
+}
+)";
+
+// The assumption that closes the gap: an environment that never requests.
+// Realizable, and a weakening of the specification above.
+const char* const k_fretish_assumed = R"({
+  "assumptions": [
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "!req",
+      "timing": { "type": "Always" }
+    }
+  ],
+  "guarantees": [
+    {
+      "condition": "req",
+      "condition-type": "trigger",
+      "response": "grant",
+      "timing": { "type": "Immediately" }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "!grant",
+      "timing": { "type": "Always" }
+    }
+  ],
+  "in_atoms": ["req"],
+  "out_atoms": ["grant"]
+}
+)";
+
+// k_fretish_assumed without its second guarantee, so strictly weaker than it.
+const char* const k_fretish_assumed_weaker = R"({
+  "assumptions": [
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "!req",
+      "timing": { "type": "Always" }
+    }
+  ],
+  "guarantees": [
+    {
+      "condition": "req",
+      "condition-type": "trigger",
+      "response": "grant",
+      "timing": { "type": "Immediately" }
+    }
+  ],
+  "in_atoms": ["req"],
+  "out_atoms": ["grant"]
+}
+)";
+
+// k_fretish_assumed with a third guarantee, which no operator can produce from
+// the two-guarantee original.
+const char* const k_fretish_extra_guarantee = R"({
+  "assumptions": [
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "!req",
+      "timing": { "type": "Always" }
+    }
+  ],
+  "guarantees": [
+    {
+      "condition": "req",
+      "condition-type": "trigger",
+      "response": "grant",
+      "timing": { "type": "Immediately" }
+    },
+    {
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "!grant",
+      "timing": { "type": "Always" }
+    },
+    {
+      "condition": "req",
+      "condition-type": "trigger",
+      "response": "grant",
+      "timing": { "type": "NextTimepoint" }
+    }
+  ],
+  "in_atoms": ["req"],
+  "out_atoms": ["grant"]
+}
+)";
+
+// k_unrealizable with its input renamed to `Req`. ltlsynt's --ins never
+// matches an uppercase name, so every driver that decides realizability has
+// to refuse it at load.
+const char* const k_uppercase_input = R"(INFO {
+  TITLE:       "alternating grant"
+  DESCRIPTION: "an input name ltlsynt cannot match"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+
+MAIN {
+  INPUTS { Req; }
+  OUTPUTS { grant; }
+  GUARANTEES {
+    G(Req -> X grant);
+    G(grant -> X !grant);
+  }
+}
+)";
+
+// k_unrealizable's first guarantee as a disjunction: a different spelling of
+// the same specification, which only a solver call can tell is equivalent.
+const char* const k_unrealizable_respelled = R"(INFO {
+  TITLE:       "alternating grant"
+  DESCRIPTION: "unrealizable, spelled differently"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+
+MAIN {
+  INPUTS { req; }
+  OUTPUTS { grant; }
+  GUARANTEES {
+    G(!req || X grant);
+    G(grant -> X !grant);
+  }
+}
+)";
+
+// k_unrealizable over another input name, so it shares no alphabet with it.
+const char* const k_unrealizable_renamed = R"(INFO {
+  TITLE:       "alternating grant"
+  DESCRIPTION: "unrealizable, over another input"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+
+MAIN {
+  INPUTS { ask; }
+  OUTPUTS { grant; }
+  GUARANTEES {
+    G(ask -> X grant);
+    G(grant -> X !grant);
+  }
+}
+)";
+
+const char* const k_config_small = R"([genetic]
+generations = 2
+population_size = 8
+
+[runtime]
+parallel = 1
+)";
+
+// With the accumulator off the final filters run once over the last
+// population, rather than streaming while the search does, which is the only
+// way a run reaches the batch maximality filter.
+const char* const k_config_batch_final_filters = R"([genetic]
+generations = 2
+population_size = 8
+accumulate_repairs = false
+
+[runtime]
+parallel = 1
+)";
+
+const char* const k_config_muc = R"([genetic]
+generations = 2
+population_size = 8
+
+[runtime]
+parallel = 1
+
+[tlsf]
+repair_mode = "muc"
+)";
+
+// Long enough that the run is still searching whenever the signal lands.
+const char* const k_config_endless = R"([genetic]
+generations = 1000000
+population_size = 8
+
+[runtime]
+parallel = 1
+)";
+
+TEST_IN("driver_peredur", test_peredur_prints_help) {
+    for (const char* flag : {"--help", "-h"}) {
+        const DriverRun run = run_driver("peredur", {flag});
+        expect(run.m_exit_code == 0,
+               std::string("peredur: ") + flag + " exits zero");
+        expect(contains(run.m_output, "Usage:") &&
+                   contains(run.m_output, "--output-dir <dir>"),
+               std::string("peredur: ") + flag + " prints the usage");
+    }
+}
+
+TEST_IN("driver_peredur", test_peredur_rejects_bad_values) {
+    const TempDir dir("e2e_peredur_values");
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish_unrealizable).string();
+    const std::string out = dir.string();
+
+    for (const char* seed : {"abc", "-1"}) {
+        const DriverRun run = run_driver(
+            "peredur", {"--input", input, "--output-dir", out, "--seed", seed});
+        expect(run.m_exit_code == 1,
+               std::string("peredur: --seed ") + seed + " is refused");
+        expect(contains(run.m_output, "Invalid --seed value"),
+               std::string("peredur: the refusal of --seed ") + seed +
+                   " says why");
+    }
+
+    const DriverRun format = run_driver(
+        "peredur", {"--input", input, "--output-dir", out, "--format", "yaml"});
+    expect(format.m_exit_code == 1, "peredur: an unknown --format is refused");
+    expect(contains(format.m_output, "Unknown --format value: 'yaml'"),
+           "peredur: the refusal names the format it did not accept");
+
+    const DriverRun no_dir = run_driver(
+        "peredur",
+        {"--input", input, "--output-dir", (dir.path() / "absent").string()});
+    expect(no_dir.m_exit_code == 1,
+           "peredur: an output directory that is not there is refused");
+    expect(contains(no_dir.m_output, "Output directory does not exist"),
+           "peredur: the refusal says the output directory is missing");
+
+    const std::string broken =
+        write_text(dir.path() / "broken.toml", "[genetic\n").string();
+    const DriverRun parse = run_driver(
+        "peredur", {"--input", input, "--output-dir", out, "--config", broken});
+    expect(parse.m_exit_code == 1, "peredur: a malformed config is refused");
+    expect(contains(parse.m_output, "TOML parse error"),
+           "peredur: the refusal says the config did not parse");
+
+    const DriverRun absent = run_driver(
+        "peredur", {"--input", input, "--output-dir", out, "--config",
+                    (dir.path() / "absent.toml").string()});
+    expect(absent.m_exit_code == 1,
+           "peredur: a config file that is not there is refused");
+    expect(contains(absent.m_output, "file does not exist"),
+           "peredur: the refusal says the config file is missing");
+}
+
+TEST_IN("driver_peredur", test_peredur_rejects_unusable_inputs) {
+    const TempDir dir("e2e_peredur_inputs");
+    const std::string out = dir.string();
+
+    // repair_mode is read only on the TLSF path, and a FRETISH run that
+    // ignored it would record a mode in its manifest that it never ran.
+    const std::string fretish =
+        write_text(dir.path() / "spec.json", k_fretish_unrealizable).string();
+    const std::string muc =
+        write_text(dir.path() / "muc.toml", k_config_muc).string();
+    const DriverRun mode = run_driver(
+        "peredur", {"--input", fretish, "--output-dir", out, "--config", muc});
+    expect(mode.m_exit_code == 1,
+           "peredur: a FRETISH run under repair_mode = muc is refused");
+    expect(contains(mode.m_output, "repair_mode is TLSF-only"),
+           "peredur: the refusal names the TLSF-only key");
+
+    const std::string malformed =
+        write_text(dir.path() / "malformed.json", "{\"guarantees\": [")
+            .string();
+    const DriverRun parse =
+        run_driver("peredur", {"--input", malformed, "--output-dir", out});
+    expect(parse.m_exit_code == 1,
+           "peredur: a FRETISH input that does not parse is refused");
+    expect(contains(parse.m_output, "JSON parse error"),
+           "peredur: the refusal says the input did not parse");
+
+    // Refused on both front ends, before any realizability verdict is made.
+    const std::string upper_tlsf =
+        write_text(dir.path() / "upper.tlsf", k_uppercase_input).string();
+    const DriverRun tlsf =
+        run_driver("peredur", {"--input", upper_tlsf, "--output-dir", out});
+    expect(tlsf.m_exit_code == 1,
+           "peredur: a TLSF input with an uppercase input name is refused");
+    expect(contains(tlsf.m_output, "input 'Req' contains an uppercase letter"),
+           "peredur: the TLSF refusal names the unsafe atom");
+
+    nlohmann::json upper = nlohmann::json::parse(k_fretish_unrealizable);
+    upper["in_atoms"] = {"Req"};
+    upper["guarantees"][0]["condition"] = "Req";
+    const std::string upper_fretish =
+        write_text(dir.path() / "upper.json", upper.dump()).string();
+    const DriverRun json =
+        run_driver("peredur", {"--input", upper_fretish, "--output-dir", out});
+    expect(json.m_exit_code == 1,
+           "peredur: a FRETISH input with an uppercase input name is refused");
+    expect(contains(json.m_output, "contains an uppercase letter"),
+           "peredur: the FRETISH refusal names the unsafe atom");
+}
+
+TEST_IN("driver_peredur", test_peredur_format_overrides_the_extension) {
+    const TempDir dir("e2e_peredur_format");
+    const std::string config =
+        write_text(dir.path() / "config.toml", k_config_small).string();
+
+    // TLSF under an extension that would otherwise select FRETISH.
+    const std::string text =
+        write_text(dir.path() / "spec.txt", k_unrealizable).string();
+    const std::filesystem::path out = dir.path() / "out";
+    std::filesystem::create_directories(out);
+    const DriverRun tlsf = run_driver(
+        "peredur", {"--input", text, "--output-dir", out.string(), "--config",
+                    config, "--seed", "1", "--format", "tlsf"});
+    expect(tlsf.m_exit_code == 0,
+           "peredur: --format tlsf reads a .txt input as TLSF");
+    expect_run_manifest(out, text, 1, "peredur/format");
+    for (const auto& repair : repair_files(out)) {
+        expect(repair.extension() == ".tlsf",
+               "peredur: --format tlsf writes TLSF repairs");
+    }
+
+    // And the reverse: a .tlsf file read as FRETISH JSON does not parse.
+    const std::string tlsf_file =
+        write_text(dir.path() / "spec.tlsf", k_unrealizable).string();
+    const DriverRun fretish =
+        run_driver("peredur", {"--input", tlsf_file, "--output-dir",
+                               out.string(), "--format", "fretish"});
+    expect(fretish.m_exit_code == 1,
+           "peredur: --format fretish reads a .tlsf input as JSON");
+    expect(contains(fretish.m_output, "JSON parse error"),
+           "peredur: TLSF read as FRETISH fails to parse");
+}
+
+// The seed is drawn when --seed is absent, and the run has to print the one it
+// drew and record the same one, or the run cannot be reproduced.
+std::size_t printed_seed(const std::string& output) {
+    const std::string marker = "Seed: ";
+    const std::size_t at = output.find(marker);
+    expect(at != std::string::npos, "peredur: the run prints its seed");
+    if (at == std::string::npos) {
+        return 0;
+    }
+    return std::stoull(output.substr(at + marker.size()));
+}
+
+TEST_IN("driver_peredur", test_peredur_reports_on_request) {
+    const TempDir dir("e2e_peredur_reports");
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish_unrealizable).string();
+    const std::string config =
+        write_text(dir.path() / "config.toml", k_config_small).string();
+    const std::filesystem::path out = dir.path() / "out";
+    std::filesystem::create_directories(out);
+
+    const DriverRun run = run_driver(
+        "peredur", {"--input", input, "--output-dir", out.string(), "--config",
+                    config, "--dashboard", "--diagnostics", "--cpu-report"});
+    expect(run.m_exit_code == 0, "peredur: a run with every report exits zero");
+    const std::size_t seed = printed_seed(run.m_output);
+    const nlohmann::json manifest =
+        nlohmann::json::parse(read_text(out / "run.json"));
+    expect(manifest.at("seed").get<std::size_t>() == seed,
+           "peredur: a drawn seed is the one the manifest records");
+
+    expect(contains(run.m_output, "Tool timing report:") &&
+               contains(run.m_output, "Cache report:"),
+           "peredur: --diagnostics prints the tool and cache reports");
+    expect(contains(run.m_output, "CPU attribution (wall "),
+           "peredur: --cpu-report prints the CPU attribution");
+
+    expect(contains(run.m_output, "Progress: "),
+           "peredur: --dashboard prints where the progress goes");
+    expect(std::filesystem::exists(out / "index.html"),
+           "peredur: --dashboard writes the page beside the progress file");
+    const std::string progress = read_text(out / "progress.jsonl");
+    std::size_t n_events = 0;
+    for (const std::string& line : tsv_lines(progress)) {
+        expect(nlohmann::json::accept(line),
+               "peredur: each progress line is one JSON object");
+        ++n_events;
+    }
+    expect(n_events >= 2, "peredur: the progress file records the run");
+}
+
+TEST_IN("driver_peredur", test_peredur_runs_tlsf_muc_mode) {
+    const TempDir dir("e2e_peredur_muc");
+    const std::string input =
+        write_text(dir.path() / "spec.tlsf", k_unrealizable).string();
+    const std::string config =
+        write_text(dir.path() / "config.toml", k_config_muc).string();
+    const std::filesystem::path out = dir.path() / "out";
+    std::filesystem::create_directories(out);
+
+    const DriverRun run = run_driver(
+        "peredur", {"--input", input, "--output-dir", out.string(), "--config",
+                    config, "--seed", "4", "--diagnostics", "--cpu-report"});
+    expect(run.m_exit_code == 0, "peredur: a muc-mode run exits zero");
+    expect(contains(run.m_output, "muc iteration 1/"),
+           "peredur: muc mode reports its first core iteration");
+    expect(contains(run.m_output, "Tool timing report:") &&
+               contains(run.m_output, "CPU attribution (wall "),
+           "peredur: a TLSF run prints the reports it was asked for");
+    const nlohmann::json manifest =
+        expect_run_manifest(out, input, 4, "peredur/muc");
+    expect(manifest.at("config").at("tlsf").at("repair_mode") == "muc",
+           "peredur: the manifest records the mode the run used");
+}
+
+TEST_IN("driver_peredur", test_peredur_filters_without_the_accumulator) {
+    const TempDir dir("e2e_peredur_batch");
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish_unrealizable).string();
+    const std::string config =
+        write_text(dir.path() / "config.toml", k_config_batch_final_filters)
+            .string();
+    const std::filesystem::path out = dir.path() / "out";
+    std::filesystem::create_directories(out);
+
+    const DriverRun run =
+        run_driver("peredur", {"--input", input, "--output-dir", out.string(),
+                               "--config", config, "--seed", "4"});
+    expect(run.m_exit_code == 0,
+           "peredur: a run with the accumulator off exits zero");
+    expect(contains(run.m_output, "final/implication"),
+           "peredur: the batch final filters report their own rows");
+    expect_run_manifest(out, input, 4, "peredur/batch");
+}
+
+// The crash log lands in a `crashes/` directory under the working directory,
+// named after the crashed process, which is this test's own working directory.
+std::vector<std::filesystem::path> crash_logs_of(pid_t pid) {
+    const std::filesystem::path crashes =
+        std::filesystem::current_path() / "crashes";
+    const std::string prefix = "crash_" + std::to_string(pid) + "_";
+    std::vector<std::filesystem::path> found;
+    if (!std::filesystem::is_directory(crashes)) {
+        return found;
+    }
+    for (const auto& entry : std::filesystem::directory_iterator(crashes)) {
+        if (entry.path().filename().string().rfind(prefix, 0) == 0) {
+            found.push_back(entry.path());
+        }
+    }
+    return found;
+}
+
+TEST_IN("driver_peredur", test_peredur_writes_a_crash_report) {
+    const TempDir dir("e2e_peredur_crash");
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish_unrealizable).string();
+    const std::string config =
+        write_text(dir.path() / "config.toml", k_config_endless).string();
+    const std::filesystem::path out = dir.path() / "out";
+    std::filesystem::create_directories(out);
+
+    const PipedChild child =
+        spawn_piped_child({std::string(PEREDUR_DRIVER_DIR) + "/peredur",
+                           "--input", input, "--output-dir", out.string(),
+                           "--config", config, "--seed", "7", "--dashboard"},
+                          ParentDeathPolicy::KillWithParentThread,
+                          ExecutableLookup::AbsolutePath);
+    close(child.m_write_fd);
+
+    // The progress file is opened after the handler is installed and the seed
+    // registered, so its existence is the earliest moment a signal is a crash
+    // rather than a kill. A signal sent before then takes the default action
+    // and leaves no report.
+    const std::filesystem::path progress = out / "progress.jsonl";
+    const auto give_up = std::chrono::steady_clock::now() + k_deadline;
+    while (!std::filesystem::exists(progress) &&
+           std::chrono::steady_clock::now() < give_up) {
+        std::this_thread::sleep_for(milliseconds{20});
+    }
+    expect(std::filesystem::exists(progress),
+           "peredur: the endless run reached its search");
+    kill(child.m_pid, SIGSEGV);
+
+    const std::pair<std::string, bool> read =
+        read_until_eof(child.m_read_fd, k_deadline);
+    expect(!read.second, "peredur: the crashed run closed its output");
+    close(child.m_read_fd);
+    reap_with_grace(child.m_pid, milliseconds{1'000}, "peredur",
+                    child.m_rss_floor_kb);
+
+    const std::vector<std::filesystem::path> logs = crash_logs_of(child.m_pid);
+    expect(logs.size() == 1, "peredur: a crash writes one report");
+    for (const auto& log : logs) {
+        const std::string report = read_text(log);
+        // Removed before anything is asserted: left behind by a failure, it
+        // would read as a real crash of this build.
+        std::filesystem::remove(log);
+        expect(contains(report, "=== CRASH REPORT ==="),
+               "peredur: the report carries its heading");
+        expect(contains(report, "Signal: SIGSEGV (11)"),
+               "peredur: the report names the signal");
+        expect(contains(report, "PID:    " + std::to_string(child.m_pid)),
+               "peredur: the report names the crashed process");
+        expect(contains(report, "Input:            " + input),
+               "peredur: the report names the input");
+        expect(contains(report, "  Seed:           7"),
+               "peredur: the report carries the seed that reproduces it");
+        expect(contains(report, "Stack trace:"),
+               "peredur: the report carries a stack trace");
+    }
+}
+
+TEST_IN("driver_realize", test_realize_decides_fretish) {
+    const TempDir dir("e2e_realize_fretish");
+    const std::string unrealizable =
+        write_text(dir.path() / "unrealizable.json", k_fretish_unrealizable)
+            .string();
+    const std::string realizable =
+        write_text(dir.path() / "realizable.json", k_fretish_assumed).string();
+
+    const DriverRun one = run_driver("realize", {unrealizable});
+    expect(one.m_exit_code == 0 && contains(one.m_output, "UNREALIZABLE"),
+           "realize: the unrealizable FRETISH specification is reported");
+
+    const DriverRun both = run_driver("realize", {unrealizable, realizable});
+    expect(both.m_exit_code == 0, "realize: several FRETISH inputs exit zero");
+    expect(contains(both.m_output, unrealizable + ": UNREALIZABLE") &&
+               contains(both.m_output, realizable + ": REALIZABLE"),
+           "realize: each FRETISH line carries its file's verdict");
+
+    // A file that does not parse fails the whole run, and among several the
+    // message names the one that failed.
+    const std::string malformed =
+        write_text(dir.path() / "malformed.json", "{\"guarantees\": [")
+            .string();
+    const DriverRun broken = run_driver("realize", {malformed, realizable});
+    expect(broken.m_exit_code == 1,
+           "realize: an input that does not parse fails the run");
+    expect(contains(broken.m_output, malformed + ": JSON parse error"),
+           "realize: the failure names the file that did not parse");
+}
+
+TEST_IN("driver_realize", test_realize_refuses_unsafe_atoms) {
+    const TempDir dir("e2e_realize_atoms");
+    const std::string upper =
+        write_text(dir.path() / "upper.tlsf", k_uppercase_input).string();
+    const DriverRun run = run_driver("realize", {upper});
+    expect(run.m_exit_code == 1,
+           "realize: an uppercase input name is refused rather than decided");
+    expect(contains(run.m_output, "input 'Req' contains an uppercase letter"),
+           "realize: the refusal names the unsafe atom");
+}
+
+TEST_IN("driver_realize", test_realize_prints_usage) {
+    const DriverRun bare = run_driver("realize", {});
+    expect(bare.m_exit_code == 1, "realize: no input is a usage error");
+    expect(contains(bare.m_output, "Usage:"),
+           "realize: a usage error prints the usage");
+    const DriverRun help = run_driver("realize", {"--help"});
+    expect(help.m_exit_code == 0 && contains(help.m_output, "Usage:"),
+           "realize: --help prints the usage and exits zero");
+}
+
+TEST_IN("driver_ltl", test_ltl_labels_several_inputs) {
+    const TempDir dir("e2e_ltl_several");
+    const std::string tlsf =
+        write_text(dir.path() / "spec.tlsf", k_unrealizable).string();
+    const std::string fretish =
+        write_text(dir.path() / "assumed.json", k_fretish_assumed).string();
+
+    const DriverRun run = run_driver("ltl", {tlsf, fretish});
+    expect(run.m_exit_code == 0, "ltl: several inputs exit zero");
+    expect(contains(run.m_output, tlsf + ":\n") &&
+               contains(run.m_output, fretish + ":\n"),
+           "ltl: each input's block is headed by its path");
+    expect(contains(run.m_output, "[assumption]"),
+           "ltl: FRETISH assumptions are labelled as such");
+    expect(contains(run.m_output, "G(!(req))"),
+           "ltl: each FRETISH assumption carries its lowering");
+
+    const DriverRun bare = run_driver("ltl", {});
+    expect(bare.m_exit_code == 1 && contains(bare.m_output, "Usage:"),
+           "ltl: no input is a usage error");
+}
+
+TEST_IN("driver_mucs", test_mucs_refuses_unusable_inputs) {
+    const TempDir dir("e2e_mucs_inputs");
+    const std::string upper =
+        write_text(dir.path() / "upper.tlsf", k_uppercase_input).string();
+    const DriverRun run = run_driver("mucs", {upper});
+    expect(run.m_exit_code == 1, "mucs: an uppercase input name is refused");
+    expect(contains(run.m_output, "contains an uppercase letter"),
+           "mucs: the refusal names the unsafe atom");
+
+    const DriverRun bare = run_driver("mucs", {});
+    expect(bare.m_exit_code == 1 && contains(bare.m_output, "Usage:"),
+           "mucs: no input is a usage error");
+}
+
+TEST_IN("driver_compare", test_compare_orders_fretish_repairs) {
+    const TempDir dir("e2e_compare_fretish");
+    const std::filesystem::path ideals = dir.path() / "ideals";
+    write_text(ideals / "assumed.json", k_fretish_assumed);
+
+    // A run's output directory, manifest included: run.json is not a repair.
+    const std::filesystem::path same = dir.path() / "same";
+    write_text(same / "repair_0.json", k_fretish_assumed);
+    write_text(same / "run.json", "{\"schema_version\": 25}\n");
+    const DriverRun equivalent = run_driver(
+        "compare", {"--repairs", same.string(), "--ideals", ideals.string()});
+    expect(equivalent.m_exit_code == 0,
+           "compare: a FRETISH run over one pair exits zero");
+    expect(contains(equivalent.m_output, "equivalent to assumed.json"),
+           "compare: a FRETISH repair identical to the ideal is equivalent");
+    expect(contains(equivalent.m_output, "Summary: 1 equivalent"),
+           "compare: the run manifest is not compared as a repair");
+
+    // The unrealizable original implies the ideal and not the reverse; the
+    // ideal with a guarantee dropped is implied by it and not the reverse.
+    const std::filesystem::path ordered = dir.path() / "ordered";
+    write_text(ordered / "repair_0.json", k_fretish_unrealizable);
+    write_text(ordered / "repair_1.json", k_fretish_assumed_weaker);
+    const DriverRun both = run_driver("compare", {"--repairs", ordered.string(),
+                                                  "--ideals", ideals.string()});
+    expect(both.m_exit_code == 0, "compare: the ordered run exits zero");
+    expect(contains(both.m_output, "strictly stronger than assumed.json"),
+           "compare: the original is strictly stronger than its weakening");
+    expect(contains(both.m_output, "strictly weaker than assumed.json"),
+           "compare: a dropped guarantee is strictly weaker than the ideal");
+    expect(contains(both.m_output,
+                    "Summary: 0 equivalent, 1 strictly stronger, 1 strictly "
+                    "weaker"),
+           "compare: the summary counts each relation once");
+}
+
+TEST_IN("driver_compare", test_compare_rejects_bad_arguments) {
+    const TempDir dir("e2e_compare_args");
+    const std::filesystem::path ideals = dir.path() / "ideals";
+    write_text(ideals / "assumed.json", k_fretish_assumed);
+    const std::filesystem::path empty = dir.path() / "empty";
+    std::filesystem::create_directories(empty);
+
+    const DriverRun bare = run_driver("compare", {});
+    expect(bare.m_exit_code == 1 && contains(bare.m_output, "Usage:"),
+           "compare: no directories is a usage error");
+
+    const DriverRun unknown =
+        run_driver("compare", {"--repairs", empty.string(), "--bogus"});
+    expect(unknown.m_exit_code == 1 &&
+               contains(unknown.m_output, "Unknown argument: --bogus"),
+           "compare: an unknown flag is refused by name");
+
+    const DriverRun nothing = run_driver(
+        "compare", {"--repairs", empty.string(), "--ideals", ideals.string()});
+    expect(nothing.m_exit_code == 1,
+           "compare: a repairs directory with nothing in it is refused");
+    expect(contains(nothing.m_output, "No .json files found in"),
+           "compare: the refusal says which extension it wanted");
+}
+
+TEST_IN("driver_maximal", test_maximal_reports_unparsed_and_equivalent) {
+    const TempDir dir("e2e_maximal_mixed");
+    const std::filesystem::path specs = dir.path() / "specs";
+    write_text(specs / "original.tlsf", k_unrealizable);
+    write_text(specs / "respelled.tlsf", k_unrealizable_respelled);
+    write_text(specs / "garbage.tlsf", "garbage\n");
+
+    // Two spellings of one specification are distinct files and one class,
+    // and a file that does not parse is counted rather than fatal.
+    const DriverRun run = run_driver(
+        "maximal", {specs.string(), "--jobs", "2", "--timeout", "5"});
+    expect(run.m_exit_code == 0,
+           "maximal: a directory with an unparsed file still exits zero");
+    expect(contains(run.m_output, "files      2") &&
+               contains(run.m_output, "distinct   2"),
+           "maximal: the two spellings are distinct before the solver");
+    expect(contains(run.m_output, "maximal    1") &&
+               contains(run.m_output, "classes    1"),
+           "maximal: equivalent spellings leave one maximal member");
+    expect(contains(run.m_output, "unparsed   1"),
+           "maximal: the file that did not parse is counted");
+    expect(contains(run.m_output, "garbage.tlsf: TLSF parse error"),
+           "maximal: the file that did not parse is named");
+
+    write_text(specs / "renamed.tlsf", k_unrealizable_renamed);
+    const DriverRun mixed = run_driver("maximal", {specs.string()});
+    expect(mixed.m_exit_code == 0, "maximal: mixed alphabets still exit zero");
+    expect(contains(mixed.m_output, "the input set mixes signal alphabets"),
+           "maximal: mixed alphabets are warned about");
+}
+
+TEST_IN("driver_maximal", test_maximal_rejects_bad_arguments) {
+    const TempDir dir("e2e_maximal_args");
+    const std::filesystem::path specs = dir.path() / "specs";
+    write_text(specs / "original.tlsf", k_unrealizable);
+
+    const DriverRun bare = run_driver("maximal", {});
+    expect(bare.m_exit_code == 1 && contains(bare.m_output, "Usage:"),
+           "maximal: no inputs is a usage error");
+
+    const DriverRun zero =
+        run_driver("maximal", {specs.string(), "--jobs", "0"});
+    expect(zero.m_exit_code == 1 &&
+               contains(zero.m_output, "--jobs expects a positive integer"),
+           "maximal: --jobs 0 is refused");
+
+    const DriverRun no_value =
+        run_driver("maximal", {specs.string(), "--timeout"});
+    expect(no_value.m_exit_code == 1 &&
+               contains(no_value.m_output, "--timeout expects a value"),
+           "maximal: --timeout without a value is refused");
+
+    const DriverRun unknown =
+        run_driver("maximal", {specs.string(), "--bogus"});
+    expect(unknown.m_exit_code == 1 &&
+               contains(unknown.m_output, "unknown argument: --bogus"),
+           "maximal: an unknown flag is refused by name");
+}
+
+TEST_IN("driver_lint_ideals", test_lint_ideals_checks_a_fretish_subject) {
+    const TempDir dir("e2e_lint_ideals_fretish");
+    const std::filesystem::path subject = dir.path() / "subject";
+    write_text(subject / "spec.json", k_fretish_unrealizable);
+    write_text(subject / "fixes" / "assumed.json", k_fretish_assumed);
+    write_text(subject / "fixes" / "dropped.json", k_fretish_assumed_weaker);
+    write_text(subject / "fixes" / "extra.json", k_fretish_extra_guarantee);
+
+    const DriverRun run = run_driver("lint-ideals", {subject.string()});
+    expect(
+        run.m_exit_code == 1,
+        "lint-ideals: a FRETISH subject with an unreachable ideal exits one");
+    expect(contains(run.m_output, "subject (3 ideals)"),
+           "lint-ideals: the heading names the subject and counts its ideals");
+    expect(contains(run.m_output, "no operator adds to the guarantee list"),
+           "lint-ideals: an ideal with an extra guarantee is unreachable");
+    expect(contains(run.m_output, "1 ideal(s) failed at least one check"),
+           "lint-ideals: only the unreachable ideal fails");
+    expect(contains(run.m_output,
+                    "assumed.json is strictly stronger than dropped.json"),
+           "lint-ideals: a sibling's weakening is reported as redundant");
+}
+
+TEST_IN("driver_lint_ideals", test_lint_ideals_rejects_bad_subjects) {
+    const TempDir dir("e2e_lint_ideals_subjects");
+
+    const DriverRun bare = run_driver("lint-ideals", {});
+    expect(bare.m_exit_code == 2 && contains(bare.m_output, "Usage:"),
+           "lint-ideals: no subject is a usage error");
+
+    const std::filesystem::path no_fixes = dir.path() / "no_fixes";
+    write_text(no_fixes / "spec.json", k_fretish_unrealizable);
+    const DriverRun none = run_driver("lint-ideals", {no_fixes.string()});
+    expect(
+        none.m_exit_code == 0 && contains(none.m_output, "no_fixes: no ideals"),
+        "lint-ideals: a subject without ideals passes and says so");
+
+    const std::filesystem::path no_spec = dir.path() / "no_spec";
+    std::filesystem::create_directories(no_spec);
+    const DriverRun missing = run_driver("lint-ideals", {no_spec.string()});
+    expect(missing.m_exit_code == 2 &&
+               contains(missing.m_output, "no spec.tlsf or spec.json"),
+           "lint-ideals: a directory without a specification is a load error");
+
+    const std::filesystem::path malformed = dir.path() / "malformed";
+    write_text(malformed / "spec.json", "{\"guarantees\": [");
+    const DriverRun broken = run_driver("lint-ideals", {malformed.string()});
+    expect(broken.m_exit_code == 2 &&
+               contains(broken.m_output, "JSON parse error"),
+           "lint-ideals: a specification that does not parse is a load error");
+}
+
 // Registered after each driver's own tests, so each suite checks --version
 // last.
 TEST_IN("driver_peredur", test_peredur_reports_its_version) {
@@ -711,20 +1514,6 @@ const char* const k_fretish_retimed = R"({
   "out_atoms": ["takeoff_roll", "lift_off"]
 }
 )";
-
-std::vector<std::string> tsv_lines(const std::string& text) {
-    std::vector<std::string> lines;
-    std::string line;
-    for (const char character : text) {
-        if (character == '\n') {
-            lines.push_back(line);
-            line.clear();
-        } else {
-            line.push_back(character);
-        }
-    }
-    return lines;
-}
 
 TEST_IN("driver_keyword_terms", test_keyword_terms_prints_the_pair_terms) {
     const TempDir dir("e2e_keyword_terms");
