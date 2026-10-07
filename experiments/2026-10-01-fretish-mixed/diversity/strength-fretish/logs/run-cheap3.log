@@ -1,0 +1,73 @@
+15:45:40 fsm-timing within-directed: 35692 candidate pairs, incremental antichain
+15:45:40 fsm-timing inc-directed: 64/1121 entered, 29 reps, 0s
+15:47:44 fsm-timing inc-directed: 704/1121 entered, 264 reps, 124s
+15:54:45 fsm-timing within-uniform: 13927 candidate pairs, incremental antichain
+15:54:46 fsm-timing inc-uniform: 64/1130 entered, 41 reps, 0s
+15:54:52 fsm-timing inc-uniform: 704/1130 entered, 253 reps, 6s
+15:55:09 fsm-timing cross: 319 calls, 1424 directed queries
+15:55:56 fsm-timing cross: done 319 calls 1424 q, cap=0 missing=0 rc=0 46s
+15:55:56 RUN fsm-timing d_front=372 u_front=335 616s
+15:55:56 rad-core-10 within-directed: 9 calls, 11 directed queries
+15:55:56 rad-core-10 within-directed: done 9 calls 11 q, cap=0 missing=0 rc=0 0s
+15:55:56 rad-core-10 within-uniform: 303 calls, 1420 directed queries
+15:55:59 rad-core-10 within-uniform: done 303 calls 1420 q, cap=0 missing=0 rc=0 3s
+15:55:59 rad-core-10 cross: 5 calls, 6 directed queries
+15:55:59 rad-core-10 cross: done 5 calls 6 q, cap=0 missing=0 rc=0 0s
+15:55:59 RUN rad-core-10 d_front=46 u_front=744 3s
+15:55:59 rad-core-68 within-directed: 509 calls, 1648 directed queries
+15:56:03 rad-core-68 within-directed: done 509 calls 1648 q, cap=0 missing=0 rc=0 4s
+15:56:03 rad-core-68 within-uniform: 713 calls, 2391 directed queries
+15:56:09 rad-core-68 within-uniform: done 713 calls 2391 q, cap=0 missing=0 rc=0 6s
+15:56:09 rad-core-68 cross: 157 calls, 234 directed queries
+15:56:10 rad-core-68 cross: done 157 calls 234 q, cap=0 missing=0 rc=0 1s
+15:56:10 RUN rad-core-68 d_front=833 u_front=1310 11s
+15:56:10 rad-core-1-18 within-directed: 475 calls, 3327 directed queries
+15:56:16 rad-core-1-18 within-directed: done 475 calls 3327 q, cap=0 missing=0 rc=0 7s
+15:56:16 rad-core-1-18 within-uniform: 633 calls, 3843 directed queries
+15:56:25 rad-core-1-18 within-uniform: done 633 calls 3843 q, cap=0 missing=0 rc=0 8s
+15:56:25 rad-core-1-18 cross: 200 calls, 265 directed queries
+15:56:26 rad-core-1-18 cross: done 200 calls 265 q, cap=0 missing=0 rc=0 1s
+15:56:26 RUN rad-core-1-18 d_front=1502 u_front=1500 16s
+15:56:26 rad-core-45 within-directed: 433 calls, 1549 directed queries
+15:56:29 rad-core-45 within-directed: done 433 calls 1549 q, cap=0 missing=0 rc=0 3s
+15:56:29 rad-core-45 within-uniform: 659 calls, 2858 directed queries
+15:56:36 rad-core-45 within-uniform: done 659 calls 2858 q, cap=0 missing=0 rc=0 6s
+15:56:36 rad-core-45 cross: 241 calls, 327 directed queries
+15:56:37 rad-core-45 cross: done 241 calls 327 q, cap=0 missing=0 rc=0 1s
+15:56:37 RUN rad-core-45 d_front=1378 u_front=1306 11s
+15:56:37 rad-core-12-18 within-directed: 615 calls, 2478 directed queries
+15:56:42 rad-core-12-18 within-directed: done 615 calls 2478 q, cap=0 missing=0 rc=0 5s
+15:56:42 rad-core-12-18 within-uniform: 1034 calls, 4779 directed queries
+15:56:53 rad-core-12-18 within-uniform: done 1034 calls 4779 q, cap=0 missing=0 rc=0 11s
+15:56:53 rad-core-12-18 cross: 249 calls, 494 directed queries
+15:56:55 rad-core-12-18 cross: done 249 calls 494 q, cap=0 missing=0 rc=0 2s
+15:56:55 RUN rad-core-12-18 d_front=1722 u_front=1610 18s
+15:56:55 rad-core-17-18 within-directed: 562 calls, 2507 directed queries
+15:57:00 rad-core-17-18 within-directed: done 562 calls 2507 q, cap=0 missing=0 rc=0 5s
+15:57:00 rad-core-17-18 within-uniform: 1377 calls, 6984 directed queries
+15:57:16 rad-core-17-18 within-uniform: done 1377 calls 6984 q, cap=0 missing=0 rc=0 16s
+15:57:17 rad-core-17-18 cross: 262 calls, 662 directed queries
+15:57:19 rad-core-17-18 cross: done 262 calls 662 q, cap=0 missing=0 rc=0 2s
+15:57:19 RUN rad-core-17-18 d_front=1761 u_front=1625 23s
+15:57:19 rad-core-55 within-directed: 403 calls, 1244 directed queries
+15:57:22 rad-core-55 within-directed: done 403 calls 1244 q, cap=0 missing=0 rc=0 3s
+15:57:22 rad-core-55 within-uniform: 1129 calls, 5633 directed queries
+15:57:34 rad-core-55 within-uniform: done 1129 calls 5633 q, cap=0 missing=0 rc=0 12s
+15:57:34 rad-core-55 cross: 853 calls, 2087 directed queries
+15:57:40 rad-core-55 cross: done 853 calls 2087 q, cap=0 missing=0 rc=0 6s
+15:57:40 RUN rad-core-55 d_front=2261 u_front=1097 21s
+15:57:40 rad-core-65 within-directed: 469 calls, 655 directed queries
+15:57:42 rad-core-65 within-directed: done 469 calls 655 q, cap=0 missing=0 rc=0 2s
+15:57:43 rad-core-65 within-uniform: 465 calls, 748 directed queries
+15:57:45 rad-core-65 within-uniform: done 465 calls 748 q, cap=0 missing=0 rc=0 2s
+15:57:45 rad-core-65 cross: 340 calls, 442 directed queries
+15:57:47 rad-core-65 cross: done 340 calls 442 q, cap=0 missing=0 rc=0 2s
+15:57:47 RUN rad-core-65 d_front=2543 u_front=2185 7s
+15:57:47 rad-core-61 within-directed: 423 calls, 534 directed queries
+15:58:30 rad-core-61 within-directed: done 423 calls 534 q, cap=0 missing=0 rc=0 43s
+15:58:30 rad-core-61 within-uniform: 400 calls, 548 directed queries
+15:58:32 rad-core-61 within-uniform: done 400 calls 548 q, cap=0 missing=0 rc=0 2s
+15:58:33 rad-core-61 cross: 338 calls, 405 directed queries
+15:58:34 rad-core-61 cross: done 338 calls 405 q, cap=0 missing=0 rc=0 2s
+15:58:34 RUN rad-core-61 d_front=3367 u_front=2669 47s
+RUN_DONE fsm-timing rad-core-10 rad-core-68 rad-core-1-18 rad-core-45 rad-core-12-18 rad-core-17-18 rad-core-55 rad-core-65 rad-core-61

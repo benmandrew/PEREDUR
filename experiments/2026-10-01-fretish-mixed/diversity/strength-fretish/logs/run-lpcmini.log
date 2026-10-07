@@ -1,0 +1,14 @@
+17:42:16 lpc-mini-core1 within-directed: 9740 candidate pairs, incremental antichain
+17:42:20 lpc-mini-core1 inc-directed: 64/1670 entered, 54 reps, 4s
+17:49:30 lpc-mini-core1 inc-directed: 704/1670 entered, 440 reps, 434s
+18:00:30 lpc-mini-core1 inc-directed: 1344/1670 entered, 653 reps, 1094s
+18:09:28 lpc-mini-core1 inc-directed-1472: 136/136 calls, 495/495 q, 314s
+18:18:12 lpc-mini-core1 within-uniform: 11959 candidate pairs, incremental antichain
+18:18:28 lpc-mini-core1 inc-uniform: 64/1734 entered, 52 reps, 16s
+18:26:48 lpc-mini-core1 inc-uniform: 704/1734 entered, 395 reps, 516s
+18:38:02 lpc-mini-core1 inc-uniform: 1344/1734 entered, 607 reps, 1190s
+18:54:02 lpc-mini-core1 cross: 423 calls, 1046 directed queries
+18:59:08 lpc-mini-core1 cross: 406/423 calls, 962/1046 q, 306s
+18:59:42 lpc-mini-core1 cross: done 423 calls 1046 q, cap=0 missing=0 rc=0 340s
+18:59:42 RUN lpc-mini-core1 d_front=707 u_front=650 4647s
+RUN_DONE lpc-mini-core1

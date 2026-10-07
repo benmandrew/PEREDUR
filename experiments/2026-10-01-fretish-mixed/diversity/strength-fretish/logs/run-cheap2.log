@@ -1,0 +1,4 @@
+15:28:51 fsm-timing within-directed: 1043 calls, 14717 directed queries
+15:33:53 fsm-timing within-directed: 12/1043 calls, 320/14717 q, 302s
+15:39:06 fsm-timing within-directed: 77/1043 calls, 2454/14717 q, 615s
+15:44:13 fsm-timing within-directed: 124/1043 calls, 3723/14717 q, 922s

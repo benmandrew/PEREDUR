@@ -1,0 +1,17 @@
+16:48:37 liquid-mixer within-directed: 211 calls, 536 directed queries
+16:53:42 liquid-mixer within-directed: 71/211 calls, 174/536 q, 304s
+16:58:45 liquid-mixer within-directed: 159/211 calls, 418/536 q, 607s
+17:01:39 liquid-mixer within-directed: done 211 calls 536 q, cap=0 missing=0 rc=0 782s
+17:01:39 liquid-mixer within-uniform: 695 calls, 1956 directed queries
+17:06:39 liquid-mixer within-uniform: 115/695 calls, 397/1956 q, 300s
+17:11:46 liquid-mixer within-uniform: 219/695 calls, 814/1956 q, 607s
+17:16:47 liquid-mixer within-uniform: 340/695 calls, 1219/1956 q, 908s
+17:21:48 liquid-mixer within-uniform: 469/695 calls, 1529/1956 q, 1209s
+17:26:57 liquid-mixer within-uniform: 642/695 calls, 1869/1956 q, 1518s
+17:28:38 liquid-mixer within-uniform: done 695 calls 1956 q, cap=0 missing=0 rc=0 1619s
+17:28:38 liquid-mixer cross: 84 calls, 137 directed queries
+17:30:11 liquid-mixer cross: done 84 calls 137 q, cap=0 missing=0 rc=0 93s
+17:30:11 RUN liquid-mixer d_front=1774 u_front=1498 2493s
+17:30:11 lpc-mini-core1 within-directed: 1527 calls, 10022 directed queries
+17:35:11 lpc-mini-core1 within-directed: 106/1527 calls, 801/10022 q, 300s
+17:40:12 lpc-mini-core1 within-directed: 178/1527 calls, 1167/10022 q, 601s

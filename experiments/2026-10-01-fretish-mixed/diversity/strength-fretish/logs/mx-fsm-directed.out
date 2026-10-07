@@ -1,0 +1,79 @@
+  pairs 500/4604  pairs 1000/4604  pairs 1500/4604  pairs 2000/4604  pairs 2500/4604  pairs 3000/4604  pairs 3500/4604  pairs 4000/4604  pairs 4500/4604  pairs 4604/4604
+files      393
+distinct   393
+maximal    73
+classes    73
+
+class 0  /dev/shm/mx.RKkw/n00002.json
+class 1  /dev/shm/mx.RKkw/n00004.json
+class 2  /dev/shm/mx.RKkw/n00005.json
+class 3  /dev/shm/mx.RKkw/n00007.json
+class 4  /dev/shm/mx.RKkw/n00008.json
+class 5  /dev/shm/mx.RKkw/n00010.json
+class 6  /dev/shm/mx.RKkw/n00013.json
+class 7  /dev/shm/mx.RKkw/n00022.json
+class 8  /dev/shm/mx.RKkw/n00042.json
+class 9  /dev/shm/mx.RKkw/n00052.json
+class 10  /dev/shm/mx.RKkw/n00055.json
+class 11  /dev/shm/mx.RKkw/n00059.json
+class 12  /dev/shm/mx.RKkw/n00060.json
+class 13  /dev/shm/mx.RKkw/n00061.json
+class 14  /dev/shm/mx.RKkw/n00064.json
+class 15  /dev/shm/mx.RKkw/n00075.json
+class 16  /dev/shm/mx.RKkw/n00078.json
+class 17  /dev/shm/mx.RKkw/n00090.json
+class 18  /dev/shm/mx.RKkw/n00091.json
+class 19  /dev/shm/mx.RKkw/n00103.json
+class 20  /dev/shm/mx.RKkw/n00137.json
+class 21  /dev/shm/mx.RKkw/n00141.json
+class 22  /dev/shm/mx.RKkw/n00143.json
+class 23  /dev/shm/mx.RKkw/n00144.json
+class 24  /dev/shm/mx.RKkw/n00146.json
+class 25  /dev/shm/mx.RKkw/n00150.json
+class 26  /dev/shm/mx.RKkw/n00153.json
+class 27  /dev/shm/mx.RKkw/n00160.json
+class 28  /dev/shm/mx.RKkw/n00165.json
+class 29  /dev/shm/mx.RKkw/n00171.json
+class 30  /dev/shm/mx.RKkw/n00181.json
+class 31  /dev/shm/mx.RKkw/n00189.json
+class 32  /dev/shm/mx.RKkw/n00196.json
+class 33  /dev/shm/mx.RKkw/n00451.json
+class 34  /dev/shm/mx.RKkw/n00452.json
+class 35  /dev/shm/mx.RKkw/n00454.json
+class 36  /dev/shm/mx.RKkw/n00464.json
+class 37  /dev/shm/mx.RKkw/n00468.json
+class 38  /dev/shm/mx.RKkw/n00469.json
+class 39  /dev/shm/mx.RKkw/n00471.json
+class 40  /dev/shm/mx.RKkw/n00474.json
+class 41  /dev/shm/mx.RKkw/n00486.json
+class 42  /dev/shm/mx.RKkw/n00494.json
+class 43  /dev/shm/mx.RKkw/n00502.json
+class 44  /dev/shm/mx.RKkw/n00507.json
+class 45  /dev/shm/mx.RKkw/n00510.json
+class 46  /dev/shm/mx.RKkw/n00513.json
+class 47  /dev/shm/mx.RKkw/n00515.json
+class 48  /dev/shm/mx.RKkw/n00517.json
+class 49  /dev/shm/mx.RKkw/n00518.json
+class 50  /dev/shm/mx.RKkw/n00520.json
+class 51  /dev/shm/mx.RKkw/n00527.json
+class 52  /dev/shm/mx.RKkw/n00532.json
+class 53  /dev/shm/mx.RKkw/n00536.json
+class 54  /dev/shm/mx.RKkw/n00542.json
+class 55  /dev/shm/mx.RKkw/n00546.json
+class 56  /dev/shm/mx.RKkw/n00547.json
+class 57  /dev/shm/mx.RKkw/n00549.json
+class 58  /dev/shm/mx.RKkw/n00556.json
+class 59  /dev/shm/mx.RKkw/n00557.json
+class 60  /dev/shm/mx.RKkw/n00560.json
+class 61  /dev/shm/mx.RKkw/n00563.json
+class 62  /dev/shm/mx.RKkw/n00577.json
+class 63  /dev/shm/mx.RKkw/n00578.json
+class 64  /dev/shm/mx.RKkw/n00580.json
+class 65  /dev/shm/mx.RKkw/n00586.json
+class 66  /dev/shm/mx.RKkw/n00590.json
+class 67  /dev/shm/mx.RKkw/n00600.json
+class 68  /dev/shm/mx.RKkw/n00606.json
+class 69  /dev/shm/mx.RKkw/n00613.json
+class 70  /dev/shm/mx.RKkw/n00616.json
+class 71  /dev/shm/mx.RKkw/n00622.json
+class 72  /dev/shm/mx.RKkw/n00623.json

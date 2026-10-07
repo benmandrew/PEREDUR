@@ -1,0 +1,19 @@
+15:30:08 rad-core-33 within-directed: 3008 calls, 22400 directed queries
+15:33:12 rad-core-33 within-directed: done 3008 calls 22400 q, cap=0 missing=0 rc=0 184s
+15:33:12 rad-core-33 within-uniform: 1518042 candidate pairs, incremental antichain
+15:33:13 rad-core-33 inc-uniform: 64/3077 entered, 41 reps, 0s
+15:33:16 rad-core-33 inc-uniform: 704/3077 entered, 413 reps, 3s
+15:33:20 rad-core-33 inc-uniform: 1344/3077 entered, 745 reps, 7s
+15:34:03 rad-core-33 inc-uniform: 1984/3077 entered, 1110 reps, 50s
+15:41:21 rad-core-33 inc-uniform: 2624/3077 entered, 1425 reps, 488s
+15:46:21 rad-core-33 inc-uniform-2624: 2282/2317 calls, 73180/74444 q, 300s
+15:51:34 rad-core-33 inc-uniform-2688: 2251/2357 calls, 94662/99968 q, 300s
+15:57:22 rad-core-33 inc-uniform-2752: 1513/2559 calls, 59760/105728 q, 300s
+16:05:13 rad-core-33 inc-uniform-2816: 1378/2748 calls, 48507/112128 q, 300s
+16:10:14 rad-core-33 inc-uniform-2816: 2038/2748 calls, 80105/112128 q, 601s
+16:18:37 rad-core-33 inc-uniform-2880: 1410/2887 calls, 45329/116352 q, 300s
+16:23:37 rad-core-33 inc-uniform-2880: 1727/2887 calls, 63105/116352 q, 601s
+16:28:37 rad-core-33 inc-uniform-2880: 2731/2887 calls, 109468/116352 q, 901s
+16:35:03 rad-core-33 inc-uniform-2944: 1459/3190 calls, 46848/120704 q, 301s
+16:40:03 rad-core-33 inc-uniform-2944: 1782/3190 calls, 63504/120704 q, 602s
+16:45:03 rad-core-33 inc-uniform-2944: 2194/3190 calls, 84504/120704 q, 902s

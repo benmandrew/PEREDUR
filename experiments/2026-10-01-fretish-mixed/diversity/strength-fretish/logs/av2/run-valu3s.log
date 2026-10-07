@@ -1,0 +1,8 @@
+17:20:47 valu3s-uc6 within-directed: 1686 calls, 3899 directed queries
+17:25:49 valu3s-uc6 within-directed: 26/1686 calls, 111/3899 q, 301s
+17:30:50 valu3s-uc6 within-directed: 76/1686 calls, 377/3899 q, 603s
+17:35:52 valu3s-uc6 within-directed: 147/1686 calls, 579/3899 q, 904s
+17:40:53 valu3s-uc6 within-directed: 188/1686 calls, 700/3899 q, 1206s
+17:45:55 valu3s-uc6 within-directed: 274/1686 calls, 976/3899 q, 1508s
+17:50:57 valu3s-uc6 within-directed: 330/1686 calls, 1117/3899 q, 1809s
+17:55:58 valu3s-uc6 within-directed: 407/1686 calls, 1350/3899 q, 2111s

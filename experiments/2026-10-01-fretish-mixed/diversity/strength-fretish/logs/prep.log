@@ -1,0 +1,19 @@
+15:05:34 PREP takeoff members d=794 u=721 nodes=1143 d_nodes=587 u_nodes=600 cand_within_d=3943 cand_within_u=4993 cand_cross_allnodes=8919 pairs_cross=352200 4s
+15:05:51 PREP fsm-combined members d=923 u=901 nodes=1815 d_nodes=915 u_nodes=901 cand_within_d=8375 cand_within_u=3528 cand_cross_allnodes=9024 pairs_cross=824415 17s
+15:06:04 PREP fsm-timing members d=1197 u=1176 nodes=2219 d_nodes=1121 u_nodes=1130 cand_within_d=35692 cand_within_u=13927 cand_cross_allnodes=43932 pairs_cross=1266730 12s
+15:06:12 PREP rad-core-10 members d=54 u=1206 nodes=1173 d_nodes=52 u_nodes=1121 cand_within_d=10 cand_within_u=1412 cand_cross_allnodes=51 pairs_cross=58292 8s
+15:06:28 PREP rad-core-68 members d=1244 u=1900 nodes=3000 d_nodes=1200 u_nodes=1839 cand_within_d=1621 cand_within_u=2380 cand_cross_allnodes=2797 pairs_cross=2206800 16s
+15:06:50 PREP rad-core-1-18 members d=1878 u=1918 nodes=3705 d_nodes=1856 u_nodes=1887 cand_within_d=3220 cand_within_u=3720 cand_cross_allnodes=7612 pairs_cross=3502272 22s
+15:07:10 PREP rad-core-45 members d=1859 u=1934 nodes=3668 d_nodes=1808 u_nodes=1893 cand_within_d=1529 cand_within_u=2873 cand_cross_allnodes=3635 pairs_cross=3422544 20s
+15:08:10 PREP rad-core-12-18 members d=2244 u=2477 nodes=4560 d_nodes=2190 u_nodes=2422 cand_within_d=2473 cand_within_u=4779 cand_cross_allnodes=5556 pairs_cross=5304180 60s
+15:09:29 PREP rad-core-17-18 members d=2293 u=2524 nodes=4659 d_nodes=2242 u_nodes=2470 cand_within_d=2501 cand_within_u=6988 cand_cross_allnodes=6146 pairs_cross=5537740 79s
+15:10:42 PREP rad-core-55 members d=2614 u=2148 nodes=4592 d_nodes=2548 u_nodes=2088 cand_within_d=1200 cand_within_u=5635 cand_cross_allnodes=6649 pairs_cross=5320224 73s
+15:12:16 PREP rad-core-65 members d=3159 u=2836 nodes=5629 d_nodes=3052 u_nodes=2725 cand_within_d=655 cand_within_u=765 cand_cross_allnodes=1532 pairs_cross=8316700 94s
+15:14:34 PREP rad-core-61 members d=3840 u=3158 nodes=6636 d_nodes=3721 u_nodes=3046 cand_within_d=527 cand_within_u=558 cand_cross_allnodes=1178 pairs_cross=11334166 138s
+15:17:51 PREP rad-core-33 members d=4481 u=3129 nodes=7487 d_nodes=4411 u_nodes=3077 cand_within_d=22361 cand_within_u=1518042 cand_cross_allnodes=2002024 pairs_cross=13572647 196s
+15:19:12 PREP lpc-mini-core1 members d=1745 u=1802 nodes=3316 d_nodes=1670 u_nodes=1734 cand_within_d=9740 cand_within_u=11959 cand_cross_allnodes=22546 pairs_cross=2895780 81s
+15:20:47 PREP liquid-mixer members d=2701 u=2047 nodes=4713 d_nodes=2678 u_nodes=2039 cand_within_d=3294 cand_within_u=1926 cand_cross_allnodes=3411 pairs_cross=5460442 94s
+15:32:54 PREP lpc-full-core1 members d=2101 u=2036 nodes=3828 d_nodes=2006 u_nodes=1943 cand_within_d=375537 cand_within_u=379056 cand_cross_allnodes=749431 pairs_cross=3897658 727s
+15:38:56 PREP valu3s-uc6 members d=6479 u=6090 nodes=12502 d_nodes=6456 u_nodes=6073 cand_within_d=3837 cand_within_u=7315 cand_cross_allnodes=9328 pairs_cross=39207288 363s
+15:38:56 PREP fsm-lmcps members d=7 u=0 nodes=7 d_nodes=7 u_nodes=0 cand_within_d=7 cand_within_u=0 cand_cross_allnodes=0 pairs_cross=0 0s
+PREP_ALL_DONE

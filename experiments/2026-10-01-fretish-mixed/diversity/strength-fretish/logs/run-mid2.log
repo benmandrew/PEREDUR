@@ -1,0 +1,10 @@
+15:59:19 liquid-mixer within-directed: 1005 calls, 3366 directed queries
+16:04:21 liquid-mixer within-directed: 110/1005 calls, 492/3366 q, 302s
+16:09:41 liquid-mixer within-directed: 199/1005 calls, 758/3366 q, 622s
+16:14:42 liquid-mixer within-directed: 276/1005 calls, 1061/3366 q, 923s
+16:19:51 liquid-mixer within-directed: 343/1005 calls, 1355/3366 q, 1232s
+16:24:58 liquid-mixer within-directed: 434/1005 calls, 1681/3366 q, 1538s
+16:29:58 liquid-mixer within-directed: 500/1005 calls, 1934/3366 q, 1839s
+16:35:00 liquid-mixer within-directed: 551/1005 calls, 2159/3366 q, 2141s
+16:40:01 liquid-mixer within-directed: 646/1005 calls, 2445/3366 q, 2442s
+16:45:26 liquid-mixer within-directed: 743/1005 calls, 2678/3366 q, 2766s

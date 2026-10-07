@@ -1,0 +1,56 @@
+diff --git a/src/compare.cpp b/src/compare.cpp
+index bb82e4f..6eac01f 100644
+--- a/src/compare.cpp
++++ b/src/compare.cpp
+@@ -14,6 +14,9 @@
+ 
+ #include <nlohmann/json.hpp>
+ 
++#include <cstdlib>
++#include <mutex>
++
+ #include "bounded_async.hpp"
+ #include "driver_support.hpp"
+ #include "filter/implication_check.hpp"
+@@ -396,14 +399,36 @@ int run_fretish(const Args& args, SatisfiabilityChecker& checker) {
+         ideal_names.push_back(ideal.first);
+     }
+ 
++    // fret-pooled patch: COMPARE_DIRECTIONS=fwd|rev skips the other
++    // direction, which the caller has already refuted on a sampled word, and
++    // every pair's raw verdicts go to stderr as DIR lines.
++    const char* dirs_env = std::getenv("COMPARE_DIRECTIONS");
++    const std::string dirs = dirs_env != nullptr ? dirs_env : "both";
++    const bool do_fwd = dirs != "rev";
++    const bool do_rev = dirs != "fwd";
++    static std::mutex dir_mutex;
++    const auto tri = [](std::optional<bool> v) {
++        return v.has_value() ? (*v ? "1" : "0") : "?";
++    };
+     run_and_report(repair_meta, ideal_names,
+                    [&](std::size_t rep, std::size_t ide) {
+                        return [&, rep, ide] {
+-                           return classify(
+-                               spec_implies(repairs[rep].second.spec,
+-                                            ideals[ide].second, checker),
+-                               spec_implies(ideals[ide].second,
+-                                            repairs[rep].second.spec, checker));
++                           const std::optional<bool> fwd =
++                               do_fwd ? spec_implies(repairs[rep].second.spec,
++                                                     ideals[ide].second, checker)
++                                      : std::optional<bool>(false);
++                           const std::optional<bool> rev =
++                               do_rev ? spec_implies(ideals[ide].second,
++                                                     repairs[rep].second.spec,
++                                                     checker)
++                                      : std::optional<bool>(false);
++                           {
++                               const std::lock_guard<std::mutex> lock(dir_mutex);
++                               std::cerr << "DIR\t" << repairs[rep].first << "\t"
++                                         << ideals[ide].first << "\t" << tri(fwd)
++                                         << "\t" << tri(rev) << "\n";
++                           }
++                           return classify(fwd, rev);
+                        };
+                    });
+     return 0;

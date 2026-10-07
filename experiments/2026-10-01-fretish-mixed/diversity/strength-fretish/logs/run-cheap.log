@@ -1,0 +1,18 @@
+15:07:12 takeoff within-directed: 814 calls, 4213 directed queries
+15:07:41 takeoff within-directed: done 814 calls 4213 q, cap=0 missing=0 rc=0 29s
+15:07:41 takeoff within-uniform: 830 calls, 5262 directed queries
+15:07:47 takeoff within-uniform: done 830 calls 5262 q, cap=0 missing=0 rc=0 6s
+15:07:47 takeoff cross: 61 calls, 93 directed queries
+15:07:47 takeoff cross: done 61 calls 93 q, cap=0 missing=0 rc=0 0s
+15:07:47 RUN takeoff d_front=113 u_front=129 35s
+15:07:47 fsm-combined within-directed: 1000 calls, 8424 directed queries
+15:09:53 fsm-combined within-directed: done 1000 calls 8424 q, cap=0 missing=0 rc=0 126s
+15:09:53 fsm-combined within-uniform: 671 calls, 3536 directed queries
+15:10:07 fsm-combined within-uniform: done 671 calls 3536 q, cap=0 missing=0 rc=0 14s
+15:10:07 fsm-combined cross: 497 calls, 1736 directed queries
+15:10:29 fsm-combined cross: done 497 calls 1736 q, cap=0 missing=0 rc=0 22s
+15:10:29 RUN fsm-combined d_front=574 u_front=650 161s
+15:10:29 fsm-timing within-directed: 2051 calls, 36059 directed queries
+15:15:32 fsm-timing within-directed: 317/2051 calls, 6872/36059 q, 303s
+15:20:34 fsm-timing within-directed: 427/2051 calls, 9786/36059 q, 605s
+15:25:50 fsm-timing within-directed: 640/2051 calls, 14644/36059 q, 922s

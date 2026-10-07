@@ -1,0 +1,15 @@
+15:05:40 CHECK mode-arbiter: 60 refuted directions, 60 decided, 0 implications
+15:05:40 fsm within-directed: 533 calls, 4187 directed queries
+15:05:44 fsm within-directed: done 533 calls 4187 q, cap=0 missing=0 rc=0 4s
+15:05:44 fsm within-uniform: 678 calls, 5369 directed queries
+15:05:49 fsm within-uniform: done 678 calls 5369 q, cap=0 missing=0 rc=0 5s
+15:05:49 fsm cross: 42 calls, 63 directed queries
+15:05:49 fsm cross: done 42 calls 63 q, cap=0 missing=0 rc=0 0s
+15:05:49 RUN fsm d_front=73 u_front=90 9s
+15:05:49 mode-arbiter within-directed: 890 calls, 4151 directed queries
+15:06:03 mode-arbiter within-directed: done 890 calls 4151 q, cap=0 missing=0 rc=0 14s
+15:06:03 mode-arbiter within-uniform: 1181 calls, 6226 directed queries
+15:06:11 mode-arbiter within-uniform: done 1181 calls 6226 q, cap=0 missing=0 rc=0 9s
+15:06:12 mode-arbiter cross: 102 calls, 182 directed queries
+15:06:12 mode-arbiter cross: done 102 calls 182 q, cap=0 missing=0 rc=0 0s
+15:06:12 RUN mode-arbiter d_front=159 u_front=313 23s
