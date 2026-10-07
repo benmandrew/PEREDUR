@@ -1,0 +1,7 @@
+humanoid-742: no results, skipped
+
+== pooled rq3: A = mrs-nsga2-apportion, B = aurus (20 families)
+  [non] A stronger on 12, B on 8, tie 0; median net +0.0790, mean +0.0532; exact Wilcoxon p 0.2455
+  [imp] A stronger on 12, B on 8, tie 0; median net +0.0790, mean +0.0532; exact Wilcoxon p 0.2455
+  mean sub(A by B) 0.1161, sub(B by A) 0.1692
+  pairs run 2163399, undecided 0 (0.0000%), errors 0
