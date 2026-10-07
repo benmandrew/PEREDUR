@@ -205,8 +205,9 @@ TEST(test_mrs_keeps_everything_when_all_parts_are_admissible) {
         [&oracle](const std::vector<std::size_t>& idx) { return oracle(idx); });
     expect(score == k_status_realizable,
            "mrs: a fully realizable guarantee side should score exactly 1.0");
-    expect(oracle.queries.size() == 4,
-           "mrs: the walk should ask once per part");
+    const std::vector<std::vector<std::size_t>> whole = {{0, 1, 2, 3}};
+    expect(oracle.queries == whole,
+           "mrs: a realizable whole should be the only query");
 }
 
 TEST(test_mrs_scores_the_kept_fraction) {
@@ -237,7 +238,7 @@ TEST(test_mrs_walk_carries_only_the_accepted_prefix) {
         [&oracle](const std::vector<std::size_t>& idx) { return oracle(idx); });
     expect(score == 2.0 / 3.0, "mrs: rejecting one part of three scores 2/3");
     const std::vector<std::vector<std::size_t>> expected = {
-        {0}, {0, 1}, {0, 2}};
+        {0, 1, 2}, {0}, {0, 1}, {0, 2}};
     expect(oracle.queries == expected,
            "mrs: a rejected part should not appear in any later query");
 }
@@ -262,15 +263,17 @@ TEST(test_mrs_admission_order_queries_the_sorted_set) {
     // The oracle sees a set of parts in one order whatever sequence admitted
     // them, since both front ends build their subset in the order they are
     // handed and the cache keys on the resulting formula string.
+    // The whole is rejected, so the walk runs, and rejects it again last.
     SatisfiabilityChecker sat;
-    RecordingOracle oracle{
-        {}, [](const std::vector<std::size_t>&) { return true; }};
+    RecordingOracle oracle{{}, [](const std::vector<std::size_t>& indices) {
+                               return indices.size() < 3;
+                           }};
     status_score_mrs(
         {"p"}, 3, sat,
         [&oracle](const std::vector<std::size_t>& idx) { return oracle(idx); },
         {2, 1, 0});
     const std::vector<std::vector<std::size_t>> expected = {
-        {2}, {1, 2}, {0, 1, 2}};
+        {0, 1, 2}, {2}, {1, 2}, {0, 1, 2}};
     expect(oracle.queries == expected,
            "mrs: a reversed walk should still query ascending index sets");
 }
@@ -402,8 +405,8 @@ TEST(test_mrs_satisfiable_whole_specification_reaches_the_walk) {
         {}, "(p) & (q)");
     expect(score == k_status_realizable,
            "mrs: a satisfiable whole specification should be walked as before");
-    expect(oracle.queries.size() == 2,
-           "mrs: a satisfiable whole specification should be walked in full");
+    expect(oracle.queries.size() == 1,
+           "mrs: a satisfiable whole specification should reach the oracle");
 }
 
 TEST(test_mrs_empty_guarantee_side_scores_realizable) {
