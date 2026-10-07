@@ -156,6 +156,13 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
     const std::chrono::milliseconds spot_budget =
         m_timeout.count() == 0 ? m_spot_budget
                                : std::min(m_timeout, m_spot_budget);
+    if (polarity == QueryPolarity::ExpectUnsat) {
+        const std::optional<bool> answer =
+            implication_answer(ltl_formula, spot_budget);
+        std::scoped_lock lock(m_cache_mutex);
+        m_cache.emplace(cache_key, answer);
+        return answer;
+    }
     if (const std::optional<bool> decided =
             spot_satisfiable(ltl_formula, spot_budget)) {
         n_spot_decided++;
@@ -163,18 +170,68 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
         m_cache.emplace(cache_key, decided);
         return decided;
     }
-    // SPOT's own blowup case is a large automaton, which happens on satisfiable
+    const std::optional<bool> answer = black_answer(ltl_formula, m_timeout);
+    std::scoped_lock lock(m_cache_mutex);
+    m_cache.emplace(cache_key, answer);
+    return answer;
+}
+
+std::optional<bool> SatisfiabilityChecker::implication_answer(
+    const std::string& ltl_formula, std::chrono::milliseconds spot_budget) {
+    // SPOT's blowup case is a large automaton, which happens on satisfiable
     // formulae -- chained `<->` over `G F` terms, period-2 counters -- and
-    // those are precisely the ones black finds a model for in milliseconds. An
-    // unsatisfiable query is the mirror image: black proves it only by
-    // exhausting a completeness bound, so escalating one SPOT could not build
-    // an automaton for buys a second subprocess and the same non-answer.
-    if (polarity == QueryPolarity::ExpectUnsat) {
-        n_escalations_declined++;
-        std::scoped_lock lock(m_cache_mutex);
-        m_cache.emplace(cache_key, std::nullopt);
-        return std::nullopt;
+    // those are precisely the ones black finds a model for in milliseconds.
+    // An implication `A & !B` between two whole specifications is that case:
+    // it holds rarely, so the query is nearly always satisfiable, and the
+    // product automaton for `!B` grows with every guarantee. Over 48 sampled
+    // humanoid-742 pairs SPOT needed 3-20s for each and black found a model
+    // in 50-60ms.
+    //
+    // So SPOT gets a first look, which settles every query on the small
+    // specifications, and then black is asked for a model. Only its SAT
+    // answer is taken. A model is a proof, and SAT is the answer SPOT would
+    // have given had it finished, so the verdicts a run reads are the ones it
+    // read before this probe existed. black's UNSAT is discarded, and the
+    // query goes back to SPOT with its full budget, so an implication is
+    // still only ever established by SPOT.
+    //
+    // A formula as long as a whole large specification skips the first look:
+    // SPOT's automaton there takes longer than any first look, and the time
+    // was spent on every pair before black answered.
+    const std::chrono::milliseconds first_look =
+        ltl_formula.size() >= k_implication_long_formula
+            ? std::chrono::milliseconds{0}
+            : std::min(spot_budget, k_implication_first_look);
+    if (first_look.count() > 0) {
+        if (const std::optional<bool> decided =
+                spot_satisfiable(ltl_formula, first_look)) {
+            n_spot_decided++;
+            return decided;
+        }
     }
+    const std::chrono::milliseconds probe_budget =
+        m_timeout.count() == 0 ? k_model_probe_budget
+                               : std::min(m_timeout, k_model_probe_budget);
+    if (black_answer(ltl_formula, probe_budget) == std::optional<bool>{true}) {
+        n_model_probe_sat++;
+        return true;
+    }
+    if (spot_budget > first_look) {
+        if (const std::optional<bool> decided =
+                spot_satisfiable(ltl_formula, spot_budget)) {
+            n_spot_decided++;
+            return decided;
+        }
+    }
+    // An unsatisfiable query is one black proves only by exhausting a
+    // completeness bound, so a second black call with a longer budget buys a
+    // second subprocess and the same non-answer.
+    n_escalations_declined++;
+    return std::nullopt;
+}
+
+std::optional<bool> SatisfiabilityChecker::black_answer(
+    const std::string& ltl_formula, std::chrono::milliseconds budget) {
     const std::string black = black_executable_path();
     assert(access(black.c_str(), F_OK) == 0);
     // -t is never omitted. black has no default timeout of its own, so an
@@ -190,7 +247,7 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
     // bounding the solve; the config default is 1000 ms and no shipped
     // configuration sets zero.
     const auto timeout_s =
-        std::chrono::ceil<std::chrono::seconds>(m_timeout).count();
+        std::chrono::ceil<std::chrono::seconds>(budget).count();
     // The formula is black-compatible because it comes from requirement_to_ltl
     // or implication check construction, never from SPOT's printer: black
     // rejects "0"/"1" and does not support "xor".
@@ -224,8 +281,6 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
             // here would be confidently wrong in the direction that admits a
             // vacuous repair.
             n_weak_operator_unresolved++;
-            std::scoped_lock lock(m_cache_mutex);
-            m_cache.emplace(cache_key, std::nullopt);
             return std::nullopt;
         }
         query = *rewritten;
@@ -234,8 +289,6 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
         // the same answer for every query sharing the key.
         if (const std::optional<bool> decided = constant_answer(query)) {
             n_constant_folded++;
-            std::scoped_lock lock(m_cache_mutex);
-            m_cache.emplace(cache_key, decided);
             return decided;
         }
     }
@@ -246,11 +299,10 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
                                               std::to_string(timeout_s), "-"};
     n_black_calls++;
     const ProcessResult result = execute_and_capture_with_input(
-        command, to_black_constants(query), m_timeout);
+        command, to_black_constants(query), budget);
     std::scoped_lock lock(m_cache_mutex);
     record_exec<SatisfiabilityChecker>(result);
     if (result.m_timed_out) {
-        m_cache.emplace(cache_key, std::nullopt);
         return std::nullopt;
     }
     // Check UNSAT before SAT: the former contains the latter as a substring.
@@ -264,7 +316,6 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
         // exited normally with "UNKNOWN (stopped at k = N)".  Treat as
         // indeterminate, same as a process-level timeout.
         n_timeouts++;
-        m_cache.emplace(cache_key, std::nullopt);
         return std::nullopt;
     } else {
         // black's output crossed a process boundary and didn't match any
@@ -274,6 +325,5 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
         throw std::runtime_error("unexpected output from black: " +
                                  result.m_output);
     }
-    m_cache.emplace(cache_key, sat);
     return sat;
 }
