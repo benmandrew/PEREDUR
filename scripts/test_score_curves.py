@@ -143,12 +143,45 @@ def test_recount_from_members_end_to_end():
         shutil.rmtree(root, ignore_errors=True)
 
 
+def test_prefilter_flags_reach_maximal():
+    absent = argparse.Namespace(prefilter_words=None,
+                                prefilter_max_prefix=None,
+                                prefilter_max_cycle=None)
+    check(SCV.prefilter_flags(absent), [],
+          "no prefilter flag leaves maximal at its own default")
+    check(SCV.prefilter_flags(argparse.Namespace()), [],
+          "and an args object predating the flags passes none")
+    root = Path(tempfile.mkdtemp(prefix="score-curves-prefilter-"))
+    saved = SCV.MAXIMAL_BIN
+    try:
+        argv_file = root / "argv.txt"
+        stub = root / "maximal"
+        stub.write_text(f"#!/bin/sh\necho \"$@\" > {argv_file}\n"
+                        "printf 'elapsed_s\\tfile\\tevent\\tx\\n"
+                        "0.5\\ta.tlsf\\tadmit\\t-\\n'\n")
+        stub.chmod(0o755)
+        SCV.MAXIMAL_BIN = stub
+        flags = SCV.prefilter_flags(argparse.Namespace(
+            prefilter_words=4096, prefilter_max_prefix=None,
+            prefilter_max_cycle=None))
+        log = SCV.antichain_walk(root, 2, 30, flags)
+        check(argv_file.read_text().split(),
+              ["--curve", str(root / SCV.INDEX_NAME), "--jobs", "2",
+               "--prefilter-words", "4096"],
+              "--prefilter-words reaches maximal --curve")
+        check(log, [(0.5, "a.tlsf", "admit")], "and the log still parses")
+    finally:
+        SCV.MAXIMAL_BIN = saved
+        shutil.rmtree(root, ignore_errors=True)
+
+
 if __name__ == "__main__":
     for test in (test_hamming_is_the_archived_threshold_form,
                  test_union_normalises_by_the_pair,
                  test_union_survives_sparse_fingerprints,
                  test_members_round_trip_in_admission_order,
                  test_members_rows_net_each_cut,
-                 test_recount_from_members_end_to_end):
+                 test_recount_from_members_end_to_end,
+                 test_prefilter_flags_reach_maximal):
         test()
     print("All score_curves.py tests passed.")

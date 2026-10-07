@@ -98,6 +98,22 @@ A separation recount never re-runs the maximality sweep. `maximality = "off"` wi
 
 `stage` and the tick refuse a score phase whose results directory is missing, unless an earlier run phase of the campaign writes it. To reproduce an archived pass, declare a campaign of one score phase.
 
+## Frontier phases
+
+A `kind = "frontier"` phase runs `pooled_frontier.py run` over a work tree its `plan` step already wrote, the families dealt to each host in `<work>/jobs-<host>.csv`:
+
+```toml
+[[phases]]
+kind = "frontier"
+work = "experiments/pooled-rq3/work"
+workers = 4        # families in flight (default 1)
+solver_jobs = 4    # maximal --jobs per family (default 4)
+timeout = 300      # seconds per solver call (default 300)
+cache = "experiments/pooled-cache"   # optional; default <work>/cache
+```
+
+It takes no profile and no seeds; a phase `hosts` table still narrows where it runs, and the host name passed as `--host` is the campaign's (`av1`), which is what `plan --hosts` named the jobs file after. `stage` refuses a host whose jobs file is missing. Before each attempt the tick refuses the same, and refuses a `build-release/maximal` or `compare` that is not a clean build of HEAD, then writes `<work>/frontier-manifest-<host>.json`. `pooled_frontier.py run` resumes by skipping families with a `result.json` and exits 0 only when every family of the host has one, so a failed attempt requeues and the next resumes. `start` refuses a campaign with a frontier phase, since the remote probe does not read those two binaries; use `enqueue`. `status` shows the phase as `frontier:<work>`, ROWS being families with a result against those dealt the host.
+
 ## Reading a run
 
 `status` never caches, and progress is never derived from a CSV's length. It prints each host's checkout, one row per campaign, and the queue.

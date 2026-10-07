@@ -97,11 +97,19 @@ DEFAULTS = {
     # directory recounts the maximal nets from that pass's membership
     # sidecars instead, which needs maximality off.
     "members_from": "",
+    # `maximal --curve`'s fingerprint prefilter. None leaves the binary's own
+    # default and passes no flag, so a phase that never names one walks as
+    # every archived curve was walked.
+    "prefilter_words": None,
+    "prefilter_max_prefix": None,
+    "prefilter_max_cycle": None,
 }
 # The outer `timeout` sits this far past score_curves.py's own deadline: the
 # deadline bounds the antichain walk, and the compare and fingerprint calls
 # around it still need time to land.
 WALL_CAP_MARGIN_S = 900
+PREFILTER_KEYS = ("prefilter_words", "prefilter_max_prefix",
+                  "prefilter_max_cycle")
 
 SEED_SUFFIX = re.compile(r"_seed(\d+)$")
 INDEX_PATH = Path("accumulated") / "index.tsv"
@@ -251,6 +259,11 @@ def scorer_args(args, part: str, run_dir: str) -> list:
                     "--fingerprint-distance", args.fingerprint_distance]
     if args.members_from:
         command += ["--members-from", str(resolve(args.members_from))]
+    if args.maximality == "on":
+        for name in PREFILTER_KEYS:
+            value = getattr(args, name)
+            if value is not None:
+                command += [f"--{name.replace('_', '-')}", str(value)]
     return command + [
         "--cuts", str(args.cuts), "--jobs", str(args.cores),
         "--deadline-s", str(args.deadline_s),
@@ -436,6 +449,7 @@ def build_manifest(args, results: Path, out: Path, versions: dict, head,
         "compare_timeout": args.compare_timeout,
         "deadline_s": args.deadline_s,
         "wall_cap_s": args.wall_cap_s,
+        **{name: getattr(args, name) for name in PREFILTER_KEYS},
         "invocation": invocation_template(args),
         "binaries": {
             **({"maximal": {"path": str(MAXIMAL_BIN),
@@ -538,6 +552,11 @@ def parse_args(argv=None) -> argparse.Namespace:
                              "recounts its maximal nets from the membership "
                              "sidecars there, with --maximality off "
                              "(default: none)")
+    for name in PREFILTER_KEYS:
+        parser.add_argument(f"--{name.replace('_', '-')}", type=int,
+                            default=DEFAULTS[name],
+                            help=f"maximal --{name.replace('_', '-')} for "
+                                 f"the walk (default: the binary's)")
     parser.add_argument("--deadline-s", type=int,
                         default=DEFAULTS["deadline_s"],
                         help=f"the antichain walk's budget in score_curves.py "
@@ -562,6 +581,11 @@ def parse_args(argv=None) -> argparse.Namespace:
         if not args.epsilon:
             parser.error("--members-from recounts the epsilon nets, so it "
                          "needs --epsilon")
+    for name in PREFILTER_KEYS:
+        value = getattr(args, name)
+        low = 0 if name == "prefilter_max_prefix" else 1
+        if value is not None and value < low:
+            parser.error(f"--{name.replace('_', '-')} must be at least {low}")
     if args.wall_cap_s is None:
         args.wall_cap_s = wall_cap_default(args.deadline_s)
     elif args.wall_cap_s < 1:

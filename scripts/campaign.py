@@ -165,6 +165,14 @@ RUNNER_CMD = os.environ.get("PEREDUR_RUNNER_CMD",
 # a stub exactly as a run phase is.
 SCORER_CMD = os.environ.get("PEREDUR_SCORER_CMD",
                             f"{REMOTE_PYTHON} scripts/score_campaign.py")
+# And for a `kind = "frontier"` phase: pooled_frontier.py's `run` over the
+# families a planned work tree deals this host.
+FRONTIER_CMD = os.environ.get("PEREDUR_FRONTIER_CMD",
+                              f"{REMOTE_PYTHON} scripts/pooled_frontier.py")
+# The binaries a frontier phase runs, gated against HEAD before it starts.
+# PEREDUR_BIN_DIR moves them, as it does for score_campaign.py.
+FRONTIER_BINARIES = ("maximal", "compare")
+FRONTIER_MANIFEST_STEM = "frontier-manifest"
 
 # Rebuilt by stage. The lab machines have no Nix, so this is the incremental
 # build against an already-configured preset directory, not a configure step;
@@ -247,6 +255,13 @@ while IFS= read -r m; do
   cat "$m"
   echo "@M@ENDSFILE"
 done
+echo "@M@FRONTIERMANIFESTS"
+find experiments -mindepth 2 -maxdepth 4 -type f -name 'frontier-manifest-*.json' 2>/dev/null |
+while IFS= read -r m; do
+  echo "@M@FFILE $m"
+  cat "$m"
+  echo "@M@ENDFFILE"
+done
 """ + QUEUE_BLOCK
 # A score phase's manifest sits inside its output directory rather than
 # beside a CSV, one level down, so it gets a sweep of its own: widening the
@@ -277,6 +292,14 @@ def plan_args(campaign: dict) -> str:
     return " ".join(shlex.quote(a) for a in args)
 
 
+# A frontier phase's progress: the families of this host's jobs file holding
+# a result.json, and the newest file under the work tree for staleness.
+FRONTIER_DETAIL = r"""if [ -f @JOBS@ ]; then
+  echo "@M@CSVS $(tail -n +2 @JOBS@ | while IFS= read -r s; do [ -f @WORK@/"$s"/result.json ] && echo x; done | wc -l)"
+  echo "@M@OUTMTIME $(find @WORK@ -maxdepth 2 -type f -printf '%T@\n' 2>/dev/null | sort -rn | head -1)"
+fi"""
+
+
 def detail_script(root: str, campaigns: list[dict]) -> str:
     """Shell reporting rows, mtimes and the runner's own plan per campaign.
 
@@ -288,6 +311,15 @@ def detail_script(root: str, campaigns: list[dict]) -> str:
     """
     lines = [f"cd {shlex.quote(root)} 2>/dev/null || exit 3"]
     for c in campaigns:
+        if c.get("kind") == "frontier":
+            # A frontier phase is done family by family: one result.json per
+            # family the plan dealt this host, written whole.
+            q_work = shlex.quote(c["out"])
+            q_jobs = shlex.quote(f"{c['out']}/jobs-{c['host']}.csv")
+            lines.append(f'echo "{MARK}CAMPAIGN {c["profile"]}"')
+            lines.append(FRONTIER_DETAIL.replace("@JOBS@", q_jobs)
+                         .replace("@WORK@", q_work).replace("@M@", MARK))
+            continue
         if c.get("kind") == "score":
             # A score phase's progress is a directory listing: one CSV per
             # scored run, moved into place whole, and the newest file under
@@ -370,6 +402,7 @@ def run_shell(host: str, script: str, timeout: int = SSH_TIMEOUT_S,
 def parse_inventory(text: str) -> dict:
     """Split the inventory script's marker-delimited output into fields."""
     out: dict = {"ps": [], "manifests": [], "score_manifests": [],
+                 "frontier_manifests": [],
                  "queue": [], "hostname": "?", "epoch": None, "branch": "?",
                  "head": "?", "dirty": None, "error": None}
     section = None
@@ -415,6 +448,17 @@ def parse_inventory(text: str) -> dict:
                 pass
             section = "scoremanifests"
             continue
+        if line.startswith(MARK + "FFILE "):
+            section, manifest_lines = "ffile", []
+            continue
+        if line.startswith(MARK + "ENDFFILE"):
+            try:
+                out["frontier_manifests"].append(
+                    json.loads("\n".join(manifest_lines)))
+            except json.JSONDecodeError:
+                pass
+            section = "frontiermanifests"
+            continue
         if line.startswith(MARK + "QFILE "):
             section = "qfile"
             queue_name = line[len(MARK) + 6:].strip()
@@ -438,7 +482,7 @@ def parse_inventory(text: str) -> dict:
             continue
         if section == "ps":
             out["ps"].append(line)
-        elif section in ("file", "qfile", "sfile"):
+        elif section in ("file", "qfile", "sfile", "ffile"):
             manifest_lines.append(line)
         else:
             buf.append(line)
@@ -562,7 +606,25 @@ def live_processes(ps_lines: list[str]) -> list[dict]:
                 continue
             found.append({"comm": comm, "profile": None, "kind": "score",
                           "out": option_of_args(args, "--out"), "args": args})
+        elif comm.startswith("python") and "pooled_frontier.py" in args:
+            work = word_after(args, "run")
+            if work is None:
+                continue
+            found.append({"comm": comm, "profile": None, "kind": "frontier",
+                          "out": work, "args": args})
     return found
+
+
+def word_after(args: str, word: str):
+    """The word following ``word`` in a command line, or None."""
+    try:
+        words = shlex.split(args)
+    except ValueError:
+        words = args.split()
+    for i, current in enumerate(words[:-1]):
+        if current == word:
+            return words[i + 1]
+    return None
 
 
 def option_of_args(args: str, option: str):
@@ -655,6 +717,39 @@ def campaigns_from_score_manifests(manifests: list[dict]) -> list[dict]:
     return out
 
 
+def campaigns_from_frontier_manifests(manifests: list[dict],
+                                      host: str) -> list[dict]:
+    """One record per frontier manifest the tick wrote for this host.
+
+    The work tree is shared by every host the plan dealt families to, and may
+    have been copied whole, so only this host's own manifest is its row.
+    """
+    out = []
+    for m in manifests:
+        if m.get("host") != host:
+            continue
+        git = m.get("git") or {}
+        maximal = (m.get("binaries") or {}).get("maximal") or {}
+        work = str(m.get("work", "?"))
+        name = Path(work).name
+        out.append({
+            "kind": "frontier",
+            "profile": f"frontier:{name}",
+            "label": f"frontier:{name}",
+            "out": work,
+            "host": host,
+            "manifest_host": m.get("hostname", "?"),
+            "started": m.get("started"),
+            "branch": git.get("branch", "?"),
+            "head": (git.get("head") or "?")[:7],
+            "binary_commit": maximal.get("commit_short", "?"),
+            "dirty_binary": maximal.get("dirty") == "1",
+            "rows_planned": m.get("planned"),
+            "seeds": [],
+        })
+    return out
+
+
 def gather_host(host: str, root: str, only: str | None, want_plan: bool,
                 show_all: bool) -> dict:
     """Everything status reports for one host.
@@ -690,7 +785,9 @@ def gather_host(host: str, root: str, only: str | None, want_plan: bool,
         "queue": inv["queue"],
     })
     campaigns = (campaigns_from_manifests(inv["manifests"])
-                 + campaigns_from_score_manifests(inv["score_manifests"]))
+                 + campaigns_from_score_manifests(inv["score_manifests"])
+                 + campaigns_from_frontier_manifests(
+                     inv.get("frontier_manifests", []), host))
     if only:
         campaigns = [c for c in campaigns if c["profile"] == only]
     elif not show_all:
@@ -777,8 +874,8 @@ def claims_campaign(proc: dict, c: dict) -> bool:
     manifest and the process may spell the path relative or absolute. Neither
     claims the other's kind, and an engine process claims nothing.
     """
-    if c.get("kind") == "score":
-        return (proc.get("kind") == "score" and bool(proc.get("out"))
+    if c.get("kind") in ("score", "frontier"):
+        return (proc.get("kind") == c["kind"] and bool(proc.get("out"))
                 and Path(proc["out"]).name == Path(c.get("out", "")).name)
     return bool(proc.get("profile")) and proc["profile"] == c["profile"]
 
@@ -1015,8 +1112,12 @@ def status_notes(reports: list[dict]) -> list[str]:
             elif p.get("kind") == "score":
                 notes.append(f"{r['host']}: scorer live on "
                              f"--out {p.get('out') or '?'}")
+            elif p.get("kind") == "frontier":
+                notes.append(f"{r['host']}: pooled_frontier.py live on "
+                             f"{p.get('out') or '?'}")
         for c in r["campaigns"]:
-            if c["state"] == "stuck" and c.get("kind") == "score":
+            if c["state"] == "stuck" and c.get("kind") in ("score",
+                                                           "frontier"):
                 notes.append(
                     f"{r['host']}/{c.get('label') or c['profile']}: a scorer "
                     f"is alive on this output directory but nothing under it "
@@ -1035,9 +1136,10 @@ def status_notes(reports: list[dict]) -> list[str]:
             if c.get("dirty_binary"):
                 notes.append(f"{r['host']}/{c['profile']}: launched off a "
                              f"binary built dirty (* on BINARY)")
-            if c.get("rows_planned") is None and c.get("kind") == "score":
-                notes.append(f"{r['host']}/{c.get('label')}: the score "
-                             f"manifest records no queued count")
+            if c.get("rows_planned") is None and c.get("kind") in (
+                    "score", "frontier"):
+                notes.append(f"{r['host']}/{c.get('label')}: the "
+                             f"{c['kind']} manifest records no queued count")
             elif c.get("rows_planned") is None:
                 notes.append(f"{r['host']}/{c['profile']}: no plan — that "
                              f"checkout may no longer define the profile")
@@ -1116,7 +1218,9 @@ def print_status(reports: list[dict]) -> None:
           "A score: row is a scoring pass: ROWS is curves written against "
           "runs queued,\nfrom its score-manifest, STALE is the newest file "
           "under its output directory, and\nrunning means a scorer names "
-          "that directory.")
+          "that directory. A frontier: row is a pooled_frontier.py run: "
+          "ROWS is\nfamilies with a result.json against those its "
+          "jobs-<host>.csv deals the host.")
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -1899,14 +2003,16 @@ CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
 # selection keys mean nothing to the scorer, and the scorer's budgets mean
 # nothing to the runner, so a key from the other kind is refused by name
 # rather than carried along unread.
-PHASE_KINDS = ("run", "score")
+PHASE_KINDS = ("run", "score", "frontier")
 RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts"}
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s",
                      "maximality", "ideals", "epsilon",
                      "fingerprint_words", "fingerprint_seed",
                      "fingerprint_max_prefix", "fingerprint_max_cycle",
-                     "fingerprint_distance", "members_from")
+                     "fingerprint_distance", "members_from",
+                     "prefilter_words", "prefilter_max_prefix",
+                     "prefilter_max_cycle")
 # The two of those that are not counts. `maximality` says whether the
 # solver-bound implication sweep runs at all and `epsilon` is the list of
 # separation thresholds, empty for none; both reach the scorer as strings and
@@ -1917,10 +2023,22 @@ SCORE_STRING_KEYS = ("epsilon", "members_from")
 # Zero is a seed like any other, so this one is bounded below at zero rather
 # than at one. Every other count here is a budget, where zero means nothing
 # runs.
-SCORE_NONNEGATIVE_KEYS = ("fingerprint_seed", "fingerprint_max_prefix")
+SCORE_NONNEGATIVE_KEYS = ("fingerprint_seed", "fingerprint_max_prefix",
+                          "prefilter_max_prefix")
+# `maximal --curve`'s fingerprint prefilter. Absent from the declaration, the
+# scorer passes no flag and the binary keeps its own default.
+SCORE_PREFILTER_KEYS = ("prefilter_words", "prefilter_max_prefix",
+                        "prefilter_max_cycle")
 SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
                     *SCORE_BUDGET_KEYS}
-PHASE_KEYS = RUN_PHASE_KEYS | SCORE_PHASE_KEYS
+# A frontier phase runs `pooled_frontier.py run` over a work tree its `plan`
+# step already wrote, the families dealt to each host in jobs-<host>.csv. It
+# reads no profile and no seeds; a phase `hosts` table still narrows where it
+# runs. The budgets default to pooled_frontier.py's own and are always written.
+FRONTIER_DEFAULTS = {"workers": 1, "solver_jobs": 4, "timeout": 300}
+FRONTIER_PHASE_KEYS = {"name", "kind", "work", "hosts", "cache",
+                       *FRONTIER_DEFAULTS}
+PHASE_KEYS = RUN_PHASE_KEYS | SCORE_PHASE_KEYS | FRONTIER_PHASE_KEYS
 
 # `describe` prints a declaration for a campaign that has already closed. It
 # is not one of these: the factor cross below is what the results CSV carries,
@@ -2124,7 +2242,8 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
         if kind not in PHASE_KINDS:
             raise CampaignError(f"{where}: kind must be one of "
                                 f"{', '.join(PHASE_KINDS)}, not {kind!r}")
-        allowed = SCORE_PHASE_KEYS if kind == "score" else RUN_PHASE_KEYS
+        allowed = {"run": RUN_PHASE_KEYS, "score": SCORE_PHASE_KEYS,
+                   "frontier": FRONTIER_PHASE_KEYS}[kind]
         unknown = sorted(set(phase) - allowed)
         if unknown:
             raise CampaignError(f"{where}: unknown key(s) {', '.join(unknown)} "
@@ -2146,7 +2265,9 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
         # A score phase naming a results directory needs no profile. Every
         # other phase does, and a profile named anywhere must be one this
         # checkout's runner defines.
-        if profile is not None or kind == "run":
+        if kind == "frontier":
+            profile = None
+        elif profile is not None or kind == "run":
             if not isinstance(profile, str) or not profile:
                 raise CampaignError(f"{where}: no profile, and no top-level "
                                     f"profile to fall back on")
@@ -2169,6 +2290,10 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
         if kind == "score":
             normalised.append(normalise_score_phase(phase, where, profile,
                                                     phase_hosts))
+            continue
+        if kind == "frontier":
+            normalised.append(normalise_frontier_phase(phase, where,
+                                                       phase_hosts))
             continue
         jobs = phase.get("jobs")
         if jobs is not None and (isinstance(jobs, bool) or not isinstance(jobs, int)
@@ -2204,6 +2329,7 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
     return {"name": name, "branch": branch, "build": build, "path": path,
             "configs": configs, "config_dirs": config_dirs,
             "results_dirs": staged_results_dirs(normalised, seeds_by_host),
+            "frontier_jobs": staged_frontier_jobs(normalised, seeds_by_host),
             "hosts": seeds_by_host, "phases": normalised,
             "description": raw.get("description", "")}
 
@@ -2259,6 +2385,16 @@ def normalise_score_phase(phase: dict, where: str, profile,
         raise CampaignError(f"{where}: fingerprint_max_prefix + "
                             f"fingerprint_max_cycle must not exceed 64, a "
                             f"lasso's position limit")
+    prefilter = {key: budgets[key] for key in SCORE_PREFILTER_KEYS
+                 if budgets.get(key) is not None}
+    if prefilter and budgets["maximality"] == "off":
+        raise CampaignError(f"{where}: {', '.join(prefilter)} tune the "
+                            f"maximality walk, so they need maximality on")
+    if prefilter.get("prefilter_max_prefix", 2) + \
+            prefilter.get("prefilter_max_cycle", 3) > 64:
+        raise CampaignError(f"{where}: prefilter_max_prefix + "
+                            f"prefilter_max_cycle must not exceed 64, a "
+                            f"lasso's position limit")
     if "wall_cap_s" not in budgets:
         import score_campaign  # noqa: PLC0415
         budgets["wall_cap_s"] = score_campaign.wall_cap_default(
@@ -2266,6 +2402,46 @@ def normalise_score_phase(phase: dict, where: str, profile,
     return {"name": phase.get("name", Path(out).name), "kind": "score",
             "profile": profile, "jobs": None, "sweeps": None, "specs": None,
             "hosts": phase_hosts, "results": results, "out": out, **budgets}
+
+
+def normalise_frontier_phase(phase: dict, where: str, phase_hosts) -> dict:
+    """A frontier phase's record: the work tree and its budgets, stated."""
+    work = phase.get("work")
+    if not isinstance(work, str) or not work:
+        raise CampaignError(f"{where}: a frontier phase needs `work`, a "
+                            f"non-empty string naming the work tree "
+                            f"pooled_frontier.py plan wrote")
+    record = {"name": phase.get("name", Path(work).name), "kind": "frontier",
+              "profile": None, "jobs": None, "sweeps": None, "specs": None,
+              "hosts": phase_hosts, "work": work, "cache": None}
+    for key, default in FRONTIER_DEFAULTS.items():
+        value = phase.get(key, default)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise CampaignError(f"{where}: {key} must be a positive integer")
+        record[key] = value
+    cache = phase.get("cache")
+    if cache is not None:
+        if not isinstance(cache, str) or not cache:
+            raise CampaignError(f"{where}: cache must be a non-empty string")
+        record["cache"] = cache
+    return record
+
+
+def frontier_jobs_path(phase: dict, host: str) -> str:
+    return f"{phase['work']}/jobs-{host}.csv"
+
+
+def staged_frontier_jobs(phases: list, seeds_by_host: dict) -> dict:
+    """Per host, the jobs files its frontier phases read. Nothing in a
+    campaign writes one, `plan` having run before it, so every one is
+    demanded at stage time on every host the phase runs on."""
+    out: dict = {}
+    for host, seeds in seeds_by_host.items():
+        out[host] = sorted({frontier_jobs_path(phase, host)
+                            for phase in phases
+                            if phase_kind(phase) == "frontier"
+                            and phase_seeds(phase, host, seeds)})
+    return out
 
 
 def phase_kind(phase: dict) -> str:
@@ -2295,6 +2471,8 @@ def staged_results_dirs(phases: list, seeds_by_host: dict) -> dict:
                 continue
             if phase_kind(phase) == "run":
                 produced.add(profile_results_dir(phase["profile"]))
+            elif phase_kind(phase) != "score":
+                continue
             elif (phase["results"] not in produced
                   and phase["results"] not in wanted):
                 wanted.append(phase["results"])
@@ -2348,7 +2526,7 @@ def entry_phase_seeds(entry: dict, index: int) -> str:
     return entry.get("seeds", "")
 
 
-def phase_args(phase: dict, seeds: list) -> list:
+def phase_args(phase: dict, seeds: list, host: str | None = None) -> list:
     """The runner arguments for one phase over one host's seeds.
 
     The seeds come from the declaration by way of the caller and never from an
@@ -2357,6 +2535,8 @@ def phase_args(phase: dict, seeds: list) -> list:
     """
     if phase_kind(phase) == "score":
         return score_phase_args(phase, seeds)
+    if phase_kind(phase) == "frontier":
+        return frontier_phase_args(phase, host)
     args = ["--profile", phase["profile"]]
     if phase.get("jobs"):
         args += ["--jobs", str(phase["jobs"])]
@@ -2388,14 +2568,34 @@ def score_phase_args(phase: dict, seeds: list) -> list:
     return args + ["--seeds", *[str(s) for s in seeds]]
 
 
+def frontier_phase_args(phase: dict, host: str | None) -> list:
+    """`pooled_frontier.py run` over this host's share of the work tree.
+
+    The host is the campaign's name for it, which is what `plan` named the
+    jobs file after, and never the machine's hostname.
+    """
+    if not host:
+        raise CampaignError(f"frontier phase {phase['name']} needs the host "
+                            f"it runs on")
+    args = ["run", phase["work"], "--host", host,
+            "--workers", str(phase["workers"]),
+            "--solver-jobs", str(phase["solver_jobs"]),
+            "--timeout", str(phase["timeout"])]
+    if phase.get("cache"):
+        args += ["--cache", phase["cache"]]
+    return args
+
+
 def phase_launcher(phase: dict) -> str:
-    """The command a phase's arguments follow: the runner, or the scorer."""
-    return SCORER_CMD if phase_kind(phase) == "score" else RUNNER_CMD
+    """The command a phase's arguments follow: runner, scorer or frontier."""
+    return {"score": SCORER_CMD,
+            "frontier": FRONTIER_CMD}.get(phase_kind(phase), RUNNER_CMD)
 
 
-def phase_command(phase: dict, seeds: list) -> str:
+def phase_command(phase: dict, seeds: list, host: str | None = None) -> str:
     return " ".join([phase_launcher(phase)]
-                    + [shlex.quote(a) for a in phase_args(phase, seeds)])
+                    + [shlex.quote(a)
+                       for a in phase_args(phase, seeds, host)])
 
 
 # -- describe -----------------------------------------------------------------
@@ -3006,8 +3206,19 @@ done
 """
 
 
+# A frontier phase's counterpart: the jobs file `plan` dealt this host.
+FRONTIER_JOBS_CHECK = r"""for jobs in @JOBS_FILES@; do
+  if [ ! -f "$jobs" ]; then
+    echo "@M@ERR no frontier jobs file at $(pwd)/$jobs — run pooled_frontier.py plan with this host in --hosts and put its work tree here, or fix work = ... in campaign.toml"
+    exit 12
+  fi
+done
+"""
+
+
 def configs_block(configs: str | None, config_dirs: list,
-                  results_dirs: list | None = None) -> str:
+                  results_dirs: list | None = None,
+                  jobs_files: list | None = None) -> str:
     """The configs section: the declared command, then the check, or just the
     check. The check is never conditional — a campaign that declares no command
     is the case that broke, not the case to trust. A score phase's results
@@ -3022,19 +3233,24 @@ def configs_block(configs: str | None, config_dirs: list,
     if results_dirs:
         results = RESULTS_CHECK.replace(
             "@RESULTS_DIRS@", " ".join(shlex.quote(d) for d in results_dirs))
+    if jobs_files:
+        results += FRONTIER_JOBS_CHECK.replace(
+            "@JOBS_FILES@", " ".join(shlex.quote(j) for j in jobs_files))
     return step + check + results
 
 
 def stage_apply_script(root: str, branch: str, sha: str, build: str,
                        configs: str | None, config_dirs: list,
-                       force: bool, results_dirs: list | None = None) -> str:
+                       force: bool, results_dirs: list | None = None,
+                       jobs_files: list | None = None) -> str:
     # CONFIGS first, and the marker last inside render_script: the configs
     # block is itself a script fragment carrying markers of its own.
     # BUILD and BIN go in unquoted -- the first is a command line, the second
     # is spliced into `./@BIN@`.
     return render_script(
         STAGE_APPLY_SCRIPT,
-        CONFIGS=configs_block(configs, config_dirs, results_dirs),
+        CONFIGS=configs_block(configs, config_dirs, results_dirs,
+                              jobs_files),
         ROOT=shlex.quote(root),
         BRANCH=shlex.quote(branch),
         SHA=shlex.quote(sha),
@@ -3171,6 +3387,8 @@ def cmd_stage(args: argparse.Namespace) -> int:
                                      campaign["build"], campaign["configs"],
                                      campaign["config_dirs"], args.force,
                                      (campaign.get("results_dirs") or {})
+                                     .get(host),
+                                     (campaign.get("frontier_jobs") or {})
                                      .get(host)),
             timeout=args.build_timeout)
         result = parse_sections(text or "")
@@ -3312,6 +3530,13 @@ def cmd_start(args: argparse.Namespace) -> int:
         print(f"error: no local branch {campaign['branch']!r} ({err})")
         return 2
     phases = campaign["phases"]
+    # A frontier phase's freshness gate covers maximal and compare, which the
+    # remote probe does not read, so it runs only where the gate does.
+    if any(phase_kind(p) == "frontier" for p in phases):
+        print(f"error: {campaign['name']} has a frontier phase, which runs "
+              f"through `enqueue` and the tick only: the tick gates "
+              f"build-release/maximal and compare against HEAD first")
+        return 2
     print(f"Starting {campaign['name']} on {', '.join(hosts)}: "
           f"{len(phases)} phase(s) per host")
 
@@ -3698,9 +3923,68 @@ def run_step(root: Path, command, log_path: Path, shell: bool = False) -> int:
     return proc.returncode
 
 
-def run_phase(root: Path, phase: dict, seeds: list, log_path: Path) -> int:
+def run_phase(root: Path, phase: dict, seeds: list, log_path: Path,
+              host: str | None = None) -> int:
     return run_step(root, shlex.split(phase_launcher(phase))
-                    + phase_args(phase, seeds), log_path)
+                    + phase_args(phase, seeds, host), log_path)
+
+
+def frontier_bin_dir(root: Path) -> Path:
+    override = os.environ.get("PEREDUR_BIN_DIR")
+    return Path(override) if override else root / "build-release"
+
+
+def frontier_versions(root: Path) -> dict:
+    import run_experiments  # noqa: PLC0415
+    return {name: run_experiments.binary_version(frontier_bin_dir(root) / name)
+            for name in FRONTIER_BINARIES}
+
+
+def frontier_blocked(root: Path, phase: dict, host: str):
+    """Why a frontier phase cannot run here, or None.
+
+    The jobs file is the stage check again, since a tick may stage itself;
+    the binaries are the freshness gate score_campaign.py applies to the same
+    two, since a frontier names the commit that decided it nowhere else.
+    """
+    jobs = root / frontier_jobs_path(phase, host)
+    if not jobs.is_file():
+        return (f"no frontier jobs file at {jobs} for phase {phase['name']} "
+                f"— run pooled_frontier.py plan with {host} in --hosts")
+    import run_experiments  # noqa: PLC0415
+    head, err = git_output(["rev-parse", "HEAD"], root)
+    problems = run_experiments.staleness_problems(
+        frontier_versions(root), None if err else head)
+    if problems:
+        return ("stale binary for frontier phase " + phase["name"] + ": "
+                + "; ".join(problems))
+    return None
+
+
+def write_frontier_manifest(root: Path, phase: dict, host: str) -> None:
+    """What `status` reads a frontier phase's row from, beside its work tree.
+
+    Rewritten at every attempt, so it names the binaries that attempt ran.
+    """
+    work = root / phase["work"]
+    with open(work / f"jobs-{host}.csv", newline="") as handle:
+        planned = max(0, sum(1 for line in handle if line.strip()) - 1)
+    head, _ = git_output(["rev-parse", "HEAD"], root)
+    branch, _ = git_output(["rev-parse", "--abbrev-ref", "HEAD"],
+                           root)
+    manifest = {
+        "kind": "frontier", "host": host, "hostname": os.uname().nodename,
+        "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "work": phase["work"], "planned": planned,
+        "invocation": " ".join([phase_launcher(phase)] + [
+            shlex.quote(a) for a in frontier_phase_args(phase, host)]),
+        "git": {"branch": branch or "?", "head": head or "?"},
+        "binaries": frontier_versions(root),
+    }
+    path = work / f"{FRONTIER_MANIFEST_STEM}-{host}.json"
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(manifest, indent=2) + "\n")
+    os.replace(tmp, path)
 
 
 def results_dir_missing(root: Path, phase: dict):
@@ -4097,8 +4381,11 @@ def tick_entry(entry: dict, campaign: dict, root: Path,
     # A score phase over a results directory the host does not hold cannot
     # run, and the scorer would say so an attempt later; the refusal is here
     # so the entry names the directory rather than an exit status.
-    blocked = (results_dir_missing(root, phase)
-               if phase_kind(phase) == "score" else None)
+    blocked = None
+    if phase_kind(phase) == "score":
+        blocked = results_dir_missing(root, phase)
+    elif phase_kind(phase) == "frontier":
+        blocked = frontier_blocked(root, phase, entry["host"])
     if blocked is not None and not args.dry_run:
         fail_or_requeue(entry, blocked)
         write_entry(entry["path"], entry)
@@ -4115,12 +4402,14 @@ def tick_entry(entry: dict, campaign: dict, root: Path,
         entry["state"] = "queued"
         log_line(entry, "dry run, phase not executed")
         write_entry(entry["path"], entry)
-        print(f"  would run: {phase_command(phase, seeds)}")
+        print(f"  would run: {phase_command(phase, seeds, entry['host'])}")
         if blocked is not None:
             print(f"  blocked: {blocked}")
         return 0
 
-    code = run_phase(root, phase, seeds, log_path)
+    if phase_kind(phase) == "frontier":
+        write_frontier_manifest(root, phase, entry["host"])
+    code = run_phase(root, phase, seeds, log_path, entry["host"])
     if code != 0:
         fail_or_requeue(entry, f"phase {index} ({phase['name']}) exited {code}")
     else:

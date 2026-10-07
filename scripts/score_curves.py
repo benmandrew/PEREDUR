@@ -349,8 +349,25 @@ def scalar_row(base: dict, metric: str, moment: float | None,
             "censored": "" if not known else int(moment is None)}
 
 
+def prefilter_flags(args) -> list[str]:
+    """`maximal`'s fingerprint-prefilter flags, only those the caller set.
+
+    An absent flag leaves the binary's own default, so a pass that never names
+    one runs the walk every archived curve was drawn under. A refutation is
+    exact at any setting, so these move the walk's cost and not its log.
+    """
+    flags: list[str] = []
+    for name in ("prefilter_words", "prefilter_max_prefix",
+                 "prefilter_max_cycle"):
+        value = getattr(args, name, None)
+        if value is not None:
+            flags += [f"--{name.replace('_', '-')}", str(value)]
+    return flags
+
+
 def antichain_walk(accumulated: Path, jobs: int | None,
-                   timeout_s: int) -> list[tuple[float, str, str]] | None:
+                   timeout_s: int, extra: list[str] | None = None
+                   ) -> list[tuple[float, str, str]] | None:
     """Return `maximal --curve`'s event log over the accumulator index.
 
     Each row is (elapsed_s, file, event) with event one of admit, drop and
@@ -369,6 +386,7 @@ def antichain_walk(accumulated: Path, jobs: int | None,
     command = [str(MAXIMAL_BIN), "--curve", str(index)]
     if jobs:
         command += ["--jobs", str(jobs)]
+    command += extra or []
     text = ""
     try:
         text = subprocess.run(command, check=True, timeout=timeout_s,
@@ -430,7 +448,8 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
                     epsilons: list[float] | None = None,
                     n_words: int = 0,
                     members: list[tuple[float, str]] | None = None,
-                    distance: str = "hamming") -> list[dict]:
+                    distance: str = "hamming",
+                    extra: list[str] | None = None) -> list[dict]:
     """Report the maximal antichain over prefixes of the accumulated set.
 
     One `maximal --curve` walk answers every cut. What it replaced was a
@@ -456,7 +475,7 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
     budget = timeout_s
     if deadline is not None:
         budget = max(1, int(deadline - time.monotonic()))
-    log = antichain_walk(accumulated, jobs, budget)
+    log = antichain_walk(accumulated, jobs, budget, extra)
     if log is None:
         return rows
     # A walk cut short covers the cuts up to its last row and no further, so
@@ -745,7 +764,7 @@ def score_run(run_dir: Path, args, deadline: float | None = None,
         rows += maximality_rows(base, index, accumulated, implying,
                                 args.cuts, args.jobs, args.maximal_timeout,
                                 deadline, prints, epsilons or [], n_words,
-                                members, distance)
+                                members, distance, prefilter_flags(args))
     elif members_from and index:
         # The membership an earlier maximality pass recorded, so the maximal
         # nets can be recounted under another sampling without the solver
@@ -884,6 +903,15 @@ def main() -> int:
                         help="budget for the antichain walk in seconds, in "
                              "place of --maximal-timeout; the cuts the walk "
                              "covered are written (0: no deadline)")
+    parser.add_argument("--prefilter-words", type=int, default=None,
+                        help="maximal --prefilter-words for the walk "
+                             "(default: the binary's)")
+    parser.add_argument("--prefilter-max-prefix", type=int, default=None,
+                        help="maximal --prefilter-max-prefix for the walk "
+                             "(default: the binary's)")
+    parser.add_argument("--prefilter-max-cycle", type=int, default=None,
+                        help="maximal --prefilter-max-cycle for the walk "
+                             "(default: the binary's)")
     parser.add_argument("--maximal-timeout", type=int, default=900,
                         help="wall budget for the antichain walk where no "
                              "deadline is set (default: 900)")
@@ -896,6 +924,11 @@ def main() -> int:
 
     if args.cuts < 1:
         parser.error("--cuts expects a positive integer")
+    for name, low in (("prefilter_words", 1), ("prefilter_max_prefix", 0),
+                      ("prefilter_max_cycle", 1)):
+        value = getattr(args, name)
+        if value is not None and value < low:
+            parser.error(f"--{name.replace('_', '-')} must be at least {low}")
     if args.epsilon and args.fingerprint_words < 1:
         parser.error("--fingerprint-words expects a positive integer")
     if args.fingerprint_max_prefix < 0 or args.fingerprint_max_cycle < 1:

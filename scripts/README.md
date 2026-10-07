@@ -536,7 +536,17 @@ fingerprint_max_prefix = 2         # longest lasso stem
 fingerprint_max_cycle = 3          # longest lasso loop; stem + loop <= 64
 fingerprint_distance = "hamming"   # or "union"
 members_from = ""      # an earlier maximality pass's out; recounts its maximal nets
+# prefilter_words = 4096       # maximal --prefilter-words; absent = binary default
+# prefilter_max_prefix = 2     # maximal --prefilter-max-prefix
+# prefilter_max_cycle = 3      # maximal --prefilter-max-cycle
 ```
+
+The three `prefilter_*` keys reach `maximal --curve` through
+`score_campaign.py` and `score_curves.py` only when declared, and need
+`maximality = "on"`. Absent, no flag is passed and the walk samples as every
+archived curve was walked (256 words, lassos of at most 2 + 3 positions). A
+refutation is exact at any setting, so they move the walk's cost and not its
+event log.
 
 `maximal_timeout` bounds one `maximal --curve` walk a run, and
 `deadline_s` overrides it wherever it is set. It was a per-cut bound until
