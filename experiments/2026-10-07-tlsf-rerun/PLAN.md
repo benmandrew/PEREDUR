@@ -6,11 +6,11 @@ The paper's strength and diversity rows rested on `2026-09-04-aurus-rematch` (`f
 
 ## Hosts
 
-av2 takes seeds 0-11, av3 12-22 and av1 23-29. av1 gets fewer seeds because it finishes the FRETISH re-run's curve pass about 6.5 h after the other two. `2026-10-07-tlsf-rerun-calib` runs seed 0 of six families on av1 before its main share. av1 is the one host built with gcc 13, so its calibration runs are diffed against av2's seed-0 runs of the same cells. Output should match byte for byte, and the wall times should agree within seed noise. If the wall times disagree, av1's seeds are re-run on av2 and av3 before the wall-time figures are read.
+av2 takes seeds 0-12, av3 13-25 and av1 26-29. av1 gets fewer seeds because its FRETISH curve pass, slowed by about 7 cores of other load, ends around midnight, six hours after av2's and av3's. `2026-10-07-tlsf-rerun-calib` runs seed 0 of six families on av1 before its main share. av1 is the one host built with gcc 13, so its calibration runs are diffed against av2's seed-0 runs of the same cells. Output should match byte for byte, and the wall times should agree within seed noise. If the wall times disagree, av1's seeds are re-run on av2 and av3 before the wall-time figures are read.
 
 ## Cost
 
-The paper-rerun cost 550.9 core-hours, 17.6-18.2 h on two hosts at 16 jobs. At about 18.4 core-hours a seed, this split puts about 14 h on av2, 13 h on av3 and 8 h on av1 after its queue clears. #211 cut one humanoid-742 search run from 2510 s to 1860 s, and #206 adds a solver call per scored individual under MRS. The archived figure is therefore an estimate, not a bound.
+The paper-rerun cost 550.9 core-hours, 17.6-18.2 h on two hosts at 16 jobs. At about 18.4 core-hours a seed, this split puts about 15 h on av2 and on av3, and about 5 h on av1 after its queue and calibration clear. #211 cut one humanoid-742 search run from 2510 s to 1860 s, and #206 adds a solver call per scored individual under MRS. The archived figure is therefore an estimate, not a bound.
 
 ## Downstream passes
 
