@@ -16,6 +16,14 @@ namespace {
 
 constexpr std::string_view k_test_suite = "syntactic_similarity";
 
+// Most of these tests pin the order measures that scored the syntactic
+// objective before keyword_similarity defaulted to Semantic.
+Config syntactic_config() {
+    Config cfg;
+    cfg.keyword_similarity = KeywordSimilarity::Syntactic;
+    return cfg;
+}
+
 Specification make_spec(
     std::initializer_list<std::pair<const char*, const char*>> reqs) {
     std::vector<Requirement> req_vec;
@@ -44,8 +52,8 @@ TEST(test_req_similarity_averages_component_scores) {
     const Requirement other_requirement{Formula("P"), Formula("P|Q"),
                                         timing::immediately()};
 
-    const double synsim =
-        syntactic_similarity(requirement, other_requirement, Config{});
+    const double synsim = syntactic_similarity(requirement, other_requirement,
+                                               syntactic_config());
     // condition: P vs P -> 1.0. response: Q vs P|Q -> shared=1, n(Q)=1,
     // n(P|Q)=3, harmonic mean = 2*1*(1/3)/(4/3) = 0.5. timing: identical ->
     // 1.0. scope: both Global -> 1.0. condition type: both Continual -> 1.0.
@@ -60,7 +68,7 @@ TEST(test_req_similarity_averages_component_scores) {
 TEST(test_spec_similarity_identical_single_req) {
     // All components identical → 1.0
     const Specification spec = make_spec({{"p", "q"}});
-    const double result = syntactic_similarity(spec, spec, Config{});
+    const double result = syntactic_similarity(spec, spec, syntactic_config());
     expect(std::fabs(result - 1.0) < 1e-12,
            "spec-similarity: identical single-req specs should score 1.0");
 }
@@ -72,7 +80,8 @@ TEST(test_spec_similarity_disjoint_atoms) {
     // trigger = 0, response = 0, timing = 1, scope = 1, ctype = 1 → 3/5
     const Specification spec_a = make_spec({{"p", "q"}});
     const Specification spec_b = make_spec({{"r", "s"}});
-    const double result = syntactic_similarity(spec_a, spec_b, Config{});
+    const double result =
+        syntactic_similarity(spec_a, spec_b, syntactic_config());
     expect(std::fabs(result - (3.0 / 5.0)) < 1e-12,
            "spec-similarity: fully disjoint single-req specs should score 3/5");
 }
@@ -81,7 +90,8 @@ TEST(test_spec_similarity_same_trigger_different_response) {
     // trigger = 1, response = 0, timing = 1, scope = 1, ctype = 1 → 4/5
     const Specification spec_a = make_spec({{"p", "q"}});
     const Specification spec_b = make_spec({{"p", "r"}});
-    const double result = syntactic_similarity(spec_a, spec_b, Config{});
+    const double result =
+        syntactic_similarity(spec_a, spec_b, syntactic_config());
     expect(
         std::fabs(result - 0.8) < 1e-12,
         "spec-similarity: same trigger, different response should score 4/5");
@@ -90,7 +100,7 @@ TEST(test_spec_similarity_same_trigger_different_response) {
 TEST(test_spec_similarity_identical_multi_req) {
     // Identical two-requirement specs → 1.0
     const Specification spec = make_spec({{"p", "q"}, {"r", "s"}});
-    const double result = syntactic_similarity(spec, spec, Config{});
+    const double result = syntactic_similarity(spec, spec, syntactic_config());
     expect(std::fabs(result - 1.0) < 1e-12,
            "spec-similarity: identical multi-req specs should score 1.0");
 }
@@ -108,7 +118,8 @@ TEST(test_spec_similarity_partial_match_multi_req) {
     // (11/3) / 5 = 11/15.
     const Specification spec_a = make_spec({{"p", "q"}, {"r", "s"}});
     const Specification spec_b = make_spec({{"p", "q"}, {"t", "u"}});
-    const double result = syntactic_similarity(spec_a, spec_b, Config{});
+    const double result =
+        syntactic_similarity(spec_a, spec_b, syntactic_config());
     expect(std::fabs(result - (11.0 / 15.0)) < 1e-12,
            "spec-similarity: specs sharing one of two requirements should "
            "score 11/15");
@@ -126,9 +137,9 @@ TEST(test_spec_similarity_differing_assumption_counts) {
     const Specification candidate(make_reqs({{"a", "b"}, {"c", "d"}}),
                                   make_reqs({{"p", "q"}}), {}, {});
     const double candidate_vs_original =
-        syntactic_similarity(candidate, original, Config{});
+        syntactic_similarity(candidate, original, syntactic_config());
     const double original_vs_candidate =
-        syntactic_similarity(original, candidate, Config{});
+        syntactic_similarity(original, candidate, syntactic_config());
     expect(std::isfinite(candidate_vs_original) &&
                candidate_vs_original >= 0.0 && candidate_vs_original <= 1.0,
            "spec-similarity: a candidate with an extra assumption must score "
@@ -163,16 +174,18 @@ TEST(test_spec_similarity_stays_aligned_across_a_deleted_guarantee) {
     const Specification shifted({}, {reqs[1], reqs[2]}, {}, {});
 
     const double tombstoned =
-        syntactic_similarity(candidate, original, Config{});
-    const double erased = syntactic_similarity(shifted, original, Config{});
+        syntactic_similarity(candidate, original, syntactic_config());
+    const double erased =
+        syntactic_similarity(shifted, original, syntactic_config());
     expect(tombstoned > erased,
            "spec-similarity: a tombstoned deletion scores above the same "
            "deletion made by erasing the slot, because the survivors stay "
            "paired with the requirements they came from");
 
     const Specification untouched({}, reqs, {}, {});
-    expect(std::fabs(syntactic_similarity(untouched, original, Config{}) -
-                     1.0) < 1e-12,
+    expect(std::fabs(
+               syntactic_similarity(untouched, original, syntactic_config()) -
+               1.0) < 1e-12,
            "spec-similarity: an untouched specification still scores 1.0");
 }
 
@@ -181,7 +194,7 @@ TEST(test_spec_similarity_stays_aligned_across_a_deleted_guarantee) {
 // Identical timings always score 1.0.
 TEST(test_timing_identical_immediately) {
     const Requirement req{Formula("p"), Formula("q"), timing::immediately()};
-    const double result = syntactic_similarity(req, req, Config{});
+    const double result = syntactic_similarity(req, req, syntactic_config());
     // All three components equal 1.0 → average is 1.0
     expect(std::fabs(result - 1.0) < 1e-12,
            "timing-sim: identical requirements (immediately) should score 1.0");
@@ -189,7 +202,7 @@ TEST(test_timing_identical_immediately) {
 
 TEST(test_timing_identical_within_ticks) {
     const Requirement req{Formula("p"), Formula("p"), timing::within_ticks(3)};
-    const double result = syntactic_similarity(req, req, Config{});
+    const double result = syntactic_similarity(req, req, syntactic_config());
     expect(std::fabs(result - 1.0) < 1e-12,
            "timing-sim: identical within_ticks requirements should score 1.0");
 }
@@ -210,7 +223,8 @@ TEST(test_timing_comparable_for_ticks) {
     const double timing_sim = 1.53 / 1.78;
     // Both are unscoped and share a condition type, so those terms read 1.0.
     const double expected = (1.0 + 1.0 + timing_sim + 1.0 + 1.0) / 5.0;
-    const double result = syntactic_similarity(req_strong, req_weak, Config{});
+    const double result =
+        syntactic_similarity(req_strong, req_weak, syntactic_config());
     expect(std::fabs(result - expected) < 1e-9,
            "timing-sim: for_ticks{2} vs for_ticks{1} should give 1.53/1.78 "
            "timing component");
@@ -226,7 +240,8 @@ TEST(test_timing_for_ticks_vs_eventually) {
     const double timing_sim = 0.01 / 1.53;
     // Both are unscoped and share a condition type, so those terms read 1.0.
     const double expected = (1.0 + 1.0 + timing_sim + 1.0 + 1.0) / 5.0;
-    const double result = syntactic_similarity(req_strong, req_weak, Config{});
+    const double result =
+        syntactic_similarity(req_strong, req_weak, syntactic_config());
     expect(std::fabs(result - expected) < 1e-9,
            "timing-sim: for_ticks{1} vs eventually should give tiny timing "
            "component");
@@ -244,7 +259,8 @@ TEST(test_timing_immediately_vs_next_timepoint) {
     const double timing_sim = 1.01 / 1.03;
     // Both are unscoped and share a condition type, so those terms read 1.0.
     const double expected = (1.0 + 1.0 + timing_sim + 1.0 + 1.0) / 5.0;
-    const double result = syntactic_similarity(req_i, req_n, Config{});
+    const double result =
+        syntactic_similarity(req_i, req_n, syntactic_config());
     expect(std::fabs(result - expected) < 1e-9,
            "timing-sim: immediately vs next_timepoint should give 1.01/1.03 "
            "timing component");
@@ -252,7 +268,7 @@ TEST(test_timing_immediately_vs_next_timepoint) {
 
 TEST(test_timing_identical_always) {
     const Requirement req{Formula("p"), Formula("p"), timing::always()};
-    const double result = syntactic_similarity(req, req, Config{});
+    const double result = syntactic_similarity(req, req, syntactic_config());
     expect(std::fabs(result - 1.0) < 1e-12,
            "timing-sim: identical always requirements should score 1.0");
 }
@@ -268,7 +284,8 @@ TEST(test_timing_always_vs_eventually) {
     const double timing_sim = 0.01 / 2.04;
     // Both are unscoped and share a condition type, so those terms read 1.0.
     const double expected = (1.0 + 1.0 + timing_sim + 1.0 + 1.0) / 5.0;
-    const double result = syntactic_similarity(req_strong, req_weak, Config{});
+    const double result =
+        syntactic_similarity(req_strong, req_weak, syntactic_config());
     expect(std::fabs(result - expected) < 1e-9,
            "timing-sim: always vs eventually should give tiny timing "
            "component");
@@ -279,7 +296,7 @@ TEST(test_timing_always_vs_eventually) {
 double timing_term(const Timing& lhs, const Timing& rhs) {
     const Requirement left{Formula("p"), Formula("q"), lhs};
     const Requirement right{Formula("p"), Formula("q"), rhs};
-    return (5.0 * syntactic_similarity(left, right, Config{})) - 4.0;
+    return (5.0 * syntactic_similarity(left, right, syntactic_config())) - 4.0;
 }
 
 // A stop timing is scored outside the downset measure, so no stop-free pair
@@ -321,7 +338,7 @@ double scope_term(const Scope& lhs, const Scope& rhs) {
                            ConditionType::Continual, true, false, lhs);
     const Requirement right(Formula("p"), Formula("q"), timing::immediately(),
                             ConditionType::Continual, true, false, rhs);
-    const double mean = syntactic_similarity(left, right, Config{});
+    const double mean = syntactic_similarity(left, right, syntactic_config());
     return (5.0 * mean) - 4.0;
 }
 
@@ -407,8 +424,9 @@ TEST(test_spec_scope_similarity_pairs_by_index) {
     const Specification original({}, {plain, plain}, {"p"}, {"q"});
     const Specification moved({}, {plain, scoped}, {"p"}, {"q"}, {"m"});
     const double both_plain =
-        syntactic_similarity(original, original, Config{});
-    const double one_moved = syntactic_similarity(original, moved, Config{});
+        syntactic_similarity(original, original, syntactic_config());
+    const double one_moved =
+        syntactic_similarity(original, moved, syntactic_config());
     expect(one_moved < both_plain,
            "scope-similarity: a scope change in one slot must lower the "
            "specification-level score, or the search has no gradient on the "
@@ -424,7 +442,7 @@ double condition_type_term(ConditionType lhs, ConditionType rhs) {
                            lhs);
     const Requirement right(Formula("p"), Formula("q"), timing::immediately(),
                             rhs);
-    const double mean = syntactic_similarity(left, right, Config{});
+    const double mean = syntactic_similarity(left, right, syntactic_config());
     return (5.0 * mean) - 4.0;
 }
 
@@ -464,8 +482,8 @@ TEST(test_spec_condition_type_similarity_pairs_by_index) {
                               ConditionType::Trigger);
     const Specification original({}, {continual, continual}, {"p"}, {"q"});
     const Specification moved({}, {continual, trigger}, {"p"}, {"q"});
-    expect(syntactic_similarity(original, moved, Config{}) <
-               syntactic_similarity(original, original, Config{}),
+    expect(syntactic_similarity(original, moved, syntactic_config()) <
+               syntactic_similarity(original, original, syntactic_config()),
            "condition-type-similarity: a condition-type change in one slot "
            "must lower the specification-level score");
 }
@@ -478,23 +496,19 @@ Config keywords_in(KeywordSimilarity mode) {
     return cfg;
 }
 
-// The default keeps the order measures in the syntactic objective, so a pair
-// differing only in timing scores exactly what it did before the key existed.
+// Syntactic mode keeps the order measures in the syntactic objective, so a
+// pair differing only in timing scores exactly what it did before the key
+// existed.
 TEST(test_keyword_similarity_syntactic_is_the_order_measure) {
-    expect(Config{}.keyword_similarity == KeywordSimilarity::Syntactic,
-           "keyword-similarity: the default must stay syntactic, or every "
-           "archived FRETISH config changes meaning");
     const Requirement strong{Formula("p"), Formula("p"), timing::for_ticks(2)};
     const Requirement weak{Formula("p"), Formula("p"), timing::for_ticks(1)};
     const double expected = (4.0 + (1.53 / 1.78)) / 5.0;
-    expect(std::fabs(syntactic_similarity(strong, weak, Config{}) - expected) <
-                   1e-9 &&
-               std::fabs(syntactic_similarity(
-                             strong, weak,
-                             keywords_in(KeywordSimilarity::Syntactic)) -
-                         expected) < 1e-9,
-           "keyword-similarity: syntactic mode should score the timing by its "
-           "downset Jaccard, as before");
+    expect(
+        std::fabs(syntactic_similarity(
+                      strong, weak, keywords_in(KeywordSimilarity::Syntactic)) -
+                  expected) < 1e-9,
+        "keyword-similarity: syntactic mode should score the timing by its "
+        "downset Jaccard, as before");
     expect(std::fabs(timing_order_similarity(timing::for_ticks(2),
                                              timing::for_ticks(1)) -
                      (1.53 / 1.78)) < 1e-9,
@@ -573,9 +587,9 @@ TEST(test_keyword_similarity_semantic_reads_tokens) {
                1e-12,
            "keyword-similarity: the specification level should read the same "
            "tokens per slot");
-    expect(
-        std::fabs(syntactic_similarity(original, moved, Config{}) - 0.6) > 1e-6,
-        "keyword-similarity: syntactic mode should not read tokens");
+    expect(std::fabs(syntactic_similarity(original, moved, syntactic_config()) -
+                     0.6) > 1e-6,
+           "keyword-similarity: syntactic mode should not read tokens");
 }
 
 }  // namespace

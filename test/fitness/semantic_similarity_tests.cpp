@@ -44,8 +44,12 @@ TEST(test_semantic_similarity_default_overload_matches_explicit_step_count) {
                                   timing::immediately()};
     const Requirement other_requirement{Formula("P"), Formula("P|Q"),
                                         timing::immediately()};
+    // Syntactic keeps the keyword measures out of the semantic objective, so
+    // only the trace count is compared.
+    Config cfg;
+    cfg.keyword_similarity = KeywordSimilarity::Syntactic;
     const double with_default =
-        semantic_similarity(requirement, other_requirement, Config{});
+        semantic_similarity(requirement, other_requirement, cfg);
     // Pin both the bound and the metric explicitly: the Config overload carries
     // both, so comparing against a bound-only call (which defaults the metric
     // to Direct) would conflate them now that Config defaults the metric to

@@ -77,7 +77,7 @@ mrs_admission_order = "degree"  # or "spec"
 # "semantic" moves those order measures into the semantic objective, mixed per
 # requirement with the trace count as w * trace + (1 - w) * keyword, and leaves
 # the syntactic objective comparing keywords as tokens only.
-keyword_similarity    = "syntactic"  # or "semantic"
+keyword_similarity    = "semantic"  # or "syntactic"
 # w above, read only under "semantic".
 semantic_trace_weight = 0.5
 

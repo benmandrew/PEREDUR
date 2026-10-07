@@ -254,13 +254,14 @@ TEST(test_config_io_enum_keys) {
                                          {"degree", MrsAdmissionOrder::Degree}},
                                         "rotate",
                                         false});
-    // Pinned because the default is what every archived config inherits, and
-    // Syntactic is the placement every run before the key used.
+    // Pinned because the default is what every archived config inherits. It
+    // moved from Syntactic to Semantic on 2026-10-06; see "Config vintage" in
+    // experiments/README.md.
     expect_enum_key<KeywordSimilarity>(
         {"fitness",
          "keyword_similarity",
          &Config::keyword_similarity,
-         KeywordSimilarity::Syntactic,
+         KeywordSimilarity::Semantic,
          {{"syntactic", KeywordSimilarity::Syntactic},
           {"semantic", KeywordSimilarity::Semantic}},
          "lexical",

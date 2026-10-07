@@ -140,6 +140,10 @@ Config golden_config() {
     // arm returns before the RandomSource at any value. Pinned so a golden that
     // gains one fails here rather than re-recording.
     cfg.p_stop = 0.15;
+    // Pinned at the placement the goldens were recorded under: the default
+    // moved to Semantic on 2026-10-06, and fitness feeds selection, so the
+    // move would otherwise re-record every FRETISH golden.
+    cfg.keyword_similarity = KeywordSimilarity::Syntactic;
     cfg.parallel = 1;
     return cfg;
 }
