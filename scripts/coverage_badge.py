@@ -44,6 +44,7 @@ BINARIES = (
     "keyword-terms",
     "lint-ideals",
     "ltl",
+    "maximal",
     "mucs",
     "realize",
     "signal_tracer",
