@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791018189028,
+  "lastUpdate": 1791368341652,
   "repoUrl": "https://github.com/benmandrew/PEREDUR",
   "entries": {
     "counter benchmarks": [
@@ -7556,6 +7556,100 @@ window.BENCHMARK_DATA = {
             "value": 2273.1097401926013,
             "unit": "ns/iter",
             "extra": "iterations: 309768\ncpu: 2272.577512848322 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "benmandrew",
+            "username": "benmandrew",
+            "email": "benmandrew@gmail.com"
+          },
+          "committer": {
+            "name": "benmandrew",
+            "username": "benmandrew",
+            "email": "benmandrew@gmail.com"
+          },
+          "id": "d734fd7a637e9f0dffbb8f14e2b45ce62c53b5b8",
+          "message": "feat(fitness): count what the MRS whole-spec screen finds\n\nThe whole-specification screen added in #206 scores a jointly\nunsatisfiable candidate 0 where the walk would have graded it. How\noften that happens decides whether runs from before the screen still\nstand, and nothing recorded it.\n\nAdd MrsScreenStats with three run-wide counters: queries asked, queries\nthat found the specification unsatisfiable, and queries left undecided.\nThey print under --diagnostics and reach run.json as mrs_screen, which\nmoves the manifest schema to 33. The output gate re-scores candidates\npast the fitness cache, so a candidate can be counted twice.\n\nOver 66 short runs on the 25 TLSF and 8 FRETISH evaluation subjects,\nthe screen fired on 4.8% of queries on both paths.",
+          "timestamp": "2026-10-06T21:22:36Z",
+          "url": "https://github.com/benmandrew/PEREDUR/commit/d734fd7a637e9f0dffbb8f14e2b45ce62c53b5b8"
+        },
+        "date": 1791368340807,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "Copy formula - 8 variables",
+            "value": 9.415412535080483,
+            "unit": "ns/iter",
+            "extra": "iterations: 74942960\ncpu: 9.41234824458495 ns\nthreads: 1"
+          },
+          {
+            "name": "Copy specification - 3-guarantee takeoff spec",
+            "value": 145.52057613346926,
+            "unit": "ns/iter",
+            "extra": "iterations: 4565192\ncpu: 145.45236629697064 ns\nthreads: 1"
+          },
+          {
+            "name": "Hash specification - 3-guarantee takeoff spec",
+            "value": 125.35452438349057,
+            "unit": "ns/iter",
+            "extra": "iterations: 5578959\ncpu: 125.33901521771355 ns\nthreads: 1"
+          },
+          {
+            "name": "Compare specifications - equal, distinct arenas",
+            "value": 83.57149895710188,
+            "unit": "ns/iter",
+            "extra": "iterations: 8374269\ncpu: 83.56760046757515 ns\nthreads: 1"
+          },
+          {
+            "name": "Syntactic similarity - small formulas (3 variables)",
+            "value": 537.3554339688671,
+            "unit": "ns/iter",
+            "extra": "iterations: 1303688\ncpu: 537.1256251495759 ns\nthreads: 1"
+          },
+          {
+            "name": "Syntactic similarity - large formulas (11 variables, O(n*m) shared_subformulae)",
+            "value": 2252.997048720348,
+            "unit": "ns/iter",
+            "extra": "iterations: 310035\ncpu: 2252.0383440579276 ns\nthreads: 1"
+          },
+          {
+            "name": "Spec implication check - warm black cache",
+            "value": 646.8176659248555,
+            "unit": "ns/iter",
+            "extra": "iterations: 1077566\ncpu: 646.6150992143408 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:5",
+            "value": 203.51396882491636,
+            "unit": "ns/iter",
+            "extra": "iterations: 3448071\ncpu: 203.4508575954499 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:10",
+            "value": 242.99182672785616,
+            "unit": "ns/iter",
+            "extra": "iterations: 2881710\ncpu: 242.92740907308524 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:20",
+            "value": 278.91631355676043,
+            "unit": "ns/iter",
+            "extra": "iterations: 2515270\ncpu: 278.8451363074338 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:50",
+            "value": 319.1042115736684,
+            "unit": "ns/iter",
+            "extra": "iterations: 2198988\ncpu: 319.0648202718702 ns\nthreads: 1"
+          },
+          {
+            "name": "Mutate specification - 3-guarantee takeoff spec",
+            "value": 3612.0765377754856,
+            "unit": "ns/iter",
+            "extra": "iterations: 194453\ncpu: 3611.688927401481 ns\nthreads: 1"
           }
         ]
       }
