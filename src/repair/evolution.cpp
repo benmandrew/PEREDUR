@@ -104,9 +104,13 @@ EvolutionResult run_evolution(
     const std::size_t col_best = status.add("best");
     // Only where the sweep below runs: a column that reads the same number
     // every generation because nothing measured it is worse than no column.
-    const std::optional<std::size_t> col_real =
-        accumulator.enabled() ? std::optional<std::size_t>(status.add("real"))
-                              : std::nullopt;
+    //
+    // A flag and a plain index rather than an optional index: gcc 11 at -O3
+    // reports the optional's payload as maybe-uninitialized inside the
+    // has_value() guard below, which -Werror turns into a failed build on the
+    // lab hosts.
+    const bool show_real = accumulator.enabled();
+    const std::size_t col_real = show_real ? status.add("real") : 0;
 
     auto format_elapsed = [](double secs) -> std::string {
         std::ostringstream oss;
@@ -116,6 +120,7 @@ EvolutionResult run_evolution(
 
     const GenerationSizes sizes = generation_sizes(cfg, population.size());
     const std::string total_str = std::to_string(cfg.generations);
+    const auto gate_status = status_objective_of(fitness_function);
     for (std::size_t gen_idx = 0; gen_idx < cfg.generations; ++gen_idx) {
         // Checked before the generation as well as between offspring, matching
         // checkTermination() at the head of AuRUS's evolve(count) loop. Without
@@ -167,12 +172,13 @@ EvolutionResult run_evolution(
             oss << std::fixed << std::setprecision(3) << summary.best;
             status.set(col_best, oss.str());
         }
-        const std::optional<std::size_t> n_real =
-            accumulate_gate_passing(population, cfg, gen_idx + 1, accumulator);
-        // Both optionals are governed by accumulator.enabled(), so either
-        // test decides the other; the pair is what lets the checker see it.
-        if (col_real.has_value() && n_real.has_value()) {
-            status.set(*col_real, std::to_string(*n_real));
+        const std::optional<std::size_t> n_real = accumulate_gate_passing(
+            population, cfg, gen_idx + 1, accumulator, gate_status);
+        // n_real and show_real are both governed by accumulator.enabled(), so
+        // either test decides the other; the pair is what lets the checker
+        // see it.
+        if (show_real && n_real.has_value()) {
+            status.set(col_real, std::to_string(*n_real));
         }
         status.finish();
 

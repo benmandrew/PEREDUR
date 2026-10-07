@@ -74,14 +74,16 @@ const std::vector<CorrectnessCheckT<Spec>>& gate_checks() {
 // generation scored, whereas the checks behind it are only warm where their
 // per-generation stage ran.
 template <typename Spec>
-bool passes_output_gate(const Spec& spec, const Config& cfg) {
-    return gate_status(spec, cfg) == 1.0 &&
+bool passes_output_gate(const Spec& spec, const Config& cfg,
+                        const FitnessFunctionT<Spec>& status) {
+    return (status ? status(spec) : gate_status(spec, cfg)) == 1.0 &&
            !first_failing_check(spec, gate_checks<Spec>()).has_value();
 }
 
 template <typename Spec>
 std::vector<char> gate_verdicts(const std::vector<Scored<Spec>>& population,
-                                const Config& cfg) {
+                                const Config& cfg,
+                                const FitnessFunctionT<Spec>& status) {
     // Each status check is an `ltlsynt` query and the whole population is
     // checked, so a serial sweep here costs a subprocess per distinct
     // candidate.
@@ -90,14 +92,16 @@ std::vector<char> gate_verdicts(const std::vector<Scored<Spec>>& population,
     if (max_in_flight <= 1) {
         for (std::size_t idx = 0; idx < population.size(); ++idx) {
             keep[idx] =
-                passes_output_gate(population[idx].specification, cfg) ? 1 : 0;
+                passes_output_gate(population[idx].specification, cfg, status)
+                    ? 1
+                    : 0;
         }
     } else {
         run_bounded_async(
             population.size(), max_in_flight,
-            [&population, &cfg](std::size_t idx) {
-                return [&spec = population[idx].specification, &cfg] {
-                    return passes_output_gate(spec, cfg);
+            [&population, &cfg, &status](std::size_t idx) {
+                return [&spec = population[idx].specification, &cfg, &status] {
+                    return passes_output_gate(spec, cfg, status);
                 };
             },
             [&keep](std::size_t idx, bool realizable) {
@@ -113,11 +117,12 @@ std::vector<char> gate_verdicts(const std::vector<Scored<Spec>>& population,
 template <typename Spec>
 std::optional<std::size_t> accumulate_gate_passing(
     const std::vector<Scored<Spec>>& population, const Config& cfg,
-    std::size_t generation, RepairAccumulator<Spec>& accumulator) {
+    std::size_t generation, RepairAccumulator<Spec>& accumulator,
+    const FitnessFunctionT<Spec>& status) {
     if (!accumulator.enabled()) {
         return std::nullopt;
     }
-    const std::vector<char> keep = gate_verdicts(population, cfg);
+    const std::vector<char> keep = gate_verdicts(population, cfg, status);
     std::size_t n_gate_passing = 0;
     for (std::size_t idx = 0; idx < population.size(); ++idx) {
         if (keep[idx] != 0) {
@@ -150,18 +155,23 @@ std::unique_ptr<StreamingMaximalFilter<Spec>> make_maximal_stream(
             .string());
 }
 
-template bool passes_output_gate(const Specification&, const Config&);
-template bool passes_output_gate(const tlsf::Specification&, const Config&);
+template bool passes_output_gate(const Specification&, const Config&,
+                                 const FitnessFunctionT<Specification>&);
+template bool passes_output_gate(const tlsf::Specification&, const Config&,
+                                 const FitnessFunctionT<tlsf::Specification>&);
 template std::vector<char> gate_verdicts(
-    const std::vector<Scored<Specification>>&, const Config&);
+    const std::vector<Scored<Specification>>&, const Config&,
+    const FitnessFunctionT<Specification>&);
 template std::vector<char> gate_verdicts(
-    const std::vector<Scored<tlsf::Specification>>&, const Config&);
+    const std::vector<Scored<tlsf::Specification>>&, const Config&,
+    const FitnessFunctionT<tlsf::Specification>&);
 template std::optional<std::size_t> accumulate_gate_passing(
     const std::vector<Scored<Specification>>&, const Config&, std::size_t,
-    RepairAccumulator<Specification>&);
+    RepairAccumulator<Specification>&, const FitnessFunctionT<Specification>&);
 template std::optional<std::size_t> accumulate_gate_passing(
     const std::vector<Scored<tlsf::Specification>>&, const Config&, std::size_t,
-    RepairAccumulator<tlsf::Specification>&);
+    RepairAccumulator<tlsf::Specification>&,
+    const FitnessFunctionT<tlsf::Specification>&);
 template std::unique_ptr<StreamingMaximalFilter<Specification>>
 make_maximal_stream(const Specification&, const Config&, const std::string&);
 template std::unique_ptr<StreamingMaximalFilter<tlsf::Specification>>
