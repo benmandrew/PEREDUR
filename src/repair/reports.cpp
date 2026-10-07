@@ -136,8 +136,11 @@ void print_diagnostics_report() {
               << SatisfiabilityChecker::n_constant_folded << "\n";
     std::cout << "Decided by SPOT (ltlfilt --satisfiable, no black call): "
               << SatisfiabilityChecker::n_spot_decided << "\n";
-    std::cout << "Left to black (SPOT undecided, polarity allows escalation): "
+    std::cout << "black calls (escalations and implication model probes): "
               << SatisfiabilityChecker::n_black_calls << "\n";
+    std::cout << "Implications refuted by a black model (SPOT undecided "
+                 "at its first look): "
+              << SatisfiabilityChecker::n_model_probe_sat << "\n";
     std::cout << "Not escalated (SPOT undecided, black would exhaust its "
                  "bound): "
               << SatisfiabilityChecker::n_escalations_declined << "\n";

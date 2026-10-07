@@ -197,7 +197,13 @@ namespace {
 // 33 added mrs_screen: how often the MRS walk's whole-specification
 // satisfiability screen ran, fired and was left undecided. Zero under any
 // other status grading, and absent before the screen existed.
-constexpr int k_schema_version = 33;
+//
+// 34 added n_model_probe_sat: implication queries black answered SAT between
+// SPOT's first look and its full budget. tool_calls.black.calls now counts
+// those probes too, so an implication-heavy run reads far more black calls
+// than one at 33, and n_escalations_declined still counts only the queries
+// left undecided.
+constexpr int k_schema_version = 34;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -474,6 +480,7 @@ void write_run_manifest(const std::string& output_dir,
         {"n_spot_decided", SatisfiabilityChecker::n_spot_decided.load()},
         {"n_escalations_declined",
          SatisfiabilityChecker::n_escalations_declined.load()},
+        {"n_model_probe_sat", SatisfiabilityChecker::n_model_probe_sat.load()},
         {"n_weak_operator_unresolved",
          SatisfiabilityChecker::n_weak_operator_unresolved.load()},
         {"n_tautology_substitutions", Ltl2tgbaStats::n_tautology_substitutions},

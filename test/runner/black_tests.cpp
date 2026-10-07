@@ -294,4 +294,30 @@ TEST(test_polarity_does_not_change_the_answer) {
     }
 }
 
+// SPOT cannot finish anything in 1 ms, so these reach the model probe. A
+// model refutes the implication, weak until included once it is rewritten
+// away, while black's UNSAT is never taken: an implication is established by
+// SPOT or not at all.
+TEST(test_model_probe_refutes_but_never_establishes) {
+    const std::size_t probes_before = SatisfiabilityChecker::n_model_probe_sat;
+    SatisfiabilityChecker refuting;
+    refuting.set_timeout(k_test_black_timeout);
+    refuting.set_spot_budget(std::chrono::milliseconds{1});
+    expect(refuting.check_satisfiability("(G F p) & !(p W q)",
+                                         QueryPolarity::ExpectUnsat) ==
+               std::optional<bool>(true),
+           "model probe: a model refutes the implication");
+    expect(SatisfiabilityChecker::n_model_probe_sat == probes_before + 1,
+           "model probe: the refutation is counted");
+
+    SatisfiabilityChecker holding;
+    holding.set_timeout(k_test_black_timeout);
+    holding.set_spot_budget(std::chrono::milliseconds{1});
+    expect(
+        !holding
+             .check_satisfiability("(G p) & !(F p)", QueryPolarity::ExpectUnsat)
+             .has_value(),
+        "model probe: black's UNSAT does not establish an implication");
+}
+
 }  // namespace
