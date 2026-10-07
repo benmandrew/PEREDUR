@@ -1,0 +1,10 @@
+== out/ws/perm/eqtime.csv
+Sel: Pareto (A) vs scalarised (B)
+  B in A vs ctrl A   n=25  cross 0.742  control 0.792  below 20/25  p 0.0034  p_below 0.0017
+  A in B vs ctrl B   n=25  cross 0.827  control 0.786  below 6/25  p 0.00025  p_below 1
+Grd: MRS (A) vs ladder (B)
+  B in A vs ctrl A   n=21  cross 0.825  control 0.812  below 8/21  p 0.39  p_below 0.81
+  A in B vs ctrl B   n=21  cross 0.807  control 0.823  below 14/21  p 0.035  p_below 0.018
+Aur: PEREDUR (A) vs AuRUS (B)
+  B in A vs ctrl A   n=17  cross 0.910  control 0.849  below 3/16  p 0.013  p_below 0.99
+  A in B vs ctrl B   n=17  cross 0.711  control 0.914  below 15/15  p 6.1e-05  p_below 3.1e-05

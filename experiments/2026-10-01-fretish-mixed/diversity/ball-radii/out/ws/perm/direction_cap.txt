@@ -1,0 +1,14 @@
+== out/ws/perm/cap_merged.csv
+Sel: Pareto (A) vs scalarised (B)
+  B in A vs ctrl A   n=25  cross 0.718  control 0.794  below 25/25  p 6e-08  p_below 3e-08
+  A in B vs ctrl B   n=25  cross 0.823  control 0.784  below 3/25  p 0.00033  p_below 1
+Grd: MRS (A) vs ladder (B)
+  B in A vs ctrl A   n=23  cross 0.836  control 0.804  below 6/23  p 0.042  p_below 0.98
+  A in B vs ctrl B   n=23  cross 0.812  control 0.819  below 17/23  p 0.12  p_below 0.059
+Aur: PEREDUR (A) vs AuRUS (B)
+  B in A vs ctrl A   n=20  cross 0.841  control 0.798  below 6/20  p 0.09  p_below 0.96
+  A in B vs ctrl B   n=20  cross 0.637  control 0.854  below 17/20  p 0.00013  p_below 6.7e-05
+== fretish/out/j3m.csv (xtriple)
+Fret: directed (A) vs uniform (B)
+  B in A vs ctrl A   n=14  cross 0.565  control 0.621  below 10/14  p 0.1  p_below 0.052
+  A in B vs ctrl B   n=15  cross 0.680  control 0.609  below 3/14  p 0.02  p_below 0.99

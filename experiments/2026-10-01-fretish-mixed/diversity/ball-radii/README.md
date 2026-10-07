@@ -46,3 +46,20 @@ At K = 3, matched and cross-seed, directed and uniform overlap by 0.607 against 
 Inputs are the rematch sidecars of `separation-recount-rematch-s0` and the screened AuRUS sidecars in `out/ws/aurus/`. It ran locally on 2026-10-07 in 26 s on 10 workers. The outputs are `out/size20/size20.csv` and `out/size20/report_size20.txt`, reproduced byte for byte by a second run.
 
 Over the 14 families that enter, PEREDUR's region holds 0.836 of AuRUS's repairs and AuRUS's holds 0.629 of PEREDUR's, larger on 11 of 14 (p = 0.0134). The cross figure, 0.732, is below both controls (0.820 and 0.833). The screened headline run (`out/ws/screened.csv`) restricted to the same 14 families gives 0.825 against 0.668, 12 of 14, p = 0.0052, with the cross figure 0.746 against 0.802 and 0.838. The verdict is unchanged. Coverage loses significance at this size (0.627 against 0.573, p = 0.24).
+
+## Each direction against its control
+
+`direction_ctrl.py` tests each containment direction against the control of the side whose region it is measured in: Y in X against X's control, and X in Y against Y's. It reads the per-family rows of `perm_null.py` and, optionally, the FRETISH `fp_prc.py` output, and runs the exact Wilcoxon signed-rank test over families. It replaces the cross figure, the mean of both directions, which reads a nested pair as two separate regions. Runs were local on 2026-10-07.
+
+```sh
+python3 direction_ctrl.py out/ws/perm/cap_merged.csv fretish/out/j3m.csv > out/ws/perm/direction_cap.txt
+python3 direction_ctrl.py out/ws/perm/eqtime.csv > out/ws/perm/direction_eqtime.txt
+```
+
+| File | Run |
+|---|---|
+| `out/ws/perm/cap_merged.csv` | `perm_null.py` at the 2 h cap on the screened AuRUS frontiers, with `humanoid-458` from the 2²⁰-word pass |
+| `out/ws/perm/eqtime.csv` | `perm_null.py` with `CUT=equal` on the screened AuRUS frontiers, 65,536 words |
+| `out/ws/perm/direction_cap.txt`, `out/ws/perm/direction_eqtime.txt` | `direction_ctrl.py` on the two files above |
+
+At the cap, AuRUS's repairs lie inside PEREDUR's spread: AuRUS's region holds 0.637 of PEREDUR's repairs against a control of 0.854 (17 of 20 below, p = 0.00013), while PEREDUR's holds 0.841 of AuRUS's against 0.798. The Pareto arm's repairs lie inside the scalarised arm's spread. Grading and FRETISH show no nesting at the cap. The `scipy` on the run host is older than 1.9, so the script passes `mode="exact"` to `wilcoxon`.
