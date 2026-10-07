@@ -227,14 +227,12 @@ jobs:
           # have already tested, spent to re-measure a number that moves on a
           # minority of commits; and it is the only clang leg main runs, so its
           # third-party cache entry is the one every pull-request branch
-          # inherits (see the cache step below). The cost is that a commit
-          # moving coverage without regenerating docs/coverage.svg now fails on
-          # main rather than on its own pull request -- run
-          # `python scripts/coverage_badge.py` before merging anything that
-          # moves the number. The entry stays inside this matrix rather than
-          # taking a job of its own so the badge check reuses the work: its
-          # build is the instrumented one and its ctest run is what writes the
-          # profiles, leaving the check itself an export and a byte comparison.
+          # inherits (see the cache step below). The badge is regenerated
+          # here and committed back by coverage-badge, so nobody runs the
+          # script by hand before merging. The entry stays inside this matrix
+          # rather than taking a job of its own so the badge reuses the work:
+          # its build is the instrumented one and its ctest run is what writes
+          # the profiles, leaving the badge itself an export and a comparison.
           # Instrumenting the debug preset instead would have cost no CI job at
           # all, and was rejected because that preset is the one everybody
           # builds locally -- it would slow the daily loop and drop a .profraw
@@ -475,15 +473,73 @@ jobs:
             ctest --preset ${{ matrix.preset }}
             echo "::endgroup::"
 
-            # The badge is a committed file, so nothing makes it wrong except a
-            # commit that moves the number and leaves it behind. --no-run reads
-            # the profiles the ctest above wrote rather than measuring again.
+            # --no-run reads the profiles the ctest above wrote rather than
+            # measuring again. The badge is rewritten only when --check fails:
+            # the figure drifts up to two tenths of a point between runs, and
+            # rewriting it every time would flip the rounded number back and
+            # forth across a boundary, one bot commit per flip. --check allows
+            # for that drift; a rewrite does not.
             if [ "${{ matrix.preset }}" = "coverage" ]; then
               echo "::group::Coverage badge"
-              python3 scripts/coverage_badge.py --check --no-run
+              python3 scripts/coverage_badge.py --check --no-run \
+                || python3 scripts/coverage_badge.py --no-run
               echo "::endgroup::"
             fi
           '
+
+      - name: Upload coverage badge
+        if: matrix.preset == 'coverage'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-badge
+          path: docs/coverage.svg
+          retention-days: 1
+
+  # Commits the badge the coverage leg drew, when it differs from the one on
+  # main. A job of its own so that write access to the repository is held by
+  # this checkout-and-push alone, and never by a leg that builds and runs the
+  # tree under test.
+  #
+  # A push made with GITHUB_TOKEN starts no workflow run, so the commit does
+  # not trigger another coverage measurement. It measured the commit that
+  # triggered this run; when main has moved on since, the badge still lands on
+  # the new tip, and that commit's own run corrects it if it moved the number.
+  coverage-badge:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Two pushes in quick succession would otherwise race to push their badges,
+    # and the loser fails on a non-fast-forward.
+    concurrency:
+      group: coverage-badge
+      cancel-in-progress: false
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Download coverage badge
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-badge
+          path: badge
+
+      - name: Commit the badge if it moved
+        run: |
+          cp badge/coverage.svg docs/coverage.svg
+          if git diff --quiet -- docs/coverage.svg; then
+            echo "The badge on main is current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(coverage): update badge for ${GITHUB_SHA::7}" \
+            -- docs/coverage.svg
+          git push origin HEAD:main
 
   # The tests for scripts/, run once on a plain runner. They import the
   # scripts and run no binary, so they need neither the Nix shell nor a

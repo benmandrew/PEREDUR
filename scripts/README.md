@@ -14,7 +14,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
 | `merge_experiments.py` | Joins per-host CSVs on `KEY_FIELDS`, keeping one row per key. Vendored likewise. |
 | `check_config_schema.py` | Lint, wired into CI and the pre-commit hook. Holds `config_io.cpp`, `config-schema.json`, `example-config.toml` and `gen_configs.DEFAULTS` against `include/config.hpp`. |
-| `coverage_badge.py` | Measures coverage and writes `docs/coverage.svg`. `--check` re-measures and fails on drift; CI runs it. |
+| `coverage_badge.py` | Measures coverage and writes `docs/coverage.svg`. `--check` fails on drift; CI rewrites and commits the badge when it does. |
 | `recompare.py` | Re-runs `compare` over repairs already on disk and rewrites the relation columns. The standing pass whenever an ideal changes. |
 | `check_well_separated.py` | Standalone `ltlsynt` well-separation check that bypasses PEREDUR's cached verdict. Also imported as a library by `aurus_validate.py`. |
 | `aurus_campaign.py` | Drives the AuRUS baseline arm of a head-to-head. |

@@ -84,7 +84,7 @@ Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves w
 - Only `///` reaches Doxygen. Wrap text like `<input>` in backticks, or `WARN_AS_ERROR` fails the docs build.
 - A new suite needs its name in the table in `test/main.cpp` and in `peredur_test_suites` in `test/CMakeLists.txt`; a test registered under a suite the table lacks stops the binary, but one missing from the CMake list silently never runs under ctest. A new driver's end-to-end suite registers its tests with `TEST_IN` in `test/drivers/e2e_tests.cpp` and also needs an `add_dependencies` entry.
 - Tests in one suite run in definition order, so reordering a file's `TEST`s reorders the run.
-- A new binary joins `BINARIES` in `scripts/coverage_badge.py`. Run that script before merging a change that moves coverage.
+- A new binary joins `BINARIES` in `scripts/coverage_badge.py`. CI commits the regenerated badge after a push to `main`; never hand-edit `docs/coverage.svg`.
 
 ### Campaigns and provenance
 
