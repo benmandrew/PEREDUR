@@ -3750,11 +3750,23 @@ def stage_checkout(root: Path, entry: dict, log_path: Path):
     wrote would name a commit it did not come from.
     """
     branch, commit = entry["branch"], entry["commit"]
-    build = entry.get("build") or DEFAULT_BUILD_CMD
     if run_step(root, ["git", "fetch", "origin", branch], log_path):
         return f"git fetch origin {branch} failed"
     if run_step(root, ["git", "checkout", "-B", branch, commit], log_path):
         return f"git checkout -B {branch} {commit[:7]} failed"
+    return build_and_verify(root, entry, log_path)
+
+
+def build_and_verify(root: Path, entry: dict, log_path: Path):
+    """Build the checkout and read its binary back. None on success.
+
+    The second half of a staging, and all of one when the checkout is already
+    at the entry's commit: a staging whose checkout landed and whose build then
+    failed leaves HEAD where the entry wants it, so HEAD alone cannot say the
+    binaries were built from it.
+    """
+    commit = entry["commit"]
+    build = entry.get("build") or DEFAULT_BUILD_CMD
     if run_step(root, build, log_path, shell=True):
         return f"the build command failed: {build}"
     binary = root / PEREDUR_BINARY
@@ -3790,6 +3802,21 @@ def ensure_staged(entry: dict, root: Path, args: argparse.Namespace):
     head, _ = git_output(["rev-parse", "HEAD"], root)
     commit = entry.get("commit")
     if branch == entry.get("branch") and (not commit or head == commit):
+        if not commit or args.no_stage or args.dry_run:
+            return None
+        # Rebuilt even here. An earlier staging that checked out this commit
+        # and then failed its build left the previous commit's binaries in
+        # place, and the next tick ran its phase on them: av3 ran
+        # 2026-10-06-pooled-rq2 on e04317d's compare that way. The build is
+        # incremental, so on a host that did build it costs seconds.
+        why = build_and_verify(root, entry, entry_log_path(entry, root))
+        if why:
+            fail_or_requeue(entry, f"rebuilding {branch} at {commit[:7]}: "
+                                   f"{why}")
+            write_entry(entry["path"], entry)
+            print(f"tick: {entry['file']} {entry['state']}: "
+                  f"{entry['last_error']}")
+            return 1
         return None
 
     want = entry.get("branch")
