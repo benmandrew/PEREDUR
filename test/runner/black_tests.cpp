@@ -294,4 +294,45 @@ TEST(test_polarity_does_not_change_the_answer) {
     }
 }
 
+// SPOT cannot finish anything in 1 ms, so these reach the model probe. A
+// model refutes the implication, weak until included once it is rewritten
+// away, while black's UNSAT is never taken: an implication is established by
+// SPOT or not at all.
+// Padded past the length at which SPOT's first look is skipped, so black is
+// asked before SPOT on any machine. Repeating one conjunct keeps the formula
+// as easy as the unpadded one.
+std::string past_first_look(const std::string& formula) {
+    std::string padded = formula;
+    while (padded.size() < 8192) {
+        padded += " & (G F r)";
+    }
+    return padded;
+}
+
+TEST(test_model_probe_refutes_but_never_establishes) {
+    const std::size_t probes_before = SatisfiabilityChecker::n_model_probe_sat;
+    SatisfiabilityChecker refuting;
+    refuting.set_timeout(k_test_black_timeout);
+    refuting.set_model_probe_budget(k_test_black_timeout);
+    expect(refuting.check_satisfiability(past_first_look("(G F p) & !(p W q)"),
+                                         QueryPolarity::ExpectUnsat) ==
+               std::optional<bool>(true),
+           "model probe: a model refutes the implication");
+    expect(SatisfiabilityChecker::n_model_probe_sat == probes_before + 1,
+           "model probe: the refutation is counted");
+
+    // black may well prove this unsatisfiable, and SPOT may or may not
+    // finish inside its budget; either way the probe settles nothing.
+    SatisfiabilityChecker holding;
+    holding.set_timeout(k_test_black_timeout);
+    holding.set_model_probe_budget(k_test_black_timeout);
+    holding.set_spot_budget(std::chrono::milliseconds{1});
+    expect(holding.check_satisfiability(past_first_look("(G p) & !(F p)"),
+                                        QueryPolarity::ExpectUnsat) !=
+               std::optional<bool>(true),
+           "model probe: black's UNSAT does not establish an implication");
+    expect(SatisfiabilityChecker::n_model_probe_sat == probes_before + 1,
+           "model probe: an unsatisfiable query is not counted as refuted");
+}
+
 }  // namespace
