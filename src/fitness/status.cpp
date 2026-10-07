@@ -132,6 +132,17 @@ double status_score_mrs(const std::vector<std::string>& components,
             return k_status_component_unsatisfiable;
         }
     }
+    // The whole guarantee side first. Realizability is monotone in the
+    // guarantees, and well-separation reads only the assumptions, so a whole
+    // that passes keeps every part whatever the order, and the walk would
+    // spend n_parts queries confirming it. A whole that fails costs one query
+    // the walk would not have asked.
+    std::vector<std::size_t> kept(n_parts);
+    std::iota(kept.begin(), kept.end(), 0);
+    if (subset_realizable(kept)) {
+        return k_status_realizable;
+    }
+    kept.clear();
     // Grown once and reused across the walk; the oracle reads it and does not
     // retain it. A rejected part is erased, so `kept` is exactly the accepted
     // set at every step -- which is what makes the queries recur across
@@ -141,8 +152,6 @@ double status_score_mrs(const std::vector<std::string>& components,
     // lowers to one formula string whatever order reached it. Under index order
     // the two coincide, which is why the walk could push and pop while that was
     // the only order it ran.
-    std::vector<std::size_t> kept;
-    kept.reserve(n_parts);
     for (const std::size_t part :
          project_admission_order(admission_order, n_parts)) {
         const auto slot = std::lower_bound(kept.begin(), kept.end(), part);
