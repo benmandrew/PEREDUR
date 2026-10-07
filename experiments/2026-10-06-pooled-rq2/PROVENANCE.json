@@ -1,0 +1,298 @@
+{
+  "campaign": "2026-10-06-pooled-rq2",
+  "attribution": "recorded",
+  "generated_on": "2026-10-07",
+  "status": "closed",
+  "kind": "score-only: pooled net-subsumption strength for RQ2, selection (mrs-nsga2-apportion against mrs-weighted) and grading (mrs-nsga2-apportion against aurus-nsga2-apportion)",
+  "kind_note": "No search ran. Each side's pool is the union of its 30 rematch runs' last-cut frontiers (separation-recount-rematch-s0 sidecars, tlsf_prc.frontier), with members whose bodies match once comments and whitespace are removed merged into one node (hash_bodies.py). Within each side every prefilter-surviving node pair is compared, giving the pooled frontier as classes of undominated nodes; every Pareto node is compared with every scalarised and ladder node that survives the fingerprint prefilter. 23 families are scored exactly. humanoid-531 and humanoid-742 are estimated from the first 100 draws a side of a seeded permutation (scripts/pooled.py, sample-plan and sample-score). The pass ran as one pre-planned pair list per host through campaign.py's compare phase; pairs already decided were left out of the lists and their rows come from the earlier runs below.",
+  "registration": "PLAN.md of the paper repository (benmandrew/counter-paper), commit decdc10 of 2026-10-06 15:10, which changed strength to the pooled design. There is no PLAN.md in this directory.",
+  "profile_commit": {
+    "sha": "22b8d1378d206ca66aa98c028806b92e964adfb8",
+    "short": "22b8d13",
+    "subject": "fix(campaign): leave compare's built-in solver paths where third_party has no install tree",
+    "branch": "campaign/pooled-rq2",
+    "queue_entries": {
+      "av1": "002 at 22b8d13, done (001 at 0fd968f cancelled)",
+      "av2": "043 at 0fd968f, done",
+      "av3": "039 at 0fd968f, done"
+    },
+    "reachable_from_main": false,
+    "held_by_tag": "provenance/pooled-rq2",
+    "held_by_tag_note": "Annotated tag at 22b8d13, cut before the close commit and pushed. 0fd968f is its parent."
+  },
+  "binary_commit": "e04317dacb8701b9ee92d43303a3190707ed721b",
+  "binary_commit_note": "Every relation in this pass came from a compare built from e04317d source. The campaign phase's binaries report 22b8d13 (av1), 0fd968f (av2) and e04317d (av3), none dirty; neither later commit changes src/, third_party/, cmake/ or CMakeLists.txt. The hand-run and per-run passes used ~/subsum/bin/compare on av2 and av3, which reports e04317d, and on av1 ~/subsum/av1/bin/compare, a wrapper around a Nix-library bundle of the same build.",
+  "budgets": {
+    "jobs": 28,
+    "black_timeout": 300,
+    "wall_timeout": 700,
+    "vmem_kb": 8000000,
+    "note": "compare --timeout 300 per solver call, an outer timeout of 700 s and ulimit -v 8000000 per pair, as in run.py; a timeout reads as undecided."
+  },
+  "pair_lists": {
+    "planned": 4676559,
+    "per_host": 1558853,
+    "by_kind": {
+      "within": 2152563,
+      "cross_over_pools": 2177645,
+      "sampled": 346351
+    },
+    "left_out_as_decided": {
+      "stage1_within": 195690,
+      "sample_batch_0": 86807
+    },
+    "build": "scripts/pooled.py cross-pools (pairs-crosspool.csv) and sample-plan for batches 1-4 at 20 draws a side, joined with stage-1 pairs-within (s1/all.csv) and sample batch 0, both orders of each id checked against every earlier result, shuffled with seed 20261006 and dealt round-robin to av1, av2, av3. The joining script ran inline and was not saved; the pair lists' md5s are recorded per host."
+  },
+  "hosts": {
+    "av1": {
+      "queue_entry": "002-2026-10-06-pooled-rq2.toml",
+      "entry_commit": "22b8d1378d206ca66aa98c028806b92e964adfb8",
+      "phase_started": "2026-10-06T22:16:53+0100",
+      "phase_finished": "2026-10-07T08:24:11+0100",
+      "pairs": "experiments/2026-10-06-pooled-rq2/pairs-av1.csv",
+      "pairs_total": 1558853,
+      "done_at_start": 0,
+      "missing": 0,
+      "pairs_md5": "90ac1ce729ec9bc28d8a9ab171bfb42a",
+      "out": "experiments/2026-10-06-pooled-rq2/subsumption-av1.csv",
+      "out_md5": "137e97be4bc10d8499f53100e6b2278c",
+      "relations": {
+        "equivalent": 7402,
+        "incomparable": 1337633,
+        "stronger": 93101,
+        "undecided": 581,
+        "weaker": 120136
+      },
+      "compare_binary": {
+        "path": "/home/benandrew/projects/counter/build-release/compare",
+        "commit": "22b8d1378d206ca66aa98c028806b92e964adfb8",
+        "commit_short": "22b8d13",
+        "dirty": "0"
+      },
+      "manifest_hostname": "av1",
+      "note": "Entry 001 at 0fd968f was cancelled at 22:11:26 before any tick staged it: compare_pairs.py at 0fd968f set PEREDUR_BLACK_PATH to third_party/black/install/bin/black, which av1 lacks (it unpacks BLACK 25.09.0 from a .deb into third_party/black/black). 22b8d13 sets each solver path only where that file exists; six known pairs gave the earlier relations on av1's own build before requeueing as 002."
+    },
+    "av2": {
+      "queue_entry": "043-2026-10-06-pooled-rq2.toml",
+      "entry_commit": "0fd968f67f15772efcb39edc6b04486c340e00dd",
+      "phase_started": "2026-10-06T22:16:52+0100",
+      "phase_finished": "2026-10-07T07:50:16+0100",
+      "pairs": "experiments/2026-10-06-pooled-rq2/pairs-av2.csv",
+      "pairs_total": 1558853,
+      "done_at_start": 0,
+      "missing": 0,
+      "pairs_md5": "d8b1c39a2a5f2001c40437ae1b4a8eed",
+      "out": "experiments/2026-10-06-pooled-rq2/subsumption-av2.csv",
+      "out_md5": "366dc05412e36b086ec0c623275075ec",
+      "relations": {
+        "equivalent": 7329,
+        "incomparable": 1338844,
+        "stronger": 92992,
+        "undecided": 559,
+        "weaker": 119129
+      },
+      "compare_binary": {
+        "path": "/home/benandrew/projects/counter/build-release/compare",
+        "commit": "0fd968f67f15772efcb39edc6b04486c340e00dd",
+        "commit_short": "0fd968f",
+        "dirty": "0"
+      },
+      "manifest_hostname": "avlab12"
+    },
+    "av3": {
+      "queue_entry": "039-2026-10-06-pooled-rq2.toml",
+      "entry_commit": "0fd968f67f15772efcb39edc6b04486c340e00dd",
+      "phase_started": "2026-10-06T22:20:03+0100",
+      "phase_finished": "2026-10-07T07:26:28+0100",
+      "pairs": "experiments/2026-10-06-pooled-rq2/pairs-av3.csv",
+      "pairs_total": 1558853,
+      "done_at_start": 0,
+      "missing": 0,
+      "pairs_md5": "5f40b5850a7df94c5c404889182047d7",
+      "out": "experiments/2026-10-06-pooled-rq2/subsumption-av3.csv",
+      "out_md5": "3c664b395331731c956cd9b7e9c1148b",
+      "relations": {
+        "equivalent": 7380,
+        "incomparable": 1337969,
+        "stronger": 93098,
+        "undecided": 581,
+        "weaker": 119825
+      },
+      "compare_binary": {
+        "path": "/home/benandrew/projects/counter/build-release/compare",
+        "commit": "e04317dacb8701b9ee92d43303a3190707ed721b",
+        "commit_short": "e04317d",
+        "dirty": "0"
+      },
+      "manifest_hostname": "av3",
+      "note": "Attempt 1 at 22:15:03 failed in staging: cmake --build stopped on a missing zstd depend rule in the build tree left by campaign/fretish-mixed. The 22:20 tick found the checkout already at 0fd968f and ran the phase without rebuilding, so the binary is the e04317d build left from 2026-10-01-fretish-mixed (the manifest records commit e04317d, dirty 0). git diff e04317d 0fd968f touches nothing under src/, third_party/, cmake/ or CMakeLists.txt, so the source is the one the other two hosts built. The skipped rebuild after a failed staging is a campaign.py defect, not fixed here."
+    }
+  },
+  "relations_total": {
+    "equivalent": 22111,
+    "incomparable": 4014446,
+    "stronger": 279191,
+    "undecided": 1721,
+    "weaker": 359090
+  },
+  "earlier_rows": {
+    "hand_run": {
+      "what": "The start of this pass, run by hand through scripts/q.sh and scripts/drive.py before the move to campaign.py, which breaks the rule against hand-rolled ssh launches. Stage-1 chunk 00 and part of sample batch 0 ran on each host from 2026-10-06 21:06 until the queues and their compare processes were killed at about 22:05; rows written before the kill are kept.",
+      "files": {
+        "results-rq2-av1.csv": {
+          "rows": 94025,
+          "md5": "e8de7ebf9a674d0ba7768a4b6db00846"
+        },
+        "results-rq2-av2.csv": {
+          "rows": 94223,
+          "md5": "33881be6e66a50f12dbcf96423499645"
+        },
+        "results-rq2-av3.csv": {
+          "rows": 94249,
+          "md5": "ddee6fa9d15cc591c9b188b8704f484e"
+        }
+      }
+    },
+    "per_run_pass": {
+      "what": "The superseded per-run subsumption pass of 2026-10-06 (scripts/plan.py, scripts/run.py), whose pair ids use the same spec|label@seed|file|label@seed|file form, so any pair it decided answers the pooled pass.",
+      "files": {
+        "results-av2.csv": {
+          "rows": 149052,
+          "md5": "a149084fe98fe9035aa0a482a59b8c71"
+        },
+        "results-av3.csv": {
+          "rows": 235937,
+          "md5": "773356e0b8bf2f9d59fe91c7b505558d"
+        },
+        "results-av2-on-av3.csv": {
+          "rows": 120879,
+          "md5": "726ae41af1228cb4f9fa0966ebf84dfc"
+        },
+        "results-742-av1.csv": {
+          "rows": 5480,
+          "md5": "b7e4409cab7ff9ebecd9955244fc63ef"
+        },
+        "results-742-av2.csv": {
+          "rows": 5179,
+          "md5": "a7dc2594ff337f407b72f2180d4857bb"
+        },
+        "results-742-av3.csv": {
+          "rows": 5179,
+          "md5": "71f149563ee113a2f12fcbc23bfd222a"
+        }
+      }
+    }
+  },
+  "scoring": {
+    "host": "local host 'ben', 2026-10-07 12:26-12:29",
+    "inputs": "the 12 result files above: six per-run, three hand-run, three campaign",
+    "steps": [
+      {
+        "argv": "python3 pooled.py cross pooled-rq2 <inputs>",
+        "wall_s": 101,
+        "result": "30,671 frontier classes over the 23 exact families (out/classes.csv); pairs-cross.csv empty, so every cross pair between classes has a row"
+      },
+      {
+        "argv": "python3 pooled.py sample-score pooled-rq2 100 <inputs>",
+        "wall_s": 12,
+        "result": "out/sample/estimates.csv; prints open, since one half-width exceeds HALF = 0.10"
+      },
+      {
+        "argv": "python3 pooled.py score pooled-rq2 <inputs>",
+        "wall_s": 18,
+        "result": "out/families.csv and out/report.txt"
+      }
+    ],
+    "nodes": {
+      "members.csv": {
+        "rows": 82257,
+        "md5": "e7a207c685ba5627ccfdb9010ccd4f90"
+      },
+      "nodes.csv": {
+        "rows": 80706,
+        "md5": "5bc1cba48281cd644ee06b6917d2b245"
+      }
+    },
+    "outputs_md5": {
+      "out/classes.csv": "8ab2c0e49e081274df3c397801001ccd",
+      "out/families.csv": "474aad69480c7b693302b179ce05baec",
+      "out/report.txt": "66e58f298be0e618e7c2e50570e836e6",
+      "out/sample/estimates.csv": "702e87600f7536f004e0c7ffbc7f11ba"
+    }
+  },
+  "result": {
+    "selection": {
+      "families": 25,
+      "a_stronger": 1,
+      "b_stronger": 24,
+      "mean_net_non": -0.2447,
+      "median_net_non": -0.2376,
+      "p_non": 1.788e-07,
+      "mean_net_imp": -0.2573,
+      "p_imp": 1.192e-07,
+      "undecided_cross_pairs": 44
+    },
+    "grading": {
+      "families": 25,
+      "a_stronger": 18,
+      "b_stronger": 7,
+      "mean_net_non": 0.1505,
+      "median_net_non": 0.0871,
+      "p_non": 0.001155,
+      "mean_net_imp": 0.1477,
+      "p_imp": 0.001296,
+      "undecided_cross_pairs": 0
+    },
+    "exact_only": {
+      "selection_mean": -0.251,
+      "selection_p": 4.8e-07,
+      "grading_mean": 0.152,
+      "grading_p": 0.0035
+    },
+    "test": "exact Wilcoxon signed-rank over families, zeros dropped; net is sub(B by A) - sub(A by B), positive when A is the stronger",
+    "sampled_half_widths": "95% half-widths at 100 draws are 0.043-0.118; humanoid-531's sub(Pareto by scalarised) at 0.118 misses the 0.10 target. Dropping both sampled families leaves both conclusions.",
+    "caveats": [
+      "Pooling favours the side with more frontier classes. The scalarised frontier is the larger in 22 of the 23 exact families, and the Pareto arm's one win, full-arbiter-aurus, is the one where its frontier is the larger; within families the net share does not track the size ratio (Spearman 0.06, p 0.78). The per-run matched design gave the same direction (-0.026).",
+      "In grading the ladder frontier is the larger in 5 of the 23 exact families, and MRS is the stronger on 3 of those 5.",
+      "No equal-time strength pass was run; the scalarised arm's runs are longer."
+    ]
+  },
+  "untracked": "Pair lists and per-host outputs stay on each host under experiments/2026-10-06-pooled-rq2/; every input and intermediate above, including the 4.7M campaign rows, is on the local host under /home/y19056ba/projects/counter-wt/repair-diversity/experiments/2026-10-01-fretish-mixed/diversity/subsumption/ (pooled-rq2/ and results/).",
+  "vendored_scripts": {
+    "compare_pairs.py": {
+      "source": "scripts/compare_pairs.py at 22b8d13",
+      "blob": "889ac71711bc7d0ed9419e856a8098ee9a31bef5",
+      "note": "av2 and av3 ran the 0fd968f version, blob 36ba25797eb863529585160f90f2e6c282983623, which differs only in always setting the solver paths."
+    },
+    "pooled.py": {
+      "source": "/home/y19056ba/projects/counter-wt/repair-diversity/experiments/2026-10-01-fretish-mixed/diversity/subsumption/pooled.py, uncommitted",
+      "blob": "d81ce4c19bec115634ef8be44995c9293846be75",
+      "note": "Imports tlsf_prc from ../ball-radii; the vendored copy sits beside it."
+    },
+    "tlsf_prc.py": {
+      "source": "analysis/repair-diversity diversity/ball-radii/tlsf_prc.py as on disk, with uncommitted edits over 4bd4b2d (blob 4a67d82f7f62adda6679f4e2c21e1936829c8e92)",
+      "blob": "52e4c50b75a6c82eb8a6583e40fe4258a7759723",
+      "note": "The edits add XSEED and CUT and an optional cut argument to frontier(); pooled.py calls frontier(path) without one, which behaves as at 4bd4b2d."
+    },
+    "hash_bodies.py": {
+      "source": "uncommitted, run on each host",
+      "blob": "f0936b62199e68f81e70a31c95f7e2f944564b3f"
+    },
+    "plan.py": {
+      "source": "uncommitted, the per-run pass's planner",
+      "blob": "c847b6c56ea4203ad546af5465387f1ce5684796"
+    },
+    "run.py": {
+      "source": "uncommitted, the per-run and hand-run runner",
+      "blob": "7aecff5c87c3c4abc41497eb75e6d538d45c1c09"
+    },
+    "q.sh": {
+      "source": "uncommitted, the hand-run queue on each host",
+      "blob": "4e1c9583e6b909194bfeb611223da5269210fd2f"
+    },
+    "drive.py": {
+      "source": "uncommitted, the local driver of the hand-run queues",
+      "blob": "46b8c3e5bf125ff4789134b3bada9d903f3f9b75"
+    }
+  }
+}

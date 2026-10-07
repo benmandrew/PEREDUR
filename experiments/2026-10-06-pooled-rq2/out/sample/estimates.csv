@@ -1,0 +1,5 @@
+comp,spec,draws,frontier_draws,subA_non,subA_non_hw,subB_non,subB_non_hw,net_non,subA_imp,subA_imp_hw,subB_imp,subB_imp_hw,net_imp,undecided
+selection,humanoid-531,100,65,0.3627,0.1177,0.042,0.0467,-0.3207,0.5337,0.1223,0.042,0.0467,-0.4917,46
+grading,humanoid-531,100,65,0.0777,0.0657,0.232,0.107,0.1543,0.1606,0.0894,0.232,0.107,0.0714,46
+selection,humanoid-742,100,70,0.0714,0.0606,0.0382,0.0426,-0.0332,0.3,0.1079,0.1529,0.08,-0.1471,238
+grading,humanoid-742,100,70,0.0429,0.0477,0.1538,0.084,0.111,0.1286,0.0788,0.2517,0.1011,0.1232,237

@@ -1,0 +1,12 @@
+  selection humanoid-531: sampled, net non -0.3207 imp -0.4917
+  selection humanoid-742: sampled, net non -0.0332 imp -0.1471
+== selection: A = mrs-nsga2-apportion, B = mrs-weighted
+  [non] families 25: A stronger on 1, B on 24, tie 0; median net -0.2376, mean -0.2447; exact Wilcoxon p 1.788e-07
+  [imp] families 25: A stronger on 1, B on 24, tie 0; median net -0.2376, mean -0.2573; exact Wilcoxon p 1.192e-07
+  undecided cross pairs 44
+  grading humanoid-531: sampled, net non +0.1543 imp +0.0714
+  grading humanoid-742: sampled, net non +0.1110 imp +0.1232
+== grading: A = mrs-nsga2-apportion, B = aurus-nsga2-apportion
+  [non] families 25: A stronger on 18, B on 7, tie 0; median net +0.0871, mean +0.1505; exact Wilcoxon p 0.001155
+  [imp] families 25: A stronger on 18, B on 7, tie 0; median net +0.0714, mean +0.1477; exact Wilcoxon p 0.001296
+  undecided cross pairs 0
