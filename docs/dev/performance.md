@@ -44,6 +44,12 @@ There is no config key, because scheduling changes no output and draws nothing f
 
 The implication filter already runs saturated, so the reachable target is the ~34% of wall spent in score stages. `make_predicate_filter`, the final gate and the implication filter accept a launch order, but none passes one yet.
 
+## Per-generation gate
+
+Under `accumulate_repairs` the output gate grades every member of every generation. Its status call, `gate_status`, used to walk the guarantee parts in index order, while the scoring walk under `mrs_admission_order = degree` admits them by conflict degree. The two walks ask `ltlsynt` about different subsets, so the gate missed `RealizabilityChecker`'s memo on most of its queries. Profiled under a `gate/verdicts` scope at 300 individuals, the gate took 98 s of a 299 s weighted-mrs run on `full-arbiter-aurus` and 106 s of 348 s on `humanoid-503`.
+
+The gate now takes the run's status objective (`status_objective_of`) and grades with it, so the walk replays the one scoring already memoised. Realizability is monotone in the guarantees, so both walks reach the top tier exactly when the whole guarantee side is realizable; the verdicts differ only where a query times out in one walk and not the other. Over 11 paired runs on six families (seed 0, 300 individuals, both arms of the paper's design), every `repair_N.json`, accumulated repair and maximal set came out byte-identical. Wall time fell from 297 s to 238 s on `full-arbiter-aurus`, 350 s to 269 s on `humanoid-503` and 112 s to 87 s on `prioritized-arbiter-aurus`, all weighted-mrs; the nsga2-aurus arm and the small families moved under 2%. The TLSF final gate, `realizable_survivors`, grades with the same objective. The FRETISH final gate, `collect_realizable_specifications`, has no fitness function in reach and still makes its own call.
+
 ## Implication prefilter
 
 The implication filter already runs saturated, so it gets cheaper only by asking the solver fewer pairs. `fingerprint::prefilter` (`src/fingerprint/prefilter.hpp`) evaluates each lowered formula on 256 *lasso words* (ultimately periodic, at most five positions) and packs the results into a bitset. A word that A accepts and B rejects refutes `A -> B`, so `refutes_implication` compares two machine words. On a 421-candidate `round-robin-arbiter-aurus` set it refuted 95.9% of ordered pairs; the FRETISH rate is unmeasured.

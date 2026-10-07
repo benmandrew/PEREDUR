@@ -20,7 +20,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include "config.hpp"
+#include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/output_gate.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
 #include "serialisation.hpp"
@@ -316,6 +319,39 @@ TEST(test_the_tlsf_serialiser_round_trips) {
         "accumulator: the TLSF writer names its file the same way");
     expect(tlsf::parse(read_text(paths[0])) == spec,
            "accumulator: a TLSF file parses back to the specification written");
+}
+
+// The gate is handed the run's status objective so that, under MRS grading,
+// it replays the walk scoring already memoised. Whatever that objective says
+// is what the gate reads.
+TEST(test_gate_reads_the_status_objective_it_is_given) {
+    const tlsf::Specification spec = tlsf::parse(
+        "INFO { SEMANTICS: Mealy; }\n"
+        "MAIN {\n"
+        "  INPUTS { r0; }\n"
+        "  OUTPUTS { g0; }\n"
+        "  GUARANTEE { G (g0 <-> r0); }\n"
+        "}\n");
+    Config cfg;
+    cfg.status_grading = StatusGrading::Mrs;
+    expect(passes_output_gate(spec, cfg),
+           "gate: a realizable specification passes on its own status call");
+    const FitnessFunctionT<tlsf::Specification> below_top =
+        [](const tlsf::Specification&) { return 0.5; };
+    expect(!passes_output_gate(spec, cfg, below_top),
+           "gate: a status objective below the top tier fails the gate");
+
+    const AggregateWeightedFitnessFunctionT<tlsf::Specification> with_status(
+        {{[](const tlsf::Specification&) { return 0.25; }, 1.0, "syntactic"},
+         {[](const tlsf::Specification&) { return 1.0; }, 1.0, "status"}});
+    const FitnessFunctionT<tlsf::Specification> found =
+        status_objective_of(with_status);
+    expect(found && found(spec) == 1.0,
+           "gate: the objective named status is the one found");
+    const AggregateWeightedFitnessFunctionT<tlsf::Specification> without(
+        {{[](const tlsf::Specification&) { return 0.25; }, 1.0, "syntactic"}});
+    expect(!status_objective_of(without),
+           "gate: a run that weights no status hands the gate nothing");
 }
 
 }  // namespace

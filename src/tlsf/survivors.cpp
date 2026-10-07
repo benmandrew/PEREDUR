@@ -79,7 +79,8 @@ std::vector<Scored<Specification>> realizable_survivors(
     const AggregateWeightedFitnessFunctionT<Specification>& fitness) {
     // Compacted in population order, so the output matches a serial sweep
     // exactly whatever order the concurrent queries answered in.
-    const std::vector<char> keep = gate_verdicts(population, cfg);
+    const std::vector<char> keep =
+        gate_verdicts(population, cfg, status_objective_of(fitness));
     std::vector<Scored<Specification>> survivors;
     for (std::size_t idx = 0; idx < population.size(); ++idx) {
         if (keep[idx] == 0) {

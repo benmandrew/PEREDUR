@@ -123,6 +123,7 @@ std::vector<Scored<Specification>> evolve_population(
     filter_stats_out = empty_filter_stats(per_gen_filters);
 
     GenerationStatus status(cfg.generations, accumulator_out.enabled());
+    const auto gate_status = status_objective_of(fitness);
 
     for (std::size_t gen = 0; gen < cfg.generations; ++gen) {
         // Before the generation as well as between offspring, matching
@@ -156,7 +157,7 @@ std::vector<Scored<Specification>> evolve_population(
         fold_filter_stats(per_gen_filters, filter_stats_out);
         const FitnessSummary summary = summarise_fitness(population);
         const std::optional<std::size_t> n_real = accumulate_gate_passing(
-            population, cfg, dashboard_gen, accumulator_out);
+            population, cfg, dashboard_gen, accumulator_out, gate_status);
         const double elapsed = status.commit(
             population.empty() ? std::nullopt
                                : std::optional<double>(summary.best),
