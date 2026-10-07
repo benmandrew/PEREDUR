@@ -1,0 +1,24 @@
+name = "2026-10-07-tlsf-rerun"
+branch = "campaign/tlsf-rerun"
+profile = "tlsf-rerun"
+description = "2026-09-14-paper-rerun's TLSF search, unchanged in design, at a binary carrying every engine change since 57fcefb (#206, #210 and #211 among them), to regenerate the paper's TLSF data. Search only: the scoring passes are declared separately, on the scorer branch. PLAN.md gives the downstream passes."
+
+# Weighted towards the hosts that free up first: av1 finishes another
+# campaign's curve pass about 6.5 h after av2 and av3, then runs the
+# calibration. All four arms of a seed run on one host, so a host difference
+# cancels inside every (family, seed) cell.
+hosts = { av2 = "0-11", av3 = "12-22", av1 = "23-29" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# The paper-rerun line, with a fresh config tree pinned at this commit.
+configs = "python3 scripts/gen_configs.py --tlsf --schemes nsga2-apportion weighted --sweeps G --levels mrs,aurus --metric log --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 1 --out-dir experiments/configs-tlsf-rerun --pin-vintage"
+
+# 550.9 core-hours at 57fcefb (17.6-18.2 h on two hosts at 16 jobs), about
+# 18.4 core-hours a seed. #211 cut a humanoid-742 search run from 2510 s to
+# 1860 s, and #206 adds a whole-spec screen under MRS, so the old figure is an
+# estimate rather than a bound.
+[[phases]]
+name = "search"
+profile = "tlsf-rerun"
+jobs = 16

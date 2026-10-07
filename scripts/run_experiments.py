@@ -1819,7 +1819,46 @@ PROFILES: dict[str, dict] = {
         # per-call RAM ceiling that pins the TLSF profiles to 1 does not bind.
         "default_jobs": 4,
     },
-
+    # The paper's TLSF search (2026-09-14-paper-rerun's design) again at a
+    # binary carrying every engine change since 57fcefb, #210 and #211 among
+    # them, in fresh directories so that no host resumes against the archived
+    # rows. The calibration profile is seed 0 on the rematch-calib families
+    # and keeps its own CSV, since the main campaign also runs seed 0.
+    "tlsf-rerun": {
+        "schemes": ["nsga2-apportion", "weighted"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["G"],
+        "levels": {"G": ["mrs", "aurus"]},
+        "specs": H2H_TLSF_READY,
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in H2H_TLSF_READY},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-tlsf-rerun",
+        "results_dir": EXPERIMENTS_DIR / "results-tlsf-rerun",
+        "results_csv": EXPERIMENTS_DIR / "results-tlsf-rerun.csv",
+        "default_jobs": 16,
+    },
+    "tlsf-rerun-calib": {
+        "schemes": ["nsga2-apportion", "weighted"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["G"],
+        "levels": {"G": ["mrs", "aurus"]},
+        "specs": ["humanoid-742", "humanoid-531", "pcar-v2-888",
+                  "full-arbiter-aurus", "minepump", "rg2"],
+        "seeds": [0],
+        "timeout_caps": {s: 7200 for s in H2H_TLSF_READY},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-tlsf-rerun",
+        "results_dir": EXPERIMENTS_DIR / "results-tlsf-rerun-calib",
+        "results_csv": EXPERIMENTS_DIR / "results-tlsf-rerun-calib.csv",
+        "default_jobs": 16,
+    },
 }
 
 

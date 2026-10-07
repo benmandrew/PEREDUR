@@ -149,6 +149,8 @@ PROFILE_CSVS: dict[str, str] = {
     # corpus and the path all differ, and neither the corpus nor the path is in
     # the key.
     "gradsel-fret": "results-gradsel-fret-m.csv",
+    "tlsf-rerun": "results-tlsf-rerun.csv",
+    "tlsf-rerun-calib": "results-tlsf-rerun-calib.csv",
 }
 
 # Per-run output directory each profile writes under experiments/. Most profiles
@@ -198,6 +200,8 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
     "rematch": "results-rematch",
     "rematch-calib": "results-rematch-calib",
     "gradsel-fret": "results-gradsel-fret-m",
+    "tlsf-rerun": "results-tlsf-rerun",
+    "tlsf-rerun-calib": "results-tlsf-rerun-calib",
 }
 
 # Natural key of a results row: one run per (sweep, level_name, selection,

@@ -1,0 +1,16 @@
+name = "2026-10-07-tlsf-rerun-calib"
+branch = "campaign/tlsf-rerun"
+profile = "tlsf-rerun-calib"
+description = "Seed 0 of 2026-10-07-tlsf-rerun on the six rematch-calib families, on av1 alone, so that av1's gcc 13 build can be checked against av2's seed-0 runs of the main campaign for identical output and comparable wall time."
+
+hosts = { av1 = "0" }
+
+build = "sh -c 'cmake --build build-release'"
+
+configs = "python3 scripts/gen_configs.py --tlsf --schemes nsga2-apportion weighted --sweeps G --levels mrs,aurus --metric log --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 1 --out-dir experiments/configs-tlsf-rerun --pin-vintage"
+
+# 24 runs; humanoid-742 and humanoid-531 bound it at up to 2 h.
+[[phases]]
+name = "calib"
+profile = "tlsf-rerun-calib"
+jobs = 16
