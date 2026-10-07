@@ -17,12 +17,28 @@ runs (X and Y at both seeds) hold more than K members, and the two cross pairs
 and both controls are all subsampled to the smallest of the four. A ball's
 radius shrinks as its frontier grows, so unmatched controls and cross pairs
 are measured with different rulers.
+
+Two further switches act on the matched mode only. XSEED=1 pairs X at 2j with
+Y at 2j+1 and X at 2j+1 with Y at 2j, so no cross pair shares a seed: two
+PEREDUR configurations at one seed share an RNG stream, which the controls,
+pairing 2j with 2j+1, never do. CUT=equal reads all four frontiers of a block
+at the latest cut no later than the earliest of the four runs' last cuts, so
+neither side is credited with search time the other did not have; CUT=<s>
+reads them at a fixed elapsed time instead.
+
+SIZE=<n> also acts on the matched mode only: every frontier of a block is
+subsampled to exactly n members, and a block whose smallest frontier holds
+fewer than n is skipped. It fixes the set size across families, for the size
+sweep that Raisa et al. (2025) recommend.
 """
 import collections, csv, glob, os, re, sys
 import numpy as np
 
 K = int(os.environ.get("K", "3"))
 MATCH = os.environ.get("MATCH") == "1"
+XSEED = os.environ.get("XSEED") == "1"
+CUT = os.environ.get("CUT")
+SIZE = int(os.environ.get("SIZE", "0"))
 COMPARISONS = [("mrs-nsga2-apportion", "aurus"),          # RQ3: shipped vs AuRUS
                ("mrs-nsga2-apportion", "aurus-nsga2-apportion"),  # grading
                ("mrs-nsga2-apportion", "mrs-weighted"),    # selection
@@ -31,8 +47,10 @@ POP = np.array([bin(i).count("1") for i in range(256)], dtype=np.uint16)
 NAME = re.compile(r"^(?:aurus_(.+)|sweep_G_(aurus|mrs)_(nsga2-apportion|weighted)_wkoff_log_(.+))_seed(\d+)\.members\.tsv$")
 
 
-def frontier(path):
+def frontier(path, t=None):
     rows = [l.rstrip("\n").split("\t") for l in list(open(path))[1:] if "\t" in l]
+    if t is not None:
+        rows = [(c, f) for c, f in rows if float(c) <= t]
     if not rows:
         return []
     last = max(float(c) for c, _ in rows)
@@ -92,13 +110,17 @@ def main():
                 "cov_x_by_y", "cov_y_by_x"])
     cache = {}
 
-    def prints(key):
-        if key not in cache:
+    def last_cut(key):
+        cuts = [float(l.split("\t", 1)[0]) for l in list(open(runs[key]))[1:] if "\t" in l]
+        return max(cuts) if cuts else 0.0
+
+    def prints(key, t=None):
+        if (key, t) not in cache:
             p = runs[key]
-            names = frontier(p)
+            names = frontier(p, t)
             fp = load_prints(p.replace(".members.tsv", ".fingerprints.tsv"), names)
-            cache[key] = np.stack([fp[n] for n in names if n in fp]) if fp else np.zeros((0, 1), np.uint8)
-        return cache[key]
+            cache[(key, t)] = np.stack([fp[n] for n in names if n in fp]) if fp else np.zeros((0, 1), np.uint8)
+        return cache[(key, t)]
 
     specs = sorted({k[1] for k in runs})
     for spec in specs:
@@ -110,14 +132,22 @@ def main():
                     keys = [(lab, spec, s) for lab in (x, y) for s in (seed, seed + 1)]
                     if not all(k in runs for k in keys):
                         continue
-                    fx0, fx1, fy0, fy1 = (prints(k) for k in keys)
+                    t = None
+                    if CUT == "equal":
+                        t = min(last_cut(k) for k in keys)
+                    elif CUT:
+                        t = float(CUT)
+                    fx0, fx1, fy0, fy1 = (prints(k, t) for k in keys)
                     if len({f.shape[1] for f in (fx0, fx1, fy0, fy1)}) != 1:
                         continue
                     m = min(len(f) for f in (fx0, fx1, fy0, fy1))
+                    if SIZE:
+                        m = SIZE if m >= SIZE else 0
                     if m <= K:
                         continue
-                    w.writerow([comp, "cross", spec, seed] + pair(fx0, fy0, rng, m))
-                    w.writerow([comp, "cross", spec, seed + 1] + pair(fx1, fy1, rng, m))
+                    c0, c1 = (fy1, fy0) if XSEED else (fy0, fy1)
+                    w.writerow([comp, "cross", spec, seed] + pair(fx0, c0, rng, m))
+                    w.writerow([comp, "cross", spec, seed + 1] + pair(fx1, c1, rng, m))
                     w.writerow([comp, "ctrl_x", spec, seed] + pair(fx0, fx1, rng, m))
                     w.writerow([comp, "ctrl_y", spec, seed] + pair(fy0, fy1, rng, m))
                 continue
