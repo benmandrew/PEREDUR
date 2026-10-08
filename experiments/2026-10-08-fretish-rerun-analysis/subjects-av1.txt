@@ -1,0 +1,2 @@
+lpc-mini-core1
+rad-core-10

@@ -1,0 +1,37 @@
+name = "2026-10-08-fretish-rerun-analysis"
+branch = "campaign/fretish-rerun-analysis"
+description = "Steps 4 and 5 of the 2026-10-06-fretish-rerun PLAN: pooled directed-against-uniform strength and FRETISH ball radii on the rerun's frontiers. Per host, a fingerprint phase draws black lasso words over the committed pooled members, fingerprints every node and plans the word-pruned pairs; a compare phase decides them. The reductions run locally after collect (PLAN.md)."
+
+# Not seed-split: each host takes whole subjects (subjects-<host>.txt), split
+# by estimated compare cost. See PLAN.md for the basis.
+hosts = { av1 = "", av2 = "", av3 = "" }
+
+# fpdraw is EXCLUDE_FROM_ALL, so the build names it.
+build = "sh -c 'cmake --build build-release && cmake --build build-release --target fpdraw'"
+
+# Draw 32768 words a subject over the members (black, 30 s a draw, 8 at a
+# time), evaluate every node on them, and plan every pair with a direction no
+# word refutes. Resumes per subject.
+[[phases]]
+name = "fingerprint"
+kind = "fingerprint"
+subjects = "experiments/2026-10-08-fretish-rerun-analysis/subjects-{host}.txt"
+members = "experiments/2026-10-08-fretish-rerun-analysis/members"
+work = "experiments/analysis-fretish-rerun-work"
+out = "experiments/analysis-fretish-rerun/fp"
+pairs = "experiments/analysis-fretish-rerun-work/pairs-{host}.csv"
+words = 32768
+seed = 3
+workers = 8
+black_timeout = 30
+
+# Every planned pair, each unrefuted direction at the archive's 20 s.
+[[phases]]
+name = "subsumption"
+kind = "compare"
+pairs = "experiments/analysis-fretish-rerun-work/pairs-{host}.csv"
+out = "experiments/analysis-fretish-rerun/subsumption-{host}.csv"
+jobs = 24
+black_timeout = 20
+wall_timeout = 180
+vmem_kb = 8388608
