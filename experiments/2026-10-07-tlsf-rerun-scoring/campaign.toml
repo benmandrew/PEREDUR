@@ -4,7 +4,7 @@ description = "Maximality curves and the separation recount over 2026-10-07-tlsf
 
 # Must equal 2026-10-07-tlsf-rerun's split: a score phase reads only the runs
 # its own host wrote.
-hosts = { av2 = "0-12", av3 = "13-25", av1 = "26-29" }
+hosts = { av2 = "0-12,19-24", av3 = "13-18", av1 = "25-29" }
 
 build = "sh -c 'cmake --build build-release'"
 

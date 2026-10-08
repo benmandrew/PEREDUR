@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Scores 2026-10-07-tlsf-rerun's search output for the paper's TLSF figures: the anytime maximality curves with their `.members.tsv` sidecars, then the separation recount at seed 0 over those sidecars. Each host scores the seeds it searched, so the split equals the search's: av2 0-12, av3 13-25, av1 26-29. The entry on each host is queued behind that host's search entry and starts when the search ends.
+Scores 2026-10-07-tlsf-rerun's search output for the paper's TLSF figures: the anytime maximality curves with their `.members.tsv` sidecars, then the separation recount at seed 0 over those sidecars. Each host scores the seeds it searched, so the split equals the search's: av2 0-12 and 19-24, av3 13-18, av1 25-29. av2's first entry scored seeds 0-12 under the search's first split; its second entry skips those as already scored. The entry on each host is queued behind that host's search entry and starts when the search ends.
 
 ## Scorer
 
