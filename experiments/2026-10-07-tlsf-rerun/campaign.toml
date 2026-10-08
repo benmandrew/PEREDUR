@@ -7,7 +7,7 @@ description = "2026-09-14-paper-rerun's TLSF search, unchanged in design, at a b
 # campaign's curve pass after av2 and av3, then runs the
 # calibration. All four arms of a seed run on one host, so a host difference
 # cancels inside every (family, seed) cell.
-hosts = { av2 = "0-12", av3 = "13-25", av1 = "26-29" }
+hosts = { av2 = "0-12,19-24", av3 = "13-18", av1 = "25-29" }
 
 build = "sh -c 'cmake --build build-release'"
 

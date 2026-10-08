@@ -6,7 +6,7 @@ The paper's strength and diversity rows rested on `2026-09-04-aurus-rematch` (`f
 
 ## Hosts
 
-av2 takes seeds 0-12, av3 13-25 and av1 26-29. av1 gets fewer seeds because its FRETISH curve pass, slowed by about 7 cores of other load, ends around midnight, six hours after av2's and av3's. `2026-10-07-tlsf-rerun-calib` runs seed 0 of six families on av1 before its main share. av1 is the one host built with gcc 13, so its calibration runs are diffed against av2's seed-0 runs of the same cells. Output should match byte for byte, and the wall times should agree within seed noise. If the wall times disagree, av1's seeds are re-run on av2 and av3 before the wall-time figures are read.
+av2 takes seeds 0-12 and 19-24, av3 13-18 and av1 25-29. The first split was av2 0-12, av3 13-25 and av1 26-29, but the av3 and av1 entries failed at the build step on the night of 2026-10-07 and only av2 ran; the same commit built cleanly on requeue at 13:27 on 2026-10-08, and the queue log kept no compiler output. With av2 done, the 17 remaining seeds were re-split at 13:40 so the three hosts finish together; av3 had started only seed 13, whose in-flight runs were lost to the restart and re-run under the resume key. Every seed still runs all four arms on one host. `2026-10-07-tlsf-rerun-calib` runs seed 0 of six families on av1 before its main share. av1 is the one host built with gcc 13, so its calibration runs are diffed against av2's seed-0 runs of the same cells. Output should match byte for byte, and the wall times should agree within seed noise. If the wall times disagree, av1's seeds are re-run on av2 and av3 before the wall-time figures are read.
 
 ## Cost
 
