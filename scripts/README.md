@@ -689,6 +689,32 @@ list has a row, so a killed or partial pass is retried rather than marked done.
 the phase by name where the host's pair list is missing.
 `PEREDUR_COMPARE_PAIRS_CMD` overrides the command, for a test.
 
+A fourth pair-list column, `dirs` (`fwd`, `rev` or `both`), is passed to
+`compare` as `COMPARE_DIRECTIONS` and adds `a_implies_b,b_implies_a` to the
+output: `1` or `0` from compare's `DIR` line, `?` for a queried direction
+with no answer, `0` for one not queried.
+
+### Fingerprinting pooled members
+
+```sh
+# What a fingerprint phase runs on av2
+python3 scripts/fingerprint_members.py experiments/x/subjects-av2.txt \
+    experiments/x/members experiments/x-work experiments/x-out/fp \
+    --pairs experiments/x-work/pairs-av2.csv --words 32768 --seed 3 \
+    --workers 8 --black-timeout 30 \
+    --manifest experiments/compare-manifests/<campaign>.fingerprint.json
+```
+
+Per subject: node files and the members' LTL go under the work directory,
+black's lasso words (`draw_black.py`, through `build-release/fpdraw ltl`) and
+every node's fingerprint (`fpdraw eval`) under the output directory, and the
+word-pruned pair list `<work>/<subject>/pairs.csv` with a `dirs` column for
+the compare phase after it. Progress is one row per finished subject in
+`<out>/done-<subjects stem>.csv`, and a rerun resumes from it. It exits 0 only
+when every subject is done. `PEREDUR_FINGERPRINT_CMD` overrides the command,
+for a test. The `kind = "fingerprint"` declaration is in
+`docs/dev/campaigns.md`.
+
 ### The queue
 
 ```sh
@@ -901,6 +927,11 @@ one below over run names rather than keys: a run on both hosts is written
 once where the two copies are byte-identical and reported as MISMATCH where
 they differ, a curve whose header comes from another `score_curves.py`
 vintage is refused, and a host that answers nothing is INCOMPLETE.
+
+`collect --outputs NAME` pulls each host's `experiments/NAME/` into
+`experiments/NAME/<host>/` the same way and joins nothing, for fingerprint
+and compare passes whose outputs are a tree. A host with no files is
+INCOMPLETE.
 
 `collect` supersedes running `merge_experiments.py` by hand. It rsyncs each
 host's per-run tree and results CSV back and merges them on the same natural

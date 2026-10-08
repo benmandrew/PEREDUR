@@ -13,6 +13,14 @@ id,relation,rc,secs is appended to OUT.csv per pair. `relation` is a's
 relation to b: `weaker` means b strictly implies a. A pair whose output names
 no relation is `error`, and one the outer timeout killed is `undecided`.
 
+An optional fourth column, dirs, names the directions to decide: `both`,
+`fwd` (a => b only) or `rev` (b => a only), passed to compare as
+COMPARE_DIRECTIONS. It needs compare built with the compare-directions change
+of campaign/fretish-rerun-analysis, which skips the other direction (reported
+0, since the planner refuted it on a word) and prints each pair's raw verdicts
+as a DIR line. With the column, OUT.csv gains a_implies_b,b_implies_a, each 1,
+0 or ? (undecided, or no DIR line).
+
 Resumable: an id already in OUT.csv is skipped. The exit status is 0 only when
 every id in PAIRS.csv is in OUT.csv once the pass ends, so a tick never marks a
 killed or partial pass done.
@@ -57,6 +65,7 @@ KEYS = (("equivalent", "equivalent"), ("strictly weaker", "weaker"),
         ("strictly stronger", "stronger"), ("incomparable", "incomparable"),
         ("timeout", "undecided"))
 TIMEOUT_RC = 124
+DIRECTIONS = ("both", "fwd", "rev")
 PROGRESS_EVERY = 2000
 
 
@@ -71,7 +80,18 @@ def relation_of(stdout: str, rc: int) -> str:
     return rel
 
 
-def compare(a: str, b: str, args, env: dict, tmp: str) -> tuple:
+def directions_of(stderr: str, dirs: str) -> tuple:
+    """(a_implies_b, b_implies_a) from the patched compare's DIR line. A
+    direction the call never decided reads `?`, one it skipped `0`."""
+    for line in stderr.splitlines():
+        parts = line.split("\t")
+        if parts[0] == "DIR" and len(parts) == 5:
+            return parts[3], parts[4]
+    return ("?" if dirs != "rev" else "0", "?" if dirs != "fwd" else "0")
+
+
+def compare(a: str, b: str, args, env: dict, tmp: str,
+            dirs: str | None = None) -> tuple:
     d = tempfile.mkdtemp(dir=tmp)
     try:
         for sub, src in (("a", a), ("b", b)):
@@ -83,11 +103,16 @@ def compare(a: str, b: str, args, env: dict, tmp: str) -> tuple:
         cmd = (f"ulimit -v {args.vmem_kb}; exec timeout {args.wall_timeout} "
                f"{args.compare} --repairs {d}/a --ideals {d}/b "
                f"--timeout {args.black_timeout}")
+        if dirs is not None:
+            env = dict(env, COMPARE_DIRECTIONS=dirs)
         t = time.time()
         p = subprocess.run(["bash", "-c", cmd], env=env, capture_output=True,
                            text=True)
-        return (relation_of(p.stdout, p.returncode), p.returncode,
-                round(time.time() - t, 2))
+        out = (relation_of(p.stdout, p.returncode), p.returncode,
+               round(time.time() - t, 2))
+        if dirs is not None:
+            out += directions_of(p.stderr, dirs)
+        return out
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -177,7 +202,14 @@ def main(argv=None) -> int:
     os.makedirs(tmp, exist_ok=True)
 
     with open(src, newline="") as handle:
-        rows = list(csv.DictReader(handle))
+        reader = csv.DictReader(handle)
+        rows = list(reader)
+        with_dirs = "dirs" in (reader.fieldnames or [])
+    bad = sorted({r["dirs"] for r in rows} - set(DIRECTIONS)) if with_dirs else []
+    if bad:
+        print(f"{src}: dirs must be one of {', '.join(DIRECTIONS)}, not "
+              f"{', '.join(bad)}", file=sys.stderr, flush=True)
+        return 2
     wanted = {r["id"] for r in rows}
     done = read_ids(out)
     todo = [r for r in rows if r["id"] not in done]
@@ -187,7 +219,8 @@ def main(argv=None) -> int:
     fh = open(out, "a", newline="")
     w = csv.writer(fh)
     if new:
-        w.writerow(["id", "relation", "rc", "secs"])
+        w.writerow(["id", "relation", "rc", "secs"]
+                   + (["a_implies_b", "b_implies_a"] if with_dirs else []))
         fh.flush()
 
     manifest = None
@@ -221,7 +254,8 @@ def main(argv=None) -> int:
         # A pair that raises gets no row, so the final check reports the pass
         # incomplete and a rerun retries it; the other pairs carry on.
         try:
-            res = compare(r["a_path"], r["b_path"], args, env, tmp)
+            res = compare(r["a_path"], r["b_path"], args, env, tmp,
+                          r["dirs"] if with_dirs else None)
         except Exception as exc:  # noqa: BLE001
             print(f"pair {r['id']}: {exc!r}", file=sys.stderr, flush=True)
             return
@@ -233,9 +267,21 @@ def main(argv=None) -> int:
                 print(f"{count[0]}/{len(todo)} {time.time() - start:.0f}s",
                       flush=True)
 
+    # Submission is bounded: Executor.map would hold a future for every
+    # pair at once, and one host's pair list can run to millions of rows.
+    slots = threading.BoundedSemaphore(args.jobs * 4)
+
+    def run_one(r):
+        try:
+            one(r)
+        finally:
+            slots.release()
+
     try:
         with ThreadPoolExecutor(args.jobs) as ex:
-            list(ex.map(one, todo))
+            for r in todo:
+                slots.acquire()
+                ex.submit(run_one, r)
     finally:
         fh.close()
     print(f"done {time.time() - start:.0f}s", flush=True)

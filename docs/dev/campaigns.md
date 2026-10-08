@@ -28,7 +28,7 @@ phases = [ { profile = "arbiter-probe", jobs = 4 } ]
 
 `configs` runs on the host during `stage`, after the build and before the version check so a failing generator reports as itself, in a subshell so `&&` behaves as written. It has no default, since no line suits every campaign and config trees are untracked.
 
-A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default), `score` or `compare`; the last two take their own keys and refuse the others by name. The lab hosts are `av1`, `av2` and `av3`.
+A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and `hosts`; `[[phases]]` headers are equivalent. Seed ranges are inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and stop at the first failure, so a phase depending on an earlier one is safe. `kind` is `run` (the default), `score`, `compare` or `fingerprint`; the last three take their own keys and refuse the others by name. The lab hosts are `av1`, `av2` and `av3`.
 
 A phase's `hosts` table overrides the campaign split for that phase under the same rules, and may only narrow it, since `stage` staged no other host; an omitted host runs nothing for that phase and a tick advances past it. It exists because `run_experiments.py --seeds` replaces a profile's seed list rather than intersecting it, so paths with different sample sizes cannot share one range without silently changing the row count. `enqueue` freezes these as `phase_seeds`; older entries fall back to the campaign split.
 
@@ -97,7 +97,7 @@ hosts = { av1 = "", av2 = "", av3 = "" }
 [[phases]]
 name = "subsumption"
 kind = "compare"
-pairs = "experiments/rq2/pairs-{host}.csv"      # id,a_path,b_path, on the host
+pairs = "experiments/rq2/pairs-{host}.csv"      # id,a_path,b_path[,dirs], on the host
 out = "experiments/rq2/subsumption-{host}.csv"  # id,relation,rc,secs, appended
 jobs = 28                # defaults: 28, 300, 700, 8000000
 black_timeout = 300      # compare --timeout, per solver call
@@ -108,6 +108,31 @@ vmem_kb = 8000000        # ulimit -v per pair
 `{host}` becomes the host's name, and a path may be absolute or relative to the checkout. `hosts`, when present, is an array of host names that narrows the campaign's list. The phase takes no `profile`, `sweeps`, `specs` or seeds.
 
 The output resumes by id. The pass exits 0 only when every id in the pair list has a row, so a killed pass spends an attempt and the next tick resumes it. `compare` and its solvers come from the checkout's `build-release`, which the tick has just built at the frozen commit. The tick refuses the phase by name when the host's pair list is missing, and `status` shows it as `compare:<campaign>.<phase>`, with output rows against the pair count from its manifest under `experiments/compare-manifests/`.
+
+A pair list may carry a fourth column, `dirs`, of `fwd`, `rev` or `both`. It reaches `compare` as `COMPARE_DIRECTIONS`, so a direction refuted in advance costs no solver call, and the output gains `a_implies_b,b_implies_a` read off compare's `DIR` line: `1`, `0`, or `?` for a queried direction with no answer. A skipped direction reads `0`. Without the column, nothing changes.
+
+## Fingerprint phases
+
+A `fingerprint` phase plans the pair list a compare phase after it decides, for a pooled strength analysis over FRETISH repairs. It runs `scripts/fingerprint_members.py`, which, per subject in the host's subject list: writes each pooled node from `<members>/<subject>.jsonl.gz` to a file, draws `words` lasso words with black over the members (a node once per member that holds it) through `build-release/fpdraw ltl` and the 2026-10-01 `draw_black.py`, evaluates every node on the words with `fpdraw eval`, and keeps a pair in each direction no word refutes. It is not seed-split, and its `{host}` and `hosts` rules are the compare phase's.
+
+```toml
+[[phases]]
+name = "fingerprint"
+kind = "fingerprint"
+subjects = "experiments/x/subjects-{host}.txt"   # one subject per line, committed
+members = "experiments/x/members"               # <subject>.jsonl.gz, committed
+work = "experiments/x-work"                     # node files, LTL dumps, per-subject pairs.csv
+out = "experiments/x-out/fp"                    # words, .meta, fp.tsv: what collect copies
+pairs = "experiments/x-work/pairs-{host}.csv"   # optional: every subject's pairs, joined
+words = 32768            # defaults: 32768, 3, 8, 30
+seed = 3
+workers = 8              # parallel black draws
+black_timeout = 30       # seconds per draw
+```
+
+`fpdraw` is `EXCLUDE_FROM_ALL`, so the campaign's `build` names it: `sh -c 'cmake --build build-release && cmake --build build-release --target fpdraw'`. A subject whose draw gets any black `ERROR`, or no word at all, fails the pass and leaves no words behind. Each step's output is written whole and renamed into place, and a subject is done once its progress row and `pairs.csv` both exist, so a killed pass resumes at the first missing step of the first unfinished subject. The pass exits 0 only when every subject is done. The tick refuses the phase by name where the subject list or members directory is missing, and `status` shows it as `fingerprint:<campaign>.<phase>` with finished subjects against the subject count.
+
+`collect --outputs <out>` copies each host's `experiments/<out>/` into `experiments/<out>/<host>/` and joins nothing; it is the collect for a fingerprint phase and the compare phase after it, whose outputs are a tree. A host with no files is INCOMPLETE.
 
 ## Reading a run
 
@@ -227,6 +252,6 @@ The output is not runnable, naming retired profiles (`wellsep-timing`) and rejec
 python3 scripts/test_campaign.py
 ```
 
-A plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. It never touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `PEREDUR_RUNNER_CMD`, `PEREDUR_SCORER_CMD` and `PEREDUR_COMPARE_PAIRS_CMD` stubs that record their arguments. `compare_pairs.py` runs against a stub `compare`. `score_campaign.py` uses a fake results tree, a `PEREDUR_SCORE_CURVES_CMD` stub, and stub binaries under `PEREDUR_BIN_DIR`. New launch-path code must be tested the same way.
+A plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. It never touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `PEREDUR_RUNNER_CMD`, `PEREDUR_SCORER_CMD`, `PEREDUR_COMPARE_PAIRS_CMD` and `PEREDUR_FINGERPRINT_CMD` stubs that record their arguments. `compare_pairs.py` runs against a stub `compare`, and `fingerprint_members.py` against a stub `fpdraw` and draw script. `score_campaign.py` uses a fake results tree, a `PEREDUR_SCORE_CURVES_CMD` stub, and stub binaries under `PEREDUR_BIN_DIR`. New launch-path code must be tested the same way.
 
 `campaign.py` parses TOML itself because av2 and av3 run python3 3.10.12 with neither `tomllib` nor `tomli`. Its subset is checked against `tomllib` on every fixture wherever that exists. Remote shell scripts never use bare globs, since zsh's `NOMATCH` aborts on an unmatched pattern and every later section vanishes in silence.
