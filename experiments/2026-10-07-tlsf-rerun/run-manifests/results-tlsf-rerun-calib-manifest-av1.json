@@ -1,0 +1,61 @@
+{
+  "profile": "tlsf-rerun-calib",
+  "hostname": "av1",
+  "started": "2026-10-08T13:27:27+0100",
+  "git": {
+    "branch": "campaign/tlsf-rerun",
+    "describe": "provenance/aurus-rematch-153-g43ab6c2",
+    "head": "43ab6c2780660e74cc2145bdc2c23a7474d3f4a4"
+  },
+  "binaries": {
+    "peredur": {
+      "path": "/home/benandrew/projects/counter/build-release/peredur",
+      "commit": "43ab6c2780660e74cc2145bdc2c23a7474d3f4a4",
+      "commit_short": "43ab6c2",
+      "dirty": "0"
+    },
+    "compare": {
+      "path": "/home/benandrew/projects/counter/build-release/compare",
+      "commit": "43ab6c2780660e74cc2145bdc2c23a7474d3f4a4",
+      "commit_short": "43ab6c2",
+      "dirty": "0"
+    }
+  },
+  "sweep": {
+    "schemes": [
+      "nsga2-apportion",
+      "weighted"
+    ],
+    "weakenings": [
+      "wkoff"
+    ],
+    "metrics": [
+      "log"
+    ],
+    "repair_modes": null,
+    "sweeps": [
+      "G"
+    ],
+    "levels": {
+      "G": [
+        "mrs",
+        "aurus"
+      ]
+    },
+    "specs": [
+      "humanoid-742",
+      "humanoid-531",
+      "pcar-v2-888",
+      "full-arbiter-aurus",
+      "minepump",
+      "rg2"
+    ],
+    "seeds": [
+      0
+    ],
+    "jobs": 16,
+    "configs_dir": "/home/benandrew/projects/counter/experiments/configs-tlsf-rerun",
+    "results_dir": "/home/benandrew/projects/counter/experiments/results-tlsf-rerun-calib",
+    "results_csv": "/home/benandrew/projects/counter/experiments/results-tlsf-rerun-calib.csv"
+  }
+}

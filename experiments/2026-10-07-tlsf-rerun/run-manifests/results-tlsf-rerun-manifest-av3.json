@@ -1,0 +1,85 @@
+{
+  "profile": "tlsf-rerun",
+  "hostname": "av3",
+  "started": "2026-10-08T17:26:55+0100",
+  "git": {
+    "branch": "campaign/tlsf-rerun",
+    "describe": "provenance/aurus-rematch-154-g953732b",
+    "head": "953732b8e1c40dbbbaa7f57a7a250bdb8c564aee"
+  },
+  "binaries": {
+    "peredur": {
+      "path": "/home/benandrew/projects/counter/build-release/peredur",
+      "commit": "953732b8e1c40dbbbaa7f57a7a250bdb8c564aee",
+      "commit_short": "953732b",
+      "dirty": "0"
+    },
+    "compare": {
+      "path": "/home/benandrew/projects/counter/build-release/compare",
+      "commit": "953732b8e1c40dbbbaa7f57a7a250bdb8c564aee",
+      "commit_short": "953732b",
+      "dirty": "0"
+    }
+  },
+  "sweep": {
+    "schemes": [
+      "nsga2-apportion",
+      "weighted"
+    ],
+    "weakenings": [
+      "wkoff"
+    ],
+    "metrics": [
+      "log"
+    ],
+    "repair_modes": null,
+    "sweeps": [
+      "G"
+    ],
+    "levels": {
+      "G": [
+        "mrs",
+        "aurus"
+      ]
+    },
+    "specs": [
+      "arbiter-aurus",
+      "lift",
+      "minepump",
+      "rg1",
+      "rg2",
+      "detector-aurus",
+      "full-arbiter-aurus",
+      "lily02",
+      "lily11",
+      "lily15",
+      "lily16",
+      "load-balancer-aurus",
+      "ltl2dba-r-2",
+      "ltl2dba-theta-2",
+      "ltl2dba27",
+      "prioritized-arbiter-aurus",
+      "round-robin-arbiter-aurus",
+      "simple-arbiter-aurus",
+      "gyro-var1",
+      "gyro-var2",
+      "humanoid-458",
+      "humanoid-503",
+      "humanoid-531",
+      "humanoid-742",
+      "pcar-v2-888"
+    ],
+    "seeds": [
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "jobs": 16,
+    "configs_dir": "/home/benandrew/projects/counter/experiments/configs-tlsf-rerun",
+    "results_dir": "/home/benandrew/projects/counter/experiments/results-tlsf-rerun",
+    "results_csv": "/home/benandrew/projects/counter/experiments/results-tlsf-rerun.csv"
+  }
+}

@@ -1,0 +1,495 @@
+{
+  "campaign": "2026-10-07-tlsf-rerun",
+  "attribution": "Ben Andrew",
+  "generated_on": "2026-10-09",
+  "status": "closed",
+  "kind": "search",
+  "kind_note": "Search only. The maximality and separation passes over these runs are 2026-10-07-tlsf-rerun-scoring, archived on campaign/tlsf-rerun-scoring under provenance/tlsf-rerun-scoring.",
+  "question": "2026-09-14-paper-rerun's TLSF search, unchanged in design, at 5d117f3, which carries every engine change since 57fcefb (#206 whole-spec screen under MRS, #210 gate replays scoring's walk, #211 black model probe). Its rows replace the PEREDUR side of the paper's TLSF figures.",
+  "endpoint": "implies_ideal per family for nsga2-apportion/mrs against the archived AuRUS arm, the registered primary that analyse_matched.py carries from the rematch's PLAN section 5.",
+  "decision_rule_firing": "Outcome 3: null, reported as parity (p = 0.6405, PEREDUR higher on 13, lower on 7, tied on 5). The paper-rerun read the same contrast as p = 0.9345, 12 higher and 8 lower.",
+  "arms": [
+    "nsga2-apportion/mrs",
+    "nsga2-apportion/aurus",
+    "weighted/mrs",
+    "weighted/aurus"
+  ],
+  "corpus": "25 TLSF families, 30 seeds (0-29), 1000-individual budget at population 100, 7200 s cap, log metric, weakening off, weights 0.1 0.2 0.7, configs from gen_configs --pin-vintage.",
+  "profile_commit": {
+    "sha": "953732b8e1c40dbbbaa7f57a7a250bdb8c564aee",
+    "short": "953732b",
+    "branch": "campaign/tlsf-rerun",
+    "subject": "the campaign/tlsf-rerun declaration commit spreading seeds over three hosts",
+    "engine": "5d117f3 (main, merge of #210)",
+    "reachable_from_main": false,
+    "held_by_tag": "provenance/tlsf-rerun",
+    "held_by_tag_note": "Annotated tag at 953732b, cut and pushed on 2026-10-09 before the archive commit. 43ab6c2, which av2's seeds 0-12 and 21 of av3's seed-13 rows ran, is 953732b's parent and so is held by the same tag."
+  },
+  "binary_commit": {
+    "rows_by_commit": {
+      "953732b": 1679,
+      "43ab6c2": 1321
+    },
+    "dirty_rows": 0,
+    "engine_equivalence": "git diff 43ab6c2 953732b touches experiments/2026-10-07-tlsf-rerun/PLAN.md and campaign.toml alone: no file under src/, include/, CMakeLists.txt or scripts/. The two binaries are built from the same engine source.",
+    "describe": "provenance/aurus-rematch-153-g43ab6c2 and provenance/aurus-rematch-154-g953732b, both dirty 0, per the run manifests"
+  },
+  "hosts": {
+    "av2": {
+      "machine": "avlab12",
+      "compiler": "gcc 11",
+      "seeds": "0-12,19-24",
+      "rows": 1900,
+      "rows_by_commit": {
+        "43ab6c2": 1300,
+        "953732b": 600
+      },
+      "core_h": 273.72,
+      "killed": 43,
+      "entries": {
+        "046": "43ab6c2, seeds 0-12, staged 2026-10-07T20:36, done 2026-10-08T09:34:50",
+        "048": "953732b, seeds 0-12,19-24, started 2026-10-08T16:42:27, cancelled 16:57:21",
+        "051": "953732b, seeds 0-12,19-24 (0-12 skipped by the resume key), 2026-10-08T17:56:55 to 2026-10-09T00:23:55, done"
+      },
+      "last_run_log": "2026-10-08T23:58:53"
+    },
+    "av3": {
+      "machine": "av3",
+      "compiler": "gcc 11",
+      "seeds": "13-18",
+      "rows": 600,
+      "rows_by_commit": {
+        "43ab6c2": 21,
+        "953732b": 579
+      },
+      "core_h": 80.8,
+      "killed": 13,
+      "entries": {
+        "042": "43ab6c2, seeds 13-25, three build failures on 2026-10-07, requeued, staged 2026-10-08T13:27:26, dequeued while running at 13:34:08 after 21 seed-13 rows",
+        "045": "953732b, seeds 13-18, started 2026-10-08T13:35:03, cancelled 16:57:26",
+        "048": "953732b, seeds 13-18, 2026-10-08T17:26:55 to 20:57:21, done"
+      },
+      "last_run_log": "2026-10-08T20:33:15",
+      "clock_note": "av3's clock runs about 17 minutes fast with NTP off."
+    },
+    "av1": {
+      "machine": "av1",
+      "compiler": "gcc 13",
+      "seeds": "25-29",
+      "rows": 500,
+      "rows_by_commit": {
+        "953732b": 500
+      },
+      "core_h": 77.78,
+      "killed": 14,
+      "entries": {
+        "007": "43ab6c2, calibration, three build failures on 2026-10-07, requeued, 2026-10-08T13:27:27 to 15:27:27, done",
+        "008": "43ab6c2, seeds 26-29, build failure, cancelled 13:34",
+        "011": "953732b, seeds 25-29, started 2026-10-08T15:30:03, cancelled 16:57:17",
+        "014": "953732b, seeds 25-29, 2026-10-08T18:11:54 to 23:09:01, done"
+      },
+      "last_run_log": "2026-10-08T22:40:28"
+    },
+    "cancelled_before_running": "av2 045, av3 041, av1 005 and 006, all at the declaration commit 0da690c.",
+    "note": "The seed split comes from campaign.toml. All four arms of a seed ran on one host, so a host difference cancels inside every (family, seed) cell."
+  },
+  "rows": {
+    "total": 3000,
+    "per_arm": 750,
+    "families": 25,
+    "seeds": 30,
+    "duplicate_keys": 0,
+    "curve_coverage": "3000 of 3000",
+    "source": "experiments/results-tlsf-rerun.csv, collected 2026-10-09"
+  },
+  "calibration": {
+    "declaration": "campaign-calib.toml (2026-10-07-tlsf-rerun-calib, folded in here): seed 0 of humanoid-742, humanoid-531, pcar-v2-888, full-arbiter-aurus, minepump and rg2 across all four arms on av1, the one gcc 13 host, diffed against av2's seed-0 runs of the same 24 cells. Both at 43ab6c2.",
+    "rows": 24,
+    "core_h": 10.21,
+    "killed": 1,
+    "found_repair": 22,
+    "implies_ideal": 11,
+    "output_check": {
+      "identical": 14,
+      "differ": 10,
+      "method": "Every file of each run directory compared byte for byte, with run.json, run.log's time columns and run-directory path, and index.tsv's elapsed_s masked.",
+      "reading": "PASS with a qualification. All 8 runs with no tool timeout on either host (minepump and rg2) are identical, and 6 runs with timeouts are identical too. The 10 that differ all hit tool timeouts on both hosts, at different counts, so the divergence follows wall-clock budgets and not the compiler. No run differs without a timeout behind it."
+    },
+    "wall_check": {
+      "identical_output": {
+        "n": 14,
+        "median_ratio_av1_over_av2": 1.089,
+        "geometric_mean": 1.095,
+        "range": [
+          0.953,
+          1.34
+        ],
+        "av1_slower": 12,
+        "sign_test_p": 0.0129
+      },
+      "both_finished": {
+        "n": 21,
+        "median_ratio_av1_over_av2": 1.069,
+        "geometric_mean": 1.053,
+        "range": [
+          0.823,
+          1.34
+        ],
+        "av1_slower": 15,
+        "sign_test_p": 0.0784
+      },
+      "seed_noise_factor": {
+        "note": "median |log(wall / cell median)| over the main campaign's finished runs of each family, all four arms, as a factor",
+        "full-arbiter-aurus": 1.406,
+        "humanoid-531": 1.206,
+        "humanoid-742": 1.154,
+        "minepump": 1.041,
+        "pcar-v2-888": 1.172,
+        "rg2": 1.039
+      },
+      "reading": "FLAG. av1 runs about 9% slower than av2 on identical work. On minepump and rg2, whose seed noise is a factor of 1.04, av1 is 1.069 to 1.340 times slower on all 8 runs, outside the noise. On the long families the ratio sits inside their noise."
+    },
+    "declared_contingency": "PLAN.md: if the wall times disagree, av1's seeds are re-run on av2 and av3 before the wall-time figures are read. The disagreement is there, and nothing was re-run: the close was told to flag it and not re-run. The re-run is owed before any wall-time figure that pools hosts is printed. Arm contrasts within a seed are unaffected, since all four arms of a seed ran on av1."
+  },
+  "verification": {
+    "stopped_by_individuals": "2930 of 2930 manifests; the other 70 directories are censored and hold no run.json. PASS.",
+    "individuals_bred": "min, max and median 1000, no overshoot. PASS.",
+    "ideal_join": "implies_ideal 1510 of 3000 (50.3%) in the results CSV against ideal_solutions > 0 on 1543 of 3000 curves. PASS.",
+    "cost_per_run": "mean 518.8 s, median 53 s, max 7200.5 s.",
+    "censored": "70 of 3000 (2.3%): humanoid-742 42, humanoid-531 28. By cell: weighted/mrs humanoid-742 30, weighted/mrs humanoid-531 26, weighted/aurus humanoid-742 12, weighted/aurus humanoid-531 2. No nsga2-apportion run was killed.",
+    "compare_timed_out": 0
+  },
+  "cost": {
+    "finished_runs": 2930,
+    "finished_core_h": 292.3,
+    "censored_runs": 70,
+    "censored_core_h": 140.0,
+    "total_core_h": 432.3,
+    "paper_rerun_total_core_h": 550.9,
+    "calibration_core_h": 10.21,
+    "note": "432.3 core-hours against the paper-rerun's 550.9, a fall of 21.5%. 32.4% of the machine time went on runs killed at the cap, against 45.4%. Finished runs cost 292.3 core-hours against 300.9, so nearly all the saving is in kills: 70 against 125."
+  },
+  "per_arm_measures": {
+    "note": "Yield, implies_ideal and timeout are over all 750 runs of an arm, a kill counting as a failure. mean_wall_s is analyse_matched's figure, which, as in the paper-rerun's archive, averages every run with a kill at its 7200 s; median_wall_s is over finished runs. The paper-rerun's value follows each.",
+    "nsga2-apportion/mrs": {
+      "yield": [
+        1.0,
+        0.993
+      ],
+      "implies_ideal": [
+        0.544,
+        0.549
+      ],
+      "timeout": [
+        0.0,
+        0.007
+      ],
+      "mean_wall_s": [
+        347.4,
+        516.4
+      ],
+      "median_wall_s": [
+        62,
+        58
+      ],
+      "core_h": 72.4
+    },
+    "nsga2-apportion/aurus": {
+      "yield": [
+        0.94,
+        0.94
+      ],
+      "implies_ideal": [
+        0.533,
+        0.535
+      ],
+      "timeout": [
+        0.0,
+        0.0
+      ],
+      "mean_wall_s": [
+        211.8,
+        281.1
+      ],
+      "median_wall_s": [
+        48,
+        47
+      ],
+      "core_h": 44.1
+    },
+    "weighted/mrs": {
+      "yield": [
+        0.925,
+        0.908
+      ],
+      "implies_ideal": [
+        0.483,
+        0.467
+      ],
+      "timeout": [
+        0.075,
+        0.091
+      ],
+      "mean_wall_s": [
+        924.5,
+        1058.0
+      ],
+      "median_wall_s": [
+        64,
+        60
+      ],
+      "core_h": 192.6
+    },
+    "weighted/aurus": {
+      "yield": [
+        0.935,
+        0.884
+      ],
+      "implies_ideal": [
+        0.453,
+        0.441
+      ],
+      "timeout": [
+        0.019,
+        0.069
+      ],
+      "mean_wall_s": [
+        591.3,
+        788.7
+      ],
+      "median_wall_s": [
+        50,
+        50
+      ],
+      "core_h": 123.2
+    }
+  },
+  "registered_primary": {
+    "cell": "nsga2-apportion/mrs",
+    "families": 25,
+    "all_runs_a_kill_is_a_failure": {
+      "peredur_higher": 13,
+      "peredur_lower": 7,
+      "tied": 5,
+      "mean_difference": -0.003,
+      "wilcoxon_p": 0.6405
+    },
+    "scorable_runs_only": {
+      "families": 24,
+      "peredur_higher": 12,
+      "peredur_lower": 7,
+      "tied": 5,
+      "mean_difference": -0.007,
+      "wilcoxon_p": 0.7452
+    },
+    "paper_rerun_for_comparison": {
+      "all_runs": {
+        "peredur_higher": 12,
+        "peredur_lower": 8,
+        "tied": 5,
+        "mean_difference": 0.003,
+        "wilcoxon_p": 0.9345
+      },
+      "scorable_runs_only": {
+        "peredur_higher": 12,
+        "peredur_lower": 7,
+        "tied": 5,
+        "mean_difference": 0.005,
+        "wilcoxon_p": 0.8983
+      }
+    },
+    "aurus_reference": "experiments/aurus-reference in the main checkout, symlinked into the worktree: the same archived AuRUS arm the paper-rerun's printout read, so the two p-values compare like with like. The paper's uncensored AuRUS rebuild is a separate reference and gives a different p.",
+    "largest_differences": "PEREDUR ahead on prioritized-arbiter-aurus (+0.600) and full-arbiter-aurus (+0.567), where AuRUS found nothing; behind on gyro-var2 (-0.533), lift and lily11 (-0.367 each) and minepump (-0.300). humanoid-742 moved from -0.133 to +0.033, its nsga2-apportion/mrs runs reaching 0.967 with none killed.",
+    "verdict": "Parity, as in the paper-rerun. Outcome 3."
+  },
+  "pooled_head_to_head_secondary": {
+    "all_runs": {
+      "peredur_higher": 12,
+      "peredur_lower": 11,
+      "tied": 2,
+      "mean_difference": -0.043,
+      "wilcoxon_p": 0.737
+    },
+    "scorable_runs_only": {
+      "families": 24,
+      "peredur_higher": 11,
+      "peredur_lower": 11,
+      "tied": 2,
+      "mean_difference": -0.035,
+      "wilcoxon_p": 0.8052
+    },
+    "paper_rerun_all_runs_p": 0.5348
+  },
+  "factor_contrasts_secondary": {
+    "note": "Post hoc, exact McNemar over 1500 paired (family, seed, other factor) cells. The paper-rerun's value follows in brackets.",
+    "selection_nsga2_against_weighted": {
+      "found_repair": "83 against 23 (129 against 23), p < 0.0001",
+      "implies_ideal": "173 against 67 (189 against 57), p < 0.0001",
+      "wall": "nsga2-apportion faster on 1288 of 1500 (1270), means 279.6 s against 757.9 s (398.8 against 923.3)"
+    },
+    "grading_mrs_against_aurus": {
+      "found_repair": "80 against 42 (78 against 20), p = 0.0007 (p < 0.0001)",
+      "implies_ideal": "111 against 81 (107 against 77), p = 0.0361 (0.0322)",
+      "wall": "mrs faster on 411 of 1500 (749), means 636.0 s against 401.6 s (787.2 against 534.9)"
+    }
+  },
+  "discovery": {
+    "time_to_first_repair": {
+      "nsga2-apportion/mrs": "750/750, median 2.9 s",
+      "nsga2-apportion/aurus": "705/750, 2.1 s",
+      "weighted/mrs": "750/750, 2.9 s",
+      "weighted/aurus": "715/750, 2.1 s"
+    },
+    "time_to_first_ideal_repair": {
+      "nsga2-apportion/mrs": "408/750, 3.1 s",
+      "nsga2-apportion/aurus": "400/750, 2.5 s",
+      "weighted/mrs": "386/750, 2.8 s",
+      "weighted/aurus": "349/750, 2.2 s"
+    },
+    "aurus": "410 of 708 usable runs, median 9.0 s (unchanged reference)"
+  },
+  "curves_at_7200s": {
+    "note": "Mean per run at the 7200 s cut from analysis-output.txt, with the paper-rerun's value second. solutions and ideal_solutions carry the double count under deviations.accumulator_double_count.",
+    "solutions": {
+      "nsga2-apportion/mrs": [
+        98.57,
+        95.81
+      ],
+      "nsga2-apportion/aurus": [
+        66.11,
+        65.71
+      ],
+      "weighted/mrs": [
+        388.99,
+        365.26
+      ],
+      "weighted/aurus": [
+        265.08,
+        256.51
+      ]
+    },
+    "ideal_solutions": {
+      "nsga2-apportion/mrs": [
+        5.61,
+        5.66
+      ],
+      "nsga2-apportion/aurus": [
+        5.1,
+        5.08
+      ],
+      "weighted/mrs": [
+        10.49,
+        10.22
+      ],
+      "weighted/aurus": [
+        9.09,
+        8.99
+      ]
+    },
+    "maximal_solutions": {
+      "nsga2-apportion/mrs": [
+        28.49,
+        28.09
+      ],
+      "nsga2-apportion/aurus": [
+        20.74,
+        20.73
+      ],
+      "weighted/mrs": [
+        86.27,
+        66.58
+      ],
+      "weighted/aurus": [
+        57.44,
+        47.42
+      ]
+    },
+    "maximal_ideal_solutions": {
+      "nsga2-apportion/mrs": [
+        1.87,
+        1.91
+      ],
+      "nsga2-apportion/aurus": [
+        1.86,
+        1.87
+      ],
+      "weighted/mrs": [
+        2.07,
+        2.04
+      ],
+      "weighted/aurus": [
+        1.77,
+        1.76
+      ]
+    }
+  },
+  "deviations": {
+    "first_split_failed_to_build": "The first split (av2 0-12, av3 13-25, av1 26-29) launched at 43ab6c2 on 2026-10-07. av3 042 and av1 007/008 failed at the build step three times that night; the queue log kept no compiler output. The same commit built cleanly on requeue at 13:27 on 2026-10-08. av2 ran seeds 0-12 alone overnight. The remaining 17 seeds were re-split at 953732b (13:40), which changes campaign.toml and PLAN.md only.",
+    "seed_13_restart": "av3 042 was dequeued at 13:34:08 with seed 13 in flight. Its 21 finished rows stand at 43ab6c2, and the in-flight runs were re-run under the resume key at 953732b.",
+    "dequeue_16_57": "At about 16:57 on 2026-10-08 the running search entries (av2 048, av3 045, av1 011) and the queued scoring entries (av2 049, av3 046, av1 012) were cancelled to move them behind 2026-10-08-fretish-rerun-analysis, and re-enqueued after it (av2 051, av3 048, av1 014). Runs in flight were killed and re-run under the resume key, which skips a run by its CSV key and never cleans its directory.",
+    "accumulator_double_count": {
+      "what": "The accumulator opens accumulated/index.tsv for append, so a killed run re-run into its own directory carries both attempts' rows behind two headers. score_curves.read_index skips the second header and counts every row. 63 of 3000 directories hold two attempts (seed 13: 15, 15: 2, 16: 4, 17: 10, 19: 16, 25: 3, 26: 13; av3 31, av2 16, av1 16; weighted/mrs 25, weighted/aurus 17, nsga2-apportion/mrs 13, nsga2-apportion/aurus 8).",
+      "repeat_or_diverge": "50 of the 63 re-ran the killed attempt's rows as an exact prefix. 13 diverge, the killed attempt having reached different candidates under the same file names, and 1044 file names are indexed only by a killed attempt.",
+      "effect_at_7200s_per_run_mean": {
+        "solutions": {
+          "nsga2-apportion/mrs": 1.1,
+          "nsga2-apportion/aurus": 0.42,
+          "weighted/mrs": 9.23,
+          "weighted/aurus": 5.34
+        },
+        "ideal_solutions": {
+          "nsga2-apportion/mrs": 0.021,
+          "nsga2-apportion/aurus": 0.035,
+          "weighted/mrs": 0.048,
+          "weighted/aurus": 0.053
+        }
+      },
+      "not_affected": "The results CSV, which reads the final repairs. maximal_solutions, maximal_ideal_solutions and the separation counts read each file once, and no members.tsv repeats a file. The 13 diverging runs' stale files can still sit in their antichains.",
+      "status": "Unresolved. The data are left as collected. The fix is to cut each affected index to its last attempt and re-score the 63 runs, or to have the runner clear a directory it re-runs."
+    },
+    "av1_wall_contingency_not_run": "See calibration.declared_contingency.",
+    "launch_manifests_overwritten": "Each re-enqueue rewrote the host's run manifest, so run-manifests/ holds the last launch per host: av2 051, av3 048, av1 014, and the calibration's 007."
+  },
+  "caveats": {
+    "aurus_rates_are_unfiltered": "As in the paper-rerun: the well-separation screen's inputs did not survive, so AuRUS's per-family rates are unfiltered.",
+    "a_kill_is_not_symmetric": "PEREDUR's accumulator flushes as it goes, so a killed run keeps its candidates; AuRUS writes its solutions at the end, so a killed run carries no verdict.",
+    "no_per_seed_pairing_with_the_paper_rerun": "The engine changes since 57fcefb move the draw stream and the scores; comparisons with the paper-rerun are per arm and per family, and descriptive.",
+    "post_hoc": "Every p-value here except the registered primary is post hoc."
+  },
+  "vendored_scripts": {
+    "commit": "953732b",
+    "files": {
+      "gen_configs.py": "e68bdceb39a5c61cc0e5d28b07a50a83b8bb18de",
+      "run_experiments.py": "735dc7c2104ad811dc4142efd726ec3b647871e4",
+      "merge_experiments.py": "57f1b3b026e733583c05e1327ebd6141410488ec",
+      "campaign.py": "af5290172150c6ac2810f6274d79677f02e65901",
+      "analyse_matched.py": "4637e10b42ac5acfcebe08a8c43521ed55d99613",
+      "analysis_lib.py": "5b3db5427a2d3b79ffed048e2f64a9ef9a9435d9",
+      "aurus_series.py": "8ac217cfcbe8f9e5c45a7ca5f9da57ec2aa314f5"
+    },
+    "added": {
+      "analyse_rerun.py": "Written for this close. Runs analyse_matched.main() at this campaign's file names with the AuRUS reference pinned to experiments/aurus-reference, then appends HOSTS, CALIBRATION and ACCUMULATOR."
+    },
+    "check": "git hash-object on each vendored file equals git rev-parse 953732b:scripts/<file>.",
+    "analysis": "python3 experiments/2026-10-07-tlsf-rerun/scripts/analyse_rerun.py > experiments/2026-10-07-tlsf-rerun/analysis-output.txt, from the repository root with the collected data and experiments/aurus-reference in place."
+  },
+  "owed": [
+    "Re-run av1's seeds 25-29 on av2 and av3 before a pooled wall-time figure is printed, per PLAN.md's calibration contingency, or record a decision not to.",
+    "Re-score the 63 two-attempt run directories with each index cut to its last attempt, or accept the measured over-count."
+  ],
+  "config_vintage": "Configs generated at 953732b by gen_configs --pin-vintage, which writes every VINTAGE_KEYS default into each config, so a later default move cannot change what these configs mean. keyword_similarity, whose default moved to semantic in dc13ed2 before 5d117f3, is among the pinned keys.",
+  "files": {
+    "PLAN.md": "The declaration, amended at 953732b for the three-host split.",
+    "campaign.toml": "The search declaration all three hosts read.",
+    "campaign-calib.toml": "2026-10-07-tlsf-rerun-calib's declaration, moved here from its own directory.",
+    "REPORT.md": "The write-up.",
+    "PROVENANCE.json": "This file.",
+    "analysis-output.txt": "The output of scripts/analyse_rerun.py, run 2026-10-09.",
+    "scripts/": "Seven scripts vendored at 953732b, and analyse_rerun.py.",
+    "run-manifests/": "The last launch manifest per host and the calibration's, read from each host by campaign.py's inventory probe.",
+    "results-tlsf-rerun.csv, results-tlsf-rerun/": "3000 rows and per-run directories, 70 censored. Untracked, in experiments/ of the collecting checkout.",
+    "results-tlsf-rerun-calib.csv, results-tlsf-rerun-calib/": "24 rows and per-run directories. Untracked."
+  },
+  "reproduce": "Check out 953732b, build the release preset and run campaign.toml through campaign.py on av2, av3 and av1. To re-derive the figures: with the collected CSVs and directories in experiments/ and experiments/aurus-reference present, run python3 experiments/2026-10-07-tlsf-rerun/scripts/analyse_rerun.py.",
+  "closed_on": "2026-10-09"
+}
