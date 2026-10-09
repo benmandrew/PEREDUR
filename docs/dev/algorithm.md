@@ -52,7 +52,7 @@ Two calls that both draw from the `RandomSource` must never be arguments of the 
 
 ## TLSF repair modes
 
-Binaries: `peredur` (genetic repair), `realize`, `compare`, `ltl`, `mucs`, `maximal`; run each with `--help` for flags.
+Binaries: `peredur` (genetic repair), `realize`, `compare`, `ltl`, `mucs`, `maximal`, `fingerprint`; run each with `--help` for flags.
 
 `mucs` prints a *minimal unrealizable core* (MUC): the smallest subset of the guarantee-side sections (PRESET, ASSERT, GUARANTEE) that stays unrealizable against the full environment side (INITIALLY, REQUIRE, ASSUME). It uses QuickXplain over `ltlsynt`, prints `REALIZABLE (no core)` for a realizable input, and is TLSF-only.
 

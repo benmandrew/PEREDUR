@@ -42,6 +42,7 @@ BINARIES = (
     "peredur",
     "compare",
     "keyword-terms",
+    "fingerprint",
     "lint-ideals",
     "ltl",
     "mucs",

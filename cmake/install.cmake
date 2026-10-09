@@ -52,6 +52,7 @@ endfunction()
 install(TARGETS
         peredur
         compare
+        fingerprint
         lint-ideals
         ltl
         maximal

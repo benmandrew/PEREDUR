@@ -34,6 +34,17 @@ constexpr std::uint64_t k_seed = 0;
 constexpr std::size_t k_max_prefix = 2;
 constexpr std::size_t k_max_cycle = 3;
 
+/// The word set one sweep draws, defaulting to the constants above. An
+/// offline scorer may sample more and longer lassos than the search can
+/// afford per generation: refutation stays exact at any setting, so only the
+/// cost moves, and every fingerprint in one sweep comes from one draw.
+struct Sampling {
+    std::size_t m_words = k_words;
+    std::uint64_t m_seed = k_seed;
+    std::size_t m_max_prefix = k_max_prefix;
+    std::size_t m_max_cycle = k_max_cycle;
+};
+
 /// One fingerprint per entry of @p specs, in order.
 ///
 /// Empty where the specifications declare no signals to sample over, or where
@@ -41,7 +52,8 @@ constexpr std::size_t k_max_cycle = 3;
 /// the whole table costs speed and nothing else, where a partial one would
 /// need a per-entry guard at every use.
 std::vector<PackedFingerprint> fingerprints_of(
-    const std::vector<tlsf::Specification>& specs);
+    const std::vector<tlsf::Specification>& specs,
+    const Sampling& sampling = {});
 
 /// The FRETISH twin. Modes join the sampled signals: a scoped requirement's
 /// mode is an atom of the lowered formula that may sit in no atom list
@@ -49,6 +61,6 @@ std::vector<PackedFingerprint> fingerprints_of(
 /// position, so leaving it out would evaluate every scope against a trace
 /// where its mode never holds.
 std::vector<PackedFingerprint> fingerprints_of(
-    const std::vector<Specification>& specs);
+    const std::vector<Specification>& specs, const Sampling& sampling = {});
 
 }  // namespace fingerprint::prefilter

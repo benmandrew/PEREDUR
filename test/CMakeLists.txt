@@ -8,6 +8,7 @@ add_executable(peredur_tests
     runner/spot_tests.cpp
     filter/correctness_tests.cpp
     filter/implication_tests.cpp
+    filter/running_antichain_tests.cpp
     filter/vacuity_tests.cpp
     filter/well_separation_tests.cpp
     genetic/accumulator_tests.cpp
@@ -67,8 +68,8 @@ target_link_libraries(peredur_tests PRIVATE peredur_fitness)
 # where they landed. Every driver is built into the same directory, so one
 # generator expression covers all of them.
 add_dependencies(peredur_tests
-    peredur compare keyword-terms lint-ideals ltl maximal mucs realize
-    signal_tracer)
+    peredur compare fingerprint keyword-terms lint-ideals ltl maximal mucs
+    realize signal_tracer)
 target_compile_definitions(peredur_tests PRIVATE
     PEREDUR_DRIVER_DIR="$<TARGET_FILE_DIR:peredur>")
 
@@ -113,6 +114,7 @@ set(peredur_test_suites
     status
     correctness
     implication_filter
+    running_antichain
     vacuity_filter
     well_separation_filter
     requirement
@@ -136,6 +138,7 @@ set(peredur_test_suites
     driver_mucs
     driver_compare
     driver_maximal
+    driver_fingerprint
     driver_lint_ideals
     driver_keyword_terms
     driver_signal_tracer

@@ -61,6 +61,8 @@ REPO_ROOT = Path(__file__).parent.parent
 BIN_DIR = Path(os.environ.get("PEREDUR_BIN_DIR", REPO_ROOT / "build-release"))
 MAXIMAL_BIN = Path(os.environ.get("MAXIMAL_BIN", BIN_DIR / "maximal"))
 COMPARE_BIN = Path(os.environ.get("COMPARE_BIN", BIN_DIR / "compare"))
+FINGERPRINT_BIN = Path(os.environ.get("FINGERPRINT_BIN",
+                                      BIN_DIR / "fingerprint"))
 
 # The scorer, as a command line rather than an import: one subprocess per run
 # is what the outer wall cap and the core pinning attach to. PEREDUR_SCORE_CURVES_CMD
@@ -77,11 +79,37 @@ DEFAULTS = {
     "maximal_timeout": 900,
     "compare_timeout": 600,
     "deadline_s": 4500,
+    # Both stages are declared rather than implied, so a phase says which
+    # curves it is for. The maximality sweep is solver-bound and the epsilon
+    # one is not, so a pass that wants only the second should not pay for the
+    # first: the 2026-09-07 maximality pass cost 311.7 worker-hours where an
+    # epsilon pass over the same 3000 runs is minutes.
+    "maximality": "on",
+    "ideals": "on",
+    "epsilon": "",
+    "fingerprint_words": 256,
+    "fingerprint_seed": 0,
+    # The lasso shape and the distance every archived count was drawn under.
+    "fingerprint_max_prefix": 2,
+    "fingerprint_max_cycle": 3,
+    "fingerprint_distance": "hamming",
+    # Empty runs the maximality stage, or none, as `maximality` says. A
+    # directory recounts the maximal nets from that pass's membership
+    # sidecars instead, which needs maximality off.
+    "members_from": "",
+    # `maximal --curve`'s fingerprint prefilter. None leaves the binary's own
+    # default and passes no flag, so a phase that never names one walks as
+    # every archived curve was walked.
+    "prefilter_words": None,
+    "prefilter_max_prefix": None,
+    "prefilter_max_cycle": None,
 }
 # The outer `timeout` sits this far past score_curves.py's own deadline: the
-# deadline stops new cuts being started, and one cut's maximal call may still
-# be inside its --maximal-timeout when it lands.
+# deadline bounds the antichain walk, and the compare and fingerprint calls
+# around it still need time to land.
 WALL_CAP_MARGIN_S = 900
+PREFILTER_KEYS = ("prefilter_words", "prefilter_max_prefix",
+                  "prefilter_max_cycle")
 
 SEED_SUFFIX = re.compile(r"_seed(\d+)$")
 INDEX_PATH = Path("accumulated") / "index.tsv"
@@ -140,6 +168,19 @@ def csv_path(out: Path, run_dir: Path) -> Path:
     return out / f"{run_dir.name}.csv"
 
 
+def sidecar_paths(out: Path, run_dir: Path) -> list:
+    """The membership files score_curves.py writes beside a run's curve.
+
+    They are written under their final names, since score_curves.py strips
+    `.csv.part` before taking the stem, so only a failed attempt has anything
+    to do: it removes them with the `.part` it leaves behind, and a reader
+    listing the output directory never sees a sidecar whose curve was thrown
+    away.
+    """
+    return [out / f"{run_dir.name}{suffix}"
+            for suffix in (".members.tsv", ".fingerprints.tsv")]
+
+
 def is_scored(path: Path) -> bool:
     """A curve is present once its CSV exists and holds something.
 
@@ -153,9 +194,21 @@ def is_scored(path: Path) -> bool:
         return False
 
 
-def read_versions() -> dict:
-    return {"maximal": R.binary_version(MAXIMAL_BIN),
-            "compare": R.binary_version(COMPARE_BIN)}
+def read_versions(args) -> dict:
+    """The binaries this pass will actually run, and no others.
+
+    A stage that is off contributes no binary: gating on `maximal` for an
+    epsilon-only pass would refuse to start over a binary nothing calls, and
+    would name a commit in the manifest that decided none of the rows.
+    """
+    versions = {}
+    if args.ideals == "on":
+        versions["compare"] = R.binary_version(COMPARE_BIN)
+    if args.maximality == "on":
+        versions["maximal"] = R.binary_version(MAXIMAL_BIN)
+    if args.epsilon:
+        versions["fingerprint"] = R.binary_version(FINGERPRINT_BIN)
+    return versions
 
 
 def enforce_freshness(versions: dict, head, allow_stale: bool) -> None:
@@ -190,12 +243,33 @@ def pin_prefix(slot: int, cores: int, pinned: bool) -> list:
 
 
 def scorer_args(args, part: str, run_dir: str) -> list:
-    return [*shlex.split(SCORE_CURVES_CMD), "--maximality",
-            "--cuts", str(args.cuts), "--jobs", str(args.cores),
-            "--deadline-s", str(args.deadline_s),
-            "--maximal-timeout", str(args.maximal_timeout),
-            "--compare-timeout", str(args.compare_timeout),
-            "--out", part, run_dir]
+    command = [*shlex.split(SCORE_CURVES_CMD)]
+    if args.maximality == "on":
+        command += ["--maximality"]
+    if args.ideals == "off":
+        command += ["--skip-ideals"]
+    if args.epsilon:
+        command += ["--epsilon", args.epsilon,
+                    "--fingerprint-words", str(args.fingerprint_words),
+                    "--fingerprint-seed", str(args.fingerprint_seed),
+                    "--fingerprint-max-prefix",
+                    str(args.fingerprint_max_prefix),
+                    "--fingerprint-max-cycle",
+                    str(args.fingerprint_max_cycle),
+                    "--fingerprint-distance", args.fingerprint_distance]
+    if args.members_from:
+        command += ["--members-from", str(resolve(args.members_from))]
+    if args.maximality == "on":
+        for name in PREFILTER_KEYS:
+            value = getattr(args, name)
+            if value is not None:
+                command += [f"--{name.replace('_', '-')}", str(value)]
+    return command + [
+        "--cuts", str(args.cuts), "--jobs", str(args.cores),
+        "--deadline-s", str(args.deadline_s),
+        "--maximal-timeout", str(args.maximal_timeout),
+        "--compare-timeout", str(args.compare_timeout),
+        "--out", part, run_dir]
 
 
 def invocation_template(args) -> str:
@@ -298,6 +372,8 @@ def score_one(run_dir: Path, slot: int, args, out: Path, ledger: Ledger,
         print(f"[{index}/{total}] {run_dir.name}: scored in {elapsed}s")
     else:
         part.unlink(missing_ok=True)
+        for sidecar in sidecar_paths(out, run_dir):
+            sidecar.unlink(missing_ok=True)
         ledger.append(FAILURES_NAME, f"{rc} {run_dir}")
         with ledger.lock:
             ledger.failed += 1
@@ -373,10 +449,18 @@ def build_manifest(args, results: Path, out: Path, versions: dict, head,
         "compare_timeout": args.compare_timeout,
         "deadline_s": args.deadline_s,
         "wall_cap_s": args.wall_cap_s,
+        **{name: getattr(args, name) for name in PREFILTER_KEYS},
         "invocation": invocation_template(args),
         "binaries": {
-            "maximal": {"path": str(MAXIMAL_BIN), **versions["maximal"]},
-            "compare": {"path": str(COMPARE_BIN), **versions["compare"]},
+            **({"maximal": {"path": str(MAXIMAL_BIN),
+                            **versions["maximal"]}}
+               if "maximal" in versions else {}),
+            **({"compare": {"path": str(COMPARE_BIN),
+                            **versions["compare"]}}
+               if "compare" in versions else {}),
+            **({"fingerprint": {"path": str(FINGERPRINT_BIN),
+                                **versions["fingerprint"]}}
+               if "fingerprint" in versions else {}),
         },
         "git": {"branch": R.git_branch(), "head": head or R.LEGACY_COMMIT},
         "allow_stale_binary": bool(args.allow_stale_binary),
@@ -424,15 +508,58 @@ def parse_args(argv=None) -> argparse.Namespace:
                              f"{DEFAULTS['cuts']})")
     parser.add_argument("--maximal-timeout", type=int,
                         default=DEFAULTS["maximal_timeout"],
-                        help=f"seconds per maximal call, per cut (default: "
+                        help=f"seconds for the antichain walk where no deadline "
+                             f"bounds it (default: "
                              f"{DEFAULTS['maximal_timeout']})")
     parser.add_argument("--compare-timeout", type=int,
                         default=DEFAULTS["compare_timeout"],
                         help=f"seconds for the compare call (default: "
                              f"{DEFAULTS['compare_timeout']})")
+    parser.add_argument("--maximality", choices=("on", "off"),
+                        default=DEFAULTS["maximality"],
+                        help="run the implication sweep over time cuts "
+                             f"(default: {DEFAULTS['maximality']})")
+    parser.add_argument("--ideals", choices=("on", "off"),
+                        default=DEFAULTS["ideals"],
+                        help="label candidates against the family's ideals "
+                             f"with compare (default: {DEFAULTS['ideals']})")
+    parser.add_argument("--epsilon", default=DEFAULTS["epsilon"],
+                        help="comma-separated separation thresholds for the "
+                             "behavioural-fingerprint curves; empty runs none "
+                             "(default: none)")
+    parser.add_argument("--fingerprint-words", type=int,
+                        default=DEFAULTS["fingerprint_words"],
+                        help="lasso words sampled per family for --epsilon "
+                             f"(default: {DEFAULTS['fingerprint_words']})")
+    parser.add_argument("--fingerprint-seed", type=int,
+                        default=DEFAULTS["fingerprint_seed"],
+                        help="word-sampling seed for --epsilon "
+                             f"(default: {DEFAULTS['fingerprint_seed']})")
+    parser.add_argument("--fingerprint-max-prefix", type=int,
+                        default=DEFAULTS["fingerprint_max_prefix"],
+                        help="longest lasso stem for --epsilon (default: "
+                             f"{DEFAULTS['fingerprint_max_prefix']})")
+    parser.add_argument("--fingerprint-max-cycle", type=int,
+                        default=DEFAULTS["fingerprint_max_cycle"],
+                        help="longest lasso loop for --epsilon (default: "
+                             f"{DEFAULTS['fingerprint_max_cycle']})")
+    parser.add_argument("--fingerprint-distance", choices=("hamming", "union"),
+                        default=DEFAULTS["fingerprint_distance"],
+                        help="normaliser of the separation distance "
+                             f"(default: {DEFAULTS['fingerprint_distance']})")
+    parser.add_argument("--members-from", default=DEFAULTS["members_from"],
+                        help="an earlier maximality pass's output directory; "
+                             "recounts its maximal nets from the membership "
+                             "sidecars there, with --maximality off "
+                             "(default: none)")
+    for name in PREFILTER_KEYS:
+        parser.add_argument(f"--{name.replace('_', '-')}", type=int,
+                            default=DEFAULTS[name],
+                            help=f"maximal --{name.replace('_', '-')} for "
+                                 f"the walk (default: the binary's)")
     parser.add_argument("--deadline-s", type=int,
                         default=DEFAULTS["deadline_s"],
-                        help=f"score_curves.py stops adding cuts after this "
+                        help=f"the antichain walk's budget in score_curves.py "
                              f"(default: {DEFAULTS['deadline_s']})")
     parser.add_argument("--wall-cap-s", type=int, default=None,
                         help=f"outer timeout on one scorer (default: "
@@ -447,6 +574,18 @@ def parse_args(argv=None) -> argparse.Namespace:
                  "compare_timeout", "deadline_s"):
         if getattr(args, name) < 1:
             parser.error(f"--{name.replace('_', '-')} must be positive")
+    if args.members_from:
+        if args.maximality == "on":
+            parser.error("--members-from needs --maximality off: it reads "
+                         "the membership that stage would compute")
+        if not args.epsilon:
+            parser.error("--members-from recounts the epsilon nets, so it "
+                         "needs --epsilon")
+    for name in PREFILTER_KEYS:
+        value = getattr(args, name)
+        low = 0 if name == "prefilter_max_prefix" else 1
+        if value is not None and value < low:
+            parser.error(f"--{name.replace('_', '-')} must be at least {low}")
     if args.wall_cap_s is None:
         args.wall_cap_s = wall_cap_default(args.deadline_s)
     elif args.wall_cap_s < 1:
@@ -465,6 +604,10 @@ def main(argv=None) -> int:
     out = resolve(args.out)
     if not results.is_dir():
         print(f"no results directory at {results}", file=sys.stderr)
+        return 2
+    if args.members_from and not resolve(args.members_from).is_dir():
+        print(f"no membership directory at {resolve(args.members_from)}",
+              file=sys.stderr)
         return 2
     # Refused before the queue is built: an oversized pool is not a slow
     # pass but a fast one, `taskset -c` on a core the host does not have
@@ -486,7 +629,7 @@ def main(argv=None) -> int:
         return 2
     already = [r for r in runs if is_scored(csv_path(out, r))]
     todo = [r for r in runs if not is_scored(csv_path(out, r))]
-    versions = read_versions()
+    versions = read_versions(args)
     head = R.working_tree_head()
     pinned = shutil.which("taskset") is not None
     timeout_bin = shutil.which("timeout")
@@ -507,7 +650,8 @@ def main(argv=None) -> int:
     print(f"    budgets:  maximal {args.maximal_timeout}s, compare "
           f"{args.compare_timeout}s, deadline {args.deadline_s}s, wall cap "
           f"{args.wall_cap_s}s")
-    print(f"    binaries: {label('maximal')}, {label('compare')}")
+    print("    binaries: "
+          + ", ".join(label(name) for name in sorted(versions)))
     print(f"    command:  {invocation_template(args)}")
 
     if args.dry_run:
@@ -533,6 +677,7 @@ def main(argv=None) -> int:
     child_env = dict(os.environ)
     child_env.setdefault("MAXIMAL_BIN", str(MAXIMAL_BIN))
     child_env.setdefault("COMPARE_BIN", str(COMPARE_BIN))
+    child_env.setdefault("FINGERPRINT_BIN", str(FINGERPRINT_BIN))
     ledger = Ledger(out)
     run_pool(todo, args, out, ledger, pinned, timeout_bin, child_env)
 

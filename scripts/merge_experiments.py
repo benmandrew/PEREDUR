@@ -152,6 +152,13 @@ PROFILE_CSVS: dict[str, str] = {
     "fretish-ablation": "results-fretish-ablation.csv",
     "fretish-rerun": "results-fretish-rerun.csv",
     "fretish-rerun-calib": "results-fretish-rerun-calib.csv",
+    "tlsf-rerun": "results-tlsf-rerun.csv",
+    "tlsf-rerun-calib": "results-tlsf-rerun-calib.csv",
+    # The 2026-09-14 paper re-run. Its own CSVs, never rematch's: the design
+    # and key fields are identical and only the commit differs, which is not
+    # in the key, so a shared CSV would keep one row of each pair.
+    "paper-rerun": "results-paper-rerun.csv",
+    "paper-rerun-calib": "results-paper-rerun-calib.csv",
 }
 
 # Per-run output directory each profile writes under experiments/. Most profiles
@@ -204,6 +211,10 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
     "fretish-ablation": "results-fretish-ablation",
     "fretish-rerun": "results-fretish-rerun",
     "fretish-rerun-calib": "results-fretish-rerun-calib",
+    "tlsf-rerun": "results-tlsf-rerun",
+    "tlsf-rerun-calib": "results-tlsf-rerun-calib",
+    "paper-rerun": "results-paper-rerun",
+    "paper-rerun-calib": "results-paper-rerun-calib",
 }
 
 # Natural key of a results row: one run per (sweep, level_name, selection,

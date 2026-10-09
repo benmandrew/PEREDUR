@@ -1,0 +1,46 @@
+name = "2026-10-07-tlsf-rerun-scoring"
+branch = "campaign/tlsf-rerun-scoring"
+description = "Maximality curves and the separation recount over 2026-10-07-tlsf-rerun's search output, with 2026-09-14-paper-rerun-curves' scorer plus two verdict-preserving speed-ups. PLAN.md gives the measurements and the passes that follow."
+
+# Must equal 2026-10-07-tlsf-rerun's split: a score phase reads only the runs
+# its own host wrote.
+hosts = { av2 = "0-12,19-24", av3 = "13-18", av1 = "25-29" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# 2026-09-14-paper-rerun-curves' maximality-peredur settings, unchanged, plus
+# the 4096-word prefilter (PLAN.md: verdict-identical on 11/11 runs).
+[[phases]]
+name = "maximality"
+kind = "score"
+results = "experiments/results-tlsf-rerun"
+out = "experiments/curves-tlsf-rerun"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 3000
+deadline_s = 7500
+prefilter_words = 4096
+
+# 2026-10-01-separation-recount's counter-s0 settings, reading membership
+# from the maximality phase above.
+[[phases]]
+name = "recount"
+kind = "score"
+results = "experiments/results-tlsf-rerun"
+out = "experiments/separation-recount-tlsf-rerun-s0"
+members_from = "experiments/curves-tlsf-rerun"
+workers = 32
+cores = 1
+maximality = "off"
+ideals = "off"
+epsilon = "0.05,0.2,0.5"
+fingerprint_words = 65536
+fingerprint_seed = 0
+fingerprint_max_prefix = 8
+fingerprint_max_cycle = 8
+fingerprint_distance = "union"
+cuts = 20
+deadline_s = 900
+wall_cap_s = 1200

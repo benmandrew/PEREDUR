@@ -69,21 +69,32 @@ kind = "score"          # scores the run phase's results directory
 workers = 8             # scorers in flight, each pinned to `cores` cores
 cores = 4               # cores per scorer, also score_curves.py --jobs
 cuts = 20
-maximal_timeout = 900   # seconds per maximal call, per cut
+maximal_timeout = 900   # seconds for the antichain walk, absent a deadline
 compare_timeout = 600   # seconds for the compare call
-deadline_s = 4500       # score_curves.py stops adding cuts after this
+deadline_s = 4500       # the walk's real budget wherever it is set
 wall_cap_s = 5400       # the outer timeout on one scorer; default deadline_s + 900
+maximality = "on"       # run the implication sweep over the time cuts
+ideals = "on"           # label candidates against the family's ideals
+epsilon = ""            # separation thresholds, e.g. "0.05,0.2,0.5"; none if empty
+fingerprint_words = 256
+fingerprint_seed = 0
 ```
+
+The maximality stage is one `maximal --curve` walk a run (see "Running antichain" in `docs/dev/performance.md`), so `maximal_timeout` bounds the whole walk and `deadline_s` replaces it wherever set. It was a per-cut bound until the walk replaced one process per cut, and applying it unchanged would have tightened it fivefold. The walk streams its event log, so a budget that fires keeps the rows already written and the curve covers the cuts up to them.
+
+The last five choose which curves a phase writes. `maximality = "off"` with a non-empty `epsilon` is the behavioural-separation pass (see "Behavioural fingerprints" in `docs/dev/performance.md`): it makes no solver call, where the maximality sweep over the 3000 rematch runs cost 311.7 worker-hours. `ideals = "off"` drops the `compare` call behind `ideal_solutions`, which is 7.2 s of a 7.3 s epsilon-only run on a 421-candidate directory. A phase with `maximality = "off"` and no `epsilon` is refused, having nothing to score. The word count and seed must match across any two phases whose curves are compared. The manifest records which stages a phase ran and which binaries decided them, so an epsilon-only pass names `fingerprint` and neither `maximal` nor `compare`.
 
 `results` defaults to the profile's results directory and `out` to `curves-<stem>`. Budgets default to `score_campaign.DEFAULTS` and are always written to the command line, so the manifest records the values used rather than a default that moved.
 
-The host runs `scripts/score_campaign.py`. Run directories are queued smallest first by `accumulated/index.tsv` length, so heavy families land last. Each worker holds `cores` cores under `taskset -c` and runs `score_curves.py --maximality` under `timeout <wall_cap_s>` in its own session, so a cap kills the `maximal` and `compare` it forked too. A curve is written as `<out>/<run>.csv.part` and moved into place only on a zero exit with a non-empty file. A failed attempt lands as `rc run` in `<out>/failures.txt`, every attempt in `<out>/timings.txt` with its budgets, and output in `<out>/warnings.log`. Startup refuses `workers x cores` above the host's CPU count, since `taskset -c` on a missing core exits 1 and drains the queue into `failures.txt`, and exits 2 when no run directory matches this host's seeds, so a tick cannot mark an empty pass done.
+The host runs `scripts/score_campaign.py`. Run directories are queued smallest first by `accumulated/index.tsv` length, so heavy families land last. Each worker holds `cores` cores under `taskset -c` and runs `score_curves.py --maximality` under `timeout <wall_cap_s>` in its own session, so a cap kills the `maximal` and `compare` it forked too. A curve is written as `<out>/<run>.csv.part` and moved into place only on a zero exit with a non-empty file. Beside it the scorer writes `<run>.members.tsv`, one row per (cut, surviving file), and `<run>.fingerprints.tsv`, one row per candidate and its hex fingerprint, and all three move or are unlinked together, so a reader never sees a sidecar whose curve was thrown away. There is no flag for the sidecars, because a flag is how membership went missing before: the 2026-09-07 pass wrote only the sizes of the survivor sets it held, so asking which repairs were maximal at 60 s cost its 311.7 worker-hours again. A failed attempt lands as `rc run` in `<out>/failures.txt`, every attempt in `<out>/timings.txt` with its budgets, and output in `<out>/warnings.log`. Startup refuses `workers x cores` above the host's CPU count, since `taskset -c` on a missing core exits 1 and drains the queue into `failures.txt`, and exits 2 when no run directory matches this host's seeds, so a tick cannot mark an empty pass done.
 
 A host scores only run directories ending `_seed<N>` for its own seeds, so the union `collect --curves` verifies is disjoint by construction.
 
 The runner's freshness gate covers `build-release/maximal` and `build-release/compare`. The declaration has no `--allow-stale-binary` key, because curves carry no commit, the manifest is the only record, and an override belongs at a prompt where somebody answers for it.
 
 The pass exits 0 only when every run has a curve; otherwise the tick spends an attempt and requeues it, and the resume skips existing non-empty CSVs. To raise a budget, commit to `campaign.toml` and `enqueue` again.
+
+A separation recount never re-runs the maximality sweep. `maximality = "off"` with `members_from` naming an earlier pass's `out` reads each run's antichains from that pass's `<run>.members.tsv` sidecars and fingerprints the candidates afresh, so the word count, lasso shape (`fingerprint_max_prefix`, `fingerprint_max_cycle`) and distance (`fingerprint_distance`) can all move at the cost of one `fingerprint` call a run. The scripts/README.md score-phase section has the keys and their defaults.
 
 `stage` and the tick refuse a score phase whose results directory is missing, unless an earlier run phase of the campaign writes it. To reproduce an archived pass, declare a campaign of one score phase.
 
@@ -133,6 +144,21 @@ black_timeout = 30       # seconds per draw
 `fpdraw` is `EXCLUDE_FROM_ALL`, so the campaign's `build` names it: `sh -c 'cmake --build build-release && cmake --build build-release --target fpdraw'`. A subject whose draw gets any black `ERROR`, or no word at all, fails the pass and leaves no words behind. Each step's output is written whole and renamed into place, and a subject is done once its progress row and `pairs.csv` both exist, so a killed pass resumes at the first missing step of the first unfinished subject. The pass exits 0 only when every subject is done. The tick refuses the phase by name where the subject list or members directory is missing, and `status` shows it as `fingerprint:<campaign>.<phase>` with finished subjects against the subject count.
 
 `collect --outputs <out>` copies each host's `experiments/<out>/` into `experiments/<out>/<host>/` and joins nothing; it is the collect for a fingerprint phase and the compare phase after it, whose outputs are a tree. A host with no files is INCOMPLETE.
+## Frontier phases
+
+A `kind = "frontier"` phase runs `pooled_frontier.py run` over a work tree its `plan` step already wrote, the families dealt to each host in `<work>/jobs-<host>.csv`:
+
+```toml
+[[phases]]
+kind = "frontier"
+work = "experiments/pooled-rq3/work"
+workers = 4        # families in flight (default 1)
+solver_jobs = 4    # maximal --jobs per family (default 4)
+timeout = 300      # seconds per solver call (default 300)
+cache = "experiments/pooled-cache"   # optional; default <work>/cache
+```
+
+It takes no profile and no seeds; a phase `hosts` table still narrows where it runs, and the host name passed as `--host` is the campaign's (`av1`), which is what `plan --hosts` named the jobs file after. `stage` refuses a host whose jobs file is missing. Before each attempt the tick refuses the same, and refuses a `build-release/maximal` or `compare` that is not a clean build of HEAD, then writes `<work>/frontier-manifest-<host>.json`. `pooled_frontier.py run` resumes by skipping families with a `result.json` and exits 0 only when every family of the host has one, so a failed attempt requeues and the next resumes. `start` refuses a campaign with a frontier phase, since the remote probe does not read those two binaries; use `enqueue`. `status` shows the phase as `frontier:<work>`, ROWS being families with a result against those dealt the host.
 
 ## Reading a run
 
@@ -190,7 +216,7 @@ A tick takes the lock at `~/.peredur-queue.lock`, recovers any `running` entry, 
 
 ## A tick stages its own branch
 
-With nobody at a terminal to confirm `--force`, a tick on the wrong branch stages itself: it fetches the entry's commit, checks it out, builds, and reads `build-release/peredur --version` before the phase.
+With nobody at a terminal to confirm `--force`, a tick on the wrong branch stages itself: it fetches the entry's commit, checks it out, builds, and reads `build-release/peredur --version` before the phase. A tick whose checkout is already at the entry's commit still builds and reads the binary back, because a staging that checked out and then failed its build leaves HEAD there over the previous commit's binaries. `--no-stage` skips that build too.
 
 It stages for the branch alone and still refuses, spending an attempt with the reason in `last_error`:
 

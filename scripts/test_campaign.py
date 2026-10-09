@@ -489,6 +489,55 @@ check((sprocs[0].get("kind"), sprocs[0].get("out"), sprocs[0]["profile"]),
       ("score", "experiments/curves-rematch", None),
       "the scorer is read as a scorer naming its output directory, and no "
       "profile")
+frontier_procs = C.live_processes([
+    "python3 python3 scripts/pooled_frontier.py run experiments/pf/work "
+    "--host av1 --workers 2",
+    "python3 python3 scripts/pooled_frontier.py score experiments/pf/work o"])
+check([(p["kind"], p["out"]) for p in frontier_procs],
+      [("frontier", "experiments/pf/work")],
+      "pooled_frontier.py run is a frontier process naming its work tree; "
+      "its offline score step is not")
+frontier_records = C.campaigns_from_frontier_manifests([
+    {"kind": "frontier", "host": "av1", "work": "experiments/pf/work",
+     "planned": 3, "started": "2026-10-07T10:00:00+0100",
+     "git": {"branch": "b", "head": "abcdef0123"},
+     "binaries": {"maximal": {"commit_short": "abcdef0", "dirty": "0"}}},
+    {"kind": "frontier", "host": "av2", "work": "experiments/pf/work",
+     "planned": 2}], "av1")
+check([(c["label"], c["rows_planned"], c["binary_commit"])
+       for c in frontier_records],
+      [("frontier:work", 3, "abcdef0")],
+      "a host reports its own frontier manifest, not one copied with the tree")
+check_true(C.claims_campaign(frontier_procs[0], frontier_records[0]),
+           "and its pooled_frontier.py run claims that row")
+check_true(not C.claims_campaign(
+    {"kind": "score", "out": "experiments/pf/work"}, frontier_records[0]),
+           "a scorer on a same-named directory does not")
+frontier_inv = C.parse_inventory("\n".join([
+    C.MARK + "FRONTIERMANIFESTS", C.MARK + "FFILE experiments/pf/work/x.json",
+    json.dumps({"kind": "frontier", "host": "av1"}),
+    C.MARK + "ENDFFILE", C.MARK + "END"]))
+check(frontier_inv["frontier_manifests"], [{"kind": "frontier", "host": "av1"}],
+      "the inventory carries frontier manifests")
+detail_root = Path(tempfile.mkdtemp(prefix="campaign-frontier-detail-"))
+try:
+    work = detail_root / "experiments" / "pf" / "work"
+    (work / "a").mkdir(parents=True)
+    (work / "a" / "result.json").write_text("{}")
+    (work / "c").mkdir()
+    (work / "c" / "result.json").write_text("{}")
+    (work / "jobs-av1.csv").write_text("spec\na\nb\n")
+    text, err = C.run_shell(C.LOCAL, C.detail_script(str(detail_root),
+                                                      frontier_records))
+    detail = C.parse_detail(text or "")
+    check((err, detail.get("frontier:work", {}).get("rows_done")), (None, 1),
+          "a frontier row counts result.json for this host's families only")
+    record = {**frontier_records[0], **detail["frontier:work"]}
+    C.annotate(record, {"epoch": int(time.time()), "processes": []})
+    check((record["state"], record["pct"] is not None), ("stalled", True),
+          "and annotates like any other row")
+finally:
+    shutil.rmtree(detail_root, ignore_errors=True)
 check(C.live_processes(["python3 python3 scripts/score_campaign.py --out x "
                         "--dry-run"]), [],
       "a --dry-run scorer is a probe, not a pass")
@@ -1494,7 +1543,13 @@ hosts = { av2 = "0-4" }
     check(score["name"], "curves-tlsf", "named after its output by default")
     check({k: score[k] for k in C.SCORE_BUDGET_KEYS},
           {"workers": 8, "cores": 4, "cuts": 20, "maximal_timeout": 900,
-           "compare_timeout": 600, "deadline_s": 4500, "wall_cap_s": 5400},
+           "compare_timeout": 600, "deadline_s": 4500, "wall_cap_s": 5400,
+           "maximality": "on", "ideals": "on", "epsilon": "",
+           "fingerprint_words": 256, "fingerprint_seed": 0,
+           "fingerprint_max_prefix": 2, "fingerprint_max_cycle": 3,
+           "fingerprint_distance": "hamming", "members_from": "",
+           "prefilter_words": None, "prefilter_max_prefix": None,
+           "prefilter_max_cycle": None},
           "every budget defaults to the scorer's own value, and the wall cap "
           "sits 900s past the deadline")
     check(C.score_defaults(),
@@ -1506,7 +1561,13 @@ hosts = { av2 = "0-4" }
           "an explicit results and out are carried through")
     check({k: old[k] for k in C.SCORE_BUDGET_KEYS},
           {"workers": 2, "cores": 8, "cuts": 5, "maximal_timeout": 60,
-           "compare_timeout": 30, "deadline_s": 100, "wall_cap_s": 1000},
+           "compare_timeout": 30, "deadline_s": 100, "wall_cap_s": 1000,
+           "maximality": "on", "ideals": "on", "epsilon": "",
+           "fingerprint_words": 256, "fingerprint_seed": 0,
+           "fingerprint_max_prefix": 2, "fingerprint_max_cycle": 3,
+           "fingerprint_distance": "hamming", "members_from": "",
+           "prefilter_words": None, "prefilter_max_prefix": None,
+           "prefilter_max_cycle": None},
           "and so is every budget it states")
     check(old["hosts"], {"av2": list(range(5))},
           "a score phase narrows the split exactly as a run phase does")
@@ -1537,6 +1598,39 @@ phases = [ { kind = "score", results = "experiments/results-rematch" } ]
     check(dironly["results_dirs"], {"av2": ["experiments/results-rematch"]},
           "but does check the results directory it reads")
 
+    write_declaration(decl_root, "frontier", """
+name = "frontier"
+branch = "feat/x"
+profile = "tlsf"
+hosts = { av1 = "", av2 = "", av3 = "" }
+[[phases]]
+kind = "frontier"
+work = "experiments/pf/work"
+hosts = ["av1", "av2"]
+""")
+    frontier = C.load_campaign("frontier", decl_root)
+    fphase = frontier["phases"][0]
+    check({k: fphase[k] for k in ("name", "kind", "profile", "work",
+                                  "workers", "solver_jobs", "timeout",
+                                  "cache")},
+          {"name": "work", "kind": "frontier", "profile": None,
+           "work": "experiments/pf/work", "workers": 1, "solver_jobs": 4,
+           "timeout": 300, "cache": None},
+          "a frontier phase takes pooled_frontier.py's defaults and no "
+          "profile, even with a top-level one")
+    check(frontier["frontier_jobs"],
+          {"av1": ["experiments/pf/work/jobs-av1.csv"],
+           "av2": ["experiments/pf/work/jobs-av2.csv"], "av3": []},
+          "stage demands each host's own jobs file, and none where the phase "
+          "narrows the host away")
+    check((frontier["config_dirs"], frontier["results_dirs"]),
+          ([], {"av1": [], "av2": [], "av3": []}),
+          "and no configs or results directory")
+    check([C.phase_runs_on(fphase, h, []) for h in ("av1", "av2", "av3")],
+          [True, True, False],
+          "a frontier phase's hosts is an array of names, like a compare "
+          "phase's, so it runs under a campaign that declares no seeds")
+
     for text, expect_in, why in (
         ('phases = [ { kind = "score" } ]', "neither",
          "a score phase with no results and no profile"),
@@ -1555,13 +1649,60 @@ phases = [ { kind = "score", results = "experiments/results-rematch" } ]
         ('phases = [ { kind = "score", results = "x", workers = 0 } ]',
          "workers must be a positive integer", "zero workers"),
         ('phases = [ { kind = "score", results = "x", cores = true } ]',
-         "cores must be a positive integer", "a boolean core count"),
+         "cores must be an integer", "a boolean core count"),
         ('phases = [ { kind = "score", results = "x", deadline_s = "1" } ]',
-         "deadline_s must be a positive integer", "a string deadline"),
+         "deadline_s must be an integer", "a string deadline"),
         ('phases = [ { kind = "score", results = "" } ]',
          "results must be a non-empty string", "an empty results"),
         ('phases = [ { kind = "score", results = "x", out = 3 } ]',
          "out must be a non-empty string", "a numeric out"),
+        ('phases = [ { kind = "score", results = "x", maximality = "yes" } ]',
+         "maximality must be one of", "a maximality that is not on or off"),
+        ('phases = [ { kind = "score", results = "x", epsilon = 3 } ]',
+         "epsilon must be a string", "a numeric epsilon"),
+        ('phases = [ { kind = "score", results = "x", '
+         'fingerprint_seed = -1 } ]',
+         "fingerprint_seed must be a non-negative integer",
+         "a negative fingerprint seed"),
+        ('phases = [ { kind = "score", results = "x", maximality = "off" } ]',
+         "would score nothing", "a phase with both stages off"),
+        ('phases = [ { kind = "score", results = "x", epsilon = "0.05", '
+         'members_from = "experiments/m" } ]',
+         "needs maximality off", "members_from beside the maximality stage"),
+        ('phases = [ { kind = "score", results = "x", maximality = "off", '
+         'epsilon = "0.05", fingerprint_distance = "jaccard" } ]',
+         "fingerprint_distance must be one of", "an unknown distance"),
+        ('phases = [ { kind = "score", results = "x", maximality = "off", '
+         'epsilon = "0.05", fingerprint_max_prefix = 32, '
+         'fingerprint_max_cycle = 33 } ]',
+         "must not exceed 64", "a lasso longer than 64 positions"),
+        ('phases = [ { kind = "score", results = "x", maximality = "off", '
+         'epsilon = "0.05", fingerprint_max_cycle = 0 } ]',
+         "fingerprint_max_cycle must be a positive integer",
+         "an empty lasso loop"),
+        ('phases = [ { kind = "score", results = "x", maximality = "off", '
+         'epsilon = "0.05", prefilter_words = 4096 } ]',
+         "need maximality on", "a prefilter key with no walk to tune"),
+        ('phases = [ { kind = "score", results = "x", '
+         'prefilter_max_prefix = 32, prefilter_max_cycle = 33 } ]',
+         "must not exceed 64", "a prefilter lasso longer than 64 positions"),
+        ('phases = [ { kind = "score", results = "x", '
+         'prefilter_words = 0 } ]',
+         "prefilter_words must be a positive integer",
+         "a prefilter drawing no words"),
+        ('phases = [ { kind = "frontier" } ]',
+         "needs `work`", "a frontier phase with no work tree"),
+        ('phases = [ { kind = "frontier", work = "w", jobs = 2 } ]',
+         "unknown key(s) jobs on a frontier phase", "jobs on a frontier phase"),
+        ('phases = [ { kind = "frontier", work = "w", profile = "full" } ]',
+         "unknown key(s) profile on a frontier phase",
+         "a profile on a frontier phase"),
+        ('phases = [ { kind = "frontier", work = "w", workers = 0 } ]',
+         "workers must be a positive integer", "a frontier with no workers"),
+        ('phases = [ { kind = "frontier", work = "w", timeout = "9" } ]',
+         "timeout must be a positive integer", "a string timeout"),
+        ('phases = [ { kind = "frontier", work = "w", cache = 3 } ]',
+         "cache must be a non-empty string", "a numeric cache"),
     ):
         got = declaration_error(decl_root, "badscore", f"""
 name = "badscore"
@@ -1592,21 +1733,59 @@ check_true(C.phase_command(phase, [0, 1]).startswith(C.RUNNER_CMD + " "),
 score_phase = {"name": "curves", "kind": "score", "profile": None,
                "results": "experiments/results-x", "out": "experiments/curves-x",
                "workers": 3, "cores": 2, "cuts": 5, "maximal_timeout": 60,
-               "compare_timeout": 30, "deadline_s": 100, "wall_cap_s": 1000}
+               "compare_timeout": 30, "deadline_s": 100, "wall_cap_s": 1000,
+               "maximality": "on", "ideals": "on", "epsilon": "",
+           "fingerprint_words": 256, "fingerprint_seed": 0}
 check(C.phase_args(score_phase, [0, 1]),
       ["--results", "experiments/results-x", "--out", "experiments/curves-x",
        "--workers", "3", "--cores", "2", "--cuts", "5",
        "--maximal-timeout", "60", "--compare-timeout", "30",
-       "--deadline-s", "100", "--wall-cap-s", "1000", "--seeds", "0", "1"],
+       "--deadline-s", "100", "--wall-cap-s", "1000",
+       "--maximality", "on", "--ideals", "on", "--epsilon", "",
+       "--fingerprint-words", "256", "--fingerprint-seed", "0",
+       "--fingerprint-max-prefix", "2", "--fingerprint-max-cycle", "3",
+       "--fingerprint-distance", "hamming", "--members-from", "",
+       "--seeds", "0", "1"],
       "a score phase becomes scorer arguments, every budget stated, seeds last")
 check(C.phase_command(score_phase, [0, 1]),
       C.SCORER_CMD + " --results experiments/results-x --out "
       "experiments/curves-x --workers 3 --cores 2 --cuts 5 "
       "--maximal-timeout 60 --compare-timeout 30 --deadline-s 100 "
-      "--wall-cap-s 1000 --seeds 0 1",
+      "--wall-cap-s 1000 --maximality on --ideals on --epsilon '' "
+      "--fingerprint-words 256 --fingerprint-seed 0 "
+      "--fingerprint-max-prefix 2 --fingerprint-max-cycle 3 "
+      "--fingerprint-distance hamming --members-from '' --seeds 0 1",
       "and its command is the scorer's, not the runner's")
 check(C.phase_launcher({"profile": "tlsf"}), C.RUNNER_CMD,
       "a phase record with no kind at all launches the runner")
+prefilter_phase = {**score_phase, "prefilter_words": 4096,
+                   "prefilter_max_prefix": None, "prefilter_max_cycle": 8}
+prefilter_args = C.phase_args(prefilter_phase, [0])
+check(prefilter_args[-6:],
+      ["--prefilter-words", "4096", "--prefilter-max-cycle", "8",
+       "--seeds", "0"],
+      "a declared prefilter key reaches the scorer and an absent one does not")
+check_true("--prefilter-max-prefix" not in prefilter_args,
+           "so the binary keeps its own default for the one left out")
+
+frontier_phase = {"name": "pf", "kind": "frontier", "profile": None,
+                  "work": "experiments/pf/work", "workers": 2,
+                  "solver_jobs": 3, "timeout": 40, "cache": None,
+                  "hosts": None}
+check(C.phase_args(frontier_phase, [0, 1], "av1"),
+      ["run", "experiments/pf/work", "--host", "av1", "--workers", "2",
+       "--solver-jobs", "3", "--timeout", "40"],
+      "a frontier phase becomes pooled_frontier.py run over the host's jobs, "
+      "with no seeds")
+check(C.phase_command({**frontier_phase, "cache": "c d"}, [0], "av2"),
+      C.FRONTIER_CMD + " run experiments/pf/work --host av2 --workers 2 "
+      "--solver-jobs 3 --timeout 40 --cache 'c d'",
+      "and its command is pooled_frontier.py's, the cache quoted")
+try:
+    C.phase_args(frontier_phase, [0])
+    check_true(False, "a frontier phase with no host must be refused")
+except C.CampaignError:
+    pass
 
 # The freeze has to reach the overrides. Freezing the campaign range alone
 # would pin the phases that do not narrow it and leave every phase that does
@@ -2035,6 +2214,22 @@ for script, why in ((apply_forced, "with a command"),
         if "*.toml" in stripped:
             check_true("'*.toml'" in stripped or '"*.toml"' in stripped,
                        f"every *.toml is quoted, not just the first: {line!r}")
+jobs_root = Path(tempfile.mkdtemp(prefix="campaign-jobs-"))
+try:
+    jobs_block = C.configs_block(None, [], None, ["w/jobs-av1.csv"]).replace(
+        "@M@", C.MARK)
+    missing = subprocess.run(["sh", "-c", jobs_block], cwd=jobs_root,
+                             capture_output=True, text=True)
+    check((missing.returncode, "no frontier jobs file" in missing.stdout),
+          (12, True), "stage refuses a host with no frontier jobs file")
+    (jobs_root / "w").mkdir()
+    (jobs_root / "w" / "jobs-av1.csv").write_text("spec\na\n")
+    present = subprocess.run(["sh", "-c", jobs_block], cwd=jobs_root,
+                             capture_output=True, text=True)
+    check(present.returncode, 0, "and passes one that has it")
+finally:
+    shutil.rmtree(jobs_root, ignore_errors=True)
+
 check_true(C.configs_block(None, ["a b", "c"]).count("'a b'") == 1,
            "a configs directory with a space in it survives the substitution")
 
@@ -2557,6 +2752,28 @@ phases = [
 ]
 """
 
+FRONTIER_DECL = """
+name = "frontier"
+branch = "feat/frontier"
+build = "true"
+hosts = { local = "8" }
+
+[[phases]]
+kind = "frontier"
+work = "experiments/pf/work"
+workers = 2
+solver_jobs = 3
+timeout = 40
+cache = "experiments/pf/cache"
+"""
+
+
+def fake_frontier_binary(path: Path, commit: str) -> None:
+    path.write_text(f"#!/bin/sh\necho commit={commit}\necho commit_short="
+                    f"{commit[:7]}\necho dirty=0\n")
+    path.chmod(0o755)
+
+
 queue_root = Path(tempfile.mkdtemp(prefix="campaign-queue-"))
 try:
     repo = queue_root / "checkout"
@@ -3004,6 +3221,27 @@ try:
     check(only_entry()["attempts"], 1, "one attempt spent")
     check_true(not calls.exists(), "and the phase never ran")
 
+    # The checkout landed before the build failed, so HEAD is already at the
+    # entry's commit and only the binaries are stale. The next tick must still
+    # build rather than take HEAD as proof: av3 ran a whole campaign's phase on
+    # the previous commit's compare after exactly this.
+    check(git(repo, "rev-parse", "HEAD"), only_entry()["commit"],
+          "the failed staging left HEAD at the entry's commit")
+    code, printed = tick()
+    check(code, 1, "and the next tick rebuilds, which fails again")
+    check_true("rebuilding feat/queued" in only_entry()["last_error"],
+               "naming the rebuild as the step that failed")
+    check(only_entry()["attempts"], 2, "spending a second attempt")
+    check_true(not calls.exists(), "and still running no phase")
+
+    entry = only_entry()
+    entry.update({"state": "queued", "attempts": 0, "build": "true"})
+    C.write_entry(entry["path"], entry)
+    code, printed = tick()
+    check(code, 0, "once the build passes, the phase runs")
+    check_true("--profile full" in calls.read_text(), "on the rebuilt binary")
+    calls.unlink()
+
     entry = only_entry()
     entry.update({"state": "queued", "attempts": 0, "build": "true",
                   "commit": "0" * 40})
@@ -3099,7 +3337,11 @@ try:
     check_true(f"would run: {C.SCORER_CMD} --results experiments/results "
                f"--out experiments/curves --workers 2 --cores 1 --cuts 20 "
                f"--maximal-timeout 900 --compare-timeout 600 --deadline-s 10 "
-               f"--wall-cap-s 910 --seeds 6 7" in printed,
+               f"--wall-cap-s 910 --maximality on --ideals on --epsilon '' "
+               f"--fingerprint-words 256 --fingerprint-seed 0 "
+               f"--fingerprint-max-prefix 2 --fingerprint-max-cycle 3 "
+               f"--fingerprint-distance hamming --members-from '' "
+               f"--seeds 6 7" in printed,
                f"printing the scorer command it would run: {printed!r}")
     check_true("blocked: no results directory" in printed,
                "and the missing results directory that blocks it")
@@ -3131,7 +3373,10 @@ try:
           "--results experiments/results --out experiments/curves "
           "--workers 2 --cores 1 --cuts 20 --maximal-timeout 900 "
           "--compare-timeout 600 --deadline-s 10 --wall-cap-s 910 "
-          "--seeds 6 7",
+          "--maximality on --ideals on --epsilon  --fingerprint-words 256 "
+          "--fingerprint-seed 0 --fingerprint-max-prefix 2 "
+          "--fingerprint-max-cycle 3 --fingerprint-distance hamming "
+          "--members-from  --seeds 6 7",
           "the scorer got every budget and this host's seeds, and nothing "
           "from the runner's vocabulary")
     check(calls.read_text().count("\n"), 1,
@@ -3298,6 +3543,98 @@ out = "experiments/fpo/sub-{host}.csv"
 
     check_true("tick --host av1" in C.cron_line("av1", "/x"),
                "av1 gets a crontab line like the others")
+    # ── a frontier phase in the queue ─────────────────────────────────────────
+    #
+    # pooled_frontier.py run over the families plan dealt this host. The tick
+    # refuses it by name without the jobs file or with a stale maximal or
+    # compare, and otherwise runs it with the host's own name and writes the
+    # manifest status reads.
+    frontier_dir = queue_root / "frontier"
+    frontier_dir.mkdir()
+    stub_frontier = frontier_dir / "stub_frontier.py"
+    stub_frontier.write_text(STUB_RUNNER)
+    frontier_calls = frontier_dir / "calls.txt"
+    C.FRONTIER_CMD = f"{sys.executable} {stub_frontier}"
+    git(repo, "checkout", "-q", "-b", "feat/frontier")
+    write_declaration(repo, "frontier", FRONTIER_DECL)
+    git(repo, "add", "experiments/frontier/campaign.toml")
+    git(repo, "commit", "-q", "--no-verify", "-m", "frontier campaign")
+    frontier_sha = git(repo, "rev-parse", "HEAD")
+    enqueue_out = io.StringIO()
+    with contextlib.redirect_stdout(enqueue_out):
+        code = C.cmd_enqueue(argparse.Namespace(
+            campaign="frontier", host=["local"], max_attempts=3, again=False,
+            dry_run=False))
+    check(code, 0, f"a campaign with a frontier phase is enqueued: "
+                   f"{enqueue_out.getvalue()}")
+    with contextlib.redirect_stdout(io.StringIO()):
+        code = C.cmd_start(argparse.Namespace(
+            campaign="frontier", host=["local"], dry_run=True,
+            ignore_queue=False))
+    check(code, 2, "but `start` refuses it, having no gate on maximal")
+    git(repo, "checkout", "-q", "feat/other")
+
+    code, printed = tick()
+    check(code, 1, "a frontier phase with no jobs file fails")
+    entry = last_entry()
+    check_true("no frontier jobs file" in entry["last_error"]
+               and "jobs-local.csv" in entry["last_error"],
+               f"naming the file: {entry['last_error']!r}")
+    check((entry["state"], entry["attempts"]), ("queued", 1),
+          "costing an attempt")
+
+    code, printed = tick(dry_run=True)
+    check_true(f"would run: {C.FRONTIER_CMD} run experiments/pf/work --host "
+               f"local --workers 2 --solver-jobs 3 --timeout 40 --cache "
+               f"experiments/pf/cache" in printed,
+               f"a dry run prints the frontier command: {printed!r}")
+    check_true("blocked: no frontier jobs file" in printed,
+               "and the missing jobs file that blocks it")
+    check(last_entry()["attempts"], 1, "without spending an attempt")
+
+    pf_work = repo / "experiments" / "pf" / "work"
+    pf_work.mkdir(parents=True)
+    (pf_work / "jobs-local.csv").write_text("spec\nlily01\nlily02\n")
+    bin_dir = frontier_dir / "bin"
+    bin_dir.mkdir()
+    for name in C.FRONTIER_BINARIES:
+        fake_frontier_binary(bin_dir / name, "0" * 40)
+    saved_bin_dir = os.environ.get("PEREDUR_BIN_DIR")
+    os.environ["PEREDUR_BIN_DIR"] = str(bin_dir)
+    try:
+        entry.update({"state": "queued", "attempts": 0})
+        C.write_entry(entry["path"], entry)
+        code, printed = tick()
+        check(code, 1, "a frontier phase over stale binaries fails")
+        check_true("stale binary" in last_entry()["last_error"],
+                   f"naming the gate: {last_entry()['last_error']!r}")
+        check_true(not frontier_calls.exists(),
+                   "and pooled_frontier.py is never reached")
+
+        for name in C.FRONTIER_BINARIES:
+            fake_frontier_binary(bin_dir / name, frontier_sha)
+        entry = last_entry()
+        entry.update({"state": "queued", "attempts": 0})
+        C.write_entry(entry["path"], entry)
+        code, printed = tick()
+        check(code, 0, f"with the jobs file and fresh binaries it runs: "
+                       f"{printed}")
+        check(last_entry()["state"], "done", "and finishes the entry")
+        check(frontier_calls.read_text().strip(),
+              "run experiments/pf/work --host local --workers 2 "
+              "--solver-jobs 3 --timeout 40 --cache experiments/pf/cache",
+              "pooled_frontier.py got the host's name and every budget")
+        manifest = json.loads(
+            (pf_work / "frontier-manifest-local.json").read_text())
+        check((manifest["host"], manifest["planned"], manifest["work"],
+               manifest["binaries"]["maximal"]["commit"]),
+              ("local", 2, "experiments/pf/work", frontier_sha),
+              "and the manifest names the host, its families and the binary")
+    finally:
+        if saved_bin_dir is None:
+            os.environ.pop("PEREDUR_BIN_DIR", None)
+        else:
+            os.environ["PEREDUR_BIN_DIR"] = saved_bin_dir
 
     line = C.cron_line("av2", "/home/benandrew/projects/counter")
     check_true("tick --host av2" in line, "the crontab line names its host")
@@ -3326,6 +3663,23 @@ finally:
 # bill arrives.
 
 SCORE_CAMPAIGN_PY = Path(__file__).resolve().parent / "score_campaign.py"
+
+# The prefilter keys reach score_curves.py only when declared, and only with
+# the maximality stage the walk belongs to.
+import score_campaign as SCAMP  # noqa: E402
+
+prefilter_cmd = SCAMP.scorer_args(SCAMP.parse_args(
+    ["--results", "r", "--out", "o", "--seeds", "0",
+     "--prefilter-words", "4096"]), "o/x.csv.part", "r/x")
+check(prefilter_cmd[prefilter_cmd.index("--prefilter-words") + 1], "4096",
+      "score_campaign.py hands --prefilter-words to score_curves.py")
+check_true("--prefilter-max-prefix" not in prefilter_cmd
+           and "--prefilter-max-cycle" not in prefilter_cmd,
+           "and nothing for the keys left at the binary's default")
+plain_cmd = SCAMP.scorer_args(SCAMP.parse_args(
+    ["--results", "r", "--out", "o", "--seeds", "0"]), "o/x.csv.part", "r/x")
+check_true(not any(a.startswith("--prefilter") for a in plain_cmd),
+           "a pass declaring none passes none")
 
 STUB_CURVES = '''#!/usr/bin/env python3
 """Stands in for score_curves.py: writes a curve, or fails as its run says."""

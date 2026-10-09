@@ -1,0 +1,22 @@
+name = "2026-09-14-paper-rerun"
+branch = "campaign/paper-rerun"
+profile = "paper-rerun"
+
+description = "The 2026-09-04-aurus-rematch search repeated at main on 2026-09-14, so the paper's RQ1, RQ3 and RQ4 read the engine that ships. Same 2x2 of selection against status grading, 25 TLSF families, 30 seeds, 1000-individual budget at population 100, 7200 s cap. AuRUS is not re-run. The maximality and separation scoring phases are declared later, from the commit that ports their tooling onto main; PLAN.md section 5."
+
+# The rematch split, unchanged. Both arms of a pair land on one host, so a
+# host-level difference cannot enter a within-PEREDUR contrast.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+# The rematch line, unchanged but for the output directory. At this commit it
+# emits no retired key.
+configs = "python3 scripts/gen_configs.py --tlsf --schemes nsga2-apportion weighted --sweeps G --levels mrs,aurus --metric log --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 1 --out-dir experiments/configs-paper-rerun --pin-vintage"
+
+# Calibration chains into main unattended, as the rematch's did: the rematch's
+# 786.8 core-hours on this design bounds the cost from above. `calib` carries
+# its own hosts table because `run_experiments.py --seeds` replaces a profile's
+# seed list rather than intersecting it; one seed a host is the 2-seed profile.
+phases = [
+    { name = "calib", profile = "paper-rerun-calib", jobs = 16, hosts = { av2 = "0", av3 = "1" } },
+    { name = "main",  profile = "paper-rerun",       jobs = 16 },
+]
