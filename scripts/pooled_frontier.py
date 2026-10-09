@@ -47,7 +47,10 @@ frontiers that the fingerprints do not refute in both directions, in
 compare_pairs.py's id,a_path,b_path format. `score` reads
 fallback-<comp>.results.csv beside it when present (compare_pairs.py's
 output) and scores that comparison per pair, under both readings; otherwise it
-leaves net_imp blank and names the family.
+leaves net_imp blank and names the family. Once every family of a host is
+done, `run` joins the host's lists into WORK/fallback-<host>.csv (header only
+when empty), so a compare phase can follow unconditionally;
+`split-fallbacks` files its output back beside each family.
 
 `plan` reads the sidecars and bodies and writes a self-contained work tree:
 WORK/<spec>/classes/<md5>.tlsf (one body per class), classes.csv, members.csv,
@@ -458,7 +461,50 @@ def cmd_run(args) -> int:
         list(ex.map(one, specs))
     missing = [s for s in specs if not os.path.exists(os.path.join(args.work, s, "result.json"))]
     print(f"{len(specs) - len(missing)}/{len(specs)} families done", flush=True)
+    if not missing:
+        n = join_fallbacks(args.work, args.host, specs)
+        print(f"{n} fallback pair(s) in fallback-{args.host}.csv", flush=True)
     return 0 if not missing else 1
+
+
+def join_fallbacks(work: str, host: str, specs: list) -> int:
+    """Every fallback pair of this host's families in one compare_pairs.py
+    list, WORK/fallback-<host>.csv, header only when there are none, so a
+    compare phase can follow this one unconditionally. Its ids carry the
+    comparison and family, which split_fallbacks() uses to file the results
+    beside each family."""
+    n = 0
+    tmp = os.path.join(work, f"fallback-{host}.csv.tmp")
+    with open(tmp, "w", newline="") as out:
+        w = csv.writer(out)
+        w.writerow(["id", "a_path", "b_path"])
+        for spec in sorted(specs):
+            for path in sorted(os.listdir(os.path.join(work, spec))):
+                if not (path.startswith("fallback-") and path.endswith(".csv")) or path.endswith(".results.csv"):
+                    continue
+                with open(os.path.join(work, spec, path), newline="") as fh:
+                    for r in csv.DictReader(fh):
+                        w.writerow([r["id"], r["a_path"], r["b_path"]])
+                        n += 1
+    os.replace(tmp, os.path.join(work, f"fallback-{host}.csv"))
+    return n
+
+
+def split_fallbacks(work: str, results: list) -> int:
+    """compare_pairs.py's output for the joined lists, filed back as
+    WORK/<spec>/fallback-<comp>.results.csv, which `score` reads."""
+    rows = {}
+    for path in results:
+        with open(path, newline="") as fh:
+            for r in csv.DictReader(fh):
+                comp, spec, _, _ = r["id"].split("|")
+                rows.setdefault((spec, comp), []).append(r)
+    for (spec, comp), rs in rows.items():
+        with open(os.path.join(work, spec, f"fallback-{comp}.results.csv"), "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=["id", "relation", "rc", "secs"], extrasaction="ignore")
+            w.writeheader()
+            w.writerows(rs)
+    return len(rows)
 
 
 # ---------------------------------------------------------------- score
@@ -609,6 +655,10 @@ def main(argv=None) -> int:
     s.add_argument("out")
     s.add_argument("--comp", action="append")
     s.set_defaults(fn=cmd_score)
+    f = sub.add_parser("split-fallbacks", help="file joined fallback results back per family")
+    f.add_argument("work")
+    f.add_argument("results", nargs="+", help="compare_pairs.py outputs of fallback-<host>.csv")
+    f.set_defaults(fn=lambda a: print(f"{split_fallbacks(a.work, a.results)} comparison(s) filed") or 0)
     args = parser.parse_args(argv)
     return args.fn(args)
 

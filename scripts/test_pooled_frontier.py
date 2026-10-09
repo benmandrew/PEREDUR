@@ -170,6 +170,23 @@ def main():
             row = next(csv.DictReader(fh))
         expect(row["net_imp"] == "", f"net_imp left blank without fallback results: {row}")
 
+        # The host's lists are joined for a compare phase, and its output is filed back.
+        with open(f"{work}/fam/fallback-rq3.csv") as fh:
+            planned = list(csv.DictReader(fh))
+        with open(f"{work}/fallback-h.csv") as fh:
+            joined = list(csv.DictReader(fh))
+        expect(joined == planned, f"fallback-h.csv joins the family's list: {len(joined)} vs {len(planned)}")
+        with open(f"{root}/fb-out.csv", "w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["id", "relation", "rc", "secs"])
+            w.writerows([r["id"], "incomparable", 0, 0.1] for r in joined)
+        expect(pf.main(["split-fallbacks", work, f"{root}/fb-out.csv"]) == 0, "split-fallbacks exits 0")
+        expect(os.path.exists(f"{work}/fam/fallback-rq3.results.csv"), "results filed beside the family")
+        pf.main(["score", work, f"{root}/out"])
+        with open(f"{root}/out/families-rq3.csv") as fh:
+            row = next(csv.DictReader(fh))
+        expect(row["net_imp"] != "", f"net_imp read from the filed results: {row}")
+
     # The exact Wilcoxon against values scipy gave for the archived passes.
     expect(abs(pf.wilcoxon_exact([1.0, -2.0, 3.0, 4.0, 5.0]) - 0.1875) < 1e-12, "wilcoxon n=5")
     expect(pf.wilcoxon_exact([]) == 1.0, "wilcoxon empty")
