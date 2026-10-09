@@ -35,7 +35,7 @@ All five checks pass. `stopped_by` reads `individuals` on 2930 of 2930 manifests
 
 av1 is the one host built with gcc 13. Its calibration ran seed 0 of six families across all four arms, and each of the 24 run directories was compared byte for byte with av2's seed-0 run of the same cell, wall-clock fields masked. 14 are identical and 10 differ. All 10 that differ hit tool timeouts on both hosts at different counts. All 8 runs with no timeout on either host (minepump and rg2) are identical, so the divergence follows the wall-clock budgets of the external tools. The output check passes on that reading.
 
-The wall check does not pass. On the 14 identical runs av1 takes a median 1.089 times av2's wall time, slower on 12 of 14 (exact sign test p = 0.0129). On minepump and rg2, whose seed noise is a factor of 1.04, av1 is 1.069 to 1.340 times slower on all 8 runs. `PLAN.md` says that av1's seeds are then re-run on av2 and av3 before any wall-time figure is read. That re-run has not happened, and it is owed before a wall-time figure pooled over hosts is printed. Contrasts between arms are unaffected, since all four arms of a seed ran on one host.
+The wall check does not pass. On the 14 identical runs av1 takes a median 1.089 times av2's wall time, slower on 12 of 14 (exact sign test p = 0.0129). On minepump and rg2, whose seed noise is a factor of 1.04, av1 is 1.069 to 1.340 times slower on all 8 runs. `PLAN.md` says that av1's seeds are then re-run on av2 and av3 before any wall-time figure is read. The decision of 2026-10-09 is to keep av1's seeds as collected, with no re-run, and the paper does not state the host difference. Contrasts between arms are unaffected, since all four arms of a seed ran on one host.
 
 ## Secondaries
 

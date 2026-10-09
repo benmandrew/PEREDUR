@@ -147,9 +147,16 @@
         "pcar-v2-888": 1.172,
         "rg2": 1.039
       },
-      "reading": "FLAG. av1 runs about 9% slower than av2 on identical work. On minepump and rg2, whose seed noise is a factor of 1.04, av1 is 1.069 to 1.340 times slower on all 8 runs, outside the noise. On the long families the ratio sits inside their noise."
+      "reading": "FLAG, decided 2026-10-09: av1's seeds are kept. av1 runs about 9% slower than av2 on identical work. On minepump and rg2, whose seed noise is a factor of 1.04, av1 is 1.069 to 1.340 times slower on all 8 runs, outside the noise. On the long families the ratio sits inside their noise."
     },
-    "declared_contingency": "PLAN.md: if the wall times disagree, av1's seeds are re-run on av2 and av3 before the wall-time figures are read. The disagreement is there, and nothing was re-run: the close was told to flag it and not re-run. The re-run is owed before any wall-time figure that pools hosts is printed. Arm contrasts within a seed are unaffected, since all four arms of a seed ran on av1."
+    "declared_contingency": "PLAN.md: if the wall times disagree, av1's seeds are re-run on av2 and av3 before the wall-time figures are read. The disagreement is there (median ratio 1.089 av1/av2 on 14 identical runs, exact sign test p = 0.0129). Decision of 2026-10-09: av1's seeds 25-29 are kept as collected and are not re-run, and the paper does not state the host difference. Arm contrasts within a seed are unaffected, since all four arms of a seed ran on av1.",
+    "decision": {
+      "date": "2026-10-09",
+      "av1_seeds": "kept, not re-run",
+      "paper": "does not state the host difference",
+      "median_ratio_av1_over_av2": 1.089,
+      "sign_test_p": 0.0129
+    }
   },
   "verification": {
     "stopped_by_individuals": "2930 of 2930 manifests; the other 70 directories are censored and hold no run.json. PASS.",
@@ -447,7 +454,7 @@
       "not_affected": "The results CSV, which reads the final repairs. maximal_solutions, maximal_ideal_solutions and the separation counts read each file once, and no members.tsv repeats a file. The 13 diverging runs' stale files can still sit in their antichains.",
       "status": "Unresolved. The data are left as collected. The fix is to cut each affected index to its last attempt and re-score the 63 runs, or to have the runner clear a directory it re-runs."
     },
-    "av1_wall_contingency_not_run": "See calibration.declared_contingency.",
+    "av1_wall_contingency_not_run": "The PLAN.md re-run of av1's seeds was not run, by decision of 2026-10-09. See calibration.declared_contingency.",
     "launch_manifests_overwritten": "Each re-enqueue rewrote the host's run manifest, so run-manifests/ holds the last launch per host: av2 051, av3 048, av1 014, and the calibration's 007."
   },
   "caveats": {
@@ -474,7 +481,6 @@
     "analysis": "python3 experiments/2026-10-07-tlsf-rerun/scripts/analyse_rerun.py > experiments/2026-10-07-tlsf-rerun/analysis-output.txt, from the repository root with the collected data and experiments/aurus-reference in place."
   },
   "owed": [
-    "Re-run av1's seeds 25-29 on av2 and av3 before a pooled wall-time figure is printed, per PLAN.md's calibration contingency, or record a decision not to.",
     "Re-score the 63 two-attempt run directories with each index cut to its last attempt, or accept the measured over-count."
   ],
   "config_vintage": "Configs generated at 953732b by gen_configs --pin-vintage, which writes every VINTAGE_KEYS default into each config, so a later default move cannot change what these configs mean. keyword_similarity, whose default moved to semantic in dc13ed2 before 5d117f3, is among the pinned keys.",
