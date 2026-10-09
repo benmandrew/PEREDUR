@@ -227,7 +227,9 @@ def cmd_plan(args) -> int:
 
 class Family:
     def __init__(self, work: str, spec: str):
-        self.spec, self.dir = spec, os.path.join(work, spec)
+        # Absolute, since compare_grid symlinks class files from a temporary
+        # directory and a relative target would resolve against that.
+        self.spec, self.dir = spec, os.path.abspath(os.path.join(work, spec))
         self.classes = {}
         with open(os.path.join(self.dir, "classes.csv"), newline="") as fh:
             for r in csv.DictReader(fh):
@@ -249,7 +251,9 @@ class Family:
 
 def tool_env() -> dict:
     env = dict(os.environ)
-    for var, path in (("PEREDUR_BLACK_PATH", os.path.join(THIRD_PARTY, "black", "install", "bin", "black")),
+    # black's wrapper, not install/bin/black: only the wrapper puts
+    # libblack.so on LD_LIBRARY_PATH.
+    for var, path in (("PEREDUR_BLACK_PATH", os.path.join(THIRD_PARTY, "black", "black")),
                       ("PEREDUR_SPOT_BIN_DIR", os.path.join(THIRD_PARTY, "spot", "bin"))):
         if os.path.exists(path):
             env.setdefault(var, path)

@@ -135,6 +135,27 @@ def main():
             json.dump(sides, fh)
         work = f"{root}/work"
         expect(pf.main(["plan", f"{root}/sides.json", work, "--specs", "fam", "--hosts", "h"]) == 0, "plan exits 0")
+        # A relative work path, as the campaign phase passes it, still yields
+        # absolute class paths: compare_grid symlinks them from /tmp.
+        cwd = os.getcwd()
+        os.chdir(root)
+        try:
+            expect(os.path.isabs(pf.Family("work", "fam").path("x")), "class paths are absolute")
+        finally:
+            os.chdir(cwd)
+        # black's wrapper, never the bare binary that cannot find libblack.so.
+        saved_tp, saved_env = pf.THIRD_PARTY, os.environ.pop("PEREDUR_BLACK_PATH", None)
+        try:
+            pf.THIRD_PARTY = f"{root}/tp"
+            for f in ("black/black", "black/install/bin/black"):
+                os.makedirs(os.path.dirname(f"{root}/tp/{f}"), exist_ok=True)
+                open(f"{root}/tp/{f}", "w").close()
+            got = pf.tool_env().get("PEREDUR_BLACK_PATH", "")
+            expect(got == f"{root}/tp/black/black", f"black path is the wrapper, got {got}")
+        finally:
+            pf.THIRD_PARTY = saved_tp
+            if saved_env is not None:
+                os.environ["PEREDUR_BLACK_PATH"] = saved_env
         run = ["run", work, "--host", "h", "--maximal", f"{root}/maximal", "--compare", f"{root}/compare",
                "--tmp", f"{root}/tmp", "--prefilter-args", ""]
         expect(pf.main(run) == 0, "run exits 0")
