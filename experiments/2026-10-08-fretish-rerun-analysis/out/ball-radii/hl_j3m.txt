@@ -1,0 +1,4 @@
+Fret: directed (A) vs uniform (B)
+  Net BinA - AinB  n=15  zeros 1  mean -0.096  HL -0.039 [-0.089, -0.005]  p 0.035
+  BinA - ctrl A    n=14  zeros 1  mean -0.027  HL -0.031 [-0.062, -0.003]  p 0.033
+  AinB - ctrl B    n=15  zeros 1  mean +0.025  HL +0.007 [-0.028, +0.043]  p 0.81

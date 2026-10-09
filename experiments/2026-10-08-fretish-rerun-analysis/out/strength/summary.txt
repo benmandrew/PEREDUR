@@ -1,0 +1,3 @@
+net_decided: n=17 median=-0.1138 mean=-0.1618 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05
+net_imp: n=17 median=-0.1138 mean=-0.1612 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05
+net_non: n=17 median=-0.1138 mean=-0.1618 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05

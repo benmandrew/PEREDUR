@@ -1,0 +1,105 @@
+strength fsm: d_front=65 u_front=92 net=-0.1998
+strength fsm-combined: d_front=567 u_front=530 net=-0.0206
+strength fsm-timing: d_front=458 u_front=369 net=-0.3311
+strength liquid-mixer: d_front=1635 u_front=1474 net=-0.0154
+strength lpc-mini-core1: d_front=863 u_front=868 net=-0.2276
+strength mode-arbiter: d_front=97 u_front=147 net=-0.5911
+strength rad-core-1-18: d_front=1206 u_front=1221 net=-0.021
+strength rad-core-10: d_front=41 u_front=627 net=-0.2683
+strength rad-core-12-18: d_front=1504 u_front=1336 net=-0.1138
+strength rad-core-17-18: d_front=1444 u_front=1335 net=-0.1037
+strength rad-core-33: d_front=2706 u_front=1709 net=-0.2798
+strength rad-core-45: d_front=1001 u_front=834 net=-0.0371
+strength rad-core-55: d_front=1544 u_front=923 net=-0.2647
+strength rad-core-61: d_front=2073 u_front=1847 net=-0.0693
+strength rad-core-65: d_front=1870 u_front=1308 net=-0.0162
+strength rad-core-68: d_front=906 u_front=991 net=-0.0239
+strength takeoff: d_front=150 u_front=167 net=-0.1676
+net_decided: n=17 median=-0.1138 mean=-0.1618 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05
+net_imp: n=17 median=-0.1138 mean=-0.1612 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05
+net_non: n=17 median=-0.1138 mean=-0.1618 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/fsm-combined.tsv 1633
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/fsm-timing.tsv 2417
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/fsm.tsv 869
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/mode-arbiter.tsv 1512
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-10.tsv 1134
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-1-18.tsv 3173
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-12-18.tsv 3961
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-17-18.tsv 3957
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-33.tsv 6040
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-45.tsv 2917
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-55.tsv 3640
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-61.tsv 4727
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-65.tsv 4271
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-68.tsv 2828
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/takeoff.tsv 1639
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/fsm-combined.tsv 1633
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/fsm-timing.tsv 2417
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/fsm.tsv 869
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/mode-arbiter.tsv 1512
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-10.tsv 1134
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-1-18.tsv 3173
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-12-18.tsv 3961
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-17-18.tsv 3957
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-33.tsv 6040
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-45.tsv 2917
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-55.tsv 3640
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-61.tsv 4727
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-65.tsv 4271
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-68.tsv 2828
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/takeoff.tsv 1639
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/fsm-combined.tsv 1633
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/fsm-timing.tsv 2417
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/fsm.tsv 869
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/mode-arbiter.tsv 1512
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-10.tsv 1134
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-1-18.tsv 3173
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-12-18.tsv 3961
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-17-18.tsv 3957
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-33.tsv 6040
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-45.tsv 2917
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-55.tsv 3640
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-61.tsv 4727
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-65.tsv 4271
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/rad-core-68.tsv 2828
+experiments/2026-10-08-fretish-rerun-analysis/out/strength/ball/takeoff.tsv 1639
+net_decided: n=17 median=-0.1138 mean=-0.1618 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05
+net_imp: n=17 median=-0.1138 mean=-0.1612 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05
+net_non: n=17 median=-0.1138 mean=-0.1618 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05
+
+== prec: cross against same-arm control (symmetric, both directions)
+  triple  d<->u: cross 0.653 vs control 0.643, cross larger 9/14 p=0.3575
+  xtriple d<->u: cross 0.624 vs control 0.643, cross larger 5/14 p=0.0353
+
+== cov: cross against same-arm control (symmetric, both directions)
+  triple  d<->u: cross 0.686 vs control 0.690, cross larger 9/15 p=0.6387
+  xtriple d<->u: cross 0.648 vs control 0.690, cross larger 1/15 p=0.0002
+
+== asymmetry: precision of B inside A's region
+  triple  u-in-d 0.608 vs d-in-u 0.697: first larger 4/14 p=0.0580
+  xtriple u-in-d 0.576 vs d-in-u 0.672: first larger 3/14 p=0.0353
+
+== same-arm control by arm
+  directed 0.644 over 14 subjects
+  uniform  0.646 over 15 subjects
+
+== per subject: xtriple u-in-d / d-in-u | control
+  fsm             0.928 / 0.909 | 0.910
+  fsm-combined    0.647 / 0.665 | 0.703
+  fsm-timing      0.735 / 0.780 | 0.739
+  mode-arbiter    0.820 / 0.937 | 0.905
+  rad-core-1-18   0.611 / 0.600 | 0.625
+  rad-core-10     0.000 / 1.000 | 0.566
+  rad-core-12-18  0.594 / 0.620 | 0.606
+  rad-core-17-18  0.574 / 0.635 | 0.624
+  rad-core-33     0.349 / 0.360 | 0.417
+  rad-core-45     0.630 / 0.634 | 0.634
+  rad-core-55     0.511 / 0.650 | 0.572
+  rad-core-61     0.224 / 0.233 | 0.277
+  rad-core-65     0.453 / 0.393 | 0.421
+  rad-core-68     0.565 / 0.663 | 0.644
+  takeoff         1.000 / 1.000 | 1.000
+== experiments/2026-10-08-fretish-rerun-analysis/out/ball-radii/j3m.csv (xtriple)
+Fret: directed (A) vs uniform (B)
+  B in A vs ctrl A   n=14  cross 0.617  control 0.644  below 10/13  p 0.033  p_below 0.016
+  A in B vs ctrl B   n=15  cross 0.672  control 0.646  below 6/14  p 0.81  p_below 0.62

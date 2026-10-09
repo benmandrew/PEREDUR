@@ -1,0 +1,4 @@
+== experiments/2026-10-08-fretish-rerun-analysis/out/ball-radii/j3m.csv (xtriple)
+Fret: directed (A) vs uniform (B)
+  B in A vs ctrl A   n=14  cross 0.617  control 0.644  below 10/13  p 0.033  p_below 0.016
+  A in B vs ctrl B   n=15  cross 0.672  control 0.646  below 6/14  p 0.81  p_below 0.62

@@ -1,0 +1,33 @@
+
+== prec: cross against same-arm control (symmetric, both directions)
+  triple  d<->u: cross 0.653 vs control 0.643, cross larger 9/14 p=0.3575
+  xtriple d<->u: cross 0.624 vs control 0.643, cross larger 5/14 p=0.0353
+
+== cov: cross against same-arm control (symmetric, both directions)
+  triple  d<->u: cross 0.686 vs control 0.690, cross larger 9/15 p=0.6387
+  xtriple d<->u: cross 0.648 vs control 0.690, cross larger 1/15 p=0.0002
+
+== asymmetry: precision of B inside A's region
+  triple  u-in-d 0.608 vs d-in-u 0.697: first larger 4/14 p=0.0580
+  xtriple u-in-d 0.576 vs d-in-u 0.672: first larger 3/14 p=0.0353
+
+== same-arm control by arm
+  directed 0.644 over 14 subjects
+  uniform  0.646 over 15 subjects
+
+== per subject: xtriple u-in-d / d-in-u | control
+  fsm             0.928 / 0.909 | 0.910
+  fsm-combined    0.647 / 0.665 | 0.703
+  fsm-timing      0.735 / 0.780 | 0.739
+  mode-arbiter    0.820 / 0.937 | 0.905
+  rad-core-1-18   0.611 / 0.600 | 0.625
+  rad-core-10     0.000 / 1.000 | 0.566
+  rad-core-12-18  0.594 / 0.620 | 0.606
+  rad-core-17-18  0.574 / 0.635 | 0.624
+  rad-core-33     0.349 / 0.360 | 0.417
+  rad-core-45     0.630 / 0.634 | 0.634
+  rad-core-55     0.511 / 0.650 | 0.572
+  rad-core-61     0.224 / 0.233 | 0.277
+  rad-core-65     0.453 / 0.393 | 0.421
+  rad-core-68     0.565 / 0.663 | 0.644
+  takeoff         1.000 / 1.000 | 1.000
