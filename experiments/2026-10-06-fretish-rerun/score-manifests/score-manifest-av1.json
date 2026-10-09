@@ -1,0 +1,65 @@
+{
+  "kind": "score",
+  "hostname": "av1",
+  "started": "2026-10-07T16:05:02+0100",
+  "finished": "2026-10-07T23:27:38+0100",
+  "results": "experiments/results-fretish-rerun",
+  "results_resolved": "/home/benandrew/projects/counter/experiments/results-fretish-rerun",
+  "out": "experiments/curves-fretish-rerun",
+  "out_resolved": "/home/benandrew/projects/counter/experiments/curves-fretish-rerun",
+  "seeds": [
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "workers": 8,
+  "cores": 4,
+  "pinned": true,
+  "pinning": "taskset -c <slot*cores>-<slot*cores+cores-1> per worker",
+  "wall_cap": "coreutils timeout, which kills the scorer's process group",
+  "cuts": 20,
+  "maximal_timeout": 900,
+  "compare_timeout": 3000,
+  "deadline_s": 7500,
+  "wall_cap_s": 8400,
+  "invocation": "python3 scripts/score_curves.py --maximality --cuts 20 --jobs 4 --deadline-s 7500 --maximal-timeout 900 --compare-timeout 3000 --out <out>/<run>.csv.part <run-dir>",
+  "binaries": {
+    "maximal": {
+      "path": "/home/benandrew/projects/counter/build-release/maximal",
+      "commit": "f828ff31ae842eba50971410dc02292de5ffa33c",
+      "commit_short": "f828ff3",
+      "dirty": "0"
+    },
+    "compare": {
+      "path": "/home/benandrew/projects/counter/build-release/compare",
+      "commit": "f828ff31ae842eba50971410dc02292de5ffa33c",
+      "commit_short": "f828ff3",
+      "dirty": "0"
+    }
+  },
+  "git": {
+    "branch": "campaign/fretish-rerun",
+    "head": "f828ff31ae842eba50971410dc02292de5ffa33c"
+  },
+  "allow_stale_binary": false,
+  "python_version": "3.12.3",
+  "counts": {
+    "queued": 400,
+    "already_scored": 0,
+    "scored": 400,
+    "failed": 0
+  },
+  "files": {
+    "curves": "<run>.csv, one per run directory scored",
+    "timings": "timings.txt: accumulated elapsed_s rc run maximal_timeout/compare_timeout/deadline_s, one line per attempt",
+    "failures": "failures.txt: rc run-dir, one line per failed attempt",
+    "warnings": "warnings.log: every scorer's stdout and stderr"
+  }
+}

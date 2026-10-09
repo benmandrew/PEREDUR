@@ -1,0 +1,45 @@
+rows 1200; commit/dirty {('f828ff3', '0'): 1200}
+curves 1200
+
+Found, anytime, McNemar exact two-sided over 600 (subject, seed) pairs
+   10 s: directed 514/600, uniform 525/600; directed-only 12, uniform-only 23, p = 0.0895; by subject {('fsm-combined', 'uniform'): 2, ('fsm-combined', 'directed'): 3, ('liquid-mixer', 'directed'): 5, ('liquid-mixer', 'uniform'): 1, ('rad-core-10', 'uniform'): 18, ('valu3s-uc6', 'directed'): 4, ('valu3s-uc6', 'uniform'): 2}
+  100 s: directed 537/600, uniform 556/600; directed-only 4, uniform-only 23, p = 0.000311; by subject {('fsm-lmcps', 'uniform'): 2, ('lpc-full-core1', 'directed'): 4, ('lpc-full-core1', 'uniform'): 3, ('rad-core-10', 'uniform'): 18}
+    cap: directed 552/600, uniform 572/600; directed-only 0, uniform-only 20, p = 1.91e-06; by subject {('fsm-lmcps', 'uniform'): 2, ('rad-core-10', 'uniform'): 18}
+
+Wall time, pairs where both finished: 570; directed faster on 426, uniform on 143; median difference (d - u) -2.94 s; W+ 47169.0 W- 114996.0 z 8.644 p = 5.43e-18
+  directed: median 33.98 s, mean 619.9 s over 600 runs; killed 30
+  uniform: median 35.06 s, mean 628.8 s over 600 runs; killed 30
+  per subject, median paired difference (d - u) and directed-faster count:
+    fsm: n 30, median -4.06 s, directed faster 29
+    fsm-combined: n 30, median 3.55 s, directed faster 12
+    fsm-lmcps: n 30, median -7.13 s, directed faster 27
+    fsm-timing: n 30, median 1.01 s, directed faster 12
+    liquid-mixer: n 30, median 408.36 s, directed faster 6
+    lpc-mini-core1: n 30, median -292.01 s, directed faster 18
+    mode-arbiter: n 30, median -3.60 s, directed faster 27
+    rad-core-1-18: n 30, median -1.35 s, directed faster 24
+    rad-core-10: n 30, median -7.89 s, directed faster 30
+    rad-core-12-18: n 30, median -2.48 s, directed faster 23
+    rad-core-17-18: n 30, median -0.86 s, directed faster 23
+    rad-core-33: n 30, median -15.68 s, directed faster 23
+    rad-core-45: n 30, median -1.75 s, directed faster 25
+    rad-core-55: n 30, median -4.42 s, directed faster 30
+    rad-core-61: n 30, median -5.97 s, directed faster 29
+    rad-core-65: n 30, median -2.50 s, directed faster 28
+    rad-core-68: n 30, median -4.11 s, directed faster 30
+    takeoff: n 30, median 2.95 s, directed faster 11
+    valu3s-uc6: n 30, median -163.49 s, directed faster 19
+
+implies_ideal, descriptive, the six subjects with reachable ideals
+  takeoff: directed 30/30, uniform 30/30
+  fsm: directed 28/30, uniform 27/30
+  fsm-timing: directed 30/30, uniform 29/30
+  fsm-combined: directed 3/30, uniform 1/30
+  fsm-lmcps: directed 0/30, uniform 0/30
+  liquid-mixer: directed 1/30, uniform 1/30
+  total: directed 92/180, uniform 88/180
+
+wall-clock hours of search, sum over runs: 208.11
+  av3: 66.93
+  av1: 69.59
+  av2: 71.60

@@ -1,0 +1,74 @@
+{
+  "profile": "fretish-rerun-calib",
+  "hostname": "av1",
+  "started": "2026-10-07T08:26:55+0100",
+  "git": {
+    "branch": "campaign/fretish-rerun",
+    "describe": "provenance/fretish-ablation-32-gf828ff3",
+    "head": "f828ff31ae842eba50971410dc02292de5ffa33c"
+  },
+  "binaries": {
+    "peredur": {
+      "path": "/home/benandrew/projects/counter/build-release/peredur",
+      "commit": "f828ff31ae842eba50971410dc02292de5ffa33c",
+      "commit_short": "f828ff3",
+      "dirty": "0"
+    },
+    "compare": {
+      "path": "/home/benandrew/projects/counter/build-release/compare",
+      "commit": "f828ff31ae842eba50971410dc02292de5ffa33c",
+      "commit_short": "f828ff3",
+      "dirty": "0"
+    }
+  },
+  "sweep": {
+    "schemes": [
+      "nsga2-apportion"
+    ],
+    "weakenings": [
+      "wkoff"
+    ],
+    "metrics": [
+      "log"
+    ],
+    "repair_modes": null,
+    "sweeps": [
+      "O"
+    ],
+    "levels": {
+      "O": [
+        "directed",
+        "uniform"
+      ]
+    },
+    "specs": [
+      "takeoff",
+      "fsm",
+      "fsm-timing",
+      "fsm-combined",
+      "fsm-lmcps",
+      "liquid-mixer",
+      "mode-arbiter",
+      "valu3s-uc6",
+      "rad-core-1-18",
+      "rad-core-10",
+      "rad-core-12-18",
+      "rad-core-17-18",
+      "rad-core-33",
+      "rad-core-45",
+      "rad-core-55",
+      "rad-core-61",
+      "rad-core-65",
+      "rad-core-68",
+      "lpc-mini-core1",
+      "lpc-full-core1"
+    ],
+    "seeds": [
+      0
+    ],
+    "jobs": 16,
+    "configs_dir": "/home/benandrew/projects/counter/experiments/configs-fretish-rerun",
+    "results_dir": "/home/benandrew/projects/counter/experiments/results-fretish-rerun-calib",
+    "results_csv": "/home/benandrew/projects/counter/experiments/results-fretish-rerun-calib.csv"
+  }
+}
