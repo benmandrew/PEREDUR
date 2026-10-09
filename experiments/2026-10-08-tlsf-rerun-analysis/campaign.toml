@@ -1,0 +1,59 @@
+name = "2026-10-08-tlsf-rerun-analysis"
+branch = "campaign/tlsf-rerun-analysis"
+description = "Downstream passes 3 and 4 of the 2026-10-07-tlsf-rerun PLAN: pooled TLSF strength (selection, grading, PEREDUR against AuRUS) and GR(1) coverage on the rerun's frontiers. The pair lists and work tree are planned locally and committed (data/); the host phases decide them, and the reductions, ball radii and the size sweep run locally after collect (PLAN.md)."
+
+# Not seed-split: every phase reads a per-host list that plan.py dealt.
+hosts = { av1 = "", av2 = "", av3 = "" }
+
+# The build also restores the committed work tree, before the stage script
+# checks for each phase's pair list or jobs file.
+build = "sh -c 'cmake --build build-release && python3 experiments/2026-10-08-tlsf-rerun-analysis/scripts/unpack.py'"
+
+# GR(1) coverage: every rerun pool repair against every archived GLASS,
+# JVTS-Repair and AMT13 frontier representative, a's relation to b, at the
+# archive's single-pair budget (black 20 s, 120 s wall).
+[[phases]]
+name = "coverage"
+kind = "compare"
+pairs = "experiments/analysis-tlsf-rerun-work/coverage/pairs-{host}.csv"
+out = "experiments/analysis-tlsf-rerun/coverage-{host}.csv"
+jobs = 16
+black_timeout = 20
+wall_timeout = 120
+vmem_kb = 8388608
+
+# Pooled RQ3, the cross half: PEREDUR's pool against AuRUS's archived pooled
+# frontier, every pair the 65,536-word prints leave open. AuRUS's bodies live
+# only on av2 and av3, so each pair runs on the host that holds its body.
+[[phases]]
+name = "rq3-cross"
+kind = "compare"
+hosts = ["av2", "av3"]
+pairs = "experiments/analysis-tlsf-rerun-work/rq3/pairs-{host}.csv"
+out = "experiments/analysis-tlsf-rerun/rq3-{host}.csv"
+jobs = 16
+black_timeout = 300
+wall_timeout = 700
+vmem_kb = 8000000
+
+# Selection and grading: each side's pooled frontier by a running antichain
+# walk, then the cross walk, over whole families dealt by plan.
+[[phases]]
+name = "strength"
+kind = "frontier"
+work = "experiments/analysis-tlsf-rerun-work/strength"
+workers = 4
+solver_jobs = 4
+timeout = 300
+
+# The walks' undecided implications, one compare per pair at the archived
+# RQ budgets. The list is header-only where every walk decided.
+[[phases]]
+name = "strength-fallback"
+kind = "compare"
+pairs = "experiments/analysis-tlsf-rerun-work/strength/fallback-{host}.csv"
+out = "experiments/analysis-tlsf-rerun/strength-fallback-{host}.csv"
+jobs = 16
+black_timeout = 300
+wall_timeout = 700
+vmem_kb = 8000000
