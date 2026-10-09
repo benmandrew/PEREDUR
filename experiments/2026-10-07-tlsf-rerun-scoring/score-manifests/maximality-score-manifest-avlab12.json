@@ -1,0 +1,77 @@
+{
+  "kind": "score",
+  "hostname": "avlab12",
+  "started": "2026-10-09T00:27:06+0100",
+  "finished": "2026-10-09T02:33:08+0100",
+  "results": "experiments/results-tlsf-rerun",
+  "results_resolved": "/home/benandrew/projects/counter/experiments/results-tlsf-rerun",
+  "out": "experiments/curves-tlsf-rerun",
+  "out_resolved": "/home/benandrew/projects/counter/experiments/curves-tlsf-rerun",
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24
+  ],
+  "workers": 8,
+  "cores": 4,
+  "pinned": true,
+  "pinning": "taskset -c <slot*cores>-<slot*cores+cores-1> per worker",
+  "wall_cap": "coreutils timeout, which kills the scorer's process group",
+  "cuts": 20,
+  "maximal_timeout": 900,
+  "compare_timeout": 3000,
+  "deadline_s": 7500,
+  "wall_cap_s": 8400,
+  "prefilter_words": 4096,
+  "prefilter_max_prefix": null,
+  "prefilter_max_cycle": null,
+  "invocation": "python3 scripts/score_curves.py --maximality --prefilter-words 4096 --cuts 20 --jobs 4 --deadline-s 7500 --maximal-timeout 900 --compare-timeout 3000 --out <out>/<run>.csv.part <run-dir>",
+  "binaries": {
+    "maximal": {
+      "path": "/home/benandrew/projects/counter/build-release/maximal",
+      "commit": "df219b910e210e93df5376973f908afab15fa025",
+      "commit_short": "df219b9",
+      "dirty": "0"
+    },
+    "compare": {
+      "path": "/home/benandrew/projects/counter/build-release/compare",
+      "commit": "df219b910e210e93df5376973f908afab15fa025",
+      "commit_short": "df219b9",
+      "dirty": "0"
+    }
+  },
+  "git": {
+    "branch": "campaign/tlsf-rerun-scoring",
+    "head": "df219b910e210e93df5376973f908afab15fa025"
+  },
+  "allow_stale_binary": false,
+  "python_version": "3.10.12",
+  "counts": {
+    "queued": 1900,
+    "already_scored": 1300,
+    "scored": 600,
+    "failed": 0
+  },
+  "files": {
+    "curves": "<run>.csv, one per run directory scored",
+    "timings": "timings.txt: accumulated elapsed_s rc run maximal_timeout/compare_timeout/deadline_s, one line per attempt",
+    "failures": "failures.txt: rc run-dir, one line per failed attempt",
+    "warnings": "warnings.log: every scorer's stdout and stderr"
+  }
+}

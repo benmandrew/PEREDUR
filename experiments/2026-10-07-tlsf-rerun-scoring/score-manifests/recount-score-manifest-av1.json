@@ -1,0 +1,57 @@
+{
+  "kind": "score",
+  "hostname": "av1",
+  "started": "2026-10-09T01:25:02+0100",
+  "finished": "2026-10-09T01:36:25+0100",
+  "results": "experiments/results-tlsf-rerun",
+  "results_resolved": "/home/benandrew/projects/counter/experiments/results-tlsf-rerun",
+  "out": "experiments/separation-recount-tlsf-rerun-s0",
+  "out_resolved": "/home/benandrew/projects/counter/experiments/separation-recount-tlsf-rerun-s0",
+  "seeds": [
+    25,
+    26,
+    27,
+    28,
+    29
+  ],
+  "workers": 32,
+  "cores": 1,
+  "pinned": true,
+  "pinning": "taskset -c <slot*cores>-<slot*cores+cores-1> per worker",
+  "wall_cap": "coreutils timeout, which kills the scorer's process group",
+  "cuts": 20,
+  "maximal_timeout": 900,
+  "compare_timeout": 600,
+  "deadline_s": 900,
+  "wall_cap_s": 1200,
+  "prefilter_words": null,
+  "prefilter_max_prefix": null,
+  "prefilter_max_cycle": null,
+  "invocation": "python3 scripts/score_curves.py --skip-ideals --epsilon 0.05,0.2,0.5 --fingerprint-words 65536 --fingerprint-seed 0 --fingerprint-max-prefix 8 --fingerprint-max-cycle 8 --fingerprint-distance union --members-from /home/benandrew/projects/counter/experiments/curves-tlsf-rerun --cuts 20 --jobs 1 --deadline-s 900 --maximal-timeout 900 --compare-timeout 600 --out <out>/<run>.csv.part <run-dir>",
+  "binaries": {
+    "fingerprint": {
+      "path": "/home/benandrew/projects/counter/build-release/fingerprint",
+      "commit": "df219b910e210e93df5376973f908afab15fa025",
+      "commit_short": "df219b9",
+      "dirty": "0"
+    }
+  },
+  "git": {
+    "branch": "campaign/tlsf-rerun-scoring",
+    "head": "df219b910e210e93df5376973f908afab15fa025"
+  },
+  "allow_stale_binary": false,
+  "python_version": "3.12.3",
+  "counts": {
+    "queued": 500,
+    "already_scored": 0,
+    "scored": 500,
+    "failed": 0
+  },
+  "files": {
+    "curves": "<run>.csv, one per run directory scored",
+    "timings": "timings.txt: accumulated elapsed_s rc run maximal_timeout/compare_timeout/deadline_s, one line per attempt",
+    "failures": "failures.txt: rc run-dir, one line per failed attempt",
+    "warnings": "warnings.log: every scorer's stdout and stderr"
+  }
+}

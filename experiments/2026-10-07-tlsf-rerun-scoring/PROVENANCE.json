@@ -1,0 +1,230 @@
+{
+  "campaign": "2026-10-07-tlsf-rerun-scoring",
+  "attribution": "Ben Andrew",
+  "generated_on": "2026-10-09",
+  "status": "closed",
+  "kind": "score",
+  "kind_note": "Two score phases over 2026-10-07-tlsf-rerun's 3000 run directories: maximality (curves with ideals, and the .members.tsv sidecars), then the separation recount at fingerprint seed 0 over those sidecars. No search, no decision rule.",
+  "source_campaign": {
+    "name": "2026-10-07-tlsf-rerun",
+    "archive": "campaign/tlsf-rerun, experiments/2026-10-07-tlsf-rerun",
+    "tag": "provenance/tlsf-rerun"
+  },
+  "profile_commit": {
+    "sha": "df219b910e210e93df5376973f908afab15fa025",
+    "short": "df219b9",
+    "branch": "campaign/tlsf-rerun-scoring",
+    "scorer": "0cfd14a plus 032c2dc (black probe on implication queries, a port of main's aaae1a8) and 1a1e86f (configurable walk prefilter)",
+    "reachable_from_main": false,
+    "held_by_tag": "provenance/tlsf-rerun-scoring",
+    "held_by_tag_note": "Annotated tag at df219b9, cut and pushed on 2026-10-09 before the archive commit. 48856b7, which av2's first entry (047) ran for seeds 0-12, is df219b9's parent and differs in PLAN.md and campaign.toml alone."
+  },
+  "scoring_binaries": {
+    "maximal": "df219b9 dirty 0",
+    "compare": "df219b9 dirty 0",
+    "fingerprint": "df219b9 dirty 0",
+    "note": "From the final score manifest on each host. av2's 1300 runs of seeds 0-12 were scored by entry 047 at 48856b7, whose manifest the later entry overwrote; its timings.txt lines survive, and 48856b7 builds the same scorer source."
+  },
+  "hosts": {
+    "av2": {
+      "machine": "avlab12",
+      "seeds": "0-12,19-24",
+      "entries": {
+        "047": "48856b7, seeds 0-12, 2026-10-08T12:42 to 16:36, done (both phases)",
+        "049": "cancelled while queued at 16:57 on 2026-10-08",
+        "052": "df219b9, seeds 0-12,19-24 (1300 already scored), maximality 2026-10-09T00:27 to 02:33, recount 02:35 to 02:49, done"
+      }
+    },
+    "av3": {
+      "machine": "av3",
+      "seeds": "13-18",
+      "entries": {
+        "043": "failed (no results directory yet) and cancelled",
+        "044": "cancelled",
+        "046": "cancelled while queued at 16:57",
+        "049": "df219b9, maximality 2026-10-08T21:02 to 22:54, recount 22:55 to 23:05, done"
+      }
+    },
+    "av1": {
+      "machine": "av1",
+      "seeds": "25-29",
+      "entries": {
+        "009": "failed and cancelled",
+        "010": "cancelled",
+        "012": "cancelled while queued at 16:57",
+        "015": "df219b9, maximality 2026-10-08T23:12 to 2026-10-09T01:24, recount 01:25 to 01:36, done"
+      }
+    }
+  },
+  "maximality_pass": {
+    "source": "experiments/results-tlsf-rerun",
+    "output": "experiments/curves-tlsf-rerun.csv (728,737 rows) and curves-tlsf-rerun/<host>/ with one <run>.csv and <run>.members.tsv per run",
+    "invocation": "python3 scripts/score_curves.py --maximality --prefilter-words 4096 --cuts 20 --jobs 4 --deadline-s 7500 --maximal-timeout 900 --compare-timeout 3000 --out <out>/<run>.csv.part <run-dir>",
+    "budgets": {
+      "workers": 8,
+      "cores": 4,
+      "cuts": 20,
+      "maximal_timeout": 900,
+      "compare_timeout": 3000,
+      "deadline_s": 7500,
+      "prefilter_words": 4096
+    },
+    "passes": {
+      "av1": {
+        "runs": 500,
+        "worker_h": 12.65,
+        "longest_s": 4597
+      },
+      "av2": {
+        "runs": 1900,
+        "worker_h": 39.09,
+        "longest_s": 6474
+      },
+      "av3": {
+        "runs": 600,
+        "worker_h": 11.32,
+        "longest_s": 2472
+      }
+    },
+    "failed": 0,
+    "at_deadline": 0,
+    "nonzero_rc": 0,
+    "worker_h_from_timings": 63.05,
+    "core_h_allocated": 252.2,
+    "against_archive": "The paper-rerun-curves maximality pass took 183.9 worker-hours on av2 for 15 seeds, with 57 runs at the 7500 s deadline. This pass took 63.05 worker-hours for 30 seeds with none at the deadline.",
+    "warnings": "70 a phase, one for each censored run directory: run.json unreadable, the run having been killed at the 7200 s search cap. Expected; the scorer reads such a run from its accumulator.",
+    "partial_curves": 0
+  },
+  "recount_pass": {
+    "source": "experiments/results-tlsf-rerun, membership from experiments/curves-tlsf-rerun",
+    "output": "experiments/separation-recount-tlsf-rerun-s0.csv (921,401 rows) and separation-recount-tlsf-rerun-s0/<host>/",
+    "invocation": "python3 scripts/score_curves.py --skip-ideals --epsilon 0.05,0.2,0.5 --fingerprint-words 65536 --fingerprint-seed 0 --fingerprint-max-prefix 8 --fingerprint-max-cycle 8 --fingerprint-distance union --members-from <curves-tlsf-rerun> --cuts 20 --jobs 1 --deadline-s 900 --maximal-timeout 900 --compare-timeout 600 --out <out>/<run>.csv.part <run-dir>",
+    "budgets": {
+      "workers": 32,
+      "cores": 1,
+      "deadline_s": 900,
+      "wall_cap_s": 1200
+    },
+    "passes": {
+      "av1": {
+        "runs": 500,
+        "worker_h": 4.4,
+        "longest_s": 386
+      },
+      "av2": {
+        "runs": 1900,
+        "worker_h": 18.38,
+        "longest_s": 460
+      },
+      "av3": {
+        "runs": 600,
+        "worker_h": 4.07,
+        "longest_s": 307
+      }
+    },
+    "failed": 0,
+    "at_deadline": 0,
+    "nonzero_rc": 0,
+    "core_h_from_timings": 26.84,
+    "against_archive": "The archived recount took about 20 core-hours over two hosts."
+  },
+  "results": {
+    "note": "Mean per run at the 7200 s cut over all 750 runs an arm, a run without the metric counting zero, from analysis-output.txt. analyse_matched.py in the search archive averages the maximal metrics over runs that found a repair, so its aurus-arm values are higher.",
+    "solutions": {
+      "nsga2-apportion/mrs": 98.57,
+      "nsga2-apportion/aurus": 66.11,
+      "weighted/mrs": 388.99,
+      "weighted/aurus": 265.08
+    },
+    "ideal_solutions": {
+      "nsga2-apportion/mrs": 5.61,
+      "nsga2-apportion/aurus": 5.1,
+      "weighted/mrs": 10.49,
+      "weighted/aurus": 9.09
+    },
+    "maximal_solutions": {
+      "nsga2-apportion/mrs": 28.49,
+      "nsga2-apportion/aurus": 19.49,
+      "weighted/mrs": 86.27,
+      "weighted/aurus": 54.76
+    },
+    "maximal_ideal_solutions": {
+      "nsga2-apportion/mrs": 1.87,
+      "nsga2-apportion/aurus": 1.75,
+      "weighted/mrs": 2.07,
+      "weighted/aurus": 1.68
+    },
+    "eps_maximal_solutions_0.05": {
+      "nsga2-apportion/mrs": 17.25,
+      "nsga2-apportion/aurus": 13.1,
+      "weighted/mrs": 44.25,
+      "weighted/aurus": 31.46
+    },
+    "eps_maximal_solutions_0.2": {
+      "nsga2-apportion/mrs": 12.76,
+      "nsga2-apportion/aurus": 9.66,
+      "weighted/mrs": 32.35,
+      "weighted/aurus": 23.33
+    },
+    "eps_maximal_solutions_0.5": {
+      "nsga2-apportion/mrs": 7.84,
+      "nsga2-apportion/aurus": 5.97,
+      "weighted/mrs": 18.85,
+      "weighted/aurus": 13.74
+    },
+    "eps_solutions_0.05": {
+      "nsga2-apportion/mrs": 35.59,
+      "nsga2-apportion/aurus": 27.66,
+      "weighted/mrs": 135.54,
+      "weighted/aurus": 104.64
+    },
+    "eps_solutions_0.2": {
+      "nsga2-apportion/mrs": 22.08,
+      "nsga2-apportion/aurus": 16.59,
+      "weighted/mrs": 75.45,
+      "weighted/aurus": 57.81
+    },
+    "eps_solutions_0.5": {
+      "nsga2-apportion/mrs": 11.27,
+      "nsga2-apportion/aurus": 8.4,
+      "weighted/mrs": 32.05,
+      "weighted/aurus": 24.07
+    }
+  },
+  "deviations": {
+    "dequeue_16_57": "The queued scoring entries on all three hosts (av2 049, av3 046, av1 012) were cancelled at about 16:57 on 2026-10-08 with the search entries ahead of them, and re-enqueued after 2026-10-08-fretish-rerun-analysis. None had started, so no scoring work was lost.",
+    "accumulator_double_count": "The search's 16:57 dequeue left 63 run directories whose accumulated/index.tsv holds two attempts, and score_curves.read_index counts both. The solutions curve over-counts by 9.23 a run on weighted/mrs at 7200 s, 5.34 on weighted/aurus, 1.10 on nsga2-apportion/mrs and 0.42 on nsga2-apportion/aurus; ideal_solutions by 0.021 to 0.053. The maximal and epsilon metrics read each file once and no members.tsv repeats a file, but 13 of the 63 runs diverged from their killed attempt and its 1044 orphaned files can sit in their antichains. Measured and recorded in the search archive's analysis-output.txt; unresolved here.",
+    "av2_first_manifest_overwritten": "Entry 052 rewrote the score manifest that entry 047 left for seeds 0-12. The binary commit for those 1300 runs rests on the queue log (047 staged 48856b7) and on 48856b7 being engine-identical to df219b9.",
+    "early_entries_failed": "Before the search had run, av3 043 failed for want of a results directory and av1 009 failed too; both were cancelled, as were av3 044 and av1 010, and scoring was re-queued behind the search."
+  },
+  "vendored_scripts": {
+    "commit": "df219b9",
+    "files": {
+      "score_campaign.py": "26c57cb4231aaf62d859a8f05421907d48b7b9a6",
+      "score_curves.py": "32cbc851aaac252f0db9f3b3992d205b432a3752",
+      "campaign.py": "b0c0b89213e21e56c2e8b7d0e50c3e9ea6b172e2",
+      "merge_experiments.py": "e8a6a2d03d98f0f3d98a443816d87f938ef6d5ed"
+    },
+    "added": {
+      "analyse_scoring.py": "Written for this close: per phase and host, the timings ledger, warnings by kind and the per-arm means at the 7200 s cut."
+    },
+    "check": "git hash-object on each vendored file equals git rev-parse df219b9:scripts/<file>.",
+    "analysis": "python3 experiments/2026-10-07-tlsf-rerun-scoring/scripts/analyse_scoring.py > experiments/2026-10-07-tlsf-rerun-scoring/analysis-output.txt"
+  },
+  "owed": [
+    "Re-score the 63 two-attempt run directories with each index cut to its last attempt, or accept the measured over-count.",
+    "The pooled strength pass (PLAN.md, Afterwards), as its own campaign over the collected sidecars."
+  ],
+  "files": {
+    "PLAN.md": "The declaration.",
+    "campaign.toml": "The two score phases the hosts read.",
+    "REPORT.md": "The write-up.",
+    "PROVENANCE.json": "This file.",
+    "analysis-output.txt": "The output of scripts/analyse_scoring.py, run 2026-10-09.",
+    "scripts/": "Four scripts vendored at df219b9, and analyse_scoring.py.",
+    "score-manifests/": "The final score manifest of each phase on each host.",
+    "curves-tlsf-rerun.csv, curves-tlsf-rerun/, separation-recount-tlsf-rerun-s0.csv, separation-recount-tlsf-rerun-s0/": "The collected outputs. Untracked, in experiments/ of the collecting checkout."
+  },
+  "reproduce": "Check out df219b9, build the release preset with the search's results-tlsf-rerun/ in place, and run campaign.toml's two phases through campaign.py on the search's host split. To re-derive the figures, run analyse_scoring.py with the collected outputs in experiments/.",
+  "closed_on": "2026-10-09"
+}

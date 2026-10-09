@@ -1,0 +1,42 @@
+
+==============================================================================
+MAXIMALITY -- curves-tlsf-rerun
+==============================================================================
+-- av1: 500 attempts over 500 runs, 12.65 worker-h, rc 0: 500, longest 4597 s, 0 at the 7500 s deadline, 0 failures
+   manifest: commit df219b910e210e93df5376973f908afab15fa025, counts {"already_scored": 0, "failed": 0, "queued": 500, "scored": 500}
+   warning x14: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+-- av2: 1900 attempts over 1900 runs, 39.09 worker-h, rc 0: 1900, longest 6474 s, 0 at the 7500 s deadline, 0 failures
+   manifest: commit df219b910e210e93df5376973f908afab15fa025, counts {"already_scored": 1300, "failed": 0, "queued": 1900, "scored": 600}
+   warning x43: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+-- av3: 600 attempts over 600 runs, 11.32 worker-h, rc 0: 600, longest 2472 s, 0 at the 7500 s deadline, 0 failures
+   manifest: commit df219b910e210e93df5376973f908afab15fa025, counts {"already_scored": 0, "failed": 0, "queued": 600, "scored": 600}
+   warning x13: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+-- total 63.05 worker-h
+-- mean per run at the 7200 s cut, over 750 runs an arm
+   metric                              nsga2-apportion/mrs  nsga2-apportion/aurus           weighted/mrs         weighted/aurus
+   solutions                                         98.57                  66.11                 388.99                 265.08
+   ideal_solutions                                    5.61                   5.10                  10.49                   9.09
+   maximal_solutions                                 28.49                  19.49                  86.27                  54.76
+   maximal_ideal_solutions                            1.87                   1.75                   2.07                   1.68
+
+==============================================================================
+RECOUNT -- separation-recount-tlsf-rerun-s0
+==============================================================================
+-- av1: 500 attempts over 500 runs, 4.40 worker-h, rc 0: 500, longest 386 s, 0 at the 900 s deadline, 0 failures
+   manifest: commit df219b910e210e93df5376973f908afab15fa025, counts {"already_scored": 0, "failed": 0, "queued": 500, "scored": 500}
+   warning x14: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+-- av2: 1900 attempts over 1900 runs, 18.38 worker-h, rc 0: 1900, longest 460 s, 0 at the 900 s deadline, 0 failures
+   manifest: commit df219b910e210e93df5376973f908afab15fa025, counts {"already_scored": 1300, "failed": 0, "queued": 1900, "scored": 600}
+   warning x43: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+-- av3: 600 attempts over 600 runs, 4.07 worker-h, rc 0: 600, longest 307 s, 0 at the 900 s deadline, 0 failures
+   manifest: commit df219b910e210e93df5376973f908afab15fa025, counts {"already_scored": 0, "failed": 0, "queued": 600, "scored": 600}
+   warning x13: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+-- total 26.84 worker-h
+-- mean per run at the 7200 s cut, over 750 runs an arm
+   metric                              nsga2-apportion/mrs  nsga2-apportion/aurus           weighted/mrs         weighted/aurus
+   eps_solutions_0.05                                35.59                  27.66                 135.54                 104.64
+   eps_solutions_0.2                                 22.08                  16.59                  75.45                  57.81
+   eps_solutions_0.5                                 11.27                   8.40                  32.05                  24.07
+   eps_maximal_solutions_0.05                        17.25                  13.10                  44.25                  31.46
+   eps_maximal_solutions_0.2                         12.76                   9.66                  32.35                  23.33
+   eps_maximal_solutions_0.5                          7.84                   5.97                  18.85                  13.74
