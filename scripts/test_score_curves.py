@@ -175,6 +175,60 @@ def test_prefilter_flags_reach_maximal():
         shutil.rmtree(root, ignore_errors=True)
 
 
+TWO_ATTEMPTS = ("file\tgeneration\telapsed_s\n"
+                "repair_0.tlsf\t1\t1.5\n"
+                "repair_1.tlsf\t2\t2.5\n"
+                "file\tgeneration\telapsed_s\n"
+                "repair_0.tlsf\t1\t1.4\n")
+
+
+def test_read_index_keeps_the_last_attempt():
+    root = Path(tempfile.mkdtemp(prefix="score-curves-"))
+    try:
+        accumulated = root / SCV.ACCUMULATED_DIR
+        accumulated.mkdir()
+        (accumulated / SCV.INDEX_NAME).write_text(TWO_ATTEMPTS)
+        check(SCV.read_index(root), [("repair_0.tlsf", 1, 1.4)],
+              "a re-run's index reads as its last attempt alone")
+        (accumulated / SCV.INDEX_NAME).write_text(
+            TWO_ATTEMPTS.split("file", 2)[0] + "file" +
+            TWO_ATTEMPTS.split("file", 2)[1])
+        check(len(SCV.read_index(root)), 2,
+              "and an index with one attempt reads whole")
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_walk_sees_the_last_attempt_only():
+    root = Path(tempfile.mkdtemp(prefix="score-curves-"))
+    saved = SCV.MAXIMAL_BIN
+    try:
+        accumulated = root / SCV.ACCUMULATED_DIR
+        accumulated.mkdir()
+        (accumulated / SCV.INDEX_NAME).write_text(TWO_ATTEMPTS)
+        for name in ("repair_0.tlsf", "repair_1.tlsf"):
+            (accumulated / name).write_text(name)
+        seen = root / "seen"
+        stub = root / "maximal"
+        # Records the index it was given and whether its files resolve.
+        stub.write_text(f"#!/bin/sh\ncat \"$2\" > {seen}\n"
+                        f"cat \"$(dirname \"$2\")/repair_0.tlsf\" >> {seen}\n"
+                        "printf 'elapsed_s\\tfile\\tevent\\tx\\n"
+                        "1.4\\trepair_0.tlsf\\tadmit\\t-\\n'\n")
+        stub.chmod(0o755)
+        SCV.MAXIMAL_BIN = stub
+        log = SCV.antichain_walk(accumulated, None, 30)
+        check(seen.read_text(),
+              "file\tgeneration\telapsed_s\nrepair_0.tlsf\t1\t1.4\n"
+              "repair_0.tlsf",
+              "maximal walks the last attempt, and its files resolve")
+        check(log, [(1.4, "repair_0.tlsf", "admit")],
+              "under the names the index gives them")
+    finally:
+        SCV.MAXIMAL_BIN = saved
+        shutil.rmtree(root, ignore_errors=True)
+
+
 if __name__ == "__main__":
     for test in (test_hamming_is_the_archived_threshold_form,
                  test_union_normalises_by_the_pair,
@@ -182,6 +236,8 @@ if __name__ == "__main__":
                  test_members_round_trip_in_admission_order,
                  test_members_rows_net_each_cut,
                  test_recount_from_members_end_to_end,
-                 test_prefilter_flags_reach_maximal):
+                 test_prefilter_flags_reach_maximal,
+                 test_read_index_keeps_the_last_attempt,
+                 test_walk_sees_the_last_attempt_only):
         test()
     print("All score_curves.py tests passed.")

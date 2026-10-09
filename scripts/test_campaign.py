@@ -1256,6 +1256,7 @@ hosts = { av2 = "0-4" }
            "fingerprint_words": 256, "fingerprint_seed": 0,
            "fingerprint_max_prefix": 2, "fingerprint_max_cycle": 3,
            "fingerprint_distance": "hamming", "members_from": "",
+           "runs_from": "",
            "prefilter_words": None, "prefilter_max_prefix": None,
            "prefilter_max_cycle": None},
           "every budget defaults to the scorer's own value, and the wall cap "
@@ -1274,6 +1275,7 @@ hosts = { av2 = "0-4" }
            "fingerprint_words": 256, "fingerprint_seed": 0,
            "fingerprint_max_prefix": 2, "fingerprint_max_cycle": 3,
            "fingerprint_distance": "hamming", "members_from": "",
+           "runs_from": "",
            "prefilter_words": None, "prefilter_max_prefix": None,
            "prefilter_max_cycle": None},
           "and so is every budget it states")
@@ -3201,6 +3203,30 @@ plain_cmd = SCAMP.scorer_args(SCAMP.parse_args(
     ["--results", "r", "--out", "o", "--seeds", "0"]), "o/x.csv.part", "r/x")
 check_true(not any(a.startswith("--prefilter") for a in plain_cmd),
            "a pass declaring none passes none")
+
+# runs_from narrows a host's seeds to the run directories a file names, for a
+# re-score of a few runs into a fresh output directory.
+with tempfile.TemporaryDirectory() as tmp:
+    tmp = Path(tmp)
+    for name in ("a_seed01", "b_seed01", "c_seed02", "d_seed05"):
+        (tmp / name).mkdir()
+    check([d.name for d in SCAMP.queue_runs(tmp, [1, 2], {"b_seed01",
+                                                          "c_seed02",
+                                                          "d_seed05"})],
+          ["b_seed01", "c_seed02"],
+          "a run list keeps the named runs of this host's seeds alone")
+    check([d.name for d in SCAMP.queue_runs(tmp, [1])],
+          ["a_seed01", "b_seed01"], "and no list keeps every run of them")
+check(C.score_phase_args({"results": "r", "out": "o",
+                          "runs_from": "experiments/x/runs.txt"}, [1])
+      [C.score_phase_args({"results": "r", "out": "o",
+                           "runs_from": "experiments/x/runs.txt"},
+                          [1]).index("--runs-from") + 1],
+      "experiments/x/runs.txt",
+      "a declared runs_from reaches score_campaign.py's command line")
+check(SCAMP.parse_args(["--results", "r", "--out", "o", "--seeds", "0",
+                        "--runs-from", "f"]).runs_from, "f",
+      "and score_campaign.py takes it")
 
 STUB_CURVES = '''#!/usr/bin/env python3
 """Stands in for score_curves.py: writes a curve, or fails as its run says."""

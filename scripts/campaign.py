@@ -2010,7 +2010,7 @@ SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "maximality", "ideals", "epsilon",
                      "fingerprint_words", "fingerprint_seed",
                      "fingerprint_max_prefix", "fingerprint_max_cycle",
-                     "fingerprint_distance", "members_from",
+                     "fingerprint_distance", "members_from", "runs_from",
                      "prefilter_words", "prefilter_max_prefix",
                      "prefilter_max_cycle")
 # The two of those that are not counts. `maximality` says whether the
@@ -2019,7 +2019,7 @@ SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
 # are checked against what it accepts rather than as positive integers.
 SCORE_CHOICE_KEYS = {"maximality": ("on", "off"), "ideals": ("on", "off"),
                      "fingerprint_distance": ("hamming", "union")}
-SCORE_STRING_KEYS = ("epsilon", "members_from")
+SCORE_STRING_KEYS = ("epsilon", "members_from", "runs_from")
 # Zero is a seed like any other, so this one is bounded below at zero rather
 # than at one. Every other count here is a budget, where zero means nothing
 # runs.
@@ -2562,7 +2562,9 @@ def score_phase_args(phase: dict, seeds: list) -> list:
     defaults = score_defaults()
     for key in SCORE_BUDGET_KEYS:
         value = phase.get(key, defaults.get(key))
-        if value is None:
+        # runs_from narrows rather than budgets, so an unset one passes
+        # nothing and every earlier phase's command line is unchanged.
+        if value is None or (key == "runs_from" and not value):
             continue
         args += [f"--{key.replace('_', '-')}", str(value)]
     return args + ["--seeds", *[str(s) for s in seeds]]

@@ -97,6 +97,10 @@ DEFAULTS = {
     # directory recounts the maximal nets from that pass's membership
     # sidecars instead, which needs maximality off.
     "members_from": "",
+    # Empty scores every run directory of the host's seeds. A file, one run
+    # directory name a line, narrows that to the runs it names: a re-score of
+    # a handful of runs into a fresh output directory.
+    "runs_from": "",
     # `maximal --curve`'s fingerprint prefilter. None leaves the binary's own
     # default and passes no flag, so a phase that never names one walks as
     # every archived curve was walked.
@@ -140,7 +144,7 @@ def seed_of(run_dir: Path):
     return int(match.group(1)) if match else None
 
 
-def queue_runs(results: Path, seeds) -> list:
+def queue_runs(results: Path, seeds, only=None) -> list:
     """The run directories to score, smallest first.
 
     Directly under the results directory, following symlinks as `find -L`
@@ -149,7 +153,8 @@ def queue_runs(results: Path, seeds) -> list:
     seed suffix and is left alone. Smallest first by index line count so the
     heavy families land last, where the budgets can still be raised for them
     before the queue reaches them; ties break on the name so the order is a
-    function of the tree alone.
+    function of the tree alone. `only`, when given, is a set of run
+    directory names, and a directory outside it is left alone too.
     """
     wanted = set(seeds)
     found = []
@@ -158,6 +163,8 @@ def queue_runs(results: Path, seeds) -> list:
             continue
         seed = seed_of(entry)
         if seed is None or seed not in wanted:
+            continue
+        if only is not None and entry.name not in only:
             continue
         found.append((index_lines(entry), entry.name, entry))
     found.sort()
@@ -435,6 +442,7 @@ def build_manifest(args, results: Path, out: Path, versions: dict, head,
         "out": str(args.out),
         "out_resolved": str(out),
         "seeds": list(args.seeds),
+        "runs_from": args.runs_from or None,
         "workers": args.workers,
         "cores": args.cores,
         "pinned": pinned,
@@ -547,6 +555,10 @@ def parse_args(argv=None) -> argparse.Namespace:
                         default=DEFAULTS["fingerprint_distance"],
                         help="normaliser of the separation distance "
                              f"(default: {DEFAULTS['fingerprint_distance']})")
+    parser.add_argument("--runs-from", default=DEFAULTS["runs_from"],
+                        help="a file naming the run directories to score, "
+                             "one a line; empty scores every run of the "
+                             "seeds (default: every run)")
     parser.add_argument("--members-from", default=DEFAULTS["members_from"],
                         help="an earlier maximality pass's output directory; "
                              "recounts its maximal nets from the membership "
@@ -619,7 +631,16 @@ def main(argv=None) -> int:
               file=sys.stderr)
         return 2
 
-    runs = queue_runs(results, args.seeds)
+    only = None
+    if args.runs_from:
+        try:
+            only = {line.strip() for line in
+                    resolve(args.runs_from).read_text().splitlines()
+                    if line.strip()}
+        except OSError as exc:
+            print(f"cannot read the run list: {exc}", file=sys.stderr)
+            return 2
+    runs = queue_runs(results, args.seeds, only)
     if not runs:
         # An empty queue is never a finished pass. Exiting 0 here would let a
         # tick mark the phase done over nothing, and status read 0 of 0.

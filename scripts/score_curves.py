@@ -92,6 +92,7 @@ being silently read as an instantaneous one.
 
 import argparse
 import bisect
+import contextlib
 import csv
 import json
 import math
@@ -99,6 +100,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -165,13 +167,27 @@ def read_manifest(run_dir: Path) -> dict:
         return {}
 
 
+def last_attempt(text: str) -> list[str]:
+    """The index lines the run's last attempt wrote, its header excluded.
+
+    The accumulator appends to index.tsv, so a run killed and re-run into its
+    own directory leaves two attempts behind two headers. Only the last
+    attempt finished, and its files are the ones on disk under the names it
+    shares with the killed one, so the killed attempt's rows are dropped.
+    """
+    lines = text.splitlines()
+    headers = [i for i, line in enumerate(lines)
+               if line.split("\t")[0] == "file"]
+    return lines[headers[-1] + 1:] if headers else lines
+
+
 def read_index(run_dir: Path) -> list[tuple[str, int, float]]:
     """Return (file, generation, elapsed_s) rows in accumulation order.
 
     An absent or empty accumulated/ directory is a legitimate outcome — a run
     with `accumulate_repairs` off, or one that passed nothing through the gate,
     creates neither the directory nor the index — so it reads as no rows rather
-    than as an error.
+    than as an error. Only the last attempt's rows are read (last_attempt).
     """
     path = run_dir / ACCUMULATED_DIR / INDEX_NAME
     try:
@@ -179,7 +195,7 @@ def read_index(run_dir: Path) -> list[tuple[str, int, float]]:
     except OSError:
         return []
     rows: list[tuple[str, int, float]] = []
-    for line in text.splitlines():
+    for line in last_attempt(text):
         fields = line.split("\t")
         if len(fields) != 3 or fields[0] == "file":
             continue
@@ -382,7 +398,44 @@ def antichain_walk(accumulated: Path, jobs: int | None,
     the cuts it covers are the early ones -- which is where an anytime curve
     carries its information.
     """
-    index = accumulated / INDEX_NAME
+    with last_attempt_index(accumulated / INDEX_NAME) as index:
+        return walk_index(index, jobs, timeout_s, extra)
+
+
+@contextlib.contextmanager
+def last_attempt_index(index: Path):
+    """An index path holding the last attempt alone, for `maximal --curve`.
+
+    The binary reads every row of the file it is given, and resolves each
+    file name against the file's directory. An index with one attempt is
+    passed as it stands. One with several is rewritten into a scratch
+    directory beside symlinks to the files its last attempt names, so the
+    names, and so the walk's event log, are unchanged.
+    """
+    try:
+        text = index.read_text()
+    except OSError:
+        yield index
+        return
+    lines = text.splitlines()
+    headers = [line for line in lines if line.split("\t")[0] == "file"]
+    if len(headers) < 2:
+        yield index
+        return
+    rows = last_attempt(text)
+    with tempfile.TemporaryDirectory(prefix="last-attempt-") as scratch:
+        root = Path(scratch)
+        (root / INDEX_NAME).write_text("\n".join([headers[-1], *rows]) + "\n")
+        for name in {line.split("\t")[0] for line in rows if "\t" in line}:
+            link = root / name
+            if not link.exists():
+                link.symlink_to((index.parent / name).resolve())
+        yield root / INDEX_NAME
+
+
+def walk_index(index: Path, jobs: int | None, timeout_s: int,
+               extra: list[str] | None) -> list[tuple[float, str, str]] | None:
+    """Run `maximal --curve` over `index` and parse its event log."""
     command = [str(MAXIMAL_BIN), "--curve", str(index)]
     if jobs:
         command += ["--jobs", str(jobs)]
