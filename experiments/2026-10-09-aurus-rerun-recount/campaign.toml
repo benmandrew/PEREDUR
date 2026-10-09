@@ -1,0 +1,35 @@
+name = "2026-10-09-aurus-rerun-recount"
+branch = "campaign/aurus-rerun-recount"
+description = "Recounts separation over 2026-09-22-aurus-rerun's AuRUS arm at 65,536 words, fingerprint seed 0, 8/8 lassos and union distance: the sampling of 2026-10-07-tlsf-rerun-scoring's PEREDUR recount, so the paper's Sep* macros compare like with like."
+
+# 2026-09-22-aurus-rerun's split, which is also where its adapted run
+# directories (experiments/results-aurus-rerun) and 2026-09-22-aurus-rerun-
+# curves' maximality sidecars (experiments/curves-aurus-uncensored) live: a
+# score phase reads only the runs its own host wrote.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# 2026-10-07-tlsf-rerun-scoring's recount phase, setting for setting. Membership
+# comes from the arm's maximality pass, as 2026-10-01-separation-recount's
+# aurus-s0 phase took it from its own (separation-maximal-aurus). humanoid-741
+# is scored here and dropped by the paper's stage.py, as for every AuRUS input.
+[[phases]]
+name = "recount"
+kind = "score"
+results = "experiments/results-aurus-rerun"
+out = "experiments/separation-recount-aurus-rerun-s0"
+members_from = "experiments/curves-aurus-uncensored"
+workers = 32
+cores = 1
+maximality = "off"
+ideals = "off"
+epsilon = "0.05,0.2,0.5"
+fingerprint_words = 65536
+fingerprint_seed = 0
+fingerprint_max_prefix = 8
+fingerprint_max_cycle = 8
+fingerprint_distance = "union"
+cuts = 20
+deadline_s = 900
+wall_cap_s = 1200
