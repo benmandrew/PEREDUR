@@ -1,0 +1,48 @@
+name = "2026-10-09-tlsf-rerun-rescore"
+branch = "campaign/tlsf-rerun-rescore"
+description = "Re-scores the 63 runs of 2026-10-07-tlsf-rerun whose accumulator index holds a killed attempt and its re-run, reading each index's last attempt only, at 2026-10-07-tlsf-rerun-scoring's settings."
+
+# The seeds of 2026-10-07-tlsf-rerun that hold a two-attempt run, each on the
+# host that wrote it: a score phase reads only the runs its own host wrote.
+hosts = { av2 = "19", av3 = "13,15-17", av1 = "25-26" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# 2026-10-07-tlsf-rerun-scoring's maximality phase, limited to runs.txt and
+# writing to a fresh directory, so no run reads as already scored.
+[[phases]]
+name = "maximality"
+kind = "score"
+results = "experiments/results-tlsf-rerun"
+out = "experiments/curves-tlsf-rerun-rescore"
+runs_from = "experiments/2026-10-09-tlsf-rerun-rescore/runs.txt"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 3000
+deadline_s = 7500
+prefilter_words = 4096
+
+# 2026-10-07-tlsf-rerun-scoring's recount phase, reading membership from the
+# maximality phase above.
+[[phases]]
+name = "recount"
+kind = "score"
+results = "experiments/results-tlsf-rerun"
+out = "experiments/separation-recount-tlsf-rerun-s0-rescore"
+runs_from = "experiments/2026-10-09-tlsf-rerun-rescore/runs.txt"
+members_from = "experiments/curves-tlsf-rerun-rescore"
+workers = 32
+cores = 1
+maximality = "off"
+ideals = "off"
+epsilon = "0.05,0.2,0.5"
+fingerprint_words = 65536
+fingerprint_seed = 0
+fingerprint_max_prefix = 8
+fingerprint_max_cycle = 8
+fingerprint_distance = "union"
+cuts = 20
+deadline_s = 900
+wall_cap_s = 1200
