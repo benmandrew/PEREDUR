@@ -1,0 +1,89 @@
+
+==============================================================================
+MAXIMALITY -- curves-tlsf-rerun-rescore
+==============================================================================
+-- av1: 16 attempts over 16 runs, 3.42 worker-h, rc 0: 16, longest 3237 s, 0 at the 7500 s deadline, 0 failures
+   manifest: commit c1c6e5b08edce86cb1764c97b873cabca82717c7, started 2026-10-09T14:32:09+0100, finished 2026-10-09T15:26:33+0100, counts {"already_scored": 0, "failed": 0, "queued": 16, "scored": 16}
+   scorer starts in warnings.log: 16
+   warning x6: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+-- av2: 16 attempts over 16 runs, 1.18 worker-h, rc 0: 16, longest 1531 s, 0 at the 7500 s deadline, 0 failures
+   manifest: commit c1c6e5b08edce86cb1764c97b873cabca82717c7, started 2026-10-09T14:30:03+0100, finished 2026-10-09T14:55:35+0100, counts {"already_scored": 0, "failed": 0, "queued": 16, "scored": 16}
+   scorer starts in warnings.log: 16
+   warning x2: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+-- av3: 31 attempts over 31 runs, 4.44 worker-h, rc 0: 31, longest 1978 s, 0 at the 7500 s deadline, 0 failures
+   manifest: commit c1c6e5b08edce86cb1764c97b873cabca82717c7, started 2026-10-09T15:10:02+0100, finished 2026-10-09T15:43:01+0100, counts {"already_scored": 25, "failed": 0, "queued": 31, "scored": 6}
+   scorer starts in warnings.log: 43
+   warning x21: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+   warning x1: WARN: the antichain walk failed — Command '['/home/benandrew/projects/co
+   curve without a members sidecar: sweep_G_mrs_weighted_wkoff_log_humanoid-531_seed16
+-- total 9.04 worker-h
+-- mean per run at the 7200 s cut, over 750 runs an arm: curves-tlsf-rerun.csv against curves-tlsf-rerun-spliced.csv
+   metric                                   nsga2-apportion/mrs  nsga2-apportion/aurus           weighted/mrs         weighted/aurus
+   solutions                   original                   98.57                  66.11                 388.99                 265.08
+                               spliced                    97.47                  65.70                 379.77                 259.74
+                               change                     -1.10                  -0.42                  -9.23                  -5.34
+   ideal_solutions             original                    5.61                   5.10                  10.49                   9.09
+                               spliced                     5.58                   5.07                  10.45                   9.04
+                               change                     -0.02                  -0.03                  -0.05                  -0.05
+   maximal_solutions           original                   28.49                  19.49                  86.27                  54.76
+                               spliced                    28.49                  19.49                  85.52                  54.53
+                               change                     -0.00                  -0.01                  -0.74                  -0.23
+   maximal_ideal_solutions     original                    1.87                   1.75                   2.07                   1.68
+                               spliced                     1.87                   1.75                   2.07                   1.68
+                               change                     +0.00                  +0.00                  -0.00                  +0.00
+-- runs outside runs.txt whose values at the cut differ: 0
+-- re-scored runs an arm: nsga2-apportion/mrs 13, nsga2-apportion/aurus 8, weighted/mrs 25, weighted/aurus 17
+-- solutions: 63 of 63 re-scored runs changed at the cut, summed fall 12057
+-- ideal_solutions: 24 of 63 re-scored runs changed at the cut, summed fall 118
+-- maximal_solutions: 25 of 63 re-scored runs changed at the cut, summed fall 732
+-- maximal_ideal_solutions: 3 of 63 re-scored runs changed at the cut, summed fall 3
+-- humanoid-531/16/weighted/mrs: re-scored curve lacks maximal_solutions (original 272), maximal_ideal_solutions (original 1)
+-- humanoid-742/25/weighted/mrs: re-scored curve lacks ideal_solutions (original 2)
+
+==============================================================================
+RECOUNT -- separation-recount-tlsf-rerun-s0-rescore
+==============================================================================
+-- av1: 16 attempts over 16 runs, 0.60 worker-h, rc 0: 16, longest 257 s, 0 at the 900 s deadline, 0 failures
+   manifest: commit c1c6e5b08edce86cb1764c97b873cabca82717c7, started 2026-10-09T15:30:02+0100, finished 2026-10-09T15:34:19+0100, counts {"already_scored": 0, "failed": 0, "queued": 16, "scored": 16}
+   scorer starts in warnings.log: 16
+   warning x6: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+-- av2: 16 attempts over 16 runs, 0.27 worker-h, rc 0: 16, longest 197 s, 0 at the 900 s deadline, 0 failures
+   manifest: commit c1c6e5b08edce86cb1764c97b873cabca82717c7, started 2026-10-09T15:00:01+0100, finished 2026-10-09T15:03:19+0100, counts {"already_scored": 0, "failed": 0, "queued": 16, "scored": 16}
+   scorer starts in warnings.log: 16
+   warning x2: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+-- av3: 31 attempts over 31 runs, 1.42 worker-h, rc 0: 31, longest 474 s, 0 at the 900 s deadline, 0 failures
+   manifest: commit c1c6e5b08edce86cb1764c97b873cabca82717c7, started 2026-10-09T16:10:01+0100, finished 2026-10-09T16:17:56+0100, counts {"already_scored": 0, "failed": 0, "queued": 31, "scored": 31}
+   scorer starts in warnings.log: 31
+   warning x9: WARN: <run>/run.json unreadable — No such file or directory: '<run>/run.
+   warning x1: WARN: no membership for <run> in /home/benandrew/projects/counter/experi
+   curve without a members sidecar: sweep_G_mrs_weighted_wkoff_log_humanoid-531_seed16
+-- total 2.30 worker-h
+-- mean per run at the 7200 s cut, over 750 runs an arm: separation-recount-tlsf-rerun-s0.csv against separation-recount-tlsf-rerun-s0-spliced.csv
+   metric                                   nsga2-apportion/mrs  nsga2-apportion/aurus           weighted/mrs         weighted/aurus
+   eps_solutions_0.05          original                   35.59                  27.66                 135.54                 104.64
+                               spliced                    35.59                  27.66                 135.43                 104.58
+                               change                     +0.00                  +0.00                  -0.11                  -0.07
+   eps_solutions_0.2           original                   22.08                  16.59                  75.45                  57.81
+                               spliced                    22.08                  16.59                  75.37                  57.76
+                               change                     +0.00                  +0.00                  -0.07                  -0.04
+   eps_solutions_0.5           original                   11.27                   8.40                  32.05                  24.07
+                               spliced                    11.27                   8.40                  32.01                  24.06
+                               change                     +0.00                  +0.00                  -0.04                  -0.01
+   eps_maximal_solutions_0.05  original                   17.25                  13.10                  44.25                  31.46
+                               spliced                    17.25                  13.10                  44.13                  31.41
+                               change                     +0.00                  -0.00                  -0.12                  -0.05
+   eps_maximal_solutions_0.2   original                   12.76                   9.66                  32.35                  23.33
+                               spliced                    12.76                   9.66                  32.27                  23.30
+                               change                     +0.00                  -0.00                  -0.08                  -0.03
+   eps_maximal_solutions_0.5   original                    7.84                   5.97                  18.85                  13.74
+                               spliced                     7.84                   5.97                  18.81                  13.73
+                               change                     +0.00                  +0.00                  -0.04                  -0.01
+-- runs outside runs.txt whose values at the cut differ: 0
+-- re-scored runs an arm: nsga2-apportion/mrs 13, nsga2-apportion/aurus 8, weighted/mrs 25, weighted/aurus 17
+-- eps_solutions_0.05: 12 of 63 re-scored runs changed at the cut, summed fall 131
+-- eps_solutions_0.2: 9 of 63 re-scored runs changed at the cut, summed fall 87
+-- eps_solutions_0.5: 7 of 63 re-scored runs changed at the cut, summed fall 39
+-- eps_maximal_solutions_0.05: 14 of 63 re-scored runs changed at the cut, summed fall 128
+-- eps_maximal_solutions_0.2: 11 of 63 re-scored runs changed at the cut, summed fall 87
+-- eps_maximal_solutions_0.5: 8 of 63 re-scored runs changed at the cut, summed fall 38
+-- humanoid-531/16/weighted/mrs: re-scored curve lacks eps_maximal_solutions_0.05 (original 25), eps_maximal_solutions_0.2 (original 14), eps_maximal_solutions_0.5 (original 8)

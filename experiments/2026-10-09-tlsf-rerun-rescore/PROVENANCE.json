@@ -1,0 +1,309 @@
+{
+  "campaign": "2026-10-09-tlsf-rerun-rescore",
+  "attribution": "recorded",
+  "attribution_note": "Every host entry was staged through campaign.py, and each score manifest records its binaries' commit as c1c6e5b, dirty 0.",
+  "generated_on": "2026-10-10",
+  "status": "closed",
+  "closed_on": "2026-10-10",
+  "kind": "score",
+  "kind_note": "Two score phases over the 63 run directories of 2026-10-07-tlsf-rerun that runs.txt names, each of whose accumulated/index.tsv holds a killed attempt and its re-run: maximality (curves with ideals, and the .members.tsv sidecars), then the separation recount at fingerprint seed 0 over those sidecars. The scorer reads each index's last attempt only. No search, no PLAN.md and no decision rule.",
+  "run_window": {
+    "first_start": "2026-10-09T14:30:02 (av3 entry 052, maximality, from its queue log)",
+    "last_finish": "2026-10-09T16:17:56 (av3 entry 052, recount, from its score manifest)",
+    "collected": "2026-10-09 16:47 and 16:48 local time (mtimes of the joined CSVs), collected again on 2026-10-10 with the same sha256 for both joined files"
+  },
+  "source_campaign": {
+    "name": "2026-10-07-tlsf-rerun",
+    "tag": "provenance/tlsf-rerun",
+    "results": "experiments/results-tlsf-rerun on each host"
+  },
+  "parent_archive": {
+    "name": "2026-10-07-tlsf-rerun-scoring",
+    "tag": "provenance/tlsf-rerun-scoring",
+    "owed_item_closed": "Re-score the 63 two-attempt run directories with each index cut to its last attempt, or accept the measured over-count.",
+    "originals": {
+      "curves-tlsf-rerun.csv": "728,737 rows, sha256 0855e6a660c0790026511ea92b08e480f58068586d2540fad05d0a089541a57e",
+      "separation-recount-tlsf-rerun-s0.csv": "921,401 rows, sha256 c9c5d78a0bb8f1bc8edb610b00ef88a03527dc8d1308ec23c891e63751b67586"
+    }
+  },
+  "profile_commit": {
+    "sha": "c1c6e5b08edce86cb1764c97b873cabca82717c7",
+    "short": "c1c6e5b",
+    "branch": "campaign/tlsf-rerun-rescore",
+    "scorer": "df219b9 (the parent archive's scorer) plus 1a0a539, which makes score_curves.py read a re-run's accumulator index by its last attempt. git diff --stat df219b9 c1c6e5b touches scripts/ and experiments/ only, and nothing under src/, include/ or test/.",
+    "reachable_from_main": false,
+    "held_by_tag": "provenance/tlsf-rerun-rescore",
+    "held_by_tag_note": "Annotated tag at c1c6e5b, tag object 5897385b5581f7d343454756fcf63adb18b7be9b, cut and pushed on 2026-10-10 before the archive commit."
+  },
+  "scoring_binaries": {
+    "maximal": "c1c6e5b dirty 0",
+    "compare": "c1c6e5b dirty 0",
+    "fingerprint": "c1c6e5b dirty 0",
+    "note": "From the score manifest of each phase on each host: maximal and compare from the maximality manifests, fingerprint from the recount manifests. allow_stale_binary is false in all six."
+  },
+  "hosts": {
+    "av1": {
+      "machine": "av1",
+      "seeds": "25-26",
+      "runs": 16,
+      "entries": {
+        "017": "80ba483, cancelled while queued at 2026-10-09T14:26:46: staged at 80ba483, which lacks runs.txt",
+        "018": "c1c6e5b, maximality 2026-10-09T14:32:09 to 15:26:33, recount 15:30:02 to 15:34:19, done"
+      }
+    },
+    "av2": {
+      "machine": "avlab12",
+      "seeds": "19",
+      "runs": 16,
+      "entries": {
+        "054": "80ba483, maximality exited 2 at 2026-10-09T14:27:06 (attempt 1/3), cancelled at 14:27:49: staged without runs.txt",
+        "055": "c1c6e5b, maximality 2026-10-09T14:30:03 to 14:55:35, recount 15:00:01 to 15:03:19, done"
+      }
+    },
+    "av3": {
+      "machine": "av3",
+      "seeds": "13,15-17",
+      "runs": 31,
+      "entries": {
+        "051": "80ba483, one attempt that could not read the run list at 2026-10-09T14:27:22, cancelled at 14:27:50: staged without runs.txt",
+        "052": "c1c6e5b, maximality started 2026-10-09T14:30:02, restarted at 15:05:02 and 15:10:02 after 'tick was interrupted mid-phase' (attempts 1/3 and 2/3), finished 15:43:01; recount 16:10:01 to 16:17:56, done"
+      }
+    }
+  },
+  "maximality_pass": {
+    "source": "experiments/results-tlsf-rerun, limited to experiments/2026-10-09-tlsf-rerun-rescore/runs.txt",
+    "output": "experiments/curves-tlsf-rerun-rescore.csv (21,923 rows, 63 curves) and curves-tlsf-rerun-rescore/<host>/ with one <run>.csv and <run>.members.tsv per run, bar the partial curve below",
+    "invocation": "python3 scripts/score_curves.py --maximality --prefilter-words 4096 --cuts 20 --jobs 4 --deadline-s 7500 --maximal-timeout 900 --compare-timeout 3000 --out <out>/<run>.csv.part <run-dir>",
+    "budgets": {
+      "workers": 8,
+      "cores": 4,
+      "cuts": 20,
+      "maximal_timeout": 900,
+      "compare_timeout": 3000,
+      "deadline_s": 7500,
+      "wall_cap_s": 8400,
+      "prefilter_words": 4096
+    },
+    "passes": {
+      "av1": {
+        "seeds": [25, 26],
+        "started": "2026-10-09T14:32:09+0100",
+        "finished": "2026-10-09T15:26:33+0100",
+        "counts": {"queued": 16, "already_scored": 0, "scored": 16, "failed": 0},
+        "runs": 16,
+        "worker_h": 3.42,
+        "longest_s": 3237
+      },
+      "av2": {
+        "seeds": [19],
+        "started": "2026-10-09T14:30:03+0100",
+        "finished": "2026-10-09T14:55:35+0100",
+        "counts": {"queued": 16, "already_scored": 0, "scored": 16, "failed": 0},
+        "runs": 16,
+        "worker_h": 1.18,
+        "longest_s": 1531
+      },
+      "av3": {
+        "seeds": [13, 15, 16, 17],
+        "started": "2026-10-09T15:10:02+0100",
+        "finished": "2026-10-09T15:43:01+0100",
+        "manifest_note": "The manifest is the third start's. The first start, at 14:30:02, scored the 25 runs the manifest counts as already scored; its manifest and the 15:05:02 start's were overwritten.",
+        "counts": {"queued": 31, "already_scored": 25, "scored": 6, "failed": 0},
+        "runs": 31,
+        "worker_h": 4.44,
+        "longest_s": 1978,
+        "scorer_starts_in_warnings_log": 43
+      }
+    },
+    "failed": 0,
+    "at_deadline": 0,
+    "nonzero_rc": 0,
+    "failures_txt": "Empty on all three hosts.",
+    "worker_h_from_timings": 9.04,
+    "core_h_allocated": 36.2,
+    "worker_h_note": "timings.txt holds one line per finished attempt: 63 lines for 63 runs. av3's warnings.log holds 43 scorer starts against 31 timings lines, so the 12 attempts cut off by the two interrupted ticks are in no ledger and their cost is not recorded.",
+    "warnings": "30 lines over the three hosts. 29 are 'run.json unreadable' (av1 6, av2 2, av3 21 over its 43 starts), the run having been killed at the 7200 s search cap. One, on av3, is 'the antichain walk failed': maximal --curve died with SIGABRT.",
+    "partial_curves": 1,
+    "partial_curve": {
+      "run": "sweep_G_mrs_weighted_wkoff_log_humanoid-531_seed16",
+      "host": "av3",
+      "cause": "warnings.log: the antichain walk failed, 'build-release/maximal --curve /tmp/last-attempt-bvj16vgt/index.tsv --jobs 4 --prefilter-words 4096' died with SIGABRT. The cause of the abort is not recorded.",
+      "effect": "The scorer exited 0 after 1312 s and wrote a curve of 694 rows holding solutions, ideal_solutions and the two time-to-first metrics, with no maximal_solutions or maximal_ideal_solutions row and no members.tsv. It is not in failures.txt and the manifest counts it as scored.",
+      "original_values_at_7200_s": {"maximal_solutions": 272, "maximal_ideal_solutions": 1}
+    }
+  },
+  "recount_pass": {
+    "source": "experiments/results-tlsf-rerun, limited to runs.txt, membership from experiments/curves-tlsf-rerun-rescore",
+    "output": "experiments/separation-recount-tlsf-rerun-s0-rescore.csv (26,133 rows, 63 curves) and separation-recount-tlsf-rerun-s0-rescore/<host>/",
+    "invocation": "python3 scripts/score_curves.py --skip-ideals --epsilon 0.05,0.2,0.5 --fingerprint-words 65536 --fingerprint-seed 0 --fingerprint-max-prefix 8 --fingerprint-max-cycle 8 --fingerprint-distance union --members-from <curves-tlsf-rerun-rescore> --cuts 20 --jobs 1 --deadline-s 900 --maximal-timeout 900 --compare-timeout 600 --out <out>/<run>.csv.part <run-dir>",
+    "budgets": {
+      "workers": 32,
+      "cores": 1,
+      "cuts": 20,
+      "deadline_s": 900,
+      "wall_cap_s": 1200
+    },
+    "passes": {
+      "av1": {
+        "seeds": [25, 26],
+        "started": "2026-10-09T15:30:02+0100",
+        "finished": "2026-10-09T15:34:19+0100",
+        "counts": {"queued": 16, "already_scored": 0, "scored": 16, "failed": 0},
+        "runs": 16,
+        "worker_h": 0.6,
+        "longest_s": 257
+      },
+      "av2": {
+        "seeds": [19],
+        "started": "2026-10-09T15:00:01+0100",
+        "finished": "2026-10-09T15:03:19+0100",
+        "counts": {"queued": 16, "already_scored": 0, "scored": 16, "failed": 0},
+        "runs": 16,
+        "worker_h": 0.27,
+        "longest_s": 197
+      },
+      "av3": {
+        "seeds": [13, 15, 16, 17],
+        "started": "2026-10-09T16:10:01+0100",
+        "finished": "2026-10-09T16:17:56+0100",
+        "counts": {"queued": 31, "already_scored": 0, "scored": 31, "failed": 0},
+        "runs": 31,
+        "worker_h": 1.42,
+        "longest_s": 474
+      }
+    },
+    "failed": 0,
+    "at_deadline": 0,
+    "nonzero_rc": 0,
+    "failures_txt": "Empty on all three hosts.",
+    "core_h_from_timings": 2.3,
+    "warnings": "18 lines: 17 'run.json unreadable' (av1 6, av2 2, av3 9) and, on av3, 'no membership for sweep_G_mrs_weighted_wkoff_log_humanoid-531_seed16'.",
+    "partial_curves": 1,
+    "partial_curve": {
+      "run": "sweep_G_mrs_weighted_wkoff_log_humanoid-531_seed16",
+      "effect": "With no membership to read, the curve holds the three eps_solutions metrics and no eps_maximal_solutions row, and has no members.tsv or fingerprints.tsv beside it.",
+      "original_values_at_7200_s": {"eps_maximal_solutions_0.05": 25, "eps_maximal_solutions_0.2": 14, "eps_maximal_solutions_0.5": 8}
+    }
+  },
+  "splice": {
+    "script": "splice.py, blob f63a383977824c3bedc11872f55528423176b00f, as committed at c1c6e5b",
+    "runs": "runs.txt, blob 9018a5b9cb8764d8417e5c32825051109d484595, 63 names",
+    "output_log": "splice-output.txt",
+    "curves": {
+      "rows_in": 728737,
+      "rows_dropped": 34220,
+      "rows_added": 21923,
+      "rows_out": 716440,
+      "out": "experiments/curves-tlsf-rerun-spliced.csv, sha256 3865d04c36b183d15d2d22ec650a64837f24d5e342a8720fc60ec6e1247cf0b5"
+    },
+    "recount": {
+      "rows_in": 921401,
+      "rows_dropped": 38382,
+      "rows_added": 26133,
+      "rows_out": 909152,
+      "out": "experiments/separation-recount-tlsf-rerun-s0-spliced.csv, sha256 0e3825a345651d07d011784cda04d8d34e582d799970c9d13a9e8c705116e435"
+    },
+    "runs_replaced": 63,
+    "runs_per_arm": {
+      "nsga2-apportion/mrs": 13,
+      "nsga2-apportion/aurus": 8,
+      "weighted/mrs": 25,
+      "weighted/aurus": 17
+    },
+    "runs_outside_runs_txt_changed_at_7200_s": 0,
+    "earlier_copy": "/home/y19056ba/projects/counter-wt/tlsf-rerun/experiments holds curves-tlsf-rerun-spliced.csv and separation-recount-tlsf-rerun-s0-spliced.csv dated 2026-10-09 16:48, with the same two sha256 values."
+  },
+  "results": {
+    "note": "Mean per run at the 7200 s cut over all 750 runs an arm, a run without the metric counting zero, from analysis-output.txt: the parent archive's merged file, then the spliced file. The solutions change equals the over-count the search archive measured (1.10, 0.42, 9.23, 5.34).",
+    "solutions": {
+      "original": {"nsga2-apportion/mrs": 98.57, "nsga2-apportion/aurus": 66.11, "weighted/mrs": 388.99, "weighted/aurus": 265.08},
+      "spliced": {"nsga2-apportion/mrs": 97.47, "nsga2-apportion/aurus": 65.70, "weighted/mrs": 379.77, "weighted/aurus": 259.74}
+    },
+    "ideal_solutions": {
+      "original": {"nsga2-apportion/mrs": 5.61, "nsga2-apportion/aurus": 5.10, "weighted/mrs": 10.49, "weighted/aurus": 9.09},
+      "spliced": {"nsga2-apportion/mrs": 5.58, "nsga2-apportion/aurus": 5.07, "weighted/mrs": 10.45, "weighted/aurus": 9.04}
+    },
+    "maximal_solutions": {
+      "original": {"nsga2-apportion/mrs": 28.49, "nsga2-apportion/aurus": 19.49, "weighted/mrs": 86.27, "weighted/aurus": 54.76},
+      "spliced": {"nsga2-apportion/mrs": 28.49, "nsga2-apportion/aurus": 19.49, "weighted/mrs": 85.52, "weighted/aurus": 54.53}
+    },
+    "maximal_ideal_solutions": {
+      "original": {"nsga2-apportion/mrs": 1.87, "nsga2-apportion/aurus": 1.75, "weighted/mrs": 2.07, "weighted/aurus": 1.68},
+      "spliced": {"nsga2-apportion/mrs": 1.87, "nsga2-apportion/aurus": 1.75, "weighted/mrs": 2.07, "weighted/aurus": 1.68}
+    },
+    "eps_solutions_0.05": {
+      "original": {"nsga2-apportion/mrs": 35.59, "nsga2-apportion/aurus": 27.66, "weighted/mrs": 135.54, "weighted/aurus": 104.64},
+      "spliced": {"nsga2-apportion/mrs": 35.59, "nsga2-apportion/aurus": 27.66, "weighted/mrs": 135.43, "weighted/aurus": 104.58}
+    },
+    "eps_solutions_0.2": {
+      "original": {"nsga2-apportion/mrs": 22.08, "nsga2-apportion/aurus": 16.59, "weighted/mrs": 75.45, "weighted/aurus": 57.81},
+      "spliced": {"nsga2-apportion/mrs": 22.08, "nsga2-apportion/aurus": 16.59, "weighted/mrs": 75.37, "weighted/aurus": 57.76}
+    },
+    "eps_solutions_0.5": {
+      "original": {"nsga2-apportion/mrs": 11.27, "nsga2-apportion/aurus": 8.40, "weighted/mrs": 32.05, "weighted/aurus": 24.07},
+      "spliced": {"nsga2-apportion/mrs": 11.27, "nsga2-apportion/aurus": 8.40, "weighted/mrs": 32.01, "weighted/aurus": 24.06}
+    },
+    "eps_maximal_solutions_0.05": {
+      "original": {"nsga2-apportion/mrs": 17.25, "nsga2-apportion/aurus": 13.10, "weighted/mrs": 44.25, "weighted/aurus": 31.46},
+      "spliced": {"nsga2-apportion/mrs": 17.25, "nsga2-apportion/aurus": 13.10, "weighted/mrs": 44.13, "weighted/aurus": 31.41}
+    },
+    "eps_maximal_solutions_0.2": {
+      "original": {"nsga2-apportion/mrs": 12.76, "nsga2-apportion/aurus": 9.66, "weighted/mrs": 32.35, "weighted/aurus": 23.33},
+      "spliced": {"nsga2-apportion/mrs": 12.76, "nsga2-apportion/aurus": 9.66, "weighted/mrs": 32.27, "weighted/aurus": 23.30}
+    },
+    "eps_maximal_solutions_0.5": {
+      "original": {"nsga2-apportion/mrs": 7.84, "nsga2-apportion/aurus": 5.97, "weighted/mrs": 18.85, "weighted/aurus": 13.74},
+      "spliced": {"nsga2-apportion/mrs": 7.84, "nsga2-apportion/aurus": 5.97, "weighted/mrs": 18.81, "weighted/aurus": 13.73}
+    },
+    "runs_changed_at_7200_s": {
+      "note": "Of the 63 re-scored runs, how many hold a different value at the cut, and the summed fall over the 63.",
+      "solutions": {"runs": 63, "summed_fall": 12057},
+      "ideal_solutions": {"runs": 24, "summed_fall": 118},
+      "maximal_solutions": {"runs": 25, "summed_fall": 732},
+      "maximal_ideal_solutions": {"runs": 3, "summed_fall": 3},
+      "eps_solutions_0.05": {"runs": 12, "summed_fall": 131},
+      "eps_solutions_0.2": {"runs": 9, "summed_fall": 87},
+      "eps_solutions_0.5": {"runs": 7, "summed_fall": 39},
+      "eps_maximal_solutions_0.05": {"runs": 14, "summed_fall": 128},
+      "eps_maximal_solutions_0.2": {"runs": 11, "summed_fall": 87},
+      "eps_maximal_solutions_0.5": {"runs": 8, "summed_fall": 38}
+    }
+  },
+  "deviations": {
+    "staged_without_runs_txt": "The first entry on each host (av1 017, av2 054, av3 051) was staged at 80ba483, which declares runs_from but lacks runs.txt. av2's and av3's each spent one attempt that scored nothing, and all three were cancelled between 14:26:46 and 14:27:50 on 2026-10-09 and superseded by the c1c6e5b entries.",
+    "av3_ticks_interrupted": "av3 entry 052's maximality phase logged 'tick was interrupted mid-phase' at 15:05:01 and 15:10:01. The first start had finished 25 runs, the second finished none, and the third scored the remaining 6. What interrupted the ticks is not recorded.",
+    "antichain_walk_aborted": "On av3, maximal --curve died with SIGABRT on sweep_G_mrs_weighted_wkoff_log_humanoid-531_seed16 in the third start. The run's re-scored curves carry no maximal_solutions, maximal_ideal_solutions or eps_maximal_solutions rows, and the splice replaces the original's rows for that run, which held them (272, 1, and 25, 14, 8 at 7200 s). In the spliced files this run therefore counts zero towards weighted/mrs on those five metrics: 272 of the 732 summed fall in maximal_solutions and 25, 14 and 8 of the 128, 87 and 38 in eps_maximal_solutions are this run's missing rows, not a removed over-count. Unresolved here.",
+    "ideal_reading_absent": "The re-scored curve of sweep_G_mrs_weighted_wkoff_log_humanoid-742_seed25 holds no ideal_solutions row where the original read 2 at 7200 s. Its only warning is the run.json one, and the cause is not recorded."
+  },
+  "vendored_scripts": {
+    "commit": "c1c6e5b",
+    "files": {
+      "score_campaign.py": "0732f86d2fdb4c97fae3735c5cc5e818a98062d6",
+      "score_curves.py": "320d47600cf96bded59d429e2a3b8e7912ed594b",
+      "campaign.py": "aede1a71e7a14ffad038c585fed0a3077ebeee04",
+      "merge_experiments.py": "e8a6a2d03d98f0f3d98a443816d87f938ef6d5ed"
+    },
+    "added": {
+      "analyse_rescore.py": "Written for this close from the parent archive's analyse_scoring.py: per phase and host, the timings ledger, scorer starts, warnings by kind and curves without a members sidecar; per arm the means at the 7200 s cut before and after the splice; and the re-scored runs whose curve lacks a metric the original held."
+    },
+    "check": "git hash-object on each vendored file equals git rev-parse c1c6e5b:scripts/<file>, checked on 2026-10-10.",
+    "analysis": "python3 experiments/2026-10-09-tlsf-rerun-rescore/scripts/analyse_rescore.py --original-dir <parent checkout>/experiments > experiments/2026-10-09-tlsf-rerun-rescore/analysis-output.txt"
+  },
+  "owed": [
+    "Re-score sweep_G_mrs_weighted_wkoff_log_humanoid-531_seed16 once the maximal --curve abort is understood, then splice again; until then the spliced files understate weighted/mrs on the maximal and eps_maximal metrics by that one run.",
+    "The cause of the SIGABRT in maximal --curve on that run's last-attempt index."
+  ],
+  "files": {
+    "campaign.toml": "The two score phases the hosts read.",
+    "runs.txt": "The 63 run directories re-scored.",
+    "splice.py": "Replaces the re-scored runs' rows in a merged curves CSV.",
+    "splice-output.txt": "The output of the two splice.py calls, run 2026-10-10: row counts and each run's final solutions before and after.",
+    "REPORT.md": "The write-up.",
+    "PROVENANCE.json": "This file.",
+    "analysis-output.txt": "The output of scripts/analyse_rescore.py, run 2026-10-10.",
+    "scripts/": "Four scripts vendored at c1c6e5b, and analyse_rescore.py.",
+    "score-manifests/": "The final score manifest of each phase on each host.",
+    "curves-tlsf-rerun-rescore.csv, curves-tlsf-rerun-rescore/, separation-recount-tlsf-rerun-s0-rescore.csv, separation-recount-tlsf-rerun-s0-rescore/, curves-tlsf-rerun-spliced.csv, separation-recount-tlsf-rerun-s0-spliced.csv": "The collected outputs and the two spliced files. Untracked, in experiments/ of the collecting checkout (/home/y19056ba/projects/counter-wt/tlsf-rescore)."
+  },
+  "reproduce": "Check out c1c6e5b, build the release preset with the search's results-tlsf-rerun/ in place, and run campaign.toml's two phases through campaign.py on its host split. Collect both outputs with campaign.py collect --curves, run splice.py against the parent archive's two merged CSVs, and run analyse_rescore.py with --original-dir naming the directory that holds them."
+}
