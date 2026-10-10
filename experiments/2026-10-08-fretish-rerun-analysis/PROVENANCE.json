@@ -1,0 +1,235 @@
+{
+  "campaign": "2026-10-08-fretish-rerun-analysis",
+  "attribution": "recorded",
+  "generated_on": "2026-10-10",
+  "closed_on": "2026-10-10",
+  "status": "closed",
+  "kind": "analysis: a fingerprint phase and a compare phase per host, then a local reduction; no search",
+  "kind_note": "Steps 4 (pooled strength) and 5 (fingerprints and ball radii) of experiments/2026-10-06-fretish-rerun/PLAN.md, run through the queue as one declaration. Not seed-split: each host takes whole subjects from subjects-<host>.txt. (PLAN.md; campaign.toml.)",
+  "close_note": "A bookkeeping close. Nothing under out/ or members/ was recomputed or edited at the close, and every figure here is copied from the file named beside it.",
+  "source_campaign": {
+    "name": "2026-10-06-fretish-rerun",
+    "archive": "campaign/fretish-rerun, experiments/2026-10-06-fretish-rerun",
+    "tag": "provenance/fretish-rerun",
+    "input": "The rerun's accumulated/maximal.tsv members, pooled once locally by scripts/pool_members.py from counter-wt/fretish-rerun/experiments/results-fretish-rerun and committed as members/<subject>.jsonl.gz; members/index.csv gives the counts and each file's SHA-256. (PLAN.md, Inputs.)"
+  },
+  "decision_rule": "None registered. This campaign's PLAN.md pre-registers no decision rule. The source campaign's PLAN.md (Endpoints and tests) names the test only: strength is the pooled net subsumption share and diversity the ball-radii containment at K = 3, each tested by the exact Wilcoxon signed-rank test over subjects. Its one decision rule, McNemar on found at the cap, belongs to the search and was fired in that archive.",
+  "decision_rule_firing": "No rule to fire. The registered tests read as follows. Strength (out/strength/summary.txt): net_decided n=17, median -0.1138, mean -0.1618, u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05; net_imp and net_non give the same counts and p. Ball radii at K = 3 (out/ball-radii/hl_j3m.txt): Net BinA - AinB n=15, zeros 1, mean -0.096, HL -0.039 [-0.089, -0.005], p 0.035; BinA - ctrl A n=14, HL -0.031 [-0.062, -0.003], p 0.033; AinB - ctrl B n=15, HL +0.007 [-0.028, +0.043], p 0.81. A is directed and B is uniform.",
+  "profile_commit": {
+    "declaration_sha": "02d5347f06e4c74ab69d94197f4aea0c708f0aec",
+    "declaration_short": "02d5347",
+    "declaration_subject": "feat(experiments): declare 2026-10-08-fretish-rerun-analysis",
+    "output_sha": "308e01a4b13f12603bc30163027f6cc8b82e5e1b",
+    "output_short": "308e01a",
+    "output_subject": "data(experiments): record 2026-10-08-fretish-rerun-analysis's reduced output",
+    "branch": "campaign/fretish-rerun-analysis",
+    "reachable_from_main": "no; the branch is pushed",
+    "held_by_tag": "provenance/fretish-rerun-analysis",
+    "held_by_tag_note": "Annotated tag, object 268ffc7, pointing at 308e01a, dated 2026-10-09T13:07:46+0100 and present on origin (checked with git ls-remote on 2026-10-10). 02d5347 is 308e01a's parent, so the tag holds both. The closing commit sits one above the tag on the pushed branch; the tag was not moved."
+  },
+  "binaries": {
+    "source": "the binaries block of experiments/compare-manifests/2026-10-08-fretish-rerun-analysis.{fingerprint,subsumption}.json on each host, read over ssh on 2026-10-10; the manifests are not copied into this archive",
+    "peredur": "02d5347 dirty 0 on all three hosts (fingerprint manifests)",
+    "compare": "02d5347 dirty 0 on all three hosts (subsumption manifests)",
+    "fpdraw_sha256": {
+      "av1": "912430ae65720ddbbcb41a09f0e6b0e3d3320ced890c65f6237c5e8891a09c28",
+      "av2": "3a47c9aeac67a96fd16251471ccac92aad7caf6bb71907c53245ee3a5f6c0a10",
+      "av3": "3a47c9aeac67a96fd16251471ccac92aad7caf6bb71907c53245ee3a5f6c0a10"
+    },
+    "fpdraw_commit": "not recorded; the manifest gives fpdraw a path and a SHA-256 only. Each host's git block reads branch campaign/fretish-rerun-analysis, head 02d5347.",
+    "black": "build-release/third_party/black/black on each host; version not recorded",
+    "draw_script": "experiments/2026-10-01-fretish-frontier-approx/scripts/draw_black.py, SHA-256 b77d67c9455536e9363ed0a4bf64faab0c8a24876d2256f77fb31e8862dbf695 on all three hosts, equal to the copy at 02d5347 (git blob 9aef80cf2f19731dbf1781abd943340038dfdd54)"
+  },
+  "run_window": {
+    "queued": "2026-10-08T16:57:11 on all three hosts",
+    "first_phase_started": "2026-10-08T17:01:58+0100",
+    "last_phase_finished": "2026-10-08T18:05:02+0100",
+    "source": "the queue entries' log lines and the phase manifests' started and finished stamps"
+  },
+  "hosts": {
+    "av1": {
+      "machine": "av1",
+      "queue_entry": "013-2026-10-08-fretish-rerun-analysis, commit 02d5347, state done, phase 2/2, attempts 0",
+      "subjects": ["lpc-mini-core1", "rad-core-10"],
+      "staged": "2026-10-08T17:00:01 to 17:01:58, from campaign/tlsf-rerun",
+      "fingerprint": {"started": "2026-10-08T17:01:58+0100", "finished": "2026-10-08T17:09:27+0100", "planned": 2, "done_at_start": 0, "missing": 0, "pairs_joined": 60797},
+      "subsumption": {"started": "2026-10-08T17:10:01+0100", "finished": "2026-10-08T18:05:02+0100", "pairs_total": 60797, "done_at_start": 0, "missing": 0, "runner_wall_s": 3301}
+    },
+    "av2": {
+      "machine": "avlab12",
+      "queue_entry": "050-2026-10-08-fretish-rerun-analysis, commit 02d5347, state done, phase 2/2, attempts 0",
+      "subjects": ["fsm-timing", "liquid-mixer", "fsm-combined", "mode-arbiter", "takeoff", "fsm"],
+      "staged": "2026-10-08T17:00:01 to 17:01:58, from campaign/tlsf-rerun",
+      "fingerprint": {"started": "2026-10-08T17:01:58+0100", "finished": "2026-10-08T17:12:55+0100", "planned": 6, "done_at_start": 0, "missing": 0, "pairs_joined": 137127},
+      "subsumption": {"started": "2026-10-08T17:15:01+0100", "finished": "2026-10-08T17:54:15+0100", "pairs_total": 137127, "done_at_start": 0, "missing": 0, "runner_wall_s": 2354}
+    },
+    "av3": {
+      "machine": "av3",
+      "queue_entry": "047-2026-10-08-fretish-rerun-analysis, commit 02d5347, state done, phase 2/2, attempts 0",
+      "subjects": ["rad-core-33", "rad-core-61", "rad-core-65", "rad-core-17-18", "rad-core-12-18", "rad-core-55", "rad-core-1-18", "rad-core-45", "rad-core-68"],
+      "staged": "2026-10-08T17:00:01 to 17:01:59, from campaign/tlsf-rerun",
+      "fingerprint": {"started": "2026-10-08T17:01:59+0100", "finished": "2026-10-08T17:12:29+0100", "planned": 9, "done_at_start": 0, "missing": 0, "pairs_joined": 380345},
+      "subsumption": {"started": "2026-10-08T17:15:01+0100", "finished": "2026-10-08T17:20:51+0100", "pairs_total": 380345, "done_at_start": 0, "missing": 0, "runner_wall_s": 350}
+    },
+    "note": "Stamps and counts are fields of each host's two phase manifests; the queue entry lines come from experiments/queue/NNN-2026-10-08-fretish-rerun-analysis.toml and runner_wall_s from the closing 'done <N>s' line of the entry's .log. No entry spent an attempt, and last_error is empty on all three. The 16:57 queue lines on each host show the TLSF re-run's entries cancelled and re-enqueued behind this one."
+  },
+  "phases": {
+    "fingerprint": {
+      "invocation": "python3 scripts/fingerprint_members.py over subjects-<host>.txt, as campaign.toml declares",
+      "budgets": {"words": 32768, "seed": 3, "workers": 8, "black_timeout_s": 30},
+      "per_subject": {
+        "source": "<host>/fp/done-subjects-<host>.csv in the collected outputs, columns nodes, words, pairs, secs",
+        "lpc-mini-core1": [3719, 32768, 59529, 369.0],
+        "rad-core-10": [1027, 32673, 1268, 80.2],
+        "fsm-timing": [2282, 32768, 63328, 93.7],
+        "liquid-mixer": [4576, 32768, 10084, 109.1],
+        "fsm-combined": [1627, 32768, 19004, 86.4],
+        "mode-arbiter": [1237, 32768, 14198, 101.3],
+        "takeoff": [1223, 32757, 16146, 172.5],
+        "fsm": [803, 32768, 14367, 93.4],
+        "rad-core-33": [5879, 32759, 315582, 92.0],
+        "rad-core-61": [4017, 32758, 727, 67.4],
+        "rad-core-65": [3686, 32764, 1264, 64.9],
+        "rad-core-17-18": [3826, 32768, 17594, 69.3],
+        "rad-core-12-18": [3820, 32768, 15990, 69.3],
+        "rad-core-55": [3434, 32752, 7741, 68.3],
+        "rad-core-1-18": [3089, 32768, 10700, 66.7],
+        "rad-core-45": [2782, 32764, 5574, 64.4],
+        "rad-core-68": [2698, 32766, 5173, 66.4]
+      },
+      "errors": "No draw.log on any host holds the string ERROR (grep -c reads 0 for all 17 subjects) and every ltl.err is empty. The count of draws that hit the 30 s black timeout is not recorded in any summary file."
+    },
+    "subsumption": {
+      "invocation": "python3 scripts/compare_pairs.py over pairs-<host>.csv, as campaign.toml declares",
+      "budgets": {"jobs": 24, "black_timeout_s": 20, "wall_timeout_s": 180, "vmem_kb": 8388608},
+      "pairs_planned": {"av1": 60797, "av2": 137127, "av3": 380345, "total": 578269},
+      "rows_written": {"av1": 60797, "av2": 137127, "av3": 380345},
+      "nonzero_rc": {"av1": 0, "av2": 0, "av3": 0},
+      "relation_counts": {
+        "av1": {"incomparable": 30450, "weaker": 15227, "stronger": 12655, "undecided": 1771, "equivalent": 694},
+        "av2": {"incomparable": 56666, "weaker": 41434, "stronger": 34112, "equivalent": 3366, "undecided": 1549},
+        "av3": {"incomparable": 306949, "weaker": 42089, "stronger": 30437, "equivalent": 870, "undecided": 0}
+      },
+      "direction_verdicts": {
+        "columns": "a_implies_b,b_implies_a; ? is a queried direction with no answer",
+        "av1": {"0,0": 30450, "0,1": 15219, "1,0": 12648, "?,0": 937, "0,?": 797, "1,1": 694, "?,?": 37, "?,1": 8, "1,?": 7},
+        "av2": {"0,0": 56666, "0,1": 41434, "1,0": 34112, "1,1": 3366, "0,?": 1105, "?,0": 444},
+        "av3": {"0,0": 306949, "0,1": 42089, "1,0": 30437, "1,1": 870}
+      },
+      "dirs_planned": {
+        "av1": {"fwd": 28128, "rev": 31606, "both": 1063},
+        "av2": {"fwd": 64928, "rev": 68644, "both": 3555},
+        "av3": {"fwd": 201373, "rev": 177926, "both": 1046}
+      },
+      "secs_column_sum": {"av1": 78642, "av2": 55984, "av3": 5763},
+      "secs_column_max": {"av1": 40.08, "av2": 20.07, "av3": 1.04},
+      "source": "pairs_planned from the manifests' pairs_total; the rest tallied at the close from the relation, rc, secs and direction columns of each host's subsumption-<host>.csv and the dirs column of pairs-<host>.csv, read on the hosts. The collected copies give the same relation and rc tallies. The total of 578,269 is also stated in 308e01a's commit message."
+    }
+  },
+  "collect": {
+    "command": "python3 scripts/campaign.py collect --outputs analysis-fretish-rerun (PLAN.md, After the queue)",
+    "when": "not recorded; the collected directory's mtime is 2026-10-08 18:18",
+    "printed_output": "not recorded; no collect log was kept",
+    "check_at_close": "The collected subsumption-<host>.csv files hold 60,797, 137,127 and 380,345 rows, equal to the manifests' pairs_total, and the three done-subjects files list all 17 subjects."
+  },
+  "reduction": {
+    "command": "sh experiments/2026-10-08-fretish-rerun-analysis/scripts/post_collect.sh, run locally from the checkout root; out/post_collect.log is its output",
+    "when": "not recorded in any file. The mtimes under out/ run from 18:23:18 (strength) to 18:34:30 (direction_j3m.txt) on 2026-10-08, and 308e01a's commit message gives 18:21 to 18:34.",
+    "hl_ctrl": "out/ball-radii/hl_j3m.txt is the output of scripts/hl_ctrl.py, which post_collect.sh does not call; its command line is not recorded, and its mtime is 2026-10-09 13:07. 308e01a's commit message records that at K = 1 the script's exact-interval assertion trips, so only K = 3 and 5 report. No hl_j5m.txt is in the archive.",
+    "python": "not recorded beyond post_collect.sh's default of /usr/bin/python3; numpy and scipy versions not recorded"
+  },
+  "counts": {
+    "members/": "17 <subject>.jsonl.gz files and index.csv (17 rows)",
+    "subjects-av1.txt": 2,
+    "subjects-av2.txt": 6,
+    "subjects-av3.txt": 9,
+    "out/strength/subjects.csv": "17 rows",
+    "out/strength/relations.csv": "6796 rows",
+    "out/strength/summary.txt": "3 lines",
+    "out/ball-radii/j1m.csv": "1155 rows",
+    "out/ball-radii/j3m.csv": "1155 rows",
+    "out/ball-radii/j5m.csv": "1155 rows",
+    "out/strength/ball/": "15 per-member fingerprint files, 355 MB, untracked",
+    "experiments/analysis-fretish-rerun/<host>/subsumption-<host>.csv": {"av1": 60797, "av2": 137127, "av3": 380345},
+    "note": "Row counts exclude the header line."
+  },
+  "undecided": {
+    "source": "out/strength/subjects.csv",
+    "pairs_undecided": {"fsm-timing": 138, "lpc-mini-core1": 66, "the other 15 subjects": 0},
+    "within_undecided_d": {"fsm-timing": 966, "lpc-mini-core1": 771, "the other 15 subjects": 0},
+    "within_undecided_u": {"lpc-mini-core1": 336, "the other 16 subjects": 0},
+    "classes_with_undecided": {"fsm-timing": {"d": 2, "u": 55}, "lpc-mini-core1": {"d": 17, "u": 29}},
+    "host_rows_undecided": {"av1": 1771, "av2": 1549, "av3": 0}
+  },
+  "results": {
+    "strength": {
+      "source": "out/strength/summary.txt and subjects.csv",
+      "net_decided": "n=17 median=-0.1138 mean=-0.1618 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05",
+      "net_imp": "n=17 median=-0.1138 mean=-0.1612 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05",
+      "net_non": "n=17 median=-0.1138 mean=-0.1618 u>d 0, d>u 17, tie 0, Wilcoxon p=1.526e-05",
+      "net_by_subject": {
+        "fsm": -0.1998, "fsm-combined": -0.0206, "fsm-timing": -0.3311, "liquid-mixer": -0.0154, "lpc-mini-core1": -0.2276, "mode-arbiter": -0.5911,
+        "rad-core-1-18": -0.021, "rad-core-10": -0.2683, "rad-core-12-18": -0.1138, "rad-core-17-18": -0.1037, "rad-core-33": -0.2798, "rad-core-45": -0.0371,
+        "rad-core-55": -0.2647, "rad-core-61": -0.0693, "rad-core-65": -0.0162, "rad-core-68": -0.0239, "takeoff": -0.1676
+      },
+      "sign": "net is sub_u minus sub_d in subjects.csv, so a negative net is a larger subsumed share of directed's frontier; the summary's own tally labels all 17 as d>u."
+    },
+    "ball_radii_k3": {
+      "source": "out/ball-radii/hl_j3m.txt, direction_j3m.txt and report_j3m.txt; A is directed, B is uniform",
+      "net_BinA_minus_AinB": "n=15 zeros 1 mean -0.096 HL -0.039 [-0.089, -0.005] p 0.035",
+      "BinA_minus_ctrl_A": "n=14 zeros 1 mean -0.027 HL -0.031 [-0.062, -0.003] p 0.033",
+      "AinB_minus_ctrl_B": "n=15 zeros 1 mean +0.025 HL +0.007 [-0.028, +0.043] p 0.81",
+      "direction_ctrl": {
+        "B in A vs ctrl A": "n=14 cross 0.617 control 0.644 below 10/13 p 0.033 p_below 0.016",
+        "A in B vs ctrl B": "n=15 cross 0.672 control 0.646 below 6/14 p 0.81 p_below 0.62"
+      },
+      "same_arm_control": {"directed": "0.644 over 14 subjects", "uniform": "0.646 over 15 subjects"}
+    },
+    "ball_radii_other_k": "report_j1m.txt and report_j5m.txt hold the K = 1 and K = 5 reads; they are not restated here."
+  },
+  "deviations": "PLAN.md, Deviations from the archive, lists five against the 2026-10-01 archive's method: a non-adaptive all-pairs plan, a word set drawn over two arms, two-arm ball-radii units, the fsm-lmcps exclusion, and the cost columns. No deviation from PLAN.md itself is recorded.",
+  "vendored_scripts": {
+    "commit": "02d5347",
+    "files": {
+      "campaign.py": "22dd750942d29fe7039d61b9400b5c5f9acac2f5",
+      "fingerprint_members.py": "57e57dfeb09d094fd6917f2312255dc78d786f24",
+      "compare_pairs.py": "656760ba2218540747918000d0a83c2bf8b3611e"
+    },
+    "check": "git hash-object on each copy equals git rev-parse 02d5347:scripts/<file>. Vendored at the close; gen_configs.py, run_experiments.py and merge_experiments.py are not vendored because the campaign ran no search and merged no CSV.",
+    "campaign_scripts": {
+      "pool_members.py": "d2cb54b12b5e21a985cc2e841ffc6ab7e1c8ae29",
+      "reduce.py": "d3bd80594ab0d6283a39fe12a882209444b177a4",
+      "post_collect.sh": "30c4723e2ead68c3c26373bb4f6f2a5286bb939d",
+      "fp_prc.py": "fd421e483c80a4cfce39dc32f541f84ae0b07aa3",
+      "fp_prc_report.py": "5650ca09c0a16e83df4a51ef1a31757eec64aa91",
+      "direction_ctrl.py": "39477daf8336b759f7bd2644ff6ff2e2d73484c7",
+      "hl_ctrl.py": "136233da3d89d2312242ca5eae791d3a3fb2efd2"
+    },
+    "campaign_scripts_note": "Git blob shas by git hash-object. The first six were committed with the declaration at 02d5347 and hl_ctrl.py with the output at 308e01a. fp_prc.py and fp_prc_report.py equal the copies under experiments/2026-10-06-fretish-rerun/diversity/ball-radii/ in the analysis/repair-diversity worktree at 22ab586, and hl_ctrl.py the copy under experiments/2026-10-01-fretish-mixed/diversity/ball-radii/ there. direction_ctrl.py differs from that worktree's copy (aafb9c4); the change is not recorded."
+  },
+  "downstream": "counter-paper 0b3a55b (2026-10-09, data(fretish): move RQ4 strength and diversity to the 2026-10 rerun) reads these outputs into data/strength-2026-10/ and paper/evaluation.tex.",
+  "files": {
+    "PLAN.md": "The declaration's plan.",
+    "campaign.toml": "The two phases the hosts read.",
+    "subjects-av{1,2,3}.txt": "The subject split.",
+    "members/": "The pooled inputs and their index.",
+    "scripts/": "The campaign's seven scripts, and three vendored at 02d5347.",
+    "out/": "The reduced output: strength tables, ball-radii CSVs and reports, post_collect.log.",
+    "PROVENANCE.json": "This file.",
+    "out/strength/ball/": "Per-member fingerprints, 355 MB. Untracked, in the closing worktree.",
+    "experiments/analysis-fretish-rerun/": "The collected host outputs (<host>/fp/<subject>/ and <host>/subsumption-<host>.csv), 2.1 GB in 108 files. Untracked, in experiments/ of the closing worktree (.claude/worktrees/agent-af97b6f2d8dc6800f under the main checkout). The hosts keep the originals under ~/projects/counter/experiments/analysis-fretish-rerun/ and the planned pairs under experiments/analysis-fretish-rerun-work/, which collect does not copy.",
+    "compare-manifests": "The six phase manifests stay on the hosts under experiments/compare-manifests/. Not collected."
+  },
+  "not_recorded": [
+    "fpdraw's commit (the manifest gives a SHA-256 only)",
+    "black's version",
+    "the count of black draws that timed out at 30 s",
+    "when collect ran and what it printed",
+    "start and finish stamps of post_collect.sh",
+    "the command line that produced out/ball-radii/hl_j3m.txt",
+    "the Python, numpy and scipy versions of the reduction",
+    "why scripts/direction_ctrl.py differs from the repair-diversity copy",
+    "a decision rule: PLAN.md registers none"
+  ],
+  "reproduce": "Check out 02d5347, build with the declaration's build line, and run campaign.toml's two phases through campaign.py on the subject split. Then collect --outputs analysis-fretish-rerun and run scripts/post_collect.sh from the checkout root at 308e01a."
+}
