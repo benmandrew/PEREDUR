@@ -46,3 +46,43 @@ fingerprint_distance = "union"
 cuts = 20
 deadline_s = 900
 wall_cap_s = 1200
+
+# The one run whose antichain walk was killed on av3 in the first pass
+# (PROVENANCE.json, antichain_walk_aborted), into fresh directories: the
+# scorer wrote it a partial curve, which reads as scored.
+[[phases]]
+name = "maximality-retry"
+kind = "score"
+hosts = { av3 = "16" }
+results = "experiments/results-tlsf-rerun"
+out = "experiments/curves-tlsf-rerun-rescore-retry"
+runs_from = "experiments/2026-10-09-tlsf-rerun-rescore/runs-retry.txt"
+workers = 1
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 3000
+deadline_s = 7500
+prefilter_words = 4096
+
+[[phases]]
+name = "recount-retry"
+kind = "score"
+hosts = { av3 = "16" }
+results = "experiments/results-tlsf-rerun"
+out = "experiments/separation-recount-tlsf-rerun-s0-rescore-retry"
+runs_from = "experiments/2026-10-09-tlsf-rerun-rescore/runs-retry.txt"
+members_from = "experiments/curves-tlsf-rerun-rescore-retry"
+workers = 1
+cores = 1
+maximality = "off"
+ideals = "off"
+epsilon = "0.05,0.2,0.5"
+fingerprint_words = 65536
+fingerprint_seed = 0
+fingerprint_max_prefix = 8
+fingerprint_max_cycle = 8
+fingerprint_distance = "union"
+cuts = 20
+deadline_s = 900
+wall_cap_s = 1200
