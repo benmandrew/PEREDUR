@@ -109,6 +109,15 @@ FRETISH_ABLATION_SPECS: list[str] = [
     "liquid-mixer", "mode-arbiter", "valu3s-uc6", *FRETISH_CORES,
 ]
 
+# The ablation corpus less the four subjects whose runs take minutes
+# (liquid-mixer, valu3s-uc6 and the two Lift-Plus-Cruise cores): 16 subjects
+# with a median search under a minute in 2026-10-06-fretish-rerun.
+ADAPTIVE_SMOKE_SPECS: list[str] = [
+    s for s in FRETISH_ABLATION_SPECS
+    if s not in ("liquid-mixer", "valu3s-uc6", "lpc-mini-core1",
+                 "lpc-full-core1")
+]
+
 # Basic-TLSF specs with ideal fixes. PEREDUR infers the TLSF format from the
 # .tlsf extension, and compare reads the .tlsf ideals the same way. The first
 # six are the original mono-vs-muc corpus; the rest were imported from the
@@ -1886,6 +1895,27 @@ PROFILES: dict[str, dict] = {
         "configs_dir": EXPERIMENTS_DIR / "configs-fretish-rerun",
         "results_dir": EXPERIMENTS_DIR / "results-fretish-rerun",
         "results_csv": EXPERIMENTS_DIR / "results-fretish-rerun.csv",
+        "default_jobs": 16,
+    },
+    # Smoke test of ordered_fields = "adaptive" against both archived arms, all
+    # three run fresh on one binary so that no arm is read across a commit.
+    # Generate with the fretish-rerun line, with --out-dir
+    # experiments/configs-adaptive-smoke.
+    "adaptive-smoke": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["directed", "uniform", "adaptive"]},
+        "specs": ADAPTIVE_SMOKE_SPECS,
+        "seeds": list(range(10)),
+        "timeout_caps": {s: 7200 for s in ADAPTIVE_SMOKE_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-adaptive-smoke",
+        "results_dir": EXPERIMENTS_DIR / "results-adaptive-smoke",
+        "results_csv": EXPERIMENTS_DIR / "results-adaptive-smoke.csv",
         "default_jobs": 16,
     },
     "fretish-rerun-calib": {

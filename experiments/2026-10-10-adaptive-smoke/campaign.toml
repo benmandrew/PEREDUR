@@ -1,0 +1,18 @@
+name = "2026-10-10-adaptive-smoke"
+branch = "campaign/adaptive-smoke"
+profile = "adaptive-smoke"
+description = "Smoke test of ordered_fields = adaptive (directed, with the direction reversed on a realizable parent) against directed and uniform, on the 16 cheap subjects of 2026-10-06-fretish-rerun. Not pre-registered: it asks whether the arm runs, what it costs and whether its repairs read stronger, to decide whether a campaign is worth declaring."
+
+# One host, so every (subject, seed) triple shares a machine.
+hosts = { av3 = "0-9" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# The fretish-rerun flags; sweep O now carries the third level.
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion --sweeps O --metric log --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 1 --out-dir experiments/configs-adaptive-smoke --pin-vintage"
+
+# 480 runs at a median near 35 s.
+[[phases]]
+name = "search"
+profile = "adaptive-smoke"
+jobs = 16

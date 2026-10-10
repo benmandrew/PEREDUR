@@ -535,10 +535,13 @@ SWEEP_K: list[tuple[str, dict]] = [
 
 # Sweep O: how mutation moves the ordered FRETISH fields (timing, condition
 # type, scope). "directed" is the default and the control; "uniform" is the
-# ablation arm. Both levels state the key, so each config names its arm.
+# ablation arm. Every level states the key, so each config names its arm.
+# "adaptive" is directed with the direction reversed on a realizable parent;
+# the closed fretish profiles pin their levels and do not pick it up.
 SWEEP_O: list[tuple[str, dict]] = [
     ("directed", {"ordered_fields": "directed"}),
     ("uniform",  {"ordered_fields": "uniform"}),
+    ("adaptive", {"ordered_fields": "adaptive"}),
 ]
 
 # Sweep R: vary elitism, for the nsga2-vs-nsga2-replicate campaign. Elitism
