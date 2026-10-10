@@ -1918,6 +1918,28 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-adaptive-smoke.csv",
         "default_jobs": 16,
     },
+    # The adaptive arm alone over the fretish-rerun design, whose directed and
+    # uniform rows are reused (experiments/2026-10-10-fretish-adaptive/PLAN.md).
+    # Fresh directories, so no host resumes against results-fretish-rerun.
+    # Generate with the fretish-rerun line, with --levels adaptive and
+    # --out-dir experiments/configs-fretish-adaptive.
+    "fretish-adaptive": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["adaptive"]},
+        "specs": FRETISH_ABLATION_SPECS,
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ABLATION_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-adaptive",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-adaptive",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-adaptive.csv",
+        "default_jobs": 16,
+    },
     "fretish-rerun-calib": {
         "schemes": ["nsga2-apportion"],
         "weakenings": ["wkoff"],

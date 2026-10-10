@@ -1,0 +1,33 @@
+name = "2026-10-10-fretish-adaptive"
+branch = "campaign/adaptive-smoke"
+profile = "fretish-adaptive"
+description = "The adaptive arm of sweep O (directed, with the direction reversed on a realizable parent) over the 2026-10-06-fretish-rerun design: 20 subjects, seeds 0-29, 600 runs. The directed and uniform arms are that campaign's archived rows. Pre-registered in PLAN.md."
+
+# One host. av1 is off limits, and av3's queue was the shorter of the other two
+# at declaration (PLAN.md).
+hosts = { av3 = "0-29" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# The fretish-rerun flags, restricted to the one new level.
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion --sweeps O --levels adaptive --metric log --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 1 --out-dir experiments/configs-fretish-adaptive --pin-vintage"
+
+# The rerun's 600 runs on av2 took 7.9 h at 16 jobs.
+[[phases]]
+name = "search"
+profile = "fretish-adaptive"
+jobs = 16
+
+# The rerun's curve phase at the same budgets; av3 scored 600 runs in 5.6 h.
+# It writes the maximal.tsv sidecars the pooled strength pass reads.
+[[phases]]
+name = "curve"
+kind = "score"
+results = "experiments/results-fretish-adaptive"
+out = "experiments/curves-fretish-adaptive"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 3000
+deadline_s = 7500
