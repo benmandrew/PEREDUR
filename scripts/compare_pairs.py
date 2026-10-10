@@ -21,7 +21,9 @@ of campaign/fretish-rerun-analysis, which skips the other direction (reported
 as a DIR line. With the column, OUT.csv gains a_implies_b,b_implies_a, each 1,
 0 or ? (undecided, or no DIR line).
 
-Resumable: an id already in OUT.csv is skipped. The exit status is 0 only when
+Resumable: an id already in OUT.csv is skipped, except one whose compare a
+signal killed (`error` with a negative rc), which is dropped from OUT.csv and
+run again. The exit status is 0 only when
 every id in PAIRS.csv is in OUT.csv once the pass ends, so a tick never marks a
 killed or partial pass done.
 
@@ -117,6 +119,29 @@ def compare(a: str, b: str, args, env: dict, tmp: str,
         shutil.rmtree(d, ignore_errors=True)
 
 
+def drop_crashed(path: str) -> int:
+    """Remove the rows of pairs whose compare a signal killed, so a resume
+    runs them again. A crash is no verdict on the pair: 27,113 pairs of
+    2026-10-08-tlsf-rerun-analysis read `error` because black could not
+    start, and a resume that counted them done could never repair that."""
+    if not os.path.exists(path):
+        return 0
+    with open(path, newline="") as handle:
+        rows = list(csv.reader(handle))
+    if not rows or "rc" not in rows[0]:
+        return 0
+    rel, rc = rows[0].index("relation"), rows[0].index("rc")
+    kept = [rows[0]] + [r for r in rows[1:]
+                        if not (r[rel] == "error" and r[rc].startswith("-"))]
+    if len(kept) == len(rows):
+        return 0
+    tmp = path + ".tmp"
+    with open(tmp, "w", newline="") as handle:
+        csv.writer(handle).writerows(kept)
+    os.replace(tmp, path)
+    return len(rows) - len(kept)
+
+
 def read_ids(path: str) -> set:
     if not os.path.exists(path):
         return set()
@@ -190,11 +215,12 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     src, out = args.pairs, args.out
     env = dict(os.environ)
-    # Point compare at the checkout's solvers only where they sit at the
-    # source-built layout. Where they do not (av1 unpacks black from a .deb
-    # into third_party/black/black), compare's built-in paths already name
-    # this build's copies.
-    for var, path in (("PEREDUR_BLACK_PATH", THIRD_PARTY / "black" / "install" / "bin" / "black"),
+    # Point compare at the checkout's solvers where the build tree has them;
+    # elsewhere compare's built-in paths already name this build's copies.
+    # black by its wrapper, never install/bin/black: only the wrapper puts
+    # libblack.so on LD_LIBRARY_PATH, and compare aborts on a black that
+    # cannot start.
+    for var, path in (("PEREDUR_BLACK_PATH", THIRD_PARTY / "black" / "black"),
                       ("PEREDUR_SPOT_BIN_DIR", THIRD_PARTY / "spot" / "bin")):
         if path.exists():
             env.setdefault(var, str(path))
@@ -211,6 +237,9 @@ def main(argv=None) -> int:
               f"{', '.join(bad)}", file=sys.stderr, flush=True)
         return 2
     wanted = {r["id"] for r in rows}
+    crashed = drop_crashed(out)
+    if crashed:
+        print(f"{crashed} crashed pair(s) dropped from {out} to run again", flush=True)
     done = read_ids(out)
     todo = [r for r in rows if r["id"] not in done]
     if os.path.dirname(out):

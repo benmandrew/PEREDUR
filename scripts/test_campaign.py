@@ -4444,6 +4444,35 @@ try:
         check_true("incomplete: 1 of 9" in proc.stderr, "and says how many")
     (cp_root / "ro").chmod(0o700)
 
+    # A pair whose compare a signal killed is no verdict: the row reads error
+    # with the negative status, and a resume drops it and runs the pair again.
+    crash_bin = cp_root / "compare-crash"
+    crash_bin.write_text(f"""#!/bin/sh
+name=$(ls "$2")
+[ -e {cp_root / 'healed'} ] || kill -ABRT $$
+echo "$name : equivalent to ideal"
+""")
+    crash_bin.chmod(0o755)
+    cpairs, cout = cp_root / "cpairs.csv", cp_root / "cout.csv"
+    cpairs.write_text("id,a_path,b_path\n"
+                      f"c0,{cp_root / 'eq.json'},{cp_root / 'ideal.json'}\n")
+
+    def run_crash() -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(COMPARE_PAIRS_PY), str(cpairs), str(cout),
+             "--compare", str(crash_bin)], capture_output=True, text=True,
+            env=dict(os.environ, COMPARE_PAIRS_TMP=str(cp_root / "tmp")))
+
+    proc = run_crash()
+    check(cout.read_text().splitlines()[1].split(",")[:3], ["c0", "error", "-6"],
+          f"a compare killed by a signal reads error with its status: {proc.stderr}")
+    (cp_root / "healed").write_text("")
+    proc = run_crash()
+    check_true("1 crashed pair(s) dropped" in proc.stdout,
+               f"a resume drops the crashed row: {proc.stdout!r}")
+    check([line.split(",")[:2] for line in cout.read_text().splitlines()[1:]],
+          [["c0", "equivalent"]], "and runs the pair again")
+
     # A dirs column: COMPARE_DIRECTIONS reaches compare, the DIR line becomes
     # two columns, and a pair the outer timeout killed reads ? where it was
     # asked and 0 where the planner had already refuted the direction.
