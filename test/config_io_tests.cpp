@@ -272,7 +272,8 @@ TEST(test_config_io_enum_keys) {
          &Config::ordered_fields,
          OrderedFieldMutation::Directed,
          {{"directed", OrderedFieldMutation::Directed},
-          {"uniform", OrderedFieldMutation::Uniform}},
+          {"uniform", OrderedFieldMutation::Uniform},
+          {"adaptive", OrderedFieldMutation::Adaptive}},
          "random",
          true});
     expect_enum_key<SimilarityMetric>(

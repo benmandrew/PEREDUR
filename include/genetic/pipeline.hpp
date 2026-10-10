@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "fitness/status.hpp"
 #include "genetic/nsga2.hpp"
 #include "genetic/operators.hpp"
 #include "genetic/random_source.hpp"
@@ -209,7 +210,14 @@ std::vector<Spec> breed_offspring(const Config& cfg,
                               random_source, cfg);
         }
         if (probability_check(cfg.mutation_rate, random_source)) {
-            offspring = ops.mutate(offspring, random_source, cfg);
+            // The status objective is registered last, and only at a weight
+            // above 0 (make_fitness_function).
+            const std::vector<double>& objectives = sorted_pop[i].objectives;
+            const bool parent_realizable =
+                cfg.fitness_weight_status > 0.0 && !objectives.empty() &&
+                objectives.back() >= k_status_realizable;
+            offspring =
+                ops.mutate(offspring, random_source, cfg, parent_realizable);
         }
         // Counted before simplification, and only when the slot actually
         // produced something new: AuRUS increments on `!chromosome.equals(

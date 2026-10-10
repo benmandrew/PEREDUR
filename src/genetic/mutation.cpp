@@ -994,7 +994,7 @@ Specification remove_guarantee(const Specification& specification,
 
 Specification mutate_specification(const Specification& specification,
                                    const RandomSource& random_source,
-                                   const Config& cfg) {
+                                   const Config& cfg, bool parent_realizable) {
     assert(random_source);
     const std::size_t n_assumptions = specification.m_assumptions.size();
     assert(n_assumptions + specification.m_guarantees.size() > 0);
@@ -1042,9 +1042,16 @@ Specification mutate_specification(const Specification& specification,
     // was a config flag until 2026-08-26, kept only so the two directions could
     // be crossed as an experiment factor; no sweep ever crossed them and
     // gen_configs.py could not emit the key.
+    //
+    // Weakening is the move for a candidate that is not yet realizable. One
+    // that is has nothing left to gain from it and only drifts further from
+    // the original, so Adaptive turns both sides round there. No draw decides
+    // it, so the stream is Directed's.
     const bool is_assumption = idx < n_assumptions;
+    const bool reversed = parent_realizable &&
+                          cfg.ordered_fields == OrderedFieldMutation::Adaptive;
     const Direction direction =
-        is_assumption ? Direction::Strengthen : Direction::Weaken;
+        is_assumption != reversed ? Direction::Strengthen : Direction::Weaken;
     // An existing assumption draws from the same pool as a freshly added one,
     // inputs plus outputs, as guarantees do.
     const std::vector<std::string>& mutation_atoms = atoms;

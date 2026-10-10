@@ -30,6 +30,10 @@ const GeneticOperators<tlsf::Specification>& tlsf_operators() {
            const RandomSource& random_source, const Config&) {
             return tlsf_crossover(parent_a, parent_b, random_source);
         },
-        tlsf_mutate, tlsf_simplify};
+        [](const tlsf::Specification& spec, const RandomSource& random_source,
+           const Config& cfg, bool /*parent_realizable*/) {
+            return tlsf_mutate(spec, random_source, cfg);
+        },
+        tlsf_simplify};
     return ops;
 }

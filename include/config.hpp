@@ -120,8 +120,10 @@ enum class TerminationMode : std::uint8_t { Generations, Individuals };
 /// each field one step along its implication order, in the direction the
 /// requirement's role gives. Uniform redraws it from the values the
 /// specification makes available, ignoring order and direction; it is the
-/// "random" arm of the directed-versus-random ablation.
-enum class OrderedFieldMutation : std::uint8_t { Directed, Uniform };
+/// "random" arm of the directed-versus-random ablation. Adaptive is Directed
+/// with the direction reversed when the parent already scored realizable, so
+/// a repair is strengthened back towards the original once it is one.
+enum class OrderedFieldMutation : std::uint8_t { Directed, Uniform, Adaptive };
 
 struct Config {
     std::size_t generations = 10;
@@ -431,7 +433,10 @@ struct Config {
     /// stops the specification uses, the other condition type, and any other
     /// scope kind over the declared modes. The p_monotone arm stays directed
     /// under both. Exists for the directed-versus-random ablation; at Directed
-    /// the draw stream is the one before the key existed.
+    /// the draw stream is the one before the key existed. Adaptive is Directed
+    /// on a parent that is not realizable and the opposite direction on one
+    /// that is, in these arms and in the p_monotone arm alike: a guarantee is
+    /// strengthened and an assumption weakened. It spends Directed's draws.
     OrderedFieldMutation ordered_fields = OrderedFieldMutation::Directed;
     /// Probability that a rewrite is a *monotone* one (monotone_rewrite,
     /// include/genetic/monotone.hpp), whose result is comparable to the formula

@@ -102,6 +102,12 @@ A weaker guarantee timing helps realizability and costs nothing on similarity, s
 
 Both arms spend the same probability draws in the same order, so `"directed"` leaves the stream byte-identical to the one before the key existed; `golden_config()` pins it. `test_uniform_ordered_fields_reproduce` pins the uniform stream over the golden population with a declared mode. A TLSF run warns about a non-default value and records the key as null, like the other single-path keys.
 
+## Adaptive direction
+
+`ordered_fields = "adaptive"` is `"directed"` with one change: when the slot's parent scored realizable, `mutate_specification` reverses the direction, strengthening a guarantee and weakening an assumption. The reversal reaches everything that reads the direction, so the timing, condition-type and scope arms and the monotone arm all turn with it. The directed rules were written for an unrealizable candidate, where a weakening is the move towards a repair; on a candidate that is already one, a weakening only moves it further from the original.
+
+`breed_offspring` reads the verdict off the parent's status objective (the last one, at `k_status_realizable`) and hands it to `GeneticOperators::mutate`. It is the parent's verdict, since a crossover ahead of the mutation is not scored. No draw decides the reversal, so an adaptive run spends the directed stream's draws and departs from a directed run only where a realizable parent is mutated. `p_add_assumption` and `p_remove_guarantee` are not reversed and still weaken a realizable parent. `test_adaptive_arm_strengthens_a_realizable_parent` pins the reversal. Unmeasured beyond a smoke test (`experiments/2026-10-10-adaptive-smoke`).
+
 ## Removable guarantees
 
 `p_remove_guarantee` (default 0.05, matching `p_add_assumption`) deletes one FRETISH guarantee or one TLSF conjunct from PRESET, ASSERT and GUARANTEE. Some ideals need it: amba, full-arbiter, load-balancer, prioritized-arbiter and round-robin-arbiter have only `drop-*` ideals. `lint-ideals`' `reachable` check asserts a guarantee side may shrink, never grow, to a floor of one.

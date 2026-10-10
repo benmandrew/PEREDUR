@@ -1094,6 +1094,38 @@ TEST(test_uniform_arm_moves_a_guarantee_both_ways) {
            "and a weaker (before) scope");
 }
 
+// --- ordered_fields = "adaptive" ------------------------------------------
+
+// Continual implies Trigger, so Trigger -> Continual strengthens a guarantee.
+// Directed never makes that move; Adaptive makes it on a realizable parent
+// and is Directed on any other.
+TEST(test_adaptive_arm_strengthens_a_realizable_parent) {
+    const Requirement trigger(Formula("a"), Formula("x"),
+                              timing::within_ticks(3), ConditionType::Trigger,
+                              true);
+    const Specification spec({}, {trigger}, {"a"}, {"x"}, {});
+    Config cfg = uniform_config(0.0, 1.0, 0.0);
+    cfg.p_add_assumption = 0.0;
+    cfg.p_remove_guarantee = 0.0;
+    const auto condition_type = [&spec, &cfg](OrderedFieldMutation arm,
+                                              bool parent_realizable) {
+        cfg.ordered_fields = arm;
+        return mutate_specification(spec, make_random_source_from_seed(0), cfg,
+                                    parent_realizable)
+            .m_guarantees.front()
+            .m_condition_type;
+    };
+    expect(condition_type(OrderedFieldMutation::Adaptive, true) ==
+               ConditionType::Continual,
+           "adaptive: a realizable parent's guarantee must strengthen");
+    expect(condition_type(OrderedFieldMutation::Adaptive, false) ==
+               ConditionType::Trigger,
+           "adaptive: an unrealizable parent's guarantee must still weaken");
+    expect(condition_type(OrderedFieldMutation::Directed, true) ==
+               ConditionType::Trigger,
+           "directed: the parent's verdict must not be read");
+}
+
 // Every kind, over the declared modes only, less the current value: an `in m1`
 // requirement can move to `in m2` but never to a mode nobody declared.
 TEST(test_uniform_scope_redraws_over_declared_modes) {

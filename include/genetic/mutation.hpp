@@ -109,12 +109,20 @@ Requirement mutate_requirement(const Requirement& requirement,
 /// it with a mutated version. The pool of atom names is taken from the
 /// specification's in_atoms and out_atoms, on both sides.
 ///
-/// @param specification The specification to mutate (must be non-empty)
-/// @param random_source Random source for index and mutation choices
-/// @param cfg           Configuration providing mutation probabilities
-/// @return              A specification with one requirement mutated
+/// A guarantee is weakened and an assumption strengthened. Under
+/// `cfg.ordered_fields = Adaptive` with @p parent_realizable set, both are
+/// reversed, which moves a specification that is already a repair back towards
+/// the original; the draws spent are the same either way.
+///
+/// @param specification     The specification to mutate (must be non-empty)
+/// @param random_source     Random source for index and mutation choices
+/// @param cfg               Configuration providing mutation probabilities
+/// @param parent_realizable Whether the specification this one descends from
+///                          scored realizable. Read under Adaptive alone.
+/// @return                  A specification with one requirement mutated
 /// @throws std::invalid_argument if specification is empty or random_source is
 ///         not callable
 Specification mutate_specification(const Specification& specification,
                                    const RandomSource& random_source,
-                                   const Config& cfg);
+                                   const Config& cfg,
+                                   bool parent_realizable = false);

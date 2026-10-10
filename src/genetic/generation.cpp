@@ -80,8 +80,9 @@ const GeneticOperators<Specification>& fretish_operators() {
             return crossover_specifications(first, second, random_source);
         },
         [](const Specification& spec, const RandomSource& random_source,
-           const Config& cfg) {
-            return mutate_specification(spec, random_source, cfg);
+           const Config& cfg, bool parent_realizable) {
+            return mutate_specification(spec, random_source, cfg,
+                                        parent_realizable);
         },
         [](Specification spec) { return simplify_offspring(std::move(spec)); }};
     return ops;
