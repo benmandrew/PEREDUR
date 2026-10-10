@@ -26,7 +26,11 @@ def main(argv) -> int:
                 tag, tool, spec, tool_file, md5 = r["id"].split("|")
                 assert tag == "cov", r["id"]
                 rel = r["relation"] if r["relation"] in KNOWN else "undecided"
-                rows[(tool, spec, tool_file, md5)] = rel
+                key = (tool, spec, tool_file, md5)
+                # A pair run twice (coverage-retry) keeps its decided row.
+                if rel == "undecided" and rows.get(key, rel) != "undecided":
+                    continue
+                rows[key] = rel
     import os
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     with open(out, "w", newline="") as fh:

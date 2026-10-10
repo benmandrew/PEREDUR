@@ -41,6 +41,8 @@ vmem_kb = 8000000
 [[phases]]
 name = "strength"
 kind = "frontier"
+# av1 finished its other four families, and humanoid-742 is sample-742's.
+hosts = ["av2", "av3"]
 work = "experiments/analysis-tlsf-rerun-work/strength"
 workers = 4
 solver_jobs = 4
@@ -51,6 +53,7 @@ timeout = 300
 [[phases]]
 name = "strength-fallback"
 kind = "compare"
+hosts = ["av2", "av3"]
 pairs = "experiments/analysis-tlsf-rerun-work/strength/fallback-{host}.csv"
 out = "experiments/analysis-tlsf-rerun/strength-fallback-{host}.csv"
 jobs = 16
@@ -72,3 +75,16 @@ jobs = 28
 black_timeout = 300
 wall_timeout = 700
 vmem_kb = 8000000
+
+# The 3,594 coverage pairs whose compare aborted on av2 and av3 (PLAN.md,
+# deviations), on av1, which is idle and holds the whole coverage tree.
+[[phases]]
+name = "coverage-retry"
+kind = "compare"
+hosts = ["av1"]
+pairs = "experiments/analysis-tlsf-rerun-work/coverage/retry-{host}.csv"
+out = "experiments/analysis-tlsf-rerun/coverage-retry-{host}.csv"
+jobs = 16
+black_timeout = 20
+wall_timeout = 120
+vmem_kb = 8388608
