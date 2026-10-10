@@ -14,7 +14,7 @@ All three inputs were collected on 2026-10-09: 3000 runs, of which 2920 have a f
 
 ## Phases and cost
 
-The campaign declares four phases, and each host runs them in order.
+The campaign declares five phases, and each host runs its own in order.
 
 | Phase | Kind | Hosts | Work | Estimate per host | Basis |
 |---|---|---|---|---|---|
@@ -22,6 +22,7 @@ The campaign declares four phases, and each host runs them in order.
 | rq3-cross | compare, jobs 16, 300 s / 700 s | av2, av3 | about 100k pairs | about 10 min | 120 sampled unrefuted PEREDUR pairs, 6 per rq3 family, run locally: 0.02-0.13 s each, about 3 core-hours in all; the archived all-pairs RQ3, 2.16M pairs in about 40 min on 3 hosts, agrees |
 | strength | frontier, 4 workers x 4 solver jobs, 300 s | av1, av2, av3 | 5 / 8 / 12 families | 1-3 h, not measured | `maximal` is not run locally (it has OOMed this box). A family's pooled walk is about one per-run maximality walk; the scoring phase did 500 of those in 2.2 h on av1 at 8 workers. The humanoid-742 and humanoid-531 walks set the tail. The archived all-pairs pooled-rq2, about 10 h on 3 hosts, is an upper bound |
 | strength-fallback | compare, jobs 16, 300 s / 700 s | av1, av2, av3 | undecided walk pairs only | minutes, or nothing | the list holds only a header where every walk decided |
+| sample-742 | compare, jobs 28, 300 s / 700 s | av3 | 62,602 pairs | 9-21 h, not measured | the archived pooled-rq2 sample pairs on humanoid-742 took 14-34 s each |
 
 ## Collect and reduce
 
@@ -35,6 +36,7 @@ systemd-run --user --scope -q -p MemoryMax=8G -p MemorySwapMax=0 choom -n 1000 -
 `post_collect.sh` takes the following steps:
 
 - It files each host's `strength/<spec>/result.json` beside the local plan, splits the fallback results back per family, and runs `pooled_frontier.py score`.
+- Before that score, it runs `sample_742.py score` on av3's `sample-742-av3.csv`, which writes `strength/humanoid-742/sampled.json` for `pooled_frontier.py score` to read.
 - It runs `score_rq3.py`, which applies the archived measure frontier against frontier. PEREDUR's frontier is the strength walk's; AuRUS's is the archived one.
 - It rebuilds `relations.csv` and runs `maoz_score.py --pass report`.
 - It runs `tlsf_prc.py` at K = 1, 3 and 5 (MATCH=1, XSEED=1), and `perm_null.py` at R = 1000 at the cap and at `CUT=equal`. These feed `perm_report.py`, `direction_ctrl.py`, `hl_ctrl.py` and `effect_sizes.py`.
@@ -58,6 +60,7 @@ The paper's `tables.py` is read, never written.
 - **Strength** is built frontier against frontier by a running antichain walk, where the archive compared all pairs. By transitivity the measure is the same.
 - **RQ3's cross** is PEREDUR's pool against AuRUS's archived frontier, with prints refuting the clearly incomparable pairs. The AuRUS-against-AuRUS verdicts are the archive's.
 - **humanoid-742** stays out of RQ3, as it was in the archive. humanoid-503, humanoid-531, full-arbiter and prioritized-arbiter still have no screened AuRUS run. RQ2, selection and grading, now covers every family, including the humanoids that the archive sampled.
+- **humanoid-742's strength row is a sampled estimate**, as it was in the archive. The exact walk on av1 finished two of the family's three frontiers (`data/humanoid-742-frontiers.json`: `mrs-nsga2-apportion`, 1693 classes, and `aurus-nsga2-apportion`, 937) and was cancelled on 2026-10-10, 19 h into the `mrs-weighted` walk over a 9480-class pool. A walk writes its result only on exit, so that time bought nothing. `scripts/sample_742.py plan` draws 100 classes from each known frontier and 200 from the `mrs-weighted` pool, by a seeded permutation, and lists every pair in which the other class's print lets it imply the draw. A pool draw is compared within its own side for frontier membership and class size, and weighs 1 / class size where it is on the frontier, as in the archived `pooled.py`. The stopping rule is the archive's: every share's 95% half-width at most 0.10. `score` prints `open` where one exceeds it, and the remedy is to raise `DRAWS` and plan again, which extends the same permutations. Entry 019 on av1 stays cancelled, and av1's other four families left no fallback pairs.
 - **Coverage** runs every pair alone at the archive's single-pair budget, 20 s for black and 120 s of wall time. The archive first ran chunks of 50 under 900 s.
 - **The `humanoid-458` substitution is unresolved.** The archived `cap_merged.csv` replaced humanoid-458's rows with a 2^20-word pass (`perm_null_dyn.py`). The AuRUS side of that pass is on av2 and av3 only (`~/tlsf-dyn/out`), so this pass reports humanoid-458 at 65,536 words. To match the archive, fetch those prints, re-fingerprint the rerun's humanoid-458 with `refp.sh` at 1,048,576 words, and run `perm_null_dyn.py` on that family.
 - **Local tools.** On this box, `build-release/third_party/black/install/bin/black` cannot load `libblack.so`. `compare_pairs.py` prefers that path when it exists, so the local cost sample set `PEREDUR_BLACK_PATH` to the build tree's `black`. The hosts use their own working builds.

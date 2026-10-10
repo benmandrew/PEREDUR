@@ -58,7 +58,10 @@ prints.tsv, WORK/plan.json and WORK/jobs-<host>.csv (families dealt to the
 hosts largest first). `run` processes its host's families, one worker each,
 and writes WORK/<spec>/result.json; it is resumable and exits 0 only when
 every family of the host has a result. `score` writes families-<comp>.csv in
-score_pooled.py's columns and report.txt.
+score_pooled.py's columns and report.txt. A family with no result.json but a
+WORK/<spec>/sampled.json (per comparison: net_non, net_imp, subA_non,
+subB_non, undecided) is scored from that estimate, with `sampled` for its
+frontier sizes, as the archived pass read the humanoids.
 
 Stdlib only, on python 3.10: `run` is meant to execute on the lab hosts.
 """
@@ -573,7 +576,16 @@ def cmd_score(args) -> int:
                 continue
             rpath = os.path.join(args.work, spec, "result.json")
             if not os.path.exists(rpath):
-                missing.append(spec)
+                spath = os.path.join(args.work, spec, "sampled.json")
+                if not os.path.exists(spath):
+                    missing.append(spec)
+                    continue
+                with open(spath) as fh:
+                    doc = json.load(fh)
+                e = doc["comparisons"][comp]
+                rows.append([spec, "sampled", "sampled", e["net_non"], e["net_imp"], e["subA_non"],
+                             e["subB_non"], doc["pairs"], e["undecided"], 0])
+                report.append(f"{comp} {spec}: sampled, net non {e['net_non']:+.4f} imp {e['net_imp']:+.4f}")
                 continue
             with open(rpath) as fh:
                 cr = json.load(fh)["comparisons"][comp]

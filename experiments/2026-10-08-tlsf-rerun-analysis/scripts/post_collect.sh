@@ -44,6 +44,10 @@ if has strength; then
     # shellcheck disable=SC2046
     "$PY" scripts/pooled_frontier.py split-fallbacks "$W/strength" \
         $(csvs "$IN"/av1/strength-fallback-av1.csv "$IN"/av2/strength-fallback-av2.csv "$IN"/av3/strength-fallback-av3.csv)
+    # humanoid-742 is a sampled estimate (PLAN.md, deviations).
+    if [ -f "$IN/av3/sample-742-av3.csv" ]; then
+        "$PY" "$S/sample_742.py" score "$IN/av3/sample-742-av3.csv"
+    fi
     "$PY" scripts/pooled_frontier.py score "$W/strength" "$OUT/strength"
 fi
 

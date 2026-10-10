@@ -57,3 +57,18 @@ jobs = 16
 black_timeout = 300
 wall_timeout = 700
 vmem_kb = 8000000
+
+# humanoid-742 as a sampled estimate: av1's walk of mrs-weighted's 9480-class
+# pool was cancelled 19 h in, with the other two frontiers cached. 100 draws
+# from each known frontier and 200 from the pool, each against the classes
+# whose print can imply it (scripts/sample_742.py); 62,602 pairs.
+[[phases]]
+name = "sample-742"
+kind = "compare"
+hosts = ["av3"]
+pairs = "experiments/analysis-tlsf-rerun-work/sample/pairs-{host}.csv"
+out = "experiments/analysis-tlsf-rerun/sample-742-{host}.csv"
+jobs = 28
+black_timeout = 300
+wall_timeout = 700
+vmem_kb = 8000000

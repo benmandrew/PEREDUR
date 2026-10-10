@@ -208,6 +208,18 @@ def main():
             row = next(csv.DictReader(fh))
         expect(row["net_imp"] != "", f"net_imp read from the filed results: {row}")
 
+        # A family with a sampled estimate and no walk result is scored from the estimate.
+        os.remove(f"{work}/fam/result.json")
+        est = {"net_non": -0.25, "net_imp": -0.5, "subA_non": 0.3, "subB_non": 0.05, "undecided": 4}
+        with open(f"{work}/fam/sampled.json", "w") as fh:
+            json.dump({"spec": "fam", "pairs": 7, "comparisons": {"rq3": est}}, fh)
+        pf.main(["score", work, f"{root}/out"])
+        with open(f"{root}/out/families-rq3.csv") as fh:
+            row = next(csv.DictReader(fh))
+        expect((row["front_A"], row["net_non"], row["net_imp"], row["pairs"]) == ("sampled", "-0.25", "-0.5", "7"),
+               f"sampled estimate scored: {row}")
+        expect("no result yet" not in open(f"{root}/out/report.txt").read(), "sampled family is not missing")
+
     # The exact Wilcoxon against values scipy gave for the archived passes.
     expect(abs(pf.wilcoxon_exact([1.0, -2.0, 3.0, 4.0, 5.0]) - 0.1875) < 1e-12, "wilcoxon n=5")
     expect(pf.wilcoxon_exact([]) == 1.0, "wilcoxon empty")
