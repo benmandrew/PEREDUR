@@ -147,7 +147,7 @@ def ratio(y: list, wt: list) -> tuple:
 
 
 def score(results: list) -> int:
-    pool, fronts, prints = load()
+    pool, fronts, _ = load()
     with open(f"{WORK}/sample/draws.json") as fh:
         draws = json.load(fh)
     rel = {}
@@ -158,6 +158,14 @@ def score(results: list) -> int:
                 rel[(x, y)] = r["relation"]
                 rel[(y, x)] = FLIP.get(r["relation"], r["relation"])
 
+    # The planned pairs are the candidates, not a second pass over prints.tsv:
+    # the plan read the 65,536-word prints, and unpack.py leaves the bundle's
+    # 4096-word copy in their place, which refutes a third as many pairs.
+    planned = set()
+    with open(f"{WORK}/sample/pairs-{HOST}.csv", newline="") as fh:
+        for r in csv.DictReader(fh):
+            _, _, x, y = r["id"].split("|")
+            planned.update(((x, y), (y, x)))
     missing = 0
 
     def ask(x, ys):
@@ -165,7 +173,7 @@ def score(results: list) -> int:
         nonlocal missing
         out = []
         for y in ys:
-            if y == x or prints[y] & ~prints[x]:
+            if (x, y) not in planned:
                 continue
             if (x, y) not in rel:
                 missing += 1

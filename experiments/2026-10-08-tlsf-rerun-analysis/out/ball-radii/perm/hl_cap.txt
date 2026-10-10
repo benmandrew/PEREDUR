@@ -1,0 +1,13 @@
+== experiments/2026-10-08-tlsf-rerun-analysis/out/ball-radii/perm/cap.csv
+Sel: Pareto (A) vs scalarised (B)
+  Net BinA - AinB  n=25  zeros 0  mean -0.138  HL -0.145 [-0.182, -0.091]  p 1.5e-05
+  BinA - ctrl A    n=25  zeros 0  mean -0.083  HL -0.086 [-0.112, -0.062]  p 3.2e-05
+  AinB - ctrl B    n=25  zeros 0  mean +0.043  HL +0.051 [+0.016, +0.076]  p 0.0081
+Grd: MRS (A) vs ladder (B)
+  Net BinA - AinB  n=24  zeros 0  mean +0.047  HL +0.023 [-0.018, +0.083]  p 0.44
+  BinA - ctrl A    n=24  zeros 1  mean +0.008  HL +0.010 [-0.011, +0.027]  p 0.33
+  AinB - ctrl B    n=24  zeros 1  mean -0.027  HL -0.024 [-0.054, -0.005]  p 0.018
+Aur: PEREDUR (A) vs AuRUS (B)
+  Net BinA - AinB  n=20  zeros 0  mean +0.197  HL +0.157 [+0.066, +0.286]  p 0.0042
+  BinA - ctrl A    n=20  zeros 0  mean +0.021  HL +0.023 [-0.016, +0.067]  p 0.23
+  AinB - ctrl B    n=20  zeros 0  mean -0.220  HL -0.160 [-0.337, -0.088]  p 0.00017

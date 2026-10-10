@@ -1,0 +1,17 @@
+grading humanoid-742: sampled, net non +0.1500 imp +0.1400
+
+== pooled grading: A = mrs-nsga2-apportion, B = aurus-nsga2-apportion (24 families)
+  [non] A stronger on 17, B on 6, tie 1; median net +0.0917, mean +0.0968; exact Wilcoxon p 0.005414
+  [imp] A stronger on 17, B on 6, tie 1; median net +0.0917, mean +0.0964; exact Wilcoxon p 0.005414
+  mean sub(A by B) 0.1226, sub(B by A) 0.2194
+  solver queries in cross walks 298028, undecided 2, errors 52
+  no result yet: humanoid-531
+selection humanoid-742: sampled, net non -0.2353 imp -0.2353
+
+== pooled selection: A = mrs-nsga2-apportion, B = mrs-weighted (24 families)
+  [non] A stronger on 0, B on 24, tie 0; median net -0.2425, mean -0.2559; exact Wilcoxon p 1.192e-07
+  [imp] A stronger on 0, B on 22, tie 0; median net -0.2576, mean -0.2734; exact Wilcoxon p 4.768e-07 (over 22)
+  mean sub(A by B) 0.3090, sub(B by A) 0.0531
+  solver queries in cross walks 1440000, undecided 35, errors 96
+  imp reading unresolved (run fallback-selection.csv): humanoid-503, pcar-v2-888
+  no result yet: humanoid-531

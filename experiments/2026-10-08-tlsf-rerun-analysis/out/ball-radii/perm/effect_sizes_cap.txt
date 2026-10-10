@@ -1,0 +1,17 @@
+== experiments/2026-10-08-tlsf-rerun-analysis/out/ball-radii/perm/cap.csv
+aurus-nsga2-apportion (X) vs aurus (Y)
+  gap: Y in X - X in Y         n=20  mean +0.191 [+0.078, +0.321]  HL +0.165 [+0.074, +0.289]  r_rb +0.70  p 0.0042
+  cross - control aurus-nsga2- n=20  mean -0.079 [-0.107, -0.053]  HL -0.076 [-0.107, -0.045]  r_rb -0.94  p 2.7e-05
+  cross - control aurus        n=20  mean -0.120 [-0.182, -0.067]  HL -0.086 [-0.197, -0.055]  r_rb -0.99  p 3.8e-06
+mrs-nsga2-apportion (X) vs aurus (Y)
+  gap: Y in X - X in Y         n=20  mean +0.197 [+0.078, +0.335]  HL +0.157 [+0.066, +0.286]  r_rb +0.70  p 0.0042
+  cross - control mrs-nsga2-ap n=20  mean -0.078 [-0.131, -0.032]  HL -0.066 [-0.119, -0.019]  r_rb -0.68  p 0.0064
+  cross - control aurus        n=20  mean -0.122 [-0.188, -0.066]  HL -0.093 [-0.190, -0.055]  r_rb -0.92  p 4.8e-05
+mrs-nsga2-apportion (X) vs aurus-nsga2-apportion (Y)
+  gap: Y in X - X in Y         n=24  mean +0.047 [-0.004, +0.105]  HL +0.023 [-0.018, +0.083]  r_rb +0.19  p 0.44
+  cross - control mrs-nsga2-ap n=24  mean -0.016 [-0.037, +0.004]  HL -0.007 [-0.031, +0.008]  r_rb -0.17  p 0.49
+  cross - control aurus-nsga2- n=24  mean -0.004 [-0.023, +0.020]  HL -0.013 [-0.026, +0.008]  r_rb -0.36  p 0.13
+mrs-nsga2-apportion (X) vs mrs-weighted (Y)
+  gap: Y in X - X in Y         n=25  mean -0.138 [-0.179, -0.094]  HL -0.145 [-0.182, -0.091]  r_rb -0.89  p 1.5e-05
+  cross - control mrs-nsga2-ap n=25  mean -0.015 [-0.033, +0.006]  HL -0.015 [-0.036, +0.004]  r_rb -0.34  p 0.15
+  cross - control mrs-weighted n=25  mean -0.026 [-0.046, -0.007]  HL -0.025 [-0.042, -0.004]  r_rb -0.50  p 0.027
