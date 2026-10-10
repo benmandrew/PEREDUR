@@ -1,0 +1,80 @@
+Maoz baselines against PEREDUR: coverage by implication
+(PLAN.md section 11 of 2026-10-02-maoz-baselines; strict reads an undecided pair as non-coverage, lenient as coverage)
+
+tool        spec            adm front  pool         cov/run        cov/pool        converse  undec  outcome
+glass       rg1               0     0   807             -/-             -/-             -/-      -  3
+glass       rg2               0     0   531             -/-             -/-             -/-      -  3
+glass       lift              1     1   468         0.0/0.0         0.0/0.0   0.9304/0.9304      -  1
+glass       gyro-var1         0     0   737             -/-             -/-             -/-      -  3
+glass       gyro-var2         1     1   721         1.0/1.0         1.0/1.0         1.0/1.0      -  covered
+glass       humanoid-458      1     1   731         0.0/0.0         0.0/0.0         1.0/1.0      -  1
+glass       humanoid-503      1     1   849         0.0/0.0         0.0/0.0   0.9909/0.9909      -  1
+glass       humanoid-531      0     0  1462             -/-             -/-             -/-      -  3
+glass       humanoid-742      0     0  2212             -/-             -/-             -/-      -  3
+glass       pcar-v2-888       0     0   651             -/-             -/-             -/-      -  3
+jvts-repair rg1              45    15   807   0.0044/0.0044   0.1333/0.1333   0.9924/0.9924      -  1
+jvts-repair rg2              12     3   531   0.0444/0.0444   0.6667/0.6667   0.9726/0.9726      -  1
+jvts-repair lift            195    11   468         0.0/0.0         0.0/0.0   0.8886/0.8886      -  1
+jvts-repair gyro-var1         6     2   737   0.0667/0.0667         0.5/0.5   0.9903/0.9903      -  1
+jvts-repair gyro-var2         6     2   721   0.6667/0.6667         1.0/1.0         1.0/1.0      -  covered
+jvts-repair humanoid-458      1     1   731         1.0/1.0         1.0/1.0         1.0/1.0      -  covered
+jvts-repair humanoid-503      0     0   849             -/-             -/-             -/-      -  3
+jvts-repair humanoid-531      0     0  1462             -/-             -/-             -/-      -  3
+jvts-repair humanoid-742      1     1  2212         0.0/0.0         0.0/0.0         1.0/1.0      -  1
+jvts-repair pcar-v2-888       0     0   651             -/-             -/-             -/-      -  3
+amt13       rg1            1000     7   807         0.0/0.0         0.0/0.0     0.999/0.999      -  1
+amt13       rg2              37     2   531         0.4/0.4         0.5/0.5   0.9777/0.9777      -  1
+amt13       lift              2     1   468         0.0/0.0         0.0/0.0     0.895/0.895      -  1
+amt13       gyro-var1       114     2   737   0.4333/0.4333         1.0/1.0   0.9929/0.9929      -  covered
+amt13       gyro-var2        35     3   721   0.5444/0.5444         1.0/1.0         1.0/1.0      -  covered
+amt13       humanoid-458      1     1   731         1.0/1.0         1.0/1.0         1.0/1.0      -  covered
+amt13       humanoid-503      0     0   849             -/-             -/-             -/-      -  3
+amt13       humanoid-531      0     0  1462             -/-             -/-             -/-      -  3
+amt13       humanoid-742      0     0  2212             -/-             -/-             -/-      -  3
+amt13       pcar-v2-888       0     0   651             -/-             -/-             -/-      -  3
+
+Outcome 1: tool frontier repairs no PEREDUR run covers
+  glass/lift: covered by no run: spec0.tlsf
+  glass/humanoid-458: covered by no run: spec0.tlsf
+  glass/humanoid-503: covered by no run: spec0.tlsf
+  jvts-repair/rg1: covered by no run: spec1.tlsf spec12.tlsf spec13.tlsf spec19.tlsf spec2.tlsf spec20.tlsf spec21.tlsf spec27.tlsf spec30.tlsf spec33.tlsf spec34.tlsf spec40.tlsf spec48.tlsf
+  jvts-repair/rg2: covered by no run: spec4.tlsf
+  jvts-repair/lift: covered by no run: spec14.tlsf spec160.tlsf spec161.tlsf spec162.tlsf spec217.tlsf spec22.tlsf spec7.tlsf spec74.tlsf spec8.tlsf spec9.tlsf spec93.tlsf
+  jvts-repair/gyro-var1: covered by no run: spec5.tlsf
+  jvts-repair/humanoid-742: covered by no run: spec0.tlsf
+  amt13/rg1: covered by no run: spec160.tlsf spec18.tlsf spec203.tlsf spec319.tlsf spec320.tlsf spec37.tlsf spec387.tlsf
+  amt13/rg2: covered by no run: spec21.tlsf
+  amt13/lift: covered by no run: spec0.tlsf
+Outcome 3: no admissible repair
+  glass/rg1: not well-separated 1
+  glass/rg2: not well-separated 1
+  glass/gyro-var1: not well-separated 1
+  glass/humanoid-531: not well-separated 1
+  glass/humanoid-742: not well-separated 1
+  glass/pcar-v2-888: not well-separated 1
+  jvts-repair/humanoid-503: killed with none printed
+  jvts-repair/humanoid-531: not well-separated 13
+  jvts-repair/pcar-v2-888: unrealisable 30, not well-separated 135
+  amt13/humanoid-503: crashed with none printed (exit 1)
+  amt13/humanoid-531: crashed with none printed (exit 1)
+  amt13/humanoid-742: crashed with none printed (exit 1)
+  amt13/pcar-v2-888: crashed with none printed (exit 1)
+
+Uncovered PEREDUR frontier repairs that change GUARANTEES (distinct, strict/lenient):
+  glass/lift: 437/437
+  glass/gyro-var2: 721/721
+  glass/humanoid-458: 731/731
+  glass/humanoid-503: 843/843
+  jvts-repair/rg1: 801/801
+  jvts-repair/rg2: 522/522
+  jvts-repair/lift: 418/418
+  jvts-repair/gyro-var1: 731/731
+  jvts-repair/gyro-var2: 721/721
+  jvts-repair/humanoid-458: 731/731
+  jvts-repair/humanoid-742: 2212/2212
+  amt13/rg1: 806/806
+  amt13/rg2: 525/525
+  amt13/lift: 421/421
+  amt13/gyro-var1: 733/733
+  amt13/gyro-var2: 721/721
+  amt13/humanoid-458: 731/731

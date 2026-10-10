@@ -1,0 +1,75 @@
+{
+  "written_by": "scripts/maoz_score.py",
+  "kind": "maoz-score",
+  "pass": "report",
+  "hostname": "ben",
+  "git": {
+    "branch": "campaign/tlsf-rerun-analysis",
+    "head": "cb0785b3cc8c06a0de98d2aa59a9ffe744ccf2aa"
+  },
+  "argv": [
+    "experiments/2026-10-08-tlsf-rerun-analysis/scripts/maoz_score.py",
+    "--pass",
+    "report",
+    "--out",
+    "experiments/2026-10-08-tlsf-rerun-analysis/out/coverage/report",
+    "--pool",
+    "experiments/analysis-tlsf-rerun-work/coverage/pool",
+    "--results",
+    "/home/y19056ba/projects/counter-wt/maoz/experiments/results-maoz-baselines",
+    "--maoz-out",
+    "/home/y19056ba/projects/counter-wt/maoz/experiments/maoz-baselines-out",
+    "--screen",
+    "/home/y19056ba/projects/counter-wt/maoz/experiments/maoz-coverage-screen",
+    "--frontier",
+    "/home/y19056ba/projects/counter-wt/maoz/experiments/maoz-coverage-frontier",
+    "--coverage",
+    "experiments/2026-10-08-tlsf-rerun-analysis/out/coverage"
+  ],
+  "out": "experiments/2026-10-08-tlsf-rerun-analysis/out/coverage/report",
+  "out_resolved": "/home/y19056ba/projects/counter/.claude/worktrees/agent-a7333ae64117631ea/experiments/2026-10-08-tlsf-rerun-analysis/out/coverage/report",
+  "results": "/home/y19056ba/projects/counter-wt/maoz/experiments/results-maoz-baselines",
+  "pool": "experiments/analysis-tlsf-rerun-work/coverage/pool",
+  "specs": [
+    "rg1",
+    "rg2",
+    "lift",
+    "gyro-var1",
+    "gyro-var2",
+    "humanoid-458",
+    "humanoid-503",
+    "humanoid-531",
+    "humanoid-742",
+    "pcar-v2-888"
+  ],
+  "tools": [
+    "glass",
+    "jvts-repair",
+    "amt13"
+  ],
+  "seeds": [
+    0
+  ],
+  "jobs": 16,
+  "budgets": {
+    "jobs": 16,
+    "realize_timeout": 600,
+    "wellsep_timeout": 60,
+    "maximal_timeout": 20,
+    "maximal_wall_s": 14400,
+    "chunk_size": 50,
+    "chunk_timeout": 900,
+    "pair_timeout": 120,
+    "cores": 1
+  },
+  "binaries": {},
+  "allow_stale_binary": false,
+  "python_version": "3.10.12",
+  "started": "2026-10-10T16:53:06+01:00",
+  "finished": "2026-10-10T16:53:19+01:00",
+  "wall_s": 13.0,
+  "counts": {
+    "planned": 30,
+    "done": 30
+  }
+}

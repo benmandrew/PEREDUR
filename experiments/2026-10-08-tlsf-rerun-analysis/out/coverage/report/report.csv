@@ -1,0 +1,31 @@
+tool,spec,n_repairs,n_realizable,n_unrealizable,n_realize_undecided,n_wellsep_no,n_wellsep_undecided,n_admissible,n_admissible_undecided,frontier_status,n_frontier,n_pool,n_runs,n_pairs,n_pairs_missing,undecided_share,coverage_per_run_strict,coverage_by_pool_strict,uncovered_tool_strict,converse_per_run_strict,converse_guarantee_weakening_strict,coverage_per_run_lenient,coverage_by_pool_lenient,uncovered_tool_lenient,converse_per_run_lenient,converse_guarantee_weakening_lenient,outcome,reason
+glass,rg1,1,1,0,0,1,0,0,0,empty,0,807,30,0,0,,,,,,,,,,,,3,not well-separated 1
+glass,rg2,1,1,0,0,1,0,0,0,empty,0,531,30,0,0,,,,,,,,,,,,3,not well-separated 1
+glass,lift,1,1,0,0,0,0,1,0,single,1,468,30,468,0,0.0,0.0,0.0,spec0.tlsf,0.9304,437,0.0,0.0,spec0.tlsf,0.9304,437,1,covered by no run: spec0.tlsf
+glass,gyro-var1,1,1,0,0,1,0,0,0,empty,0,737,30,0,0,,,,,,,,,,,,3,not well-separated 1
+glass,gyro-var2,1,1,0,0,0,0,1,0,single,1,721,30,721,0,0.0,1.0,1.0,,1.0,721,1.0,1.0,,1.0,721,covered,every frontier repair covered by the pool
+glass,humanoid-458,1,1,0,0,0,0,1,0,single,1,731,30,731,0,0.0,0.0,0.0,spec0.tlsf,1.0,731,0.0,0.0,spec0.tlsf,1.0,731,1,covered by no run: spec0.tlsf
+glass,humanoid-503,1,1,0,0,0,0,1,0,single,1,849,30,849,0,0.0,0.0,0.0,spec0.tlsf,0.9909,843,0.0,0.0,spec0.tlsf,0.9909,843,1,covered by no run: spec0.tlsf
+glass,humanoid-531,1,1,0,0,1,0,0,0,empty,0,1462,30,0,0,,,,,,,,,,,,3,not well-separated 1
+glass,humanoid-742,1,1,0,0,1,0,0,0,empty,0,2212,30,0,0,,,,,,,,,,,,3,not well-separated 1
+glass,pcar-v2-888,1,1,0,0,1,0,0,0,empty,0,651,30,0,0,,,,,,,,,,,,3,not well-separated 1
+jvts-repair,rg1,49,49,0,0,4,0,45,0,ok,15,807,30,12105,0,0.0,0.0044,0.1333,spec1.tlsf spec12.tlsf spec13.tlsf spec19.tlsf spec2.tlsf spec20.tlsf spec21.tlsf spec27.tlsf spec30.tlsf spec33.tlsf spec34.tlsf spec40.tlsf spec48.tlsf,0.9924,801,0.0044,0.1333,spec1.tlsf spec12.tlsf spec13.tlsf spec19.tlsf spec2.tlsf spec20.tlsf spec21.tlsf spec27.tlsf spec30.tlsf spec33.tlsf spec34.tlsf spec40.tlsf spec48.tlsf,0.9924,801,1,covered by no run: spec1.tlsf spec12.tlsf spec13.tlsf spec19.tlsf spec2.tlsf spec20.tlsf spec21.tlsf spec27.tlsf spec30.tlsf spec33.tlsf spec34.tlsf spec40.tlsf spec48.tlsf
+jvts-repair,rg2,12,12,0,0,0,0,12,0,ok,3,531,30,1593,0,0.0,0.0444,0.6667,spec4.tlsf,0.9726,522,0.0444,0.6667,spec4.tlsf,0.9726,522,1,covered by no run: spec4.tlsf
+jvts-repair,lift,221,221,0,0,26,0,195,0,ok,11,468,30,5148,0,0.0,0.0,0.0,spec14.tlsf spec160.tlsf spec161.tlsf spec162.tlsf spec217.tlsf spec22.tlsf spec7.tlsf spec74.tlsf spec8.tlsf spec9.tlsf spec93.tlsf,0.8886,418,0.0,0.0,spec14.tlsf spec160.tlsf spec161.tlsf spec162.tlsf spec217.tlsf spec22.tlsf spec7.tlsf spec74.tlsf spec8.tlsf spec9.tlsf spec93.tlsf,0.8886,418,1,covered by no run: spec14.tlsf spec160.tlsf spec161.tlsf spec162.tlsf spec217.tlsf spec22.tlsf spec7.tlsf spec74.tlsf spec8.tlsf spec9.tlsf spec93.tlsf
+jvts-repair,gyro-var1,7,7,0,0,1,0,6,0,ok,2,737,30,1474,0,0.0,0.0667,0.5,spec5.tlsf,0.9903,731,0.0667,0.5,spec5.tlsf,0.9903,731,1,covered by no run: spec5.tlsf
+jvts-repair,gyro-var2,12,12,0,0,6,0,6,0,ok,2,721,30,1442,0,0.0,0.6667,1.0,,1.0,721,0.6667,1.0,,1.0,721,covered,every frontier repair covered by the pool
+jvts-repair,humanoid-458,1,1,0,0,0,0,1,0,single,1,731,30,731,0,0.0,1.0,1.0,,1.0,731,1.0,1.0,,1.0,731,covered,every frontier repair covered by the pool
+jvts-repair,humanoid-503,0,0,0,0,0,0,0,0,empty,0,849,30,0,0,,,,,,,,,,,,3,killed with none printed
+jvts-repair,humanoid-531,13,13,0,0,13,0,0,0,empty,0,1462,30,0,0,,,,,,,,,,,,3,not well-separated 13
+jvts-repair,humanoid-742,3,2,1,0,2,0,1,0,single,1,2212,30,2212,0,0.0,0.0,0.0,spec0.tlsf,1.0,2212,0.0,0.0,spec0.tlsf,1.0,2212,1,covered by no run: spec0.tlsf
+jvts-repair,pcar-v2-888,135,105,30,0,135,0,0,0,empty,0,651,30,0,0,,,,,,,,,,,,3,"unrealisable 30, not well-separated 135"
+amt13,rg1,1000,1000,0,0,0,0,1000,0,ok,7,807,30,5649,0,0.0,0.0,0.0,spec160.tlsf spec18.tlsf spec203.tlsf spec319.tlsf spec320.tlsf spec37.tlsf spec387.tlsf,0.999,806,0.0,0.0,spec160.tlsf spec18.tlsf spec203.tlsf spec319.tlsf spec320.tlsf spec37.tlsf spec387.tlsf,0.999,806,1,covered by no run: spec160.tlsf spec18.tlsf spec203.tlsf spec319.tlsf spec320.tlsf spec37.tlsf spec387.tlsf
+amt13,rg2,37,37,0,0,0,0,37,0,ok,2,531,30,1062,0,0.0,0.4,0.5,spec21.tlsf,0.9777,525,0.4,0.5,spec21.tlsf,0.9777,525,1,covered by no run: spec21.tlsf
+amt13,lift,2,2,0,0,0,0,2,0,ok,1,468,30,468,0,0.0,0.0,0.0,spec0.tlsf,0.895,421,0.0,0.0,spec0.tlsf,0.895,421,1,covered by no run: spec0.tlsf
+amt13,gyro-var1,114,114,0,0,0,0,114,0,ok,2,737,30,1474,0,0.0,0.4333,1.0,,0.9929,733,0.4333,1.0,,0.9929,733,covered,every frontier repair covered by the pool
+amt13,gyro-var2,35,35,0,0,0,0,35,0,ok,3,721,30,2163,0,0.0,0.5444,1.0,,1.0,721,0.5444,1.0,,1.0,721,covered,every frontier repair covered by the pool
+amt13,humanoid-458,1,1,0,0,0,0,1,0,single,1,731,30,731,0,0.0,1.0,1.0,,1.0,731,1.0,1.0,,1.0,731,covered,every frontier repair covered by the pool
+amt13,humanoid-503,0,0,0,0,0,0,0,0,empty,0,849,30,0,0,,,,,,,,,,,,3,crashed with none printed (exit 1)
+amt13,humanoid-531,0,0,0,0,0,0,0,0,empty,0,1462,30,0,0,,,,,,,,,,,,3,crashed with none printed (exit 1)
+amt13,humanoid-742,0,0,0,0,0,0,0,0,empty,0,2212,30,0,0,,,,,,,,,,,,3,crashed with none printed (exit 1)
+amt13,pcar-v2-888,0,0,0,0,0,0,0,0,empty,0,651,30,0,0,,,,,,,,,,,,3,crashed with none printed (exit 1)

@@ -61,7 +61,9 @@ if has coverage; then
     # maoz_score.py's report pass over relations.csv rebuilt from the per-pair
     # compare output, with the archived screen and frontier.
     "$PY" "$S/coverage_relations.py" "$OUT/coverage/relations.csv" "$IN"/av*/coverage-*.csv
-    "$PY" "$S/maoz_score.py" --pass report --out "$OUT/coverage/report" \
+    # maoz_score.py imports check_well_separated and run_experiments, which
+    # sit in the checkout's scripts/, not beside the vendored copy.
+    PYTHONPATH=scripts "$PY" "$S/maoz_score.py" --pass report --out "$OUT/coverage/report" \
         --pool "$W/coverage/pool" \
         --results "$MAOZ/experiments/results-maoz-baselines" \
         --maoz-out "$MAOZ/experiments/maoz-baselines-out" \
