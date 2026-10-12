@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -61,6 +63,53 @@ TEST(test_write_structure) {
     expect(out.find("PRESET") == std::string::npos,
            "write: omits empty sections");
     expect(out.find("TITLE:") != std::string::npos, "write: emits title");
+}
+
+TEST(test_write_changes) {
+    const tlsf::Specification original = tlsf::parse(
+        "INFO { SEMANTICS: Mealy; }\n"
+        "MAIN { INPUTS { req; } OUTPUTS { grant; }\n"
+        "       GUARANTEE { G (req -> X grant); G (grant -> X !grant); } }");
+    expect(tlsf::write_changes(original, original).empty(),
+           "changes: a specification changes nothing against itself");
+
+    // One guarantee rewritten and an assumption added. The untouched guarantee
+    // is not listed, and the old formula comes before its replacement.
+    const tlsf::Specification repair = tlsf::parse(
+        "INFO { SEMANTICS: Mealy; }\n"
+        "MAIN { INPUTS { req; } OUTPUTS { grant; }\n"
+        "       ASSUME { G F !req; }\n"
+        "       GUARANTEE { G (req -> F grant); G (grant -> X !grant); } }");
+    const tlsf::Specification rewritten = tlsf::parse(
+        "INFO { SEMANTICS: Mealy; }\n"
+        "MAIN { INPUTS { req; } OUTPUTS { grant; }\n"
+        "       GUARANTEE { G (req -> X grant); G (req -> F grant); } }");
+    const std::string changes = tlsf::write_changes(original, repair);
+    const std::string added = tlsf::write_changes(original, rewritten);
+    expect(changes.rfind("  ASSUME + ", 0) == 0,
+           "changes: an added assumption is listed first, as an addition");
+    const std::size_t dropped = changes.find("  GUARANTEE - ");
+    const std::size_t replaced = changes.find("  GUARANTEE + ");
+    expect(dropped != std::string::npos && replaced != std::string::npos &&
+               dropped < replaced,
+           "changes: a rewritten guarantee is a removal then an addition");
+    expect(std::count(changes.begin(), changes.end(), '\n') == 3,
+           "changes: the untouched guarantee is not listed");
+    expect(
+        changes.substr(replaced) == added.substr(added.find("  GUARANTEE + ")),
+        "changes: the same new formula prints the same way");
+
+    // A deleted slot reads as a removal, and its absence after a round trip
+    // through text reads the same.
+    tlsf::Specification deleted = original;
+    deleted.m_guarantee[0].m_removed = true;
+    const std::string removal = tlsf::write_changes(original, deleted);
+    expect(removal.rfind("  GUARANTEE - ", 0) == 0 &&
+               std::count(removal.begin(), removal.end(), '\n') == 1,
+           "changes: a deleted guarantee is one removal line");
+    expect(tlsf::write_changes(original, tlsf::parse(tlsf::write(deleted))) ==
+               removal,
+           "changes: a repair read back from text lists the same lines");
 }
 
 TEST(test_semantics_written) {

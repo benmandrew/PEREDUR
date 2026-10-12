@@ -252,13 +252,16 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
             std::cout << ", written to " << output_dir << "/";
         }
         std::cout << "\n";
+        if (cfg.report_repair_summary) {
+            print_repair_changes(original_spec, scored_maximal);
+        }
         dashboard.run_end(budget.generations(), realizable_vec.size(),
                           maximal.size(), seconds_since(wall_start));
         filter_stats.insert(filter_stats.end(), final_filter_stats.begin(),
                             final_filter_stats.end());
-        print_filter_report(filter_stats, EmptyFilterReport::Heading);
         print_scoring_report();
         if (cfg.report_diagnostics) {
+            print_filter_report(filter_stats, EmptyFilterReport::Heading);
             print_diagnostics_report();
         }
         if (cfg.report_cpu_timing) {

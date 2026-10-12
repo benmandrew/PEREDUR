@@ -71,6 +71,14 @@ std::pair<std::vector<Specification>, std::vector<FilterRunStats>>
 finish_maximal_stream(StreamingMaximalFilter<Specification>& stream,
                       const std::vector<Specification>& realizable_vec);
 
+// Prints, for each repair in the order write_specifications numbered them, its
+// file name and then what it changed against @p original: a `-` line for each
+// live requirement of the original the repair no longer has and a `+` line for
+// each one only the repair has. Requirements are matched by equality within a
+// side, never by position.
+void print_repair_changes(const Specification& original,
+                          const std::vector<ScoredSpecification>& scored);
+
 void write_specifications(
     const std::vector<ScoredSpecification>& scored,
     const AggregateWeightedFitnessFunction& fitness_function,

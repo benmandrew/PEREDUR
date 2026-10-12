@@ -166,6 +166,9 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
                           .count());
     internal::print_repair_summary(n_realizable, survivors.size(),
                                    cfg.run_implication_filter, output_dir);
+    if (cfg.report_repair_summary) {
+        internal::print_repair_changes(original, survivors);
+    }
     return 0;
 }
 

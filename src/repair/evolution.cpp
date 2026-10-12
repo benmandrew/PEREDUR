@@ -305,6 +305,71 @@ finish_maximal_stream(StreamingMaximalFilter<Specification>& stream,
     return {std::move(maximal), std::move(stats)};
 }
 
+namespace {
+
+std::vector<Requirement> live_requirements(
+    const std::vector<Requirement>& reqs) {
+    std::vector<Requirement> live;
+    for (const Requirement& req : reqs) {
+        if (!req.m_removed) {
+            live.push_back(req);
+        }
+    }
+    return live;
+}
+
+// Writes a line for each requirement of @p from with no equal partner left in
+// @p against. A requirement held twice on one side and once on the other is
+// listed once.
+void print_unmatched(const std::string& prefix,
+                     const std::vector<Requirement>& from,
+                     const std::vector<Requirement>& against, bool& any) {
+    std::vector<bool> used(against.size(), false);
+    for (const Requirement& req : from) {
+        bool matched = false;
+        for (std::size_t i = 0; i < against.size() && !matched; ++i) {
+            if (!used[i] && against[i] == req) {
+                used[i] = true;
+                matched = true;
+            }
+        }
+        if (!matched) {
+            // A requirement with no condition renders with a leading space.
+            const std::string text = strip_atom_prefix(req).to_string();
+            std::cout << prefix << text.substr(text.find_first_not_of(' '))
+                      << "\n";
+            any = true;
+        }
+    }
+}
+
+void print_side_changes(const std::string& name,
+                        const std::vector<Requirement>& before,
+                        const std::vector<Requirement>& after, bool& any) {
+    const std::vector<Requirement> old_reqs = live_requirements(before);
+    const std::vector<Requirement> new_reqs = live_requirements(after);
+    print_unmatched("  " + name + " - ", old_reqs, new_reqs, any);
+    print_unmatched("  " + name + " + ", new_reqs, old_reqs, any);
+}
+
+}  // namespace
+
+void print_repair_changes(const Specification& original,
+                          const std::vector<ScoredSpecification>& scored) {
+    for (std::size_t i = 0; i < scored.size(); ++i) {
+        const Specification& repair = scored[i].specification;
+        std::cout << "\nrepair_" << i << ".json\n";
+        bool any = false;
+        print_side_changes("ASSUMPTION", original.m_assumptions,
+                           repair.m_assumptions, any);
+        print_side_changes("GUARANTEE", original.m_guarantees,
+                           repair.m_guarantees, any);
+        if (!any) {
+            std::cout << "  (no change)\n";
+        }
+    }
+}
+
 void write_specifications(
     const std::vector<ScoredSpecification>& scored,
     const AggregateWeightedFitnessFunction& fitness_function,

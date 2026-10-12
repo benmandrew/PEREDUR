@@ -20,6 +20,11 @@ void write_survivors(
     const AggregateWeightedFitnessFunctionT<Specification>& fitness,
     const std::string& output_dir);
 
+// Prints, for each survivor in the order write_survivors numbered them, its
+// file name and then what it changed against @p original.
+void print_repair_changes(const Specification& original,
+                          const std::vector<Scored<Specification>>& survivors);
+
 void print_repair_summary(std::size_t n_realizable, std::size_t n_written,
                           bool implication_filter_run,
                           const std::string& output_dir);

@@ -256,15 +256,23 @@ struct Config {
     /// question about one interactive run rather than about the search, exactly
     /// as PEREDUR_PROFILE does for the scope profiler.
     bool report_cpu_timing = false;
-    /// When true, print the engine-internal counters at exit: per-tool call and
-    /// cache totals, the ltl2tgba tautology substitutions, the constant-folded
-    /// count, and the fitness cache hit rate. Set by `peredur --diagnostics`
-    /// alone, a flag rather than a TOML key for the same reason
-    /// report_cpu_timing is. Off by default because stdout is for watching a
-    /// run in progress and none of these say anything about the run's repairs.
-    /// Nothing is lost by omitting them: every one is written to
+    /// When true, print the filter report and the engine-internal counters at
+    /// exit: per-filter population counts, per-tool call and cache totals, the
+    /// ltl2tgba tautology substitutions, the constant-folded count, and the
+    /// fitness cache hit rate. Set by `peredur --diagnostics` alone, a flag
+    /// rather than a TOML key for the same reason report_cpu_timing is. Off by
+    /// default because stdout is for watching a run in progress and none of
+    /// these say anything about the run's repairs. Nothing is lost by omitting
+    /// them: every one is written to
     /// `<output-dir>/run.json` on every successful run either way.
     bool report_diagnostics = false;
+    /// When true, follow the closing count with what each written repair
+    /// changed: the formulae it dropped and the ones it put in their place,
+    /// under the repair's file name. Without it a repair is a whole
+    /// specification that has to be compared with the input by hand. Set by
+    /// `peredur --repair-summary` alone, a flag rather than a TOML key for the
+    /// same reason report_cpu_timing is.
+    bool report_repair_summary = false;
     /// When true, stream per-stage and per-generation progress to
     /// `<output-dir>/progress.jsonl` and copy the dashboard page beside it.
     /// Opt-in

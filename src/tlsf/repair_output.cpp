@@ -51,6 +51,16 @@ void write_survivors(
     }
 }
 
+void print_repair_changes(const Specification& original,
+                          const std::vector<Scored<Specification>>& survivors) {
+    for (std::size_t i = 0; i < survivors.size(); ++i) {
+        const std::string changes =
+            write_changes(original, survivors[i].specification);
+        std::cout << "\nrepair_" << i << ".tlsf\n"
+                  << (changes.empty() ? "  (no change)\n" : changes);
+    }
+}
+
 void print_repair_summary(std::size_t n_realizable, std::size_t n_written,
                           bool implication_filter_run,
                           const std::string& output_dir) {

@@ -1,5 +1,6 @@
 #include "tlsf/writer.hpp"
 
+#include <array>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -93,6 +94,27 @@ void write_formula_section(std::string& out, const std::string& name,
     out += "  }\n";
 }
 
+// Appends a line for each formula of @p from with no equal partner left in
+// @p against. A formula held twice on one side and once on the other is
+// listed once.
+void write_unmatched(std::string& out, const std::string& prefix,
+                     const std::vector<Formula>& from,
+                     const std::vector<Formula>& against) {
+    std::vector<bool> used(against.size(), false);
+    for (const Formula& formula : from) {
+        bool matched = false;
+        for (std::size_t i = 0; i < against.size() && !matched; ++i) {
+            if (!used[i] && against[i] == formula) {
+                used[i] = true;
+                matched = true;
+            }
+        }
+        if (!matched) {
+            out += prefix + to_tlsf_expr(formula) + "\n";
+        }
+    }
+}
+
 }  // namespace
 
 std::string write(const Specification& specification) {
@@ -118,6 +140,23 @@ std::string write(const Specification& specification) {
     write_formula_section(out, "ASSERT", specification.m_assert);
     write_formula_section(out, "GUARANTEE", specification.m_guarantee);
     out += "}\n";
+    return out;
+}
+
+std::string write_changes(const Specification& original,
+                          const Specification& repair) {
+    static const std::array<const char*, 6> k_names = {
+        "INITIALLY", "PRESET", "REQUIRE", "ASSUME", "ASSERT", "GUARANTEE"};
+    const std::array<const Section*, 6> before = sections_of(original);
+    const std::array<const Section*, 6> after = sections_of(repair);
+    std::string out;
+    for (std::size_t i = 0; i < before.size(); ++i) {
+        const std::vector<Formula> old_formulae = live_formulae(*before[i]);
+        const std::vector<Formula> new_formulae = live_formulae(*after[i]);
+        const std::string name = std::string("  ") + k_names[i];
+        write_unmatched(out, name + " - ", old_formulae, new_formulae);
+        write_unmatched(out, name + " + ", new_formulae, old_formulae);
+    }
     return out;
 }
 

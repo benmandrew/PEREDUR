@@ -301,14 +301,14 @@ TEST_IN("driver_peredur", test_peredur_repairs_tlsf) {
     std::filesystem::create_directories(first);
     std::filesystem::create_directories(second);
 
-    const DriverRun run =
-        run_driver("peredur", {"--input", input, "--output-dir", first.string(),
-                               "--config", config, "--seed", "2"});
+    const DriverRun run = run_driver(
+        "peredur", {"--input", input, "--output-dir", first.string(),
+                    "--config", config, "--seed", "2", "--repair-summary"});
     expect(run.m_exit_code == 0, "peredur: a TLSF run exits zero");
     expect(contains(run.m_output, "Seed: 2"),
            "peredur: the run prints the seed it was given");
-    expect(contains(run.m_output, "Filter report:"),
-           "peredur: the run prints the filter report");
+    expect(!contains(run.m_output, "Filter report:"),
+           "peredur: the filter report stays off stdout by default");
     expect(contains(run.m_output, "Done in"),
            "peredur: the run prints its closing line");
     const nlohmann::json manifest =
@@ -333,14 +333,21 @@ TEST_IN("driver_peredur", test_peredur_repairs_tlsf) {
     // the repairs rather than run.json, whose timings are wall-clock.
     const DriverRun again = run_driver(
         "peredur", {"--input", input, "--output-dir", second.string(),
-                    "--config", config, "--seed", "2"});
+                    "--config", config, "--seed", "2", "--diagnostics"});
     expect(again.m_exit_code == 0, "peredur: the repeat run exits zero");
+    expect(contains(again.m_output, "Filter report:"),
+           "peredur: --diagnostics prints the filter report");
+    expect(!contains(again.m_output, "\nrepair_0.tlsf\n"),
+           "peredur: a run lists no repair unless asked");
     const std::vector<std::filesystem::path> first_repairs =
         repair_files(first);
     const std::vector<std::filesystem::path> second_repairs =
         repair_files(second);
     expect(first_repairs.size() == second_repairs.size(),
            "peredur: one seed writes the same number of repairs twice");
+    expect(
+        first_repairs.empty() || contains(run.m_output, "\nrepair_0.tlsf\n  "),
+        "peredur: --repair-summary lists what the first repair changed");
     for (std::size_t i = 0; i < first_repairs.size(); ++i) {
         expect(first_repairs[i].filename() == second_repairs[i].filename(),
                "peredur: the repairs are named the same way twice");
@@ -358,10 +365,13 @@ TEST_IN("driver_peredur", test_peredur_repairs_fretish) {
     const std::filesystem::path out = dir.path() / "out";
     std::filesystem::create_directories(out);
 
-    const DriverRun run =
-        run_driver("peredur", {"--input", input, "--output-dir", out.string(),
-                               "--config", config, "--seed", "5"});
+    const DriverRun run = run_driver(
+        "peredur", {"--input", input, "--output-dir", out.string(), "--config",
+                    config, "--seed", "5", "--repair-summary"});
     expect(run.m_exit_code == 0, "peredur: a FRETISH run exits zero");
+    expect(repair_files(out).empty() ||
+               contains(run.m_output, "\nrepair_0.json\n  "),
+           "peredur: --repair-summary lists what a FRETISH repair changed");
     expect(contains(run.m_output, "Done in"),
            "peredur: the FRETISH run prints its closing line");
     const nlohmann::json manifest =
@@ -1115,9 +1125,9 @@ TEST_IN("driver_peredur", test_peredur_filters_without_the_accumulator) {
     const std::filesystem::path out = dir.path() / "out";
     std::filesystem::create_directories(out);
 
-    const DriverRun run =
-        run_driver("peredur", {"--input", input, "--output-dir", out.string(),
-                               "--config", config, "--seed", "4"});
+    const DriverRun run = run_driver(
+        "peredur", {"--input", input, "--output-dir", out.string(), "--config",
+                    config, "--seed", "4", "--diagnostics"});
     expect(run.m_exit_code == 0,
            "peredur: a run with the accumulator off exits zero");
     expect(contains(run.m_output, "final/implication"),
