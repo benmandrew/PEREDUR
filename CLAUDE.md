@@ -58,7 +58,7 @@ Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves w
 ### Config and output
 
 - A new TOML key is one row in `k_config_keys` (`src/config/keys.hpp`), which drives the parser, the key spec and `config_json()`; a new enum type also needs its `EnumNames` array in `src/config/enum_names.hpp` and a `ConfigMember` alternative. It also touches `schemas/config-schema.json`, `example-config.toml` (whose values must equal the built-in defaults), and `DEFAULT_FIELDS` or `GEN_CONFIGS_FIELDS` in `scripts/check_config_schema.py`. `lint` checks them against each other.
-- Moving a C++ default changes what every archived config means: record it under "Config vintage" in `experiments/README.md`. Removing a key retires the sweeps and runner profiles that emit it.
+- Moving a C++ default changes what every archived config means: record it under "Config vintage" in `docs/dev/config-and-provenance.md`. Removing a key retires the sweeps and runner profiles that emit it.
 - A new `--diagnostics` counter also joins `write_run_manifest` and bumps `k_schema_version`.
 - A new `peredur` flag joins the table in `src/main.cpp`, or `find_unknown_arg` rejects it.
 - Anything that moves the cursor goes through `stdout_is_tty()` (`include/status_line.hpp`). Most runs are redirected to `run.log`.

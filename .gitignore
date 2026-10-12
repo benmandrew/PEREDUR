@@ -65,7 +65,6 @@ semantics.txt
 # so `/experiments*/` would make the negations below dead letters. Descent stops
 # at the campaign subdirectory — run dirs and CSVs are never walked.
 /experiments*/*
-!/experiments/README.md
 !/experiments/*/
 /experiments/*/*
 !/experiments/*/PROVENANCE.json

@@ -180,7 +180,7 @@ struct Config {
     ///
     /// Moving this default changes what every archived config *means*, since
     /// none of them state a key that did not exist when they ran. See "Config
-    /// vintage" in experiments/README.md, and VINTAGE_KEYS in
+    /// vintage" in docs/dev/config-and-provenance.md, and VINTAGE_KEYS in
     /// scripts/gen_configs.py.
     MrsAdmissionOrder mrs_admission_order = MrsAdmissionOrder::Degree;
     /// Which objective scores the FRETISH keyword fields (see
@@ -325,7 +325,8 @@ struct Config {
     /// power from the 200 paired runs instead.
     ///
     /// An archived campaign config that omits the key therefore means something
-    /// it did not; see the config vintage note in experiments/README.md.
+    /// it did not; see the config vintage note in
+    /// docs/dev/config-and-provenance.md.
     ///
     /// Live under `[tlsf] repair_mode = "muc"` as well, since 2026-09-18: the
     /// core populations themselves are never accumulated, because a candidate
@@ -468,7 +469,7 @@ struct Config {
     /// exactly as it ran before the operator existed — the probability is read
     /// before the RNG is drawn, so a zero never costs a draw — which is what
     /// reproducing a campaign archived before 2026-08-13 requires (see the
-    /// config vintage note in experiments/README.md).
+    /// config vintage note in docs/dev/config-and-provenance.md).
     ///
     /// The risk to watch is that removal is monotonically good for
     /// realizability, so the status objective pays for it while the similarity

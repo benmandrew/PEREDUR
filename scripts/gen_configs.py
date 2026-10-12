@@ -141,8 +141,8 @@ DEFAULTS: dict = {
     # 2026-09-11 and were 0 before, where neither arm costs an RNG draw. Emitted
     # into [mutation] only when a sweep overrides them (see make_toml), so the
     # standard grids stay byte-identical, which makes the move a "Config
-    # vintage" entry in experiments/README.md; both are in VINTAGE_KEYS. No
-    # sweep crosses them yet.
+    # vintage" entry in docs/dev/config-and-provenance.md; both are in
+    # VINTAGE_KEYS. No sweep crosses them yet.
     "p_condition_type": 0.15,
     "p_scope": 0.15,
     # FRETISH only: probability a mutation rewrites the stop of an until or
@@ -174,8 +174,8 @@ DEFAULTS: dict = {
     # existing grid stays byte-identical; TLSF sweep N crosses it. Sweep N
     # states it on both arms rather than letting the control inherit silence,
     # which is why that campaign is the one archive the move did not reinterpret
-    # -- the exposure "Config vintage" in experiments/README.md records for
-    # every other archive here.
+    # -- the exposure "Config vintage" in docs/dev/config-and-provenance.md
+    # records for every other archive here.
     "accumulate_repairs": True,
     "black_timeout_ms": 1000,
     "repair_mode": "monolithic",
@@ -184,7 +184,7 @@ DEFAULTS: dict = {
     # make_toml), so every existing grid stays byte-identical; sweep G varies
     # it. That silence is what makes the move a config-vintage change for every
     # campaign archived before it -- see "Config vintage" in
-    # experiments/README.md.
+    # docs/dev/config-and-provenance.md.
     "status_grading": "mrs",
     # Mirrors include/config.hpp, which moved to "degree" on 2026-08-14. Emitted
     # into [fitness] only when a sweep overrides it (see make_toml), so every
@@ -214,8 +214,9 @@ DEFAULTS: dict = {
     # TLSF-only under [tlsf.mutation] before, and the FRETISH arm defaulted to
     # 0. Every campaign archived before 2026-08-21 ran without either operator
     # and cannot state so, which makes this a "Config vintage" entry in
-    # experiments/README.md rather than a silent one -- reproducing such a
-    # campaign means writing both keys to 0. p_monotone is in VINTAGE_KEYS.
+    # docs/dev/config-and-provenance.md rather than a silent one -- reproducing
+    # such a campaign means writing both keys to 0. p_monotone is in
+    # VINTAGE_KEYS.
     "p_monotone": 0.25,
     "p_clone_assumption": 0.25,
     # The 2026-08-25 assumption-reach keys (see config.hpp): a width for the

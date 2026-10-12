@@ -1557,64 +1557,71 @@ finally:
 
 # ── describe against the real archive ─────────────────────────────────────────
 #
-# The tracked half of every archive -- PROVENANCE.json and the vendored
-# scripts -- is present in any checkout, so these run everywhere. The results
-# CSVs are gitignored, so the checks that need one run only where it is.
+# The archives left the repository after 274d496, so a fresh checkout has none
+# and this section is skipped there. It runs where the closed campaigns are
+# checked out under experiments/. The results CSVs were never tracked, so the
+# checks that need one run only where it is.
 
 ARCHIVE_ROOT = C.REPO_ROOT / "experiments"
+ABLATION = ARCHIVE_ROOT / "2026-07-24-ablation"
 archives = sorted(p.parent.name for p in
                   ARCHIVE_ROOT.glob("*/PROVENANCE.json"))
-check_true(len(archives) >= 19,
-           f"every closed campaign is describable ({len(archives)})")
-for name in archives:
-    table = C.describe_campaign(name, ARCHIVE_ROOT / name)
-    check(table["name"], name, f"{name} describes")
-    check(table["attribution"], "inferred", f"{name} says it was derived")
-    check_true("jobs" in table["not_recorded"],
-               f"{name} records no job count, because nothing recorded one")
+if (ABLATION / "PROVENANCE.json").exists():
+    check_true(len(archives) >= 19,
+               f"every closed campaign is describable ({len(archives)})")
+    for name in archives:
+        table = C.describe_campaign(name, ARCHIVE_ROOT / name)
+        check(table["name"], name, f"{name} describes")
+        check(table["attribution"], "inferred", f"{name} says it was derived")
+        check_true("jobs" in table["not_recorded"],
+                   f"{name} records no job count, "
+                   "because nothing recorded one")
 
-elitism = ARCHIVE_ROOT / "2026-08-07-elitism"
-order, source = C.driver_order(elitism)
-check(order, ["elitism-fret", "elitism-tlsf"],
-      "the elitism driver states its phase order, and nothing else does")
-check(source, "scripts/campaign_driver.sh", "from the script that states it")
+    elitism = ARCHIVE_ROOT / "2026-08-07-elitism"
+    order, source = C.driver_order(elitism)
+    check(order, ["elitism-fret", "elitism-tlsf"],
+          "the elitism driver states its phase order, and nothing else does")
+    check(source, "scripts/campaign_driver.sh",
+          "from the script that states it")
 
-branch, source = C.provenance_branch(elitism)
-check((branch, source), ("feat/elitism-campaign",
-                         "PROVENANCE.json: profile_commit.branch"),
-      "and its branch, from the key that holds it")
+    branch, source = C.provenance_branch(elitism)
+    check((branch, source), ("feat/elitism-campaign",
+                             "PROVENANCE.json: profile_commit.branch"),
+          "and its branch, from the key that holds it")
 
-# arbiter-probe's branch value continues into prose after the branch name.
-probe_branch, _ = C.provenance_branch(ARCHIVE_ROOT
-                                      / "2026-08-10-arbiter-probe")
-check(probe_branch, "feat/arbiter-probe",
-      "only the branch name is taken, not the sentence around it")
+    # arbiter-probe's branch value continues into prose after the branch name.
+    probe_branch, _ = C.provenance_branch(ARCHIVE_ROOT
+                                          / "2026-08-10-arbiter-probe")
+    check(probe_branch, "feat/arbiter-probe",
+          "only the branch name is taken, not the sentence around it")
 
-by_csv = C.vendored_profile_csvs(ARCHIVE_ROOT / "2026-07-24-ablation")
-check(sorted(by_csv["results-ablate-tlsf.csv"]), ["ablate-tlsf", "h2h-tlsf"],
-      "two profiles claim one CSV in the ablation archive")
-check(C.profile_of_csv("results-ablate-tlsf.csv", by_csv), "ablate-tlsf",
-      "and the CSV name breaks the tie")
-check(C.vendored_profile_csvs(ARCHIVE_ROOT / "2026-07-10-fretish-sweeps"), {},
-      "the 2026-07-10 runner has no PROFILES dict at all")
+    by_csv = C.vendored_profile_csvs(ABLATION)
+    check(sorted(by_csv["results-ablate-tlsf.csv"]),
+          ["ablate-tlsf", "h2h-tlsf"],
+          "two profiles claim one CSV in the ablation archive")
+    check(C.profile_of_csv("results-ablate-tlsf.csv", by_csv), "ablate-tlsf",
+          "and the CSV name breaks the tie")
+    check(C.vendored_profile_csvs(ARCHIVE_ROOT
+                                  / "2026-07-10-fretish-sweeps"), {},
+          "the 2026-07-10 runner has no PROFILES dict at all")
 
-ablate_csv = ARCHIVE_ROOT / "2026-07-24-ablation" / "results-ablate-fret.csv"
-if ablate_csv.exists():
-    cross = C.read_cross(ablate_csv)
-    check(cross["rows"], 1280, "the ablation cross is 2x2x2x4x40 rows")
-    check(sorted(cross["schemes"]), ["nsga2", "weighted"], "two schemes")
-    check(sorted(cross["metrics"]), ["direct", "log"], "two metrics")
-    check(len(cross["seeds"]), 40, "forty seeds")
-    check(cross["not_recorded"], [], "and a header wide enough for all of it")
-    table = C.describe_campaign("2026-07-24-ablation",
-                                ARCHIVE_ROOT / "2026-07-24-ablation")
-    check([p["profile"] for p in table["phases"]],
-          ["ablate-fret", "ablate-tlsf"], "both of the ablation's phases")
-    check_true("phase_order" in table["not_recorded"],
-               "in the order of their CSV names, which nothing recorded")
-    check(C.parse_toml(C.dump_campaign(table)), {k: v for k, v in
-                                                 table.items()},
-          "and the printed form round-trips through the parser")
+    ablate_csv = ABLATION / "results-ablate-fret.csv"
+    if ablate_csv.exists():
+        cross = C.read_cross(ablate_csv)
+        check(cross["rows"], 1280, "the ablation cross is 2x2x2x4x40 rows")
+        check(sorted(cross["schemes"]), ["nsga2", "weighted"], "two schemes")
+        check(sorted(cross["metrics"]), ["direct", "log"], "two metrics")
+        check(len(cross["seeds"]), 40, "forty seeds")
+        check(cross["not_recorded"], [],
+              "and a header wide enough for all of it")
+        table = C.describe_campaign("2026-07-24-ablation", ABLATION)
+        check([p["profile"] for p in table["phases"]],
+              ["ablate-fret", "ablate-tlsf"], "both of the ablation's phases")
+        check_true("phase_order" in table["not_recorded"],
+                   "in the order of their CSV names, which nothing recorded")
+        check(C.parse_toml(C.dump_campaign(table)), {k: v for k, v in
+                                                     table.items()},
+              "and the printed form round-trips through the parser")
 
 
 # ── stage: the refusals ───────────────────────────────────────────────────────

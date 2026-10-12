@@ -180,7 +180,7 @@ Closing a campaign means the archive can be read without the git history. Rename
 - Where the campaign ran a score phase, assemble its `maximality_pass` block from the score manifests under `experiments/<out>/<host>/`: the `invocation` template, the budgets, both scoring binaries' commits, the seeds each host scored, the start and finish stamps and the counts are all fields of `score-manifest-<host>.json`, and the failed and partial curves are read off `failures.txt` and `timings.txt` beside it. Nothing in that block is reconstructed from memory.
 - Vendor `gen_configs.py`, `run_experiments.py` and `merge_experiments.py` verbatim into `experiments/<campaign>/scripts/`, and record each one's source commit and git blob sha in `vendored_scripts`. Check a copy with `git hash-object`.
 - If the branch is split into pull requests or rebased rather than merged, tag its tip `provenance/<name>` and record that in `profile_commit.held_by_tag`. Every sha the file names points into that branch, and without the tag `git gc` collects them.
-- If a C++ default flipped between the campaign running and the close, add it to the "Config vintage" note in `experiments/README.md`. An archived config only holds the keys a sweep overrode, so a changed default silently changes what every one of them means.
+- If a C++ default flipped between the campaign running and the close, add it to the "Config vintage" note in `docs/dev/config-and-provenance.md`. An archived config only holds the keys a sweep overrode, so a changed default silently changes what every one of them means.
 
 `campaign.toml` stays in the archive, keeping the seed split reproducible; queue entries do not.
 
@@ -191,7 +191,7 @@ python scripts/campaign.py describe <campaign>
 python scripts/campaign.py describe --all --json
 ```
 
-`describe` derives a declaration for an archived campaign from `experiments/<campaign>/` and writes nothing. The 19 closed campaigns never had one, and none is written into them: an archive is replayed through its vendored scripts at its recorded commit, where `campaign.py` does not exist, and a file beside its own sources would be a cache that can drift. `describe --all --json` also answers whether a config knob is ever set, over 19 archives rather than roughly 65,000 configs.
+`describe` derives a declaration for an archived campaign from `experiments/<campaign>/` and writes nothing. The archives left this repository after `274d496`, so `describe` needs them checked out from that commit first (see `docs/dev/config-and-provenance.md`). The 19 closed campaigns never had one, and none is written into them: an archive is replayed through its vendored scripts at its recorded commit, where `campaign.py` does not exist, and a file beside its own sources would be a cache that can drift. `describe --all --json` also answers whether a config knob is ever set, over 19 archives rather than roughly 65,000 configs.
 
 The factor cross comes from the merged CSV's key columns (`sweep`, `level_name`, `selection`, `weakening`, `metric`, `repair_mode`, `spec`, `seed`), preferred over vendored `PROFILES` because the dict says what was intended and the CSV what happened. The host split comes from disjoint per-host CSVs (13 of 19), the branch from `PROVENANCE.json` (5 of 19), and phase order from a vendored shell driver, which only elitism has.
 

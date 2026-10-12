@@ -221,7 +221,8 @@ TEST(test_config_io_enum_keys) {
     // (renamed Nsga2Truncate), and Nsga2Apportion from 2026-08-14 -- and only
     // the 64 `sweep_B_pop50_takeoff_*` configs under 2026-07-13-fretish-sweeps
     // are exposed.
-    // See "Config vintage" in experiments/README.md before moving it again.
+    // See "Config vintage" in docs/dev/config-and-provenance.md before moving
+    // it again.
     expect_enum_key<SelectionScheme>(
         {"genetic",
          "selection_scheme",
@@ -236,7 +237,7 @@ TEST(test_config_io_enum_keys) {
     // key did not exist before 2026-08-11, so no archived config can state it,
     // and moving this back to Tiered silently re-reads every one of them under
     // a different status objective. See "Config vintage" in
-    // experiments/README.md.
+    // docs/dev/config-and-provenance.md.
     expect_enum_key<StatusGrading>({"fitness",
                                     "status_grading",
                                     &Config::status_grading,
@@ -256,7 +257,7 @@ TEST(test_config_io_enum_keys) {
                                         false});
     // Pinned because the default is what every archived config inherits. It
     // moved from Syntactic to Semantic on 2026-10-06; see "Config vintage" in
-    // experiments/README.md.
+    // docs/dev/config-and-provenance.md.
     expect_enum_key<KeywordSimilarity>(
         {"fitness",
          "keyword_similarity",

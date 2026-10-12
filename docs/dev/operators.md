@@ -49,7 +49,7 @@ The FRETISH arm applies this to the lowering as a three-entry table in `src/gene
 
 On TLSF the direction is a fair coin: a search that only weakens guarantees and strengthens assumptions cannot recover from an ancestor that overshot the ideal, and the arm's purpose is comparability. The FRETISH arm follows the requirement's mutation direction, as its timing, condition-type and scope arms do.
 
-The probability is read before the RNG is drawn, so at 0 the arm costs no draw. `test_zero_probability_costs_no_draw` (`test/tlsf/monotone_tests.cpp`) pins TLSF; `test_new_arms_cost_no_draw_at_zero` (`test/genetic/determinism_tests.cpp`) pins FRETISH by comparing rendered draw traces, since a replacement rewrite can draw equally often down another branch. `golden_config()` pins the key at 0, and the key is in the "Config vintage" note in `experiments/README.md`.
+The probability is read before the RNG is drawn, so at 0 the arm costs no draw. `test_zero_probability_costs_no_draw` (`test/tlsf/monotone_tests.cpp`) pins TLSF; `test_new_arms_cost_no_draw_at_zero` (`test/genetic/determinism_tests.cpp`) pins FRETISH by comparing rendered draw traces, since a replacement rewrite can draw equally often down another branch. `golden_config()` pins the key at 0, and the key is in the "Config vintage" note in `docs/dev/config-and-provenance.md`.
 
 `AddOperand` and `Constant`, the two rules sound at every node, are offered everywhere. Limiting `AddOperand` to `And` and `Or` would leave `Constant` as the only move at a literal, while every assumption-shaped ideal is a disjunction of literals. The connective comes from the direction, not the node kind.
 
@@ -65,7 +65,7 @@ The probability is read before the `RandomSource` is touched, so at 0 it costs n
 
 ## Assumption construction
 
-On both paths an appended assumption obliges an *input* literal, and only its guard may draw an output. An assumption obliging an output is one the system defeats by never raising its own signal, and well-separation passes the guarded form `G(<lit> -> F <output>)`, because an environment that never raises the guard satisfies it. A guard equal to the obliged literal is negated at no extra draw, which keeps the tautology `G(l -> F l)` out. With no input, nothing is appended: FRETISH skips the operator's draw, and TLSF can still clone. The FRETISH path (`add_assumption` in `src/genetic/mutation.cpp`) caught up with TLSF on 2026-09-24, which moved its draw stream; `experiments/README.md` records the break.
+On both paths an appended assumption obliges an *input* literal, and only its guard may draw an output. An assumption obliging an output is one the system defeats by never raising its own signal, and well-separation passes the guarded form `G(<lit> -> F <output>)`, because an environment that never raises the guard satisfies it. A guard equal to the obliged literal is negated at no extra draw, which keeps the tautology `G(l -> F l)` out. With no input, nothing is appended: FRETISH skips the operator's draw, and TLSF can still clone. The FRETISH path (`add_assumption` in `src/genetic/mutation.cpp`) caught up with TLSF on 2026-09-24, which moved its draw stream; `docs/dev/config-and-provenance.md` records the break.
 
 Two keys remain, each at a no-op default (campaign-armed value in brackets):
 
