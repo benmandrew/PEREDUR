@@ -1,0 +1,27 @@
+INFO {
+  TITLE:       "Two-client arbiter"
+  DESCRIPTION: "The paper's running example: mutual exclusion against two immediate grants"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+
+MAIN {
+  INPUTS {
+    r1;
+    r2;
+  }
+  OUTPUTS {
+    g1;
+    g2;
+  }
+  GUARANTEES {
+    // ME: the two clients are never granted together
+    G !(g1 && g2);
+
+    // R1: a request from client 1 is granted at once
+    G (r1 -> g1);
+
+    // R2: a request from client 2 is granted at once
+    G (r2 -> g2);
+  }
+}
