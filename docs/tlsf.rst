@@ -35,22 +35,25 @@ What the search finds
 
 .. code-block:: sh
 
-   peredur --input examples/lily02/spec.tlsf --output-dir out --seed 42
+   peredur --input examples/lily02/spec.tlsf --output-dir out --seed 42 --repair-summary
 
-That run reports ``Realizable specifications: 11 (3 maximal)`` and writes the three maximal repairs, in a few seconds on 20 threads. The seed fixes which repairs come out, not how long they take — that swings with how the external solvers get scheduled.
+That run reports ``Realizable specifications: 95 (26 maximal, 11 equivalent)`` and writes the 26 maximal repairs, in about 3 seconds on 20 threads. The seed fixes which repairs come out, not how long they take — that swings with how the external solvers get scheduled.
 
-All three carry the first two guarantees through unchanged — re-printed in the writer's fully parenthesised form, but the same formulae — and rewrite only the third:
+After the count, ``--repair-summary`` lists what each repair changed. A ``-`` line is a formula of the input that the repair dropped, and a ``+`` line is a formula it added, both in the writer's fully parenthesised form. The second and third blocks read:
 
 .. code-block:: text
 
-   original    G(cancel -> X (!grant U go))
-   repair_0    G((go & !req) -> X (grant U !grant))
-   repair_1    G((go & req)  -> X (!grant U grant))
-   repair_2    G(!go         -> X (grant U !grant))
+   repair_1.tlsf
+     GUARANTEE - G((cancel) -> (X((!(grant)) U (go))))
+     GUARANTEE + G(F(((cancel) && (!(grant))) U (grant)))
 
-None of them is the intended fix. Every one weakens the guarantee rather than strengthening the environment, and every one drops ``cancel`` from the specification altogether — which makes the obligation vacuous in exactly the case it was written for. They are genuine repairs by the definition the search is given: ``realize`` confirms all three. They are also a fair illustration of the limit of that definition. Reading down the output and checking what a repair gave up is the intended way to use it.
+   repair_2.tlsf
+     GUARANTEE - G((cancel) -> (X((!(grant)) U (go))))
+     GUARANTEE + G((req) -> (X(((req) || (cancel)) U (!(grant)))))
 
-The order the files are written in is the algorithm's own ranking, not descending fitness. Under either NSGA-II scheme that is Pareto rank followed by crowding distance, which is why the weighted scalars here run 0.941, 0.945, 0.950 — ascending. Only the ``weighted`` scheme sorts by the scalar. See :doc:`configuration`.
+Of the 26 repairs, 25 drop or rewrite the third guarantee. Six of those change nothing else, 14 also rewrite the first guarantee, and 4 also rewrite the second. Four repairs add an assumption, and none of the four is the intended fix. Every repair passes ``realize``, which is the definition of a repair that the search is given. Reading down the list and checking what each repair gave up is the intended way to use it.
+
+The order the files are written in is the algorithm's own ranking, not descending fitness. Under either NSGA-II scheme that is Pareto rank followed by crowding distance, which is why the weighted scalars of the first three repairs run 0.959, 0.969, 0.967. Only the ``weighted`` scheme sorts by the scalar. See :doc:`configuration`.
 
 The assumption-adding move that would have found the intended fix is controlled by ``p_add_assumption``, shared with FRETISH mode; ``[tlsf.mutation]`` tunes the TLSF-specific operators. Both are described in :doc:`configuration`.
 
@@ -67,7 +70,7 @@ The ``mucs`` tool prints that core, and nothing else:
    core: 1 of 3 guarantee-side formulae
    [GUARANTEE] G((cancel) -> (X((!(grant)) U (go))))
 
-The core is the third guarantee alone — the same formula all three repairs chose to rewrite, arrived at by a different route. Where the search discovers it by trying edits and keeping what works, the extractor proves it by elimination, in a handful of synthesis calls rather than a population.
+The core is the third guarantee alone — the formula that 25 of the 26 repairs rewrite, arrived at by a different route. Where the search discovers it by trying edits and keeping what works, the extractor proves it by elimination, in a handful of synthesis calls rather than a population.
 
 The environment side is held fixed in every query. Relaxing an assumption can only make synthesis harder, so it can never be part of a core. That leaves unrealisability monotone in the guarantee-side set: adding a system obligation can never restore realisability. Monotonicity is what makes a minimal unrealisable subset well defined, and what lets the extractor use *QuickXplain* (Junker 2004), at ``O(k log(n/k))`` synthesis calls for a core of size ``k`` out of ``n`` formulae. On an already-realisable input ``mucs`` prints ``REALIZABLE (no core)``. It is TLSF-only; FRETISH input is not supported.
 
