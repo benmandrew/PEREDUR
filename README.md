@@ -1,6 +1,6 @@
 # PEREDUR
 
-![Coverage](docs/coverage.svg)
+[![Docker image](https://img.shields.io/badge/docker-benmandrew%2Fperedur-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/benmandrew/peredur) ![Coverage](docs/coverage.svg)
 
 PEREDUR repairs unrealisable reactive specifications with a multi-objective genetic algorithm.
 
