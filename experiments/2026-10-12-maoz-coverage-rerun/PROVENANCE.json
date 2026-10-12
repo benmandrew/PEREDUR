@@ -1,0 +1,877 @@
+{
+  "campaign": "2026-10-12-maoz-coverage-rerun",
+  "attribution": "recorded",
+  "generated_on": "2026-10-12",
+  "status": "closed",
+  "kind": "score-only: 2026-10-05-maoz-coverage repeated with the PEREDUR pool built from 2026-10-07-tlsf-rerun's final frontiers",
+  "kind_note": "No search ran here. The tool side is the adapted tree of 2026-10-02-maoz-baselines that keeps the G on safety assumptions written to REQUIRE (experiments/results-maoz-baselines-gfix, adapter at 1b8073c), the tree the re-score of 2026-10-12 read. Passes and budgets are 2026-10-05-maoz-coverage's. Registration is section 11 of experiments/2026-10-02-maoz-baselines/PLAN.md.",
+  "supersedes": "2026-10-05-maoz-coverage and its re-score of 2026-10-12, for the paper's GR(1) table. Neither is altered.",
+  "profile_commit": {
+    "sha": "626460b7f21ff99ff2327d2514fd0209d25a18cf",
+    "short": "626460b",
+    "subject": "feat(experiments): declare 2026-10-12-maoz-coverage-rerun",
+    "branch": "campaign/maoz-coverage-rerun",
+    "queue_entries": {
+      "av2": "059-2026-10-12-maoz-coverage-rerun at 626460b, 0 failed attempts",
+      "av3": "061-2026-10-12-maoz-coverage-rerun at 626460b, state done, 0 failed attempts"
+    },
+    "reachable_from_main": false,
+    "held_by_tag": "provenance/maoz-coverage-rerun",
+    "note": "Each host's tick staged this sha itself and built it; every solver pass's binary reports this commit with dirty 0. src/ is unchanged from 1b8073c, the parent."
+  },
+  "binary_commit": "626460b7f21ff99ff2327d2514fd0209d25a18cf",
+  "launch": {
+    "enqueued": "2026-10-12T17:50:50+01:00",
+    "first_tick": "2026-10-12T17:55",
+    "hosts": {
+      "av2": "seed 0, humanoid-742",
+      "av3": "seed 1, the other nine subjects"
+    },
+    "seed_note": "The seed names a host's share and no pass reads it. maoz_score.py accepted seed 0 alone before 626460b.",
+    "window_source": "The score manifests under each out directory's av2/ and av3/, and the two queue logs beside this file."
+  },
+  "pool": {
+    "out": "experiments/maoz-peredur-pool-tlsf-rerun",
+    "built_on": "local host 'ben', 2026-10-12T17:48:51+01:00, rsynced to av2 and av3 before the enqueue; pool.tsv md5 matched on both",
+    "arm": "sweep_G_mrs_nsga2-apportion_wkoff_log",
+    "sources": {
+      "curves": "curves-tlsf-rerun/{av1,av2,av3} (2026-10-07-tlsf-rerun-scoring), in the campaign/tlsf-rerun worktree",
+      "curves_rescored": "curves-tlsf-rerun-rescore/{av1,av2,av3} (2026-10-09-tlsf-rerun-rescore), in the campaign/tlsf-rerun-rescore worktree; read in place of the original sidecar for the runs it holds",
+      "rerun": "experiments/results-tlsf-rerun (2026-10-07-tlsf-rerun)"
+    },
+    "argv": "scripts/maoz_score.py --pass pool --out experiments/maoz-peredur-pool-tlsf-rerun --curves /home/y19056ba/projects/counter-wt/tlsf-rerun/experiments/curves-tlsf-rerun --curves-rescored /home/y19056ba/projects/counter-wt/tlsf-rescore/experiments/curves-tlsf-rerun-rescore --rerun /home/y19056ba/projects/counter-wt/tlsf-rerun/experiments/results-tlsf-rerun --allow-stale-binary",
+    "counts": {
+      "planned": 300,
+      "done": 300,
+      "frontier_rows": 9275,
+      "unique": 9168,
+      "unique_per_spec": {
+        "rg1": 807,
+        "rg2": 531,
+        "lift": 468,
+        "gyro-var1": 737,
+        "gyro-var2": 721,
+        "humanoid-458": 731,
+        "humanoid-503": 849,
+        "humanoid-531": 1462,
+        "humanoid-742": 2211,
+        "pcar-v2-888": 651
+      },
+      "rescored_runs": 11
+    },
+    "rebuild_check": "The manifest names 1b8073c because the build ran maoz_score.py before its change was committed. The pool was rebuilt at 626460b from the same sources on 2026-10-12, and diff -r against the shipped pool found no difference outside the manifest."
+  },
+  "budgets": {
+    "jobs": 16,
+    "realize_timeout": 600,
+    "wellsep_timeout": 60,
+    "maximal_timeout": 20,
+    "maximal_wall_s": 14400,
+    "chunk_size": 50,
+    "chunk_timeout": 900,
+    "pair_timeout": 120,
+    "cores": 1
+  },
+  "passes": {
+    "screen-av2": {
+      "hostname": "avlab12",
+      "out": "experiments/maoz-coverage-rerun-screen",
+      "specs": [
+        "humanoid-742"
+      ],
+      "seeds": [
+        0
+      ],
+      "started": "2026-10-12T17:56:44+01:00",
+      "finished": "2026-10-12T17:56:44+01:00",
+      "wall_s": 0.1,
+      "binaries": {
+        "realize": {
+          "path": "/home/benandrew/projects/counter/build-release/realize",
+          "commit": "626460b7f21ff99ff2327d2514fd0209d25a18cf",
+          "commit_short": "626460b",
+          "dirty": "0"
+        },
+        "ltlsynt": {
+          "path": "/home/benandrew/projects/counter/build-release/third_party/spot/bin/ltlsynt",
+          "version": "/home/benandrew/projects/counter/build-release/third_party/spot/bin/ltlsynt (spot) 2.15.1"
+        }
+      },
+      "counts": {
+        "planned": 4,
+        "done": 4,
+        "already": 0,
+        "admissible": {
+          "no": 3,
+          "yes": 1
+        }
+      },
+      "python_version": "3.12.3",
+      "allow_stale_binary": false,
+      "argv": "scripts/maoz_score.py --pass screen --out experiments/maoz-coverage-rerun-screen --results experiments/results-maoz-baselines-gfix --jobs 16 --realize-timeout 600 --wellsep-timeout 60 --maximal-timeout 20 --maximal-wall-s 14400 --chunk-size 50 --chunk-timeout 900 --pair-timeout 120 --cores 1 --specs humanoid-742 --seeds 0"
+    },
+    "screen-av3": {
+      "hostname": "av3",
+      "out": "experiments/maoz-coverage-rerun-screen",
+      "specs": [
+        "rg1",
+        "rg2",
+        "lift",
+        "gyro-var1",
+        "gyro-var2",
+        "humanoid-458",
+        "humanoid-503",
+        "humanoid-531",
+        "pcar-v2-888"
+      ],
+      "seeds": [
+        1
+      ],
+      "started": "2026-10-12T18:10:01+01:00",
+      "finished": "2026-10-12T18:10:05+01:00",
+      "wall_s": 4.0,
+      "binaries": {
+        "realize": {
+          "path": "/home/benandrew/projects/counter/build-release/realize",
+          "commit": "626460b7f21ff99ff2327d2514fd0209d25a18cf",
+          "commit_short": "626460b",
+          "dirty": "0"
+        },
+        "ltlsynt": {
+          "path": "/home/benandrew/projects/counter/build-release/third_party/spot/bin/ltlsynt",
+          "version": "/home/benandrew/projects/counter/build-release/third_party/spot/bin/ltlsynt (spot) 2.15.1"
+        }
+      },
+      "counts": {
+        "planned": 1648,
+        "done": 1648,
+        "already": 0,
+        "admissible": {
+          "yes": 1458,
+          "no": 190
+        }
+      },
+      "python_version": "3.12.3",
+      "allow_stale_binary": false,
+      "argv": "scripts/maoz_score.py --pass screen --out experiments/maoz-coverage-rerun-screen --results experiments/results-maoz-baselines-gfix --jobs 16 --realize-timeout 600 --wellsep-timeout 60 --maximal-timeout 20 --maximal-wall-s 14400 --chunk-size 50 --chunk-timeout 900 --pair-timeout 120 --cores 1 --specs rg1 rg2 lift gyro-var1 gyro-var2 humanoid-458 humanoid-503 humanoid-531 pcar-v2-888 --seeds 1"
+    },
+    "frontier-av2": {
+      "hostname": "avlab12",
+      "out": "experiments/maoz-coverage-rerun-frontier",
+      "specs": [
+        "humanoid-742"
+      ],
+      "seeds": [
+        0
+      ],
+      "started": "2026-10-12T18:00:02+01:00",
+      "finished": "2026-10-12T18:00:02+01:00",
+      "wall_s": 0.0,
+      "binaries": {
+        "maximal": {
+          "path": "/home/benandrew/projects/counter/build-release/maximal",
+          "commit": "626460b7f21ff99ff2327d2514fd0209d25a18cf",
+          "commit_short": "626460b",
+          "dirty": "0"
+        }
+      },
+      "counts": {
+        "planned": 3,
+        "done": 3,
+        "failed": 0,
+        "representatives": 1
+      },
+      "python_version": "3.12.3",
+      "allow_stale_binary": false,
+      "argv": "scripts/maoz_score.py --pass frontier --out experiments/maoz-coverage-rerun-frontier --results experiments/results-maoz-baselines-gfix --screen experiments/maoz-coverage-rerun-screen --jobs 16 --realize-timeout 600 --wellsep-timeout 60 --maximal-timeout 20 --maximal-wall-s 14400 --chunk-size 50 --chunk-timeout 900 --pair-timeout 120 --cores 1 --specs humanoid-742 --seeds 0"
+    },
+    "frontier-av3": {
+      "hostname": "av3",
+      "out": "experiments/maoz-coverage-rerun-frontier",
+      "specs": [
+        "rg1",
+        "rg2",
+        "lift",
+        "gyro-var1",
+        "gyro-var2",
+        "humanoid-458",
+        "humanoid-503",
+        "humanoid-531",
+        "pcar-v2-888"
+      ],
+      "seeds": [
+        1
+      ],
+      "started": "2026-10-12T18:15:01+01:00",
+      "finished": "2026-10-12T18:15:16+01:00",
+      "wall_s": 14.5,
+      "binaries": {
+        "maximal": {
+          "path": "/home/benandrew/projects/counter/build-release/maximal",
+          "commit": "626460b7f21ff99ff2327d2514fd0209d25a18cf",
+          "commit_short": "626460b",
+          "dirty": "0"
+        }
+      },
+      "counts": {
+        "planned": 27,
+        "done": 27,
+        "failed": 0,
+        "representatives": 54
+      },
+      "python_version": "3.12.3",
+      "allow_stale_binary": false,
+      "argv": "scripts/maoz_score.py --pass frontier --out experiments/maoz-coverage-rerun-frontier --results experiments/results-maoz-baselines-gfix --screen experiments/maoz-coverage-rerun-screen --jobs 16 --realize-timeout 600 --wellsep-timeout 60 --maximal-timeout 20 --maximal-wall-s 14400 --chunk-size 50 --chunk-timeout 900 --pair-timeout 120 --cores 1 --specs rg1 rg2 lift gyro-var1 gyro-var2 humanoid-458 humanoid-503 humanoid-531 pcar-v2-888 --seeds 1"
+    },
+    "coverage-av2": {
+      "hostname": "avlab12",
+      "out": "experiments/maoz-coverage-rerun-relations",
+      "specs": [
+        "humanoid-742"
+      ],
+      "seeds": [
+        0
+      ],
+      "started": "2026-10-12T18:05:01+01:00",
+      "finished": "2026-10-12T18:32:50+01:00",
+      "wall_s": 1669.0,
+      "binaries": {
+        "compare": {
+          "path": "/home/benandrew/projects/counter/build-release/compare",
+          "commit": "626460b7f21ff99ff2327d2514fd0209d25a18cf",
+          "commit_short": "626460b",
+          "dirty": "0"
+        }
+      },
+      "counts": {
+        "planned": 2211,
+        "done": 2211,
+        "units": 45,
+        "relations": {
+          "undecided": 192,
+          "incomparable": 2019
+        }
+      },
+      "python_version": "3.12.3",
+      "allow_stale_binary": false,
+      "argv": "scripts/maoz_score.py --pass coverage --out experiments/maoz-coverage-rerun-relations --results experiments/results-maoz-baselines-gfix --pool experiments/maoz-peredur-pool-tlsf-rerun --frontier experiments/maoz-coverage-rerun-frontier --jobs 16 --realize-timeout 600 --wellsep-timeout 60 --maximal-timeout 20 --maximal-wall-s 14400 --chunk-size 50 --chunk-timeout 900 --pair-timeout 120 --cores 1 --specs humanoid-742 --seeds 0"
+    },
+    "coverage-av3": {
+      "hostname": "av3",
+      "out": "experiments/maoz-coverage-rerun-relations",
+      "specs": [
+        "rg1",
+        "rg2",
+        "lift",
+        "gyro-var1",
+        "gyro-var2",
+        "humanoid-458",
+        "humanoid-503",
+        "humanoid-531",
+        "pcar-v2-888"
+      ],
+      "seeds": [
+        1
+      ],
+      "started": "2026-10-12T18:20:01+01:00",
+      "finished": "2026-10-12T18:23:27+01:00",
+      "wall_s": 206.2,
+      "binaries": {
+        "compare": {
+          "path": "/home/benandrew/projects/counter/build-release/compare",
+          "commit": "626460b7f21ff99ff2327d2514fd0209d25a18cf",
+          "commit_short": "626460b",
+          "dirty": "0"
+        }
+      },
+      "counts": {
+        "planned": 36809,
+        "done": 36809,
+        "units": 771,
+        "relations": {
+          "incomparable": 35813,
+          "stronger": 782,
+          "equivalent": 5,
+          "weaker": 206,
+          "undecided": 3
+        }
+      },
+      "python_version": "3.12.3",
+      "allow_stale_binary": false,
+      "argv": "scripts/maoz_score.py --pass coverage --out experiments/maoz-coverage-rerun-relations --results experiments/results-maoz-baselines-gfix --pool experiments/maoz-peredur-pool-tlsf-rerun --frontier experiments/maoz-coverage-rerun-frontier --jobs 16 --realize-timeout 600 --wellsep-timeout 60 --maximal-timeout 20 --maximal-wall-s 14400 --chunk-size 50 --chunk-timeout 900 --pair-timeout 120 --cores 1 --specs rg1 rg2 lift gyro-var1 gyro-var2 humanoid-458 humanoid-503 humanoid-531 pcar-v2-888 --seeds 1"
+    },
+    "report-local": {
+      "hostname": "ben",
+      "out": "experiments/maoz-coverage-rerun-report",
+      "started": "2026-10-12T18:33:28+01:00",
+      "finished": "2026-10-12T18:33:44+01:00",
+      "wall_s": 16.0,
+      "counts": {
+        "planned": 30,
+        "done": 30
+      },
+      "python_version": "3.10.12",
+      "allow_stale_binary": true,
+      "argv": "scripts/maoz_score.py --pass report --out experiments/maoz-coverage-rerun-report --results experiments/results-maoz-baselines-gfix --pool experiments/maoz-peredur-pool-tlsf-rerun --screen experiments/maoz-coverage-rerun-screen --frontier experiments/maoz-coverage-rerun-frontier --coverage experiments/maoz-coverage-rerun-relations --maoz-out experiments/maoz-baselines-out --allow-stale-binary"
+    }
+  },
+  "join": "Each host's screen.csv, frontier.csv, frontier-summary.csv, relations.csv and timings.csv were copied into <out>/<host>/ and concatenated under one header into <out>/, av2 first. The subjects are disjoint between hosts, and no data row repeats. The joined files end lines with LF where the hosts' end them with CRLF.",
+  "results": {
+    "screen": {
+      "tool_repairs": 1652,
+      "admissible": 1459,
+      "rejected": 193,
+      "note": "The counts of 2026-10-05-maoz-coverage's re-score."
+    },
+    "frontier": {
+      "cells": 30,
+      "representatives": 55,
+      "failed": 0
+    },
+    "coverage": {
+      "pairs": 39020,
+      "relations": {
+        "undecided": 195,
+        "incomparable": 37832,
+        "stronger": 782,
+        "equivalent": 5,
+        "weaker": 206
+      },
+      "units": 816,
+      "pair_reruns": 0,
+      "undecided_by_spec": {
+        "humanoid-742": 192,
+        "humanoid-503": 3
+      }
+    },
+    "outcome_counts": {
+      "3": 13,
+      "1": 9,
+      "covered": 6,
+      "undetermined": 2
+    },
+    "cells": [
+      {
+        "tool": "glass",
+        "spec": "rg1",
+        "outcome": "3",
+        "n_repairs": "1",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "807",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "glass",
+        "spec": "rg2",
+        "outcome": "3",
+        "n_repairs": "1",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "531",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "glass",
+        "spec": "lift",
+        "outcome": "1",
+        "n_repairs": "1",
+        "n_admissible": "1",
+        "n_frontier": "1",
+        "n_pool": "468",
+        "n_pairs": "468",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.0",
+        "coverage_per_run_lenient": "0.0",
+        "converse_per_run_strict": "0.9304",
+        "converse_per_run_lenient": "0.9304",
+        "reason": "covered by no run: spec0.tlsf"
+      },
+      {
+        "tool": "glass",
+        "spec": "gyro-var1",
+        "outcome": "3",
+        "n_repairs": "1",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "737",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "glass",
+        "spec": "gyro-var2",
+        "outcome": "covered",
+        "n_repairs": "1",
+        "n_admissible": "1",
+        "n_frontier": "1",
+        "n_pool": "721",
+        "n_pairs": "721",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "1.0",
+        "coverage_per_run_lenient": "1.0",
+        "converse_per_run_strict": "1.0",
+        "converse_per_run_lenient": "1.0",
+        "reason": "every frontier repair covered by the pool"
+      },
+      {
+        "tool": "glass",
+        "spec": "humanoid-458",
+        "outcome": "1",
+        "n_repairs": "1",
+        "n_admissible": "1",
+        "n_frontier": "1",
+        "n_pool": "731",
+        "n_pairs": "731",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.0",
+        "coverage_per_run_lenient": "0.0",
+        "converse_per_run_strict": "1.0",
+        "converse_per_run_lenient": "1.0",
+        "reason": "covered by no run: spec0.tlsf"
+      },
+      {
+        "tool": "glass",
+        "spec": "humanoid-503",
+        "outcome": "undetermined",
+        "n_repairs": "1",
+        "n_admissible": "1",
+        "n_frontier": "1",
+        "n_pool": "849",
+        "n_pairs": "849",
+        "undecided_share": "0.0035",
+        "coverage_per_run_strict": "0.0",
+        "coverage_per_run_lenient": "0.1",
+        "converse_per_run_strict": "0.9909",
+        "converse_per_run_lenient": "0.9871",
+        "reason": "covered only if undecided pairs cover: spec0.tlsf"
+      },
+      {
+        "tool": "glass",
+        "spec": "humanoid-531",
+        "outcome": "3",
+        "n_repairs": "1",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "1462",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "glass",
+        "spec": "humanoid-742",
+        "outcome": "3",
+        "n_repairs": "1",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "2211",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "glass",
+        "spec": "pcar-v2-888",
+        "outcome": "3",
+        "n_repairs": "1",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "651",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "not well-separated 1"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "rg1",
+        "outcome": "1",
+        "n_repairs": "49",
+        "n_admissible": "45",
+        "n_frontier": "15",
+        "n_pool": "807",
+        "n_pairs": "12105",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.0044",
+        "coverage_per_run_lenient": "0.0044",
+        "converse_per_run_strict": "0.9924",
+        "converse_per_run_lenient": "0.9924",
+        "reason": "covered by no run: spec1.tlsf spec12.tlsf spec13.tlsf spec19.tlsf spec2.tlsf spec20.tlsf spec21.tlsf spec27.tlsf spec30.tlsf spec33.tlsf spec34.tlsf spec40.tlsf spec48.tlsf"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "rg2",
+        "outcome": "1",
+        "n_repairs": "12",
+        "n_admissible": "12",
+        "n_frontier": "3",
+        "n_pool": "531",
+        "n_pairs": "1593",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.0444",
+        "coverage_per_run_lenient": "0.0444",
+        "converse_per_run_strict": "0.9726",
+        "converse_per_run_lenient": "0.9726",
+        "reason": "covered by no run: spec4.tlsf"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "lift",
+        "outcome": "1",
+        "n_repairs": "221",
+        "n_admissible": "195",
+        "n_frontier": "11",
+        "n_pool": "468",
+        "n_pairs": "5148",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.0",
+        "coverage_per_run_lenient": "0.0",
+        "converse_per_run_strict": "0.8886",
+        "converse_per_run_lenient": "0.8886",
+        "reason": "covered by no run: spec14.tlsf spec160.tlsf spec161.tlsf spec162.tlsf spec18.tlsf spec217.tlsf spec22.tlsf spec23.tlsf spec7.tlsf spec8.tlsf spec9.tlsf"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "gyro-var1",
+        "outcome": "1",
+        "n_repairs": "7",
+        "n_admissible": "6",
+        "n_frontier": "2",
+        "n_pool": "737",
+        "n_pairs": "1474",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.0667",
+        "coverage_per_run_lenient": "0.0667",
+        "converse_per_run_strict": "0.9903",
+        "converse_per_run_lenient": "0.9903",
+        "reason": "covered by no run: spec5.tlsf"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "gyro-var2",
+        "outcome": "covered",
+        "n_repairs": "12",
+        "n_admissible": "6",
+        "n_frontier": "2",
+        "n_pool": "721",
+        "n_pairs": "1442",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.6667",
+        "coverage_per_run_lenient": "0.6667",
+        "converse_per_run_strict": "1.0",
+        "converse_per_run_lenient": "1.0",
+        "reason": "every frontier repair covered by the pool"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "humanoid-458",
+        "outcome": "covered",
+        "n_repairs": "1",
+        "n_admissible": "1",
+        "n_frontier": "1",
+        "n_pool": "731",
+        "n_pairs": "731",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "1.0",
+        "coverage_per_run_lenient": "1.0",
+        "converse_per_run_strict": "1.0",
+        "converse_per_run_lenient": "1.0",
+        "reason": "every frontier repair covered by the pool"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "humanoid-503",
+        "outcome": "3",
+        "n_repairs": "0",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "849",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "killed with none printed"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "humanoid-531",
+        "outcome": "3",
+        "n_repairs": "13",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "1462",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "not well-separated 13"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "humanoid-742",
+        "outcome": "undetermined",
+        "n_repairs": "3",
+        "n_admissible": "1",
+        "n_frontier": "1",
+        "n_pool": "2211",
+        "n_pairs": "2211",
+        "undecided_share": "0.0868",
+        "coverage_per_run_strict": "0.0",
+        "coverage_per_run_lenient": "1.0",
+        "converse_per_run_strict": "1.0",
+        "converse_per_run_lenient": "0.9165",
+        "reason": "covered only if undecided pairs cover: spec0.tlsf"
+      },
+      {
+        "tool": "jvts-repair",
+        "spec": "pcar-v2-888",
+        "outcome": "3",
+        "n_repairs": "135",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "651",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "not well-separated 135"
+      },
+      {
+        "tool": "amt13",
+        "spec": "rg1",
+        "outcome": "1",
+        "n_repairs": "1000",
+        "n_admissible": "1000",
+        "n_frontier": "7",
+        "n_pool": "807",
+        "n_pairs": "5649",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.0",
+        "coverage_per_run_lenient": "0.0",
+        "converse_per_run_strict": "0.999",
+        "converse_per_run_lenient": "0.999",
+        "reason": "covered by no run: spec160.tlsf spec18.tlsf spec203.tlsf spec319.tlsf spec320.tlsf spec37.tlsf spec387.tlsf"
+      },
+      {
+        "tool": "amt13",
+        "spec": "rg2",
+        "outcome": "1",
+        "n_repairs": "37",
+        "n_admissible": "37",
+        "n_frontier": "2",
+        "n_pool": "531",
+        "n_pairs": "1062",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.4",
+        "coverage_per_run_lenient": "0.4",
+        "converse_per_run_strict": "0.9777",
+        "converse_per_run_lenient": "0.9777",
+        "reason": "covered by no run: spec21.tlsf"
+      },
+      {
+        "tool": "amt13",
+        "spec": "lift",
+        "outcome": "1",
+        "n_repairs": "2",
+        "n_admissible": "2",
+        "n_frontier": "1",
+        "n_pool": "468",
+        "n_pairs": "468",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.0",
+        "coverage_per_run_lenient": "0.0",
+        "converse_per_run_strict": "0.895",
+        "converse_per_run_lenient": "0.895",
+        "reason": "covered by no run: spec0.tlsf"
+      },
+      {
+        "tool": "amt13",
+        "spec": "gyro-var1",
+        "outcome": "covered",
+        "n_repairs": "114",
+        "n_admissible": "114",
+        "n_frontier": "2",
+        "n_pool": "737",
+        "n_pairs": "1474",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.4333",
+        "coverage_per_run_lenient": "0.4333",
+        "converse_per_run_strict": "0.9929",
+        "converse_per_run_lenient": "0.9929",
+        "reason": "every frontier repair covered by the pool"
+      },
+      {
+        "tool": "amt13",
+        "spec": "gyro-var2",
+        "outcome": "covered",
+        "n_repairs": "35",
+        "n_admissible": "35",
+        "n_frontier": "3",
+        "n_pool": "721",
+        "n_pairs": "2163",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "0.5444",
+        "coverage_per_run_lenient": "0.5444",
+        "converse_per_run_strict": "1.0",
+        "converse_per_run_lenient": "1.0",
+        "reason": "every frontier repair covered by the pool"
+      },
+      {
+        "tool": "amt13",
+        "spec": "humanoid-458",
+        "outcome": "covered",
+        "n_repairs": "1",
+        "n_admissible": "1",
+        "n_frontier": "1",
+        "n_pool": "731",
+        "n_pairs": "731",
+        "undecided_share": "0.0",
+        "coverage_per_run_strict": "1.0",
+        "coverage_per_run_lenient": "1.0",
+        "converse_per_run_strict": "1.0",
+        "converse_per_run_lenient": "1.0",
+        "reason": "every frontier repair covered by the pool"
+      },
+      {
+        "tool": "amt13",
+        "spec": "humanoid-503",
+        "outcome": "3",
+        "n_repairs": "0",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "849",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "crashed with none printed (exit 1)"
+      },
+      {
+        "tool": "amt13",
+        "spec": "humanoid-531",
+        "outcome": "3",
+        "n_repairs": "0",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "1462",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "crashed with none printed (exit 1)"
+      },
+      {
+        "tool": "amt13",
+        "spec": "humanoid-742",
+        "outcome": "3",
+        "n_repairs": "0",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "2211",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "crashed with none printed (exit 1)"
+      },
+      {
+        "tool": "amt13",
+        "spec": "pcar-v2-888",
+        "outcome": "3",
+        "n_repairs": "0",
+        "n_admissible": "0",
+        "n_frontier": "0",
+        "n_pool": "651",
+        "n_pairs": "0",
+        "undecided_share": "",
+        "coverage_per_run_strict": "",
+        "coverage_per_run_lenient": "",
+        "converse_per_run_strict": "",
+        "converse_per_run_lenient": "",
+        "reason": "crashed with none printed (exit 1)"
+      }
+    ]
+  },
+  "decision": "Outcome 1 (section 11.5), under both readings of undecided pairs, as in 2026-10-05-maoz-coverage.",
+  "decision_note": "Every cell's outcome is the one 2026-10-05-maoz-coverage's re-score gave: 9 cells with a tool frontier repair that no PEREDUR run covers, 6 covered in full, 2 undetermined (GLASS on humanoid-503, JVTS-Repair on humanoid-742) and 13 with no admissible repair. Within the cells, JVTS-Repair on rg1 has 13 of 15 frontier repairs uncovered where it had 15 (spec6 and spec46 are now covered), and JVTS-Repair on lift has 11 of 11 uncovered under both readings where the lenient reading had 7. Pairs fall from 39,034 to 39,020 and undecided pairs from 230 to 195.",
+  "files": {
+    "PLAN.md": "What changes against 2026-10-05-maoz-coverage, the pool and the host split.",
+    "campaign.toml": "The declaration the queue ran.",
+    "PROVENANCE.json": "This file.",
+    "scripts/": "Vendored scripts at 626460b, blob shas below.",
+    "059-…log, 061-…log": "The queue entries' logs from av2 and av3. Untracked.",
+    "../maoz-coverage-rerun-{screen,frontier,relations,report}/": "The passes' outputs, joined, with each host's half under av2/ and av3/. Untracked; md5s below.",
+    "../maoz-peredur-pool-tlsf-rerun/": "The PEREDUR pool, 9,168 TLSF files. Untracked."
+  },
+  "output_md5": {
+    "maoz-coverage-rerun-screen/screen.csv": "11e4fd87d5828b6ed9602100e40e66aa",
+    "maoz-coverage-rerun-frontier/frontier.csv": "1cdecdd67d541ecb8838718865e387b7",
+    "maoz-coverage-rerun-frontier/frontier-summary.csv": "dc71da339d6a116217a1bff6665f1939",
+    "maoz-coverage-rerun-relations/relations.csv": "c178714ee766aee0c8459dff7ec14c79",
+    "maoz-coverage-rerun-relations/timings.csv": "4818d8ce8fdb78d8396dea2fc28e0660",
+    "maoz-coverage-rerun-report/report.csv": "2bcc3638f6dc7c470111bae1c8c001d0",
+    "maoz-coverage-rerun-report/report.txt": "c04e9d68f6bb17962897b09026f56a6d",
+    "maoz-peredur-pool-tlsf-rerun/pool.tsv": "2c0e8a393ef9ef6d078a552906ced2a8",
+    "maoz-peredur-pool-tlsf-rerun/runs.tsv": "59cc05d099fdbe5483a993e423207642",
+    "maoz-coverage-rerun-frontier/av2/frontier-summary.csv": "55bb6cb27109acae37574828dc6c7725",
+    "maoz-coverage-rerun-frontier/av2/frontier.csv": "abe1fca5b675bd2d550f8e92aa56fe44",
+    "maoz-coverage-rerun-frontier/av3/frontier-summary.csv": "b73642f26f42b06fde89986603901a75",
+    "maoz-coverage-rerun-frontier/av3/frontier.csv": "6364c770b10b5c00975813724434972b",
+    "maoz-coverage-rerun-relations/av2/relations.csv": "e7aa227dd0e07fa65b58297ea3c7c1aa",
+    "maoz-coverage-rerun-relations/av2/timings.csv": "c7599f908dd3bf19b8ae14b4abe5ef97",
+    "maoz-coverage-rerun-relations/av3/relations.csv": "35f84d9859d912f79fc4bdaf8b76172a",
+    "maoz-coverage-rerun-relations/av3/timings.csv": "2a8ed24b10d2fcf1f8fa002b0eb2cb41",
+    "maoz-coverage-rerun-screen/av2/screen.csv": "abf5178aeb51b93a4306db0665da53eb",
+    "maoz-coverage-rerun-screen/av3/screen.csv": "f6d957777f15c5ec3cc9c818e485b177"
+  },
+  "vendored_scripts": {
+    "vendored_on": "2026-10-12",
+    "source_commit": "626460b",
+    "files": {
+      "maoz_score.py": "4b52f7bbc2cae285f67ff3a01246102fc72980f1",
+      "campaign.py": "f41278e4a98677b0a09b0f25734a982db030ca3e",
+      "check_well_separated.py": "de9b6687b3bfd0f693812377360b3f8532abebb8"
+    }
+  }
+}
