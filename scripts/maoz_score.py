@@ -364,21 +364,30 @@ def frontier_files(members: Path) -> tuple[float | None, list[str]]:
 
 def pass_pool(args, out: Path, manifest: Manifest) -> int:
     curves = resolve(args.curves)
+    rescored = resolve(args.curves_rescored) if args.curves_rescored else None
     rerun = resolve(args.rerun)
+    n_rescored = 0
     pool_rows, run_rows = [], []
     written: dict = {}
     manifest.data.update({"curves": str(curves), "rerun": str(rerun),
+                          "curves_rescored": rescored and str(rescored),
                           "arm": ARM})
     manifest.data["counts"]["planned"] = len(args.specs) * N_RUNS
     manifest.write()
     for spec in args.specs:
         for seed in range(N_RUNS):
             run = f"{ARM}_{spec}_seed{seed:02d}"
-            found = [(h, curves / h / f"{run}.members.tsv")
-                     for h in ("av2", "av3")]
-            found = [(h, p) for h, p in found if p.exists()]
+            # A re-scored run's sidecar replaces the one it re-scored.
+            found = []
+            for root in filter(None, (rescored, curves)):
+                found = [(h.name, h / f"{run}.members.tsv")
+                         for h in sorted(root.iterdir()) if h.is_dir()]
+                found = [(h, p) for h, p in found if p.exists()]
+                if found:
+                    n_rescored += root == rescored
+                    break
             if not found:
-                sys.exit(f"no sidecar for {run} under {curves}/{{av2,av3}}")
+                sys.exit(f"no sidecar for {run} under {curves}/<host>")
             sides = {h: frontier_files(p) for h, p in found}
             if len({json.dumps(v) for v in sides.values()}) > 1:
                 sys.exit(f"{run}: the two hosts' sidecars disagree")
@@ -415,7 +424,7 @@ def pass_pool(args, out: Path, manifest: Manifest) -> int:
     per_spec = {s: sum(1 for (sp, _) in written if sp == s)
                 for s in args.specs}
     manifest.finish(frontier_rows=len(pool_rows), unique=len(written),
-                    unique_per_spec=per_spec)
+                    unique_per_spec=per_spec, rescored_runs=n_rescored)
     print(f"pool: {len(pool_rows)} frontier rows over {len(run_rows)} runs, "
           f"{len(written)} unique repairs")
     for spec, n in per_spec.items():
@@ -1051,6 +1060,10 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--curves", default=str(DEFAULT_CURVES),
                         metavar="DIR", help="pool: the paper re-run's curves "
                         "directory, holding av2/ and av3/")
+    parser.add_argument("--curves-rescored", metavar="DIR",
+                        help="pool: a re-score's <host>/<run>.members.tsv "
+                        "sidecars, read in place of --curves's for the runs "
+                        "it holds")
     parser.add_argument("--rerun", default=str(DEFAULT_RERUN), metavar="DIR",
                         help="pool: the paper re-run's results directory")
     parser.add_argument("--specs", nargs="+", default=list(SUBJECTS),
@@ -1059,15 +1072,16 @@ def parse_args(argv=None) -> argparse.Namespace:
                         choices=list(TOOLS), metavar="TOOL")
     parser.add_argument("--seeds", nargs="+", type=int, default=[0],
                         metavar="N", help="accepted from campaign.py; the "
-                        "tools are deterministic, so only seed 0")
+                        "tools are deterministic, so one seed, which "
+                        "names the host's share and nothing reads")
     for key, value in DEFAULTS.items():
         parser.add_argument(f"--{key.replace('_', '-')}", type=int,
                             default=value, metavar="N",
                             help=f"(default: {value})")
     parser.add_argument("--allow-stale-binary", action="store_true")
     args = parser.parse_args(argv)
-    if args.seeds != [0]:
-        parser.error("the tools are deterministic: declare seed 0 only")
+    if len(args.seeds) != 1:
+        parser.error("the tools are deterministic: declare one seed a host")
     if min(getattr(args, k) for k in DEFAULTS) < 1:
         parser.error("every budget must be a positive integer")
     need = {"frontier": ("screen",), "coverage": ("frontier",),

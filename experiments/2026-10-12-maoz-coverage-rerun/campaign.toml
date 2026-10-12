@@ -1,0 +1,108 @@
+# 2026-10-05-maoz-coverage again, with one input changed: the PEREDUR pool is
+# built from 2026-10-07-tlsf-rerun's final frontiers, where that campaign read
+# 2026-09-14-paper-rerun's. The passes, the budgets and the tool side are that
+# campaign's as its re-score ran them, on the adapted tree that keeps the G on
+# safety assumptions (experiments/results-maoz-baselines-gfix, from 1b8073c).
+# Registration is still section 11 of 2026-10-02-maoz-baselines/PLAN.md.
+#
+# The pool is built locally with `maoz_score.py --pass pool`, since the run
+# directories are spread over av1, av2 and av3, and copied to both hosts with
+# the tool tree before the entry is queued. See PLAN.md here.
+name = "2026-10-12-maoz-coverage-rerun"
+branch = "campaign/maoz-coverage-rerun"
+
+# The tools are deterministic, so each host takes one seed, which names its
+# share and which no pass reads. The work is split by subject: humanoid-742
+# was 88% of the last coverage pass's compare time, so av2 takes it alone and
+# av3 takes the other nine.
+hosts = { av2 = "0", av3 = "1" }
+
+# Section 11.1: realize within 600 s, the well-separation ltlsynt within 60 s
+# with the fast path off.
+[[phases]]
+name = "screen-av2"
+kind = "maoz-score"
+pass = "screen"
+hosts = { av2 = "0" }
+specs = ["humanoid-742"]
+results = "experiments/results-maoz-baselines-gfix"
+out = "experiments/maoz-coverage-rerun-screen"
+jobs = 16
+realize_timeout = 600
+wellsep_timeout = 60
+
+# Section 11.2: maximal per (tool, subject), 20 s per solver call, 4 h cap.
+[[phases]]
+name = "frontier-av2"
+kind = "maoz-score"
+pass = "frontier"
+hosts = { av2 = "0" }
+specs = ["humanoid-742"]
+results = "experiments/results-maoz-baselines-gfix"
+screen = "experiments/maoz-coverage-rerun-screen"
+out = "experiments/maoz-coverage-rerun-frontier"
+jobs = 16
+maximal_timeout = 20
+maximal_wall_s = 14400
+
+# Section 11.3: every (pool repair, tool frontier repair) pair through
+# compare, 50 pool files a unit under 900 s, then pair by pair under 120 s.
+[[phases]]
+name = "coverage-av2"
+kind = "maoz-score"
+pass = "coverage"
+hosts = { av2 = "0" }
+specs = ["humanoid-742"]
+results = "experiments/results-maoz-baselines-gfix"
+frontier = "experiments/maoz-coverage-rerun-frontier"
+pool = "experiments/maoz-peredur-pool-tlsf-rerun"
+out = "experiments/maoz-coverage-rerun-relations"
+jobs = 16
+cores = 1
+chunk_size = 50
+chunk_timeout = 900
+pair_timeout = 120
+
+[[phases]]
+name = "screen-av3"
+kind = "maoz-score"
+pass = "screen"
+hosts = { av3 = "1" }
+specs = ["rg1", "rg2", "lift", "gyro-var1", "gyro-var2", "humanoid-458", "humanoid-503", "humanoid-531", "pcar-v2-888"]
+results = "experiments/results-maoz-baselines-gfix"
+out = "experiments/maoz-coverage-rerun-screen"
+jobs = 16
+realize_timeout = 600
+wellsep_timeout = 60
+
+[[phases]]
+name = "frontier-av3"
+kind = "maoz-score"
+pass = "frontier"
+hosts = { av3 = "1" }
+specs = ["rg1", "rg2", "lift", "gyro-var1", "gyro-var2", "humanoid-458", "humanoid-503", "humanoid-531", "pcar-v2-888"]
+results = "experiments/results-maoz-baselines-gfix"
+screen = "experiments/maoz-coverage-rerun-screen"
+out = "experiments/maoz-coverage-rerun-frontier"
+jobs = 16
+maximal_timeout = 20
+maximal_wall_s = 14400
+
+[[phases]]
+name = "coverage-av3"
+kind = "maoz-score"
+pass = "coverage"
+hosts = { av3 = "1" }
+specs = ["rg1", "rg2", "lift", "gyro-var1", "gyro-var2", "humanoid-458", "humanoid-503", "humanoid-531", "pcar-v2-888"]
+results = "experiments/results-maoz-baselines-gfix"
+frontier = "experiments/maoz-coverage-rerun-frontier"
+pool = "experiments/maoz-peredur-pool-tlsf-rerun"
+out = "experiments/maoz-coverage-rerun-relations"
+jobs = 16
+cores = 1
+chunk_size = 50
+chunk_timeout = 900
+pair_timeout = 120
+
+# The report pass is not a phase here: it reads both hosts' halves, so it
+# runs locally over the joined screen, frontier and relations CSVs.
