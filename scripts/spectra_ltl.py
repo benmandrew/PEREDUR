@@ -391,16 +391,20 @@ def statement_ltl(body: str, spec: Spec) -> tuple[str, bool]:
 def assumption_section(body: str, spec: Spec) -> tuple[str, str]:
     """Where one added assumption goes in a TLSF file, and what it says there.
 
-    A safety assumption `G phi` with no past operator goes to REQUIRE as phi,
-    which the lowering wraps in G again. One with no temporal operator at all
-    is an initial condition and goes to INITIALLY. Everything else, GF and the
-    rare G over a past operator, goes to ASSUMPTIONS verbatim; under the
-    non-strict lowering a safety assumption there means what it means in
-    REQUIRE.
+    A safety assumption `G phi` with no past operator goes to REQUIRE as
+    `G phi`, with its G kept. Every REQUIRE entry of the subject files carries
+    its own G, and the Strict lowering reads REQUIRE inside `psi_s W !psi_e`
+    stepwise: a bare phi there releases the system only when phi fails at
+    step 0, so the assumption the tool computed would hold only initially.
+    Written that way, 30 of JVTS-Repair's pcar-v2-888 repairs and one of its
+    humanoid-742 repairs were unrealisable, though Spectra's GR1Game reports
+    them realisable. One with no temporal operator at all is an initial
+    condition and goes to INITIALLY. Everything else, GF and the rare G over a
+    past operator, goes to ASSUMPTIONS verbatim.
     """
     node = Parser(body, spec.enc, spec.defines).parse()
     if node[0] == "G" and past_depth(node[1]) == 0:
-        return "REQUIRE", emit(node[1])
+        return "REQUIRE", emit(node)
     if not always(node):
         return "INITIALLY", emit(node)
     return "ASSUMPTIONS", emit(node)
