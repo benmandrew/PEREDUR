@@ -1,8 +1,0 @@
-pandas>=2.0
-numpy>=1.24
-scipy>=1.11
-matplotlib>=3.7
-seaborn>=0.13
-notebook>=7.0
-ipykernel>=6.0
-scikit-posthocs>=0.9

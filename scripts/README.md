@@ -1,6 +1,6 @@
 # Experiment Scripts
 
-Scripts for running parameter sweep experiments and analysing the results.
+Scripts for running and scoring parameter sweep experiments. Analysis scripts are vendored into the campaign they analyse and are not kept here.
 
 ## What is in here
 
@@ -15,17 +15,10 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `merge_experiments.py` | Joins per-host CSVs on `KEY_FIELDS`, keeping one row per key. Vendored likewise. |
 | `check_config_schema.py` | Lint, wired into CI and the pre-commit hook. Holds `config_io.cpp`, `config-schema.json`, `example-config.toml` and `gen_configs.DEFAULTS` against `include/config.hpp`. |
 | `coverage_badge.py` | Measures coverage and writes `docs/coverage.svg`. `--check` fails on drift; CI rewrites and commits the badge when it does. |
-| `recompare.py` | Re-runs `compare` over repairs already on disk and rewrites the relation columns. The standing pass whenever an ideal changes. |
 | `check_well_separated.py` | Standalone `ltlsynt` well-separation check that bypasses PEREDUR's cached verdict. Also imported as a library by `aurus_validate.py`. |
 | `aurus_campaign.py` | Drives the AuRUS baseline arm of a head-to-head. |
 | `aurus_validate.py` | Re-checks AuRUS's claimed repairs with `realize` and scores them with `compare`. Run it before any AuRUS analysis. |
-| `analysis_lib.py` | Statistics and CSV helpers shared by the analysers. Read its header before vendoring an analyser — importing it means the analyser is no longer standalone. |
-| `analyse_aurus_h2h.py` | Scores a PEREDUR-versus-AuRUS head-to-head, and reads other campaigns against that archived reference. |
-| `analyse_selection_default.py` | Scores the selection-default campaign. Carries a `--self-test` over synthetic rows. |
-| `analyse.ipynb` | Generic notebook over a sweep's `results.csv`; `RESULTS_CSV` overrides the path. |
-| `drop_censored_rows.py` | Deletes timeout-censored rows and their run directories so a resume re-runs them under a looser cap. Used once, on the replicate recap. |
 | `import_fret.py` | Converts FRET project exports into a FRETISH `spec.json` for `examples/`. Its docstring lists every conversion rule, and its stderr summary names each requirement a lossy rule touched. Comparisons over several variables or arithmetic need z3's Python bindings, which `nix develop` provides. |
-| `maximality_sweep.py` | Runs the `maximal` binary over both arms of a head-to-head. Hard-wired to two directory layouts. |
 | `test_campaign.py` | Covers `campaign.py`. No pytest; run it directly. CI's `python-tests` job runs every `test_*.py` here but `test_domain_constraints_lpc.py`. |
 | `test_experiment_paths.py` | Covers the factor-path parsers and the resume-key invariants in `run_experiments.py` and `gen_configs.py`. |
 | `test_import_fret.py` | Covers `import_fret.py` over a synthetic export, including property tests of its domain constraints. No pytest; run it directly inside `nix develop`, which provides z3's Python bindings. |
@@ -49,26 +42,7 @@ cmake --workflow --preset release
 This produces `build-release/peredur` and `build-release/compare`, which the
 runner script expects at those exact paths.
 
-## 2. Set up the Python environment
-
-```sh
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r scripts/requirements.txt
-```
-
-Dependencies installed:
-
-| Package | Purpose |
-|---|---|
-| `pandas` | Data loading and aggregation |
-| `scipy` | Kruskal-Wallis and chi-square tests |
-| `matplotlib` / `seaborn` | Plotting |
-| `scikit-posthocs` | Post-hoc Dunn test |
-| `numpy` | Array arithmetic in `analyse.ipynb` |
-| `notebook` / `ipykernel` | Running `analyse.ipynb` |
-
-## 3. Generate experiment configs
+## 2. Generate experiment configs
 
 ```sh
 python scripts/gen_configs.py
@@ -137,7 +111,7 @@ bound 5, but it moves the semantic similarity score and so changes which
 repairs win. `H`'s `cross0.0` level tests whether crossover contributes at all
 — the default of 0.1 leaves the search almost entirely mutation-driven.
 
-## 4. Run the experiments
+## 3. Run the experiments
 
 ```sh
 python scripts/run_experiments.py                 # the full sweep (default)
@@ -365,7 +339,7 @@ python scripts/run_experiments.py --sweeps A --specs takeoff --seeds 0 1 2
 
 Per-run outputs (repair JSON files) land in `experiments/results/<run-id>/`.
 
-## 5. Splitting across machines
+## 4. Splitting across machines
 
 Each run is independent, so the work can be divided on any of the three
 filtering axes and recombined afterwards. At ~29 minutes for the full sweep the
@@ -463,7 +437,7 @@ Host av3 av3.cs.man.ac.uk
 	User benandrew
 ```
 
-## 6. Campaign status and collection
+## 5. Campaign status and collection
 
 `campaign.py` covers a campaign's whole life on the lab machines: declaring it,
 staging the hosts, launching it, polling it and bringing its results home.
@@ -923,37 +897,3 @@ pointed at a stub that records its arguments instead of running a campaign.
 The verification is the half worth having. A merge that quietly drops one
 machine's share of a campaign reads the same as a merge that worked, and the
 union check is what separates them before any analysis is run on the file.
-
-## 7. Analyse the results
-
-Launch Jupyter and open the notebook:
-
-```sh
-jupyter notebook scripts/analyse.ipynb
-```
-
-Or run it non-interactively:
-
-```sh
-jupyter nbconvert --to notebook --execute scripts/analyse.ipynb \
-    --output scripts/analyse_executed.ipynb
-```
-
-The notebook reads `experiments/results.csv` by default; point it at another
-results file — an archived or per-machine copy, say — with the `RESULTS_CSV`
-env var, which also works for `nbconvert --execute`:
-
-```sh
-RESULTS_CSV=../experiments/results-av2.csv jupyter notebook scripts/analyse.ipynb
-```
-
-It produces:
-
-- Box plots of best fitness per level
-- Bar charts of implies-ideal rate and found-repair rate
-- Kruskal-Wallis H test (continuous fitness) with post-hoc Dunn / Holm correction
-- Chi-square test (binary implies-ideal) with post-hoc Fisher's exact / Bonferroni correction
-- Cross-sweep summary table
-
-Sweep C is displayed only if its results are present in the CSV, which they are
-unless the run was narrowed with `--sweeps`.
