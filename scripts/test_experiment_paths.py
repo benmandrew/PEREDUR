@@ -6,7 +6,7 @@ and it exits non-zero on the first failure. The one thing worth guarding is that
 ``scheme_of`` / ``weakening_of`` / ``metric_of`` recover the right factor from a
 path regardless of how deep the factors nest — a config that lands one level
 deeper than a parser expects is silently mis-attributed to the wrong cell and
-its rows key wrong (the trap REPORT.md flags).
+its rows key wrong.
 
 The second half guards the commit-provenance columns, whose failure mode is the
 mirror image: a column that joins the resume or merge key makes every archived
@@ -147,9 +147,8 @@ for f in ("selection", "weakening", "metric", "repair_mode"):
 
 P = R.PROFILES
 
-# Extending TLSF_SPECS for the ablation campaign must not grow the corpora of
-# the profiles whose results CSVs are already recorded against the original
-# six families.
+# Extending TLSF_SPECS must not grow the corpora of the profiles pinned to the
+# original six families.
 check(P["tlsf"]["specs"], R.TLSF_CORE_SPECS, "tlsf profile corpus")
 check(P["muc"]["specs"], R.TLSF_CORE_SPECS, "muc profile corpus")
 check(P["padd"]["specs"],
@@ -157,8 +156,7 @@ check(P["padd"]["specs"],
       "padd profile corpus")
 
 # The two ablation arms are the same 4-cell factorial: 2 schemes x 2 metrics, at
-# the single sweep-C default level. The third factor was the Halstead weight,
-# retired on 2026-08-13 with the objective itself.
+# the single sweep-C default level.
 check(len(R.TLSF_ABLATION_SPECS), 20, "ablation TLSF corpus size")
 for name in ("ablate-fret", "ablate-tlsf"):
     check(sorted(P[name]["schemes"]), ["nsga2-truncate", "weighted"],
@@ -171,7 +169,7 @@ check(P["ablate-tlsf"]["specs"], R.TLSF_ABLATION_SPECS, "ablate-tlsf corpus")
 # h2h-tlsf dedups against ablate-tlsf by sharing its configs dir, results dir
 # and results CSV: the resume key carries every factor, so the control-cell
 # rows ablate-tlsf completed are skipped rather than re-run. If any of these
-# three diverge the dedup silently breaks and the top-up re-runs 195 rows.
+# three diverge the dedup silently breaks and the top-up re-runs those rows.
 for field in ("configs_dir", "results_dir", "results_csv"):
     check(P["h2h-tlsf"][field], P["ablate-tlsf"][field],
           f"h2h-tlsf shares ablate-tlsf {field}")
@@ -192,13 +190,12 @@ check(sorted(set(P["aurus-h2h"]["timeout_caps"].values())), [7200],
 
 # The head-to-head corpus is the AuRUS paper's evaluation set, all 26 rows.
 check(len(R.H2H_TLSF_SPECS), 26, "h2h TLSF corpus size")
-# The July corpus is frozen separately so changing the live list cannot change
-# what the h2h-tlsf profile — that campaign's definition — means.
+# The h2h-tlsf corpus is frozen separately so changing the live list cannot
+# change what that profile means.
 check(len(R.H2H_TLSF_SPECS_2026_07), 12, "2026-07 h2h TLSF corpus size")
-# codesample-un1 and codesample-un2 were July rows and are not rows in the
-# paper's tables, so the two corpora differ in both directions. amba is in
-# neither: July excluded it for the path reason, and it is not a paper row
-# either, so it never belonged to the head-to-head under any reading.
+# codesample-un1 and codesample-un2 are in the frozen corpus and are not rows
+# in the paper's tables, so the two corpora differ in both directions. amba is
+# in neither.
 for dropped in ("codesample-un1", "codesample-un2"):
     assert dropped in R.H2H_TLSF_SPECS_2026_07, \
         f"{dropped} should be in the 2026-07 corpus"
@@ -256,7 +253,7 @@ assert A.SPEC_TLSF["pcar-v2-888"].startswith("examples/icse2019/"), \
 assert A.ONLY_INPUTS_A <= set(A.SPEC_TLSF), \
     f"unknown specs in ONLY_INPUTS_A: {A.ONLY_INPUTS_A - set(A.SPEC_TLSF)}"
 check(len(A.ONLY_INPUTS_A), 9, "specs run with -onlyInputsA")
-# -factors takes three values at 3f6f01f (STATUS,SYN,SEMANTIC), and
+# -factors takes three values in base AuRUS (STATUS,SYN,SEMANTIC), and
 # Settings.setFactors halves the semantic weight into LOST_MODELS and
 # WON_MODELS. A four-value spelling belongs to this project's fork, where the
 # semantic weight was split in two, and prints usage and exits against the
@@ -306,9 +303,9 @@ assert V.parse_compare_output is R.parse_compare_output, \
 
 # merge_experiments mirrors the per-profile CSV names and result directories,
 # in two separate tables that nothing but this ties together. Over every profile
-# rather than a named few: aurus-h2h was added to PROFILE_CSVS alone and the
-# omission surfaced as a KeyError from `campaign.py collect`, after the campaign
-# had finished, which is the worst moment to discover it.
+# rather than a named few: an omission surfaces as a KeyError from
+# `campaign.py collect`, after the campaign has finished, which is the worst
+# moment to discover it.
 for name in P:
     assert name in M.PROFILE_CSVS, \
         f"profile {name} is missing from merge_experiments.PROFILE_CSVS"
@@ -398,9 +395,9 @@ assert (M.key_of({**legacy_row, "selection": "nsga2"})
         != M.key_of({**legacy_row, "selection": "nsga2-replicate"})), \
     "the two NSGA-II schemes must stay distinct cells"
 
-# The historical header, copied from experiments/2026-07-23-arbiter-hp/
-# results-arbiter-hp.csv. Resuming against it must find its rows, and appending
-# to it must drop the new columns rather than widening a closed campaign's CSV.
+# A header that predates the provenance columns. Resuming against it must find
+# its rows, and appending to it must drop the new columns rather than widening
+# a closed campaign's CSV.
 LEGACY_HEADER = [
     "sweep", "level_name", "level_value", "selection", "weakening", "metric",
     "repair_mode", "spec", "seed", "found_repair", "n_repairs", "best_fitness",
@@ -423,8 +420,8 @@ with tempfile.TemporaryDirectory() as tmp:
 
     # The archived row says selection = "nsga2"; the plan is keyed off
     # scheme_of(), which canonicalises. Resume only skips the row if both sides
-    # agree, so the key here must be the canonical name — otherwise 224,861
-    # archived rows miss and re-run.
+    # agree, so the key here must be the canonical name — otherwise archived
+    # rows miss and re-run.
     done = R.load_done_set(legacy_csv)
     check(done,
           {("C", "default", "nsga2-truncate", "wkon", "log", "mono", "lift", 3)},

@@ -32,7 +32,7 @@ so one call per file would cost the run over again.
 The maximality half is a separate stage behind --maximality, off by default. It
 is computed offline, after and apart from the timed run, and must never be read
 as part of it. Its cost is why: `maximal` is a pairwise implication sweep that
-has taken 19 GB on this corpus, so it runs at a bounded number of time cuts
+is heavy in memory, so it runs at a bounded number of time cuts
 (default 20, log-spaced) rather than at every candidate.
 
 Usage:
@@ -157,8 +157,8 @@ def spec_from_dir_name(run_dir: Path) -> str:
     """Name the family from the run directory, matching it against examples/.
 
     A censored run has no manifest to read the input path out of, and those are
-    not the runs to drop: they hold 17.2% of the accumulated candidates and are
-    concentrated in the families PEREDUR finds hardest. Matching against the
+    not the runs to drop: they are concentrated in the families PEREDUR finds
+    hardest. Matching against the
     example directories rather than splitting on "_" keeps a family name that
     contains a separator readable, and reports nothing rather than a wrong
     family when no name matches.
@@ -246,15 +246,12 @@ def maximal_over(files: list[Path], jobs: int | None,
     naming the first file of each, so the survivors are distinct specifications
     — which is what both maximality metrics count.
 
-    The wall bound is what `compare_relations` beside it always had and this
-    did not. `maximal` bounds each black call at 20 seconds of its own accord,
-    but a batch of 169 files is 14,196 pairs decided in both directions, so
-    28,392 calls at that budget leave 39 hours of headroom on four jobs and
-    nothing capped the total. One humanoid-531 batch ran for 17.6 hours and
-    eight workers a host returned nothing in thirteen. Abandoning the cut
-    instead costs that cut alone: the caller keeps the survivors and the
-    consumed index from the last cut that succeeded, so the run goes on and
-    yields the cuts it can decide.
+    The wall bound caps the whole batch. `maximal` bounds each black call of
+    its own accord, but the number of calls is quadratic in the batch, so
+    without the bound nothing caps the total. Abandoning the cut costs that
+    cut alone: the caller keeps the survivors and the consumed index from the
+    last cut that succeeded, so the run goes on and yields the cuts it can
+    decide.
     """
     if not files:
         return set()
@@ -352,10 +349,8 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
     domination is monotone under adding elements: if A was dominated by B in
     the prefix at one cut, B is still present at the next, so A can never
     re-enter the antichain. The maximal set of the whole prefix therefore
-    equals the maximal set of (previous survivors + new arrivals). Measured
-    over this campaign's 546,282 candidates it takes the pairwise sweep from
-    272.7M comparisons to 60.1M, 4.5x fewer, because a prefix of 186 is
-    replaced by a batch of about 40 survivors and the handful that are new.
+    equals the maximal set of (previous survivors + new arrivals), which
+    makes the pairwise sweep several times cheaper.
 
     `maximal` quotients its survivors by mutual implication and names one
     representative per class, so carrying representatives forward keeps the
@@ -363,8 +358,8 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
     class implies exactly the same ideals as its representative, implication
     being transitive through the equivalence.
 
-    Cuts landing on the same prefix are skipped rather than recomputed, which
-    removes 29% of the invocations over this campaign for no change in output.
+    Cuts landing on the same prefix are skipped rather than recomputed, for
+    no change in output.
 
     The cheaper algorithm this is still not: walk the set in timestamp order
     keeping a running maximal antichain and compare each arrival against that
@@ -397,9 +392,8 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
         if found is None:
             # Stop, rather than try the next cut: nothing was consumed, so
             # the next batch is this one plus more and cannot do better in
-            # the same budget. Continuing burned the whole deadline on cuts
-            # that all failed -- 752 of them over the matched campaign, 48%
-            # of its worker-hours, yielding no row.
+            # the same budget. Continuing would burn the whole deadline on
+            # cuts that all fail, yielding no row.
             break
         survivors = found
         consumed = len(prefix)

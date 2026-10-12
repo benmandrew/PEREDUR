@@ -79,24 +79,21 @@ FRETISH_SPECS: dict[str, dict[str, Path]] = {
     "mode-arbiter": _spec("mode-arbiter", "json"),
 }
 
-# The four-family corpus every FRETISH profile before 2026-09-09 ran, frozen as
-# its own name. mode-arbiter joined FRETISH_SPECS with the selection x grading
-# campaign, and FRETISH_SPECS is the path registry rather than any campaign's
-# corpus: a profile that spelled its specs as list(FRETISH_SPECS) would have
-# silently gained a fifth family, widening the spec set a closed campaign is the
-# record of. New profiles name the corpus they want.
+# The four-family FRETISH corpus, frozen under its own name. FRETISH_SPECS is
+# the path registry, not a corpus: a profile that spelled its specs as
+# list(FRETISH_SPECS) would gain every family added there. Profiles name the
+# corpus they want.
 FRETISH_SPECS_2026_07: list[str] = [
     "takeoff", "fsm", "fsm-timing", "fsm-combined",
 ]
 
 # Basic-TLSF specs with ideal fixes. PEREDUR infers the TLSF format from the
 # .tlsf extension, and compare reads the .tlsf ideals the same way. The first
-# six are the original mono-vs-muc corpus; the rest were imported from the
-# aurus tree (9e5fc08 and the takeoff-tlsf/arbiter-aurus follow-ups) for the
-# ablation campaign. takeoff-tlsf is the AuRUS takeoff case study as TLSF — a
-# separate family from the FRETISH examples/takeoff/ that FRETISH_SPECS names.
-# It is inert: no profile runs it, since both upstream "genuine" fixes proved
-# invalid (see EXPERIMENTS.md 2026-07-24), leaving it without ideals.
+# .tlsf extension, and compare reads the .tlsf ideals the same way.
+# takeoff-tlsf is the AuRUS takeoff case study as TLSF — a separate family
+# from the FRETISH examples/takeoff/ that FRETISH_SPECS names. It is inert: no
+# profile runs it, since both upstream "genuine" fixes are invalid, leaving it
+# without ideals.
 TLSF_SPECS: dict[str, dict[str, Path]] = {
     "arbiter": _spec("arbiter", "tlsf"),
     "gyro-var1": _spec("gyro-var1", "tlsf"),
@@ -113,9 +110,7 @@ TLSF_SPECS: dict[str, dict[str, Path]] = {
     "rg2": _spec("rg2", "tlsf"),
     "takeoff-tlsf": _spec("takeoff-tlsf", "tlsf"),
     "arbiter-aurus": _spec("arbiter-aurus", "tlsf"),
-    # SYNTCOMP arbiter family, imported without ideals in 9e5fc08 and promoted
-    # into the ablation corpus on 2026-07-24 when hand-written ideal repairs
-    # landed (system-weakening fixes, realize-validated; see EXPERIMENTS.md).
+    # SYNTCOMP arbiter family. Its ideals are hand-written system weakenings.
     "arbiter-handshake": _spec("arbiter-handshake", "tlsf"),
     "detector": _spec("detector", "tlsf"),
     "full-arbiter": _spec("full-arbiter", "tlsf"),
@@ -123,19 +118,17 @@ TLSF_SPECS: dict[str, dict[str, Path]] = {
     "prioritized-arbiter": _spec("prioritized-arbiter", "tlsf"),
     "round-robin-arbiter": _spec("round-robin-arbiter", "tlsf"),
     "simple-arbiter": _spec("simple-arbiter", "tlsf"),
-    # Imported from AuRUS's case-studies/syntcomp-unreal/ for the 2026-08-14
-    # head-to-head. Its upstream "genuine" repairs are other Acacia+ instances
-    # rather than weakenings of it, so the ideal beside it is hand-written.
+    # Imported from AuRUS's case-studies/syntcomp-unreal/. Its upstream
+    # "genuine" repairs are other Acacia+ instances rather than weakenings of
+    # it, so the ideal beside it is hand-written.
     "ltl2dba27": _spec("ltl2dba27", "tlsf"),
-    # The full-TLSF half of the AuRUS corpus, imported 2026-08-17. PEREDUR's
-    # parser rejects the GLOBAL block these carry, so each spec.tlsf is the
-    # `syfco -f basic` lowering of its source rather than a copy of it. Six
-    # took their ideal from the upstream genuine/ directory, where the repair
-    # is the spec with its single injected guarantee deleted; ltl2dba-r-2 and
-    # ltl2dba-theta-2 have no upstream reference at all and their ideals are
-    # hand-written on the ltl2dba27 pattern. The -aurus suffix is load-bearing
-    # throughout: this project already has same-named families at different
-    # SYNTCOMP parameter instances, and they are not these.
+    # The full-TLSF half of the AuRUS corpus. PEREDUR's parser rejects the
+    # GLOBAL block these carry, so each spec.tlsf is the `syfco -f basic`
+    # lowering of its source rather than a copy of it. Six take their ideal
+    # from the upstream genuine/ directory; ltl2dba-r-2 and ltl2dba-theta-2
+    # have no upstream reference and their ideals are hand-written. The -aurus
+    # suffix is load-bearing: this project already has same-named families at
+    # different SYNTCOMP parameter instances, and they are not these.
     "detector-aurus": _spec("detector-aurus", "tlsf"),
     "full-arbiter-aurus": _spec("full-arbiter-aurus", "tlsf"),
     "load-balancer-aurus": _spec("load-balancer-aurus", "tlsf"),
@@ -144,12 +137,10 @@ TLSF_SPECS: dict[str, dict[str, Path]] = {
     "simple-arbiter-aurus": _spec("simple-arbiter-aurus", "tlsf"),
     "ltl2dba-r-2": _spec("ltl2dba-r-2", "tlsf"),
     "ltl2dba-theta-2": _spec("ltl2dba-theta-2", "tlsf"),
-    # The basic-TLSF half of the same corpus, imported 2026-08-17 verbatim --
-    # these parse as they stand, so each spec.tlsf is byte-identical to its
-    # AuRUS source. None had an upstream reference repair, so every ideal here
-    # is hand-written. humanoid-741 is imported but absent from this table and
-    # has no fixes/ dir at all: see H2H_UNSCOREABLE for why no valid ideal
-    # exists for it.
+    # The basic-TLSF half of the same corpus, byte-identical to its AuRUS
+    # source. None has an upstream reference repair, so every ideal here is
+    # hand-written. humanoid-741 is imported but absent from this table and
+    # has no fixes/ dir: see H2H_UNSCOREABLE for why no valid ideal exists.
     "lily11": _spec("lily11", "tlsf"),
     "lily15": _spec("lily15", "tlsf"),
     "lily16": _spec("lily16", "tlsf"),
@@ -158,17 +149,14 @@ TLSF_SPECS: dict[str, dict[str, Path]] = {
     "pcar-v2-888": _spec("pcar-v2-888", "tlsf"),
 }
 
-# The original six-family TLSF corpus. The pre-ablation TLSF profiles (tlsf,
-# muc, padd, and the retired wellsep) pin this list rather than
-# list(TLSF_SPECS), so extending the table above does not silently grow what
-# they run — their results CSVs are already recorded against exactly these six.
+# The original six-family TLSF corpus. The tlsf, muc and padd profiles pin
+# this list rather than list(TLSF_SPECS), so extending the table above does
+# not silently grow what they run.
 TLSF_CORE_SPECS: list[str] = [
     "arbiter", "gyro-var1", "humanoid-531", "lift", "lily02", "minepump",
 ]
 
-# The 20 fixes-backed TLSF families of the ablation campaign (PLAN §2): the
-# original 13, plus the 7 SYNTCOMP arbiter families promoted on 2026-07-24
-# after hand-written ideals landed for them.
+# The 20 fixes-backed TLSF families the ablate-tlsf profile runs.
 TLSF_ABLATION_SPECS: list[str] = [
     "arbiter", "gyro-var1", "gyro-var2", "humanoid-458", "humanoid-531",
     "lift", "lily02", "minepump", "amba", "codesample-un1", "codesample-un2",
@@ -176,49 +164,6 @@ TLSF_ABLATION_SPECS: list[str] = [
     "arbiter-handshake", "detector", "full-arbiter", "load-balancer",
     "prioritized-arbiter", "round-robin-arbiter", "simple-arbiter",
 ]
-
-# Per-spec wall caps for the 20-family TLSF corpus at gen10/pop200, sized by the
-# 2026-08-11-status-grading pilot to at least 4x its worst observed wall time per
-# spec. They are per-spec rather than flat because the ltlsynt budget moved from
-# 500 ms to 10 s (74beaea): a single query may now run 20x longer than any flat
-# cap calibrated under the old budget assumed, and the corpus spreads over an
-# order of magnitude. amba is the case that forces it, measuring 1078 s
-# standalone in the campaign's expensive arm — a flat 600 s or 900 s cap censors
-# exactly the arm under test and returns the censoring as the result, which is
-# the same failure the raised budget was fixing.
-TLSF_WALL_CAPS_GEN10: dict[str, int] = {
-    "amba": 4320, "humanoid-531": 1560, "lift": 840,
-    "simple-arbiter": 720, "round-robin-arbiter": 660,
-    "humanoid-458": 540, "full-arbiter": 420, "gyro-var1": 420,
-    "gyro-var2": 420, "detector": 360, "arbiter": 300,
-    "arbiter-handshake": 300, "codesample-un1": 300,
-    "codesample-un2": 300, "lily02": 300, "load-balancer": 300,
-    "minepump": 300, "prioritized-arbiter": 300, "rg1": 300,
-    "rg2": 300,
-}
-
-
-# Upper bound on the compute-match factor any `-cm` profile will be generated
-# at, used to scale that profile's wall caps. It is a ceiling and not a
-# measurement: the real factor comes out of calibration, hours after this
-# module is imported, so a cap cannot track it. Over-scaling a cap only wastes
-# the headroom of a run that was never going to reach it, while under-scaling
-# censors the longer arm and returns the censoring as the result, so the bound
-# is deliberately loose. Raise it before generating with a larger
-# --compute-match-factor.
-CM_CAP_HEADROOM = 1.5
-
-
-def scaled_wall_caps(factor: float) -> dict[str, int]:
-    """`TLSF_WALL_CAPS_GEN10` scaled for an arm running more generations.
-
-    Cost scales with generations*population, so a compute-matched arm needs its
-    caps scaled by at least the factor its generation count was, or the cap
-    censors the longer arm by construction and the comparison measures the cap.
-    """
-    return {spec: round(cap * factor)
-            for spec, cap in TLSF_WALL_CAPS_GEN10.items()}
-
 
 # The head-to-head corpus IS the AuRUS paper's evaluation set: the 26
 # specifications the paper's tables evaluate. Both arms target all 26, so this
@@ -228,13 +173,12 @@ def scaled_wall_caps(factor: float) -> dict[str, int]:
 # test_experiment_paths.py; that module imports this one, so the names are
 # written here and the paths there rather than either importing the other.
 #
-# amba, codesample-un1 and codesample-un2 were in the 2026-07 corpus and are
-# not rows in the paper's tables, so they leave the head-to-head. They keep
-# their PEREDUR families and ideals for the ablation corpus.
+# amba, codesample-un1 and codesample-un2 are not rows in the paper's tables,
+# so they are not in this list. They keep their PEREDUR families and ideals
+# for the ablation corpus.
 #
-# takeoff-tlsf never entered, on the older ground that both of its upstream
-# "genuine" fixes are invalid (one truncated, one unsatisfiable) — see
-# EXPERIMENTS.md 2026-07-24.
+# takeoff-tlsf is out because both of its upstream "genuine" fixes are invalid
+# (one truncated, one unsatisfiable).
 H2H_TLSF_SPECS: list[str] = [
     # Literature (5)
     "arbiter-aurus", "lift", "minepump", "rg1", "rg2",
@@ -254,15 +198,6 @@ H2H_TLSF_SPECS: list[str] = [
 # arm runs `H2H_TLSF_SPECS` minus this list, and `test_experiment_paths.py`
 # asserts the two partition exactly, so importing a family fails that test
 # until it is struck off here.
-#
-# Two obstacles, neither structural. Seven parse today but have no reference
-# repairs upstream, so each needs a hand-written weakening ideal: lily11,
-# lily15, lily16, humanoid-503, humanoid-741, humanoid-742, pcar-v2-888. The
-# other eight are full-format TLSF that PEREDUR's parser rejects on the GLOBAL
-# block; `syfco -f basic` lowers them to a form it parses, and AuRUS ships one
-# at lib/syfco. Six of those eight do carry upstream references, though AuRUS
-# references replace rather than weaken as a rule, so each still needs
-# validating with lint-ideals before it can serve as an ideal.
 #
 # Nothing here blocks the AuRUS arm, which runs all 26 regardless and archives
 # every out.txt, so an import re-scores runs that already exist.
@@ -289,9 +224,6 @@ H2H_PENDING_IMPORT: list[str] = []
 # can. A semantically sound repair does exist -- dropping the `G(!next_head)`
 # ASSERT that `mucs` names makes it realizable -- but it is outside the
 # operators' image, so no ideal built on it would be a fair target either.
-#
-# AuRUS produced zero repairs for this family across all 30 repeats, which is
-# consistent with the same obstruction rather than with a budget limit.
 H2H_UNSCOREABLE: list[str] = ["humanoid-741"]
 
 # What the PEREDUR arm can run right now.
@@ -300,75 +232,22 @@ H2H_TLSF_READY: list[str] = [
     if s not in H2H_PENDING_IMPORT and s not in H2H_UNSCOREABLE
 ]
 
-# The four families the 2026-08-26 selection smoke test drops, and the rule that
-# drops them: mean wall time above 600 s in the 2026-08-23-monotone `monoon`
-# arm, which is that campaign's cell at the configuration this one runs. The
-# rule is cost and nothing else -- outcome plays no part -- because a corpus
-# chosen by how well the incumbent scheme scored on it is a corpus selected on
-# the response, and the whole point of the comparison is that either arm may
-# win a family. Stated here rather than applied inline so the exclusion is
-# checkable against the archive it was measured from.
-#
-# The measured means: humanoid-742 7200 s (capped on every seed, and 0/20 on
-# found_repair), humanoid-531 6149 s, pcar-v2-888 1643 s, humanoid-503 685 s.
-# Together they are 84% of a seed's serial cost over the 25 families, and
-# humanoid-742 alone is the whole 2 h per-host budget on one job -- so keeping
-# any of them means the campaign cannot finish, not that it finishes slowly.
-SELECTION_SMOKE_EXCLUDED: list[str] = [
-    "humanoid-503", "humanoid-531", "humanoid-742", "pcar-v2-888",
-]
-
-# H2H_TLSF_READY minus the cost exclusions above: 21 families.
-SELECTION_SMOKE_SPECS: list[str] = [
-    s for s in H2H_TLSF_READY if s not in SELECTION_SMOKE_EXCLUDED
-]
-
-# The cost-calibration subset of the 2026-08-28 selection x grading campaign:
-# 12 of the 25 H2H_TLSF_READY families, chosen to span the measured cost range
-# rather than to answer anything. All four SELECTION_SMOKE_EXCLUDED families are
-# in it deliberately -- they are the ones whose behaviour under an internal
-# deadline is unknown, that exclusion having been a cost rule and the deadline
-# being what retires it -- together with four upper-middle families, two middle
-# and two cheap ones, taken from the 2026-08-23-monotone `monoon` per-family
-# means the `selection-smoke` cap table quotes. A subset chosen on cost alone
-# says nothing about the response, which is what keeps it usable for sizing the
-# full run without selecting the corpus on the outcome.
-CURVES_CALIB_SPECS: list[str] = [
-    # the four the cost rule used to exclude (7200, 6149, 1643, 685 s)
-    "humanoid-742", "humanoid-531", "pcar-v2-888", "humanoid-503",
-    # upper-middle
-    "lift", "prioritized-arbiter-aurus", "gyro-var1", "humanoid-458",
-    # middle
-    "gyro-var2", "ltl2dba-theta-2",
-    # cheap
-    "minepump", "rg2",
-]
-
-# The corpus the 2026-07-24 head-to-head actually ran, frozen so that changing
-# the live list above cannot retroactively change what the `h2h-tlsf` profile
-# means. That profile is the July campaign's definition and nothing else runs
-# it; the 2026-08-14 campaign uses `aurus-h2h` instead. Written out rather than
-# derived from H2H_TLSF_SPECS: it was derived once, and moving the live corpus
-# to the paper's 26 rows silently carried this to 25.
+# The corpus of the `h2h-tlsf` profile, frozen so that changing the live list
+# above cannot change what that profile means. Written out rather than derived
+# from H2H_TLSF_SPECS, so a change to the live corpus cannot carry over.
 H2H_TLSF_SPECS_2026_07: list[str] = [
     "gyro-var1", "gyro-var2", "humanoid-458", "humanoid-531", "lift",
     "lily02", "minepump", "codesample-un1", "codesample-un2", "rg1", "rg2",
     "arbiter-aurus",
 ]
 
-# The arbitration corpus of the 2026-08-10 diversity probe. 2026-07-31-replicate
-# found nsga2-apportion (then nsga2-replicate) repairing `arbiter` 120/120 where
-# nsga2-truncate managed 0/120 — the only place either NSGA-II scheme has ever
-# separated on found_repair, and the lever the arbiter-hp and arbiter-padd
-# campaigns hunted through p_add_assumption without finding. That result rests on
-# one family, so this list is every fixes-backed family whose unrealizability is
-# an arbitration conflict: the seven arbiters, plus amba (a bus arbiter) and
-# load-balancer (arbitration over servers). Six of the nine did not exist in the
-# corpus when replicate ran.
+# The arbiter-probe corpus: every fixes-backed family whose unrealizability is
+# an arbitration conflict -- the seven arbiters, plus amba (a bus arbiter) and
+# load-balancer (arbitration over servers).
 #
 # lily02 is the tenth and is not an arbiter. It is the counter-signal control:
-# replicate's apportion arm cost it implies_ideal 1.00 -> 0.44, so a probe that
-# only sampled families the scheme helps would report the upside alone.
+# a probe that only sampled families the scheme helps would report the upside
+# alone.
 ARBITER_PROBE_SPECS: list[str] = [
     "arbiter", "arbiter-aurus", "arbiter-handshake", "full-arbiter",
     "prioritized-arbiter", "round-robin-arbiter", "simple-arbiter",
@@ -382,9 +261,8 @@ SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **TLSF_SPECS}
 N_SEEDS = 30
 
 # compare runs n_repairs * n_ideals * 2 implication checks, each with compare's
-# own 20s black budget. fsm-timing (bounded-interval operators) is slow: a 29-
-# repair run measured ~141s, and repair counts grow with generations/population.
-# Keep this well above that, in line with the generous peredur_timeout budgets.
+# own 20s black budget. fsm-timing (bounded-interval operators) is slow, and
+# repair counts grow with generations/population, so keep this generous.
 # A profile whose arms differ in repair count should raise it via its own
 # `compare_timeout` key -- see the compare_timed_out column below.
 COMPARE_TIMEOUT_S = 600
@@ -396,21 +274,18 @@ CSV_FIELDS = [
     "timed_out", "n_dropped", "compare_timed_out", "commit", "dirty",
 ]
 
-# Rows written before `selection` existed are all NSGA-II: every config in use
-# pinned selection_scheme = "nsga2", verified against the per-run config.toml
-# snapshots of the 2026-07-14 sweep (1470/1470). Defaulting them to "nsga2"
-# keeps resume working against those CSVs instead of re-running them.
+# Rows written before `selection` existed are all NSGA-II. Defaulting them to
+# "nsga2" keeps resume working against those CSVs instead of re-running them.
 LEGACY_SELECTION = "nsga2"
 
 # The two NSGA-II schemes were renamed -- "nsga2" -> "nsga2-truncate" and
 # "nsga2-replicate" -> "nsga2-apportion" -- and the binary rejects the old
 # spellings outright. Only the name moved: the scheme each one selects is
 # unchanged, so a row recorded under either spelling names the same cell of the
-# design. 224,861 archived rows carry "nsga2" and the replicate campaign's rows
-# carry "nsga2-replicate", against zero rows written under the new names so far.
-# Canonicalising every `selection` value as it is read back -- from an archived
-# CSV on resume, or from a config directory name -- is what keeps those rows
-# matching the plan instead of missing it and re-running finished campaigns.
+# design. Canonicalising every `selection` value as it is read back -- from an
+# archived CSV on resume, or from a config directory name -- is what keeps old
+# rows matching the plan instead of missing it and re-running finished
+# campaigns.
 # gen_configs.py emits the new names only; this mapping is read-side alone.
 SCHEME_ALIASES: dict[str, str] = {
     "nsga2": "nsga2-truncate",
@@ -424,9 +299,8 @@ def canonical_scheme(name: str) -> str:
 
 
 # Rows written before `weakening` existed ran configs with run_weakening = true
-# (the DEFAULTS value, overridden only by sweep J's weaken-off level, which the
-# profiles of that era did not run). Same purpose as LEGACY_SELECTION: keep
-# resume matching those rows rather than re-running them.
+# (the DEFAULTS value). Same purpose as LEGACY_SELECTION: keep resume matching
+# those rows rather than re-running them.
 LEGACY_WEAKENING = "wkon"
 
 # Directory names gen_configs.py --weakening emits. A config directly under
@@ -455,13 +329,11 @@ LEGACY_REPAIR = "mono"
 # read as LEGACY_REPAIR.
 REPAIR_DIRS: tuple[str, ...] = ("mono", "muc")
 
-# Rows written before `commit` existed have no recorded commit at all: nothing
-# asked the binary what it was built from, and a binary's commit is not
-# recoverable after the fact (mtime bounds a window, and the binaries on av2/av3
-# lag main by an unbounded amount — see the PROVENANCE.json files under
-# experiments/). Unlike LEGACY_SELECTION this is an admission of ignorance
-# rather than a known value, so it must never join the resume or merge key:
-# keying on it would make every archived row miss and re-run whole campaigns.
+# Rows written before `commit` existed have no recorded commit at all, and a
+# binary's commit is not recoverable after the fact. Unlike LEGACY_SELECTION
+# this is an admission of ignorance rather than a known value, so it must never
+# join the resume or merge key: keying on it would make every archived row miss
+# and re-run whole campaigns.
 LEGACY_COMMIT = "unknown"
 
 # Every factor directory name, so scheme_of can tell a scheme segment apart
@@ -520,10 +392,9 @@ BASELINE_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
     ("I", "mut1.0"): ("A", "gen10"),
 }
 
-# The TLSF campaign runs only sweeps A (generations) and B (population), which
+# The tlsf profile runs only sweeps A (generations) and B (population), which
 # cross at the gen10/pop200 baseline, so B/pop200 aliases onto A/gen10 exactly
-# as in the FRETISH grid. No other sweep is generated, so the rest of
-# BASELINE_ALIASES has nothing to match and is left out.
+# as in the FRETISH grid. The rest of BASELINE_ALIASES has nothing to match.
 TLSF_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
     ("B", "pop200"): ("A", "gen10"),
 }
@@ -573,65 +444,14 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results.csv",
         "default_jobs": 1,
     },
-    # The full factorial: every level of every sweep, run under both selection
-    # schemes, at 100 seeds. selection_scheme is a factor here rather than a
-    # constant, which is what makes nsga2-vs-weighted answerable per level
-    # instead of only at the baseline.
-    "factorial": {
-        "schemes": ["nsga2-truncate", "weighted"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": None,  # every sweep found in experiments/configs/
-        "levels": {},
-        "specs": list(FRETISH_SPECS_2026_07),
-        "seeds": list(range(100)),
-        "timeout_caps": None,
-        "baseline_aliases": BASELINE_ALIASES,
-        "configs_dir": CONFIGS_DIR,
-        "results_dir": RESULTS_DIR,
-        "results_csv": EXPERIMENTS_DIR / "results-factorial.csv",
-        "default_jobs": 4,
-    },
-    # Direct-vs-log similarity metric as the sole crossed factor, at the same
-    # large operating point as cj-large (generations=40, population_size=1000)
-    # where repairs are strong enough for the metric to move outcomes. Only the
-    # all-defaults C/default level runs — the metric is the experiment, so the
-    # seed count is spent on statistical power for the main effect rather than
-    # on a grid. No aliasing: a single level has nothing to alias onto.
-    "metric": {
-        "schemes": ["nsga2-truncate"],
-        "weakenings": None,
-        "metrics": ["direct", "log"],
-        "repair_modes": None,
-        "sweeps": ["C"],
-        "levels": {"C": ["default"]},
-        "specs": list(FRETISH_SPECS_2026_07),
-        "seeds": list(range(100)),
-        "timeout_caps": {"takeoff": 600, "fsm": 600, "fsm-timing": 600,
-                         "fsm-combined": 900},
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-metric",
-        "results_dir": EXPERIMENTS_DIR / "results-metric",
-        "results_csv": EXPERIMENTS_DIR / "results-metric.csv",
-        "default_jobs": 4,
-    },
     # Monolithic vs MUC-guided repair (tlsf.repair_mode) crossed with the TLSF
     # assumption/guarantee mutation split (sweep M), on the TLSF spec corpus —
-    # the FRETISH path rejects repair_mode outright, so crossing it over them
-    # would fail every muc run rather than compare two arms. The split interacts with repair_mode: muc keeps
-    # the environment side at full size while shrinking the guarantee side to the
-    # minimal core, so at a fixed p_assumption it spends a larger share of its
-    # guarantee mutations on the culprit formulae (verified: the assumption side
-    # stays live in muc, so the factor is not confounded). Responses are
-    # implies_ideal and wall_time_s co-equal — muc's pitch is quality where
-    # monolithic sits at implies_ideal~=0 (gyro/lift/humanoid) AND runtime on the
-    # heavy specs. Operating point gen10/pop200 (the config defaults), matching
-    # the prior monolithic TLSF data for comparability. Generate the configs with
+    # the FRETISH path rejects repair_mode outright. Operating point
+    # gen10/pop200 (the config defaults). Generate the configs with
     #   python scripts/gen_configs.py --tlsf --sweeps M --repair both \
     #       --out-dir experiments/configs-muc
-    # (--tlsf carries the 500 ms ltlsynt timeout and 0.15 scoring tolerance the
-    # heavy specs need; --sweeps C would not — TLSF_SWEEPS has no C level.)
+    # (--tlsf carries the ltlsynt timeout and scoring tolerance the heavy
+    # specs need; --sweeps C would not — TLSF_SWEEPS has no C level.)
     "muc": {
         "schemes": ["nsga2-truncate"],
         "weakenings": None,
@@ -640,16 +460,14 @@ PROFILES: dict[str, dict] = {
         "sweeps": ["M"],
         "levels": {"M": ["pg0.3", "pg0.5", "pg0.7", "pg0.9"]},
         "specs": list(TLSF_CORE_SPECS),
-        # Seed-major disjoint ranges across av2/av3 (pass --seeds on launch); the
-        # list is the ceiling a 60 h/machine deadline kill truncates to a
+        # A ceiling. Run disjoint seed ranges per host (pass --seeds on
+        # launch); a deadline kill truncates the seed-major order to a
         # balanced design.
         "seeds": list(range(60)),
-        # Caps sized to the slow (monolithic) arm so it is never censored — a cap
-        # that bites records implies_ideal=0 and truncates wall_time_s for a run
-        # that merely ran long, corrupting both responses. From the measured
-        # gen10/pop200 monolithic means: humanoid 768 s (p90 1739 s), lift 73 s,
-        # gyro 16 s, the rest single-digit. Applied identically to both arms so
-        # muc's speed shows as a genuinely lower wall_time rather than a cap.
+        # Per-spec caps sized to the slow (monolithic) arm so it is never
+        # censored, and applied identically to both arms: a cap that bites
+        # records implies_ideal=0 and truncates wall_time_s for a run that
+        # merely ran long.
         "timeout_caps": {"humanoid-531": 2400, "lift": 600, "gyro-var1": 300,
                          "arbiter": 120, "lily02": 120, "minepump": 120},
         "baseline_aliases": {},
@@ -661,20 +479,11 @@ PROFILES: dict[str, dict] = {
         # RAM and risk OOM.
         "default_jobs": 1,
     },
-    # Follow-up to the muc campaign: sweep p_add_assumption (sweep P: 0.05, 0.15,
-    # 0.3, 0.5) crossed with repair_mode {mono, muc}. The muc campaign found that
-    # reaching an assumption-side ideal (e.g. arbiter's G F r0 & G F r1) is
-    # bottlenecked on the fixed 0.05-rate p_add_assumption structural mutation, not
-    # on the assumption/guarantee split; this tests whether raising it shifts
-    # repairs from guarantee-weakening to the ideal. humanoid-531 is dropped: it
-    # never reaches the ideal in either arm (so p_add_assumption cannot inform it)
-    # and it is ~88% of the per-seed cost, so excluding it turns a ~12-seed
-    # overnight run into a ~45-seed one on the specs where the lever operates.
-    # Generate with:
+    # p_add_assumption (sweep P) crossed with repair_mode {mono, muc}, on the
+    # core TLSF corpus. humanoid-531 is dropped: it dominates the per-seed
+    # cost and p_add_assumption cannot inform it. Generate with:
     #   python scripts/gen_configs.py --tlsf --sweeps P --repair both \
     #       --out-dir experiments/configs-padd
-    # (--tlsf carries the 60 s ltl2tgba-timeout, 500 ms ltlsynt-timeout and 0.15
-    # scoring tolerance; the ltl2tgba-timeout needs the deployed counting-leak fix.)
     "padd": {
         "schemes": ["nsga2-truncate"],
         "weakenings": None,
@@ -683,8 +492,8 @@ PROFILES: dict[str, dict] = {
         "sweeps": ["P"],
         "levels": {"P": ["padd0.05", "padd0.15", "padd0.3", "padd0.5"]},
         "specs": [s for s in TLSF_CORE_SPECS if s != "humanoid-531"],
-        # Generous ceiling; a 12 h/machine overnight deadline truncates the
-        # seed-major order to a balanced design at whatever depth it reaches.
+        # A generous ceiling; a deadline kill truncates the seed-major order
+        # to a balanced design at whatever depth it reaches.
         "seeds": list(range(160)),
         "timeout_caps": {"arbiter": 120, "gyro-var1": 300, "lift": 600,
                          "lily02": 120, "minepump": 120},
@@ -696,11 +505,9 @@ PROFILES: dict[str, dict] = {
     },
     # The basic-TLSF examples swept over generations (A) and population (B), the
     # two operating-point parameters, NSGA-II only, default weakening. These
-    # specs are much slower than the FRETISH ones — three of them (lift,
-    # gyro-var1, humanoid-531) take ~3 min even at the gen10/pop200 baseline and
-    # scale with generations*population — so the grid is a coarse cross (four
-    # levels per axis, sharing the baseline) rather than the fine FRETISH grid,
-    # trading gradations for seeds within a fixed wall-clock budget. Reads its
+    # specs are much slower than the FRETISH ones and scale with
+    # generations*population, so the grid is a coarse cross (four levels per
+    # axis, sharing the baseline) rather than the fine FRETISH grid. Reads its
     # own experiments/configs-tlsf/ grid; generate it with
     #   python scripts/gen_configs.py --tlsf
     "tlsf": {
@@ -712,17 +519,14 @@ PROFILES: dict[str, dict] = {
         "levels": {},
         "specs": list(TLSF_CORE_SPECS),
         # A generous ceiling, not a commitment. Ordering is seed-major, so a
-        # machine killed at the wall-clock deadline leaves a balanced design at
-        # whatever seed depth it reached; splitting 0-29/30-59 across av2/av3
-        # keeps the two seed ranges disjoint so a truncated pair still merges to
-        # one balanced dataset. ~16 h/machine is the real stop condition.
+        # machine killed at a wall-clock deadline leaves a balanced design at
+        # whatever seed depth it reached; disjoint seed ranges per host keep a
+        # truncated pair mergeable into one balanced dataset.
         "seeds": list(range(60)),
         # Flat per-spec caps generous enough that the largest operating point
         # (gen40 / pop500) never censors a slow-but-progressing run — a cap that
         # bites records implies_ideal = 0 for a run that merely ran long, which
-        # corrupts the response variable. Sized from the measured baseline
-        # (~190s for the heavy specs at gen10/pop200) times the ~4x operating
-        # range times a safety margin for the jobs>1 thread-pool cap.
+        # corrupts the response variable.
         "timeout_caps": {"arbiter": 2400, "gyro-var1": 3600,
                          "humanoid-531": 3600, "lift": 3600,
                          "lily02": 1200, "minepump": 1200},
@@ -736,16 +540,11 @@ PROFILES: dict[str, dict] = {
         # peak RAM by jobs and risk an OOM.
         "default_jobs": 1,
     },
-    # FRETISH arm of the ablation campaign (PLAN §1): a 2x2 factorial of
-    # selection scheme (nsga2/weighted) x similarity metric (log/direct), at the
-    # C/default weight preset — 4 cells, so the interaction is measurable, not
-    # just main effects. It ran as a 2x2x2, the third factor being the Halstead
-    # weight (C/default's 0.1 against C/no-halstead's 0.0); the Halstead
-    # objective was removed on 2026-08-13 and its level went with it, so the
-    # third factor is retired and the archived rows are the only record of it.
-    # Operating point generations=40/population_size=1000, the metric-campaign
-    # scale where repairs are strong enough for the factors to move outcomes.
-    # Control cell: nsga2 / log. Generate with
+    # FRETISH arm of the ablation: a 2x2 factorial of selection scheme
+    # (nsga2/weighted) x similarity metric (log/direct), at the C/default
+    # weight preset — 4 cells, so the interaction is measurable, not just main
+    # effects. Operating point generations=40/population_size=1000. Control
+    # cell: nsga2 / log. Generate with
     #   python scripts/gen_configs.py --sweeps C --levels default \
     #       --schemes nsga2-truncate weighted --metric both \
     #       --generations 40 --population-size 1000 \
@@ -761,9 +560,8 @@ PROFILES: dict[str, dict] = {
         "levels": {"C": ["default"]},
         "specs": list(FRETISH_SPECS_2026_07),
         "seeds": list(range(30)),
-        # The cj-large/metric caps for the same operating point: measured worst
-        # case there was ~41s, so these are 15-20x margin — a cap that bites
-        # records implies_ideal = 0 for a run that was merely slow.
+        # Generous margin over the worst case at this operating point — a cap
+        # that bites records implies_ideal = 0 for a run that was merely slow.
         "timeout_caps": {"takeoff": 600, "fsm": 600, "fsm-timing": 600,
                          "fsm-combined": 900},
         # Only sweep C runs, so there is no A/gen baseline to alias onto.
@@ -773,76 +571,17 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-ablate-fret.csv",
         "default_jobs": 4,
     },
-    # TLSF arm of the same 4-cell factorial, over the 13 fixes-backed TLSF
-    # families at the TLSF operating point (gen10/pop200, the config defaults).
-    # A flat 600 s per-run cap (the arbiter-hp precedent) bounds the heavy tail
-    # — humanoid means 768 s uncapped with a 1739 s p90, and the corpus mean of
-    # ~150 s/run is what makes 4 x 13 x 15 fit the campaign window; the
-    # censoring it introduces is deliberate and applied identically to every
-    # cell. The configs also need the tlsf-profile runtime settings (500 ms
-    # ltlsynt timeout, 60 s ltl2tgba timeout, 0.15 scoring-failure tolerance),
-    # passed explicitly because --tlsf swaps in the TLSF sweep table, which has
-    # no sweep C. Generate with
+    # TLSF arm of the same 4-cell factorial, over TLSF_ABLATION_SPECS at the
+    # TLSF operating point (gen10/pop200, the config defaults). A flat 600 s
+    # per-run cap bounds the heavy tail; the censoring it introduces is
+    # deliberate and applied identically to every cell. The configs also need
+    # the tlsf-profile runtime settings, passed explicitly because --tlsf swaps
+    # in the TLSF sweep table, which has no sweep C. Generate with
     #   python scripts/gen_configs.py --sweeps C --levels default \
     #       --schemes nsga2-truncate weighted --metric both \
     #       --ltlsynt-timeout 500 --ltl2tgba-timeout 60000 \
     #       --max-scoring-failure-rate 0.15 \
     #       --out-dir experiments/configs-ablate-tlsf
-    # The status objective's grading scale (sweep G: tiered vs mrs), over the
-    # TLSF ablation corpus at the config defaults. Everything but the grading is
-    # held fixed -- one scheme, one metric, one operating point -- because the
-    # question is whether the finer scale changes what the search finds, and
-    # crossing more factors would spend the window on power the primary
-    # comparison needs. See experiments/2026-08-11-status-grading/PLAN.md, which
-    # pre-registers the endpoints and deliberately registers no decision rule.
-    #
-    # Generate with
-    #   python scripts/gen_configs.py --tlsf --sweeps G \
-    #       --ltlsynt-timeout 10000 \
-    #       --out-dir experiments/configs-status-grading
-    #
-    # Per-spec caps at 4x the slowest run a 3-seed pilot over this exact corpus
-    # and operating point measured, floored at 300s and rounded to the minute.
-    # 4x rather than the 6-20x the older tables used: those were sized when
-    # nothing bounded an individual ltlsynt query, whereas ltlsynt_timeout_ms is
-    # 10000 here, so the per-run tail is far shorter. amba earns 4320s against
-    # the flat 600s of ablate-tlsf -- its mrs arm alone measured 1078s -- and
-    # capping it at 600s would censor the arm rather than measure it.
-    "status-grading": {
-        "schemes": ["nsga2-truncate"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["G"],
-        "levels": {"G": ["tiered", "mrs"]},
-        "specs": list(TLSF_ABLATION_SPECS),
-        "seeds": list(range(24)),
-        # A frozen byte-for-byte copy of TLSF_WALL_CAPS_GEN10, which was
-        # extracted from this table and deliberately left duplicated here.
-        # status-grading is a closed campaign, so this table is a record of
-        # the caps its archived rows actually ran under; replacing it with a
-        # reference to the constant would let a future recalibration of the
-        # constant silently restate what that archive means. The two agreeing
-        # today is not a reason to couple them. Do not deduplicate.
-        "timeout_caps": {
-            "amba": 4320, "humanoid-531": 1560, "lift": 840,
-            "simple-arbiter": 720, "round-robin-arbiter": 660,
-            "humanoid-458": 540, "full-arbiter": 420, "gyro-var1": 420,
-            "gyro-var2": 420, "detector": 360, "arbiter": 300,
-            "arbiter-handshake": 300, "codesample-un1": 300,
-            "codesample-un2": 300, "lily02": 300, "load-balancer": 300,
-            "minepump": 300, "prioritized-arbiter": 300, "rg1": 300,
-            "rg2": 300,
-        },
-        # Sweep G has no gen/pop axis, so there is no A/gen baseline to alias.
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-status-grading",
-        "results_dir": EXPERIMENTS_DIR / "results-status-grading",
-        "results_csv": EXPERIMENTS_DIR / "results-status-grading.csv",
-        # jobs=1 for the same RAM reason as the other TLSF profiles: ltlsynt is
-        # multi-GB per call on these specs and the cap is per PEREDUR process.
-        "default_jobs": 1,
-    },
     "ablate-tlsf": {
         "schemes": ["nsga2-truncate", "weighted"],
         "weakenings": None,
@@ -852,10 +591,8 @@ PROFILES: dict[str, dict] = {
         "levels": {"C": ["default"]},
         "specs": list(TLSF_ABLATION_SPECS),
         "seeds": list(range(15)),
-        # A flat 600s over the whole set, sized while ltlsynt_timeout_ms was
-        # 500. amba no longer fits it: at the 10000 budget a gen5/pop100 probe
-        # took 404s, so gen10/pop200 will run past this cap and be censored —
-        # trading its old zero-yield for a timeout rather than a result.
+        # A flat 600s over the whole set, sized for a 500 ms ltlsynt timeout.
+        # amba does not fit it at a larger ltlsynt budget and is censored.
         # Recalibrate amba (and re-check the rest) before launching; see
         # TLSF_LTLSYNT_TIMEOUT_MS in gen_configs.py.
         "timeout_caps": {s: 600 for s in TLSF_ABLATION_SPECS},
@@ -868,17 +605,15 @@ PROFILES: dict[str, dict] = {
         "default_jobs": 1,
     },
     # Head-to-head top-up against the AuRUS baseline (scripts/aurus_campaign.py):
-    # the control cell only (nsga2 / log metric / C-default weights), extended
-    # to seeds 0-19 and to the H2H_TLSF_SPECS corpus, so every family AuRUS
-    # runs has 20 PEREDUR control runs to compare against. Dedup with
-    # ablate-tlsf is by construction: this profile shares ablate-tlsf's
-    # configs dir, results dir, and results CSV, and the resume key (sweep,
-    # level, selection, weakening, metric, repair_mode, spec, seed) fully
-    # identifies a control-cell row — so the (spec, seed) rows ablate-tlsf
-    # already completed are skipped and only the top-up executes:
-    # arbiter-aurus at seeds 0-19 plus the 11 shared families at seeds 15-19.
-    # The same sharing means the two profiles must not run concurrently on
-    # one machine (interleaved CSV appends and run dirs).
+    # the control cell only (nsga2 / log metric / C-default weights), at seeds
+    # 0-19 over H2H_TLSF_SPECS_2026_07. Dedup with ablate-tlsf is by
+    # construction: this profile shares ablate-tlsf's configs dir, results
+    # dir, and results CSV, and the resume key (sweep, level, selection,
+    # weakening, metric, repair_mode, spec, seed) fully identifies a
+    # control-cell row — so the (spec, seed) rows ablate-tlsf already
+    # completed are skipped and only the top-up executes. The same sharing
+    # means the two profiles must not run concurrently on one machine
+    # (interleaved CSV appends and run dirs).
     "h2h-tlsf": {
         "schemes": ["nsga2-truncate"],
         "weakenings": None,
@@ -898,25 +633,19 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-ablate-tlsf.csv",
         "default_jobs": 1,
     },
-    # The 2026-08-14 head-to-head. Separate from `h2h-tlsf` in every path it
-    # writes, because it differs from that profile in the two things the resume
-    # key does not carry: the corpus is 25 scoreable families rather than 12,
-    # and the wall cap is 7200s rather than 600s. Sharing ablate-tlsf's CSV as
-    # `h2h-tlsf` does would put rows from both caps under one key and let the
-    # merge keep whichever arrived first.
+    # The head-to-head at AuRUS's own budget. Separate from `h2h-tlsf` in
+    # every path it writes, because it differs from that profile in the two
+    # things the resume key does not carry: the corpus and the wall cap.
+    # Sharing ablate-tlsf's CSV as `h2h-tlsf` does would put rows from both
+    # caps under one key and let the merge keep whichever arrived first.
     #
-    # 7200s matches AuRUS's `--gato 7200`, the published 2 h budget. The July
-    # campaign ran PEREDUR at 600s against AuRUS at 3600s and reported the 6x
-    # asymmetry as favouring the baseline; this one removes the asymmetry
-    # instead, so neither tool's figure needs that caveat and neither compares
-    # to July's on cost.
+    # 7200s matches AuRUS's `--gato 7200`, the published 2 h budget, so
+    # neither tool's figure needs a budget caveat.
     "aurus-h2h": {
         # Both of these track the built-in defaults rather than pinning an
         # arm, because a head-to-head has to run PEREDUR as it ships: a
         # baseline comparison against a configuration no user gets by
-        # default measures the wrong thing. nsga2-apportion became the
-        # default in c71ecf0 and this profile followed it; `log` has been
-        # the default metric throughout. Re-check both against
+        # default measures the wrong thing. Re-check both against
         # include/config.hpp whenever a default moves.
         "schemes": ["nsga2-apportion"],
         "weakenings": None,
@@ -938,610 +667,11 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-aurus-h2h.csv",
         "default_jobs": 1,
     },
-    # The same corpus and cap at the configuration PEREDUR ships on 2026-08-21,
-    # plus the accumulator. `experiments/2026-08-14-aurus-h2h` measured a PEREDUR
-    # that had none of the three changes since made permanent, and
-    # `experiments/2026-08-20-ops-weakening/REPORT.md` could only read them
-    # against the 10 families that campaign's corpus shares with this one --
-    # where the test drops to 7 clusters and detects nothing. This runs the
-    # arm over all 25 so the archived AuRUS rows are answered at full power.
-    #
-    # There is no control arm. The 499 archived `aurus-h2h` rows are it: same
-    # corpus, same seeds, same 7200 s cap, same two hosts. The two configs
-    # differ in exactly four keys -- `accumulate_repairs`, `run_weakening`,
-    # `run_well_separation` and the operator grammar, which is unconditional in
-    # the binary rather than a key -- so the comparison is a bundle test and
-    # PLAN.md says so rather than attributing anything to one of them.
-    #
-    # Sweep N at `accon` alone, rather than crossing it: the accumulator was
-    # measured on its own by `2026-08-19-accumulator` and this campaign holds it
-    # on, so the level is a way to state the key in the archived config rather
-    # than a factor. `--weakening off` does the same job for `run_weakening`.
-    # `run_well_separation` is the one key nothing states: it rides the binary
-    # default (false since b101ada) and PLAN.md records the value, since
-    # `--pin-vintage` would write `run_well_separation = true` from a
-    # `gen_configs.DEFAULTS` entry stale since 2026-08-10 -- the same defect that put that filter into the
-    # archived arm against the `aurus-h2h` profile's own stated intent.
-    "aurus-h2h-ship": {
-        "schemes": ["nsga2-apportion"],
-        "weakenings": ["wkoff"],
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["N"],
-        "levels": {"N": ["accon"]},
-        "specs": H2H_TLSF_READY,
-        "seeds": list(range(20)),
-        "timeout_caps": {s: 7200 for s in H2H_TLSF_READY},
-        # 1800 s, against the 600 s default `aurus-h2h` took. Both changes this
-        # arm carries push repairs into compare: over the sweep-O corpus the
-        # accumulator with the screen off ran a median of 7 repairs per scoring
-        # run against 4 with the screen on, and compare is n_repairs x n_ideals
-        # x 2 implication checks. The archived arm timed out once in 499 at
-        # 600 s with half the load, and a compare timeout costs the row's
-        # implies_ideal silently, which is the endpoint.
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-aurus-h2h-ship",
-        "results_dir": EXPERIMENTS_DIR / "results-aurus-h2h-ship",
-        "results_csv": EXPERIMENTS_DIR / "results-aurus-h2h-ship.csv",
-        # jobs = 8, as `aurus-h2h` runs it and for the reason its declaration
-        # records: the 24-run calibration peaked at 18.7 GB of 125 GB, and at
-        # jobs = 1 this campaign is about 31 hours per host against roughly 4.
-        "default_jobs": 8,
-    },
-    # The follow-up to `aurus-h2h-ship`, on feat/monotone-operators. Same
-    # corpus, same seeds, same 7200 s caps, same jobs count: that campaign's
-    # archived rows are this one's outer control, and a paired (spec, seed) read
-    # needs every one of those to match. Three arms rather than one because the
-    # branch carries three independent changes -- see TLSF_SWEEP_T in
-    # gen_configs.py for which contrast attributes which.
-    "monotone": {
-        "schemes": ["nsga2-apportion"],
-        "weakenings": ["wkoff"],
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["T"],
-        "levels": {"T": ["monooff", "monoon", "monoship"]},
-        "specs": H2H_TLSF_READY,
-        "seeds": list(range(20)),
-        "timeout_caps": {s: 7200 for s in H2H_TLSF_READY},
-        # 1800 s, matching `aurus-h2h-ship`. The accumulator is on here too, and
-        # a compare timeout costs the row's implies_ideal silently.
-        "compare_timeout": 1800,
-        # No aliasing. None of the three arms is the grid baseline, and aliasing
-        # one onto the archived control would import rows from a different
-        # binary under this campaign's key.
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-monotone",
-        "results_dir": EXPERIMENTS_DIR / "results-monotone",
-        "results_csv": EXPERIMENTS_DIR / "results-monotone.csv",
-        "default_jobs": 8,
-    },
-    # WeightedAverage against the shipped nsga2-apportion, at the configuration
-    # PEREDUR ships on 2026-08-26 and with the selection scheme as the only key
-    # that differs between the arms. A smoke test: 2 h per host, so it is sized
-    # to answer whether the scheme still trades the way the 2026-07-24 ablation
-    # measured it, not to close the question.
-    #
-    # Both arms run fresh rather than pairing the nsga2 arm against the
-    # 2026-08-23-monotone `monoon` rows it would otherwise duplicate. Those rows
-    # came from a different commit under a 7200 s cap, and this profile caps far
-    # tighter, so their censoring differs from this one's -- and a control
-    # inherited across a commit boundary is what the stale-binary and
-    # cost-vintage notes in docs/dev/config-and-provenance.md exist about. The archived rows
-    # are a validity check on the fresh nsga2 arm instead, which is free.
-    #
-    # Sweep T at `monoon` alone, rather than sweep N or a bare C level: `monoon`
-    # is the one level in any TLSF sweep whose four keys (p_monotone 0.25,
-    # p_clone_assumption 0.25, elitism_rate 0.1, accumulate_repairs true) all
-    # equal today's config.hpp defaults, so the archived config states every key
-    # that has moved recently instead of inheriting it. `monoship` does not --
-    # it pins elitism_rate 0.0, a default move the monotone campaign measured
-    # and did not make. `--weakening off`, `--metric log` and `--pin-vintage`
-    # cover the rest; see the campaign declaration for the generator line.
-    #
-    # The aggregate fitness weights are 0.1 / 0.2 / 0.7 (syntactic / semantic /
-    # status), passed explicitly through gen_configs.py's `--weights`. They are
-    # neither the binary's 0.2 / 0.5 / 0.5 nor the 0.33 triple gen_configs.py
-    # pins into every other grid, so nothing here is inherited: the weighted arm
-    # ranks by precisely this scalar, which makes the triple a parameter of the
-    # question rather than of the harness. Every wall time and rate quoted below
-    # and in the cap table was measured at 0.33 each, so they size the run and
-    # do not control it.
-    #
-    # The corpus is SELECTION_SMOKE_SPECS, H2H_TLSF_READY minus four families
-    # excluded on measured cost alone -- see that constant for the rule and the
-    # numbers. found_repair is saturated at 1.00 on all 21 under the nsga2 arm,
-    # so implies_ideal is the endpoint and found_repair is a control that should
-    # not move.
-    "selection-smoke": {
-        "schemes": ["nsga2-apportion", "weighted"],
-        "weakenings": ["wkoff"],
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["T"],
-        "levels": {"T": ["monoon"]},
-        "specs": SELECTION_SMOKE_SPECS,
-        # 16 seeds, split 0-7 / 8-15. Both arms of a pair run on the same host,
-        # so the split is over seeds and never over schemes, which the runner
-        # crosses itself. 21 families x 16 seeds = 336 pairs.
-        "seeds": list(range(16)),
-        # 4x the slowest run the 2026-08-23-monotone `monoon` arm recorded per
-        # family, floored at 300 s, rounded to the minute and clamped at 3600 s.
-        # 4x rather than the older tables' 6-20x for status-grading's reason:
-        # ltlsynt_timeout_ms bounds the per-query tail at 10 s here. The clamp
-        # binds on lift alone (904 s max, so 3600 s is 4.0x by luck) and exists
-        # because a single run at a cap above the per-host budget cannot be
-        # distinguished from the campaign not finishing.
-        #
-        # The caps are sized off the nsga2 arm because it is the only arm with
-        # archived timings. If the weighted arm is slower they bite it alone,
-        # which is the one-sided censoring `replicate-recap` was written to
-        # undo -- so read timed_out per arm before reading implies_ideal.
-        "timeout_caps": {
-            "lift": 3600, "prioritized-arbiter-aurus": 3300,
-            "gyro-var1": 2100, "full-arbiter-aurus": 1980,
-            "humanoid-458": 1560, "round-robin-arbiter-aurus": 1380,
-            "gyro-var2": 840, "ltl2dba-theta-2": 600,
-            "load-balancer-aurus": 360, "arbiter-aurus": 300,
-            "detector-aurus": 300, "lily02": 300, "lily11": 300,
-            "lily15": 300, "lily16": 300, "ltl2dba-r-2": 300,
-            "ltl2dba27": 300, "minepump": 300, "rg1": 300, "rg2": 300,
-            "simple-arbiter-aurus": 300,
-        },
-        # 1800 s, as monotone and aurus-h2h-ship set it. accumulate_repairs is
-        # on, so a run emits several times more repairs than the 600 s default
-        # was sized for, and a compare timeout costs the row's implies_ideal
-        # silently -- which is the endpoint.
-        "compare_timeout": 1800,
-        # Neither arm is a grid baseline, and there is no gen/pop axis in sweep
-        # T to alias onto.
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-selection-smoke",
-        "results_dir": EXPERIMENTS_DIR / "results-selection-smoke",
-        "results_csv": EXPERIMENTS_DIR / "results-selection-smoke.csv",
-        # jobs = 8, the value the aurus-h2h calibration cleared on this corpus
-        # (24 runs peaked at load 21.7 of 32 and 18.7 GB of 125 GB), and the
-        # value monotone and aurus-h2h-ship ran -- which is what makes this
-        # campaign's wall times readable against theirs.
-        "default_jobs": 8,
-    },
-    # ── 2026-08-28 selection x grading ───────────────────────────────────────
-    #
-    # A 2x2 ablation on TLSF, measuring repair discovery over time rather than
-    # at a fixed generation count: selection_scheme (nsga2-apportion against
-    # weighted) crossed with fitness.status_grading (mrs, PEREDUR's own, against
-    # aurus, AuRUS's six-level ladder). Two schemes x two sweep-G levels is the
-    # whole cross -- the schemes are config directories and the grading arm
-    # rides in level_name, so both are already key columns and nothing here
-    # needs a new one.
-    #
-    # What makes it a curve rather than a point is genetic.max_wall_s: every arm
-    # runs generations = 500, far more than any of these families reaches, so
-    # the deadline is what ends every run and each arm gets the same wall clock
-    # instead of the same number of generations. PEREDUR stops itself at the
-    # next generation boundary past the deadline and writes run.json and its
-    # repairs normally, so a run that hits the budget is measured rather than
-    # censored -- which is exactly what the harness's own timeout_caps kill
-    # cannot do. accumulate_repairs is on (the binary's default), so each repair
-    # carries the generation it was found at and the response is readable as a
-    # function of elapsed budget.
-    #
-    # runtime.parallel = 1 for the same reason: a scoring pool whose size varies
-    # with --jobs makes wall time a property of the host's load rather than of
-    # the arm, and the endpoint here is wall time. gen_configs.py states the key
-    # in the config and derive_config leaves a stated value alone.
-    #
-    # The fitness weights are 0.1 / 0.2 / 0.7 (syntactic / semantic / status),
-    # AuRUS's published triple, passed through gen_configs.py's --weights. Only
-    # the weighted scheme reads them, so setting them globally is correct and
-    # inert for the two nsga2-apportion arms; stating them keeps the archived
-    # config self-describing instead of inheriting either the binary's
-    # 0.2/0.5/0.5 or the 0.33 triple gen_configs.py otherwise pins.
-    #
-    # The corpus is H2H_TLSF_READY, all 25 families -- not SELECTION_SMOKE_SPECS.
-    # That constant's four exclusions are a pure cost rule (families whose mean
-    # wall time ran past 600 s, humanoid-742 capping at 7200 s on every seed),
-    # and max_wall_s now bounds every run from inside, so the reason for the
-    # exclusion is gone and it is retired for this campaign.
-    #
-    # Two profiles: `curves-calib` sizes the run, `curves` is the run. They keep
-    # separate configs/results/CSV paths for the usual run_id-collision reason.
-    "curves-calib": {
-        "schemes": ["nsga2-apportion", "weighted"],
-        "weakenings": ["wkoff"],
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["G"],
-        "levels": {"G": ["mrs", "aurus"]},
-        # 12 families spanning the cost range; see CURVES_CALIB_SPECS.
-        "specs": CURVES_CALIB_SPECS,
-        # 2 seeds: 12 families x 2 seeds x 4 arms = 96 runs, enough to read a
-        # per-family wall time and a jobs-level peak RSS and nothing else. The
-        # calibration is what fixes `curves`'s seed count.
-        "seeds": list(range(2)),
-        # 3600 s against the campaign's 1800 s internal deadline -- 2x headroom,
-        # because max_wall_s stops the *search* and interrupts neither the
-        # filters, the scoring, nor the final realizability gate, so a run
-        # overruns by whatever the generation it was in had left. The external
-        # cap is a backstop against a hung tool, not the budget; a run that hits
-        # it has lost its row, which is the outcome the deadline exists to
-        # avoid. Flat rather than per-family because the deadline, not the
-        # family, is what ends every run here.
-        "timeout_caps": {s: 3600 for s in CURVES_CALIB_SPECS},
-        # 1800 s, as monotone, aurus-h2h-ship and selection-smoke set it.
-        # accumulate_repairs is on and the budget is long, so a run emits far
-        # more repairs than the 600 s default was sized for and a compare
-        # timeout costs the row's implies_ideal silently.
-        "compare_timeout": 1800,
-        # Sweep G has no gen/pop axis, so there is no A/gen baseline to alias,
-        # and neither arm is a grid baseline.
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-curves-calib",
-        "results_dir": EXPERIMENTS_DIR / "results-curves-calib",
-        "results_csv": EXPERIMENTS_DIR / "results-curves-calib.csv",
-        # 16 rather than the 1 the other TLSF profiles use. That 1 is a RAM
-        # argument -- ltlsynt is multi-GB resident per call and its concurrency
-        # cap is per PEREDUR process, so N jobs multiply the cap by N -- but it
-        # was sized for runs whose own thread pool was hardware concurrency.
-        # These runs are single-threaded (parallel = 1), so each holds one
-        # ltlsynt at a time and 16 jobs is 16 concurrent calls on a 32-core,
-        # 125 GB machine. Unverified: 16 is the proposal this profile exists to
-        # check, and the calibration's peak RSS is what confirms or lowers it
-        # before `curves` runs.
-        "default_jobs": 16,
-    },
-    "curves": {
-        "schemes": ["nsga2-apportion", "weighted"],
-        "weakenings": ["wkoff"],
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["G"],
-        "levels": {"G": ["mrs", "aurus"]},
-        "specs": H2H_TLSF_READY,
-        # Six seeds, and the number is arithmetic rather than a power
-        # calculation: at generations = 500 no run finishes before its
-        # genetic.max_wall_s, so the campaign's cost is exactly
-        # specs x arms x seeds x cap, or 25 x 4 x 6 x 400 s = 66.7 h against a
-        # budget of 80 h. Must stay equal to the host split in
-        # experiments/2026-08-28-selection-grading/campaign.toml, the two being
-        # the same number written twice. Topping up is free -- the resume key
-        # is read off the results CSV, so added seeds re-run nothing.
-        "seeds": list(range(6)),
-        "timeout_caps": {s: 3600 for s in H2H_TLSF_READY},
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-curves",
-        "results_dir": EXPERIMENTS_DIR / "results-curves",
-        "results_csv": EXPERIMENTS_DIR / "results-curves.csv",
-        # See curves-calib: 16 on the single-threaded-run argument, unverified
-        # until the calibration reads back a peak RSS.
-        "default_jobs": 16,
-    },
-    # The same 2x2 as `curves`, budgeted in AuRUS's currency instead of seconds,
-    # so a speed claim between the two tools has a common denominator. AuRUS
-    # stops at GA_MAX_NUM_INDIVIDUALS = 1000 bred individuals at
-    # GA_POPULATION_SIZE = 100 -- confirmed three ways: the settings banner of
-    # all 679 archived h2h logs that carry one, the two
-    # `numberOfVisitedIndividuals++` sites in GeneticAlgorithm.java (per accepted
-    # mutant and per crossover offspring, both before the population is scored),
-    # and Brizzio et al., GECCO '23 sec. 6, "the termination criterion is reached
-    # either when 1000 individuals are generated or after 2hrs of execution
-    # time". It is not a cap on solutions: no archived run reached 1000 of those,
-    # the median being 486 and the maximum 741.
-    #
-    # `curves` measured the same four arms at a 400 s deadline, which is the
-    # wrong currency for this question in PEREDUR's favour -- its manifests read
-    # a median 81 generations at population 200 inside that deadline, about
-    # 16,200 offspring, or 16x what AuRUS is allowed. Here the budget is fixed
-    # and wall time becomes the measured outcome.
-    #
-    # generations = 500 rather than the ~12 that 1000 individuals needs at
-    # population 100 (offspring_n is population_size - elite_n = 90 a generation,
-    # and only an offspring differing from its parent counts). The generation
-    # limit must not be what stops the run, or the campaign silently measures
-    # something else; `stopped_by` must read `individuals` on every row and that
-    # is the first thing to check in the results.
-    #
-    # Generate with
-    #   python scripts/gen_configs.py --tlsf \
-    #       --schemes nsga2-apportion weighted --sweeps G --levels mrs,aurus \
-    #       --metric log --weakening off --weights 0.1 0.2 0.7 \
-    #       --termination individuals --max-individuals 1000 \
-    #       --generations 500 --population-size 100 --parallel 1 \
-    #       --out-dir experiments/configs-matched --pin-vintage
-    "matched": {
-        "schemes": ["nsga2-apportion", "weighted"],
-        "weakenings": ["wkoff"],
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["G"],
-        "levels": {"G": ["mrs", "aurus"]},
-        "specs": H2H_TLSF_READY,
-        # 30 rather than the 6 `curves` ran, matching the 30 repeats a family
-        # AuRUS's archived corpus carries (15 per host on each of av2 and av3).
-        # The endpoint is a survival curve and 6 repeats per family per arm
-        # estimates one poorly, which is the whole reason to spend the budget
-        # here rather than on a longer deadline. A budget of 1000 individuals is
-        # what makes it affordable: the smoke run measured 210 s on minepump at
-        # this config, 73 s of it search and the rest the gate and the
-        # implication filter, against the 2012 s `curves` averaged at a 400 s
-        # search. At a mean of 500 s the 3000 runs are about 13 h of wall clock
-        # over the two hosts.
-        #
-        # Must stay consistent with the campaign-level host split, which is the
-        # same number written twice -- a host range wider than this list runs
-        # nothing for the excess. Topping up further is free either way: the
-        # resume key is read off the results CSV, so added seeds re-run nothing.
-        "seeds": list(range(30)),
-        # 7200 s rather than the 3600 `curves` used, and the reason is that
-        # campaign's own casualty rate: 245 of its 600 runs were killed at 3600 s
-        # and lost their manifests, because genetic.max_wall_s bounds the search
-        # and nothing after it -- the final realizability gate and the
-        # implication filter run past the deadline uncapped and cost about as
-        # much again. A budget of 1000 individuals leaves a far smaller
-        # accumulated set to filter, so this should not bind at all; it is here
-        # so that a family which surprises us is measured rather than censored.
-        # It also matches AuRUS's own GA_EXECUTION_TIMEOUT.
-        "timeout_caps": {s: 7200 for s in H2H_TLSF_READY},
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-matched",
-        "results_dir": EXPERIMENTS_DIR / "results-matched",
-        "results_csv": EXPERIMENTS_DIR / "results-matched.csv",
-        "default_jobs": 16,
-    },
-    # The 2026-08-29-aurus-matched design re-run at the engine `main` carries
-    # after #170. Same 2x2, same 25 families, same 30 seeds, same 1000-individual
-    # budget at population 100, same 7200 s cap -- so the only declared
-    # difference from that archive is the binary, and the campaign is a
-    # measurement of the tool as it now stands rather than a re-scoring of the
-    # old one. Six commits move the search path between the two (0ef4d47,
-    # 20d83e6, 9d70449, ed3b5dd, 720b4a9, 332a621), so its rows are not
-    # comparable to the archive's row by row and nothing here pairs against
-    # them; `4ad290d` also collapses equivalent specs in the implication filter,
-    # which moves `n_repairs` and `n_implies` on their own.
-    #
-    # Sized by the `rematch-calib` phase rather than by the archive: no campaign
-    # has run at this engine, and #170 took the final filter stage from 264 s of
-    # a 312 s humanoid-531 run to a fraction of it, so the archive's 1152.1
-    # core-hours is an upper bound of unknown tightness.
-    #
-    #   python scripts/gen_configs.py --tlsf \
-    #       --schemes nsga2-apportion weighted --sweeps G --levels mrs,aurus \
-    #       --metric log --weakening off --weights 0.1 0.2 0.7 \
-    #       --termination individuals --max-individuals 1000 \
-    #       --generations 500 --population-size 100 --parallel 1 \
-    #       --out-dir experiments/configs-rematch --pin-vintage
-    "rematch": {
-        "schemes": ["nsga2-apportion", "weighted"],
-        "weakenings": ["wkoff"],
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["G"],
-        "levels": {"G": ["mrs", "aurus"]},
-        "specs": H2H_TLSF_READY,
-        "seeds": list(range(30)),
-        "timeout_caps": {s: 7200 for s in H2H_TLSF_READY},
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-rematch",
-        "results_dir": EXPERIMENTS_DIR / "results-rematch",
-        "results_csv": EXPERIMENTS_DIR / "results-rematch.csv",
-        "default_jobs": 16,
-    },
-    # Calibration for `rematch`, and the only thing it decides is whether the
-    # main phase is affordable. Six families spanning the archive's measured
-    # cost range at 2 seeds and all four cells: the three that dominated the
-    # archive's bill (humanoid-742 at 60.0 core-hours in the control cell,
-    # humanoid-531 57.8, pcar-v2-888 41.4), one upper-middle (full-arbiter-aurus
-    # 23.3), and two cheap ones (minepump, rg2) so the light half is not
-    # extrapolated from the heavy. Chosen on the archive's cost and on nothing
-    # else -- picking families by how well an arm scored on them selects the
-    # corpus on the response, which is what PLAN.md section 6 forbids.
-    "rematch-calib": {
-        "schemes": ["nsga2-apportion", "weighted"],
-        "weakenings": ["wkoff"],
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["G"],
-        "levels": {"G": ["mrs", "aurus"]},
-        "specs": ["humanoid-742", "humanoid-531", "pcar-v2-888",
-                  "full-arbiter-aurus", "minepump", "rg2"],
-        "seeds": list(range(2)),
-        "timeout_caps": {s: 7200 for s in H2H_TLSF_READY},
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-rematch",
-        "results_dir": EXPERIMENTS_DIR / "results-rematch-calib",
-        "results_csv": EXPERIMENTS_DIR / "results-rematch-calib.csv",
-        "default_jobs": 16,
-    },
-    # nsga2 vs nsga2-replicate on FRETISH, at the gen40/pop1000 operating point
-    # the cj-large and metric campaigns used — so the control arm is checkable
-    # against their rows rather than being taken on trust. Three arms:
-    #   nsga2-truncate/sweep_R    control
-    #   nsga2-apportion/sweep_R   treatment
-    #   nsga2-truncate/sweep_S    compute-matched control (see gen_configs)
-    # The design is the config tree, not this table: sweep S is generated under
-    # the truncate scheme only, so listing both schemes and both sweeps still
-    # yields three arms rather than four. Generate with
-    #   python scripts/gen_configs.py --schemes nsga2-truncate nsga2-apportion \
-    #       --sweeps R --generations 40 --population-size 1000 \
-    #       --out-dir experiments/configs-replicate
-    #   python scripts/gen_configs.py --schemes nsga2-truncate --sweeps S \
-    #       --generations 40 --population-size 1000 \
-    #       --compute-match-factor <measured> \
-    #       --out-dir experiments/configs-replicate
-    #
-    # Responses: implies_ideal (quality) with fsm carrying the power — it is the
-    # only FRETISH family measured off both bounds (0.46-0.53 across cj-large
-    # and metric) — fsm-combined (0.08) testing upward movement, and
-    # takeoff/fsm-timing (~1.0) as saturation controls that should not move.
-    # found_repair, n_repairs and wall_time_s are secondary.
-    "replicate": {
-        "schemes": ["nsga2-truncate", "nsga2-apportion"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["R", "S"],
-        "levels": {},
-        "specs": list(FRETISH_SPECS_2026_07),
-        # Seed-major disjoint ranges across av2/av3 (pass --seeds on launch).
-        # 200 pairs per cell resolves ~0.15 absolute on implies_ideal at fsm's
-        # p~=0.5, ~0.10 pooled over the two elitism levels. Smaller effects are
-        # out of reach at any budget this campaign can afford — 0.05 would need
-        # ~1600 seeds per arm.
-        "seeds": list(range(200)),
-        # cj-large's caps for this operating point, scaled for the two arms that
-        # cost more: replicate breeds from a replicated population and sweep S
-        # runs a longer generation budget. Sized never to bite — a cap that
-        # fires records implies_ideal = 0 for a run that was merely slow.
-        "timeout_caps": {"takeoff": 900, "fsm": 900, "fsm-timing": 900,
-                         "fsm-combined": 1500},
-        # The treatment arm's whole claim is that it keeps more distinct
-        # candidates, which shows up as more repairs, and compare's cost scales
-        # with them. At the default 600 s the arm under test would be the one
-        # whose comparisons get censored.
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-replicate",
-        "results_dir": EXPERIMENTS_DIR / "results-replicate",
-        "results_csv": EXPERIMENTS_DIR / "results-replicate.csv",
-        "default_jobs": 4,
-    },
-    # The weakening cross of the FRETISH comparison, on the two specs with
-    # headroom. `replicate` runs at the shipped run_weakening = true, where the
-    # filter drops about 70% of each generation's offspring -- so it measures
-    # replicate's advantage in a configuration that discards most of what
-    # breeding produces, and the 2026-07-15 cj-large campaign found that turning
-    # the filter off raises implies_ideal. This arm runs the same sweep R cells
-    # with the filter off, to say whether "replicate keeps more distinct
-    # candidates" survives the stage that throws most of them away.
-    #
-    # Only fsm and fsm-combined: takeoff and fsm-timing sit at implies_ideal
-    # ~1.0, so a second factor buys nothing there. Arm C is not crossed in --
-    # compute-matching is a statement about the scheme's cost, inherited from
-    # the wkon arm -- so this is a two-arm comparison.
-    #
-    # It shares `replicate`'s results directory and CSV deliberately: the
-    # weakening column separates the rows, run_id carries a _wkoff tag so no run
-    # directory collides with the flat-layout runs, and the analysis reads one
-    # file. Generate the configs it reads with
-    #   python scripts/gen_configs.py --schemes nsga2-truncate nsga2-apportion \
-    #       --sweeps R --weakening off --generations 40 --population-size 1000 \
-    #       --out-dir experiments/configs-replicate
-    #
-    # The caps are 3600 s, not the wkon arm's 900/1500. Sweep R's partial results
-    # showed the tighter caps censoring only the replicate arm -- 250 of 352
-    # fsm-timing pairs, 56 of 358 fsm-combined -- because they were sized off
-    # nsga2's costs and replicate runs several times longer. A cap that fires on
-    # one arm and never on the other is a one-sided filter on the response under
-    # test, so this arm gets a cap loose enough to bind on neither.
-    "replicate-wkoff": {
-        "schemes": ["nsga2-truncate", "nsga2-apportion"],
-        "weakenings": ["wkoff"],
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["R"],
-        "levels": {},
-        "specs": ["fsm", "fsm-combined"],
-        "seeds": list(range(200)),
-        "timeout_caps": {"fsm": 3600, "fsm-combined": 3600},
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-replicate",
-        "results_dir": EXPERIMENTS_DIR / "results-replicate",
-        "results_csv": EXPERIMENTS_DIR / "results-replicate.csv",
-        "default_jobs": 4,
-    },
-    # Sweep R again at a cap that binds on neither arm, to replace the rows the
-    # original caps censored. Sweep R sized its timeouts off nsga2's costs, and
-    # replicate runs several times longer, so the cap fired on the treatment arm
-    # alone -- 250 of 352 fsm-timing pairs, 56 of 358 fsm-combined, 34 of 354
-    # takeoff, against zero for nsga2 in every cell. A one-sided cap on the
-    # response under test is a bias, not a budget. fsm is absent because nothing
-    # censored there.
-    #
-    # It shares `replicate`'s CSV and results dir so resume does the selection:
-    # delete the censored rows (and their run directories), point this profile at
-    # the same cells, and only the deleted ones execute. Recap rows are therefore
-    # indistinguishable from originals by key -- deliberately, since the analysis
-    # wants one row per cell -- but recoverable from the data, as any surviving
-    # row censored at the old cap still reads timed_out=1 at wall_time_s == 900
-    # or 1500.
-    #
-    # fsm-timing is expected to be run on a seed subsample via --seeds: it scores
-    # implies_ideal 1.000 in both arms on every pair that completed, so its
-    # re-run buys an honest wall-time ratio rather than a quality contrast, and
-    # the full 250 costs about 31 h per machine against roughly 6 h for 50 seeds.
-    "replicate-recap": {
-        "schemes": ["nsga2-truncate", "nsga2-apportion"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["R"],
-        "levels": {},
-        "specs": ["takeoff", "fsm-timing", "fsm-combined"],
-        "seeds": list(range(200)),
-        "timeout_caps": {
-            "takeoff": 3600, "fsm-timing": 3600, "fsm-combined": 3600},
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-replicate",
-        "results_dir": EXPERIMENTS_DIR / "results-replicate",
-        "results_csv": EXPERIMENTS_DIR / "results-replicate.csv",
-        "default_jobs": 4,
-    },
-    # The TLSF half of the same comparison, at the TLSF baseline operating point
-    # (gen10/pop200) for comparability with the prior TLSF data. Two arms only:
-    # the compute-matched control rides on the FRETISH half, where the responses
-    # are less saturated and a run costs minutes rather than tens of minutes.
-    # Generate with
-    #   python scripts/gen_configs.py --tlsf \
-    #       --schemes nsga2-truncate nsga2-apportion \
-    #       --sweeps R --out-dir experiments/configs-replicate-tlsf
-    # (--tlsf carries the 500 ms ltlsynt timeout, 60 s ltl2tgba timeout and 0.15
-    # scoring tolerance the heavy specs need.)
-    #
-    # Specs chosen by measured headroom from the 2026-07-21 muc campaign at this
-    # operating point: arbiter (found_repair 0.50) and lily02 (implies_ideal
-    # 0.67) are the two that can move; gyro-var1, lift and minepump sit at
-    # implies_ideal 0.000 with found_repair ~1.0 and serve as negative controls.
-    # humanoid-531 is excluded on cost alone (965 s mean, 2400 s p90).
-    "replicate-tlsf": {
-        "schemes": ["nsga2-truncate", "nsga2-apportion"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["R"],
-        "levels": {},
-        "specs": ["arbiter", "gyro-var1", "lift", "lily02", "minepump"],
-        "seeds": list(range(60)),
-        # The muc profile's caps, roughly doubled: the treatment arm runs longer
-        # and its extra survivors each cost realizability checks.
-        "timeout_caps": {"arbiter": 300, "gyro-var1": 600, "lift": 1200,
-                         "lily02": 300, "minepump": 300},
-        "compare_timeout": 1200,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-replicate-tlsf",
-        "results_dir": EXPERIMENTS_DIR / "results-replicate-tlsf",
-        "results_csv": EXPERIMENTS_DIR / "results-replicate-tlsf.csv",
-        # jobs=1 for the same RAM reason as the tlsf profile: ltlsynt is
-        # multi-GB resident per call on these specs.
-        "default_jobs": 1,
-    },
-    # Does nsga2-apportion's diversity unlock the arbiter family, or only the one
-    # `arbiter` spec? See experiments/2026-08-10-arbiter-probe/PLAN.md for the
-    # pre-registered decision rule. This is a generality probe, not a rerun of
-    # 2026-07-31-replicate: that campaign's decision failed on FRETISH cost and
-    # on the compute-matched control, neither of which this can reopen, and it
-    # deliberately carries no arm C for the same reason.
-    #
-    # Both schemes, one level. Sweep R restricted to elit0.1 pins elitism_rate
-    # into the archived config at the shipped default rather than inheriting it,
-    # because 2026-08-07-elitism may yet move that default and an inherited key
-    # would silently restate what this campaign ran under.
+    # Does nsga2-apportion's diversity unlock the arbiter family, or only the
+    # one `arbiter` spec? Both schemes, one level. Sweep R restricted to
+    # elit0.1 pins elitism_rate into the config at the shipped default rather
+    # than inheriting it, so a later change of default cannot restate what
+    # this profile runs.
     #
     # Generate the configs with
     #   python scripts/gen_configs.py --tlsf \
@@ -1555,19 +685,15 @@ PROFILES: dict[str, dict] = {
         "sweeps": ["R"],
         "levels": {"R": ["elit0.1"]},
         "specs": list(ARBITER_PROBE_SPECS),
-        # 40 seeds x 9 arbiter families = 360 pooled pairs. The effect under test
-        # is the replicate arbiter split (0/120 vs 120/120); 40 pairs per family
-        # resolve ~0.3 absolute on found_repair, which is far coarser than that
-        # split and still fine enough to separate "unlocks the family" from
-        # "unlocked one spec". Seed-major disjoint ranges across av2/av3.
+        # 40 seeds x 9 arbiter families = 360 pooled pairs: enough to separate
+        # "unlocks the family" from "unlocked one spec".
         "seeds": list(range(40)),
-        # elitism-tlsf's flat 900 s on the same operating point and hosts. Sized
-        # never to bite: replicate censored its treatment arm alone with caps cut
-        # to nsga2's costs, and apportion is the treatment arm here too.
+        # A flat cap sized never to bite: a tighter cap would censor the
+        # treatment arm (apportion) alone.
         "timeout_caps": {spec: 900 for spec in ARBITER_PROBE_SPECS},
-        # apportion's whole claim is more distinct survivors, so it returns more
-        # repairs and compare's cost scales with them — the same asymmetry that
-        # censored replicate's comparisons at the 600 s default.
+        # apportion's whole claim is more distinct survivors, so it returns
+        # more repairs and compare's cost scales with them; the 600 s default
+        # would censor its comparisons.
         "compare_timeout": 1800,
         "baseline_aliases": {},
         "configs_dir": EXPERIMENTS_DIR / "configs-arbiter-probe",
@@ -1576,250 +702,6 @@ PROFILES: dict[str, dict] = {
         # jobs=1 for the same RAM reason as every other TLSF profile.
         "default_jobs": 1,
     },
-    # ── 2026-08-11-selection-default ────────────────────────────────────────
-    # Whether nsga2-apportion should replace nsga2-truncate as the shipped
-    # default. See experiments/2026-08-11-selection-default/PLAN.md for the
-    # pre-registered decision rule, its five criteria and the 0.05
-    # non-inferiority margin with the power calculation behind it.
-    #
-    # Three arms, and they are split across two profiles per path rather than
-    # crossed inside one. A single profile listing both schemes and both sweeps
-    # emits the full product, which would add a fourth cell -- apportion at
-    # matched generations -- that no criterion reads and that costs a third of
-    # the campaign's wall time. The -cm profiles therefore carry the compute
-    # control alone, and share the CSV and run directory of their R half so the
-    # three arms merge and analyse as one dataset. KEY_FIELDS includes `sweep`
-    # and `level_name`, so R/elit0.1 and S/cm-elit0.1 are distinct keys and the
-    # sharing cannot collide.
-    #
-    # The corpus is deliberately not enriched: every FRETISH spec and the whole
-    # 20-family TLSF corpus, with `arbiter` one family of twenty. 2026-08-10
-    # measured its effect on a corpus picked because that effect was there,
-    # which is why it could not speak to a default.
-    #
-    # Generate the R halves with
-    #   python scripts/gen_configs.py [--tlsf] \
-    #       --schemes nsga2-truncate nsga2-apportion --sweeps R --levels elit0.1 \
-    #       --out-dir experiments/configs-seldefault[-tlsf] --pin-vintage
-    # and the compute control with the ratio measured in calibration (PLAN §5):
-    #   python scripts/gen_configs.py [--tlsf] --schemes nsga2-truncate \
-    #       --sweeps S --levels cm-elit0.1 --compute-match-factor <measured> \
-    #       --out-dir experiments/configs-seldefault[-tlsf] --pin-vintage
-    # --pin-vintage on both, per PLAN §8: without it a config states only the
-    # keys its sweep overrode, and the three whose C++ defaults have moved are
-    # inherited from whatever binary reads them next. The factor is per path --
-    # FRETISH and TLSF calibrate separately and measured 1.372 and 1.117.
-    "seldefault-fret": {
-        "schemes": ["nsga2-truncate", "nsga2-apportion"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["R"],
-        "levels": {"R": ["elit0.1"]},
-        "specs": list(FRETISH_SPECS_2026_07),
-        # 4 specs x 70 seeds = 280 pairs per contrast, which is what PLAN §7's
-        # power table requires for the 0.05 margin to clear at a true adverse
-        # effect of -0.01, given the 0.341 paired SD measured on the elitism
-        # campaign's 600 FRETISH pairs.
-        "seeds": list(range(70)),
-        "timeout_caps": {"takeoff": 900, "fsm": 900, "fsm-timing": 900,
-                         "fsm-combined": 1800},
-        # As arbiter-probe: apportion returns more repairs, and compare's cost
-        # scales with them.
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-seldefault",
-        "results_dir": EXPERIMENTS_DIR / "results-seldefault",
-        "results_csv": EXPERIMENTS_DIR / "results-seldefault.csv",
-        # 4 as on every FRETISH profile; ltlsynt is not in play here, so the
-        # per-call RAM ceiling that pins the TLSF profiles to 1 does not bind.
-        # Both halves must agree: wall_time_s is a response variable and arm C
-        # is defined by it, so a contention difference between the arms would
-        # land straight in the ratio that sets arm C's own generation count.
-        "default_jobs": 4,
-    },
-    "seldefault-fret-cm": {
-        "schemes": ["nsga2-truncate"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["S"],
-        "levels": {"S": ["cm-elit0.1"]},
-        "specs": list(FRETISH_SPECS_2026_07),
-        "seeds": list(range(70)),
-        # Arm C runs more generations than arm A by construction, so it must not
-        # inherit a cap sized for A: censoring the control alone is how replicate
-        # lost its comparison.
-        "timeout_caps": {"takeoff": 1800, "fsm": 1800, "fsm-timing": 1800,
-                         "fsm-combined": 3600},
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-seldefault",
-        "results_dir": EXPERIMENTS_DIR / "results-seldefault",
-        "results_csv": EXPERIMENTS_DIR / "results-seldefault.csv",
-        "default_jobs": 4,
-    },
-    "seldefault-tlsf": {
-        "schemes": ["nsga2-truncate", "nsga2-apportion"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["R"],
-        "levels": {"R": ["elit0.1"]},
-        "specs": list(TLSF_ABLATION_SPECS),
-        # 20 families x 25 seeds = 500 pairs, above the 420 PLAN §7 requires at
-        # the 0.418 paired SD measured on the arbiter probe's 400 TLSF pairs.
-        "seeds": list(range(25)),
-        # The R half runs at gen10/pop200, the operating point the caps were
-        # calibrated at, so it takes them unscaled.
-        "timeout_caps": dict(TLSF_WALL_CAPS_GEN10),
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-seldefault-tlsf",
-        "results_dir": EXPERIMENTS_DIR / "results-seldefault-tlsf",
-        "results_csv": EXPERIMENTS_DIR / "results-seldefault-tlsf.csv",
-        # jobs=1 for the same RAM reason as every other TLSF profile.
-        "default_jobs": 1,
-    },
-    "seldefault-tlsf-cm": {
-        "schemes": ["nsga2-truncate"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["S"],
-        "levels": {"S": ["cm-elit0.1"]},
-        "specs": list(TLSF_ABLATION_SPECS),
-        "seeds": list(range(25)),
-        # Raised over the R half for the same reason as seldefault-fret-cm.
-        # CM_CAP_HEADROOM is a ceiling on the compute-match factor rather than
-        # the factor itself: the factor is only known after calibration, which
-        # runs long after this dict is imported, so the cap cannot track it and
-        # the invariant is instead that it never falls below it. Calibration on
-        # 2026-08-13 measured 1.117 on this path (11 generations against 10),
-        # well inside the ceiling. A cap is only wrong when it censors, so the
-        # slack costs nothing; a --compute-match-factor above CM_CAP_HEADROOM
-        # is the case to catch, and raise this for.
-        "timeout_caps": scaled_wall_caps(CM_CAP_HEADROOM),
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-seldefault-tlsf",
-        "results_dir": EXPERIMENTS_DIR / "results-seldefault-tlsf",
-        "results_csv": EXPERIMENTS_DIR / "results-seldefault-tlsf.csv",
-        "default_jobs": 1,
-    },
-    # The ops-pilot, opswk-fret, opswk-tlsf, ops-tlsf and ops-fret profiles are
-    # retired. All five ran sweep O, the cross of `[genetic]
-    # repaired_operators`; that key is gone and the repaired grammar is the only
-    # one, so the sweep can no longer be generated and neither can a profile that
-    # names it. merge_experiments.py keeps its entries for them, as it does for
-    # wellsep-timing, so the archived CSVs stay mergeable.
-    #
-    # The assumption-reach profile is retired on the same terms. It ran sweep U,
-    # two of whose three operator levels set `[tlsf.mutation]
-    # p_union_assumption`; that key is gone with the union crossover it armed,
-    # so the sweep cannot be generated and neither can this profile.
-    # `experiments/2026-08-26-assumption-reach` is the record, and it reproduces
-    # from its own vendored scripts/ at the commit its PROVENANCE.json names.
-    #
-    # Five more retired on 2026-09-11, when `[filters] run_weakening` and
-    # `[filters] run_well_separation` were removed with the filters they
-    # switched. cj-large and weakening-arbiter crossed the weakening filter on
-    # and off through gen_configs --weakening, which now emits the wkoff
-    # directory alone; wellsep, arbiter-hp and arbiter-padd ran TLSF sweeps W
-    # and Q, whose every level states run_well_separation. None of the five can
-    # be regenerated, and merge_experiments.py keeps its entries for them so the
-    # archived CSVs stay mergeable. Each archive reproduces from its own
-    # vendored scripts/ at the commit its PROVENANCE.json names.
-    # ── 2026-09-09 FRETISH selection x grading ───────────────────────────────
-    #
-    # The FRETISH replication of experiments/2026-08-28-selection-grading:
-    # selection_scheme (nsga2-apportion against weighted) crossed with
-    # fitness.status_grading (mrs, PEREDUR's own, against aurus, AuRUS's
-    # six-level ladder). Two schemes x two sweep-K levels is the whole cross;
-    # the schemes are config directories and the grading arm rides in
-    # level_name, so both are already key columns and neither needs a new one.
-    #
-    # The factor is only measurable on this path from 2026-09-09. The FRETISH
-    # final realizability gate hard-coded Tiered until then, so a run configured
-    # `aurus` scored its search on the six-level ladder and judged its output on
-    # the three-point one; the admitted set never moved, the correctness table
-    # being applied whatever the scale folded in, but the grading arm could not
-    # be read at the gate. Running this against an earlier binary measures the
-    # search alone.
-    #
-    # Unlike the TLSF twin this is a point rather than a curve: it runs the
-    # FRETISH ablation operating point, gen40/pop1000, which is what every
-    # archived FRETISH sweep ran, and genetic.max_wall_s = 7200 is a backstop
-    # rather than the terminator. A 10-run probe at gen40/pop1000 measured
-    # fsm at 151s, mode-arbiter at 345-606s and takeoff at 250s, so most runs
-    # end on generations; the deadline exists because that probe ran under a
-    # 900s harness timeout and lost five of ten runs, and a run that stops on
-    # its own deadline writes its repairs and run.json where a harness kill
-    # writes neither.
-    #
-    # timeout_caps at 16200s is the backstop above the backstop, sized on the
-    # 2.2x rule: 2026-08-28-selection-grading ran a 400s deadline into 335
-    # compute-hours against the 67 the cap predicted, and 245 of its 600 runs
-    # were then killed by a 3600s timeout_caps and lost their manifests. The
-    # gate and the implication filter run past max_wall_s uncapped, and the
-    # filter is quadratic in the accumulated set, so the margin is deliberate.
-    #
-    # The weights are 0.1 / 0.2 / 0.7 (syntactic / semantic / status), AuRUS's
-    # published triple, matching the TLSF campaign exactly so the two are
-    # readable against each other on the grading factor. Only the weighted
-    # scheme reads them, so they are inert for the two nsga2-apportion arms.
-    # This makes the selection factor "NSGA-II against AuRUS-weighted
-    # scalarisation" rather than "against weighting in general", the confound
-    # 2026-08-28-selection-grading/PLAN.md registered before its own run.
-    #
-    # run_weakening is off, matching the binary's default since 2026-08-20
-    # rather than gen_configs.py's pinned true, so the campaign measures the
-    # shipping screen rather than one no default run applies.
-    #
-    # Generate with
-    #   python3 scripts/gen_configs.py --schemes nsga2-apportion weighted \
-    #       --sweeps K --levels mrs,aurus --metric log --weakening off \
-    #       --weights 0.1 0.2 0.7 --generations 10 --population-size 200 \
-    #       --max-wall-s 1800 \
-    #       --out-dir experiments/configs-gradsel-fret-m --pin-vintage
-    "gradsel-fret": {
-        "schemes": ["nsga2-apportion", "weighted"],
-        # Both stated rather than left None, and they must match the generator's
-        # --weakening/--metric flags: these are path segments of the config tree
-        # rather than declarations, so a None here globs `<scheme>/sweep_*.toml`
-        # while gen_configs.py has written `<scheme>/wkoff/log/sweep_*.toml`,
-        # and the runner exits on an empty configs directory.
-        "weakenings": ["wkoff"],
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["K"],
-        "levels": {"K": ["mrs", "aurus"]},
-        # All five families, mode-arbiter included: it contributes
-        # implies_ideal = 0 by construction (see FRETISH_SPECS) and is carried
-        # for found_repair and n_repairs, being the only scoped family and so
-        # the only run that exercises the scope machinery at all.
-        "specs": list(FRETISH_SPECS),
-        "seeds": list(range(30)),
-        # 2.25x the 1800 s deadline, which the deadline itself does not bound:
-        # the final gate and the implication filter both run past it, and the
-        # TLSF twin overran its own by 2.2x.
-        "timeout_caps": {"takeoff": 4050, "fsm": 4050, "fsm-timing": 4050,
-                         "fsm-combined": 4050, "mode-arbiter": 4050},
-        # Only sweep K runs, so there is no A/gen baseline to alias onto.
-        "baseline_aliases": {},
-        # -m for matched: the first declaration ran gen40/pop1000 and its 94
-        # surviving rows are under the unsuffixed names on both hosts. The
-        # resume key holds neither the operating point nor the binary, so a
-        # re-run against those directories would skip the finished cells and
-        # merge two operating points and two implication checks into one CSV.
-        "configs_dir": EXPERIMENTS_DIR / "configs-gradsel-fret-m",
-        "results_dir": EXPERIMENTS_DIR / "results-gradsel-fret-m",
-        "results_csv": EXPERIMENTS_DIR / "results-gradsel-fret-m.csv",
-        # 4 as on every FRETISH profile; ltlsynt is not in play here, so the
-        # per-call RAM ceiling that pins the TLSF profiles to 1 does not bind.
-        "default_jobs": 4,
-    },
-
 }
 
 
@@ -2134,8 +1016,8 @@ def write_manifest(path: Path, profile_name: str, profile: dict,
 
     The CSV carries the binary commit per row, but nothing else about the
     launch: which branch, which levels, how many workers. Reconstructing that
-    afterwards from config mtimes is the guesswork the PROVENANCE.json files
-    under experiments/ document; this writes it down at run time instead.
+    afterwards from config mtimes is guesswork; this writes it down at run time
+    instead.
     """
     manifest = {
         "profile": profile_name,
@@ -2231,13 +1113,8 @@ def derive_config(config_path: Path, output_dir: Path, parallel_k: int) -> Path:
     exists to fill in for a config that says nothing, so that jobs * parallel
     stays near the core count; a stated value is the campaign's own claim about
     how each run is meant to execute, and overwriting it silently makes the
-    thread pool a function of --jobs rather than of the design. The rule is
-    general rather than a per-profile exemption because there is no config in
-    any grid this reads that states the key by accident: gen_configs.py emits it
-    only under --parallel, which a campaign passes deliberately (the `curves`
-    profiles pass 1, their runs being single-threaded on purpose). Before that
-    flag existed nothing emitted the key at all, so the rewrite branch this
-    replaces was never reached and no archived grid changes meaning.
+    thread pool a function of --jobs rather than of the design. gen_configs.py
+    emits the key only under --parallel, which a campaign passes deliberately.
     """
     text = config_path.read_text()
     line = f"parallel = {parallel_k}"

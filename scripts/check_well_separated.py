@@ -61,10 +61,9 @@ SECTION_ALIASES = {
 #
 # "nsga2" and "nsga2-replicate" are the pre-rename spellings of
 # "nsga2-truncate" and "nsga2-apportion". gen_configs.py emits the new names
-# only, but every run directory archived under experiments/ is named with the
-# old ones, and those are the directories this script is usually pointed at --
-# so dropping them here would lose the anchor on exactly the layout it reads
-# most. Membership is tested per token, so the order is presentational.
+# only, but older run directories are named with the old ones, so dropping
+# them here would lose the anchor on that layout. Membership is tested per
+# token, so the order is presentational.
 SCHEMES = ("nsga2-truncate", "nsga2-apportion", "nsga2-replicate", "nsga2",
            "weighted")
 

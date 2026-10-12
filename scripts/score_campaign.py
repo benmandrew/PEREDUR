@@ -12,17 +12,13 @@ campaign.toml runs. The search writes one run directory per (spec, seed) under
 a results directory; this walks those directories and runs score_curves.py
 --maximality over each, one invocation per run, writing <out>/<run>.csv.
 
-Two campaigns (2026-08-29-aurus-matched and 2026-09-04-aurus-rematch) needed
-this pass, at 716 and roughly 325 worker-hours, and both times it was a pair
-of hand-rolled bash scripts on the hosts, a budget file edited over ssh, and
-provenance assembled by hand afterwards. This file reproduces those scripts'
-mechanics -- a smallest-first queue by accumulated/index.tsv line count, N
-workers each pinned to a block of cores, one score_curves.py per run under an
-outer wall cap, the per-run CSV moved into place through a .part file, a
-timings line per run naming the budgets it ran under, a failures list -- and
-adds what they lacked: a manifest recording every budget and both scoring
-binaries' commits, the same freshness gate run_experiments.py runs, and a
-resume, so a requeued phase re-scores only what failed.
+The mechanics are a smallest-first queue by accumulated/index.tsv line count,
+N workers each pinned to a block of cores, one score_curves.py per run under
+an outer wall cap, the per-run CSV moved into place through a .part file, a
+timings line per run naming the budgets it ran under, and a failures list.
+Beside those sit a manifest recording every budget and both scoring binaries'
+commits, the same freshness gate run_experiments.py runs, and a resume, so a
+requeued phase re-scores only what failed.
 
 A host scores only the seeds it is given. The seed split is enforced here, in
 the same place the runner enforces it, so two hosts sharing a results
@@ -115,8 +111,8 @@ def seed_of(run_dir: Path):
 def queue_runs(results: Path, seeds) -> list:
     """The run directories to score, smallest first.
 
-    Directly under the results directory, following symlinks as `find -L`
-    did; named `..._seed<N>` with N in this host's seeds, and nothing else. A
+    Directly under the results directory, following symlinks; named
+    `..._seed<N>` with N in this host's seeds, and nothing else. A
     directory that is not a run -- `accumulated`, a stray file -- carries no
     seed suffix and is left alone. Smallest first by index line count so the
     heavy families land last, where the budgets can still be raised for them
@@ -239,8 +235,8 @@ def run_capped(command: list, log, env: dict, wall_cap_s: int,
     A scorer forks maximal and compare, and killing score_curves.py alone
     leaves those running to the end of their own budgets on cores the next
     item is about to be pinned to. coreutils timeout kills the group it
-    started; the fallback used to kill the child alone, so both paths now
-    put the scorer in a new session and kill that with os.killpg on expiry.
+    started and the fallback must do the same, so both paths put the scorer
+    in a new session and kill that with os.killpg on expiry.
     """
     try:
         proc = subprocess.Popen(command, cwd=str(REPO_ROOT), stdout=log,

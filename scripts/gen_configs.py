@@ -33,29 +33,18 @@ CONFIGS_DIR = Path(__file__).parent.parent / "experiments" / "configs"
 # nsga2-apportion is appended rather than ordered next to nsga2-truncate so the
 # first two entries keep the positions the earlier grids were generated under.
 #
-# The two NSGA-II schemes were renamed: "nsga2" -> "nsga2-truncate" and
-# "nsga2-replicate" -> "nsga2-apportion". That is a hard break rather than a
-# deprecation -- config_io.cpp rejects the old spellings, so a config emitted
-# under them does not run at all. Each string here is also a config *directory*
-# name: scheme_of() in run_experiments.py reads it back into the `selection`
-# column of every results CSV, and that column joins KEY_FIELDS in
-# merge_experiments.py -- the natural key for resume and merge. Roughly a
-# quarter of a million archived rows were written under the old names, so the
-# rename would make every one of them miss its key and re-run a finished
-# campaign. SCHEME_ALIASES / canonical_scheme() in run_experiments.py and
-# merge_experiments.py close that gap by canonicalising every `selection` value
-# read back; nothing else here may depend on the old spellings.
+# Each string here is also a config *directory* name: scheme_of() in
+# run_experiments.py reads it back into the `selection` column of every results
+# CSV, and that column joins KEY_FIELDS in merge_experiments.py -- the natural
+# key for resume and merge. config_io.cpp rejects the old spellings "nsga2" and
+# "nsga2-replicate" of the two NSGA-II schemes.
 SCHEMES: list[str] = ["nsga2-truncate", "weighted", "nsga2-apportion"]
 
-# The weakening directory, which names a state and no longer sets one. The
-# weakening filter and its [filters] run_weakening key were removed on
-# 2026-09-11, so the binary never weakens and no config states the key. The
-# directory stays because `weakening` is one of merge_experiments.KEY_FIELDS:
-# weakening_of() in run_experiments.py reads it back into that column, and a
-# flat config with no weakening directory is attributed to LEGACY_WEAKENING
-# ("wkon"), which was true of every run before 2026-08-20 and is false of every
-# run since. A new campaign therefore passes --weakening off, as every one since
-# 2026-08-20 has, so its rows say what the binary did.
+# The weakening directory names a state and sets none: the binary never weakens
+# and no config states a key. The directory stays because `weakening` is one of
+# merge_experiments.KEY_FIELDS: weakening_of() in run_experiments.py reads it
+# back into that column and attributes a flat config to LEGACY_WEAKENING
+# ("wkon"). A new campaign therefore passes --weakening off.
 WEAKENINGS: dict[str, list[str]] = {
     "off": ["wkoff"],
 }
@@ -98,7 +87,7 @@ REPAIRS: dict[str, list[tuple[str, str]]] = {
 #     config carries no metric directory, so metric_of() in run_experiments.py
 #     attributes it to LEGACY_METRIC ("direct"), and `metric` is one of
 #     merge_experiments.KEY_FIELDS, so the emitted value has to keep matching
-#     that recorded CSV column or ~225k archived rows stop joining their own
+#     that recorded CSV column or archived rows stop joining their own
 #     key. Cross the metric explicitly with --metric to exercise
 #     "logarithmic".
 #   * selection_scheme — pinned "nsga2-truncate"; config.hpp defaults it to
@@ -137,18 +126,13 @@ DEFAULTS: dict = {
     "p_response": 0.5,
     "p_timing": 0.15,
     # FRETISH only: probability a mutation moves the condition type, and the
-    # scope, along its implication order. Both default to p_timing's 0.15 since
-    # 2026-09-11 and were 0 before, where neither arm costs an RNG draw. Emitted
-    # into [mutation] only when a sweep overrides them (see make_toml), so the
-    # standard grids stay byte-identical, which makes the move a "Config
-    # vintage" entry in docs/dev/config-and-provenance.md; both are in
-    # VINTAGE_KEYS. No sweep crosses them yet.
+    # scope, along its implication order. Emitted into [mutation] only when a
+    # sweep overrides them (see make_toml), so the standard grids stay
+    # byte-identical; both are in VINTAGE_KEYS.
     "p_condition_type": 0.15,
     "p_scope": 0.15,
     # FRETISH only: probability a mutation rewrites the stop of an until or
-    # before timing. New on 2026-09-15 at p_timing's rate; no archived
-    # specification carries a stop timing, so the arm draws nothing on any of
-    # them. Emitted into [mutation] only when a sweep overrides it.
+    # before timing. Emitted into [mutation] only when a sweep overrides it.
     "p_stop": 0.15,
     # Probability a mutation appends a new environment (fairness) assumption
     # rather than rewriting an existing requirement/section. Emitted into
@@ -169,34 +153,24 @@ DEFAULTS: dict = {
     # unrecorded. check_config_schema.py enforces the agreement for every key
     # of this table that is not deliberately exempt.
     # Report every gate-passing candidate of every generation rather than only
-    # the final population's. On in the binary since 2026-08-25, and emitted
-    # into [genetic] only when a sweep overrides it (see make_toml), so every
-    # existing grid stays byte-identical; TLSF sweep N crosses it. Sweep N
-    # states it on both arms rather than letting the control inherit silence,
-    # which is why that campaign is the one archive the move did not reinterpret
-    # -- the exposure "Config vintage" in docs/dev/config-and-provenance.md
-    # records for every other archive here.
+    # the final population's. Emitted into [genetic] only when a sweep
+    # overrides it (see make_toml), so every existing grid stays
+    # byte-identical; TLSF sweep N crosses it.
     "accumulate_repairs": True,
     "black_timeout_ms": 1000,
     "repair_mode": "monolithic",
-    # Mirrors include/config.hpp, which moved to "mrs" on the 2026-08-11
-    # campaign. Emitted into [fitness] only when a sweep overrides it (see
-    # make_toml), so every existing grid stays byte-identical; sweep G varies
-    # it. That silence is what makes the move a config-vintage change for every
-    # campaign archived before it -- see "Config vintage" in
-    # docs/dev/config-and-provenance.md.
+    # Mirrors include/config.hpp. Emitted into [fitness] only when a sweep
+    # overrides it (see make_toml), so every existing grid stays
+    # byte-identical; sweep G varies it.
     "status_grading": "mrs",
-    # Mirrors include/config.hpp, which moved to "degree" on 2026-08-14. Emitted
-    # into [fitness] only when a sweep overrides it (see make_toml), so every
-    # existing grid stays byte-identical. Read only under status_grading =
-    # "mrs", so pinning it says nothing about a tiered arm either way -- and it
-    # is a config-vintage change for every campaign archived before it, none of
-    # which could state a key their binary had never heard of.
+    # Mirrors include/config.hpp. Emitted into [fitness] only when a sweep
+    # overrides it (see make_toml), so every existing grid stays
+    # byte-identical. Read only under status_grading = "mrs", so pinning it
+    # says nothing about a tiered arm either way.
     "mrs_admission_order": "degree",
     # FRETISH keyword placement (see config.hpp). Both mirror the C++ defaults
     # and are emitted into [fitness] only when a sweep overrides them, so every
-    # existing grid stays byte-identical. The default reproduces every run from
-    # before the keys existed, so neither is a config-vintage change.
+    # existing grid stays byte-identical.
     "keyword_similarity": "semantic",
     "semantic_trace_weight": 0.5,
     # TLSF-only [tlsf.mutation] split (see config.hpp). Emitted only when a sweep
@@ -207,27 +181,15 @@ DEFAULTS: dict = {
     "p_assumption": 0.3,
     "p_temporal": 0.2,
     # The monotone arm and the clone-an-assumption branch of p_add_assumption
-    # (see config.hpp). Both default on in the binary and each is emitted only
-    # when a sweep overrides it (see make_toml), so every grid generated before
-    # they existed stays byte-identical; TLSF sweep T crosses them. p_monotone
-    # sits under [mutation] and is read by both paths since 2026-09-11; it was
-    # TLSF-only under [tlsf.mutation] before, and the FRETISH arm defaulted to
-    # 0. Every campaign archived before 2026-08-21 ran without either operator
-    # and cannot state so, which makes this a "Config vintage" entry in
-    # docs/dev/config-and-provenance.md rather than a silent one -- reproducing
-    # such a campaign means writing both keys to 0. p_monotone is in
+    # (see config.hpp). Each is emitted only when a sweep overrides it (see
+    # make_toml), so existing grids stay byte-identical; TLSF sweep T crosses
+    # them. p_monotone sits under [mutation], is read by both paths, and is in
     # VINTAGE_KEYS.
     "p_monotone": 0.25,
     "p_clone_assumption": 0.25,
-    # The 2026-08-25 assumption-reach keys (see config.hpp): a width for the
-    # disjunctive body tlsf_add_assumption draws and a bare-F form for an
-    # appended assumption. Both default to their no-op value in the binary, so
-    # a campaign archived before 2026-08-25 that omits them means exactly what
-    # it always meant and no "Config vintage" entry is owed. p_remove_assumption
-    # and p_burst_continue were removed with their operators on 2026-09-11. A
-    # fifth key, p_union_assumption, was removed rather than kept at its no-op;
-    # a config that still sets it is warned about and ignored, so reproduce
-    # such a campaign from its vendored scripts/.
+    # A width for the disjunctive body tlsf_add_assumption draws and a bare-F
+    # form for an appended assumption (see config.hpp). Both default to their
+    # no-op value in the binary, so a config that omits them is unchanged.
     "max_assumption_width": 1,
     "p_bare_assumption": 0.0,
     # Per-call ltlsynt timeout in ms; 0 = no timeout, matching config.hpp.
@@ -237,7 +199,7 @@ DEFAULTS: dict = {
     # Per-call ltl2tgba (model-counting) timeout in ms; 0 = no timeout, matching
     # config.hpp. Emitted only when positive. The counting-path -D determinization
     # blows up super-exponentially on some deep formulae; the TLSF campaign sets
-    # it to cut the multi-GB, hours-long counting tail (see the ltl2tgba leak fix).
+    # it to cut the multi-GB, hours-long counting tail.
     "ltl2tgba_timeout_ms": 0,
     # 0 = fall back to config.hpp's 0.05. Emitted only when positive, so the
     # standard grids stay byte-identical. The TLSF one-hot encodings mutate into
@@ -423,13 +385,6 @@ SWEEP_B: list[tuple[str, dict]] = [
 ]
 
 # Sweep C: vary fitness weight presets (generations=10, population_size=200)
-#
-# The "no-halstead" level was retired on 2026-08-13 with the Halstead objective
-# itself. It set weight_halstead to 0 against a default of 0.1, so with the key
-# gone the level says nothing the "default" level does not; the ablation it
-# carried is retired with it. Archived rows recording it stay readable, and the
-# campaigns that ran it reproduce from their vendored per-campaign scripts/ at
-# the commit their PROVENANCE.json names.
 SWEEP_C: list[tuple[str, dict]] = [
     ("default",         {}),
     ("syntactic-heavy", {"weight_syntactic": 0.8, "weight_semantic": 0.2}),
@@ -472,9 +427,8 @@ SWEEP_F: list[tuple[str, dict]] = [
 ]
 
 # Sweep G: vary the bounded model-counting horizon. Raising it costs almost
-# nothing — the bound enters through the transfer matrix, not a SAT call, and
-# bound 80 measured within noise of bound 5 — but it moves the semantic
-# similarity score, so it changes which repairs win.
+# nothing — the bound enters through the transfer matrix, not a SAT call — but
+# it moves the semantic similarity score, so it changes which repairs win.
 SWEEP_G: list[tuple[str, dict]] = [
     ("bound5",   {"default_bound": 5}),
     ("bound10",  {"default_bound": 10}),
@@ -505,47 +459,25 @@ SWEEP_I: list[tuple[str, dict]] = [
     ("mut1.0",  {"mutation_rate": 1.0}),   # baseline
 ]
 
-# Sweep J is retired. It ablated the weakening filter through [filters]
-# run_weakening, which was removed on 2026-09-11 with the filter itself, so
-# neither arm is expressible. Its archived campaigns reproduce from their
-# vendored per-campaign scripts/ at the commit their PROVENANCE.json names, as
-# sweeps C, O and V do.
-
 # Sweep K: the status objective's grading scale, on the FRETISH path. The TLSF
 # table carries the same three levels under G; the FRETISH G is the model-count
 # bound and was there first, so this is the same factor under a free letter
 # rather than a letter reused across the two tables. K is unused in both, and O
 # and U are avoided as retired rather than free.
-#
-# The scale is only measurable on this path from 2026-09-09: the FRETISH final
-# realizability gate hard-coded Tiered until then, so a run configured `aurus`
-# scored its search on the six-level ladder and judged its output on the
-# three-point one. Generating this sweep against an earlier binary measures the
-# search alone with a gate that ignores the factor.
 SWEEP_K: list[tuple[str, dict]] = [
     ("tiered", {"status_grading": "tiered"}),
     ("mrs",    {"status_grading": "mrs"}),
     ("aurus",  {"status_grading": "aurus"}),
 ]
 
-# Sweep R: vary elitism, for the nsga2-vs-nsga2-replicate campaign. Elitism
-# carries the top fraction over verbatim, which re-injects exact duplicates into
-# the pool -- the mechanism nsga2-replicate deduplicates away. The scheme's
-# original A/B ran at elitism_rate = 0, which is *not* the shipped default, so
-# crossing the two states is what separates "replicate helps" from "replicate
-# helps only where nothing else re-injects duplicates".
+# Sweep R: vary elitism. Elitism carries the top fraction over verbatim, which
+# re-injects exact duplicates into the pool -- the mechanism nsga2-replicate
+# deduplicates away. Crossing the two states separates "replicate helps" from
+# "replicate helps only where nothing else re-injects duplicates".
 SWEEP_R: list[tuple[str, dict]] = [
     ("elit0",   {"elitism_rate": 0.0}),
     ("elit0.1", {"elitism_rate": 0.1}),   # config.hpp default
 ]
-
-# Sweep O is retired. It crossed [genetic] repaired_operators, the repaired
-# mutation and crossover grammar of 2026-08-19 against the one every campaign
-# before it ran; that grammar is now the only one and the key no longer exists,
-# so neither arm is expressible and the sweep cannot be generated at all. Its
-# archived campaigns are the only record, and they reproduce from their
-# vendored per-campaign scripts/ at the commit their PROVENANCE.json names, as
-# sweep V does after [filters.intervals] went.
 
 # Sweep S: the compute-matched control for sweep R. nsga2-replicate costs more
 # wall time per run than nsga2 (it breeds from a replicated population), so a
@@ -564,19 +496,11 @@ DEFAULT_COMPUTE_MATCH_FACTOR = 1.5
 # being archived. A generated config states a key only where a sweep overrides
 # it, so everything else is inherited from the binary at run time — which means
 # changing a C++ default silently changes what every archived config *means*.
-# These have crossed that line: status_grading went tiered -> mrs on
-# 2026-08-12, swapping the status objective outright rather than shifting a
-# threshold, mrs_admission_order went spec ->
-# degree on 2026-08-14, which reorders the greedy walk inside that objective and
-# so moves the score of every candidate the walk grades, and p_condition_type,
-# p_scope and the FRETISH p_monotone went 0 -> 0.15, 0.15 and 0.25 on
-# 2026-09-11. run_well_separation and allow_output_assumptions (which moved
-# twice) were here until their keys were removed on 2026-09-11; the binary now
-# warns on a config stating either and ignores the key.
 # --pin-vintage writes these explicitly so a campaign archived today still
-# describes the run it was, whatever the defaults do afterwards. Add a key here when its default moves; the cost of a spurious
-# entry is one redundant line per config, and the cost of a missing one is an
-# archive that cannot be reproduced.
+# describes the run it was, whatever the defaults do afterwards. Add a key here
+# when its default moves; the cost of a spurious entry is one redundant line
+# per config, and the cost of a missing one is an archive that cannot be
+# reproduced.
 VINTAGE_KEYS: tuple[str, ...] = (
     "status_grading", "mrs_admission_order",
     "p_condition_type", "p_scope", "p_monotone",
@@ -610,13 +534,12 @@ SWEEPS: list[tuple[str, list]] = [
 
 # ── TLSF campaign grid ───────────────────────────────────────────────────────
 
-# The basic-TLSF examples are far slower than the FRETISH specs — three of them
-# take ~3 min even at gen10/pop200 and cost scales with generations*population —
-# so the TLSF campaign sweeps only the two operating-point axes over a coarse
-# four-level cross rather than the fine FRETISH grid, spending the fixed
-# wall-clock budget on seeds instead of gradations. The two axes cross at the
-# gen10/pop200 baseline (shared level), matching the FRETISH aliasing so
-# B/pop200 collapses onto A/gen10. Emitted by `--tlsf` into configs-tlsf/.
+# The basic-TLSF examples are far slower than the FRETISH specs, and cost
+# scales with generations*population, so the TLSF campaign sweeps only the two
+# operating-point axes over a coarse four-level cross rather than the fine
+# FRETISH grid. The two axes cross at the gen10/pop200 baseline (shared level),
+# matching the FRETISH aliasing so B/pop200 collapses onto A/gen10. Emitted by
+# `--tlsf` into configs-tlsf/.
 TLSF_SWEEP_A: list[tuple[str, dict]] = [
     ("gen5",  {"generations": 5}),
     ("gen10", {"generations": 10}),   # baseline (shared with B/pop200)
@@ -638,7 +561,7 @@ TLSF_SWEEP_B: list[tuple[str, dict]] = [
 # full size while the guarantee side is the minimal core, so the same split
 # spends a larger share of guarantee mutations on the culprit formulae. pg0.7 is
 # the config.hpp baseline (p_assumption=0.3). Crossed with tlsf.repair_mode via
-# `--tlsf --sweeps M --repair both` for the mono-vs-muc campaign.
+# `--tlsf --sweeps M --repair both`.
 TLSF_SWEEP_M: list[tuple[str, dict]] = [
     # Level names still read as the guarantee-side share, which is now
     # 1 - p_assumption rather than its own key. They are load-bearing: level
@@ -650,13 +573,11 @@ TLSF_SWEEP_M: list[tuple[str, dict]] = [
     ("pg0.9", {"p_assumption": 0.1}),
 ]
 
-# TLSF sweep P: vary p_add_assumption (TLSF-only campaign use, though the key is
-# shared by both modes). Raising it makes mutation append a fairness assumption
-# more often, the structural move needed to reach assumption-side ideals (e.g.
-# arbiter's G F r0 & G F r1). The 2026-07-21 muc campaign found the ideal-hit rate
-# is bottlenecked on this fixed-rate mutation, not the assumption/guarantee split;
-# this sweep tests whether raising it shifts repairs from guarantee-weakening to
-# the ideal. padd0.05 is the config.hpp baseline. Crossed with tlsf.repair_mode.
+# TLSF sweep P: vary p_add_assumption (TLSF-only campaign use, though the key
+# is shared by both modes). Raising it makes mutation append a fairness
+# assumption more often, the structural move needed to reach assumption-side
+# ideals (e.g. arbiter's G F r0 & G F r1). padd0.05 is the config.hpp baseline.
+# Crossed with tlsf.repair_mode.
 TLSF_SWEEP_P: list[tuple[str, dict]] = [
     ("padd0.05", {"p_add_assumption": 0.05}),   # baseline
     ("padd0.15", {"p_add_assumption": 0.15}),
@@ -678,16 +599,6 @@ TLSF_SWEEP_D: list[tuple[str, dict]] = [
     ("prem0.3",  {"p_remove_guarantee": 0.3}),
 ]
 
-# TLSF sweeps W and Q are retired. W crossed [filters] run_well_separation
-# against allow_output_assumptions as a 2x2, and Q spread p_add_assumption over
-# the two run_well_separation = true arms for the arbiter follow-up; that key
-# was removed on 2026-09-11 with the per-generation well-separation filter, and
-# allow_output_assumptions with it, so neither sweep is expressible. The
-# well-separation row of the correctness table still drives the final gate and
-# the input screen. Their archived
-# campaigns (wellsep, arbiter-hp, arbiter-padd) reproduce from their vendored
-# per-campaign scripts/ at the commit their PROVENANCE.json names.
-
 # TLSF sweep R: the elitism cross of the FRETISH sweep R, at the TLSF baseline
 # operating point (gen10/pop200) and carrying the TLSF runtime settings --tlsf
 # supplies. Same letter as the FRETISH sweep because it is the same factor; the
@@ -698,75 +609,36 @@ TLSF_SWEEP_R: list[tuple[str, dict]] = list(SWEEP_R)
 # Expressed as a sweep rather than as a crossed factor directory, deliberately.
 # A crossed factor would need its own CSV column, and that column would have to
 # join KEY_FIELDS in merge_experiments.py to tell the two arms apart -- which
-# means every one of the ~225k archived rows, none of which carries the column,
+# means every one of the archived rows, none of which carries the column,
 # would need a legacy default to keep matching. A sweep needs none of that: the
 # arm rides in `level_name`, a field the key already carries, exactly as sweep C
 # carries its weight presets. Cross it as a factor only when a campaign needs it
 # crossed with something else.
 #
-# "tiered" is the config.hpp default and the baseline arm; "mrs" is the greedy
-# maximal-realizable-subset scale. level_value_of() reads a trailing number off
-# the level name and finds none in either, as with sweep C's default and
-# status-only, so both record a null level value.
-#
-# "aurus" was appended on 2026-08-28, after the ladder landed in config.hpp, and
-# is appended rather than ordered beside "tiered" for the reason SCHEMES is: the
-# closed `status-grading` profile pins levels ["tiered", "mrs"] and its archived
-# rows name those two, so the pair keeps the positions it was generated under.
-# AuRUS's own six-level scale (0, 0.05, 0.1, 0.2, 0.5, 1.0) grades by which side
-# of the specification is satisfiable on its own and never folds well-separation
-# into its realizability query, so crossing it against "mrs" ablates PEREDUR's
-# status objective against the design it derives from. It carries no trailing
-# number either, so it records a null level value like the other two.
+# "mrs" is the greedy maximal-realizable-subset scale and "aurus" is AuRUS's
+# own six-level scale. "aurus" is appended rather than ordered beside "tiered"
+# so the first two levels keep the positions archived rows name. No level name
+# carries a trailing number, so level_value_of() records a null level value.
 TLSF_SWEEP_G: list[tuple[str, dict]] = [
     ("tiered", {"status_grading": "tiered"}),
     ("mrs",    {"status_grading": "mrs"}),
     ("aurus",  {"status_grading": "aurus"}),
 ]
 
-# TLSF sweep N: the cross-generation accumulator, off against on. PEREDUR
-# otherwise reports the maximal antichain of its *final* population, so a
-# candidate that passed the output gate in generation 3 and was not selected
-# into generation 4 is a repair the search found and discarded. The AuRUS
-# baseline keeps them all, which is most of why the 2026-08-14 head-to-head
-# recorded it emitting a median of 448 solutions against PEREDUR's 4. Repair
-# quality is judged existentially, so a larger emitted set cannot lower
-# implies_ideal; the question is how much it raises it, and what the extra gate
-# sweep per generation costs on this path.
+# TLSF sweep N: the cross-generation accumulator, off against on. With it off,
+# PEREDUR reports the maximal antichain of its *final* population, so a
+# candidate that passed the output gate in one generation and was not selected
+# into the next is a repair the search found and discarded.
 TLSF_SWEEP_N: list[tuple[str, dict]] = [
     ("accoff", {"accumulate_repairs": False}),   # control
     ("accon",  {"accumulate_repairs": True}),
 ]
 
-# TLSF sweep T: attribute the three changes on feat/monotone-operators, one
-# contrast at a time, against the archived 2026-08-21-aurus-h2h-ship rows as the
-# outer control. That campaign is main at the shipping configuration plus the
-# accumulator over this same corpus, cap and seed split, so every arm below is
-# paired with it on (spec, seed).
-#
-# The branch carries three independent changes and their keys do not separate
-# them evenly. Widening the TLSF binary grammar to draw Implies is unconditional
-# -- there is no key for it -- so it rides in every arm here and is attributable
-# only against the archived rows. The monotone rewrite and the cloned assumption
-# have keys, and both cost no RNG draw at 0 (the branch's
-# test_zero_probability_costs_no_draw pins that), so monooff reproduces the
-# grammar widening alone rather than approximating it. Elitism has a key too.
-#
-#   archived -> monooff   the Implies widening
-#   monooff  -> monoon    the monotone rewrite + the cloned assumption
-#   monoon   -> monoship  elitism_rate 0.1 -> 0, the branch's other default move
-#   archived -> monoship  the branch as it ships
-#
-# elitism_rate is stated on all three arms rather than left to the default, for
-# sweep N's reason: the branch moves that default, so an arm inheriting silence
-# would mean one thing here and another after the next default move. 0.1 on the
-# first two matches what the archived control ran, which is what makes the first
-# two contrasts read as the code change alone.
-#
-# accumulate_repairs is stated on every arm for a second reason: the control ran
-# it on, through sweep N's accon level, and it is off in the binary. An arm that
-# left it silent would answer a different question from the one it is paired
-# with, and the endpoint is per-run implies_ideal over everything emitted.
+# TLSF sweep T: the monotone rewrite and the cloned assumption, off against on,
+# then with elitism off. Both operators cost no RNG draw at 0, so monooff runs
+# without them exactly. elitism_rate and accumulate_repairs are stated on every
+# arm rather than left to the default, so a later default move cannot change
+# what an arm means.
 TLSF_SWEEP_T: list[tuple[str, dict]] = [
     ("monooff",  {"p_monotone": 0.0,  "p_clone_assumption": 0.0,
                   "elitism_rate": 0.1, "accumulate_repairs": True}),
@@ -775,15 +647,6 @@ TLSF_SWEEP_T: list[tuple[str, dict]] = [
     ("monoship", {"p_monotone": 0.25, "p_clone_assumption": 0.25,
                   "elitism_rate": 0.0, "accumulate_repairs": True}),
 ]
-
-# Sweep U is retired. It crossed the 2026-08-25 assumption-reach operators
-# against search size, and two of its three operator levels set
-# [tlsf.mutation] p_union_assumption; that key is gone -- the union crossover
-# it armed cannot reach what it was written for -- so neither `reach` nor
-# `reachburst` is expressible and the sweep cannot be generated at all.
-# `experiments/2026-08-26-assumption-reach` is the only record of what ran, and
-# it reproduces from its vendored per-campaign scripts/ at the commit its
-# PROVENANCE.json names, as sweeps C, O and V do.
 
 TLSF_SWEEPS: list[tuple[str, list]] = [
     ("A", TLSF_SWEEP_A),
@@ -797,10 +660,8 @@ TLSF_SWEEPS: list[tuple[str, list]] = [
     ("T", TLSF_SWEEP_T),
     # The compute-matched control, on the same terms as the FRETISH grid's S:
     # TLSF_SWEEP_R is SWEEP_R, so make_sweep_s already emits the right levels
-    # and main() rebuilds this entry from --compute-match-factor whichever table
-    # was selected. Registered here because 2026-08-11-selection-default asks
-    # its question on both paths, and a compute control on one of them would
-    # leave the other unable to separate a better search from a longer one.
+    # and main() rebuilds this entry from --compute-match-factor whichever
+    # table was selected.
     ("S", make_sweep_s(DEFAULTS["generations"], DEFAULT_COMPUTE_MATCH_FACTOR)),
 ]
 
@@ -812,32 +673,17 @@ TLSF_CONFIGS_DIR = Path(__file__).parent.parent / "experiments" / "configs-tlsf"
 # timed-out check is undecided: it admits no repair, and drops the candidate at
 # the well-separation filter.
 #
-# This was 500ms, on the measured call-duration distribution: sharply bimodal,
-# 95% of calls under 50ms, only ~2% past 100ms, an almost-empty 0.5-1s band, so
-# 500ms and 10s abandon nearly the same set (~0.1% of calls apart) while 500ms
-# caps the pathological tail far tighter. Every one of those figures counts
-# calls pooled across the corpus, and pooling is what made 500ms look free. It
-# hides the per-spec case: where a spec's *own* realizability query exceeds the
-# budget, it does not shed 0.1% of its calls, it sheds all of them. amba is that
-# spec — 1.5s for the unrealizable original, 6.1s to prove its known-good
-# repair realizable — so every amba run in every campaign generated at 500ms
-# scored a constant status objective and had its repairs rejected at the final
-# gate. Re-run at a budget that decides it, amba yields; its 96/96 zero-yield
-# across the archive measures this, not the search.
-#
-# 10s matches the C++ default (Config::ltlsynt_timeout) and clears the corpus
-# worst case by a wide margin while still cutting the minutes-long tail. One
-# query may now run 20x longer than it could before, so the per-spec
-# `timeout_caps` in run_experiments.py — calibrated while 500ms bounded every
-# query — need re-checking before a launch, amba's above all.
+# The value matches the C++ default (Config::ltlsynt_timeout). The budget must
+# exceed each spec's *own* realizability query: below it, every run of that
+# spec scores a constant status objective and has its repairs rejected at the
+# final gate.
 TLSF_LTLSYNT_TIMEOUT_MS = 10000
 
 # Default per-call ltl2tgba (model-counting) timeout (ms) for the TLSF campaign.
 # The counting path has no internal timeout and its -D determinization blows up
-# super-exponentially on some deep formulae (observed multi-GB, hours-long, then
-# orphaned). 60 s is generous — legitimate counts finish in milliseconds to ~20 s
-# — while cutting the pathological tail. A timed-out count drops that individual
-# (absorbed by max_scoring_failure_rate). Needs the ltl2tgba-timeout binary fix.
+# super-exponentially on some deep formulae. The bound sits well above any
+# legitimate count while cutting that tail. A timed-out count drops that
+# individual (absorbed by max_scoring_failure_rate).
 TLSF_LTL2TGBA_TIMEOUT_MS = 60000
 
 # Scoring-failure tolerance for the TLSF campaign. The one-hot balancer/direction

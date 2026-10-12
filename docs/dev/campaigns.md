@@ -6,7 +6,7 @@ The campaign declaration, the verbs that act on it, and what each reading means;
 
 A campaign is declared once, in `experiments/<name>/campaign.toml`: its branch, the seed range each lab host takes, and its phases. Everything that acts on a campaign goes through `scripts/campaign.py`, so the seed split exists in one place. Never hand-roll an `ssh … nohup … run_experiments.py` line and never choose a seed range at the prompt; two hosts sharing a seed run it twice and the merge keeps one row per key, which costs machine time and yields nothing. `campaign.toml` is tracked (a `.gitignore` negation), because the hosts get it by checking out the campaign's branch.
 
-The verbs are `stage` (put a host on the branch and rebuild it), `start` (launch the phases detached), `enqueue` plus the cron-driven `tick` (the unattended path), `dequeue` (take an entry back out, killing the tick holding it), `status`, `load` (CPU, memory, disk and GPU use per host, cheap enough for `watch`), `queue`, `collect` and `describe` (derive a declaration for an archived campaign).
+The verbs are `stage` (put a host on the branch and rebuild it), `start` (launch the phases detached), `enqueue` plus the cron-driven `tick` (the unattended path), `dequeue` (take an entry back out, killing the tick holding it), `status`, `load` (CPU, memory, disk and GPU use per host, cheap enough for `watch`), `queue` and `collect`.
 
 `campaign.py status` is the source of truth, read-only, and costs about a second. Never carry campaign state in conversation context; re-run the poll later rather than predicting what it will say. Never poll in a loop, and never spawn an agent to watch a run: `enqueue` the campaign and let the five-minute tick drive it.
 
@@ -61,7 +61,7 @@ Neither takes a seed range; `enqueue` freezes the split into the entry, so editi
 
 ```toml
 [[phases]]
-profile = "matched"
+profile = "tlsf"
 jobs = 16
 
 [[phases]]
@@ -183,21 +183,6 @@ Closing a campaign means the archive can be read without the git history. Rename
 - If a C++ default flipped between the campaign running and the close, add it to the "Config vintage" note in `docs/dev/config-and-provenance.md`. An archived config only holds the keys a sweep overrode, so a changed default silently changes what every one of them means.
 
 `campaign.toml` stays in the archive, keeping the seed split reproducible; queue entries do not.
-
-## Describing a closed campaign
-
-```sh
-python scripts/campaign.py describe <campaign>
-python scripts/campaign.py describe --all --json
-```
-
-`describe` derives a declaration for an archived campaign from `experiments/<campaign>/` and writes nothing. The archives left this repository after `274d496`, so `describe` needs them checked out from that commit first (see `docs/dev/config-and-provenance.md`). The 19 closed campaigns never had one, and none is written into them: an archive is replayed through its vendored scripts at its recorded commit, where `campaign.py` does not exist, and a file beside its own sources would be a cache that can drift. `describe --all --json` also answers whether a config knob is ever set, over 19 archives rather than roughly 65,000 configs.
-
-The factor cross comes from the merged CSV's key columns (`sweep`, `level_name`, `selection`, `weakening`, `metric`, `repair_mode`, `spec`, `seed`), preferred over vendored `PROFILES` because the dict says what was intended and the CSV what happened. The host split comes from disjoint per-host CSVs (13 of 19), the branch from `PROVENANCE.json` (5 of 19), and phase order from a vendored shell driver, which only elitism has.
-
-`attribution = "inferred"` follows 12 of the 19 `PROVENANCE.json` files and means each value was read from the file `derived_from` names, not recorded at the time. Unrecorded fields are listed in `not_recorded` and omitted rather than defaulted, since an absent field is true of the archive and a plausible default is not. `jobs` is always there, every run having taken its profile's `default_jobs`. A CSV header older than `selection` leaves `schemes` absent.
-
-The output is not runnable, naming retired profiles (`wellsep-timing`) and rejected schemes (`nsga2`). `2026-07-31-replicate`, `2026-08-03-libspot-soak` and `2026-08-04-engine-comparison` never ran a factor cross and get stubs naming their vendored scripts and `kind`, with `phases` in `not_recorded`, so every printed line has a file behind it.
 
 ## Testing this
 

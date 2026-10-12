@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the AuRUS baseline campaign and collect metrics to a results CSV.
 
-The head-to-head arm of the ablation campaign (PLAN §3.3): for each spec x
+The head-to-head arm of the ablation campaign: for each spec x
 repeat, invoke AuRUS's ./unreal-repair.sh from the AuRUS repo root with the
 campaign parameters (BASE_FLAGS plus -GATO=<gato>, and -onlyInputsA for the
 nine specs run-all-together.sh drives), one output directory per repeat.
@@ -10,13 +10,12 @@ override), so independent repeats stand in for seeds and every out.txt is
 archived.
 
 `--aurus-root` must point at AuRUS as its authors left it, commit 3f6f01f,
-which is the last upstream commit before this project's fork. The fork above
-it changes the GA core, the model-counting fitness and the solver layer, and
-would measure an optimised AuRUS rather than the published baseline. Only one
-substitution is unavoidable: 3f6f01f tracks a macOS Mach-O Strix binary at
-lib/new_strix/strix, so any Linux run needs a Linux Strix dropped in there.
-Note the entry point lives at the repo root at that commit; the fork later
-moved it under scripts/.
+the last upstream commit before this project's fork. The fork changes the GA
+core, the model-counting fitness and the solver layer, and would measure an
+optimised AuRUS rather than the published baseline. One substitution is
+unavoidable: that commit tracks a macOS Strix binary at lib/new_strix/strix,
+so a Linux run needs a Linux Strix dropped in there. The entry point is at
+the repo root at that commit, not under scripts/ as in the fork.
 
 Per-run wall time is measured here, externally, rather than trusting the
 JVM's self-report (recorded too, as aurus_time_s).
@@ -56,7 +55,7 @@ from pathlib import Path
 # rows carry in this campaign's CSVs, valued by a path relative to
 # <aurus-root>. The tree spans two roots — the case studies and the loose
 # `examples/` one — so these are root-relative rather than rooted at
-# `case-studies/`, which is what previously made the examples/ rows unnameable.
+# `case-studies/`, which would leave the examples/ rows unnameable.
 #
 # Eleven of the keys are PEREDUR examples/ names, so those rows join directly
 # against run_experiments.py's `aurus-h2h` rows; they are H2H_TLSF_SPECS there
@@ -149,13 +148,11 @@ SPEC_TLSF: dict[str, str] = {
 # drivers under scripts/legacy/, which are the record of how the paper's
 # numbers were produced; all three of them agree on every flag here.
 #
-# `-k=20` is the model-counter bound. The 2026-07-24 campaign ran 10, which
-# counted traces to half the depth on AuRUS's side of a comparison where
-# PEREDUR's own `model_counting.default_bound` is 20; the legacy drivers
-# settle it independently of the paper's prose. `-GATO` is supplied per run
-# from --gato and is 7200 in all three drivers too. `-geneNUM=0` restates the
-# shipped default (GA_GENE_NUM_OF_MUTATIONS), so it is a no-op kept for
-# fidelity to the record. See experiments/2026-07-24-ablation/REPORT.md.
+# `-k=20` is the model-counter bound, the same depth as PEREDUR's own
+# `model_counting.default_bound`. `-GATO` is supplied per run from --gato
+# and is 7200 in all three drivers too. `-geneNUM=0` restates the shipped
+# default (GA_GENE_NUM_OF_MUTATIONS), so it is a no-op kept for fidelity to
+# the record.
 #
 # `-factors` is STATUS,SYN,SEMANTIC and is a DELIBERATE DEPARTURE from the
 # drivers, which do not agree on it: run-all-together.sh omits it,
@@ -279,7 +276,7 @@ def main() -> None:
                              "built (bin/ populated by ant compile)")
     # Absolutised because AuRUS resolves a relative -out against its own repo
     # root (its scripts cd there), scattering outputs under the aurus tree
-    # while the parser reads the harness-side path — bitten 2026-07-26.
+    # while the parser reads the harness-side path.
     parser.add_argument("--out-root", type=lambda p: Path(p).resolve(),
                         required=True, metavar="PATH",
                         help="Directory for <spec>/repeat-NN/ run dirs and "

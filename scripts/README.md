@@ -8,7 +8,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 
 | Script | Role |
 |---|---|
-| `campaign.py` | The operating surface for a campaign: `stage`, `start`, `enqueue`, `tick`, `status`, `load`, `queue`, `collect`, `describe`. Everything that acts on a campaign goes through it. See `docs/dev/campaigns.md` for the state each verb leaves behind. |
+| `campaign.py` | The operating surface for a campaign: `stage`, `start`, `enqueue`, `tick`, `status`, `load`, `queue`, `collect`. Everything that acts on a campaign goes through it. See `docs/dev/campaigns.md` for the state each verb leaves behind. |
 | `run_experiments.py` | Runs one phase of a sweep on one host and appends rows to the results CSV. Vendored into every campaign archive. |
 | `score_campaign.py` | The runner's scoring twin: one `score_curves.py --maximality` per run directory over one host's seeds, under a pinned worker pool, with a manifest of the budgets and binaries. What a `kind = "score"` phase runs. |
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
@@ -133,8 +133,6 @@ CSV it writes:
 | Profile | Schemes | Sweeps / levels | Seeds | Results CSV | Wall-clock at `--jobs 4` |
 |---|---|---|---|---|---|
 | `full` (default) | nsga2-truncate | the original 14 levels of A, B, C | 0–29 | `results.csv` | ~29 min (1440 runs) |
-| `factorial` | nsga2-truncate, weighted | every level of A–J (J since retired) | 0–99 | `results-factorial.csv` | ~14.6 h (43,200 runs) |
-| `metric` | nsga2-truncate | C/default only, `metric` crossed direct×log | 0–99 | `results-metric.csv` | ~1 h split across two machines (800 runs at generations=40/population=1000) |
 | `tlsf` | nsga2-truncate | A + B, coarse 4-level cross (7 operating points) | 0–59 (ceiling) | `results-tlsf.csv` | ~16 h split across av2+av3 (`--jobs 1`; the six TLSF specs) |
 
 `full` is pinned to the four generation and five population levels it has
@@ -149,37 +147,6 @@ Measured across two 32-core machines splitting the seeds, each running
 `python scripts/run_experiments.py --profile full --jobs 4`: 690 runs in 13.2
 minutes and 13.9 minutes. The table assumes `--jobs 4`; `full` defaults to
 `--jobs 1`, which serialises the same work into about 115 minutes.
-
-`factorial` is the wide one: 63 levels × 4 specs × 100 seeds × 2 schemes =
-50,400 rows from 43,200 executions, about 58 hours of serial compute. Split
-across av2 and av3 at `--jobs 4` that is roughly 7.3 hours each. Its point is
-that `selection_scheme` becomes a factor rather than a constant, so
-nsga2-vs-weighted is answerable at every level instead of only at the baseline
-— `results.csv` holds no weighted runs at all, so that comparison cannot be
-made from it. Seeds extend cheaply afterwards: `--seeds $(seq -s' ' 100 149)`
-against an existing `results-factorial.csv` runs only the new ones.
-
-`metric` isolates the `model_counting.metric` factor — the direct-vs-log choice
-of how bounded trace counts become a semantic-similarity score. It crosses that
-factor (`direct` × `logarithmic`) over the single all-defaults `C/default` level
-at the larger `generations=40`/`population_size=1000` operating point, where
-repairs are strong enough for the metric to move outcomes. It reads its own
-`experiments/configs-metric/<scheme>/<direct|log>/` grid, so generate it with
-`--metric both` (below) before running:
-
-```sh
-python scripts/gen_configs.py --generations 40 --population-size 1000 \
-    --schemes nsga2-truncate --sweeps C --metric both --out-dir experiments/configs-metric
-python scripts/run_experiments.py --profile metric --seeds $(seq -s' ' 0 49) --jobs 4   # av2
-python scripts/run_experiments.py --profile metric --seeds $(seq -s' ' 50 99) --jobs 4  # av3
-python scripts/merge_experiments.py av2 av3 --profile metric
-```
-
-The 800 rows are `2 metrics × 4 specs × 100 seeds` — no sweep grid, so the
-budget buys statistical power on the main effect. Ordering is seed-major, so
-killing a machine at the wall-clock deadline leaves a balanced design (every
-metric/spec sampled at the same seeds, just fewer of them) rather than a
-half-finished one.
 
 `tlsf` runs the six basic-TLSF examples (arbiter, gyro-var1, humanoid-531,
 lift, lily02, minepump) rather than the four FRETISH specs, swept over
@@ -391,7 +358,7 @@ python scripts/merge_experiments.py /path/to/peredur
 ```
 
 **`--profile` must match the profile the runs used.** Each profile writes its
-own CSV — `full` → `results.csv`, `factorial` → `results-factorial.csv` — and
+own CSV — `full` → `results.csv`, `tlsf` → `results-tlsf.csv` — and
 the flag defaults to `full`. When no source carries a CSV for the chosen
 profile, the merge stops and names the mismatch rather than writing anything.
 
@@ -406,9 +373,8 @@ never duplicates rows. Per-run directories encode their scheme and seed
 between schemes.
 
 `selection`, `weakening` and `metric` are part of the key because a profile may
-run every level under both selection schemes (`factorial`), both weakening
-states (`cj-large`, retired with the screen on 2026-09-11 but still merged),
-or both similarity metrics (`metric`); without them the
+run every level under both selection schemes, both weakening states or both
+similarity metrics; without them the
 crossed rows collapse onto one key and half are dropped in silence. Rows written
 before a column existed carry its legacy default — nsga2, wkon, direct — so both
 scripts read an absent value as that rather than empty, which keeps resume and
@@ -704,9 +670,8 @@ size of a campaign. `--no-plan` skips the query, and planned totals then read
 as unknown.
 
 Rows done is that same plan's already-done count, not the length of the
-results CSV, and the two are not interchangeable. Profiles share CSVs —
-`replicate`, `replicate-wkoff` and `replicate-recap` all write
-`results-replicate.csv` — and a top-up relaunch rewrites the manifest to a
+results CSV, and the two are not interchangeable. Profiles may share a CSV,
+and a top-up relaunch rewrites the manifest to a
 handful of seeds while the file still holds every earlier row. Reading the
 file's length as progress reports 400/40 in that second case and calls a
 campaign that started minutes ago finished. Where no plan came back the file's
@@ -848,33 +813,6 @@ on its own branch. `merge_experiments.PROFILE_CSVS` is the authority and an
 unmerged profile is absent from it, so `collect` refuses to guess
 `results-<profile>.csv` rather than merge a campaign into a file nobody is
 watching.
-
-### Describing a closed one
-
-```sh
-# One archived campaign's declaration, derived from its directory
-python scripts/campaign.py describe 2026-08-07-elitism
-
-# Every archive, machine-readable
-python scripts/campaign.py describe --all --json
-
-# Read the archives from another checkout (results CSVs are gitignored)
-python scripts/campaign.py describe --all --archive-root ~/projects/counter/experiments
-```
-
-The campaigns under `experiments/` closed before `campaign.toml` existed, so
-none of them has a declaration. `describe` derives one and prints it: the
-factor cross from the merged results CSV, the host split from the per-host
-CSVs where their seed blocks are disjoint, and the branch from
-`PROVENANCE.json`. It writes nothing, into the archive or anywhere else.
-
-Every field printed is named against the file it came from in `derived_from`,
-and every field no file in the archive records is listed in `not_recorded`
-rather than defaulted. `attribution = "inferred"` marks the whole output as a
-reading of the archive rather than a record kept at the time. It is not
-runnable: it names retired profiles and retired selection-scheme spellings,
-and an archived campaign is reproduced from `experiments/<campaign>/scripts/`
-at the commit its `PROVENANCE.json` names.
 
 ### Tests
 

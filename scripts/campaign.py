@@ -12,7 +12,6 @@
     python scripts/campaign.py queue
     python scripts/campaign.py tick --host av2
     python scripts/campaign.py cron --print --host av2
-    python scripts/campaign.py describe --all --json
 
 A campaign is declared once, in ``experiments/<name>/campaign.toml``: the
 branch it runs on, the seed range each host takes, and the phases to run. That
@@ -50,20 +49,12 @@ because those are the two things a reset destroys and nothing here can bring
 back; ``stage --force`` remains the only way past either, and it wants a human
 at a terminal.
 
-``describe`` is the archive's half of the same idea, for the campaigns that
-closed before any of this existed. It derives a declaration from what the
-archive already carries -- the merged results CSV, the per-host CSVs and
-PROVENANCE.json -- and prints it. It writes nothing: the derivation's sources
-sit in the directory it read, and a campaign is reproduced from its vendored
-``scripts/`` at a commit where this file does not exist.
-
 Hosts are reached by their ssh-config alias (``av2``), not by the FQDN in
 merge_experiments.REMOTES: the FQDN form falls through to password auth under
 BatchMode, which a status poll cannot answer.
 """
 
 import argparse
-import ast
 import errno
 import fcntl
 import getpass
@@ -102,7 +93,7 @@ SSH_MUX_OPTS = [*SSH_OPTS, "-o", "ControlMaster=auto",
                 "-o", "ControlPersist=120"]
 SSH_TIMEOUT_S = 45
 # collect --dry-run's measure step walks a whole result tree with du and find.
-# On a cold cache over the 29GB experiments dir that outlasts the status
+# On a cold cache over a large experiments dir that outlasts the status
 # deadline by a wide margin, and a status deadline applied here reports a
 # perfectly healthy machine as unreachable.
 MEASURE_TIMEOUT_S = 600
@@ -475,8 +466,7 @@ def parse_detail(text: str) -> dict:
     ``rows_done`` is the runner's own already-done count, out of the ``Plan:``
     line, which is scoped to the same selection ``rows_planned`` is. The whole
     CSV's length is not that number and cannot be substituted for it: profiles
-    share CSVs (``replicate``, ``replicate-wkoff`` and ``replicate-recap`` all
-    write ``results-replicate.csv``), and a top-up relaunch rewrites the
+    may share a CSV, and a top-up relaunch rewrites the
     manifest to a couple of seeds while the file still holds every earlier row,
     which read the file's length as progress reports 400/40 and calls a
     just-started campaign finished. The length is kept only as a fallback for
@@ -726,9 +716,8 @@ def annotate(c: dict, host_report: dict) -> None:
 
     A process is attributed to a campaign only when it names that campaign's
     profile. An engine process names none, and matching those against every
-    campaign made one unrelated `peredur` on av2 report all six of its archived
-    campaigns as running while idle av3 reported the same six from the same
-    data as stalled. Unattributable processes belong in the host's PROCESSES
+    campaign would let one unrelated `peredur` report every campaign on its
+    host as running. Unattributable processes belong in the host's PROCESSES
     column, which is where they still appear.
 
     A matched process is corroborated against the campaign's own output before
@@ -840,8 +829,7 @@ def colour_enabled(no_color: bool = False, stream=None, env=None) -> bool:
     here: `tick` runs from cron into $HOME/.peredur-queue.log and `status` is
     routinely piped or captured, and escapes in either are noise nobody can
     read through. It is the failure the C++ side already guards with
-    ``stdout_is_tty()`` -- one unguarded status line was 59KB of escapes for
-    1.2KB of content.
+    ``stdout_is_tty()``.
 
     ``--no-color`` beats everything, then NO_COLOR (any non-empty value, per
     no-color.org), then CLICOLOR_FORCE, which forces colour on down a pipe and
@@ -1210,7 +1198,7 @@ def rsync_pending(host: str, csv_name: str, result_dir: str | None) -> dict:
 
     Read-only on both ends: rsync builds its file list and reports on it, and
     writes nothing. That is the whole point of collect's dry run against a
-    29GB tree.
+    large tree.
     """
     out: dict = {}
     root = source_root(host)
@@ -1907,14 +1895,6 @@ SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
                     *SCORE_BUDGET_KEYS}
 PHASE_KEYS = RUN_PHASE_KEYS | SCORE_PHASE_KEYS
 
-# `describe` prints a declaration for a campaign that has already closed. It
-# is not one of these: the factor cross below is what the results CSV carries,
-# which a live declaration has no use for, since the runner's profile holds
-# the cross for a campaign that has not run yet.
-ARCHIVE_ATTRIBUTION = "inferred"
-ARCHIVE_FACTOR_KEYS = ("sweeps", "schemes", "weakenings", "metrics",
-                       "repair_modes", "specs")
-
 
 def parse_seed_range(text: str, where: str) -> list:
     """``"0-99"``, ``"7"`` or ``"0-9,20-29"`` to an explicit, sorted seed list.
@@ -1995,9 +1975,7 @@ def known_profiles() -> set:
     """Profiles the runner in *this* checkout defines.
 
     Imported lazily and never mirrored here: run_experiments.PROFILES is the
-    definition, campaign.toml only names one of them. Eighteen archived
-    campaigns vendor their own copy of that file, so a second copy of the table
-    would be the nineteenth thing to keep in sync.
+    definition, campaign.toml only names one of them.
     """
     import run_experiments  # noqa: PLC0415
     return set(run_experiments.PROFILES)
@@ -2350,379 +2328,6 @@ def phase_command(phase: dict, seeds: list) -> str:
                     + [shlex.quote(a) for a in phase_args(phase, seeds)])
 
 
-# -- describe -----------------------------------------------------------------
-#
-# A closed campaign's declaration is derived on demand and printed; nothing is
-# written into experiments/. The archive is the source, and a file caching this
-# derivation beside its own inputs could only drift from them. It would also be
-# an anachronism: a campaign is reproduced at the commit its PROVENANCE.json
-# names, through the vendored scripts/, and campaign.py does not exist there.
-
-# The results CSV's key columns are the factor cross that ran, one archive key
-# per column. The CSV is preferred over the vendored PROFILES dict throughout:
-# the dict says what was intended and the CSV says what happened, and the two
-# differ wherever a campaign was launched with --sweeps or --specs, or stopped
-# early. A column the header lacks is reported as unrecorded, never defaulted —
-# merge_experiments.fill_defaults would supply LEGACY_SELECTION and friends
-# here, which is exactly the invention this verb must not make.
-CROSS_COLUMNS = (("sweep", "sweeps"), ("selection", "schemes"),
-                 ("weakening", "weakenings"), ("metric", "metrics"),
-                 ("repair_mode", "repair_modes"), ("spec", "specs"))
-
-# Per-host CSVs are named both ways in the archive -- av2.results-muc.csv and
-# av2-results-factorial.csv -- so the separator is matched, not assumed. Eight
-# campaigns use the hyphen and five the dot.
-HOST_CSV = "^(?P<host>av[0-9]+)[.-](?P<stem>.+)[.]csv$"
-
-
-def archive_scripts(archive: Path) -> list:
-    return sorted(p.name for p in (archive / "scripts").glob("*")
-                  if p.is_file())
-
-
-def archive_kind(archive: Path) -> str | None:
-    try:
-        facts = json.loads((archive / "PROVENANCE.json").read_text())
-    except (OSError, ValueError):
-        return None
-    kind = facts.get("kind")
-    return kind if isinstance(kind, str) and kind else None
-
-
-def vendored_profile_csvs(archive: Path) -> dict:
-    """``{results CSV name: [profile, ...]}`` from the vendored runner.
-
-    Read with ``ast`` rather than by importing: the vendored copies span a
-    month of the runner's history and are records, not modules, so nothing
-    here should execute one. A vintage with no PROFILES dict at all -- the
-    2026-07-10 runner took --sweeps/--specs/--seeds on the command line --
-    yields an empty map, and the profile is then simply not recorded.
-    """
-    path = archive / "scripts" / "run_experiments.py"
-    try:
-        tree = ast.parse(path.read_text())
-    except (OSError, SyntaxError):
-        return {}
-    table = None
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and len(node.targets) == 1:
-            target, assigned = node.targets[0], node.value
-        elif isinstance(node, ast.AnnAssign):
-            target, assigned = node.target, node.value
-        else:
-            continue
-        if (isinstance(target, ast.Name) and target.id == "PROFILES"
-                and isinstance(assigned, ast.Dict)):
-            table = assigned
-    if table is None:
-        return {}
-    out: dict = {}
-    for key, value in zip(table.keys, table.values):
-        if not (isinstance(key, ast.Constant) and isinstance(key.value, str)
-                and isinstance(value, ast.Dict)):
-            continue
-        for field_key, field_value in zip(value.keys, value.values):
-            if not (isinstance(field_key, ast.Constant)
-                    and field_key.value == "results_csv"):
-                continue
-            for part in ast.walk(field_value):
-                if (isinstance(part, ast.Constant)
-                        and isinstance(part.value, str)
-                        and part.value.endswith(".csv")):
-                    out.setdefault(part.value, []).append(key.value)
-    return out
-
-
-def profile_of_csv(csv_name: str, by_csv: dict) -> str | None:
-    """The profile a merged CSV belongs to, where exactly one claims it.
-
-    Several profiles share one CSV (``ablate-tlsf`` and ``h2h-tlsf``, three
-    ``replicate`` variants), so the name is the tiebreak: results-X.csv
-    belongs to profile X where such a profile is among the claimants. Where
-    the tie does not break, no profile is recorded.
-    """
-    claimants = by_csv.get(csv_name, [])
-    if len(claimants) == 1:
-        return claimants[0]
-    stem = csv_name[len("results-"):-len(".csv")] \
-        if csv_name.startswith("results-") else ""
-    named = [p for p in claimants if p == stem]
-    return named[0] if len(named) == 1 else None
-
-
-def archive_crosses(archive: Path) -> list:
-    """The merged results CSVs, each with the per-host CSVs that fed it.
-
-    A per-host file counts only where its stem matches a merged one, which is
-    what keeps av2.well-separation-verdicts.csv -- a post-hoc analysis output
-    with no merged counterpart -- from being read as a campaign's host split.
-    """
-    files = sorted(p.name for p in archive.glob("*.csv"))
-    merged = [f for f in files
-              if f.startswith("results") and ".bak." not in f
-              and not re.match(HOST_CSV, f)]
-    out = []
-    for name in merged:
-        stem = name[:-len(".csv")]
-        hosts = {}
-        for other in files:
-            match = re.match(HOST_CSV, other)
-            if match and match.group("stem") == stem:
-                hosts[match.group("host")] = archive / other
-        out.append((name, hosts))
-    return out
-
-
-def read_cross(path: Path) -> dict:
-    """The factor cross one merged results CSV records.
-
-    Values keep the order of their first appearance rather than being sorted
-    here, so the list is the file's own order; a merged CSV is sorted on the
-    natural key, so most of these read alphabetically and the ones that do not
-    (ablate-tlsf's arbiter-aurus, appended after the merge) say so.
-    """
-    header, rows = merge.read_rows(path)
-    order: dict = {key: [] for _, key in CROSS_COLUMNS}
-    levels: dict = {}
-    seeds = set()
-    for record in rows:
-        for column, key in CROSS_COLUMNS:
-            value = record.get(column)
-            if value and value not in order[key]:
-                order[key].append(value)
-        level = record.get("level_name")
-        sweep = record.get("sweep")
-        if level and sweep is not None:
-            seen = levels.setdefault(sweep, [])
-            if level not in seen:
-                seen.append(level)
-        seed = record.get("seed")
-        if seed is not None and seed.isdigit():
-            seeds.add(int(seed))
-    missing = [key for column, key in CROSS_COLUMNS if column not in header]
-    if "level_name" not in header:
-        missing.append("levels")
-    if "seed" not in header:
-        missing.append("seeds")
-    cross = {key: values for key, values in order.items() if values}
-    return {"rows": len(rows), "levels": levels, "seeds": sorted(seeds),
-            "not_recorded": missing, **cross}
-
-
-def host_split_of(host_csvs: dict) -> dict:
-    """``{host: "0-19"}`` from the per-host CSVs, if the blocks are disjoint.
-
-    An overlap means the two files are not a seed split -- a re-collect, or one
-    host's file copied over the other's -- so nothing is claimed about it.
-    """
-    seeds = {}
-    for host, path in sorted(host_csvs.items()):
-        _, rows = merge.read_rows(path)
-        block = {int(r["seed"]) for r in rows
-                 if r.get("seed", "").isdigit()}
-        if not block:
-            return {}
-        seeds[host] = block
-    blocks = list(seeds.values())
-    for i, first in enumerate(blocks):
-        for second in blocks[i + 1:]:
-            if first & second:
-                return {}
-    return {host: format_seed_range(sorted(block))
-            for host, block in seeds.items()}
-
-
-def driver_order(archive: Path) -> tuple:
-    """The profile order a vendored shell driver runs, and the file saying so.
-
-    Only the elitism campaign has one. Everywhere else the order the phases
-    appear in the printed form is the order of their CSV names and carries no
-    claim, which is what phase_order in not_recorded says.
-    """
-    for path in sorted((archive / "scripts").glob("*.sh")):
-        found = []
-        for profile in re.findall(r"--profile\s+([A-Za-z0-9_-]+)",
-                                  path.read_text()):
-            if profile not in found:
-                found.append(profile)
-        if len(found) > 1:
-            return found, f"scripts/{path.name}"
-    return [], None
-
-
-def provenance_branch(archive: Path) -> tuple:
-    """The branch the archive states, and where it states it.
-
-    Two spellings are in use: a top-level ``branch`` and ``profile_commit
-    .branch``. Only a leading bare branch name is taken -- arbiter-probe's
-    value continues into prose after it -- and a value that is prose from the
-    first character is not a branch name and is left alone.
-    """
-    try:
-        facts = json.loads((archive / "PROVENANCE.json").read_text())
-    except (OSError, ValueError):
-        return None, None
-    profile = facts.get("profile_commit")
-    for value, where in ((facts.get("branch"), "branch"),
-                         (profile.get("branch")
-                          if isinstance(profile, dict) else None,
-                          "profile_commit.branch")):
-        if not isinstance(value, str):
-            continue
-        match = re.match(r"^([A-Za-z0-9._/-]+)(\s|$)", value.strip())
-        if match:
-            return match.group(1), f"PROVENANCE.json: {where}"
-    return None, None
-
-
-def describe_campaign(name: str, archive: Path) -> dict:
-    """Derive a campaign declaration from what its archive carries.
-
-    Every field is read out of a file in the archive and recorded against it in
-    derived_from; a field no file records is listed in not_recorded and left
-    out. An absent field is a true statement about the archive, which a
-    plausible default would not be.
-    """
-    if not archive.is_dir():
-        raise CampaignError(f"no archive directory at {archive}")
-    table: dict = {"name": name, "attribution": ARCHIVE_ATTRIBUTION}
-    sources: dict = {}
-    unrecorded = []
-
-    branch, branch_source = provenance_branch(archive)
-    if branch:
-        table["branch"] = branch
-        sources["branch"] = branch_source
-    else:
-        unrecorded.append("branch")
-
-    crosses = archive_crosses(archive)
-    by_csv = vendored_profile_csvs(archive)
-    phases = []
-    for csv_name, host_csvs in crosses:
-        cross = read_cross(archive / csv_name)
-        phase: dict = {"name": csv_name[len("results"):-len(".csv")]
-                       .lstrip("-") or name}
-        profile = profile_of_csv(csv_name, by_csv)
-        missing = list(cross["not_recorded"])
-        if profile:
-            phase["profile"] = profile
-        else:
-            missing.append("profile")
-        phase["cross"] = csv_name
-        phase["rows"] = cross["rows"]
-        for key in ARCHIVE_FACTOR_KEYS:
-            if cross.get(key):
-                phase[key] = cross[key]
-        if cross["levels"]:
-            phase["levels"] = cross["levels"]
-        if cross["seeds"]:
-            phase["seeds"] = format_seed_range(cross["seeds"])
-        split = host_split_of(host_csvs)
-        if split:
-            phase["hosts"] = split
-        if missing:
-            phase["not_recorded"] = missing
-        phases.append(phase)
-
-    splits = [p.get("hosts") for p in phases]
-    if splits and all(s and s == splits[0] for s in splits):
-        # One split for the campaign: state it once, at the top, where a live
-        # declaration states it.
-        table["hosts"] = splits[0]
-        sources["hosts"] = "per-host CSVs (disjoint seed blocks)"
-        for phase in phases:
-            phase.pop("hosts", None)
-    elif any(splits):
-        sources["hosts"] = "per-host CSVs, per phase (disjoint seed blocks)"
-    else:
-        unrecorded.append("hosts")
-
-    order, order_source = driver_order(archive)
-    if order:
-        phases.sort(key=lambda p: (order.index(p["profile"])
-                                   if p.get("profile") in order
-                                   else len(order)))
-        sources["phase_order"] = order_source
-    elif len(phases) > 1:
-        unrecorded.append("phase_order")
-
-    if phases:
-        table["phases"] = phases
-        sources["cross"] = ", ".join(csv_name for csv_name, _ in crosses)
-    else:
-        # No merged results CSV: not a factor-cross campaign at all. The soak
-        # and the engine comparison drive their own scripts and share no row
-        # schema with the repair campaigns; forcing phases onto them would
-        # declare a cross that never existed.
-        unrecorded.append("phases")
-        scripts = archive_scripts(archive)
-        if scripts:
-            table["scripts"] = scripts
-            sources["scripts"] = "scripts/ (vendored verbatim)"
-        kind = archive_kind(archive)
-        if kind:
-            table["kind"] = kind
-            sources["kind"] = "PROVENANCE.json: kind"
-
-    # No campaign passed --jobs: the elitism driver is the only launch script
-    # in the archive and it names none, so every run took its profile's
-    # default_jobs. That is the runner's value, not the campaign's.
-    unrecorded.append("jobs")
-    table["not_recorded"] = sorted(unrecorded)
-    table["derived_from"] = {key: sources[key] for key in sorted(sources)}
-    return table
-
-
-DESCRIBE_HEADER = """\
-# `campaign.py describe {name}`
-#
-# Derived from that directory just now, not written before the campaign ran.
-# attribution = "{attribution}" makes this a reading of the archive rather
-# than a record kept at the time: every field is named against the file it
-# came from in derived_from, and a field no file records is listed in
-# not_recorded rather than defaulted. Nothing here is runnable — reproduce
-# this campaign from its scripts/ at the commit PROVENANCE.json names, a
-# revision at which campaign.py does not exist.
-"""
-
-
-def dump_campaign(table: dict) -> str:
-    """The declaration as TOML: flat keys, then one [[phases]] block each."""
-    phases = table.get("phases", [])
-    flat = {key: value for key, value in table.items() if key != "phases"}
-    out = DESCRIBE_HEADER.format(name=table["name"],
-                                 attribution=ARCHIVE_ATTRIBUTION)
-    out += dump_toml(flat)
-    for phase in phases:
-        out += "\n[[phases]]\n" + dump_toml(phase)
-    return out
-
-
-def cmd_describe(args: argparse.Namespace) -> int:
-    archive_root = (Path(args.archive_root) if args.archive_root
-                    else REPO_ROOT / "experiments")
-    names = list(args.campaigns)
-    if args.all:
-        names = sorted(p.name for p in archive_root.iterdir()
-                       if (p / "PROVENANCE.json").is_file())
-    if not names:
-        print("nothing to describe: name a campaign, or --all")
-        return 1
-    described, failed = [], 0
-    for name in names:
-        try:
-            described.append(describe_campaign(name, archive_root / name))
-        except CampaignError as exc:
-            print(f"{name}: {exc}", file=sys.stderr)
-            failed += 1
-    if args.json:
-        print(json.dumps(described, indent=2))
-    else:
-        print("\n".join(dump_campaign(table) for table in described), end="")
-    return 1 if failed else 0
-
-
 # -- stage --------------------------------------------------------------------
 
 STAGE_PROBE_SCRIPT = r"""
@@ -2808,10 +2413,10 @@ class HostProbe:
     """What one host answered. Every field is present on every path.
 
     A dataclass rather than a dict because the two callers read it after an
-    ``error`` guard, and a probe that returned early used to leave the rest of
-    the keys absent -- an empty answer with no error at all (a shell that
-    printed nothing and exited zero) got past that guard and raised a KeyError
-    in the middle of staging, which is the worst place for a crash.
+    ``error`` guard, and an empty answer with no error at all (a shell that
+    printed nothing and exited zero) gets past that guard. With keys absent
+    that is a KeyError in the middle of staging, which is the worst place for
+    a crash.
     """
     error: str | None = None
     branch: str = "?"
@@ -2918,8 +2523,8 @@ tail -5 "$configlog"; rm -f "$configlog"
 
 # The half that runs whether or not the campaign declares a command: every
 # declaration written before the key existed still has to fail here rather than
-# on the host three ticks later, which is what run_experiments.py exiting 1 on
-# an empty configs directory cost the aurus-h2h launch.
+# on the host three ticks later, when run_experiments.py exits 1 on an empty
+# configs directory.
 #
 # `find` with a quoted pattern rather than a glob: the lab login shell is zsh,
 # whose default NOMATCH never lets `*.toml` — the exact thing being tested for
@@ -3805,9 +3410,8 @@ def ensure_staged(entry: dict, root: Path, args: argparse.Namespace):
         if not commit or args.no_stage or args.dry_run:
             return None
         # Rebuilt even here. An earlier staging that checked out this commit
-        # and then failed its build left the previous commit's binaries in
-        # place, and the next tick ran its phase on them: av3 ran
-        # 2026-10-06-pooled-rq2 on e04317d's compare that way. The build is
+        # and then failed its build leaves the previous commit's binaries in
+        # place, and the next tick would run its phase on them. The build is
         # incremental, so on a host that did build it costs seconds.
         why = build_and_verify(root, entry, entry_log_path(entry, root))
         if why:
@@ -4282,9 +3886,8 @@ echo "@M@END"
 # does not word-split there, so `for p in $FRONTIER` over a frontier of four
 # pids iterates once over all four as a single word, `pgrep -P` rejects it,
 # and the frontier holds the single space the substitution leaves. `[ -n " " ]`
-# is true, so that loop never terminates -- it spun at 25% of a core on av3
-# until it was killed by hand. Every loop here reads its pids from a file for
-# the same reason, one per line.
+# is true, so that loop never terminates. Every loop here reads its pids from
+# a file for the same reason, one per line.
 
 
 def cmd_dequeue(args: argparse.Namespace) -> int:
@@ -4363,15 +3966,15 @@ def cmd_dequeue(args: argparse.Namespace) -> int:
 
 
 def cron_line(host: str, root: str) -> str:
-    # No `flock -n` wrapper. It used to be here as an outer guard, but flock
-    # locks attach to the open file description, and the wrapper's fd is
-    # inherited across the exec: acquire_lock() then opens the same path a
-    # second time, gets a distinct description, and is denied by the lock its
-    # own parent holds. Every tick died that way -- silently, since both the
-    # wrapper and the tick exit 0 -- and a queue could never start a phase.
-    # acquire_lock() alone is the guard, and it covers strictly more: the
-    # wrapper only ever bound cron ticks, while the inner lock also blocks a
-    # tick typed by hand against a cron phase already running.
+    # No `flock -n` wrapper. flock locks attach to the open file description,
+    # and a wrapper's fd is inherited across the exec: acquire_lock() then
+    # opens the same path a second time, gets a distinct description, and is
+    # denied by the lock its own parent holds. Every tick would die that way
+    # -- silently, since both the wrapper and the tick exit 0 -- and the
+    # queue could never start a phase. acquire_lock() alone is the guard, and
+    # it covers strictly more: a wrapper binds only cron ticks, while the
+    # inner lock also blocks a tick typed by hand against a cron phase
+    # already running.
     return (f"*/5 * * * * cd {root} && "
             f"{REMOTE_PYTHON} scripts/campaign.py tick --host {host} "
             f">> $HOME/.peredur-queue.log 2>&1")
@@ -4404,9 +4007,9 @@ def cmd_cron(args: argparse.Namespace) -> int:
 # exception to never globbing remotely: /proc always holds pid 1, so zsh's
 # NOMATCH cannot fire.
 #
-# nvidia-smi wakes a runtime-suspended card, which on the laptop costs 1.9s
-# and a second of system time per call and keeps the card from ever powering
-# down under `watch`. A suspended card is idle by definition, so the probe
+# nvidia-smi wakes a runtime-suspended card, which on the laptop is slow on
+# every call and keeps the card from ever powering down under `watch`. A
+# suspended card is idle by definition, so the probe
 # reads its power state out of sysfs and only asks nvidia-smi when every
 # NVIDIA display device is awake. The lab hosts' cards never suspend.
 LOAD_SCRIPT = r"""
@@ -4798,25 +4401,6 @@ def build_parser() -> argparse.ArgumentParser:
                               "queued on that host.")
     enqueue.add_argument("--dry-run", action="store_true")
     enqueue.set_defaults(func=cmd_enqueue)
-
-    describe = sub.add_parser(
-        "describe",
-        help="Print a closed campaign's declaration, derived from its "
-             "archive. Read-only: it writes nothing.")
-    describe.add_argument("campaigns", nargs="*",
-                          help="Archived campaign directory name(s).")
-    describe.add_argument("--all", action="store_true",
-                          help="Every directory under experiments/ holding a "
-                               "PROVENANCE.json.")
-    describe.add_argument("--archive-root", metavar="DIR",
-                          help="Where to read the archives (default: this "
-                               "checkout's experiments/). Results CSVs are "
-                               "gitignored, so a worktree or a fresh clone "
-                               "reads them from the checkout that holds "
-                               "them.")
-    describe.add_argument("--json", action="store_true",
-                          help="Machine-readable output.")
-    describe.set_defaults(func=cmd_describe)
 
     queue = sub.add_parser("queue", help="Every host's queue, read-only.")
     queue.add_argument("--host", choices=[*HOSTS, LOCAL])

@@ -54,11 +54,9 @@ PROFILE_CSVS: dict[str, str] = {
     "padd": "results-padd.csv",
     "tlsf": "results-tlsf.csv",
     "wellsep": "results-wellsep.csv",
-    # Its own CSV, never wellsep's: the sweep letter and level names differ but
-    # the key fields (spec, seed, selection, ...) overlap, so sharing would
-    # interleave two campaigns in one dataset. The profile itself is retired --
-    # its sweep varied filters.intervals.well_separation, a key that no longer
-    # exists -- but the entry stays so the archived CSVs remain mergeable.
+    # Its own CSV, never wellsep's: the key fields (spec, seed, selection, ...)
+    # overlap, so sharing would interleave two datasets. The profile is
+    # retired, but the entry stays so the archived CSVs remain mergeable.
     "wellsep-timing": "results-wellsep-timing.csv",
     "arbiter-hp": "results-arbiter-hp.csv",
     "arbiter-padd": "results-arbiter-padd.csv",
@@ -67,40 +65,25 @@ PROFILE_CSVS: dict[str, str] = {
     # so merging under either profile name merges the same rows.
     "ablate-tlsf": "results-ablate-tlsf.csv",
     "h2h-tlsf": "results-ablate-tlsf.csv",
-    # The 2026-08-14 head-to-head, deliberately NOT sharing the above: it runs
-    # 25 families at a 7200s cap where h2h-tlsf ran 12 at 600s, and neither the
-    # corpus nor the cap is in the resume key, so shared rows would collide.
+    # Deliberately NOT sharing the above: the corpus and the cap differ from
+    # h2h-tlsf's and neither is in the resume key, so shared rows collide.
     "aurus-h2h": "results-aurus-h2h.csv",
-    # The 2026-08-21 re-run of that corpus at the shipping configuration plus
-    # the accumulator. Its own CSV for the same reason `aurus-h2h` has one: the
-    # arm differs from that campaign's in four keys and none of them is in the
-    # resume key, so a shared CSV would let the merge keep whichever row of a
-    # pair arrived first.
+    # Its own CSV for the same reason `aurus-h2h` has one.
     "aurus-h2h-ship": "results-aurus-h2h-ship.csv",
-    # Retired with sweep U -- two of its operator levels set
-    # [tlsf.mutation] p_union_assumption, a key that no longer exists --
-    # and kept here for the same reason the ops-* entries are: the
-    # archived CSVs stay mergeable.
+    # Retired with sweep U, and kept here for the same reason the ops-*
+    # entries are: the archived CSVs stay mergeable.
     "assumption-reach": "results-assumption-reach.csv",
     "monotone": "results-monotone.csv",
-    # The 2026-08-26 selection smoke test. Its own CSV rather than sharing
-    # `monotone`'s: the two run the same sweep T level over an overlapping
-    # corpus and seed range, and the arm that separates them is
-    # `selection`, which IS in the key -- but the corpus and the timeout caps
-    # are not, and this campaign drops four families and caps far tighter. A
-    # shared CSV would put rows from two cap tables under one key.
+    # Its own CSV rather than sharing `monotone`'s: the corpus and the timeout
+    # caps differ, and neither is in the key.
     "selection-smoke": "results-selection-smoke.csv",
-    # The 2026-08-28 selection x grading ablation. Two CSVs, never shared: the
-    # calibration runs a 12-family subset at 2 seeds to size the full run, so
-    # merging its rows into the campaign's would put a different corpus and a
-    # different seed count under one key.
+    # Two CSVs, never shared: the calibration runs a different corpus and seed
+    # count, and merging its rows in would put both under one key.
     "curves-calib": "results-curves-calib.csv",
     "curves": "results-curves.csv",
-    # The 2026-08-20 operator cross; one CSV per path, never shared, since
-    # the two paths run different corpora at different operating points. All
-    # five profiles are retired -- their sweep varied genetic.repaired_operators,
-    # a key that no longer exists -- but the entries stay so the archived CSVs
-    # remain mergeable.
+    # One CSV per path, never shared, since the two paths run different
+    # corpora at different operating points. All five profiles are retired,
+    # but the entries stay so the archived CSVs remain mergeable.
     "opswk-fret": "results-opswk-fret.csv",
     "opswk-tlsf": "results-opswk-tlsf.csv",
     "ops-pilot": "results-ops-pilot.csv",
@@ -114,18 +97,14 @@ PROFILE_CSVS: dict[str, str] = {
     # place and under the same keys.
     "replicate-recap": "results-replicate.csv",
     "replicate-tlsf": "results-replicate-tlsf.csv",
-    # Its own CSVs, never replicate's: sweep R's level names are the same but
-    # the campaign, corpus and commit differ, so sharing would interleave two
-    # datasets under one set of keys.
+    # Its own CSV, never replicate's: sweep R's level names are the same but
+    # the corpus differs, so sharing would interleave two datasets under one
+    # set of keys.
     "arbiter-probe": "results-arbiter-probe.csv",
     # Its own CSV, never ablate-tlsf's: same corpus and sweep letter, but sweep
     # G's arms are the status grading scale rather than ablate-tlsf's C, and the
     # level names do not overlap.
     "status-grading": "results-status-grading.csv",
-    # Registered here because test_experiment_paths asserts every profile in
-    # run_experiments has both a CSV and a result directory. The profile landed
-    # on main with neither, which `campaign.py collect` would have surfaced as a
-    # KeyError once the campaign finished.
     "weakening-arbiter": "results-wkarb.csv",
     # The -cm halves share their R half's CSV deliberately: they are the third
     # arm of one design, not a separate campaign, and KEY_FIELDS separates them
@@ -135,19 +114,11 @@ PROFILE_CSVS: dict[str, str] = {
     "seldefault-tlsf": "results-seldefault-tlsf.csv",
     "seldefault-tlsf-cm": "results-seldefault-tlsf.csv",
     "matched": "results-matched.csv",
-    # The 2026-09-04 re-match. Both landed on main with no entry in either
-    # table, which `test_experiment_paths` reports and which `campaign.py
-    # collect` would have raised as a KeyError after the campaign finished --
-    # the same omission the `weakening-arbiter` note above records. The
-    # calibration keeps its own CSV for the reason `curves-calib` does: six
-    # families at 2 seeds sized the main phase, and merging those rows in would
-    # put a different corpus and seed count under one key.
+    # The calibration keeps its own CSV for the reason `curves-calib` does.
     "rematch": "results-rematch.csv",
     "rematch-calib": "results-rematch-calib.csv",
-    # The 2026-09-09 selection x grading cross on the FRETISH path, replicating
-    # `curves`. Its own CSV rather than that campaign's: the sweep letter, the
-    # corpus and the path all differ, and neither the corpus nor the path is in
-    # the key.
+    # Its own CSV rather than `curves`'s: the corpus and the path differ, and
+    # neither is in the key.
     "gradsel-fret": "results-gradsel-fret-m.csv",
 }
 
@@ -225,10 +196,9 @@ LEGACY_COMMIT = "unknown"
 # "nsga2-replicate" -> "nsga2-apportion" -- and the binary rejects the old
 # spellings outright. Only the name moved: the scheme each one selects is
 # unchanged, so a row recorded under either spelling names the same cell of the
-# design. 224,861 archived rows carry "nsga2" and the replicate campaign's rows
-# carry "nsga2-replicate"; canonicalising the `selection` value wherever it
-# enters a KEY_FIELDS key is what lets an archived row and a new one join as one
-# row rather than merging into two. Duplicated from run_experiments.py rather
+# design. Canonicalising the `selection` value wherever it enters a KEY_FIELDS
+# key is what lets an archived row and a new one join as one row rather than
+# merging into two. Duplicated from run_experiments.py rather
 # than imported, like every other LEGACY_* constant here: both scripts are
 # standalone and are vendored per campaign under experiments/<campaign>/scripts/,
 # where a cross-import would not resolve. The stored `selection` value itself is

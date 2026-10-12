@@ -21,7 +21,7 @@ Every repair that survives (a) is then asked whether it is well-separated —
 whether the system can force the spec's own assumptions to fail. AuRUS ran
 with -addA, so it may add assumptions freely, and a repair that reaches
 realizability by adding assumptions it then defeats is the cheat PEREDUR's
-status objective was rewritten to stop paying for. Without this column a
+status objective does not pay for. Without this column a
 claimed repair count says nothing about how many of the repairs mean
 anything. The query goes through check_well_separated.check_one (imported,
 not copied) rather than a PEREDUR binary: PEREDUR's in-run checker caches a
@@ -279,8 +279,7 @@ def main() -> None:
         # own assumptions, and PEREDUR's output gate rejects those
         # unconditionally, so crediting AuRUS for one would score the two arms
         # by different standards. The unfiltered rate is kept alongside as
-        # implies_genuine_all because it is what PLAN.md pre-registered before
-        # the gap could be measured; see the 2026-08-17 amendment there.
+        # implies_genuine_all.
         scored = [d["file"] for d in details
                   if d["realize_verdict"] == "REALIZABLE"
                   and d["separation"] != VERDICT_NOT_WELL_SEPARATED]

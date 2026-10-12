@@ -9,8 +9,7 @@ ties them together:
     effective config to ``run.json`` from the same table, which is what a
     campaign reads back; this checks that it still does. A key missing from
     ``run.json`` is silent: the run behaves as configured and records nothing
-    about it. Two of the four ``[tlsf.mutation]`` keys were missing this way
-    before the table existed.
+    about it.
   * ``schemas/config-schema.json`` -- what an editor validates against. It sets
     ``additionalProperties: false``, so a key missing here is flagged as an
     error in the editor even though the binary accepts it.
@@ -21,9 +20,8 @@ ties them together:
     campaign archive by the very mechanism that exists to record a moved
     default.
 
-Drift between them is silent and has happened: ``nsga2-replicate`` was added to
-the parser and the docs but not to the schema enum. This compares all four
-key sets and exits non-zero on any disagreement.
+Drift between them is silent. This compares all four key sets and exits
+non-zero on any disagreement.
 
 The parser reads only the keys the table lists, so a key cannot be read
 without this check seeing it.
@@ -324,7 +322,7 @@ GEN_CONFIGS_FIELDS = {
 # Entries that deliberately do not track config.hpp, each with the reason it
 # must not be "corrected" into agreement. The first two are results-CSV key
 # columns and the next three are emitted unconditionally, so following the
-# binary would put every new row at odds with roughly 225k archived ones; the
+# binary would put every new row at odds with the archived ones; the
 # last four are sentinels make_toml reads as "emit nothing", not mirrors of a
 # C++ value at all.
 GEN_CONFIGS_EXEMPT = {
@@ -505,9 +503,8 @@ def main():
         )
 
     # example-config.toml is the template users copy, and it says every value in
-    # it is the built-in default. That was silently false for eight keys, so the
-    # claim is now enforced: each scalar key's value must equal the initialiser
-    # of the Config member that backs it.
+    # it is the built-in default. The claim is enforced: each scalar key's
+    # value must equal the initialiser of the Config member that backs it.
     defaults = hpp_defaults(hpp_source)
     for path, value in sorted(toml_scalars(example).items()):
         if path in UNPINNED_KEYS:
