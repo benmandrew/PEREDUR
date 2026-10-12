@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""humanoid-742's strength row as a sampled estimate, as the archive read it.
+"""A family's strength row as a sampled estimate, as the archive read it.
 
-    python3 sample_742.py plan                  # pair list, draws, bundle
-    python3 sample_742.py score RESULTS.csv...  # estimates, sampled.json
+    python3 sample_family.py SPEC plan                  # pair list, draws, bundle
+    python3 sample_family.py SPEC score RESULTS.csv...  # estimates, sampled.json
 
-The exact pass needs the pooled frontier of every side. av1 walked two of
-them (data/humanoid-742-frontiers.json: Pareto, 1693 classes, and the ladder,
-937), and the third, mrs-weighted's 9480-class pool, was cancelled 19 h into
-its walk. This is the 2026-10-06-pooled-rq2 sampling (pooled.py sample-plan
+The exact pass needs the pooled frontier of every side. For each family in
+FAMILIES the walks finished two of them (data/SPEC-frontiers.json), and the
+third, mrs-weighted's pool, did not finish: humanoid-742's 9480-class walk on
+av1 was cancelled after 19 h, and humanoid-531's 8552-class walk on av2 ran
+past 29 h. This is the 2026-10-06-pooled-rq2 sampling (pooled.py sample-plan
 and sample-score) over what is known:
 
 - A side whose frontier is known is sampled from that frontier, so each draw
@@ -37,9 +38,11 @@ import tarfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(os.path.dirname(HERE), "data")
 WORK = os.path.join("experiments", "analysis-tlsf-rerun-work")
-SPEC = "humanoid-742"
-FAM = f"{WORK}/strength/{SPEC}"
-HOST = "av3"
+# spec -> (host that runs the pairs, sample dir under WORK, bundle). humanoid-742
+# keeps the layout it was planned and run with.
+FAMILIES = {"humanoid-742": ("av3", "sample", "sample.tar.xz"),
+            "humanoid-531": ("av1", "sample/humanoid-531", "sample-humanoid-531.tar.xz")}
+SPEC = FAM = HOST = SDIR = BUNDLE = None
 P, W, L = "mrs-nsga2-apportion", "mrs-weighted", "aurus-nsga2-apportion"
 COMPS = {"selection": (P, W), "grading": (P, L)}
 # Draws per side. A known frontier's share is a plain proportion, whose 95%
@@ -59,7 +62,7 @@ def load():
         for line in fh:
             md5, _, hexed = line.rstrip("\n").partition("\t")
             prints[md5] = int(hexed, 16)
-    with open(f"{DATA}/humanoid-742-frontiers.json") as fh:
+    with open(f"{DATA}/{SPEC}-frontiers.json") as fh:
         fronts = {s: v["members"] for s, v in json.load(fh).items()}
     pool = {s: sorted(m for m, ss in sides.items() if s in ss) for s in (P, W, L)}
     for s, members in fronts.items():
@@ -104,22 +107,23 @@ def plan() -> int:
                         continue
                     seen.add((x, y))
                     rows.append([f"sample|{SPEC}|{x}|{y}", path(x), path(y)])
-    os.makedirs(f"{WORK}/sample", exist_ok=True)
+    os.makedirs(SDIR, exist_ok=True)
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\n")
     w.writerow(["id", "a_path", "b_path"])
     w.writerows(rows)
-    with open(f"{WORK}/sample/pairs-{HOST}.csv", "w") as fh:
+    with open(f"{SDIR}/pairs-{HOST}.csv", "w") as fh:
         fh.write(buf.getvalue())
-    with open(f"{WORK}/sample/draws.json", "w") as fh:
+    with open(f"{SDIR}/draws.json", "w") as fh:
         json.dump(draws, fh, indent=1)
     for (side, role), n in sorted(per.items()):
         print(f"{side} draws ({len(draws[side])}) against {role}: {n} pairs")
-    print(f"{len(rows)} distinct pairs in {WORK}/sample/pairs-{HOST}.csv")
+    print(f"{len(rows)} distinct pairs in {SDIR}/pairs-{HOST}.csv")
 
-    bundle = f"{DATA}/sample.tar.xz"
+    bundle = f"{DATA}/{BUNDLE}"
+    rel_dir = os.path.relpath(SDIR, WORK)
     with tarfile.open(bundle, "w:xz", preset=6) as tar:
-        for name in (f"sample/pairs-{HOST}.csv", "sample/draws.json"):
+        for name in (f"{rel_dir}/pairs-{HOST}.csv", f"{rel_dir}/draws.json"):
             with open(f"{WORK}/{name}", "rb") as fh:
                 blob = fh.read()
             ti = tarfile.TarInfo(name)
@@ -128,7 +132,7 @@ def plan() -> int:
     with open(f"{DATA}/bundles.json") as fh:
         bundles = json.load(fh)
     with open(bundle, "rb") as fh:
-        bundles["sample.tar.xz"] = hashlib.sha256(fh.read()).hexdigest()
+        bundles[BUNDLE] = hashlib.sha256(fh.read()).hexdigest()
     with open(f"{DATA}/bundles.json", "w") as fh:
         json.dump(bundles, fh, indent=1, sort_keys=True)
     return 0
@@ -148,7 +152,7 @@ def ratio(y: list, wt: list) -> tuple:
 
 def score(results: list) -> int:
     pool, fronts, _ = load()
-    with open(f"{WORK}/sample/draws.json") as fh:
+    with open(f"{SDIR}/draws.json") as fh:
         draws = json.load(fh)
     rel = {}
     for res in results:
@@ -162,7 +166,7 @@ def score(results: list) -> int:
     # the plan read the 65,536-word prints, and unpack.py leaves the bundle's
     # 4096-word copy in their place, which refutes a third as many pairs.
     planned = set()
-    with open(f"{WORK}/sample/pairs-{HOST}.csv", newline="") as fh:
+    with open(f"{SDIR}/pairs-{HOST}.csv", newline="") as fh:
         for r in csv.DictReader(fh):
             _, _, x, y = r["id"].split("|")
             planned.update(((x, y), (y, x)))
@@ -230,9 +234,17 @@ def score(results: list) -> int:
     return 0
 
 
+def select(spec: str) -> None:
+    global SPEC, FAM, HOST, SDIR, BUNDLE
+    HOST, sdir, BUNDLE = FAMILIES[spec]
+    SPEC, FAM, SDIR = spec, f"{WORK}/strength/{spec}", f"{WORK}/{sdir}"
+
+
 if __name__ == "__main__":
-    if len(sys.argv) >= 2 and sys.argv[1] == "plan":
-        sys.exit(plan())
-    if len(sys.argv) >= 3 and sys.argv[1] == "score":
-        sys.exit(score(sys.argv[2:]))
+    if len(sys.argv) >= 3 and sys.argv[1] in FAMILIES:
+        select(sys.argv[1])
+        if sys.argv[2] == "plan":
+            sys.exit(plan())
+        if len(sys.argv) >= 4 and sys.argv[2] == "score":
+            sys.exit(score(sys.argv[3:]))
     sys.exit(__doc__)
