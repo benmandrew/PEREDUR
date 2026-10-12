@@ -861,12 +861,8 @@ finally:
     merge.REPO_ROOT = real_merge_root
     shutil.rmtree(tmp, ignore_errors=True)
 
-# ── TOML, in the subset the campaign files use ────────────────────────────────
+# ── TOML ──────────────────────────────────────────────────────────────────────
 
-# campaign.py parses TOML itself because tick runs on av2 and av3, whose
-# python3 is 3.10 with no tomllib and no tomli. The risk that buys is a parser
-# that quietly disagrees with every other reader of the same file, so each
-# fixture below is checked against tomllib wherever tomllib exists.
 importlib.reload(C)
 
 DECLARATION = """
@@ -894,20 +890,6 @@ profile = "muc"
 jobs = 4
 """
 
-try:
-    import tomllib
-except ImportError:  # 3.10, which is what the lab machines run.
-    tomllib = None
-
-for label, text in (("inline form", DECLARATION), ("header form", HEADER_FORM),
-                    ("an entry", C.dump_toml(
-                        {"campaign": "x", "state": "queued", "phase": 0,
-                         "log": ['a "quoted" line', "b"], "done": True}))):
-    parsed = C.parse_toml(text)
-    if tomllib is not None:
-        check(parsed, tomllib.loads(text),
-              f"the built-in parser must agree with tomllib on {label}")
-
 check(C.parse_toml(DECLARATION)["hosts"], {"av2": "0-99", "av3": "100-199"},
       "an inline table of host seed ranges")
 check(C.parse_toml(HEADER_FORM)["phases"][0]["specs"], ["amba", "lily02"],
@@ -920,7 +902,6 @@ check(C.parse_toml(C.dump_toml(roundtrip)), roundtrip,
 
 for bad, why in (
     ('a = { b = 1,\n c = 2 }', "a newline inside an inline table"),
-    ("a = 1.5", "a float, which nothing here uses"),
     ('a = 1\na = 2', "a duplicate key"),
     ('a = "unterminated', "an unterminated string"),
     ("[t]\n[t]", "a duplicate table"),
@@ -1535,7 +1516,7 @@ if shutil.which("zsh"):
         shutil.rmtree(nomatch_root, ignore_errors=True)
 
 
-# ── stage and start, end to end against a throwaway checkout ──────────────────
+# ── stage, end to end against a throwaway checkout ────────────────────────────
 
 def git(root: Path, *args: str) -> str:
     """git against a fixture, with the ambient config that could break it off.
@@ -1804,132 +1785,6 @@ try:
     binary.write_text(FAKE_BINARY)
     binary.chmod(0o755)
 
-    # start: the seed split comes from the declaration and from nowhere else.
-    head = git(repo, "rev-parse", "HEAD")
-
-    def start_args(**kwargs) -> argparse.Namespace:
-        base = {"campaign": "fixture", "host": None, "dry_run": True,
-                "ignore_queue": False}
-        base.update(kwargs)
-        return argparse.Namespace(**base)
-
-    started = io.StringIO()
-    with contextlib.redirect_stdout(started):
-        code = C.cmd_start(start_args())
-    printed = started.getvalue()
-    check_true("--seeds 0 1" in printed and "--seeds 2 3" in printed,
-               "each host is launched on its own declared seeds")
-    check_true("--profile full" in printed, "with the declared profile")
-    check(code, 0, "a staged host is ready to be launched on")
-
-    # A score phase joins the chain like any other, after the run phase that
-    # writes what it scores, on the same host seeds. The declaration is
-    # edited in place and put back: start reads the working tree and refuses
-    # on nothing a dirty tree would trip.
-    write_declaration(repo, "fixture", FIXTURE_DECL.replace(
-        'phases = [ { profile = "full", jobs = 2 } ]',
-        'phases = [ { profile = "full", jobs = 2 }, '
-        '{ kind = "score", profile = "full", workers = 2, cores = 1 } ]'))
-    started = io.StringIO()
-    with contextlib.redirect_stdout(started):
-        code = C.cmd_start(start_args())
-    printed = started.getvalue()
-    check(code, 0, f"a campaign with a score phase is launchable: {printed}")
-    chain = [ln for ln in printed.splitlines() if " && " in ln]
-    check(len(chain), 2, "one chain per host")
-    check_true(all(ln.strip().startswith(C.RUNNER_CMD) and
-                   f" && {C.SCORER_CMD} --results experiments/results --out "
-                   f"experiments/curves --workers 2 --cores 1 " in ln
-                   for ln in chain),
-               f"the runner first, then the scorer over the same results "
-               f"directory: {chain}")
-    check_true("--seeds 0 1 --seeds" not in printed
-               and any("--seeds 0 1 && " in ln and ln.rstrip().endswith(
-                   "--seeds 0 1") for ln in chain),
-               "with av2's seeds on both of av2's phases")
-    write_declaration(repo, "fixture", FIXTURE_DECL)
-
-    # The runner's own freshness gate, asked one step early: a launch that
-    # dies on the far side of a nohup leaves its message in a log nobody is
-    # reading yet.
-    binary.unlink()
-    blocked = io.StringIO()
-    with contextlib.redirect_stdout(blocked):
-        code = C.cmd_start(start_args())
-    check(code, 1, "a host with no binary is not launched on")
-    check_true("no build-release/peredur" in blocked.getvalue(),
-               "and the missing binary is what it names")
-    binary.write_text(FAKE_BINARY)
-    binary.chmod(0o755)
-
-    fixture = {"branch": "feat/fixture", "name": "fixture"}
-    stale = C.start_refusals(
-        C.HostProbe(branch="feat/fixture", head=head,
-                    binary={"commit": "b" * 40, "commit_short": "bbbbbbb",
-                            "dirty": "0"}), fixture, head)
-    check(len(stale), 1, "a binary from another commit is the only complaint")
-    check_true("bbbbbbb" in stale[0], "and it names the commit it was built at")
-    ready = C.HostProbe(branch="feat/fixture", head=head,
-                        binary={"commit": head, "commit_short": head[:7],
-                                "dirty": "0"})
-    busy = C.start_refusals(
-        replace(ready, processes=[{"comm": "python3", "profile": "tlsf"}]),
-        fixture, head)
-    check_true(any("already live" in r for r in busy),
-               "a host already running a campaign is not launched on again")
-
-    # A pending queue entry is a launch waiting to happen: starting beside it
-    # is two runners resuming off one CSV as soon as the tick fires. Same
-    # reasoning as enqueue's refusal of a second entry, so the same default.
-    queued = replace(ready, queue=[{"file": "003-fixture.toml",
-                                    "campaign": "fixture", "state": "queued"}])
-    racing = C.start_refusals(queued, fixture, head)
-    check(len(racing), 1, "a queued entry for this campaign refuses the start")
-    check_true("003-fixture.toml" in racing[0] and "queued" in racing[0],
-               f"naming the entry and its state: {racing}")
-    check_true("--ignore-queue" in racing[0], "and the way past it")
-    check(C.start_refusals(queued, fixture, head, ignore_queue=True), [],
-          "which the override clears")
-    running_entry = C.start_refusals(
-        replace(ready, queue=[{"file": "003-fixture.toml",
-                               "campaign": "fixture", "state": "running"}]),
-        fixture, head)
-    check_true(len(running_entry) == 1 and "running" in running_entry[0],
-               "a running entry refuses on the same ground, named as running")
-    for spent in ("done", "failed"):
-        check(C.start_refusals(
-            replace(ready, queue=[{"file": "003-fixture.toml",
-                                   "campaign": "fixture", "state": spent}]),
-            fixture, head), [],
-            f"a {spent} entry is not pending, so it does not block a start")
-    check(C.start_refusals(
-        replace(ready, queue=[{"file": "003-other.toml", "campaign": "other",
-                               "state": "queued"}]), fixture, head), [],
-        "and another campaign's entry is not this campaign's race")
-
-    # End to end, so the refusal and the override are exercised through the
-    # probe rather than only against a constructed one.
-    (repo / C.QUEUE_DIR).mkdir(parents=True, exist_ok=True)
-    (repo / C.QUEUE_DIR / "007-fixture.toml").write_text(
-        C.dump_toml({"campaign": "fixture", "host": "av2", "state": "queued"}))
-    buffer = io.StringIO()
-    with contextlib.redirect_stdout(buffer):
-        code = C.cmd_start(start_args())
-    check(code, 1, "a start beside a pending entry is refused")
-    check_true("007-fixture.toml" in buffer.getvalue(), "and names the entry")
-    buffer = io.StringIO()
-    with contextlib.redirect_stdout(buffer):
-        code = C.cmd_start(start_args(ignore_queue=True))
-    check(code, 0, "--ignore-queue launches anyway")
-    check_true("racing queue entry 007-fixture.toml" in buffer.getvalue(),
-               "and still names what it is racing")
-    shutil.rmtree(repo / C.QUEUE_DIR)
-
-    chain = " && ".join(C.phase_command(p, [0, 1]) for p in
-                        C.load_campaign("fixture", repo)["phases"])
-    script = C.launch_script("/r", chain, "experiments/fixture/x.log")
-    check_true("nohup" in script and "< /dev/null" in script,
-               "the launch survives the ssh session that started it")
 finally:
     C.run_shell = REAL_RUN_SHELL
     C.probe_processes = REAL_PROBE_PROCESSES
@@ -3064,10 +2919,6 @@ STAGE_ROWS = [["av2", "feat/x", "abc1234", "abc1234", "staged"],
               ["av5", "feat/x", "abc1234", "abc1234", "not confirmed"],
               ["av6", "feat/x", "abc1234", "abc1234", "BINARY MISMATCH"],
               ["av7", "main", "deadbee", "deadbee", "would stage (--force)"]]
-START_ROWS = [["av2", "0-99", "12345", "launched"],
-              ["av3", "100-199", "-", "dry run"],
-              ["av4", "200-299", "-", "blocked"],
-              ["av5", "300-399", "-", "failed: no pid returned"]]
 
 COLOUR_TABLES = [
     ("checkout", C.CHECKOUT_HEADERS, C.checkout_rows(COLOUR_REPORTS),
@@ -3075,7 +2926,6 @@ COLOUR_TABLES = [
     ("campaign", C.HEADERS, C.status_rows(COLOUR_REPORTS), C.status_paint),
     ("queue", C.QUEUE_HEADERS, C.queue_rows(COLOUR_REPORTS), C.queue_paint),
     ("stage", C.STAGE_HEADERS, STAGE_ROWS, C.stage_paint),
-    ("start", C.START_HEADERS, START_ROWS, C.start_paint),
 ]
 
 try:
@@ -3141,99 +2991,8 @@ try:
 finally:
     C.set_colour(False)
 
-# ── load ──────────────────────────────────────────────────────────────────────
-
-LOAD_OUT = """##NPROC 32
-##LOADAVG 29.64 26.73 34.45 26/1230 2534793
-##UPTIME 1386000.12
-##STAT0 cpu  1000 0 200 8000 100 0 0 0 0 0
-##STAT1 cpu  2600 0 600 9000 300 0 0 0 0 0
-##USERTICKS benandrew 1001 2400
-##USERTICKS root 0 1
-##USERTICKS 4242 600
-##MEM MemTotal 131707948
-##MEM MemAvailable 127091572
-##MEM SwapTotal 2097148
-##MEM SwapFree 2097148
-##DISK 1921208544 300472232 1523070472 /
-##GPU 0, 0, 99, 20475, 37, NVIDIA RTX 4000 SFF Ada Generation
-##GPU 1, [N/A], 0, 0, 0, Some Card
-##WHO alice 2
-##END
-"""
-
-LOAD = C.parse_load(LOAD_OUT)
-check(LOAD["cores"], 32, "core count")
-check(LOAD["loadavg"], [29.64, 26.73, 34.45], "load averages, in order")
-# 3200 ticks elapsed: 2000 busy, 1000 idle and 200 iowait.
-check((LOAD["cpu_pct"], LOAD["iowait_pct"]), (62.5, 6.25),
-      "busy excludes both idle and iowait, and iowait is reported apart")
-# The window is 3200 ticks over 32 cores, so 100 ticks is one core's worth.
-check(LOAD["user_cores"], {"benandrew": 24.0, "uid4242": 6.0},
-      "per-user cores are ticks over the window, an unnamed uid keeps its "
-      "number, and a user under 0.05 cores is dropped")
-check(LOAD["mem"], {"total": 131707948 * 1024,
-                    "used": (131707948 - 127091572) * 1024},
-      "memory used is total less MemAvailable, in bytes")
-check(LOAD["swap"]["used"], 0, "untouched swap reads zero")
-check(LOAD["disk"]["mount"], "/", "disk mount point")
-check([g["name"] for g in LOAD["gpus"]],
-      ["NVIDIA RTX 4000 SFF Ada Generation"],
-      "a GPU line with [N/A] in a numeric field is dropped, not read as zero")
-check(LOAD["sessions"], {"alice": 2}, "sessions per user")
-check(C.parse_load("##STAT0 cpu 1 2 3 4 5\n")["user_cores"], {},
-      "a probe cut off before its second sample yields no CPU figures")
-check("cpu_pct" in C.parse_load("##STAT0 cpu 1 2 3 4 5\n"), False,
-      "and no busy percentage either, rather than a wrong one")
-check(C.cpu_split([1, 0, 0, 1, 0], [1, 0, 0, 1, 0]), None,
-      "a zero-length window divides by nothing")
-
-ASLEEP = C.parse_load("##GPUSLEEP 0000:01:00.0\n##END\n")
-check(C.gpu_rows([{"host": "local", "reachable": True, **ASLEEP}]),
-      [["local", "-", "asleep", "-", "-", "PCI 0000:01:00.0"]],
-      "a suspended card is listed as asleep, named by its PCI address")
-
-LOAD_REPORTS = [{"host": "av3", "reachable": True, "error": None, **LOAD},
-                {"host": "av2", "reachable": False,
-                 "error": "ssh: connect to host av2 port 22: Connection "
-                          "timed out after a long while"}]
-LOAD_ROWS = C.load_rows(LOAD_REPORTS)
-check(LOAD_ROWS[0][:5], ["av3", "32", "29.6 26.7 34.5", "62%", "6%"],
-      "load row's leading cells")
-check(len(LOAD_ROWS[1]), len(C.LOAD_HEADERS),
-      "an unreachable host still fills every column")
-check_true(LOAD_ROWS[1][1].startswith("(unreachable: ")
-           and LOAD_ROWS[1][1].endswith("...)"),
-           "and its reason is truncated so it cannot widen the table")
-check(C.pressure(LOAD, "LOAD 1/5/15"), "yellow",
-      "29.6 on 32 cores is past three quarters of the box")
-check(C.pressure({**LOAD, "cores": 20}, "LOAD 1/5/15"), "red",
-      "the same load on 20 cores is over it")
-check(C.pressure(LOAD, "MEM"), None, "3% memory is unremarkable")
-
-try:
-    C.set_colour(True)
-    painted = C.render_table(LOAD_ROWS, C.LOAD_HEADERS,
-                             C.load_painter(LOAD_REPORTS))
-    C.set_colour(False)
-    check(strip_ansi(painted), C.render_table(LOAD_ROWS, C.LOAD_HEADERS),
-          "the coloured load table strips back to the plain one")
-finally:
-    C.set_colour(False)
-
-# The script itself, run here for real: it is the one part a fixture cannot
-# vouch for, and running it touches nothing but /proc and /sys. The checkout is
-# named directly because the queue tests above leave C.REPO_ROOT pointing at a
-# temporary one they have since deleted.
-LOCAL_LOAD = C.gather_load(C.LOCAL, str(CAMPAIGN_PY.parent.parent))
-check(LOCAL_LOAD["error"], None, "the load probe runs on this machine")
-for key in ("cores", "loadavg", "cpu_pct", "mem", "disk", "uptime_s"):
-    check_true(key in LOCAL_LOAD, f"the live probe reports {key}")
-
-
 parser = C.build_parser()
-for argv in (["status"], ["queue"], ["collect"], ["stage", "c"],
-             ["start", "c"], ["load"]):
+for argv in (["status"], ["queue"], ["collect"], ["stage", "c"]):
     check(parser.parse_args(argv).no_color, False,
           f"`{argv[0]}` prints a table, so it takes --no-color")
     check(parser.parse_args(argv + ["--no-color"]).no_color, True,

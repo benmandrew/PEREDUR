@@ -6,7 +6,7 @@ The campaign declaration, the verbs that act on it, and what each reading means;
 
 A campaign is declared once, in `experiments/<name>/campaign.toml`: its branch, the seed range each lab host takes, and its phases. Everything that acts on a campaign goes through `scripts/campaign.py`, so the seed split exists in one place. Never hand-roll an `ssh … nohup … run_experiments.py` line and never choose a seed range at the prompt; two hosts sharing a seed run it twice and the merge keeps one row per key, which costs machine time and yields nothing. `campaign.toml` is tracked (a `.gitignore` negation), because the hosts get it by checking out the campaign's branch.
 
-The verbs are `stage` (put a host on the branch and rebuild it), `start` (launch the phases detached), `enqueue` plus the cron-driven `tick` (the unattended path), `dequeue` (take an entry back out, killing the tick holding it), `status`, `load` (CPU, memory, disk and GPU use per host, cheap enough for `watch`), `queue` and `collect`.
+The verbs are `stage` (put a host on the branch and rebuild it), `enqueue` plus the cron-driven `tick` (the unattended path), `dequeue` (take an entry back out, killing the tick holding it), `status`, `queue` and `collect`.
 
 `campaign.py status` is the source of truth, read-only, and costs about a second. Never carry campaign state in conversation context; re-run the poll later rather than predicting what it will say. Never poll in a loop, and never spawn an agent to watch a run: `enqueue` the campaign and let the five-minute tick drive it.
 
@@ -49,9 +49,7 @@ Staging *refuses by default* the three ways to destroy work that cannot be recov
 
 ## Launching
 
-**`start`** launches immediately. It re-probes each host, refuses one that is unstaged, running a campaign, or holding a pending queue entry for this campaign (`--ignore-queue` overrides, naming the entry it races), then runs its phases as one detached `nohup` chain joined with `&&` and appends the launch to `experiments/<name>/launches.jsonl`. Use it when the machines are free and the campaign is next.
-
-**`enqueue`** hands the campaign to the host's queue and returns. Use it whenever the machines might be busy, whenever the campaign is one of several, and in preference to waiting: the tick starts it within five minutes and `queue` says where it got to. A second entry for the same campaign needs `--again`, since two entries mean two runners resuming off one CSV.
+**`enqueue`** hands the campaign to the host's queue and returns. It is the only way to launch: the tick starts it within five minutes and `queue` says where it got to. A second entry for the same campaign needs `--again`, since two entries mean two runners resuming off one CSV.
 
 Neither takes a seed range; `enqueue` freezes the split into the entry, so editing the declaration mid-flight cannot move seeds under written rows.
 
@@ -106,7 +104,7 @@ A score phase appears as `score:<out>`, read from `score-manifest-<host>.json`: 
 
 ## The binary freshness gate
 
-`run_experiments.py`, `stage` and `start` all refuse a binary whose commit differs from HEAD, built dirty, or unable to answer `--version`. `start` checks it so a launch does not die unseen behind `nohup`.
+`run_experiments.py` and `stage` both refuse a binary whose commit differs from HEAD, built dirty, or unable to answer `--version`.
 
 `--allow-stale-binary` is legitimate only when rows should carry the older commit: reproducing an archive at its `PROVENANCE.json` revision, or topping up a campaign unaffected by later commits. It never bypasses a failed build or saves a rebuild before a published campaign; the `*` is permanent.
 
@@ -192,4 +190,4 @@ python3 scripts/test_campaign.py
 
 A plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. It never touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `PEREDUR_RUNNER_CMD` and `PEREDUR_SCORER_CMD` stubs that record their arguments. `score_campaign.py` uses a fake results tree, a `PEREDUR_SCORE_CURVES_CMD` stub, and stub binaries under `PEREDUR_BIN_DIR`. New launch-path code must be tested the same way.
 
-`campaign.py` parses TOML itself because av2 and av3 run python3 3.10.12 with neither `tomllib` nor `tomli`. Its subset is checked against `tomllib` on every fixture wherever that exists. Remote shell scripts never use bare globs, since zsh's `NOMATCH` aborts on an unmatched pattern and every later section vanishes in silence.
+`campaign.py` reads TOML through `tomllib`, which the hosts' Python 3.12 provides, and falls back to `tomli` on Python 3.10. Remote shell scripts never use bare globs, since zsh's `NOMATCH` aborts on an unmatched pattern and every later section vanishes in silence.

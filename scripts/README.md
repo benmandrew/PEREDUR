@@ -8,7 +8,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 
 | Script | Role |
 |---|---|
-| `campaign.py` | The operating surface for a campaign: `stage`, `start`, `enqueue`, `tick`, `status`, `load`, `queue`, `collect`. Everything that acts on a campaign goes through it. See `docs/dev/campaigns.md` for the state each verb leaves behind. |
+| `campaign.py` | The operating surface for a campaign: `stage`, `enqueue`, `tick`, `status`, `queue`, `collect`. Everything that acts on a campaign goes through it. See `docs/dev/campaigns.md` for the state each verb leaves behind. |
 | `run_experiments.py` | Runs one phase of a sweep on one host and appends rows to the results CSV. Vendored into every campaign archive. |
 | `score_campaign.py` | The runner's scoring twin: one `score_curves.py --maximality` per run directory over one host's seeds, under a pinned worker pool, with a manifest of the budgets and binaries. What a `kind = "score"` phase runs. |
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
@@ -28,7 +28,7 @@ A campaign's own `experiments/<campaign>/scripts/` holds verbatim copies of the 
 
 ## Prerequisites
 
-- Python 3.11+, because `check_config_schema.py` imports stdlib `tomllib` with no fallback. `campaign.py` itself runs on 3.10, having its own TOML parser for the lab hosts (see below).
+- Python 3.11+, because `check_config_schema.py` imports stdlib `tomllib` with no fallback. `campaign.py` also runs on 3.10 where the `tomli` package is installed.
 - The `peredur` and `compare` binaries built in release mode (see below)
 
 ## 1. Build the project
@@ -479,8 +479,7 @@ as it narrows a run phase, and each host scores its own seeds alone.
 A phase's own `hosts` table overrides the campaign-level split for that phase
 alone, and may only narrow it — every host it names must already be declared at
 the top level, since `stage` staged no other one. A host the table omits runs
-nothing for that phase, contributing no command to that host's `&&` chain under
-`start` and being skipped by a tick. `enqueue` freezes the per-phase ranges into
+nothing for that phase: a tick skips it. `enqueue` freezes the per-phase ranges into
 the queue entry as `phase_seeds`, for the reason it already freezes the campaign
 range, and an entry written before that field existed falls back to the campaign
 split. The case for it is a campaign whose paths have different sample sizes,
@@ -499,10 +498,8 @@ exists: it has both hosts run the shared seeds, and the merge keeps one row per
 key, so the campaign costs more machine time and returns fewer rows than the
 plan says without anything looking wrong.
 
-`campaign.py` reads this TOML with a parser of its own rather than `tomllib`,
-because `tick` runs on av2 and av3, whose python3 is 3.10.12 with neither
-`tomllib` (3.11) nor `tomli` present. `test_campaign.py` checks that parser
-against `tomllib` on every fixture.
+`campaign.py` reads this TOML through `tomllib`, which the hosts' Python 3.12
+provides. On Python 3.10 it falls back to the `tomli` package.
 
 ### Staging the hosts
 
@@ -529,20 +526,11 @@ stage also refuses a checkout ahead of the pushed commit.
 
 ### Launching
 
-```sh
-python scripts/campaign.py start arbiter-probe --dry-run   # print the commands
-python scripts/campaign.py start arbiter-probe
-```
-
-`start` re-probes each host, refuses one that is unstaged, already running a
-campaign, or holding a queue entry for this campaign in any state a tick could
-still run, and launches that host's phases as one detached `nohup` chain joined
-with `&&`. `--ignore-queue` overrides the last of those and names the entry it
-is racing. Each launch is appended to `experiments/<name>/launches.jsonl`.
-Neither `start` nor `enqueue` accepts a seed range: both read the split from
-`campaign.toml`, which is the only place it is written down. A score phase
-joins the chain like any other phase, as a `score_campaign.py` command over
-the same seeds, and `start --dry-run` and `tick --dry-run` print it.
+A campaign is launched by `enqueue`, described under the queue below.
+`enqueue` accepts no seed range: it reads the split from `campaign.toml`, which
+is the only place it is written down. A score phase runs like any other phase,
+as a `score_campaign.py` command over the same seeds, and `tick --dry-run`
+prints it.
 
 ### Scoring a finished search
 
@@ -732,29 +720,6 @@ poll and the cron tick's log stay readable. `--no-color`, on every verb that
 prints a table, and a non-empty `NO_COLOR` in the environment both turn it off;
 `CLICOLOR_FORCE=1` forces it on down a pipe, which is what `less -R` wants.
 `--json` is never coloured.
-
-### Machine load
-
-```sh
-python scripts/campaign.py load                     # av2, av3 and this machine
-python scripts/campaign.py load --host av3          # one host
-python scripts/campaign.py load --json              # machine-readable
-watch -c -n 2 'CLICOLOR_FORCE=1 python3 scripts/campaign.py load --no-legend'
-```
-
-A read-only poll of each machine's resources. The first table holds cores, the
-1/5/15-minute load average, CPU and iowait over a one-second sample, memory
-(total less `MemAvailable`), swap, free space on the filesystem holding the
-checkout, and uptime. A cell turns yellow or red as it nears saturation, with
-load judged against the core count. The second table lists each GPU's
-utilisation, memory and temperature. A last line per host gives cores used by
-each user over the same second, and who is logged in.
-
-One poll costs about 1.2s of wall time, nearly all of it the CPU sample, and
-under 0.1s of CPU on each host. ssh reuses a master connection for two minutes,
-so only the first poll pays the handshake. `nvidia-smi` is skipped when the
-card is runtime-suspended, since querying it would wake the card at a cost of
-about a second of system time; such a card is listed as `asleep`.
 
 ### Collecting a finished one
 

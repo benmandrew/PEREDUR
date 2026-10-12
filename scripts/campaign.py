@@ -3,55 +3,28 @@
 
     python scripts/campaign.py status            # one table of live state
     python scripts/campaign.py status --json     # the same, machine-readable
-    python scripts/campaign.py load              # CPU, memory, disk, GPU
     python scripts/campaign.py collect --profile tlsf --dry-run
     python scripts/campaign.py collect --profile tlsf
     python scripts/campaign.py stage arbiter-probe --dry-run
-    python scripts/campaign.py start arbiter-probe
     python scripts/campaign.py enqueue arbiter-probe
     python scripts/campaign.py queue
+    python scripts/campaign.py requeue --host av2 001-tlsf.toml
+    python scripts/campaign.py dequeue --host av2 001-tlsf.toml
     python scripts/campaign.py tick --host av2
     python scripts/campaign.py cron --print --host av2
 
 A campaign is declared once, in ``experiments/<name>/campaign.toml``: the
-branch it runs on, the seed range each host takes, and the phases to run. That
-file is the only place a seed split is written down, so the split cannot differ
-between the launch, a resume and the merge. ``stage``, ``start`` and ``enqueue``
-all read it and none of them accepts a seed range as an argument.
-
-``status`` is read-only. It asks each host for its launch manifests
-(``experiments/<stem>-manifest-<host>.json``, written by run_experiments.py),
-its git state, its process table and the mtimes underneath each campaign's
-result directory, then asks ``run_experiments.py --dry-run`` on that same host
-how many rows the launch's selection plans. Nothing here re-derives a sweep:
-the manifest says what the launch asked for and the runner says how many rows
-that expands to, so a profile edit cannot make this script disagree with the
-runner about the size of a campaign.
-
-``collect`` wraps merge_experiments.py rather than reimplementing it -- the
-rsync, the natural key and the merge all come from that module -- and adds the
-verification the manual step never had: row counts per host against the merged
-total, and a duplicate-key scan.
-
-``stage`` prepares a host and refuses by default: a dirty checkout, a live
-run, or a branch other than the campaign's each block it, because the recovery
-from a wrong ``git checkout -f`` there is somebody's unpushed work.
-
-``enqueue`` and ``tick`` are the unattended path. A queue entry lives on the
-host that will run it, under ``experiments/queue/NNN-<name>.toml``, and a cron
-tick takes the lowest-numbered queued entry and runs its next phase under a
-lock. Nothing polls: the tick is the only thing that watches a run.
-
-A queue holds campaigns on different branches, so a tick stages the checkout
-onto the branch and commit its entry froze at enqueue, then rebuilds. It does
-that for the branch alone. A dirty checkout and a live run still stop it dead,
-because those are the two things a reset destroys and nothing here can bring
-back; ``stage --force`` remains the only way past either, and it wants a human
-at a terminal.
+branch it runs on, the seed range each host takes, and the phases to run.
+``stage`` and ``enqueue`` read that file, and neither accepts a seed range as
+an argument. ``status`` and ``queue`` are read-only. ``collect`` wraps
+merge_experiments.py and verifies the merge. ``tick`` runs on a host, from
+cron, and runs the next phase of the lowest-numbered queued entry under a lock.
 
 Hosts are reached by their ssh-config alias (``av2``), not by the FQDN in
 merge_experiments.REMOTES: the FQDN form falls through to password auth under
 BatchMode, which a status poll cannot answer.
+
+The operating manual is docs/dev/campaigns.md.
 """
 
 import argparse
@@ -62,7 +35,6 @@ import json
 import os
 import re
 import shlex
-import string
 import subprocess
 import sys
 import time
@@ -83,56 +55,36 @@ HOSTS: tuple[str, ...] = ("av1", "av2", "av3")
 LOCAL = "local"
 
 SSH_OPTS = ["-o", "ConnectTimeout=8", "-o", "BatchMode=yes"]
-# `load` is meant to sit under `watch`, where the handshake would be most of
-# each poll's cost. A master connection that outlives the call for two minutes
-# makes every poll after the first a channel on an open session. Kept to
-# `load`: the other verbs run rarely, and a stale master is one more thing to
-# reason about when a launch misbehaves.
-SSH_MUX_OPTS = [*SSH_OPTS, "-o", "ControlMaster=auto",
-                "-o", "ControlPath=~/.ssh/campaign-load-%C",
-                "-o", "ControlPersist=120"]
 SSH_TIMEOUT_S = 45
-# collect --dry-run's measure step walks a whole result tree with du and find.
-# On a cold cache over a large experiments dir that outlasts the status
-# deadline by a wide margin, and a status deadline applied here reports a
-# perfectly healthy machine as unreachable.
+# collect --dry-run's measure step walks a whole result tree with du and find,
+# which on a cold cache outlasts the status deadline by a wide margin.
 MEASURE_TIMEOUT_S = 600
 
 # How long a campaign's newest run.log may go untouched before a live process
-# stops corroborating it. Bounded by the harness's own limits rather than
-# guessed: no single run outlasts them, and the largest any profile allows is
-# a 3600s PEREDUR timeout (gen40, and the largest timeout_caps entry) plus an
-# 1800s compare timeout, so 90 minutes bounds one run's silence. Doubled, for
-# the granularity of the log writes and for a jobs=1 host, where the next
-# run.log only appears once the previous run has finished.
+# stops corroborating it. The largest any profile allows is a 3600s PEREDUR
+# timeout plus an 1800s compare timeout, so 90 minutes bounds one run's
+# silence. Doubled, because on a jobs=1 host the next run.log only appears
+# once the previous run has finished.
 STALE_RUN_S = 3 * 3600
 
 # av2's non-interactive ssh shell has no `python` on PATH, only `python3`.
 REMOTE_PYTHON = "python3"
 
-# Marker protocol for the remote scripts. Chosen over one-shot JSON because the
-# remote side has to stay a plain shell script: an inline python heredoc would
-# need quoting through ssh and would hide its own parse errors as empty output.
+# Marker protocol for the remote scripts, which stay plain shell: an inline
+# python heredoc would hide its own parse errors as empty output.
 MARK = "##"
 
-# A remote script's fillable slots, which is also what render_script checks a
-# template against. Deliberately narrow -- upper case, digits and underscores
-# between two @ -- so it cannot match an address or a path a value happens to
-# carry; only the template is ever scanned, never a substituted value.
+# A remote script's fillable slots. Narrow -- upper case, digits and
+# underscores between two @ -- so it cannot match an address or a path.
 PLACEHOLDER_RE = re.compile(r"@[A-Z0-9_]+@")
 
 
 def render_script(template: str, **subs: str) -> str:
     """Fill a remote script template's ``@NAME@`` slots.
 
-    ``@M@`` is the marker, is implicit, and goes last: a value spliced in --
-    the stage script's configs block -- carries markers of its own, and
-    substituting the marker first would leave those literal.
-
-    A slot the caller does not name raises rather than shipping. The remote
-    side is a shell script, so an unsubstituted ``@ROOT@`` is not an obvious
-    placeholder over there but a bare word, and `cd @ROOT@` on a lab machine
-    fails somewhere other than where the mistake is.
+    ``@M@`` is the marker, is implicit, and goes last: a value spliced in
+    carries markers of its own. A slot the caller does not name raises, since
+    an unsubstituted ``@ROOT@`` is a bare word to the remote shell.
     """
     named = {f"@{key}@" for key in subs} | {"@M@"}
     unfilled = sorted(set(PLACEHOLDER_RE.findall(template)) - named)
@@ -144,35 +96,27 @@ def render_script(template: str, **subs: str) -> str:
     return template.replace("@M@", MARK)
 
 
-# The runner, as a command line rather than an import: tick shells it in the
-# checkout it is standing in, and PEREDUR_RUNNER_CMD points it at a stub so the
-# launch paths can be tested without launching a campaign. REMOTE_PYTHON for
-# the same reason it is used everywhere else -- av2's ssh shell has no `python`.
+# The runner, as a command line: tick shells it in the checkout it is standing
+# in, and PEREDUR_RUNNER_CMD points it at a stub for the tests.
 RUNNER_CMD = os.environ.get("PEREDUR_RUNNER_CMD",
                             f"{REMOTE_PYTHON} scripts/run_experiments.py")
-# The scoring twin, for a `kind = "score"` phase: one score_curves.py per run
-# directory over this host's seeds, driven by scripts/score_campaign.py. The
-# same override pattern, so a tick running a score phase can be tested against
-# a stub exactly as a run phase is.
+# The scoring twin, for a `kind = "score"` phase, with the same override.
 SCORER_CMD = os.environ.get("PEREDUR_SCORER_CMD",
                             f"{REMOTE_PYTHON} scripts/score_campaign.py")
 
 # Rebuilt by stage. The lab machines have no Nix, so this is the incremental
-# build against an already-configured preset directory, not a configure step;
-# a campaign whose build differs overrides it with `build` in campaign.toml.
+# build; a campaign overrides it with `build` in campaign.toml.
 DEFAULT_BUILD_CMD = "cmake --build build-release"
 PEREDUR_BINARY = "build-release/peredur"
 
 # Queue entries live under the checkout that runs them, not in git: a tick
 # rewrites the entry's state on every transition, and a tracked file doing that
-# would leave the checkout dirty, which is exactly what stage refuses to touch.
-# experiments/ is ignored by content, so the directory needs no .gitignore work.
+# would leave the checkout dirty, which stage refuses to touch.
 QUEUE_DIR = "experiments/queue"
 QUEUE_LOCK = "~/.peredur-queue.lock"
 QUEUE_STATES = ("queued", "running", "done", "failed", "cancelled")
 # ensure_staged's third answer, beside None (go on) and an exit code (stop):
-# the checkout moved and took the tick's own sources with it, so the rest of
-# this tick belongs to a process that has read them. See restart_after_stage.
+# the checkout moved the tick's own sources. See restart_after_stage.
 RESTART = "restart"
 TICK_RESTART_ENV = "PEREDUR_TICK_RESTARTED"
 TICK_LOCK_FD_ENV = "PEREDUR_TICK_LOCK_FD"
@@ -198,11 +142,9 @@ def source_path(host: str) -> str:
 
 # -- Remote inventory ---------------------------------------------------------
 
-# The queue dump, shared verbatim by the inventory and the stage probe. Both
-# want the same thing -- every entry's name and its whole body -- and both put
-# it last, so an entry's own text cannot be read as one of the sections above
-# it. That means it also carries the closing ``@M@END``, and a template ending
-# in it needs nothing after.
+# The queue dump, shared by the inventory and the stage probe. Both put it
+# last, so an entry's own text cannot be read as one of the sections above it,
+# and it carries the closing ``@M@END``.
 QUEUE_BLOCK = r"""echo "@M@QUEUE"
 find @QUEUE@ -maxdepth 1 -type f -name '*.toml' 2>/dev/null | sort |
 while IFS= read -r q; do
@@ -239,15 +181,12 @@ while IFS= read -r m; do
   echo "@M@ENDSFILE"
 done
 """ + QUEUE_BLOCK
-# A score phase's manifest sits inside its output directory rather than
-# beside a CSV, one level down, so it gets a sweep of its own: widening the
-# first to depth two would pull in the per-host manifests archived campaigns
-# keep under their own directories.
-# The manifest sweep goes through `find`, not a glob, because the lab login
-# shell is zsh: its default NOMATCH aborts the whole script where a glob matches
-# nothing, so on a host with no manifest every section after the loop vanishes.
-# sh and bash substitute the unmatched pattern instead, which is why this only
-# ever fails in production.
+# A score phase's manifest sits one level down, inside its output directory,
+# so it gets a sweep of its own: widening the first to depth two would pull in
+# the per-host manifests archived campaigns keep under their own directories.
+# The sweeps go through `find`, not a glob, because the lab login shell is
+# zsh: its default NOMATCH aborts the whole script where a glob matches
+# nothing.
 
 
 def inventory_script(root: str) -> str:
@@ -272,18 +211,14 @@ def detail_script(root: str, campaigns: list[dict]) -> str:
     """Shell reporting rows, mtimes and the runner's own plan per campaign.
 
     The plan comes from ``run_experiments.py --dry-run`` with the manifest's
-    selection replayed onto it, so the count is whatever the runner would
-    itself execute rather than a second expansion of the sweep. A profile the
-    host's checkout no longer defines simply yields no plan line, and the
-    caller reports that campaign's total as unknown.
+    selection replayed onto it. A profile the host's checkout no longer
+    defines yields no plan line.
     """
     lines = [f"cd {shlex.quote(root)} 2>/dev/null || exit 3"]
     for c in campaigns:
         if c.get("kind") == "score":
             # A score phase's progress is a directory listing: one CSV per
-            # scored run, moved into place whole, and the newest file under
-            # the output directory for staleness. No plan to ask for -- the
-            # queued count is in the manifest already.
+            # scored run, and the newest file for staleness.
             q_out = shlex.quote(c["out"])
             lines += [
                 f'echo "{MARK}CAMPAIGN {c["profile"]}"',
@@ -320,12 +255,7 @@ TIMEOUT_PREFIX = "timed out after"
 
 
 def is_timeout(error: str | None) -> bool:
-    """Whether a run_shell error was the deadline rather than a failure.
-
-    The two want different words in the output and often different fixes: a
-    timeout on a healthy machine means the probe was too cheap a deadline for
-    the tree it walked, not that the host is down.
-    """
+    """Whether a run_shell error was the deadline rather than a failure."""
     return bool(error) and error.startswith(TIMEOUT_PREFIX)
 
 
@@ -333,10 +263,8 @@ def run_shell(host: str, script: str, timeout: int = SSH_TIMEOUT_S,
               ssh_opts: list[str] = SSH_OPTS):
     """Run a shell script on ``host`` (or locally). Returns (stdout, error).
 
-    A timeout returns whatever had already arrived alongside the error, rather
-    than discarding it. The markers stream out in order, so a probe cut short
-    still carries every section that completed, and throwing them away flips a
-    finished campaign to "stalled" purely because the poll was slow.
+    A timeout returns whatever had already arrived alongside the error: the
+    markers stream out in order, so every section that completed is usable.
     """
     if host == LOCAL:
         cmd = ["sh", "-c", script]
@@ -358,15 +286,58 @@ def run_shell(host: str, script: str, timeout: int = SSH_TIMEOUT_S,
     return proc.stdout, None
 
 
+def marker_blocks(text: str, tag: str) -> list:
+    """(name, body) for each @TAG name / @ENDTAG pair a marker script emitted."""
+    out: list = []
+    name, body, inside = "", [], False
+    for line in text.splitlines():
+        if line.startswith(f"{MARK}{tag} "):
+            name, body, inside = line[len(MARK) + len(tag) + 1:].strip(), [], True
+        elif line.startswith(f"{MARK}END{tag}"):
+            out.append((name, "\n".join(body)))
+            inside = False
+        elif inside:
+            body.append(line)
+    return out
+
+
+def parse_toml_blocks(text: str, tag: str) -> list:
+    """The TOML documents a marker script emitted, one per block.
+
+    A half-written entry is kept with its name and the parse error: a tick
+    cannot leave one, but a hand-edited entry can, and silence hides the queue.
+    """
+    out: list = []
+    for name, body in marker_blocks(text, tag):
+        try:
+            entry = parse_toml(body)
+        except TomlError as exc:
+            entry = {"error": str(exc)}
+        # The base name, as `requeue` and the queue table both name an entry.
+        entry["file"] = Path(name).name
+        out.append(entry)
+    return out
+
+
 def parse_inventory(text: str) -> dict:
     """Split the inventory script's marker-delimited output into fields."""
     out: dict = {"ps": [], "manifests": [], "score_manifests": [],
-                 "queue": [], "hostname": "?", "epoch": None, "branch": "?",
-                 "head": "?", "dirty": None, "error": None}
+                 "queue": parse_toml_blocks(text, "QFILE"), "hostname": "?",
+                 "epoch": None, "branch": "?", "head": "?", "dirty": None,
+                 "error": None}
+    for _, body in marker_blocks(text, "FILE"):
+        try:
+            out["manifests"].append(json.loads(body))
+        except json.JSONDecodeError:
+            pass
+    for name, body in marker_blocks(text, "SFILE"):
+        try:
+            manifest = json.loads(body)
+            manifest["file"] = name
+            out["score_manifests"].append(manifest)
+        except (json.JSONDecodeError, TypeError):
+            pass
     section = None
-    manifest_lines: list[str] = []
-    queue_name = ""
-    score_name = ""
     buf: list[str] = []
 
     def flush() -> None:
@@ -378,59 +349,17 @@ def parse_inventory(text: str) -> dict:
             out["branch"], out["head"] = buf[0].strip(), buf[1].strip()
             out["dirty"] = buf[2].strip().isdigit() and int(buf[2].strip()) > 0
 
+    # A block's own lines land in `buf` under its marker's name, which flush
+    # ignores.
     for line in text.splitlines():
         if line.startswith(MARK + "ERR"):
             out["error"] = line[len(MARK) + 3:].strip()
             return out
-        if line.startswith(MARK + "FILE "):
-            section, manifest_lines = "file", []
-            continue
-        if line.startswith(MARK + "ENDFILE"):
-            try:
-                out["manifests"].append(json.loads("\n".join(manifest_lines)))
-            except json.JSONDecodeError:
-                pass
-            section = "manifests"
-            continue
-        if line.startswith(MARK + "SFILE "):
-            section = "sfile"
-            score_name = line[len(MARK) + 6:].strip()
-            manifest_lines = []
-            continue
-        if line.startswith(MARK + "ENDSFILE"):
-            try:
-                manifest = json.loads("\n".join(manifest_lines))
-                manifest["file"] = score_name
-                out["score_manifests"].append(manifest)
-            except (json.JSONDecodeError, TypeError):
-                pass
-            section = "scoremanifests"
-            continue
-        if line.startswith(MARK + "QFILE "):
-            section = "qfile"
-            queue_name = line[len(MARK) + 6:].strip()
-            manifest_lines = []
-            continue
-        if line.startswith(MARK + "ENDQFILE"):
-            # A half-written entry is skipped with its name kept: a tick
-            # interrupted between the temp file and the rename cannot leave one,
-            # but a hand-edited entry can, and silence there hides the queue.
-            try:
-                entry = parse_toml("\n".join(manifest_lines))
-                entry["file"] = Path(queue_name).name
-            except TomlError as exc:
-                entry = {"file": Path(queue_name).name, "error": str(exc)}
-            out["queue"].append(entry)
-            section = "queue"
-            continue
         if line.startswith(MARK):
             flush()
             section, buf = line[len(MARK):].strip().lower(), []
-            continue
-        if section == "ps":
+        elif section == "ps":
             out["ps"].append(line)
-        elif section in ("file", "qfile", "sfile"):
-            manifest_lines.append(line)
         else:
             buf.append(line)
     flush()
@@ -440,10 +369,8 @@ def parse_inventory(text: str) -> dict:
 def parse_plan_line(line: str) -> dict:
     """Pull the counts out of run_experiments.py's ``Plan:`` line.
 
-    Format: ``N result rows (M via aliasing), K already done; L runs to
-    execute``. Each number is read from the phrase that names it rather than
-    from a fixed position, so a clause added to that line later does not
-    silently reassign the ones already there.
+    Each number is read from the phrase that names it, not from a fixed
+    position, so a clause added to that line does not reassign the others.
     """
     out: dict = {}
     for phrase, key in (("result rows", "rows_planned"),
@@ -463,14 +390,11 @@ def parse_plan_line(line: str) -> dict:
 def parse_detail(text: str) -> dict:
     """Marker output of detail_script, keyed by profile name.
 
-    ``rows_done`` is the runner's own already-done count, out of the ``Plan:``
-    line, which is scoped to the same selection ``rows_planned`` is. The whole
-    CSV's length is not that number and cannot be substituted for it: profiles
-    may share a CSV, and a top-up relaunch rewrites the
-    manifest to a couple of seeds while the file still holds every earlier row,
-    which read the file's length as progress reports 400/40 and calls a
-    just-started campaign finished. The length is kept only as a fallback for
-    when no plan came back, and a fallback row is marked in the output.
+    ``rows_done`` is the runner's own already-done count from the ``Plan:``
+    line, scoped to the same selection as ``rows_planned``. The CSV's length
+    is only a fallback for when no plan came back, and is marked as one:
+    profiles may share a CSV, and a top-up relaunch narrows the manifest
+    while the file still holds every earlier row.
     """
     per: dict = {}
     current: dict | None = None
@@ -515,26 +439,17 @@ def parse_detail(text: str) -> dict:
 
 # -- Process detection --------------------------------------------------------
 
-# `maximal` is here for the scoring pass, which runs it under score_curves.py
-# beside `compare`; both are engine processes a stage must not reset under.
-# `counter` is the engine binary's name before the rename to peredur: a host
-# still running a binary built under that name is as busy as one running
-# `peredur`.
+# `maximal` runs under score_curves.py in the scoring pass. `counter` is the
+# engine binary's name before the rename to peredur.
 ENGINE_COMMS = ("peredur", "counter", "compare", "maximal", "ltlsynt", "black")
 
 
 def live_processes(ps_lines: list[str]) -> list[dict]:
     """Runner, scorer and engine processes, from a ``comm args`` listing.
 
-    Matched on ``comm``, never on the whole command line. ``pgrep -f
-    run_experiments.py`` would match this script's own ssh command, whose text
-    names it; the comm of that process is the login shell, so keying on comm
-    excludes it by construction.
-
-    A scorer (score_campaign.py, the score phase's twin of the runner) is
-    reported with ``kind = "score"`` and the ``--out`` directory it writes,
-    which is what a score phase's status row is matched against; it names no
-    profile, so nothing that keys on one mistakes it for a run.
+    Matched on ``comm``, never on the whole command line, which would match
+    this script's own ssh command. A scorer is reported with ``kind =
+    "score"`` and the ``--out`` directory it writes; it names no profile.
     """
     found = []
     for line in ps_lines:
@@ -590,9 +505,8 @@ def campaigns_from_manifests(manifests: list[dict]) -> list[dict]:
             "branch": git.get("branch", "?"),
             "head": (git.get("head") or "?")[:7],
             "binary_commit": binary.get("commit_short", "?"),
-            # The runner refuses to launch off a dirty binary without
-            # --allow-stale-binary, so a true here says the override was used
-            # and the campaign's rows name a commit they did not come from.
+            # True means --allow-stale-binary was used: the campaign's rows
+            # name a commit they did not come from.
             "dirty_binary": binary.get("dirty") == "1",
             "results_csv": sweep.get("results_csv", ""),
             "results_dir": sweep.get("results_dir", ""),
@@ -608,12 +522,9 @@ def campaigns_from_manifests(manifests: list[dict]) -> list[dict]:
 def campaigns_from_score_manifests(manifests: list[dict]) -> list[dict]:
     """One record per score manifest, in the shape the run records take.
 
-    The output directory's name stands where a profile would, since a score
-    phase has none of its own, and ``label`` is what the table prints. The
-    planned count is the manifest's queued count -- the scorer wrote it
-    knowing this host's seeds -- and the done count comes from the detail
-    probe's listing of the directory, so a pass that is still running reads
-    live rather than from the counts its manifest froze at launch.
+    The output directory's name stands where a profile would, and ``label``
+    is what the table prints. The planned count is the manifest's queued
+    count; the done count comes from the detail probe.
     """
     out = []
     for m in manifests:
@@ -647,12 +558,7 @@ def campaigns_from_score_manifests(manifests: list[dict]) -> list[dict]:
 
 def gather_host(host: str, root: str, only: str | None, want_plan: bool,
                 show_all: bool) -> dict:
-    """Everything status reports for one host.
-
-    Never raises: an unreachable machine costs one row of the table, not the
-    run, so a poll against a lab that is half up still says what the other half
-    is doing.
-    """
+    """Everything status reports for one host. Never raises."""
     report: dict = {"host": host, "root": root, "reachable": False,
                     "error": None, "campaigns": [], "hidden": 0,
                     "processes": [], "queue": []}
@@ -661,9 +567,8 @@ def gather_host(host: str, root: str, only: str | None, want_plan: bool,
     if inv["error"]:
         report["error"] = inv["error"]
         return report
-    # A timed-out inventory is still usable when its git section completed --
-    # the sections stream in order, so a branch means everything before it
-    # arrived. Without one there is nothing to report but the failure.
+    # A timed-out inventory is still usable when its git section completed:
+    # the sections stream in order.
     if err is not None:
         if not (is_timeout(err) and inv["branch"] != "?"):
             report["error"] = err
@@ -684,18 +589,15 @@ def gather_host(host: str, root: str, only: str | None, want_plan: bool,
     if only:
         campaigns = [c for c in campaigns if c["profile"] == only]
     elif not show_all:
-        # Manifests accumulate: a machine keeps one per campaign it has ever
-        # launched. The ones whose branch the checkout has since left cannot be
-        # the campaign now in flight, and their profile is usually no longer
-        # defined either, so they report as unknowns and drown the live rows.
+        # A machine keeps one manifest per campaign it has ever launched.
+        # Those on a branch the checkout has left cannot be in flight.
         live = [c for c in campaigns if c["branch"] == report["branch"]]
         report["hidden"] = len(campaigns) - len(live)
         campaigns = live
     if campaigns and want_plan:
         text, err = run_shell(host, detail_script(root, campaigns))
-        # Parsed unconditionally: the campaigns are reported one after another,
-        # so a probe cut short still holds complete records for the ones that
-        # got their turn, and dropping them reports those as stalled.
+        # Parsed unconditionally: a probe cut short still holds complete
+        # records for the campaigns that got their turn.
         detail = parse_detail(text or "")
         if err is not None:
             report["partial"] = True
@@ -711,20 +613,11 @@ def annotate(c: dict, host_report: dict) -> None:
     """Derive percent, staleness, state and ETA for one campaign.
 
     Times are differenced against the host's own clock, sampled in the same
-    inventory call, because av3 runs minutes away from av2 whenever NTP is off
-    and a staleness measured across that skew is fiction.
+    inventory call, because the hosts' clocks can be minutes apart.
 
     A process is attributed to a campaign only when it names that campaign's
-    profile. An engine process names none, and matching those against every
-    campaign would let one unrelated `peredur` report every campaign on its
-    host as running. Unattributable processes belong in the host's PROCESSES
-    column, which is where they still appear.
-
-    A matched process is corroborated against the campaign's own output before
-    it counts as progress. `running` beside a nine-day staleness is the reading
-    that stops someone investigating a dead run, which is the failure this tool
-    exists to prevent, so that combination reports as `stuck` instead — worth
-    seeing rather than hidden behind either plain state.
+    profile; an engine process names none. A matched process whose campaign
+    output has gone silent reports as `stuck`, not `running`.
     """
     now = host_report.get("epoch") or int(time.time())
     done = c.get("rows_done")
@@ -750,9 +643,8 @@ def annotate(c: dict, host_report: dict) -> None:
     c["eta_s"] = None
     if (c["state"] == "running" and done and planned
             and c["elapsed_s"] and c["elapsed_s"] > 0):
-        # Deliberately crude: rows per second since the manifest was written,
-        # which credits this launch with any rows it merely resumed onto. It
-        # answers "roughly when", not "when".
+        # Crude: rows per second since the manifest was written, which
+        # credits this launch with any rows it merely resumed onto.
         rate = done / c["elapsed_s"]
         if rate > 0:
             c["eta_s"] = int((planned - done) / rate)
@@ -763,8 +655,7 @@ def claims_campaign(proc: dict, c: dict) -> bool:
 
     A runner claims the campaign whose profile it names; a scorer claims the
     score phase whose output directory it names, compared by name since the
-    manifest and the process may spell the path relative or absolute. Neither
-    claims the other's kind, and an engine process claims nothing.
+    path may be relative or absolute. An engine process claims nothing.
     """
     if c.get("kind") == "score":
         return (proc.get("kind") == "score" and bool(proc.get("out"))
@@ -785,9 +676,8 @@ def parse_started(value: str | None) -> float | None:
 
 # -- Colour -------------------------------------------------------------------
 
-# Plain SGR escapes, no colorama and no rich: av2 and av3 run python 3.10.12
-# with no third-party packages at all, which is the same reason TOML is parsed
-# by hand below.
+# Plain SGR escapes, no colorama and no rich: the hosts have no third-party
+# packages.
 ANSI = {
     "bold": "\033[1m",
     "dim": "\033[2m",
@@ -802,12 +692,8 @@ ANSI_RESET = "\033[0m"
 class Style:
     """Paints text, or hands it back untouched when colour is off.
 
-    Held as one module-level instance rather than threaded through every
-    caller: the decision is made once from the command line and every table
-    renderer needs it. Colour is decoration over a plain layout, never part of
-    it -- ``render_table`` measures the unpainted text and pads outside the
-    escapes, so stripping the escapes from a coloured table gives back the
-    plain one byte for byte.
+    Colour is decoration over a plain layout: stripping the escapes from a
+    coloured table gives back the plain one byte for byte.
     """
 
     def __init__(self, enabled: bool = False) -> None:
@@ -825,15 +711,9 @@ STYLE = Style(False)
 def colour_enabled(no_color: bool = False, stream=None, env=None) -> bool:
     """Whether to colour, deciding in the order the conventions are read in.
 
-    Off wherever stdout is not a terminal, which is the case that matters
-    here: `tick` runs from cron into $HOME/.peredur-queue.log and `status` is
-    routinely piped or captured, and escapes in either are noise nobody can
-    read through. It is the failure the C++ side already guards with
-    ``stdout_is_tty()``.
-
-    ``--no-color`` beats everything, then NO_COLOR (any non-empty value, per
-    no-color.org), then CLICOLOR_FORCE, which forces colour on down a pipe and
-    is what makes this testable and `less -R` usable.
+    ``--no-color`` beats everything, then NO_COLOR (any non-empty value),
+    then CLICOLOR_FORCE, which forces colour on down a pipe. Otherwise colour
+    is off wherever stdout is not a terminal, as under cron.
     """
     env = os.environ if env is None else env
     if no_color:
@@ -884,12 +764,9 @@ def render_table(rows: list[list[str]], headers: list[str],
                  paint=None) -> str:
     """Left-aligned columns, headers bold, cells optionally coloured.
 
-    ``paint(row, col, cell, style) -> str`` may wrap a cell in escapes. It is
-    called for its cell alone and every width is computed from the unpainted
-    text, with the padding added *outside* whatever it returns -- so an escape
-    can neither widen a column nor survive the trailing ``rstrip``, and a
-    coloured table strips back to exactly the plain one. Passing a painter
-    costs nothing when colour is off, where it is not called at all.
+    ``paint(row, col, cell, style) -> str`` may wrap a cell in escapes.
+    Widths come from the unpainted text and the padding goes outside whatever
+    it returns. It is not called when colour is off.
     """
     widths = [len(h) for h in headers]
     for row in rows:
@@ -915,9 +792,7 @@ HEADERS = ["HOST", "CAMPAIGN", "ROWS", "PCT", "STATE", "STALE", "ETA",
            "BRANCH", "BINARY"]
 
 # Only the readings a poll is looking for are coloured: the two that are fine
-# (done, running) and the two that want a person (stuck, stalled). Everything
-# else in the table stays the terminal's own foreground, so colour marks a
-# state rather than decorating a row.
+# (done, running) and the two that want a person (stuck, stalled).
 STATE_COLOURS = {"done": ("green",), "running": ("cyan",),
                  "stuck": ("red",), "stalled": ("yellow",)}
 
@@ -964,11 +839,9 @@ def status_rows(reports: list[dict]) -> list[list[str]]:
             done = c.get("rows_done")
             planned = c.get("rows_planned")
             # The campaign's own branch, out of its manifest, flagged when the
-            # checkout has since moved off it -- that disagreement is exactly
-            # what makes a resumed campaign produce rows from another commit.
+            # checkout has since moved off it.
             branch = c["branch"] + ("!" if c["branch"] != r["branch"] else "")
-            # "~" marks a row whose done count is the whole CSV rather than
-            # this launch's share of it, which is the one row that can still
+            # "~" marks a done count taken from the whole CSV, which can
             # overstate progress. See parse_detail.
             done_cell = ("~" if c.get("rows_from_csv") else "") + (
                 str(done) if done is not None else "?")
@@ -1056,12 +929,7 @@ def checkout_paint(row: int, col: int, cell: str, style: Style) -> str:
 
 
 def checkout_rows(reports: list[dict]) -> list[list[str]]:
-    """The checkout each host is sitting on, independent of any campaign.
-
-    Separate from the campaign table because the two can disagree: a campaign
-    row names the branch its manifest was written on, which is the branch its
-    results came from, while this names the branch a resumed run would use.
-    """
+    """The checkout each host is sitting on, independent of any campaign."""
     rows = []
     for r in reports:
         if not r["reachable"]:
@@ -1078,9 +946,7 @@ def print_status(reports: list[dict]) -> None:
                        checkout_paint))
     print()
     print(render_table(status_rows(reports), HEADERS, status_paint))
-    # The queue table is printed only where there is a queue: it comes free
-    # with the inventory the poll already ran, and an empty one is a row of
-    # dashes saying nothing.
+    # The queue table is printed only where there is a queue.
     queue = queue_rows(reports)
     if queue:
         print()
@@ -1130,10 +996,9 @@ def cmd_status(args: argparse.Namespace) -> int:
 def resolve_profile(args: argparse.Namespace) -> tuple[str, str | None]:
     """``(csv_name, result_dir_name)`` for the profile, or explicit overrides.
 
-    merge_experiments.PROFILE_CSVS is the authority. A campaign living on an
-    unmerged branch is absent from it, which is what the overrides are for
-    rather than a guess at ``results-<profile>.csv``: a wrong guess merges a
-    campaign into a file nobody is watching, and says nothing while it does.
+    merge_experiments.PROFILE_CSVS is the authority. A campaign on an unmerged
+    branch is absent from it and needs the overrides; the name is never
+    guessed.
     """
     if args.csv or args.results_dir:
         if not args.csv:
@@ -1194,11 +1059,9 @@ def measure_source(host: str, csv_name: str, result_dir: str | None) -> dict:
 
 
 def rsync_pending(host: str, csv_name: str, result_dir: str | None) -> dict:
-    """What an rsync would actually move, via ``rsync -a --dry-run --stats``.
+    """What an rsync would move, via ``rsync -a --dry-run --stats``.
 
-    Read-only on both ends: rsync builds its file list and reports on it, and
-    writes nothing. That is the whole point of collect's dry run against a
-    large tree.
+    Read-only on both ends.
     """
     out: dict = {}
     root = source_root(host)
@@ -1245,16 +1108,12 @@ def verify_merge(results_csv: Path, before: set, per_host: dict,
                  missing: list | tuple = ()) -> bool:
     """Row count, duplicate keys, and per-host counts against the merged total.
 
-    The arithmetic that matters is the union, not the sum. Two hosts running
-    disjoint seed ranges overlap on nothing, while re-collecting an already
-    merged campaign overlaps on everything; only the union tells those apart
-    from a silent loss.
+    The check is against the union, not the sum: disjoint seed ranges overlap
+    on nothing and a re-collect overlaps on everything.
 
-    ``missing`` names hosts that were asked for and contributed nothing. The
-    union is computed over the survivors alone and so agrees with itself
-    perfectly, which is exactly why a host dropping out has to be carried in
-    here rather than inferred: a half-collected campaign otherwise verifies
-    clean and exits zero.
+    ``missing`` names hosts that were asked for and contributed nothing. It
+    is passed in because the union over the surviving hosts agrees with
+    itself, so a half-collected campaign would otherwise verify clean.
     """
     _, merged_rows = merge.read_rows(results_csv)
     merged_keys = {merge.key_of(r) for r in merged_rows}
@@ -1315,9 +1174,8 @@ def collect_dry_run(hosts: list[str], csv_name: str, result_dir: str | None,
         measured = measure_source(host, csv_name, result_dir)
         if measured.get("error"):
             ok = False
-            # A deadline and a dead host need different words: the first says
-            # the probe was too cheap for the tree, the second that nobody is
-            # home, and only the second means the collect cannot proceed.
+            # A deadline and a dead host need different words: only the
+            # second means the collect cannot proceed.
             why = ("measure timed out" if measured["timed_out"]
                    else f"unreachable: {measured['error']}")
             rows.append([host, f"({why})", "-", "-", "-", "-"])
@@ -1349,16 +1207,10 @@ def collect_dry_run(hosts: list[str], csv_name: str, result_dir: str | None,
 
 # -- collect --curves ---------------------------------------------------------
 #
-# A score phase leaves one CSV per run under <out>/ on each host, beside the
-# timings, failures and warnings files and the host's score manifest. Each
-# host's directory is pulled whole into experiments/<out>/<host>/ -- the raw
-# per-host record, which is what an archive's maximality_pass block is
-# assembled from -- and the per-run CSVs are then joined into
-# experiments/<out>.csv, header once. The join is a union by run name, as the
-# results merge is a union by key: two hosts on disjoint seeds share no run
-# name, and a run scored on both is a split violation worth reporting.
-
-CURVES_SIDE_FILES = ("timings.txt", "failures.txt", "warnings.log")
+# A score phase leaves one CSV per run under <out>/ on each host. Each host's
+# directory is pulled whole into experiments/<out>/<host>/ and the per-run
+# CSVs are joined into experiments/<out>.csv, header once. The join is a union
+# by run name: a run scored on two hosts is a split violation.
 
 
 def curves_dir_local(out_name: str) -> Path:
@@ -1386,10 +1238,8 @@ def count_csv_rows(path: Path) -> int:
 def pull_curves(host: str, out_name: str, dry_run: bool) -> dict:
     """rsync one host's ``<out>/`` into ``experiments/<out>/<host>/``.
 
-    The whole directory, not the CSVs alone: the timings, failures and
-    warnings files and the score manifest are the record of how each curve
-    was produced, and they travel with it. Returns rsync's verdict; a dry run
-    reports the transfer it would make and moves nothing.
+    The whole directory, not the CSVs alone. Returns rsync's verdict; a dry
+    run reports the transfer it would make and moves nothing.
     """
     src = f"{source_root(host)}/experiments/{out_name}/"
     dst = curves_dir_local(out_name) / host
@@ -1418,14 +1268,9 @@ def merge_curves(per_host: dict, merged_csv: Path) -> tuple:
     Returns ``(union, problems)``: the run names that would be written, and
     the reasons the join is not clean. A run present on two hosts is written
     once, from the first host, and reported unless the two copies are
-    byte-identical -- the seeds are split, so two differing copies of one
-    run mean two hosts scored it, under budgets that may differ. Two
-    distinct headers among the curves mean two vintages of score_curves.py,
-    and the join refuses naming both rather than concatenating one set of
-    rows under the other's columns.
+    byte-identical. Two distinct headers among the curves are a problem.
 
-    The merged file is written only when every curve was accepted. A join
-    with any problem leaves whatever ``merged_csv`` held before, so a bad
+    The merged file is written only when there is no problem, so a bad
     collect cannot overwrite a good file with a partial one.
     """
     problems: list = []
@@ -1472,11 +1317,9 @@ def verify_curves(merged_csv: Path, before_rows: int, per_host: dict,
                   host_dirs: dict) -> bool:
     """The results merge's verification, over run names rather than keys.
 
-    Every per-run row is expected in the merged file exactly once, so the
-    merged row count must equal the sum over the union of each chosen
-    curve's rows. A host that answered nothing is INCOMPLETE, for the reason
-    verify_merge gives: arithmetic over the hosts that did answer agrees
-    with itself.
+    The merged row count must equal the sum over the union of each chosen
+    curve's rows. A host that answered nothing is INCOMPLETE, as in
+    verify_merge.
     """
     ok = not missing and not problems
     print("\nVerification")
@@ -1585,9 +1428,7 @@ def cmd_collect(args: argparse.Namespace) -> int:
         return collect_curves(hosts, args.curves, args.dry_run)
     csv_name, result_dir = resolve_profile(args)
     results_csv = REPO_ROOT / "experiments" / csv_name
-    # Named for what actually chose the file: --csv bypasses --profile
-    # entirely, and a banner reading "Profile: full" over an arbiter-probe
-    # collect describes a run that is not happening.
+    # Named for what chose the file: --csv bypasses --profile entirely.
     source = (f"{csv_name} (--csv override, --profile unused)" if args.csv
               else f"{args.profile} → {csv_name}")
     print(f"Collecting: {source}"
@@ -1603,12 +1444,9 @@ def cmd_collect(args: argparse.Namespace) -> int:
     pulled: dict = {}
     missing: list[str] = []
     for host in hosts:
-        # merge_experiments does the transfer and the merge; only the ssh
-        # destination differs, so pull_source is called directly rather than
-        # through resolve_source, whose REMOTES entry is the FQDN form.
-        # It wraps only the CSV rsync against failure, so the per-run transfer
-        # raises out of here on an unreachable host and would otherwise lose
-        # the reachable host's rows to a traceback.
+        # pull_source is called directly, not through resolve_source, whose
+        # REMOTES entry is the FQDN form. It wraps only the CSV rsync against
+        # failure, so the per-run transfer raises on an unreachable host.
         try:
             path = merge.pull_source(host, source_root(host),
                                      False, tmp_dir, csv_name, result_dir)
@@ -1627,225 +1465,26 @@ def cmd_collect(args: argparse.Namespace) -> int:
         print(f"\nNo {csv_name} found on any host — nothing merged.")
         return 1
     per_host = {host: key_set(path) for host, path in pulled.items()}
-    # Merge what did arrive: the merge is idempotent and keyed, so a later run
-    # against the recovered host completes the file rather than redoing it.
-    # The exit status still fails, because a partial collect that reports
-    # success is the silent loss this verification exists to catch.
+    # Merge what did arrive: the merge is idempotent and keyed, so a later
+    # run completes the file. The exit status still fails.
     merge.merge_csv(list(pulled.values()), results_csv)
     return 0 if verify_merge(results_csv, before, per_host, missing) else 1
 
 
-# -- TOML, in the subset these files use --------------------------------------
+# -- TOML ----------------------------------------------------------------------
 
-# Written by hand rather than through tomllib because tick runs on the lab
-# machines, whose python3 is 3.10.12 -- tomllib arrived in 3.11, and neither
-# tomli nor toml is installed there. A campaign that could only be enqueued
-# from this workstation would defeat the point of the queue. The subset is
-# strings, integers, booleans, arrays, inline tables and [table] /
-# [[array-of-tables]] headers, which is everything campaign.toml and a queue
-# entry use; test_campaign.py checks it against tomllib on every fixture, so
-# the two cannot drift apart in what they accept.
+# tomllib arrived in Python 3.11, which the lab hosts have. tomli is the same
+# parser under its old name, for a workstation still on 3.10.
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib  # type: ignore[no-redef]
 
-
-class TomlError(ValueError):
-    """A campaign or queue file that does not parse."""
-
-
-BARE_KEY_CHARS = frozenset(string.ascii_letters + string.digits + "_-")
-STRING_ESCAPES = {'"': '"', "\\": "\\", "n": "\n", "t": "\t", "r": "\r"}
-
-
-class TomlReader:
-    def __init__(self, text: str):
-        self.text = text
-        self.pos = 0
-
-    # -- primitives
-    def fail(self, message: str):
-        line = self.text.count("\n", 0, min(self.pos, len(self.text))) + 1
-        raise TomlError(f"line {line}: {message}")
-
-    def peek(self) -> str:
-        return self.text[self.pos] if self.pos < len(self.text) else ""
-
-    def skip(self, newlines: bool) -> None:
-        while self.pos < len(self.text):
-            ch = self.text[self.pos]
-            if ch in " \t" or (newlines and ch in "\r\n"):
-                self.pos += 1
-            elif ch == "#":
-                end = self.text.find("\n", self.pos)
-                self.pos = len(self.text) if end < 0 else end
-            else:
-                return
-
-    def expect(self, ch: str) -> None:
-        if self.peek() != ch:
-            self.fail(f"expected {ch!r}, found {self.peek()!r}")
-        self.pos += 1
-
-    # -- values
-    def read_key(self) -> str:
-        if self.peek() in "\"'":
-            return self.read_string()
-        start = self.pos
-        while self.peek() in BARE_KEY_CHARS and self.peek():
-            self.pos += 1
-        if self.pos == start:
-            self.fail(f"expected a key, found {self.peek()!r}")
-        return self.text[start:self.pos]
-
-    def read_dotted_key(self) -> list:
-        parts = [self.read_key()]
-        while True:
-            self.skip(False)
-            if self.peek() != ".":
-                return parts
-            self.pos += 1
-            self.skip(False)
-            parts.append(self.read_key())
-
-    def read_string(self) -> str:
-        quote = self.peek()
-        self.pos += 1
-        out = []
-        while True:
-            if self.pos >= len(self.text):
-                self.fail("unterminated string")
-            ch = self.text[self.pos]
-            if ch == "\n":
-                self.fail("unterminated string")
-            self.pos += 1
-            if ch == quote:
-                return "".join(out)
-            if ch == "\\" and quote == '"':
-                esc = self.text[self.pos:self.pos + 1]
-                if esc not in STRING_ESCAPES:
-                    self.fail(f"unsupported escape \\{esc}")
-                out.append(STRING_ESCAPES[esc])
-                self.pos += 1
-            else:
-                out.append(ch)
-
-    def read_value(self):
-        ch = self.peek()
-        if ch in "\"'":
-            return self.read_string()
-        if ch == "[":
-            return self.read_array()
-        if ch == "{":
-            return self.read_inline_table()
-        start = self.pos
-        while self.peek() and self.peek() not in ",]}\r\n#":
-            self.pos += 1
-        word = self.text[start:self.pos].strip()
-        if word == "true":
-            return True
-        if word == "false":
-            return False
-        digits = word.replace("_", "")
-        if digits and (digits.lstrip("+-").isdigit() and digits.lstrip("+-")):
-            return int(digits)
-        self.pos = start
-        self.fail(f"unsupported value {word!r}: campaign files hold strings, "
-                  f"integers, booleans, arrays and inline tables only")
-
-    def read_array(self) -> list:
-        self.expect("[")
-        out = []
-        while True:
-            self.skip(True)
-            if self.peek() == "]":
-                self.pos += 1
-                return out
-            if not self.peek():
-                self.fail("unterminated array")
-            out.append(self.read_value())
-            self.skip(True)
-            if self.peek() == ",":
-                self.pos += 1
-            elif self.peek() != "]":
-                self.fail(f"expected ',' or ']', found {self.peek()!r}")
-
-    def read_inline_table(self) -> dict:
-        # Newlines are rejected inside braces, as TOML itself rejects them:
-        # accepting more than tomllib does would let a file parse here and fail
-        # for the editor and for any later reader.
-        self.expect("{")
-        out: dict = {}
-        while True:
-            self.skip(False)
-            if self.peek() == "}":
-                self.pos += 1
-                return out
-            if self.peek() in "\r\n" or not self.peek():
-                self.fail("unterminated inline table (no newlines inside {})")
-            key = self.read_key()
-            self.skip(False)
-            self.expect("=")
-            self.skip(False)
-            if key in out:
-                self.fail(f"duplicate key {key!r}")
-            out[key] = self.read_value()
-            self.skip(False)
-            if self.peek() == ",":
-                self.pos += 1
-            elif self.peek() != "}":
-                self.fail(f"expected ',' or '}}', found {self.peek()!r}")
-
-    # -- document
-    def document(self) -> dict:
-        root: dict = {}
-        table = root
-        while True:
-            self.skip(True)
-            if not self.peek():
-                return root
-            if self.peek() == "[":
-                table = self.read_header(root)
-                continue
-            key = self.read_key()
-            self.skip(False)
-            self.expect("=")
-            self.skip(False)
-            if key in table:
-                self.fail(f"duplicate key {key!r}")
-            table[key] = self.read_value()
-            self.skip(False)
-            if self.peek() and self.peek() not in "\r\n#":
-                self.fail(f"trailing text after a value: {self.peek()!r}")
-
-    def read_header(self, root: dict) -> dict:
-        self.expect("[")
-        array = self.peek() == "["
-        if array:
-            self.pos += 1
-        self.skip(False)
-        parts = self.read_dotted_key()
-        self.skip(False)
-        self.expect("]")
-        if array:
-            self.expect("]")
-        table = root
-        for part in parts[:-1]:
-            table = table.setdefault(part, {})
-            if not isinstance(table, dict):
-                self.fail(f"{part!r} is not a table")
-        last = parts[-1]
-        if array:
-            table.setdefault(last, [])
-            if not isinstance(table[last], list):
-                self.fail(f"{last!r} is not an array of tables")
-            table[last].append({})
-            return table[last][-1]
-        if last in table:
-            self.fail(f"duplicate table [{'.'.join(parts)}]")
-        table[last] = {}
-        return table[last]
+TomlError = tomllib.TOMLDecodeError
 
 
 def parse_toml(text: str) -> dict:
-    return TomlReader(text).document()
+    return tomllib.loads(text)
 
 
 def toml_value(value) -> str:
@@ -1863,7 +1502,7 @@ def toml_value(value) -> str:
             return "{}"
         return "{ " + ", ".join(f"{k} = {toml_value(v)}"
                                 for k, v in value.items()) + " }"
-    raise TomlError(f"cannot write {type(value).__name__} to TOML")
+    raise TypeError(f"cannot write {type(value).__name__} to TOML")
 
 
 def dump_toml(table: dict) -> str:
@@ -1875,33 +1514,24 @@ def dump_toml(table: dict) -> str:
 # -- The campaign declaration -------------------------------------------------
 
 class CampaignError(Exception):
-    """A campaign.toml that cannot be acted on. Always fatal: acting on half a
-    declaration is what a bad seed split looks like from the inside."""
+    """A campaign.toml that cannot be acted on. Always fatal."""
 
 
 CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
                  "configs", "description"}
-# A phase is a search run (`kind = "run"`, the default and what every phase
-# was before the key existed) or an offline scoring pass over a results
-# directory (`kind = "score"`). Each kind reads its own keys: the runner's
-# selection keys mean nothing to the scorer, and the scorer's budgets mean
-# nothing to the runner, so a key from the other kind is refused by name
-# rather than carried along unread.
+# A phase is a search run (`kind = "run"`, the default) or an offline scoring
+# pass over a results directory (`kind = "score"`). Each kind reads its own
+# keys, and a key from the other kind is refused by name.
 PHASE_KINDS = ("run", "score")
 RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts"}
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s")
 SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
                     *SCORE_BUDGET_KEYS}
-PHASE_KEYS = RUN_PHASE_KEYS | SCORE_PHASE_KEYS
 
 
 def parse_seed_range(text: str, where: str) -> list:
     """``"0-99"``, ``"7"`` or ``"0-9,20-29"`` to an explicit, sorted seed list.
-
-    Explicit because run_experiments.py's ``--seeds`` takes a list of integers
-    and nothing else, and because an overlap between two hosts is only visible
-    once both ranges are sets.
     """
     if not isinstance(text, str) or not text.strip():
         raise CampaignError(f"{where}: seed range must be a non-empty string")
@@ -1928,10 +1558,8 @@ def parse_seed_range(text: str, where: str) -> list:
 def parse_host_split(hosts, where: str) -> dict:
     """A ``hosts`` table to a host -> seed list map, checked for overlap.
 
-    Shared by the campaign-level table and a phase's override, so a phase's
-    split is held to exactly the standard the campaign's is: the overlap check
-    is the one that has to run at both levels, since a phase that re-declares
-    a split is a second chance to write the same seed twice.
+    Shared by the campaign-level table and a phase's override, so the overlap
+    check runs at both levels.
     """
     if not isinstance(hosts, dict) or not hosts:
         raise CampaignError(f"{where} must be a non-empty table, "
@@ -1956,8 +1584,7 @@ def parse_host_split(hosts, where: str) -> dict:
 
 
 def format_seed_range(seeds: list) -> str:
-    """The inverse, collapsing runs, so a queue entry reads like what was asked
-    for rather than as a hundred integers."""
+    """The inverse of parse_seed_range, collapsing runs."""
     parts, run = [], []
     for seed in sorted(seeds):
         if run and seed == run[-1] + 1:
@@ -1974,8 +1601,7 @@ def format_seed_range(seeds: list) -> str:
 def known_profiles() -> set:
     """Profiles the runner in *this* checkout defines.
 
-    Imported lazily and never mirrored here: run_experiments.PROFILES is the
-    definition, campaign.toml only names one of them.
+    Imported lazily and never mirrored here.
     """
     import run_experiments  # noqa: PLC0415
     return set(run_experiments.PROFILES)
@@ -1984,25 +1610,15 @@ def known_profiles() -> set:
 def profile_configs_dir(profile: str) -> str:
     """A profile's configs directory, relative to the repo root.
 
-    ``PROFILES`` holds it as an absolute path, built from the ``REPO_ROOT`` of
-    whichever checkout imported the runner — this one. The stage script runs on
-    a lab machine whose checkout sits under a different home directory, so the
-    absolute form names a path that does not exist over there, and a check
-    against it would pass or fail for a reason that has nothing to do with the
-    campaign. Relative to the runner's own root is the one form that means the
-    same thing on both sides, since the script has already cd'd to the host's
-    checkout before it looks.
+    ``PROFILES`` holds it as an absolute path under this checkout. A lab
+    machine's checkout sits under a different home directory, so only the
+    relative form means the same thing on both sides.
     """
     return profile_dir(profile, "configs_dir", "configs")
 
 
 def profile_results_dir(profile: str) -> str:
-    """A profile's results directory, relative to the repo root.
-
-    What a score phase scores when it names a profile rather than a
-    directory: the runner wrote that profile's runs there, on this host, in
-    the phase before.
-    """
+    """A profile's results directory, relative to the repo root."""
     return profile_dir(profile, "results_dir", "results")
 
 
@@ -2044,10 +1660,7 @@ def campaign_path(name: str, root: Path | None = None) -> Path:
 def load_campaign(name: str, root: Path | None = None) -> dict:
     """Read and validate ``experiments/<name>/campaign.toml``.
 
-    Every failure here is louder than the thing it prevents. An overlapping
-    seed range is the one worth the most noise: both hosts run the overlap,
-    which doubles the work, and the merge keys those rows together and keeps
-    one, so the campaign silently costs more and yields less than it says.
+    Raises CampaignError on any fault, including a seed shared by two hosts.
     """
     path = campaign_path(name, root)
     try:
@@ -2158,10 +1771,7 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
         raise CampaignError(f"{path}: configs must be a non-empty string")
     # Every profile the run phases name, not just the campaign-level one: a
     # campaign whose phases straddle two profiles reads two configs
-    # directories, and checking only the default leaves the second phase to
-    # fail on the host, hours after the stage said the host was ready. A score
-    # phase reads no configs; what it reads is a results directory, checked
-    # separately below.
+    # directories. A score phase reads no configs.
     config_dirs = sorted({profile_configs_dir(phase["profile"])
                           for phase in normalised if phase_kind(phase) == "run"})
     return {"name": name, "branch": branch, "build": build, "path": path,
@@ -2175,12 +1785,10 @@ def normalise_score_phase(phase: dict, where: str, profile,
                           phase_hosts) -> dict:
     """A score phase's record: where it reads, where it writes, its budgets.
 
-    ``results`` defaults to the named profile's results directory, made
-    relative the way the configs directory is, since the same host-side
-    check reads it; ``out`` defaults to ``curves-<stem>`` beside it. Every
-    budget defaults to the scorer's own value and is carried explicitly to the
-    command line, so the manifest the host writes names what the declaration
-    meant rather than what the scorer happened to default to.
+    ``results`` defaults to the named profile's results directory, relative
+    to the repo root; ``out`` defaults to ``curves-<stem>`` beside it. Every
+    budget defaults to the scorer's own value and is carried explicitly to
+    the command line, so the host's manifest records the declaration's values.
     """
     # `results` and the profile were checked by the caller; one of the two is
     # present by the time this runs.
@@ -2215,14 +1823,9 @@ def phase_kind(phase: dict) -> str:
 def staged_results_dirs(phases: list, seeds_by_host: dict) -> dict:
     """Per host, the results directories `stage` has to find there already.
 
-    A score phase reads a results directory the way a run phase reads a
-    configs directory, and an absent one fails the phase on the host after
-    the stage said the host was ready. But the common case is a score phase
-    scoring the run phase declared before it in the same campaign, whose
-    results directory does not exist until that phase has run, so those are
-    not demanded at stage time: only a directory no earlier run phase of this
-    campaign produces is, and only on the hosts the phase runs on, since a
-    phase narrowed away from a host reads nothing there.
+    A directory an earlier run phase of the same campaign produces does not
+    exist at stage time and is not demanded. A phase narrowed away from a
+    host demands nothing there.
     """
     out: dict = {}
     for host, seeds in seeds_by_host.items():
@@ -2256,15 +1859,9 @@ def campaign_hosts(campaign: dict, only: list | None) -> list:
 def phase_seeds(phase: dict, host: str, default: list) -> list:
     """One host's seeds for one phase: the phase's own split, or the campaign's.
 
-    A phase overrides the split where its row count is set by something other
-    than the campaign's seed budget — two paths whose sample sizes come from
-    separate power calculations are the motivating case, since one range
-    cannot serve both and the wider one silently multiplies the narrower
-    phase's cost.
-
     A phase that declares a split and omits a host runs nowhere on it: an
-    absent host is a deliberate narrowing, and falling back to the campaign
-    range there would hand it the seeds the override exists to withhold.
+    absent host is a deliberate narrowing, with no fallback to the campaign
+    range.
     """
     if phase.get("hosts") is None:
         return default
@@ -2274,11 +1871,8 @@ def phase_seeds(phase: dict, host: str, default: list) -> list:
 def entry_phase_seeds(entry: dict, index: int) -> str:
     """The frozen seed range one queue entry runs its `index`-th phase on.
 
-    An entry enqueued before phases could narrow the split carries no
-    `phase_seeds`, and falls back to the campaign range it was enqueued under:
-    that range is what its finished phases ran on and what their rows are
-    keyed by, so re-reading it from a since-edited declaration is the one
-    thing the freeze exists to prevent.
+    An entry that carries no `phase_seeds` falls back to the campaign range
+    it was enqueued under, never to the current declaration.
     """
     frozen = list(entry.get("phase_seeds") or [])
     if index < len(frozen):
@@ -2289,9 +1883,8 @@ def entry_phase_seeds(entry: dict, index: int) -> str:
 def phase_args(phase: dict, seeds: list) -> list:
     """The runner arguments for one phase over one host's seeds.
 
-    The seeds come from the declaration by way of the caller and never from an
-    argument typed at launch time: a hand-typed range is how two hosts end up
-    running the same seeds.
+    The seeds come from the declaration, never from an argument typed at
+    launch time.
     """
     if phase_kind(phase) == "score":
         return score_phase_args(phase, seeds)
@@ -2308,9 +1901,7 @@ def phase_args(phase: dict, seeds: list) -> list:
 def score_phase_args(phase: dict, seeds: list) -> list:
     """The scorer's arguments: every budget stated, then the seeds.
 
-    Stated rather than left to the scorer's defaults so the two never
-    disagree about what a phase ran under, and so the manifest the scorer
-    writes on the host records the declaration's values.
+    Stated so the manifest the scorer writes records the declaration's values.
     """
     args = ["--results", phase["results"], "--out", phase["out"]]
     for key in SCORE_BUDGET_KEYS:
@@ -2343,8 +1934,7 @@ echo "@M@BIN"
 if [ -x @BIN@ ]; then @BIN@ --version 2>/dev/null; fi
 """ + QUEUE_BLOCK
 # The queue block goes last, so an entry's own text cannot be read as one of
-# the sections above it. It is here rather than in a second round trip because
-# start has to know whether a tick is about to run the same campaign.
+# the sections above it.
 
 
 def stage_probe_script(root: str) -> str:
@@ -2381,42 +1971,12 @@ def parse_version_lines(lines: list) -> dict:
     return out
 
 
-def parse_toml_blocks(text: str, tag: str) -> list:
-    """The TOML documents a marker script emitted between @TAG@/END@TAG@ pairs.
-
-    Separate from parse_sections, which flattens a marker into a single key and
-    so cannot keep one file's lines apart from the next one's.
-    """
-    out: list = []
-    name, body, inside = "", [], False
-    for line in text.splitlines():
-        if line.startswith(f"{MARK}{tag} "):
-            name, body, inside = line[len(MARK) + len(tag) + 1:].strip(), [], True
-        elif line.startswith(f"{MARK}END{tag}"):
-            try:
-                entry = parse_toml("\n".join(body))
-            except TomlError as exc:
-                entry = {"error": str(exc)}
-            # The base name, as `requeue` and the queue table both name an
-            # entry: `find` hands back a path, and one of the three spellings
-            # has to win before a message quotes something nobody can retype.
-            entry["file"] = Path(name).name
-            out.append(entry)
-            inside = False
-        elif inside:
-            body.append(line)
-    return out
-
-
 @dataclass
 class HostProbe:
     """What one host answered. Every field is present on every path.
 
-    A dataclass rather than a dict because the two callers read it after an
-    ``error`` guard, and an empty answer with no error at all (a shell that
-    printed nothing and exited zero) gets past that guard. With keys absent
-    that is a KeyError in the middle of staging, which is the worst place for
-    a crash.
+    An empty answer with no error gets past the callers' ``error`` guard, so
+    no field may be absent.
     """
     error: str | None = None
     branch: str = "?"
@@ -2428,15 +1988,11 @@ class HostProbe:
 
 
 def probe_processes(ps_lines: list) -> list:
-    """The probe's live-process list. A seam, and the only one here.
+    """The probe's live-process list.
 
     `stage` refuses on any live `peredur` or `run_experiments.py` on the
-    machine, whether or not it belongs to the checkout being staged, which is
-    the right reading on a shared host and stays. The consequence is that the
-    verdict depends on the whole machine, so a test pointing the probe at a
-    local fixture inherits this machine's real processes and refuses for
-    reasons that have nothing to do with the fixture. Tests replace this, the
-    same way they replace run_shell, and then assert both directions.
+    machine, so the verdict depends on the whole machine. Tests replace this
+    function, as they replace run_shell.
     """
     return live_processes(ps_lines)
 
@@ -2463,10 +2019,8 @@ def parse_stage_probe(text: str, error: str | None = None) -> HostProbe:
 def stage_refusals(probe: HostProbe, branch: str) -> list:
     """Why this host must not be touched. Empty means it may be.
 
-    Each of the three is a way to destroy work that is not recoverable from
-    this side: uncommitted edits, a run in flight, and somebody else's branch.
-    The default is to refuse, because the cost of a wrong refusal is a retyped
-    command and the cost of a wrong reset is a day of someone's work.
+    Each of the three destroys work that cannot be recovered from this side:
+    uncommitted edits, a run in flight, and somebody else's branch.
     """
     out = []
     if probe.dirty:
@@ -2508,11 +2062,9 @@ echo "@M@END"
 """
 
 # Runs after the build and before the version read, so a generator that fails
-# reports as itself rather than as a broken build or a bad binary. The command
-# goes in a subshell, unlike the build's: a campaign generating configs for two
-# profiles writes two gen_configs.py calls joined with `&&`, and `! a && b`
-# binds the negation to the first alone, so the second would run unwatched and
-# a failure in the first would read as a successful stage.
+# reports as itself. The command goes in a subshell: a campaign may join two
+# gen_configs.py calls with `&&`, and `! a && b` binds the negation to the
+# first alone.
 CONFIGS_STEP = r"""configlog=$(mktemp) || { echo "@M@ERR mktemp failed"; exit 9; }
 if ! ( @CONFIGS_CMD@ ) > "$configlog" 2>&1; then
   tail -20 "$configlog"; rm -f "$configlog"
@@ -2521,18 +2073,12 @@ fi
 tail -5 "$configlog"; rm -f "$configlog"
 """
 
-# The half that runs whether or not the campaign declares a command: every
-# declaration written before the key existed still has to fail here rather than
-# on the host three ticks later, when run_experiments.py exits 1 on an empty
-# configs directory.
+# Runs whether or not the campaign declares a command, so an empty configs
+# directory fails here and not on the host three ticks later.
 #
-# `find` with a quoted pattern rather than a glob: the lab login shell is zsh,
-# whose default NOMATCH never lets `*.toml` — the exact thing being tested for
-# — mean what it means in sh. Unmatched, the find is skipped outright and the
-# check reads as an empty directory; matched against a stray .toml in the
-# working directory, the find searches for that name instead. Both are the same
-# wrong answer, and neither says anything on stdout. -print -quit stops at the
-# first hit rather than walking a directory of thousands.
+# `find` with a quoted pattern, not a glob: the lab login shell is zsh, whose
+# default NOMATCH skips the check where `*.toml` matches nothing. -print -quit
+# stops at the first hit.
 CONFIGS_CHECK = r"""for cfgdir in @CONFIG_DIRS@; do
   if [ -z "$(find "$cfgdir" -name '*.toml' -print -quit 2>/dev/null)" ]; then
     echo "@M@ERR no config files under $(pwd)/$cfgdir — generate them with scripts/gen_configs.py, and declare that command as configs = ... in campaign.toml"
@@ -2540,20 +2086,14 @@ CONFIGS_CHECK = r"""for cfgdir in @CONFIG_DIRS@; do
   fi
 done
 """
-# No `git clean`: a host's untracked files are its results, and a campaign
-# staged over them would delete the previous campaign's output. `checkout -f`
-# discards tracked modifications only, which is the whole of what --force was
-# asked to discard. The build goes through a temporary file rather than a pipe
-# into `tail`, whose exit status is the one a pipeline reports: piped, a failed
-# build reads as a successful stage and the mismatch only surfaces at the
-# version check two lines later.
+# No `git clean`: a host's untracked files are its results. `checkout -f`
+# discards tracked modifications only. The build goes through a temporary file
+# and not a pipe into `tail`, whose exit status is the one a pipeline reports.
 
 
-# A score phase's counterpart: the results directory it reads has to be on
-# the host already, unless a run phase of the same campaign writes it first,
-# in which case staged_results_dirs leaves it out and the tick checks it when
-# the phase's turn comes. A directory rather than a file test, since a results
-# tree is thousands of run directories and the question is whether it exists.
+# A score phase's counterpart: the results directory it reads must be on the
+# host already, unless a run phase of the same campaign writes it first, in
+# which case the tick checks it when the phase's turn comes.
 RESULTS_CHECK = r"""for resdir in @RESULTS_DIRS@; do
   if [ ! -d "$resdir" ]; then
     echo "@M@ERR no results directory at $(pwd)/$resdir for a score phase — run the campaign that writes it on this host first, or fix results = ... in campaign.toml"
@@ -2566,9 +2106,8 @@ done
 def configs_block(configs: str | None, config_dirs: list,
                   results_dirs: list | None = None) -> str:
     """The configs section: the declared command, then the check, or just the
-    check. The check is never conditional — a campaign that declares no command
-    is the case that broke, not the case to trust. A score phase's results
-    directory is checked the same way, after it."""
+    check. The check is never conditional. A score phase's results directory
+    is checked the same way, after it."""
     step = (CONFIGS_STEP.replace("@CONFIGS_CMD@", configs) if configs else "")
     # A campaign of score phases alone names no configs directory, and a
     # `for` over an empty list is one shell dialect away from a syntax error.
@@ -2586,9 +2125,8 @@ def stage_apply_script(root: str, branch: str, sha: str, build: str,
                        configs: str | None, config_dirs: list,
                        force: bool, results_dirs: list | None = None) -> str:
     # CONFIGS first, and the marker last inside render_script: the configs
-    # block is itself a script fragment carrying markers of its own.
-    # BUILD and BIN go in unquoted -- the first is a command line, the second
-    # is spliced into `./@BIN@`.
+    # block carries markers of its own. BUILD and BIN go in unquoted -- the
+    # first is a command line, the second is spliced into `./@BIN@`.
     return render_script(
         STAGE_APPLY_SCRIPT,
         CONFIGS=configs_block(configs, config_dirs, results_dirs),
@@ -2606,12 +2144,7 @@ STAGE_HEADERS = ["HOST", "BRANCH", "HEAD", "BINARY", "RESULT"]
 
 
 def stage_paint(row: int, col: int, cell: str, style: Style) -> str:
-    """RESULT is green only for a host that is staged and verified.
-
-    Everything else -- refused, not confirmed, stage failed, BINARY MISMATCH
-    -- is a host that will run nothing, and reads the same, since the whole
-    stage is off if any one of them appears.
-    """
+    """RESULT is green only for a host that is staged and verified."""
     if STAGE_HEADERS[col] != "RESULT":
         return cell
     if cell == "staged":
@@ -2622,7 +2155,7 @@ def stage_paint(row: int, col: int, cell: str, style: Style) -> str:
 
 
 def probe_host(host: str) -> HostProbe:
-    """One round trip for everything stage and start decide on."""
+    """One round trip for everything stage decides on."""
     text, err = run_shell(host, stage_probe_script(source_path(host)))
     return parse_stage_probe(text or "", err)
 
@@ -2640,10 +2173,8 @@ def git_output(args: list, root: Path | None = None) -> tuple:
 def confirm_discard(host: str, probe: HostProbe, refusals: list) -> bool:
     """Name what --force will destroy, then require the host name typed back.
 
-    A y/n prompt is too cheap for this: the answer has to name the machine, so
-    a reflex keystroke cannot approve a reset of the wrong one. Refused
-    outright when nothing can be typed, which is what makes --force unusable
-    from cron or from a script.
+    Refused outright when stdin is not a terminal, which makes --force
+    unusable from cron or from a script.
     """
     print(f"\n  --force on {host} will discard:")
     for kind, why in refusals:
@@ -2706,13 +2237,9 @@ def cmd_stage(args: argparse.Namespace) -> int:
             rows.append([host, probe.branch, probe.head[:7], commit, "refused"])
             continue
         # Confirm on --force itself, not on whether a refusal was found. The
-        # remote script has a fourth thing it declines to discard, a checkout
-        # ahead of the target commit, and the probe cannot see it: the host may
-        # not hold the target sha until the apply script fetches. So a host
-        # that is clean, idle and on the right branch yields no refusal here
-        # and still refuses over there. Gating on `refusals` made --force inert
-        # for exactly that host and skipped the prompt with it, which is the
-        # state a rebased branch leaves both machines in.
+        # remote script also declines to discard a checkout ahead of the
+        # target commit, and the probe cannot see that: the host may not hold
+        # the target sha until the apply script fetches.
         if args.force and not (args.dry_run or confirm_discard(host, probe,
                                                                refusals)):
             ok = False
@@ -2751,196 +2278,6 @@ def cmd_stage(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
-# -- start --------------------------------------------------------------------
-
-START_HEADERS = ["HOST", "SEEDS", "PID", "RESULT"]
-
-
-def start_paint(row: int, col: int, cell: str, style: Style) -> str:
-    if START_HEADERS[col] != "RESULT":
-        return cell
-    if cell == "launched":
-        return style(cell, "green")
-    if cell == "dry run":
-        return style(cell, "dim")
-    return style(cell, "red")
-
-
-LAUNCH_SCRIPT = r"""
-cd @ROOT@ 2>/dev/null || { echo "@M@ERR not a directory: @ROOT@"; exit 3; }
-mkdir -p @LOGDIR@ || { echo "@M@ERR cannot write @LOGDIR@"; exit 4; }
-nohup sh -c @CHAIN@ < /dev/null >> @LOG@ 2>&1 &
-echo "@M@PID $!"
-echo "@M@END"
-"""
-# nohup and a detached sh, so the run outlives the ssh connection that started
-# it. `&&` between phases: a phase that fails stops the chain rather than
-# letting the next one run against a half-finished CSV.
-
-
-def launch_script(root: str, chain: str, log: str) -> str:
-    return render_script(LAUNCH_SCRIPT,
-                         ROOT=shlex.quote(root),
-                         LOGDIR=shlex.quote(str(Path(log).parent)),
-                         CHAIN=shlex.quote(chain),
-                         LOG=shlex.quote(log))
-
-
-def pending_queue_entries(probe: HostProbe, name: str) -> list:
-    """This campaign's queue entries on that host that a tick could still run.
-
-    A `done` entry is spent, and a `failed` or `cancelled` one needs `requeue`
-    before any tick touches it; anything else is a launch waiting to happen.
-    """
-    return [entry for entry in probe.queue
-            if entry.get("campaign") == name
-            and entry.get("state") not in ("done", "failed", "cancelled")]
-
-
-def start_refusals(probe: HostProbe, campaign: dict, sha: str,
-                   ignore_queue: bool = False) -> list:
-    """Why a host is not ready to be launched on.
-
-    The binary check is the runner's own gate asked one step earlier: it
-    refuses a mismatched or dirty binary anyway, and finding that out here
-    costs one ssh round trip rather than a launch that dies on the far side of
-    a nohup with its message in a log nobody is reading yet.
-
-    The queue check is the same reasoning as `enqueue`'s refusal of a second
-    entry: a start beside a queued entry is two runners resuming off one CSV
-    as soon as the tick fires, and where a launch path can produce that, the
-    default has to be refusal.
-    """
-    out = []
-    if probe.branch != campaign["branch"]:
-        out.append(f"on {probe.branch}, campaign wants {campaign['branch']} — "
-                   f"run stage first")
-    if probe.head != sha:
-        out.append(f"head is {probe.head[:7]}, campaign is at {sha[:7]} — "
-                   f"run stage first")
-    if not probe.binary:
-        out.append(f"no {PEREDUR_BINARY} that answers --version")
-    elif probe.binary.get("commit") != sha:
-        out.append(f"binary was built from "
-                   f"{probe.binary.get('commit_short', '?')}, not {sha[:7]}")
-    elif probe.binary.get("dirty") != "0":
-        out.append("binary was built from a dirty tree")
-    for proc in probe.processes:
-        if proc.get("profile"):
-            out.append(f"a runner is already live on --profile "
-                       f"{proc['profile']}")
-        elif proc.get("kind") == "score":
-            out.append(f"a scorer is already live on --out "
-                       f"{proc.get('out') or '?'}")
-    if not ignore_queue:
-        for entry in pending_queue_entries(probe, campaign["name"]):
-            out.append(
-                f"queue entry {entry.get('file', '?')} is "
-                f"{entry.get('state', '?')} for this campaign — the tick will "
-                f"run it, and both would resume off one CSV. Pass "
-                f"--ignore-queue to launch anyway, or drop the entry.")
-    return out
-
-
-def record_launch(campaign: dict, record: dict) -> Path:
-    """Append one launch to ``experiments/<name>/launches.jsonl``.
-
-    Untracked and append-only. The manifest run_experiments.py writes on the
-    host is the authority on what a run did; this is the record of what was
-    asked for, from the side that asked, which is the half that disappears
-    when an ssh session closes.
-    """
-    path = REPO_ROOT / "experiments" / campaign["name"] / "launches.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a") as handle:
-        handle.write(json.dumps(record) + "\n")
-    return path
-
-
-def cmd_start(args: argparse.Namespace) -> int:
-    try:
-        campaign = load_campaign(args.campaign)
-        hosts = campaign_hosts(campaign, args.host)
-    except CampaignError as exc:
-        print(f"error: {exc}")
-        return 2
-    sha, err = git_output(["rev-parse", campaign["branch"]])
-    if err:
-        print(f"error: no local branch {campaign['branch']!r} ({err})")
-        return 2
-    phases = campaign["phases"]
-    print(f"Starting {campaign['name']} on {', '.join(hosts)}: "
-          f"{len(phases)} phase(s) per host")
-
-    rows, ok = [], True
-    for host in hosts:
-        seeds = campaign["hosts"][host]
-        # A phase narrowed away from this host contributes no command at all.
-        # An empty --seeds is an argparse error rather than a no-op, and the
-        # phases are joined with &&, so emitting one would take every later
-        # phase on the host down with it.
-        chain = " && ".join(phase_command(p, s) for p in phases
-                            if (s := phase_seeds(p, host, seeds)))
-        if not chain:
-            rows.append([host, format_seed_range(seeds), "-",
-                         "no phase runs here; every phase narrows it away"])
-            continue
-        probe = probe_host(host)
-        if probe.error:
-            ok = False
-            rows.append([host, format_seed_range(seeds), "-",
-                         f"unreachable: {probe.error}"])
-            continue
-        refusals = start_refusals(probe, campaign, sha, args.ignore_queue)
-        # The override still names what it is racing, so the launch record and
-        # the terminal both say a tick may follow this run onto the same CSV.
-        for entry in (pending_queue_entries(probe, campaign["name"])
-                      if args.ignore_queue else []):
-            print(f"\n  {host}: --ignore-queue, racing queue entry "
-                  f"{entry.get('file', '?')} ({entry.get('state', '?')})")
-        stamp = time.strftime("%Y%m%dT%H%M%S")
-        log = f"experiments/{campaign['name']}/launch-{host}-{stamp}.log"
-        if args.dry_run:
-            # Printed whether or not the host is ready: a dry run is asked in
-            # order to read the command, and a host that is merely unstaged
-            # would otherwise hide the one thing being checked.
-            print(f"\n  {host}: would run\n    {chain}\n    log: {log}")
-            for why in refusals:
-                print(f"    blocked: {why}")
-            ok = ok and not refusals
-            rows.append([host, format_seed_range(seeds), "-",
-                         "blocked" if refusals else "dry run"])
-            continue
-        if refusals:
-            ok = False
-            print(f"\n  {host}: REFUSED")
-            for why in refusals:
-                print(f"    {why}")
-            rows.append([host, format_seed_range(seeds), "-", "refused"])
-            continue
-        text, err = run_shell(host, launch_script(source_path(host), chain, log))
-        sections = parse_sections(text or "")
-        if err or "err" in sections or "pid" not in sections:
-            ok = False
-            why = " ".join(sections.get("err", [])) or err or "no pid returned"
-            rows.append([host, format_seed_range(seeds), "-", f"failed: {why}"])
-            continue
-        pid = (sections["pid"] or ["?"])[0]
-        record_launch(campaign, {
-            "campaign": campaign["name"], "host": host, "pid": pid,
-            "branch": campaign["branch"], "commit": sha,
-            "seeds": format_seed_range(seeds), "log": log, "command": chain,
-            "phases": [p["name"] for p in phases],
-            "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-        })
-        rows.append([host, format_seed_range(seeds), pid, "launched"])
-    print()
-    print(render_table(rows, START_HEADERS, start_paint))
-    if not args.dry_run:
-        print("\nDetached. Poll with `campaign.py status`; do not watch it.")
-    return 0 if ok else 1
-
-
 # -- The queue ----------------------------------------------------------------
 
 # States, and every transition between them:
@@ -2959,10 +2296,9 @@ def cmd_start(args: argparse.Namespace) -> int:
 #                                tick holding it first
 #   cancelled-> queued           `campaign requeue`, by hand
 #
-# `running` with no tick holding the lock is an interrupted phase, not a live
-# one: a tick runs its phase in the foreground, so the state outliving the
-# process means the process died. It costs an attempt, which is what stops a
-# phase that kills its tick every time from cycling for ever.
+# `running` with no tick holding the lock is an interrupted phase: a tick runs
+# its phase in the foreground. It costs an attempt, which stops a phase that
+# kills its tick every time from cycling for ever.
 
 
 def queue_dir(root: Path | None = None) -> Path:
@@ -3022,23 +2358,15 @@ def new_entry(campaign: dict, host: str, max_attempts: int,
         "host": host,
         "branch": campaign["branch"],
         # The commit the branch was at when this was enqueued, and the build
-        # command that turns it into a binary. Both are here rather than read
-        # from campaign.toml at tick time because the declaration lives on the
-        # campaign's own branch: a tick standing on another branch cannot read
-        # a word of it until after the checkout it is about to perform. These
-        # two fields are exactly what that checkout needs.
-        #
-        # Freezing the commit has the same force as freezing the seeds below.
-        # A campaign's phases run over hours and requeue between them, and one
-        # whose phases straddled two commits would write rows under a single
-        # `commit` column that came from two different binaries.
+        # command. The declaration lives on the campaign's own branch, so a
+        # tick standing on another branch cannot read it before the checkout
+        # these two fields drive. Freezing the commit also keeps every phase
+        # on one binary.
         "commit": commit,
         "build": campaign["build"],
-        # Frozen at enqueue: an edit to campaign.toml between enqueue and tick
-        # must not silently move a host's share of the seeds under a run that
-        # has already produced rows against the old split. Phases that narrow
-        # the split are frozen one by one for the same reason — freezing the
-        # campaign range alone would leave every override free to move.
+        # Frozen at enqueue: an edit to campaign.toml must not move a host's
+        # share of the seeds under a run that has already produced rows.
+        # Phases that narrow the split are frozen one by one.
         "seeds": format_seed_range(campaign["hosts"][host]),
         "phase_seeds": [format_seed_range(phase_seeds(p, host,
                                                       campaign["hosts"][host]))
@@ -3075,9 +2403,8 @@ mv @PATH@.tmp @PATH@ || { echo "@M@ERR rename failed"; exit 7; }
 echo "@M@WROTE @PATH@"
 echo "@M@END"
 """
-# base64 rather than a heredoc: the body is TOML with quotes and brackets in
-# it, and it crosses ssh into a zsh login shell. One encoding step removes
-# every quoting question at once, and `base64 -d` is in coreutils on both hosts.
+# base64, not a heredoc: the body is TOML with quotes and brackets in it, and
+# it crosses ssh into a zsh login shell.
 
 
 def cmd_enqueue(args: argparse.Namespace) -> int:
@@ -3093,9 +2420,8 @@ def cmd_enqueue(args: argparse.Namespace) -> int:
     if err:
         print(f"error: no local branch {branch!r} to enqueue ({err})")
         return 2
-    # Pushed here rather than left to `stage`, because a tick now stages the
-    # entry itself and fetches from origin to do it. An entry naming a commit
-    # no host can fetch is one that burns its attempts and stops.
+    # Pushed here because a tick stages the entry itself and fetches from
+    # origin to do it.
     if not args.dry_run:
         _, err = git_output(["push", "origin", f"{branch}:{branch}"])
         if err:
@@ -3158,14 +2484,9 @@ def cmd_enqueue(args: argparse.Namespace) -> int:
 def acquire_lock(path: Path):
     """Non-blocking exclusive lock, or None when another tick holds it.
 
-    The only lock on the queue. A tick typed by hand while cron is mid-phase
-    would otherwise run a second runner against the same results CSV, and the
-    two resume off the same file.
-
-    Note that flock is per open file description rather than per process, so
-    two `open()`s of this path in one process contend with each other. That is
-    why the crontab line must not wrap the tick in `flock` on the same file --
-    see cron_line().
+    The only lock on the queue. flock is per open file description, not per
+    process, so two `open()`s of this path in one process contend. That is
+    why the crontab line must not wrap the tick in `flock` on the same file.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     handle = open(path, "a+")
@@ -3182,11 +2503,8 @@ def acquire_lock(path: Path):
 def adopted_lock():
     """The queue lock carried across the tick's own re-exec, or None.
 
-    The restarted process inherits the locked descriptor rather than taking
-    the lock again. flock is per open file description, so a lock dropped for
-    the length of an exec would let a hand-typed tick in between the two
-    processes and both would then run the same entry -- the failure the lock
-    exists to prevent, reached through the mechanism that prevents it.
+    The restarted process inherits the locked descriptor: a lock dropped for
+    the length of an exec would let a hand-typed tick in between.
     """
     raw = os.environ.pop(TICK_LOCK_FD_ENV, "")
     if not raw:
@@ -3201,19 +2519,12 @@ def adopted_lock():
 def restart_after_stage(lock, entry: dict):
     """Re-exec this tick so the rest of it runs the sources just checked out.
 
-    A tick reads the campaign declaration only after staging the checkout,
-    the declaration being tracked on the campaign's own branch, and the
-    running process keeps the campaign.py it imported before the checkout
-    moved. A declaration using keys that older revision does not define fails
-    to parse, and a phase kind it does not define cannot be rendered even
-    where it does parse -- both of which read as a bad declaration rather
-    than as a stale parser, and the obvious response, editing the file, is
-    wrong.
+    The running process keeps the campaign.py it imported before the checkout
+    moved, which may not parse the declaration on the staged branch.
 
-    ensure_staged has already put the entry back in `queued`, so the
-    restarted tick picks it up as it would any other and the restart spends
-    no attempt. An exec that fails is not fatal: the tick carries on with the
-    sources it has, which is what it did before this existed.
+    ensure_staged has already put the entry back in `queued`, so the restart
+    spends no attempt. An exec that fails is not fatal: the tick carries on
+    with the sources it has.
     """
     os.set_inheritable(lock.fileno(), True)
     env = dict(os.environ)
@@ -3227,23 +2538,19 @@ def restart_after_stage(lock, entry: dict):
                   [sys.executable, str(Path(__file__).resolve()),
                    *sys.argv[1:]], env)
     except OSError as exc:
-        # Not fatal: the tick carries on with the sources it has, which is
-        # what it did before this existed.
         print(f"tick: could not restart ({exc}); carrying on unstaged")
         return None
-    # Unreachable where the exec worked, that call having replaced this
-    # process. It is here so that a stubbed exec stops the tick the way the
-    # real one does, rather than falling through into the phase.
+    # Reached only under a stubbed exec, which must stop the tick the way the
+    # real one does.
     return 0
 
 
 def run_step(root: Path, command, log_path: Path, shell: bool = False) -> int:
     """Run one command in the checkout, appending everything it says to a log.
 
-    No deadline anywhere on this path: a phase is hours of work and the lock is
-    what keeps a second tick off it. A tick killed here costs nothing —
-    run_experiments.py resumes off the results CSV, so the next one continues
-    rather than repeats, and a killed build is simply rebuilt.
+    No deadline: a phase is hours of work and the lock keeps a second tick
+    off it. A killed tick costs nothing, since run_experiments.py resumes off
+    the results CSV.
     """
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with open(log_path, "a") as log:
@@ -3263,10 +2570,8 @@ def run_phase(root: Path, phase: dict, seeds: list, log_path: Path) -> int:
 def results_dir_missing(root: Path, phase: dict):
     """Why a score phase cannot run here, or None.
 
-    The scorer's own check, asked before the attempt is spent: the results
-    directory is produced by an earlier phase or an earlier campaign, and a
-    host that never ran either has nothing to score. Named in the entry's
-    `last_error`, in the words the stage check uses.
+    Asked before the attempt is spent, so the entry's `last_error` names the
+    directory.
     """
     directory = root / phase["results"]
     if directory.is_dir():
@@ -3283,27 +2588,17 @@ def entry_log_path(entry: dict, root: Path) -> Path:
 
 # -- staging, from a tick -----------------------------------------------------
 #
-# `stage` is the attended path. It reaches a host over ssh and refuses three
-# things — a dirty checkout, a live run, and another branch — and the way past
-# any of them is a human typing the host name back at a terminal.
-#
-# A queue holding campaigns on two branches cannot use that. The only thing
-# between one entry and the next is a branch, and there is nobody at the
-# terminal when the tick fires at 03:05. So the tick stages the one refusal
-# that destroys nothing: it re-points the checkout at the entry's own commit,
-# which is on origin, and rebuilds. It never answers the other two. Uncommitted
-# work and a live run are both cases where the checkout carries something this
-# side cannot reconstruct, and resetting either unattended is precisely the
-# failure `stage --force` was written to make impossible.
+# `stage` is the attended path and refuses three things: a dirty checkout, a
+# live run, and another branch. A tick overrides the branch refusal alone: it
+# re-points the checkout at the entry's own commit, which is on origin, and
+# rebuilds. Uncommitted work and a live run still stop it, because nothing on
+# this side can reconstruct either.
 
 
 def local_processes() -> list:
     """Runner and engine processes on this machine.
 
-    A seam, for the same reason probe_processes is one on the remote path: the
-    check is machine-wide by design, so a test standing in a fixture checkout
-    would otherwise inherit whatever this box happens to be running and refuse
-    for reasons that have nothing to do with the fixture.
+    Machine-wide by design, so tests replace it, as they do probe_processes.
     """
     proc = subprocess.run(["ps", "-o", "comm=,args=", "-u", getpass.getuser()],
                           capture_output=True, text=True)
@@ -3330,9 +2625,7 @@ def tick_stage_refusals(root: Path) -> list:
         out.append(f"live process(es): {', '.join(busy)} — a checkout under a "
                    f"running campaign swaps the binary its rows name")
     # An unpushed commit is the third thing a checkout can hold that nothing
-    # here can bring back. `stage` guards the same case by refusing a checkout
-    # ahead of the pushed commit, which cannot be asked across two unrelated
-    # branches; asking whether any remote branch contains HEAD can.
+    # here can bring back, so HEAD must be on some remote branch.
     contained, err = git_output(["branch", "-r", "--contains", "HEAD"], root)
     if err is None and not contained.strip():
         head, _ = git_output(["rev-parse", "--short", "HEAD"], root)
@@ -3344,15 +2637,8 @@ def tick_stage_refusals(root: Path) -> list:
 def stage_checkout(root: Path, entry: dict, log_path: Path):
     """Fetch, check out the entry's commit, rebuild, verify. None on success.
 
-    Neither `git checkout -f` nor `git clean`, for two different reasons. The
-    tree is clean by the time this runs, so -f would only ever discard
-    something the refusals above were meant to stop; and a host's untracked
-    files are its results, which `clean` would delete.
-
-    The binary is read back the way `stage` reads it, because that is the
-    check run_experiments.py itself makes one step later: a build that half
-    ran leaves a binary from the previous commit, and every row the phase then
-    wrote would name a commit it did not come from.
+    No `git checkout -f`: the tree is clean by the time this runs. No
+    `git clean`: a host's untracked files are its results.
     """
     branch, commit = entry["branch"], entry["commit"]
     if run_step(root, ["git", "fetch", "origin", branch], log_path):
@@ -3365,10 +2651,8 @@ def stage_checkout(root: Path, entry: dict, log_path: Path):
 def build_and_verify(root: Path, entry: dict, log_path: Path):
     """Build the checkout and read its binary back. None on success.
 
-    The second half of a staging, and all of one when the checkout is already
-    at the entry's commit: a staging whose checkout landed and whose build then
-    failed leaves HEAD where the entry wants it, so HEAD alone cannot say the
-    binaries were built from it.
+    Also run when the checkout is already at the entry's commit: an earlier
+    staging whose build failed leaves HEAD right and the binary stale.
     """
     commit = entry["commit"]
     build = entry.get("build") or DEFAULT_BUILD_CMD
@@ -3393,10 +2677,7 @@ def ensure_staged(entry: dict, root: Path, args: argparse.Namespace):
 
     None means the tick may go on and run the phase. Anything else is the
     tick's exit code, with the entry already rewritten and the reason printed.
-
-    The commit is checked as well as the branch. An entry froze one at enqueue,
-    and a branch that has moved since is a different campaign from the one the
-    earlier phases wrote rows for.
+    The commit is checked as well as the branch.
     """
     branch, err = checkout_branch(root)
     if err:
@@ -3409,10 +2690,8 @@ def ensure_staged(entry: dict, root: Path, args: argparse.Namespace):
     if branch == entry.get("branch") and (not commit or head == commit):
         if not commit or args.no_stage or args.dry_run:
             return None
-        # Rebuilt even here. An earlier staging that checked out this commit
-        # and then failed its build leaves the previous commit's binaries in
-        # place, and the next tick would run its phase on them. The build is
-        # incremental, so on a host that did build it costs seconds.
+        # Rebuilt even here: see build_and_verify. The build is incremental,
+        # so on a host that did build it costs seconds.
         why = build_and_verify(root, entry, entry_log_path(entry, root))
         if why:
             fail_or_requeue(entry, f"rebuilding {branch} at {commit[:7]}: "
@@ -3426,9 +2705,7 @@ def ensure_staged(entry: dict, root: Path, args: argparse.Namespace):
     want = entry.get("branch")
     want = f"{want} at {commit[:7]}" if commit else str(want)
     if not commit or args.no_stage:
-        # An entry written before this field existed names no commit to stage
-        # to, and there is nothing safe to guess: the branch has moved since,
-        # or it would not be here. It refuses exactly as every entry used to.
+        # An entry that names no commit has nothing safe to stage to.
         why = "--no-stage" if commit else "the entry names no commit"
         fail_or_requeue(entry, f"checkout is on {branch}, entry wants {want} "
                                f"— stage it first ({why})")
@@ -3459,25 +2736,20 @@ def ensure_staged(entry: dict, root: Path, args: argparse.Namespace):
         write_entry(entry["path"], entry)
         print(f"tick: {entry['file']} {entry['state']}: {entry['last_error']}")
         return 1
-    # Back to queued rather than left running: the staging succeeded, and a
-    # tick killed between here and the phase must not spend an attempt on work
-    # that is already done. tick_entry marks it running again immediately.
+    # Back to queued: a tick killed between here and the phase must not spend
+    # an attempt on a staging that succeeded. tick_entry marks it running.
     entry["state"] = "queued"
     log_line(entry, f"staged {want}")
     write_entry(entry["path"], entry)
     print(f"tick: {entry['file']} staged {want}")
-    # Only where the checkout moved this tick's own sources. A campaign that
-    # merely sits on another branch of the same scripts is the common case,
-    # and restarting for it would cost every such tick a five-minute cycle
-    # for nothing.
+    # Restart only where the checkout moved this tick's own sources.
     changed, _ = git_output(["diff", "--name-only", head, "HEAD", "--",
                              "scripts"], root)
     if not changed.strip():
         return None
     if os.environ.get(TICK_RESTART_ENV):
-        # Restarted once already and the scripts moved again. Going round
-        # again is the loop this guard exists for, so this tick runs on what
-        # it has and the next one starts from the staged sources anyway.
+        # Restarted once already and the scripts moved again: run on what
+        # this tick has, so the restart cannot loop.
         print(f"tick: {entry['file']} scripts moved again after a restart; "
               f"running on the sources this tick was started with")
         return None
@@ -3487,13 +2759,9 @@ def ensure_staged(entry: dict, root: Path, args: argparse.Namespace):
 def config_dirs_missing(root: Path, config_dirs: list) -> list:
     """The declared configs directories holding no `.toml`. Empty means ready.
 
-    The local twin of CONFIGS_CHECK, which the attended stage path runs over
-    ssh, and it has to answer the same question the same way: recursive,
-    because gen_configs.py writes a directory per factor level and nothing
-    lands at the top; first hit only, because a generated tree is thousands of
-    files and the question is whether it is empty. A directory that is not
-    there at all is missing rather than an error, since that is the state a
-    host is in before anything generated anything.
+    The local twin of CONFIGS_CHECK and must answer the same way: recursive,
+    because gen_configs.py writes a directory per factor level, and first hit
+    only. A directory that does not exist is missing, not an error.
     """
     missing = []
     for name in config_dirs:
@@ -3507,11 +2775,8 @@ def config_dirs_missing(root: Path, config_dirs: list) -> list:
 def ensure_configs(campaign: dict, root: Path, log_path: Path):
     """Generate the campaign's configs where the host has none. None on ready.
 
-    Checked before it is run, so the common case -- a host staged by hand, or
-    one that generated them for an earlier phase -- costs one directory scan
-    and runs no generator. A campaign declaring no command fails here with the
-    words the stage path uses, rather than three ticks later as
-    run_experiments.py exiting 1 with the attempts already spent.
+    Checked before the generator is run. A campaign declaring no command
+    fails here, before the runner spends the attempts.
     """
     missing = config_dirs_missing(root, campaign["config_dirs"])
     if not missing:
@@ -3523,9 +2788,8 @@ def ensure_configs(campaign: dict, root: Path, log_path: Path):
                 f"configs = ... in campaign.toml")
     if run_step(root, configs, log_path, shell=True):
         return f"the configs command failed: {configs}"
-    # Re-checked rather than trusted: a generator called with the wrong flags
-    # writes a different directory and exits 0, which is the failure that
-    # reaches the runner rather than the log.
+    # Re-checked: a generator called with the wrong flags writes a different
+    # directory and exits 0.
     still = config_dirs_missing(root, campaign["config_dirs"])
     if still:
         return (f"the configs command left no config files under "
@@ -3534,12 +2798,7 @@ def ensure_configs(campaign: dict, root: Path, log_path: Path):
 
 
 def fail_or_requeue(entry: dict, why: str) -> None:
-    """One attempt spent. Past the cap the entry stops moving and says why.
-
-    A failed phase that requeued for ever would look exactly like a slow one,
-    and the queue would keep a machine busy re-running something that cannot
-    work. The cap is what makes the difference visible in one column.
-    """
+    """One attempt spent. Past the cap the entry stops moving and says why."""
     entry["attempts"] = int(entry.get("attempts", 0)) + 1
     entry["last_error"] = why
     cap = int(entry.get("max_attempts", DEFAULT_MAX_ATTEMPTS))
@@ -3590,9 +2849,8 @@ def cmd_tick(args: argparse.Namespace) -> int:
             print("tick: nothing queued.")
             return 0
         entry = ready[0]
-        # Before load_campaign, not after: the declaration is tracked on the
-        # campaign's own branch, so a checkout standing on another one cannot
-        # read it until this has moved it.
+        # Before load_campaign: the declaration is tracked on the campaign's
+        # own branch, which the checkout may not be on yet.
         code = ensure_staged(entry, root, args)
         if code == RESTART:
             code = restart_after_stage(lock, entry)
@@ -3605,9 +2863,8 @@ def cmd_tick(args: argparse.Namespace) -> int:
             write_entry(entry["path"], entry)
             print(f"tick: {entry['file']} {entry['state']}: {exc}")
             return 1
-        # After load_campaign rather than inside stage_checkout: the command
-        # and the directories to check are keys of campaign.toml, which the
-        # comment above is about not being readable any earlier.
+        # After load_campaign: the command and the directories to check are
+        # keys of campaign.toml.
         if args.dry_run:
             missing = config_dirs_missing(root, campaign["config_dirs"])
             if missing:
@@ -3628,9 +2885,8 @@ def cmd_tick(args: argparse.Namespace) -> int:
 
 def tick_entry(entry: dict, campaign: dict, root: Path,
                args: argparse.Namespace) -> int:
-    # No branch check here. ensure_staged is the one place that decides what
-    # the checkout may run, and a second test of its own predicate would be
-    # dead code rather than a safety net.
+    # No branch check here: ensure_staged alone decides what the checkout may
+    # run.
     index = int(entry.get("phase", 0))
     if index >= len(campaign["phases"]):
         entry["state"] = "done"
@@ -3650,9 +2906,8 @@ def tick_entry(entry: dict, campaign: dict, root: Path,
         return 0
     seeds = parse_seed_range(text, f"{entry['file']}: phase {index} seeds")
     log_path = entry_log_path(entry, root)
-    # A score phase over a results directory the host does not hold cannot
-    # run, and the scorer would say so an attempt later; the refusal is here
-    # so the entry names the directory rather than an exit status.
+    # Refused here, before the scorer would, so the entry names the missing
+    # results directory and not an exit status.
     blocked = (results_dir_missing(root, phase)
                if phase_kind(phase) == "score" else None)
     if blocked is not None and not args.dry_run:
@@ -3735,9 +2990,7 @@ def queue_rows(reports: list) -> list:
                 rows.append([report["host"], name, "-", "-", "unparseable",
                              "-", "-", "-", "-", entry["error"]])
                 continue
-            # The branch is the column that matters once a queue holds
-            # campaigns on more than one: it is what the tick stages to, and
-            # the reason a checkout moves between two entries.
+            # The branch is what the tick stages to.
             commit = str(entry.get("commit", ""))
             rows.append([
                 report["host"], name, str(entry.get("campaign", "?")),
@@ -3790,16 +3043,10 @@ echo "@M@END"
 """
 
 
-def cmd_requeue(args: argparse.Namespace) -> int:
-    """Clear a failed entry's attempt count so the next tick tries it again.
-
-    Deliberately a separate verb rather than a tick that resets itself: a
-    failed phase has a cause, and the cap exists so that somebody reads the log
-    before the machine spends another night on it.
-    """
-    import base64  # noqa: PLC0415
-    host, root = args.host, (source_path(args.host) if args.host != LOCAL
-                             else str(REPO_ROOT))
+def named_entry(args: argparse.Namespace):
+    """(root, entry) for the queue entry a verb names, or its exit code."""
+    host = args.host
+    root = source_path(host) if host != LOCAL else str(REPO_ROOT)
     report = gather_host(host, root, None, False, False)
     if not report["reachable"]:
         print(f"error: {host} unreachable: {report['error']}")
@@ -3809,17 +3056,29 @@ def cmd_requeue(args: argparse.Namespace) -> int:
     if not matches:
         print(f"error: {host} has no queue entry {args.entry!r}")
         return 2
-    entry = entry_body(matches[0])
+    return root, entry_body(matches[0])
+
+
+def entry_b64(entry: dict) -> str:
+    import base64  # noqa: PLC0415
+    return shlex.quote(base64.b64encode(dump_toml(entry).encode()).decode())
+
+
+def cmd_requeue(args: argparse.Namespace) -> int:
+    """Clear a failed entry's attempt count so the next tick tries it again."""
+    host, found = args.host, named_entry(args)
+    if isinstance(found, int):
+        return found
+    root, entry = found
     entry["state"] = "queued"
     entry["attempts"] = 0
     entry["last_error"] = ""
     log_line(entry, "requeued by hand")
-    encoded = base64.b64encode(dump_toml(entry).encode()).decode()
     text, err = run_shell(host, render_script(
         REQUEUE_SCRIPT,
         ROOT=shlex.quote(root),
         PATH=shlex.quote(f"{QUEUE_DIR}/{args.entry}"),
-        B64=shlex.quote(encoded)))
+        B64=entry_b64(entry)))
     sections = parse_sections(text or "")
     if err or "err" in sections or "end" not in sections:
         print(f"error: {' '.join(sections.get('err', [])) or err}")
@@ -3871,61 +3130,36 @@ if [ @WRITE@ = yes ]; then
 fi
 echo "@M@END"
 """
-# The tick goes first and the entry is rewritten last, in one script rather
-# than two round trips. A tick writes the entry's state at the end of every
-# phase from the copy it holds in memory, so an entry rewritten while its tick
-# is alive is overwritten hours later by a process that never heard of this,
-# and the queue then disagrees with the machine. Its descendants are collected
-# before it dies, since a dead parent's children reparent to init and no walk
-# finds them afterwards; they are killed after it, being the runner and the
-# `peredur` processes the phase launched, which outlive the tick otherwise and
-# keep writing rows into a results CSV nothing is waiting for.
+# The tick is killed first and the entry rewritten last, in one script: a live
+# tick writes the entry's state at the end of every phase from the copy it
+# holds in memory, and would overwrite the rewrite. Its descendants are
+# collected before it dies, since a dead parent's children reparent to init,
+# and killed after it, or the runner and engine processes outlive the tick.
 #
-# The tree is a fixpoint over one `ps -eo pid=,ppid=` snapshot rather than a
-# loop over `pgrep -P`, because the remote shell is zsh: an unquoted parameter
-# does not word-split there, so `for p in $FRONTIER` over a frontier of four
-# pids iterates once over all four as a single word, `pgrep -P` rejects it,
-# and the frontier holds the single space the substitution leaves. `[ -n " " ]`
-# is true, so that loop never terminates. Every loop here reads its pids from
-# a file for the same reason, one per line.
+# The tree is a fixpoint over one `ps -eo pid=,ppid=` snapshot, not a loop
+# over `pgrep -P`, because the remote shell is zsh: an unquoted parameter does
+# not word-split there, so `for p in $FRONTIER` iterates once over the whole
+# frontier. Every loop here reads its pids from a file, one per line, for the
+# same reason.
 
 
 def cmd_dequeue(args: argparse.Namespace) -> int:
     """Take an entry out of the queue, stopping the phase it is mid-way through.
 
-    The inverse of `enqueue`, and the only supported way to stop a campaign:
-    the tick has no stop of its own, so without this the choice was editing
-    queue TOML on a lab machine by hand or waiting for the attempt cap to
-    spend itself against a run nobody wants any more.
-
-    It tombstones rather than deleting the file, following `p_remove_guarantee`
-    and for the same reason: the log is the record of what the entry did, and
-    `enqueue` numbers entries from the names already present, so a deleted
-    021 lets the next campaign take a number a reader has already seen mean
-    something else. `requeue` puts a cancelled entry back, which is what makes
-    this a stop rather than a withdrawal -- one verb for both, since a
-    cancelled entry and a failed one need exactly the same thing done to them.
+    The entry is marked cancelled, not deleted: its log is the record of what
+    it did, and `enqueue` numbers entries from the names already present.
+    `requeue` puts a cancelled entry back.
     """
-    import base64  # noqa: PLC0415
-    host, root = args.host, (source_path(args.host) if args.host != LOCAL
-                             else str(REPO_ROOT))
-    report = gather_host(host, root, None, False, False)
-    if not report["reachable"]:
-        print(f"error: {host} unreachable: {report['error']}")
-        return 1
-    matches = [e for e in report["queue"]
-               if Path(e.get("file", "")).name == args.entry]
-    if not matches:
-        print(f"error: {host} has no queue entry {args.entry!r}")
-        return 2
-    entry = entry_body(matches[0])
+    host, found = args.host, named_entry(args)
+    if isinstance(found, int):
+        return found
+    root, entry = found
     was = str(entry.get("state", "?"))
     if was == "cancelled":
         print(f"{host}: {args.entry} is already cancelled.")
         return 0
     # Only a `running` entry names a live tick. The pid on any other state is
-    # the last tick to have held it, long dead, and its number belongs to
-    # whatever the machine has started since.
+    # long dead and may since have been reused.
     try:
         pid = int(entry.get("pid", 0)) if was == "running" else 0
     except (TypeError, ValueError):
@@ -3934,7 +3168,6 @@ def cmd_dequeue(args: argparse.Namespace) -> int:
     entry["state"] = "cancelled"
     entry["last_error"] = why
     log_line(entry, f"cancelled while {was}: {why}")
-    encoded = base64.b64encode(dump_toml(entry).encode()).decode()
     text, err = run_shell(host, render_script(
         DEQUEUE_SCRIPT,
         ROOT=shlex.quote(root),
@@ -3942,7 +3175,7 @@ def cmd_dequeue(args: argparse.Namespace) -> int:
         PID=str(pid),
         KILL="no" if args.dry_run else "yes",
         WRITE="no" if args.dry_run else "yes",
-        B64=shlex.quote(encoded)), timeout=SSH_TIMEOUT_S + 10)
+        B64=entry_b64(entry)), timeout=SSH_TIMEOUT_S + 10)
     sections = parse_sections(text or "")
     if err or "err" in sections or "end" not in sections:
         print(f"error: {' '.join(sections.get('err', [])) or err}")
@@ -3968,22 +3201,17 @@ def cmd_dequeue(args: argparse.Namespace) -> int:
 def cron_line(host: str, root: str) -> str:
     # No `flock -n` wrapper. flock locks attach to the open file description,
     # and a wrapper's fd is inherited across the exec: acquire_lock() then
-    # opens the same path a second time, gets a distinct description, and is
-    # denied by the lock its own parent holds. Every tick would die that way
-    # -- silently, since both the wrapper and the tick exit 0 -- and the
-    # queue could never start a phase. acquire_lock() alone is the guard, and
-    # it covers strictly more: a wrapper binds only cron ticks, while the
-    # inner lock also blocks a tick typed by hand against a cron phase
-    # already running.
+    # opens the same path a second time and is denied by the lock its own
+    # parent holds, silently, since both exit 0. acquire_lock() alone is the
+    # guard, and it also blocks a tick typed by hand.
     return (f"*/5 * * * * cd {root} && "
             f"{REMOTE_PYTHON} scripts/campaign.py tick --host {host} "
             f">> $HOME/.peredur-queue.log 2>&1")
 
 
 def cmd_cron(args: argparse.Namespace) -> int:
-    """Print the crontab line. Printing is all it does, deliberately: a verb
-    that installs a cron entry on a lab machine would be editing somebody
-    else's crontab from a script, with no record of what it replaced."""
+    """Print the crontab line. Nothing is installed: a script must not edit
+    a crontab on a lab machine."""
     root = source_path(args.host) if args.host != LOCAL else str(REPO_ROOT)
     print(cron_line(args.host, root))
     print(f"\n# Not installed. Add it on {args.host} with `crontab -e`.")
@@ -3993,297 +3221,6 @@ def cmd_cron(args: argparse.Namespace) -> int:
           "file: the wrapper's fd is\n# inherited across the exec and the "
           "tick is then denied by its own parent.")
     return 0
-
-
-# -- load ---------------------------------------------------------------------
-
-# Cheap enough to sit under `watch`: no top, no ps, one sleep. Per-process
-# CPU ticks are read straight out of /proc/<pid>/stat on either side of the
-# second the /proc/stat delta covers, and summed per owning uid. The comm field
-# is parenthesised and may hold spaces, so it is squashed to one token before
-# fields are counted (utime and stime are fields 14 and 15). A process that
-# starts or exits inside the second is missed, which undercounts a box full of
-# short solver calls but never misattributes one. The /proc globs are the one
-# exception to never globbing remotely: /proc always holds pid 1, so zsh's
-# NOMATCH cannot fire.
-#
-# nvidia-smi wakes a runtime-suspended card, which on the laptop is slow on
-# every call and keeps the card from ever powering down under `watch`. A
-# suspended card is idle by definition, so the probe
-# reads its power state out of sysfs and only asks nvidia-smi when every
-# NVIDIA display device is awake. The lab hosts' cards never suspend.
-LOAD_SCRIPT = r"""
-export LC_ALL=C
-ticks() { cat /proc/[0-9]*/stat 2>/dev/null | sed 's/ (.*) / c /' \
-  | awk '{ print $1, $14 + $15 }'; }
-echo "@M@NPROC $(nproc)"
-echo "@M@LOADAVG $(cat /proc/loadavg)"
-echo "@M@UPTIME $(cut -d' ' -f1 /proc/uptime)"
-T0=$(ticks)
-echo "@M@STAT0 $(head -1 /proc/stat)"
-sleep 1
-echo "@M@STAT1 $(head -1 /proc/stat)"
-T1=$(ticks)
-{ echo "$T0" | sed 's/^/0 /'; echo "$T1" | sed 's/^/1 /'
-  stat -c 'u %n %u' /proc/[0-9]* 2>/dev/null | sed 's|/proc/||'; } \
-  | awk '$1 == 0 { t0[$2] = $3 } $1 == 1 { t1[$2] = $3 } $1 == "u" { uid[$2] = $3 }
-    END { for (p in t1) if ((p in t0) && (p in uid)) d[uid[p]] += t1[p] - t0[p]
-          for (u in d) if (d[u] > 0) print u, d[u] }' \
-  | while read -r u d; do
-      echo "@M@USERTICKS $(getent passwd "$u" | cut -d: -f1 || true) $u $d"
-    done
-awk '/^(MemTotal|MemAvailable|SwapTotal|SwapFree):/ {
-       sub(":", "", $1); print "@M@MEM", $1, $2 }' /proc/meminfo
-df -Pk @ROOT@ 2>/dev/null | awk 'NR == 2 { print "@M@DISK", $2, $3, $4, $6 }'
-asleep=
-for v in $(grep -l 0x10de /sys/bus/pci/devices/*/vendor 2>/dev/null); do
-  d=${v%/vendor}
-  case "$(cat "$d/class")" in 0x03*) ;; *) continue ;; esac
-  if [ "$(cat "$d/power/runtime_status" 2>/dev/null)" = suspended ]; then
-    asleep=1; echo "@M@GPUSLEEP ${d##*/}"
-  fi
-done
-if [ -z "$asleep" ] && command -v nvidia-smi >/dev/null 2>&1; then
-  nvidia-smi --query-gpu=index,utilization.gpu,memory.used,memory.total,temperature.gpu,name \
-    --format=csv,noheader,nounits 2>/dev/null | sed 's/^/@M@GPU /'
-fi
-who 2>/dev/null | awk '{ print $1 }' | sort | uniq -c \
-  | awk '{ print "@M@WHO", $2, $1 }'
-echo "@M@END"
-"""
-
-
-def cpu_split(stat0: list[int], stat1: list[int]) -> tuple[float, float] | None:
-    """Busy and iowait percentages between two /proc/stat ``cpu`` lines.
-
-    iowait is idle time with a disk request outstanding, so it is taken out of
-    busy and reported on its own: a box stuck on I/O reads as idle otherwise.
-    Guest time is already inside user and nice, and is not counted twice.
-    """
-    if len(stat0) < 5 or len(stat1) < 5:
-        return None
-    delta = [b - a for a, b in zip(stat0[:8], stat1[:8])]
-    total = sum(delta)
-    if total <= 0:
-        return None
-    idle, iowait = delta[3], delta[4]
-    return (100.0 * (total - idle - iowait) / total, 100.0 * iowait / total)
-
-
-def parse_load(text: str) -> dict:
-    """Marker output of LOAD_SCRIPT. Byte counts are bytes, not kB."""
-    out: dict = {"gpus": [], "gpus_asleep": [], "user_cores": {},
-                 "sessions": {}}
-    stats: dict = {}
-    mem: dict = {}
-    user_ticks: dict = {}
-    for line in text.splitlines():
-        if not line.startswith(MARK):
-            continue
-        tag, _, rest = line[len(MARK):].partition(" ")
-        fields = rest.split()
-        try:
-            if tag == "NPROC" and fields:
-                out["cores"] = int(fields[0])
-            elif tag == "LOADAVG" and len(fields) >= 3:
-                out["loadavg"] = [float(f) for f in fields[:3]]
-            elif tag == "UPTIME" and fields:
-                out["uptime_s"] = float(fields[0])
-            elif tag in ("STAT0", "STAT1") and len(fields) > 1:
-                stats[tag] = [int(f) for f in fields[1:]]
-            elif tag == "USERTICKS" and len(fields) in (2, 3):
-                # A uid with no passwd entry arrives without a name.
-                name = fields[0] if len(fields) == 3 else f"uid{fields[0]}"
-                user_ticks[name] = user_ticks.get(name, 0) + int(fields[-1])
-            elif tag == "MEM" and len(fields) == 2:
-                mem[fields[0]] = int(fields[1]) * 1024
-            elif tag == "DISK" and len(fields) >= 4:
-                out["disk"] = {"total": int(fields[0]) * 1024,
-                               "used": int(fields[1]) * 1024,
-                               "free": int(fields[2]) * 1024,
-                               "mount": fields[3] if len(fields) > 3 else "?"}
-            elif tag == "GPU":
-                # The name goes last because it is the one field that can
-                # carry a comma-free run of spaces; split on the first five.
-                parts = [p.strip() for p in rest.split(",", 5)]
-                if len(parts) == 6:
-                    out["gpus"].append({
-                        "index": int(parts[0]), "util_pct": float(parts[1]),
-                        "mem_used": int(float(parts[2])) * 1024 * 1024,
-                        "mem_total": int(float(parts[3])) * 1024 * 1024,
-                        "temp_c": float(parts[4]), "name": parts[5]})
-            elif tag == "GPUSLEEP" and fields:
-                out["gpus_asleep"].append(fields[0])
-            elif tag == "WHO" and len(fields) == 2:
-                out["sessions"][fields[0]] = int(fields[1])
-        except ValueError:
-            # nvidia-smi prints "[N/A]" for a field a card cannot report; a
-            # line that does not parse is dropped rather than read as zero.
-            continue
-    split = cpu_split(stats.get("STAT0", []), stats.get("STAT1", []))
-    if split:
-        out["cpu_pct"], out["iowait_pct"] = split
-    # The window's length in ticks is the /proc/stat delta over all cores
-    # divided by the core count, which spares assuming sleep took exactly 1s
-    # or that CLK_TCK is 100.
-    if user_ticks and out.get("cores") and "STAT0" in stats and "STAT1" in stats:
-        window = (sum(stats["STAT1"][:8]) - sum(stats["STAT0"][:8])) / out["cores"]
-        if window > 0:
-            out["user_cores"] = {u: t / window for u, t in user_ticks.items()
-                                 if t / window >= 0.05}
-    if "MemTotal" in mem and "MemAvailable" in mem:
-        out["mem"] = {"total": mem["MemTotal"],
-                      "used": mem["MemTotal"] - mem["MemAvailable"]}
-    if "SwapTotal" in mem and "SwapFree" in mem:
-        out["swap"] = {"total": mem["SwapTotal"],
-                       "used": mem["SwapTotal"] - mem["SwapFree"]}
-    return out
-
-
-def gather_load(host: str, root: str) -> dict:
-    text, error = run_shell(host, render_script(LOAD_SCRIPT,
-                                                ROOT=shlex.quote(root)),
-                            ssh_opts=SSH_MUX_OPTS)
-    report = {"host": host, "reachable": text is not None, "error": error}
-    if text is not None:
-        report.update(parse_load(text))
-    return report
-
-
-LOAD_HEADERS = ["HOST", "CORES", "LOAD 1/5/15", "CPU", "IOWAIT", "MEM",
-                "SWAP", "DISK FREE", "UP"]
-GPU_HEADERS = ["HOST", "GPU", "UTIL", "MEM", "TEMP", "NAME"]
-
-
-def fraction_cell(part: dict | None) -> str:
-    if not part or not part.get("total"):
-        return "-"
-    return (f"{human_bytes(part['used'])}/{human_bytes(part['total'])} "
-            f"{int(100 * part['used'] / part['total'])}%")
-
-
-def load_rows(reports: list[dict]) -> list[list[str]]:
-    rows = []
-    for r in reports:
-        if not r["reachable"]:
-            why = (r["error"] or "?").replace("\t", " ")
-            if len(why) > 44:
-                why = why[:41] + "..."
-            label = "no answer" if is_timeout(r["error"]) else "unreachable"
-            rows.append([r["host"], f"({label}: {why})", *["-"] * 7])
-            continue
-        disk = r.get("disk")
-        rows.append([
-            r["host"],
-            str(r.get("cores", "?")),
-            " ".join(f"{x:.1f}" for x in r["loadavg"]) if r.get("loadavg")
-            else "-",
-            f"{r['cpu_pct']:.0f}%" if "cpu_pct" in r else "-",
-            f"{r['iowait_pct']:.0f}%" if "iowait_pct" in r else "-",
-            fraction_cell(r.get("mem")),
-            fraction_cell(r.get("swap")),
-            (f"{human_bytes(disk['free'])} "
-             f"{int(100 * disk['free'] / disk['total'])}%")
-            if disk and disk.get("total") else "-",
-            human_duration(r.get("uptime_s")),
-        ])
-    return rows
-
-
-def gpu_rows(reports: list[dict]) -> list[list[str]]:
-    rows = []
-    for r in reports:
-        if not r["reachable"]:
-            continue
-        rows += [[r["host"], str(g["index"]), f"{g['util_pct']:.0f}%",
-                  fraction_cell({"used": g["mem_used"],
-                                 "total": g["mem_total"]}),
-                  f"{g['temp_c']:.0f}C", g["name"]] for g in r["gpus"]]
-        # Named by PCI address: the index is nvidia-smi's, which was not asked.
-        rows += [[r["host"], "-", "asleep", "-", "-", f"PCI {addr}"]
-                 for addr in r.get("gpus_asleep", [])]
-    return rows
-
-
-def pressure(r: dict, header: str) -> str | None:
-    """``"red"``, ``"yellow"`` or None for one load-table cell's reading.
-
-    Read from the report rather than the cell text, which is rounded. Load is
-    judged against the core count, since 30 is saturation on a 32-core host
-    and overload on the laptop.
-    """
-    def grade(x: float, warn: float, bad: float) -> str | None:
-        return "red" if x >= bad else "yellow" if x >= warn else None
-
-    if header == "LOAD 1/5/15" and r.get("loadavg") and r.get("cores"):
-        return grade(r["loadavg"][0] / r["cores"], 0.75, 1.0)
-    if header == "CPU" and "cpu_pct" in r:
-        return grade(r["cpu_pct"], 75, 95)
-    if header == "IOWAIT" and "iowait_pct" in r:
-        return grade(r["iowait_pct"], 10, 25)
-    if header in ("MEM", "SWAP"):
-        part = r.get(header.lower())
-        if part and part.get("total"):
-            return grade(part["used"] / part["total"], 0.75, 0.9)
-    if header == "DISK FREE" and r.get("disk", {}).get("total"):
-        free = r["disk"]["free"] / r["disk"]["total"]
-        return "red" if free < 0.05 else "yellow" if free < 0.15 else None
-    return None
-
-
-def load_painter(reports: list[dict]):
-    def paint(row: int, col: int, cell: str, style: Style) -> str:
-        r = reports[row]
-        if not r["reachable"]:
-            return style(cell, "red") if col == 1 else cell
-        colour = pressure(r, LOAD_HEADERS[col])
-        return style(cell, colour) if colour else cell
-    return paint
-
-
-def load_notes(reports: list[dict]) -> list[str]:
-    """Who is using each host: CPU by user over the sample, then sessions."""
-    notes = []
-    for r in reports:
-        if not r["reachable"]:
-            continue
-        top = sorted(r.get("user_cores", {}).items(), key=lambda kv: -kv[1])
-        busy = ", ".join(f"{u} {c:.1f}" for u, c in top[:4]) or "nobody"
-        who = ", ".join(f"{u}" + (f" x{n}" if n > 1 else "")
-                        for u, n in sorted(r.get("sessions", {}).items()))
-        notes.append(f"{r['host']}: cores by user: {busy}; "
-                     f"logged in: {who or 'nobody'}")
-    return notes
-
-
-def cmd_load(args: argparse.Namespace) -> int:
-    hosts = [args.host] if args.host else list(HOSTS)
-    targets = [(h, source_path(h)) for h in hosts if h != LOCAL]
-    if not args.host or args.host == LOCAL:
-        targets.append((LOCAL, str(REPO_ROOT)))
-    with ThreadPoolExecutor(max_workers=max(1, len(targets))) as pool:
-        reports = list(pool.map(lambda t: gather_load(*t), targets))
-    if args.json:
-        print(json.dumps({"generated": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                          "hosts": reports}, indent=2))
-    else:
-        print(render_table(load_rows(reports), LOAD_HEADERS,
-                           load_painter(reports)))
-        gpus = gpu_rows(reports)
-        if gpus:
-            print()
-            print(render_table(gpus, GPU_HEADERS))
-        notes = load_notes(reports)
-        if notes:
-            print()
-            print("\n".join(notes))
-        if not args.no_legend:
-            print("\nCPU, IOWAIT and cores by user cover one second sampled "
-                  "now; LOAD is the kernel's\n1/5/15-minute average, against "
-                  "CORES. MEM counts what MemAvailable says cannot\nbe "
-                  "reclaimed. DISK FREE is the filesystem holding the "
-                  "checkout.")
-    return 0 if all(r["reachable"] for r in reports) else 1
 
 
 # -- Entry point --------------------------------------------------------------
@@ -4318,18 +3255,6 @@ def build_parser() -> argparse.ArgumentParser:
                              "planned totals then read as unknown.")
     add_colour_flag(status)
     status.set_defaults(func=cmd_status)
-
-    load = sub.add_parser(
-        "load", help="CPU, memory, disk and GPU use, per host.")
-    load.add_argument("--host", choices=[*HOSTS, LOCAL],
-                      help="Only this host (default: every host plus this "
-                           "machine).")
-    load.add_argument("--json", action="store_true",
-                      help="Machine-readable output.")
-    load.add_argument("--no-legend", action="store_true",
-                      help="Drop the closing explanation, for `watch`.")
-    add_colour_flag(load)
-    load.set_defaults(func=cmd_load)
 
     collect = sub.add_parser(
         "collect", help="rsync each host's results back, merge and verify.")
@@ -4374,19 +3299,6 @@ def build_parser() -> argparse.ArgumentParser:
                                          "build (default: 3600).")
     add_colour_flag(stage)
     stage.set_defaults(func=cmd_stage)
-
-    start = sub.add_parser(
-        "start", help="Launch the campaign's phases on each host, detached.")
-    start.add_argument("campaign")
-    start.add_argument("--host", action="append", choices=[*HOSTS, LOCAL])
-    start.add_argument("--dry-run", action="store_true",
-                       help="Print the command each host would run.")
-    start.add_argument("--ignore-queue", action="store_true",
-                       help="Launch even where a queue entry for this "
-                            "campaign is still pending on that host. Names "
-                            "the entry it is racing.")
-    add_colour_flag(start)
-    start.set_defaults(func=cmd_start)
 
     enqueue = sub.add_parser(
         "enqueue", help="Add the campaign to each host's queue for the tick.")
@@ -4441,11 +3353,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     cron = sub.add_parser("cron", help="Print the crontab line for a host.")
     cron.add_argument("--host", choices=[*HOSTS, LOCAL], required=True)
-    # Deliberately a no-op: cmd_cron prints whether or not it is passed, and
-    # nothing reads print_only. It stays accepted because `cron --print` is the
-    # invocation this module's own docstring, docs/dev/campaigns.md and
-    # scripts/README.md all document, and dropping the flag would make the
-    # documented line -- and anybody's shell history -- exit 2 instead.
+    # A no-op: cmd_cron prints whether or not it is passed. It stays accepted
+    # because `cron --print` is the documented invocation.
     cron.add_argument("--print", dest="print_only", action="store_true",
                       help="Print the line. Printing is all this verb does; "
                            "nothing is installed anywhere.")
@@ -4456,8 +3365,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     # --json is never coloured, whatever the terminal says: it is parsed, not
-    # read, and the guarantee is worth making structural rather than resting
-    # on no --json path happening to call render_table.
+    # read.
     set_colour(not getattr(args, "json", False)
                and colour_enabled(getattr(args, "no_color", False)))
     sys.exit(args.func(args))

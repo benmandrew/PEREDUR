@@ -14,4 +14,4 @@
 - The crontab line must not wrap `tick` in `flock`: the tick then deadlocks on its own lock and logs nothing that reads as an error. `campaign.py cron --print` emits the correct line.
 - `KEY_FIELDS` in `merge_experiments.py` and the resume key in `run_experiments.py` are off limits, and `commit`/`dirty` never join either.
 - Launch-path changes are tested with `python3 scripts/test_campaign.py` against stubs, never on a lab host. Read its closing summary, since it reports every failure at the end.
-- `campaign.py` parses TOML itself because the hosts run python 3.10 without `tomllib`. Remote shell scripts never contain a bare glob, because the hosts' zsh aborts on `NOMATCH`.
+- Remote shell scripts never contain a bare glob, because the hosts' zsh aborts on `NOMATCH`.
