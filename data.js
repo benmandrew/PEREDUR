@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791454939259,
+  "lastUpdate": 1791887076007,
   "repoUrl": "https://github.com/benmandrew/PEREDUR",
   "entries": {
     "counter benchmarks": [
@@ -7744,6 +7744,100 @@ window.BENCHMARK_DATA = {
             "value": 3575.6431400938263,
             "unit": "ns/iter",
             "extra": "iterations: 196147\ncpu: 3575.441694239519 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "benmandrew",
+            "username": "benmandrew",
+            "email": "benmandrew@gmail.com"
+          },
+          "committer": {
+            "name": "benmandrew",
+            "username": "benmandrew",
+            "email": "benmandrew@gmail.com"
+          },
+          "id": "f4505c286c81500feb27869b24a5784bd2337fd9",
+          "message": "refactor(scripts): drop load and start verbs, read TOML with tomllib\n\ncampaign.py loses two verbs to make the file smaller. `load` polled\neach host's CPU, memory, disk and GPU use, and no other verb depended\non it. `start` launched phases by hand as a detached chain, which\n`enqueue` with the cron `tick` already does unattended. Remove both\nverbs, their parser options and their tests (311 and 203 lines of\ncampaign.py). `enqueue` with `tick` is now the only way to launch, and\n`launches.jsonl` is no longer written.\n\nThe hand-written TOML reader (199 lines) existed because the lab\nhosts ran Python 3.10, which has no `tomllib`. av1, av2 and av3 now\nrun 3.12.3, so use `tomllib` and fall back to the `tomli` package on\n3.10. Two consequences:\n- The `python-tests` CI job moves from Python 3.10 to 3.12.\n- A float in a campaign file now parses. The old reader rejected it,\n  so the test of that rejection is removed.\n\nAlso, with no change in behaviour:\n- `parse_inventory` and `parse_toml_blocks` share one `marker_blocks`\n  helper.\n- `requeue` and `dequeue` share `named_entry` and `entry_b64`.\n- Remove the unused `SSH_MUX_OPTS`, `CURVES_SIDE_FILES` and\n  `PHASE_KEYS`.\n- Trim docstrings from 563 to 341 lines and comments from 365 to\n  235. The module docstring is now 27 lines and points at\n  docs/dev/campaigns.md. The syntax tree is identical apart from\n  comments and docstrings.\n\ncampaign.py goes from 4,468 to 3,375 lines and test_campaign.py from\n3,287 to 3,046. test_campaign.py passes on Python 3.10 and 3.13.\nscripts/README.md, docs/dev/campaigns.md, docs/dev/testing.md and\nscripts/CLAUDE.md are updated to match.",
+          "timestamp": "2026-10-12T19:05:22Z",
+          "url": "https://github.com/benmandrew/PEREDUR/commit/f4505c286c81500feb27869b24a5784bd2337fd9"
+        },
+        "date": 1791887074818,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "Copy formula - 8 variables",
+            "value": 7.552414409921189,
+            "unit": "ns/iter",
+            "extra": "iterations: 93067212\ncpu: 7.551556384863017 ns\nthreads: 1"
+          },
+          {
+            "name": "Copy specification - 3-guarantee takeoff spec",
+            "value": 137.02209263198603,
+            "unit": "ns/iter",
+            "extra": "iterations: 4992660\ncpu: 137.01773483473738 ns\nthreads: 1"
+          },
+          {
+            "name": "Hash specification - 3-guarantee takeoff spec",
+            "value": 129.32396506662593,
+            "unit": "ns/iter",
+            "extra": "iterations: 5482551\ncpu: 129.2649148179378 ns\nthreads: 1"
+          },
+          {
+            "name": "Compare specifications - equal, distinct arenas",
+            "value": 71.48085778380354,
+            "unit": "ns/iter",
+            "extra": "iterations: 9862625\ncpu: 71.44194704756596 ns\nthreads: 1"
+          },
+          {
+            "name": "Syntactic similarity - small formulas (3 variables)",
+            "value": 490.8034077846955,
+            "unit": "ns/iter",
+            "extra": "iterations: 1424151\ncpu: 490.61190491738614 ns\nthreads: 1"
+          },
+          {
+            "name": "Syntactic similarity - large formulas (11 variables, O(n*m) shared_subformulae)",
+            "value": 2045.415943115283,
+            "unit": "ns/iter",
+            "extra": "iterations: 342869\ncpu: 2044.7420472542 ns\nthreads: 1"
+          },
+          {
+            "name": "Spec implication check - warm black cache",
+            "value": 619.448224102315,
+            "unit": "ns/iter",
+            "extra": "iterations: 1128556\ncpu: 619.3172310456902 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:5",
+            "value": 188.2686926406651,
+            "unit": "ns/iter",
+            "extra": "iterations: 3713868\ncpu: 188.21716307633983 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:10",
+            "value": 212.97173625658118,
+            "unit": "ns/iter",
+            "extra": "iterations: 3286755\ncpu: 212.93592099198156 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:20",
+            "value": 238.25989049177952,
+            "unit": "ns/iter",
+            "extra": "iterations: 2936583\ncpu: 238.21850054978842 ns\nthreads: 1"
+          },
+          {
+            "name": "Trace model counting - matrix exponentiation/steps:50",
+            "value": 287.9927662274521,
+            "unit": "ns/iter",
+            "extra": "iterations: 2425567\ncpu: 287.93551899411545 ns\nthreads: 1"
+          },
+          {
+            "name": "Mutate specification - 3-guarantee takeoff spec",
+            "value": 3317.182277055835,
+            "unit": "ns/iter",
+            "extra": "iterations: 211387\ncpu: 3316.248842170988 ns\nthreads: 1"
           }
         ]
       }
