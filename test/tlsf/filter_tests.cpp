@@ -138,6 +138,88 @@ TEST(test_spec_implies_counts_a_timeout) {
            "timeout");
 }
 
+// Dropping shared system conjuncts must never change a verdict, and a wrong one
+// is silent, so every ordered pair is checked against the whole-formula query
+// on a checker that shares no memo. Both semantics are covered, strict for the
+// `psi_s W !psi_e` term, and the bodies share some environment sections and
+// differ in others so that both the shortened and the declined route run.
+TEST(test_tlsf_residual_agrees_with_whole_query) {
+    const std::string signals = "INPUTS { a; c; } OUTPUTS { b; d; } ";
+    const std::vector<std::string> bodies = {
+        "REQUIRE { a; } ASSERT { b; } GUARANTEE { G (a -> F b); G F d; }",
+        "REQUIRE { a; } ASSERT { b; } GUARANTEE { G (a -> F b); }",
+        "REQUIRE { a; } ASSERT { b; d -> b; } GUARANTEE { G F d; }",
+        "REQUIRE { a; } ASSERT { d -> b; } GUARANTEE { G (a -> F b); G F d; }",
+        "REQUIRE { a; } PRESET { !b; } ASSERT { b; } GUARANTEE { G F d; }",
+        "REQUIRE { a; } ASSERT { b; } GUARANTEE { G (a -> F b); G (c -> d); }",
+        "REQUIRE { a; c -> a; } ASSERT { b; } GUARANTEE { G (a -> F b); }",
+        "ASSUME { G F c; } ASSERT { b; } GUARANTEE { G (a -> F b); }",
+    };
+    const std::size_t residual_before =
+        ImplicationFilterStats::n_residual_queries.load();
+    const std::size_t settled_before =
+        ImplicationFilterStats::n_residual_settled.load();
+    for (const std::string_view semantics : {"Mealy", "Mealy,Strict"}) {
+        std::vector<tlsf::Specification> specs;
+        for (const std::string& body : bodies) {
+            std::string source = "INFO { SEMANTICS: ";
+            source += semantics;
+            source += "; }\nMAIN {\n";
+            source += signals + body;
+            source += "\n}\n";
+            specs.push_back(tlsf::parse(source));
+        }
+        SatisfiabilityChecker checker;
+        for (std::size_t i = 0; i < specs.size(); ++i) {
+            for (std::size_t j = 0; j < specs.size(); ++j) {
+                if (i == j) {
+                    continue;
+                }
+                SatisfiabilityChecker fresh;
+                const std::optional<bool> whole = fresh.check_satisfiability(
+                    "(" + specs[i].to_ltl() + ") & !(" + specs[j].to_ltl() +
+                        ")",
+                    QueryPolarity::ExpectUnsat);
+                const std::optional<bool> implied =
+                    tlsf_spec_implies(specs[i], specs[j], checker);
+                std::string message = "tlsf-filter: the residual query ";
+                message += "disagreed with the whole one under ";
+                message += semantics;
+                message += " on " + bodies[i] + " => " + bodies[j];
+                expect(whole.has_value() && implied.has_value() &&
+                           *implied == !*whole,
+                       message);
+            }
+        }
+    }
+    expect(ImplicationFilterStats::n_residual_queries.load() > residual_before,
+           "tlsf-filter: some pair must have asked a shortened query");
+    expect(ImplicationFilterStats::n_residual_settled.load() > settled_before,
+           "tlsf-filter: some pair must have been settled with no query");
+}
+
+// A residual is offered only where the environment sections agree, and only
+// where it drops something.
+TEST(test_tlsf_residual_declines_a_different_environment) {
+    const tlsf::Specification guarded = parse_main(
+        "INPUTS { a; } OUTPUTS { b; } ASSUME { G F a; } "
+        "GUARANTEE { G (a -> b); G F b; }");
+    const tlsf::Specification unguarded = parse_main(
+        "INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); G F b; }");
+    expect(!tlsf_residual_destination(guarded, unguarded).has_value(),
+           "tlsf-filter: a different ASSUME must decline the residual");
+    const tlsf::Specification fewer =
+        parse_main("INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); }");
+    const std::optional<tlsf::Specification> residual =
+        tlsf_residual_destination(unguarded, fewer);
+    expect(residual.has_value() && tlsf::count_live(residual->m_guarantee) == 0,
+           "tlsf-filter: a shared GUARANTEE conjunct must be dropped");
+    const tlsf::Specification other =
+        parse_main("INPUTS { a; } OUTPUTS { b; } GUARANTEE { G !b; }");
+    expect(!tlsf_residual_destination(unguarded, other).has_value(),
+           "tlsf-filter: a residual that drops nothing must be declined");
+}
+
 // --- assumption satisfiability ---
 
 // The predicate behind both the per-generation vacuity filter and the

@@ -84,9 +84,28 @@ FilterFunctionT<tlsf::Specification> tlsf_make_vacuity_filter(
 
 /// Whether spec @p from logically implies spec @p dest: true when
 /// `(from.to_ltl()) & !(dest.to_ltl())` is unsatisfiable, false when
-/// satisfiable, nullopt when the black query times out. Unlike the FRETISH
-/// assume-guarantee decomposition this is a complete whole-formula check
-/// (tlsf::Specification lowers to a single LTL formula via to_ltl()).
+/// satisfiable, nullopt when the black query times out. A complete
+/// whole-formula check, as `spec_implies` is on the FRETISH path.
+///
+/// Where the two share their environment sections, conjuncts both carry in
+/// the same system section are dropped from `dest` first
+/// (tlsf_residual_destination), and a `dest` left with none is implied with no
+/// query.
 std::optional<bool> tlsf_spec_implies(const tlsf::Specification& from,
                                       const tlsf::Specification& dest,
                                       SatisfiabilityChecker& checker);
+
+/// `dest` with every live PRESET, ASSERT and GUARANTEE conjunct that `from`
+/// carries in the same section marked removed, or nothing where that would
+/// change the implication query's answer or drop nothing.
+///
+/// The answer is unchanged when the two have the same semantics and the same
+/// live INITIALLY, REQUIRE and ASSUME conjuncts. Every system section then
+/// sits positively under the same premises on both sides: PRESET under θ_e,
+/// ASSERT under `G` or, strict, as `ψ_s W !ψ_e` with one shared right-hand
+/// side, and GUARANTEE under `(G ψ_e & φ_e)`. A conjunct `from` supplies
+/// under a premise is one `dest` gets under the same premise, and `W`
+/// distributes over a conjunction on its left, so `from & !dest` and
+/// `from & !residual` hold on the same traces.
+std::optional<tlsf::Specification> tlsf_residual_destination(
+    const tlsf::Specification& from, const tlsf::Specification& dest);

@@ -242,6 +242,10 @@ inline void reset_stats() {
         0, std::memory_order_relaxed);
     ImplicationFilterStats::n_fingerprint_refuted.store(
         0, std::memory_order_relaxed);
+    ImplicationFilterStats::n_residual_queries.store(0,
+                                                     std::memory_order_relaxed);
+    ImplicationFilterStats::n_residual_settled.store(0,
+                                                     std::memory_order_relaxed);
 }
 
 }  // namespace antichain

@@ -40,6 +40,13 @@ struct ImplicationFilterStats {
     /// is the width of the population's equivalence classes, which nothing
     /// else records: a class of k members contributes k-1 here.
     inline static std::atomic<std::size_t> n_equivalent_collapsed{0};
+    /// Ordered implication checks that asked about a shortened destination,
+    /// the guarantees both sides carry having been dropped from the negated
+    /// side as `spec_implies` and `tlsf_spec_implies` describe.
+    inline static std::atomic<std::size_t> n_residual_queries{0};
+    /// Ordered implication checks settled true with no query, every guarantee
+    /// of the destination being one the source carries.
+    inline static std::atomic<std::size_t> n_residual_settled{0};
 };
 
 /// Ranks candidates within one equivalence class, higher surviving. Returning

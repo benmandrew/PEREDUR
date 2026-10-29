@@ -91,14 +91,77 @@ FilterFunctionT<tlsf::Specification> tlsf_make_vacuity_filter(
         max_in_flight);
 }
 
+namespace {
+
+std::vector<std::string> sorted_live(const tlsf::Section& section) {
+    std::vector<std::string> rendered;
+    for (const Formula& formula : tlsf::live_formulae(section)) {
+        rendered.push_back(formula.to_string());
+    }
+    std::sort(rendered.begin(), rendered.end());
+    return rendered;
+}
+
+// Marks removed each live conjunct of @p dest that @p from also carries, and
+// reports whether it marked any.
+bool drop_shared(const tlsf::Section& from, tlsf::Section& dest) {
+    const std::vector<std::string> carried = sorted_live(from);
+    bool dropped = false;
+    for (tlsf::SectionEntry& entry : dest) {
+        if (!entry.m_removed &&
+            std::binary_search(carried.begin(), carried.end(),
+                               entry.m_formula.to_string())) {
+            entry.m_removed = true;
+            dropped = true;
+        }
+    }
+    return dropped;
+}
+
+}  // namespace
+
+std::optional<tlsf::Specification> tlsf_residual_destination(
+    const tlsf::Specification& from, const tlsf::Specification& dest) {
+    if (from.m_semantics != dest.m_semantics ||
+        sorted_live(from.m_initially) != sorted_live(dest.m_initially) ||
+        sorted_live(from.m_require) != sorted_live(dest.m_require) ||
+        sorted_live(from.m_assume) != sorted_live(dest.m_assume)) {
+        return std::nullopt;
+    }
+    tlsf::Specification residual = dest;
+    // Each call runs, not just the first to drop something.
+    const bool dropped_preset = drop_shared(from.m_preset, residual.m_preset);
+    const bool dropped_assert = drop_shared(from.m_assert, residual.m_assert);
+    const bool dropped_guarantee =
+        drop_shared(from.m_guarantee, residual.m_guarantee);
+    if (!dropped_preset && !dropped_assert && !dropped_guarantee) {
+        return std::nullopt;
+    }
+    return residual;
+}
+
 std::optional<bool> tlsf_spec_implies(const tlsf::Specification& from,
                                       const tlsf::Specification& dest,
                                       SatisfiabilityChecker& checker) {
     if (from == dest) {
         return true;
     }
+    const std::optional<tlsf::Specification> residual =
+        tlsf_residual_destination(from, dest);
+    if (residual.has_value() && tlsf::count_live(residual->m_preset) == 0 &&
+        tlsf::count_live(residual->m_assert) == 0 &&
+        tlsf::count_live(residual->m_guarantee) == 0) {
+        ImplicationFilterStats::n_residual_settled.fetch_add(
+            1, std::memory_order_relaxed);
+        return true;
+    }
+    if (residual.has_value()) {
+        ImplicationFilterStats::n_residual_queries.fetch_add(
+            1, std::memory_order_relaxed);
+    }
+    const tlsf::Specification& target = residual.has_value() ? *residual : dest;
     const std::optional<bool> sat = checker.check_satisfiability(
-        "(" + from.to_ltl() + ") & !(" + dest.to_ltl() + ")",
+        "(" + from.to_ltl() + ") & !(" + target.to_ltl() + ")",
         QueryPolarity::ExpectUnsat);
     if (!sat.has_value()) {
         // Counted as the FRETISH spec_implies counts it, so the implication

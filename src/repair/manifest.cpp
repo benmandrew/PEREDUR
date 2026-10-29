@@ -203,7 +203,11 @@ namespace {
 // those probes too, so an implication-heavy run reads far more black calls
 // than one at 33, and n_escalations_declined still counts only the queries
 // left undecided.
-constexpr int k_schema_version = 34;
+//
+// 35 added implication.residual_queries and implication.residual_settled: the
+// implication checks that dropped shared guarantees from the negated side, and
+// those settled true with nothing left to ask.
+constexpr int k_schema_version = 35;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -349,15 +353,22 @@ nlohmann::json tool_calls_json() {
 // equivalent, a class of k members contributing k-1. `fingerprint_refuted`
 // counts ordered pairs, two per unordered pair, so a pair both directions of
 // which a sampled word refuted never reaches `comparisons` at all.
+// `residual_queries` and `residual_settled` count ordered checks too: those
+// that dropped shared guarantees before querying, and those left nothing to
+// query.
 nlohmann::json implication_json() {
-    return {{"comparisons", ImplicationFilterStats::n_comparisons.load()},
-            {"skipped", ImplicationFilterStats::n_skipped.load()},
-            {"duplicates", ImplicationFilterStats::n_duplicates.load()},
-            {"timeouts", ImplicationFilterStats::n_timeouts.load()},
-            {"equivalent_collapsed",
-             ImplicationFilterStats::n_equivalent_collapsed.load()},
-            {"fingerprint_refuted",
-             ImplicationFilterStats::n_fingerprint_refuted.load()}};
+    return {
+        {"comparisons", ImplicationFilterStats::n_comparisons.load()},
+        {"skipped", ImplicationFilterStats::n_skipped.load()},
+        {"duplicates", ImplicationFilterStats::n_duplicates.load()},
+        {"timeouts", ImplicationFilterStats::n_timeouts.load()},
+        {"equivalent_collapsed",
+         ImplicationFilterStats::n_equivalent_collapsed.load()},
+        {"fingerprint_refuted",
+         ImplicationFilterStats::n_fingerprint_refuted.load()},
+        {"residual_queries", ImplicationFilterStats::n_residual_queries.load()},
+        {"residual_settled",
+         ImplicationFilterStats::n_residual_settled.load()}};
 }
 
 nlohmann::json caches_json() {

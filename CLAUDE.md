@@ -13,7 +13,7 @@ Detail lives in `docs/dev/`. Read the file covering an area before changing it. 
 | `docs/dev/algorithm.md` | Algorithm flow, Elitism, Termination modes, Run output, Live dashboard, TLSF repair modes, Key types |
 | `docs/dev/operators.md` | Crossover, Operator repairs of 2026-08-19, Implication in the TLSF grammar, Monotone rewrites, Cloned assumptions, Assumption construction, Timing donation, Removable guarantees |
 | `docs/dev/fretish-scopes.md` | FRETISH scopes |
-| `docs/dev/performance.md` | Cache keys, Scoring dispatch, Implication prefilter, Tool subprocesses, Profiling |
+| `docs/dev/performance.md` | Cache keys, Scoring dispatch, Implication prefilter, Implication residual query, Tool subprocesses, Profiling |
 | `docs/dev/config-and-provenance.md` | Config keys (including config vintage and retired keys), Commit provenance |
 | `docs/dev/campaigns.md` | Campaigns: the operating manual for `scripts/campaign.py` |
 | `docs/dev/testing.md` | Tests, Coverage |

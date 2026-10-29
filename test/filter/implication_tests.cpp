@@ -197,6 +197,76 @@ TEST(test_independent_responses_not_implied) {
            "spec_implies: unrelated responses should not imply each other (b)");
 }
 
+// --- residual query ---
+
+// Dropping shared guarantees must never change a verdict, and a wrong one is
+// silent, so every ordered pair is checked against the whole-formula query on a
+// checker that shares no memo. The pairs share some assumptions and not others,
+// so both the shortened and the declined route run, and one pair has nothing
+// left to ask.
+TEST(test_residual_agrees_with_whole_query) {
+    const std::vector<std::string> ins{"a", "b"};
+    const std::vector<std::string> outs{"c", "d"};
+    const Requirement assume_a = g_req("a");
+    const Requirement assume_b = f_req("b");
+    const Requirement respond =
+        Requirement(Formula("a"), Formula("c"), timing::within_ticks(2));
+    const Requirement respond_late =
+        Requirement(Formula("a"), Formula("c"), timing::within_ticks(3));
+    const Requirement hold =
+        Requirement(Formula("b"), Formula("d"), timing::for_ticks(2));
+    const std::vector<Specification> specs{
+        Specification({assume_a}, {respond, hold}, ins, outs),
+        Specification({assume_a}, {respond_late, hold}, ins, outs),
+        Specification({assume_a}, {respond}, ins, outs),
+        Specification({assume_a, assume_b}, {respond, hold}, ins, outs),
+        Specification({assume_b}, {respond_late, hold}, ins, outs),
+        Specification({}, {respond, f_req("d")}, ins, outs),
+        Specification({}, {respond}, ins, outs),
+    };
+    const std::size_t residual_before =
+        ImplicationFilterStats::n_residual_queries.load();
+    const std::size_t settled_before =
+        ImplicationFilterStats::n_residual_settled.load();
+    SatisfiabilityChecker checker;
+    for (std::size_t i = 0; i < specs.size(); ++i) {
+        for (std::size_t j = 0; j < specs.size(); ++j) {
+            if (i == j) {
+                continue;
+            }
+            SatisfiabilityChecker fresh;
+            const std::optional<bool> whole = fresh.check_satisfiability(
+                "(" + specs[i].to_ltl() + ") & !(" + specs[j].to_ltl() + ")",
+                QueryPolarity::ExpectUnsat);
+            const std::optional<bool> implied =
+                spec_implies(specs[i], specs[j], checker);
+            expect(
+                whole.has_value() && implied.has_value() && *implied == !*whole,
+                "spec_implies: the residual query disagreed with the whole "
+                "one on " +
+                    specs[i].to_string() + " => " + specs[j].to_string());
+        }
+    }
+    expect(ImplicationFilterStats::n_residual_queries.load() > residual_before,
+           "spec_implies: some pair must have asked a shortened query");
+    expect(ImplicationFilterStats::n_residual_settled.load() > settled_before,
+           "spec_implies: some pair must have been settled with no query");
+}
+
+// An assumption of the source missing from the destination declines the
+// residual, since the destination's assumptions then need not give the
+// source's guarantees.
+TEST(test_residual_needs_the_source_assumptions) {
+    const Specification guarded({g_req("a")}, {g_req("c"), f_req("d")}, {}, {});
+    const Specification unguarded({}, {g_req("c")}, {}, {});
+    expect(!residual_destination(guarded, unguarded).has_value(),
+           "residual_destination: a missing assumption must decline");
+    const std::optional<Specification> residual =
+        residual_destination(unguarded, guarded);
+    expect(residual.has_value() && count_live(residual->m_guarantees) == 1,
+           "residual_destination: the shared guarantee must be dropped");
+}
+
 // --- fingerprint prefilter ---
 
 // A sampled word may refute an implication and may never confirm one, so the
