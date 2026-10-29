@@ -33,6 +33,9 @@ std::vector<Word> atom_column(std::size_t index, std::size_t n_words) {
         0xAAAAAAAAAAAAAAAAULL, 0xCCCCCCCCCCCCCCCCULL, 0xF0F0F0F0F0F0F0F0ULL,
         0xFF00FF00FF00FF00ULL, 0xFFFF0000FFFF0000ULL, 0xFFFFFFFF00000000ULL};
     if (index < k_word_shift) {
+        // Braces would select the initializer_list constructor and build a
+        // two-element vector.
+        // NOLINTNEXTLINE(modernize-return-braced-init-list)
         return std::vector<Word>(n_words, k_patterns[index]);
     }
     // At or above it the bit is constant across a word, so a word is all ones
@@ -102,6 +105,9 @@ std::vector<Word> evaluate(const Formula& formula,
     // so a formula that is neither an atom nor unary is binary.
     if (!operands) {
         assert(false);
+        // Braces would select the initializer_list constructor and build a
+        // two-element vector.
+        // NOLINTNEXTLINE(modernize-return-braced-init-list)
         return std::vector<Word>(n_words, 0);
     }
     std::vector<Word> left = evaluate(operands->first, indices, n_words);

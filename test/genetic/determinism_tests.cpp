@@ -98,9 +98,6 @@ std::string render_trace(const DrawTrace& trace) {
     return text;
 }
 
-const std::vector<std::string> k_in_atoms = {"a", "b", "c"};
-const std::vector<std::string> k_out_atoms = {"x", "y"};
-
 /// Pins every Config field the breeding path reads, so the goldens below track
 /// the code rather than the config defaults. A default that changes the draw
 /// stream in production is a real event, but it should not surface here as an
@@ -152,6 +149,8 @@ Config golden_config() {
 /// spec with no assumptions, so breeding reaches both the assumption and
 /// guarantee arms of mutate_specification and a non-trivial timing pool.
 std::vector<Specification> golden_population() {
+    const std::vector<std::string> k_in_atoms = {"a", "b", "c"};
+    const std::vector<std::string> k_out_atoms = {"x", "y"};
     return {
         Specification({make_req("a", "x", timing::immediately())},
                       {make_req("b", "y", timing::next_timepoint())},
@@ -182,7 +181,7 @@ AggregateWeightedFitnessFunction golden_fitness() {
     constexpr double k_expressive_scale = 400.0;
     return AggregateWeightedFitnessFunction(
         {{[](const Specification& spec) {
-              return 1.0 / (1.0 + spec_size(spec) / k_compact_scale);
+              return 1.0 / (1.0 + (spec_size(spec) / k_compact_scale));
           },
           1.0, "compact"},
          {[](const Specification& spec) {
@@ -237,6 +236,8 @@ std::string render_population(
 // but still spends an engine word, and an implementation that skips that draw
 // passes every other case here while shifting the whole stream by one.
 TEST(test_golden_bounded_uniform) {
+    // The golden values below are this seed's stream.
+    // NOLINTNEXTLINE(bugprone-random-generator-seed)
     std::mt19937 rng(20260820);
     const std::vector<std::uint32_t> bounds = {1,  2,  3,    4,      7,
                                                12, 60, 1000, 1000000};

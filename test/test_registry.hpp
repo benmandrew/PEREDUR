@@ -22,9 +22,13 @@ struct TestRegistrar {
 };
 
 /// Defines and registers `name` under an explicit suite.
-#define TEST_IN(suite, name)                                    \
-    void name();                                                \
-    const TestRegistrar name##_registrar{(suite), #name, name}; \
+///
+/// Registration only throws if it cannot allocate, and at start-up that has
+/// nowhere to go but terminate.
+#define TEST_IN(suite, name)                                      \
+    void name();                                                  \
+    /* NOLINTNEXTLINE(bugprone-throwing-static-initialization) */ \
+    const TestRegistrar name##_registrar{(suite), #name, name};   \
     void name()
 
 /// Defines and registers `name` under the unit's `k_test_suite`.

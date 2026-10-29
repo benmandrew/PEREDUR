@@ -58,6 +58,9 @@ std::vector<std::string> formaliser_command() {
 PersistentProcess::PersistentProcess(std::vector<std::string> command)
     : m_command(std::move(command)) {}
 
+// The throw is an allocation failure building reap_with_grace's name, which
+// terminates as intended.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 PersistentProcess::~PersistentProcess() {
     if (!m_spawned) {
         return;

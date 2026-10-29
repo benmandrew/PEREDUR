@@ -1,16 +1,28 @@
+#include <charconv>
 #include <chrono>
 #include <csignal>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <system_error>
 
 #include <cpptrace/cpptrace.hpp>
 
 namespace {
+
+// 0 for anything that is not a whole decimal int, which signal_name and the
+// PID line already read as unknown.
+int parse_int_or_zero(const char* text) {
+    int value = 0;
+    const char* const end = text + std::strlen(text);
+    const auto [ptr, error] = std::from_chars(text, end, value);
+    return error == std::errc() && ptr == end ? value : 0;
+}
 
 const char* signal_name(int signal_number) {
     switch (signal_number) {
@@ -41,6 +53,9 @@ std::string current_time_string() {
 
 }  // namespace
 
+// Only libc++'s allocation failures (length_error, bad_array_new_length) can
+// escape, and terminating on them is intended.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char* argv[]) {
     cpptrace::object_trace trace;
     cpptrace::safe_object_frame frame{};
@@ -56,8 +71,9 @@ int main(int argc, char* argv[]) {
         }
     }
     const int signal_number =
-        argc >= 3 && argv[2] != nullptr ? std::atoi(argv[2]) : 0;
-    const int pid = argc >= 4 && argv[3] != nullptr ? std::atoi(argv[3]) : 0;
+        argc >= 3 && argv[2] != nullptr ? parse_int_or_zero(argv[2]) : 0;
+    const int pid =
+        argc >= 4 && argv[3] != nullptr ? parse_int_or_zero(argv[3]) : 0;
     const char* metadata = argc >= 5 && argv[4] != nullptr && argv[4][0] != '\0'
                                ? argv[4]
                                : nullptr;

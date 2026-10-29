@@ -89,6 +89,9 @@ std::optional<bool> realize_one(const std::string& path,
 
 }  // namespace
 
+// Only libc++'s allocation failures (length_error, bad_array_new_length) can
+// escape, and terminating on them is intended.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, const char* const argv[]) {
     if (!has_program_name(argc, argv)) {
         return 1;

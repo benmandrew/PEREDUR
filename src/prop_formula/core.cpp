@@ -10,7 +10,11 @@
 
 Formula::Formula() : m_impl(std::make_shared<Impl>("true")) {}
 
+// Formula's constructor throws only bad_alloc, which at start-up has nowhere to
+// go but terminate.
+// NOLINTNEXTLINE(bugprone-throwing-static-initialization)
 Formula Formula::true_formula = Formula("true");
+// NOLINTNEXTLINE(bugprone-throwing-static-initialization)
 Formula Formula::false_formula = Formula("false");
 
 Formula::Formula(const std::string& formula)

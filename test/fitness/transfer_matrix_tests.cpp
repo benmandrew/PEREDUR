@@ -182,7 +182,7 @@ Count brute_force_trace_count(const Requirement& req, std::size_t step_count) {
         for (std::size_t step = 0; step < step_count; ++step) {
             trace.emplace_back(
                 static_cast<bool>((mask >> (2U * step)) & 1U),
-                static_cast<bool>((mask >> (2U * step + 1U)) & 1U));
+                static_cast<bool>((mask >> ((2U * step) + 1U)) & 1U));
         }
         if (trace_satisfies_requirement(req, trace)) {
             ++count;
@@ -413,12 +413,14 @@ TEST(test_count_traces_formula) {
 // asserts a value past 2^128, i.e. one that a 128-bit Count could not hold --
 // which is the regime the long double Count exists for, and the one the rest of
 // this file (expected counts of 1, 3, 17) never reaches.
-Count exact_power_of_two(int exponent) { return std::ldexp(1.0L, exponent); }
+Count exact_power_of_two(int exponent) {
+    return std::ldexp(Count{1}, exponent);
+}
 
 Count power_of_three(std::size_t exponent) {
-    Count result = 1.0L;
+    Count result = 1;
     for (std::size_t step = 0; step < exponent; ++step) {
-        result *= 3.0L;
+        result *= Count{3};
     }
     return result;
 }
@@ -472,8 +474,9 @@ TEST(test_count_traces_beyond_128_bits) {
 // silently saturated to a finite maximum.
 TEST(test_count_overflow_detected_at_ceiling) {
     Count result = 0;
-    expect(count_mul_overflow(std::numeric_limits<Count>::max(), 2.0L, result),
-           "count_mul_overflow: max * 2 must report overflow");
+    expect(
+        count_mul_overflow(std::numeric_limits<Count>::max(), Count{2}, result),
+        "count_mul_overflow: max * 2 must report overflow");
     expect(!std::isfinite(result),
            "count_mul_overflow: an overflowing product must not stay finite");
 }

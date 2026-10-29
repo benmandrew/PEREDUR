@@ -362,6 +362,9 @@ std::size_t lint_fretish(const std::filesystem::path& dir,
 
 }  // namespace
 
+// Only libc++'s allocation failures (length_error, bad_array_new_length) can
+// escape, and terminating on them is intended.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv) {
     if (handle_info_flags(argc, argv, print_usage)) {
         return 0;

@@ -22,6 +22,7 @@
 /// Trace counts are only ever consumed as ratios cast to double, so exponent
 /// range matters and exact integer width does not. x87 80-bit long double is
 /// exact to 2^64 (same as uint64) but reaches 2^16384 rather than 2^128.
+// NOLINTNEXTLINE(google-runtime-float): the range above is the point.
 using Count = long double;
 
 // Three things below depend on Count being floating-point and break silently

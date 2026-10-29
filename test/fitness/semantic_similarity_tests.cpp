@@ -233,11 +233,11 @@ TEST(test_semantic_similarity_atom_rich_deep_horizon_in_range) {
 // coarser than double epsilon so it survives ratio_or_throw's cast to double,
 // which a mere ulp of long double would not.
 TEST(test_semantic_similarity_from_counts_clamps_rounding_overshoot) {
-    const Count base = std::ldexp(1.0L, 70);
+    const Count base = std::ldexp(Count{1}, 70);
     // base + 2^30 is exact and strictly greater in long double's 64-bit
     // mantissa (the two differ by 40 bits), so the conjunction count exceeds
     // the individual counts and the directional ratios land just above 1.
-    const Count overshoot = base + std::ldexp(1.0L, 30);
+    const Count overshoot = base + std::ldexp(Count{1}, 30);
     const SemanticSimilarityCounts counts{base, base, overshoot};
     const double score = semantic_similarity_from_counts(counts);
     expect(score >= 0.0 && score <= 1.0,
@@ -317,8 +317,8 @@ TEST(test_semantic_similarity_propequiv_responses_score_equal) {
 // Exercises the metric branch through semantic_similarity_from_counts, without
 // invoking the model counter.
 TEST(test_semantic_similarity_metric_direct_vs_logarithmic) {
-    const Count whole = std::ldexp(1.0L, 20);
-    const Count shared = std::ldexp(1.0L, 10);
+    const Count whole = std::ldexp(Count{1}, 20);
+    const Count shared = std::ldexp(Count{1}, 10);
     const SemanticSimilarityCounts counts{whole, whole, shared};
 
     const double direct =

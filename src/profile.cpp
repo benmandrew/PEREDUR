@@ -114,7 +114,7 @@ class ThreadPort {
     ThreadPort& operator=(const ThreadPort&) = delete;
     ThreadPort(ThreadPort&&) = delete;
     ThreadPort& operator=(ThreadPort&&) = delete;
-    mach_port_t get() const { return m_port; }
+    [[nodiscard]] mach_port_t get() const { return m_port; }
 
    private:
     mach_port_t m_port;
@@ -217,6 +217,8 @@ void report(std::ostream& out) {
                                      return entry->m_calls.load() == 0;
                                  }),
                   ordered.end());
+    // The comparator orders by wall time, never by address.
+    // NOLINTNEXTLINE(bugprone-nondeterministic-pointer-iteration-order)
     std::sort(ordered.begin(), ordered.end(),
               [](const Site* lhs, const Site* rhs) {
                   return lhs->m_wall_ns.load() > rhs->m_wall_ns.load();
