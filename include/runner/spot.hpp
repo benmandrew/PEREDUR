@@ -6,7 +6,9 @@
 
 #include <chrono>
 #include <cstdint>
+#include <deque>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -92,6 +94,33 @@ struct SpecificationSides {
     std::string m_scope;
     std::vector<const Requirement*> m_assumption_requirements;
     std::vector<const Requirement*> m_guarantee_requirements;
+};
+
+/// Returns the full filesystem path to the autfilt binary.
+std::string autfilt_path();
+
+/// What RealizabilityChecker's controller store did: the queries it answered
+/// realizable without ltlsynt, and the execs that cost. Guarded by the
+/// checker's own lock, as the checker's counters are.
+struct ControllerReuseStats {
+    /// Queries checked against at least one stored controller.
+    inline static std::size_t n_attempts = 0;
+    /// Of those, the queries a controller was shown to realize, which no
+    /// ltlsynt exec then decided.
+    inline static std::size_t n_hits = 0;
+    /// Guarantees put to a product emptiness check, one autfilt exec each.
+    inline static std::size_t n_guarantees_checked = 0;
+    /// Guarantee checks answered from a check already run against the same
+    /// controller under the same assumptions.
+    inline static std::size_t n_verdict_hits = 0;
+    /// Controllers ltlsynt emitted that joined the store.
+    inline static std::size_t n_stored = 0;
+    /// Every ltl2tgba and autfilt exec the checks made, the emptiness checks
+    /// among them.
+    inline static std::size_t n_execs = 0;
+    inline static std::size_t n_timeouts = 0;
+    inline static double total_time_s = 0.0;
+    inline static double total_cpu_s = 0.0;
 };
 
 class RealizabilityChecker {
@@ -208,6 +237,14 @@ class RealizabilityChecker {
         m_route_input_free = enabled;
     }
 
+    /// The fewest guarantees a FRETISH query needs before this checker stores
+    /// its controller or tries a stored one on it. Below the default of 10,
+    /// ltlsynt's median call is cheaper than the several execs a check makes.
+    /// Lowered by tests to exercise the store on small specifications.
+    void set_controller_reuse_min_guarantees(std::size_t count) {
+        m_reuse_min_guarantees = count;
+    }
+
    private:
     /// One decided query, with its two sides interned to integer ids so that
     /// the inclusion tests are over small sorted vectors rather than over
@@ -233,6 +270,36 @@ class RealizabilityChecker {
         const std::vector<std::string>& conjuncts,
         const std::vector<const Requirement*>& requirements);
 
+    /// A query the controller store may answer: its interned sides, with the
+    /// canonical formula behind each id, copied out so that the checks run
+    /// without m_cache_mutex.
+    struct ReuseQuery {
+        std::string m_scope;
+        std::vector<int> m_assumptions;
+        std::vector<int> m_guarantees;
+        std::vector<std::string> m_assumption_formulas;
+        std::vector<std::string> m_guarantee_formulas;
+    };
+    struct StoredController;
+    struct ControllerProduct;
+
+    std::vector<std::shared_ptr<StoredController>> reuse_candidates(
+        const ReuseQuery& query);
+    bool product_meets(ControllerProduct& product, int guarantee,
+                       const std::string& formula);
+    bool controller_realizes(const ReuseQuery& query);
+    bool settled_by_controller(const ReuseQuery& query,
+                               const std::string& cache_key);
+    ReuseQuery reuse_query(const std::string& scope,
+                           const std::vector<int>& assumptions,
+                           const std::vector<int>& guarantees) const;
+    std::shared_ptr<ControllerProduct> product_for(
+        const std::shared_ptr<StoredController>& controller,
+        const ReuseQuery& query);
+    std::optional<std::string> assumption_automaton(const ReuseQuery& query);
+    std::optional<std::string> negation_automaton(const std::string& formula);
+    void store_controller(const ReuseQuery& query, const std::string& hoa);
+
     mutable std::mutex m_cache_mutex;
     /// Canonical conjunct to id, and the decided queries over those ids. Both
     /// live under m_cache_mutex, being read and written on the same paths as
@@ -255,6 +322,33 @@ class RealizabilityChecker {
     /// not a verdict: each caller still resolves it in its own direction.
     std::unordered_map<std::string, std::optional<bool>> m_cache;
     bool m_route_input_free = true;
+
+    /// The canonical formula behind each conjunct id, under m_cache_mutex.
+    std::vector<std::string> m_conjunct_formulas;
+
+    /// The controller store. When ltlsynt decides a large FRETISH query
+    /// realizable it is asked for the winning Mealy machine too, at no extra
+    /// cost, and the machine is kept, the most recent 64 per scope. A later
+    /// query the two subsumption passes miss is put to the stored machines
+    /// sharing the most conjuncts with it before it reaches ltlsynt. A machine
+    /// realizes `(&A) -> (&G)` when no word it produces satisfies every
+    /// assumption and violates a guarantee, which is one product emptiness
+    /// check per guarantee. Only a pass is believed: a failure, a timeout or a
+    /// tool error falls through to ltlsynt, so the store changes how a verdict
+    /// is reached and never which one. Everything here lives under
+    /// m_reuse_mutex, which is never held together with m_cache_mutex.
+    std::mutex m_reuse_mutex;
+    std::size_t m_reuse_min_guarantees = 10;
+    std::unordered_map<std::string,
+                       std::deque<std::shared_ptr<StoredController>>>
+        m_controllers;
+    /// HOA of the conjunction of an assumption set, keyed by its sorted ids;
+    /// nullopt where ltl2tgba failed on it.
+    std::unordered_map<std::string, std::optional<std::string>>
+        m_assumption_automata;
+    /// HOA of a guarantee's negation, keyed on its canonical formula.
+    std::unordered_map<std::string, std::optional<std::string>>
+        m_negation_automata;
 };
 
 /// Returns the process-lifetime RealizabilityChecker instance. All callers

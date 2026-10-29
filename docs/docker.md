@@ -118,7 +118,7 @@ The `release` preset has nothing to do with it. `CMAKE_BUILD_TYPE` governs what 
 
 They are left unstripped even so. A release build still emits a symbol table, and cpptrace resolves the crash handler's frames through it, so stripping `bin/` would trade a small saving for crash reports that are addresses and nothing else — in the one environment where re-running under a debugger is hardest. The strip step therefore covers `libexec/`, where the tools are, and stops there.
 
-Only three of Spot's sixteen binaries are ever spawned — `ltlsynt`, `ltl2tgba` and `ltlfilt` — so [`cmake/install.cmake`](../cmake/install.cmake) names those three one at a time and the other thirteen never reach the runtime stage. The static archives are excluded on the same argument, nothing in the image linking against anything, and `libspot.a` is far larger than the shared library a run actually loads.
+Only four of Spot's sixteen binaries are ever spawned — `ltlsynt`, `ltl2tgba`, `ltlfilt` and `autfilt` — so [`cmake/install.cmake`](../cmake/install.cmake) names those four one at a time and the other twelve never reach the runtime stage. The static archives are excluded on the same argument, nothing in the image linking against anything, and `libspot.a` is far larger than the shared library a run actually loads.
 
 No figure for the built image is written down here, because a Spot or Ganak version bump moves it and nothing in the repository re-checks it. `docker images benmandrew/peredur:<tag>` reports the size of whatever was built, on the version pins in force at the time.
 

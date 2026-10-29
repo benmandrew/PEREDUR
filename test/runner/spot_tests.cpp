@@ -374,6 +374,159 @@ TEST(test_input_free_routing_agrees_with_ltlsynt) {
            "spot-runner: a query with an input should not be routed");
 }
 
+namespace controller_reuse {
+
+std::string requirement(const std::string& condition,
+                        const std::string& response, std::string_view timing) {
+    return R"({"condition": ")" + condition +
+           R"(", "condition-type": "continual", "response": ")" + response +
+           R"(", "timing": )" + std::string(timing) + "}";
+}
+
+constexpr std::string_view k_immediately = R"({"type": "Immediately"})";
+constexpr std::string_view k_eventually = R"({"type": "Eventually"})";
+constexpr std::string_view k_always = R"({"type": "Always"})";
+
+struct Requirements {
+    // A grant answers each request at once, and busy is never raised.
+    std::string m_answers = requirement("req", "grant", k_immediately);
+    std::string m_idle = requirement("true", "!busy", k_always);
+    // Implied by m_answers, and not ordered against it by the rule pass,
+    // which compares only the requirements one query replaced in the other.
+    std::string m_answers_eventually =
+        requirement("req", "grant", k_eventually);
+    // At odds with m_answers unless requests never come.
+    std::string m_withholds = requirement("true", "!grant", k_always);
+    std::string m_asks_eventually = requirement("true", "req", k_eventually);
+    std::string m_never_asks = requirement("true", "!req", k_always);
+};
+
+Specification spec(const std::vector<std::string>& assumptions,
+                   const std::vector<std::string>& guarantees) {
+    const auto join = [](const std::vector<std::string>& items) {
+        std::string joined;
+        for (const std::string& item : items) {
+            joined += (joined.empty() ? "" : ", ") + item;
+        }
+        return joined;
+    };
+    return parse_specification_json(
+        R"({"assumptions": [)" + join(assumptions) + R"(], "guarantees": [)" +
+        join(guarantees) +
+        R"(], "in_atoms": ["req"], "out_atoms": ["grant", "busy"]})");
+}
+
+// Each query against a checker whose store is open to small specifications,
+// and against a fresh checker, which is ltlsynt alone. Returns the ltlsynt
+// execs the storing checker made.
+std::size_t expect_agrees(RealizabilityChecker& storing,
+                          const Specification& query, const std::string& what) {
+    RealizabilityChecker fresh;
+    const bool from_tool = realizable(fresh, query);
+    const std::size_t before = RealizabilityChecker::n_cache_misses;
+    expect(realizable(storing, query) == from_tool,
+           "spot-runner: the controller store disagreed with ltlsynt on " +
+               what + ": " + query.to_ltl());
+    return RealizabilityChecker::n_cache_misses - before;
+}
+
+}  // namespace controller_reuse
+
+// The store's three claims in order: a child adding an implied guarantee is
+// answered by its parent's controller, checking only that guarantee; the same
+// controller still passes its own guarantees once the assumption it was built
+// under is dropped; and a guarantee it does not meet sends the query on to
+// ltlsynt, which finds it unrealizable.
+TEST(test_controller_reuse_agrees_with_ltlsynt) {
+    using controller_reuse::expect_agrees;
+    using controller_reuse::spec;
+    const controller_reuse::Requirements req;
+    RealizabilityChecker storing;
+    storing.set_controller_reuse_min_guarantees(1);
+    const std::size_t stored = ControllerReuseStats::n_stored;
+    const std::size_t hits = ControllerReuseStats::n_hits;
+    const std::size_t checked = ControllerReuseStats::n_guarantees_checked;
+    std::size_t execs = 0;
+
+    execs += expect_agrees(
+        storing, spec({req.m_asks_eventually}, {req.m_answers, req.m_idle}),
+        "the parent");
+    expect(ControllerReuseStats::n_stored == stored + 1,
+           "spot-runner: a realizable query's controller should be stored");
+
+    execs += expect_agrees(
+        storing,
+        spec({req.m_asks_eventually},
+             {req.m_answers, req.m_idle, req.m_answers_eventually}),
+        "a child adding an implied guarantee");
+    expect(ControllerReuseStats::n_hits == hits + 1,
+           "spot-runner: the parent's controller should answer the child");
+    expect(ControllerReuseStats::n_guarantees_checked == checked + 1,
+           "spot-runner: under equal assumptions only the new guarantee "
+           "should be checked");
+    expect(ControllerReuseStats::n_stored == stored + 1,
+           "spot-runner: a query a controller answered stores no new one");
+
+    execs += expect_agrees(
+        storing,
+        spec({}, {req.m_answers, req.m_idle, req.m_answers_eventually}),
+        "the child without its assumption");
+    expect(ControllerReuseStats::n_hits == hits + 2,
+           "spot-runner: the controller should pass its own guarantees "
+           "without the assumption it never needed");
+    expect(ControllerReuseStats::n_guarantees_checked == checked + 4,
+           "spot-runner: under other assumptions every guarantee should be "
+           "checked");
+
+    execs += expect_agrees(
+        storing, spec({}, {req.m_answers, req.m_idle, req.m_withholds}),
+        "a guarantee the controller breaks");
+    expect(ControllerReuseStats::n_hits == hits + 2,
+           "spot-runner: a failed check must not answer the query");
+    expect(execs == 2,
+           "spot-runner: ltlsynt should run on the parent and on the query "
+           "no controller answered, and nowhere else");
+}
+
+// A controller that relies on its assumption: never asked, it never grants.
+// Without the assumption the query is unrealizable, and the check, which
+// cannot lean on the assumption either, must fail rather than answer it.
+TEST(test_controller_reuse_never_answers_unrealizable) {
+    using controller_reuse::expect_agrees;
+    using controller_reuse::spec;
+    const controller_reuse::Requirements req;
+    RealizabilityChecker storing;
+    storing.set_controller_reuse_min_guarantees(1);
+    const std::size_t attempts = ControllerReuseStats::n_attempts;
+    const std::size_t hits = ControllerReuseStats::n_hits;
+    expect_agrees(
+        storing,
+        spec({req.m_never_asks}, {req.m_answers, req.m_withholds, req.m_idle}),
+        "the guarded parent");
+    expect_agrees(storing, spec({}, {req.m_answers, req.m_withholds}),
+                  "the parent without its guard");
+    expect(ControllerReuseStats::n_attempts == attempts + 1 &&
+               ControllerReuseStats::n_hits == hits,
+           "spot-runner: the guarded controller should be tried and refused");
+}
+
+// Below the gate the store is never consulted and nothing joins it, so small
+// specifications run exactly as they did before it.
+TEST(test_controller_reuse_gate_skips_small_queries) {
+    using controller_reuse::spec;
+    const controller_reuse::Requirements req;
+    RealizabilityChecker checker;
+    const std::size_t stored = ControllerReuseStats::n_stored;
+    const std::size_t attempts = ControllerReuseStats::n_attempts;
+    realizable(checker, spec({}, {req.m_answers, req.m_idle}));
+    realizable(checker,
+               spec({}, {req.m_answers, req.m_idle, req.m_answers_eventually}));
+    expect(ControllerReuseStats::n_stored == stored &&
+               ControllerReuseStats::n_attempts == attempts,
+           "spot-runner: a query under ten guarantees should neither store "
+           "nor try a controller");
+}
+
 // SPOT 2.15.1's ltl2tgba exits 2 with "print_hoa(): automaton is complete but
 // prop_complete()==false" on formulae that reduce to a tautology. The wrapper
 // must treat that as the trivially-true (universal) automaton rather than

@@ -4,7 +4,7 @@ The external solvers, how their paths resolve, install rules and the container i
 
 ## External tools
 
-- `ltl2tgba`, `ltlsynt`: SPOT, built by `cmake/spot.cmake` and found via the `SPOT_BIN_DIR` macro.
+- `ltl2tgba`, `ltlsynt`, `ltlfilt`, `autfilt`: SPOT, built by `cmake/spot.cmake` and found via the `SPOT_BIN_DIR` macro.
 - `black`: linear temporal logic (LTL) satisfiability checker, from `PATH` or `cmake/black.cmake`. Always run it with a timeout, `black -t <seconds> ...`.
 - `ganak`: model counter, a release binary fetched by `cmake/ganak.cmake`.
 - `node`: runs the vendored FRET formaliser (`vendor/fretCLI.main.js`), found on `PATH` at run time and never fetched by CMake.

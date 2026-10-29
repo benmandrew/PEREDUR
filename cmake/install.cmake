@@ -77,11 +77,11 @@ install(DIRECTORY "${CMAKE_SOURCE_DIR}/examples"
     DESTINATION "${PEREDUR_DATA_DIR}" COMPONENT peredur)
 
 if(PEREDUR_INSTALL_TOOLS)
-    # Three of Spot's sixteen binaries are ever spawned; the other thirteen are
+    # Four of Spot's sixteen binaries are ever spawned; the other twelve are
     # tools nothing here calls. The static archives are excluded for the same
     # reason, nothing linking against them and libspot.a dwarfing the shared
     # library the image does load.
-    foreach(_spot_tool ltlsynt ltl2tgba ltlfilt)
+    foreach(_spot_tool ltlsynt ltl2tgba ltlfilt autfilt)
         peredur_install_wrapped_tool(
             NAME "${_spot_tool}"
             BINARY "${SPOT_BIN_DIR}/${_spot_tool}"

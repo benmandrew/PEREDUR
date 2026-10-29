@@ -94,7 +94,7 @@ Five paths are compiled in, and each takes an environment variable that wins ove
 
 | Variable | Overrides |
 |---|---|
-| `PEREDUR_SPOT_BIN_DIR` | the directory holding `ltlsynt`, `ltl2tgba` and `ltlfilt` |
+| `PEREDUR_SPOT_BIN_DIR` | the directory holding `ltlsynt`, `ltl2tgba`, `ltlfilt` and `autfilt` |
 | `PEREDUR_GANAK_PATH` | the `ganak` binary |
 | `PEREDUR_BLACK_PATH` | the `black` binary |
 | `PEREDUR_FORMALISER_SCRIPT` | the vendored FRET formaliser script |

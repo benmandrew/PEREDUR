@@ -223,7 +223,12 @@ namespace {
 // models the prefilter adds to its sampled words, and the ordered pairs only
 // a model word refuted. From this version `fingerprint_refuted` counts those
 // pairs too, so it reads higher than at 38 wherever a model separated a pair.
-constexpr int k_schema_version = 39;
+//
+// 40 added caches.realizability.controller_reuse: the realizability queries
+// put to a stored controller, those it answered, and the guarantee checks
+// that cost; and tool_calls.controller_check, the ltl2tgba and autfilt execs
+// behind them. tool_calls.ltlsynt.calls falls by the hits.
+constexpr int k_schema_version = 40;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -342,6 +347,12 @@ nlohmann::json tool_calls_json() {
                         RealizabilityChecker::n_cache_hits,
                         RealizabilityChecker::n_timeouts,
                         RealizabilityChecker::total_time_s)},
+        // The controller store's ltl2tgba and autfilt execs, apart from the
+        // counting path's ltl2tgba row.
+        {"controller_check", row(ControllerReuseStats::n_execs,
+                                 ControllerReuseStats::n_verdict_hits,
+                                 ControllerReuseStats::n_timeouts,
+                                 ControllerReuseStats::total_time_s)},
         // "calls" is black's own exec count, which parted company with the
         // cache-miss count when SPOT took the first stage: a miss now
         // reaches black only if SPOT left it undecided and its polarity
@@ -412,7 +423,16 @@ nlohmann::json caches_json() {
              {"rule_subsumed", RealizabilityChecker::n_rule_subsumed},
              // Decided by satisfiability, the query having no inputs.
              {"satisfiability_routed",
-              RealizabilityChecker::n_satisfiability_routed}}},
+              RealizabilityChecker::n_satisfiability_routed},
+             // Answered realizable by a controller ltlsynt emitted for
+             // another query; disjoint from the counts above.
+             {"controller_reuse",
+              {{"attempts", ControllerReuseStats::n_attempts},
+               {"hits", ControllerReuseStats::n_hits},
+               {"guarantees_checked",
+                ControllerReuseStats::n_guarantees_checked},
+               {"verdicts_recalled", ControllerReuseStats::n_verdict_hits},
+               {"stored", ControllerReuseStats::n_stored}}}}},
         {"count_traces",
          row(CountTracesStats::n_hits, CountTracesStats::n_misses)},
         {"ltl2tgba",

@@ -84,6 +84,15 @@ void print_cache_report() {
                      "satisfiability rather than by ltlsynt: "
                   << RealizabilityChecker::n_satisfiability_routed << "\n";
     }
+    if (ControllerReuseStats::n_attempts > 0) {
+        std::cout << "realizability queries answered by a stored controller: "
+                  << ControllerReuseStats::n_hits << " of "
+                  << ControllerReuseStats::n_attempts << " tried ("
+                  << ControllerReuseStats::n_guarantees_checked
+                  << " guarantees checked, "
+                  << ControllerReuseStats::n_verdict_hits << " recalled, "
+                  << ControllerReuseStats::n_stored << " controllers stored)\n";
+    }
 }
 
 void print_diagnostics_report() {
@@ -124,6 +133,12 @@ void print_diagnostics_report() {
               SatisfiabilityChecker::total_time_s,
               SatisfiabilityChecker::n_cache_hits,
               SatisfiabilityChecker::n_timeouts);
+    // The controller store's ltl2tgba and autfilt execs, kept apart from the
+    // counting path's ltl2tgba row.
+    print_row("ctl-check", ControllerReuseStats::n_execs,
+              ControllerReuseStats::total_time_s,
+              ControllerReuseStats::n_verdict_hits,
+              ControllerReuseStats::n_timeouts);
     // Untimed, so there is never a timeout to report.
     print_row("ganak", GanakStats::n_cache_misses, GanakStats::total_time_s,
               GanakStats::n_cache_hits, 0);
@@ -208,9 +223,10 @@ void print_cpu_report(double wall_s) {
     line("  ltlsynt", RealizabilityChecker::total_cpu_s);
     line("  black", SatisfiabilityChecker::total_cpu_s);
     line("  ganak", GanakStats::total_cpu_s);
+    line("  ctl-check", ControllerReuseStats::total_cpu_s);
     const double attributed =
         Ltl2tgbaStats::total_cpu_s + LtlfiltStats::total_cpu_s +
         RealizabilityChecker::total_cpu_s + SatisfiabilityChecker::total_cpu_s +
-        GanakStats::total_cpu_s;
+        GanakStats::total_cpu_s + ControllerReuseStats::total_cpu_s;
     line("  unattributed", child_cpu - attributed);
 }
