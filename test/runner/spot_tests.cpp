@@ -235,6 +235,61 @@ TEST(test_subsumption_agrees_with_ltlsynt) {
            "one of these queries without an exec");
 }
 
+// The rule pass settles a query that replaces a requirement of a decided one
+// with a requirement the rules order, which inclusion never matches. Each
+// query below replaces one requirement of the one before it, in the direction
+// its verdict carries over: a weaker guarantee under a realizable entry, a
+// stronger guarantee or a weaker assumption under an unrealizable one.
+TEST(test_rule_subsumption_agrees_with_ltlsynt) {
+    const auto requirement = [](const std::string& condition,
+                                const std::string& response,
+                                const std::string& timing) {
+        return R"({"condition": ")" + condition +
+               R"(", "condition-type": "continual", "response": ")" + response +
+               R"(", "timing": )" + timing + "}";
+    };
+    const std::string within = R"({"type": "WithinTicks", "ticks": 3})";
+    const std::string eventually = R"({"type": "Eventually"})";
+    const std::string immediately = R"({"type": "Immediately"})";
+    const std::string always = R"({"type": "Always"})";
+    const std::string silent = requirement("true", "!grant", always);
+    const auto spec = [](const std::vector<std::string>& assumptions,
+                         const std::vector<std::string>& guarantees) {
+        const auto join = [](const std::vector<std::string>& items) {
+            std::string joined;
+            for (const std::string& item : items) {
+                joined += (joined.empty() ? "" : ", ") + item;
+            }
+            return joined;
+        };
+        return parse_specification_json(
+            R"({"assumptions": [)" + join(assumptions) +
+            R"(], "guarantees": [)" + join(guarantees) +
+            R"(], "in_atoms": ["req"], "out_atoms": ["grant"]})");
+    };
+    const std::vector<Specification> queries = {
+        spec({}, {requirement("req", "grant", within)}),
+        spec({}, {requirement("req", "grant", eventually)}),
+        spec({}, {requirement("req", "grant", within), silent}),
+        spec({}, {requirement("req", "grant", immediately), silent}),
+        spec({requirement("true", "req", always)},
+             {requirement("req", "grant", immediately), silent}),
+        spec({requirement("true", "req", eventually)},
+             {requirement("req", "grant", immediately), silent}),
+    };
+    RealizabilityChecker ordering;
+    const std::size_t before = RealizabilityChecker::n_rule_subsumed;
+    for (const Specification& query : queries) {
+        RealizabilityChecker fresh;
+        expect(realizable(ordering, query) == realizable(fresh, query),
+               "spot-runner: the rule pass disagreed with ltlsynt on " +
+                   query.to_ltl());
+    }
+    expect(RealizabilityChecker::n_rule_subsumed == before + 3,
+           "spot-runner: the rule pass should settle the three ordered "
+           "replacements without an exec");
+}
+
 // SPOT 2.15.1's ltl2tgba exits 2 with "print_hoa(): automaton is complete but
 // prop_complete()==false" on formulae that reduce to a tautology. The wrapper
 // must treat that as the trivially-true (universal) automaton rather than

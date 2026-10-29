@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <bitset>
 #include <cassert>
 #include <chrono>
 #include <cstdlib>
@@ -20,6 +21,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "filter/implication_check.hpp"
 #include "formula_key.hpp"
 #include "requirement.hpp"
 #include "runner/formula_input.hpp"
@@ -245,13 +247,50 @@ bool includes_sorted(const std::vector<int>& superset,
                          subset.end());
 }
 
+// A query replacing more conjuncts than this is not ordered against an entry:
+// past a few, the rule calls cost more than the scan saves.
+constexpr std::size_t k_rule_difference_cap = 4;
+
+// The ids of @p lhs missing from @p rhs, into @p out, or false once there are
+// more than k_rule_difference_cap. A bit of the signature difference is at
+// least one missing id, so the popcount rejects most entries before the walk.
+bool bounded_difference(const std::vector<int>& lhs,
+                        std::uint64_t lhs_signature,
+                        const std::vector<int>& rhs,
+                        std::uint64_t rhs_signature, std::vector<int>& out) {
+    if (std::bitset<64>(lhs_signature & ~rhs_signature).count() >
+        k_rule_difference_cap) {
+        return false;
+    }
+    out.clear();
+    auto cursor = rhs.begin();
+    for (const int conjunct_id : lhs) {
+        while (cursor != rhs.end() && *cursor < conjunct_id) {
+            ++cursor;
+        }
+        if (cursor != rhs.end() && *cursor == conjunct_id) {
+            continue;
+        }
+        if (out.size() == k_rule_difference_cap) {
+            return false;
+        }
+        out.push_back(conjunct_id);
+    }
+    return true;
+}
+
 }  // namespace
 
 std::vector<int> RealizabilityChecker::intern_side(
-    const std::vector<std::string>& conjuncts) {
+    const std::vector<std::string>& conjuncts,
+    const std::vector<const Requirement*>& requirements) {
+    assert(requirements.empty() || requirements.size() == conjuncts.size());
     std::vector<int> ids;
     ids.reserve(conjuncts.size());
-    for (const std::string& conjunct : conjuncts) {
+    for (std::size_t position = 0; position < conjuncts.size(); ++position) {
+        const std::string& conjunct = conjuncts[position];
+        const Requirement* requirement =
+            requirements.empty() ? nullptr : requirements[position];
         // Canonically, so that a re-spelling of a conjunct is still the same
         // conjunct -- which is the whole reason two candidates differing in
         // one slot are comparable at all.
@@ -265,13 +304,20 @@ std::vector<int> RealizabilityChecker::intern_side(
                 : conjunct.substr(0, separator + 1) +
                       formula_key::canonical(conjunct.substr(separator + 1));
         const auto found = m_conjunct_ids.find(key);
-        if (found != m_conjunct_ids.end()) {
-            ids.push_back(found->second);
-            continue;
+        const int conjunct_id = found != m_conjunct_ids.end()
+                                    ? found->second
+                                    : static_cast<int>(m_conjunct_ids.size());
+        if (found == m_conjunct_ids.end()) {
+            m_conjunct_ids.emplace(key, conjunct_id);
+            m_conjunct_requirements.emplace_back();
         }
-        const int fresh = static_cast<int>(m_conjunct_ids.size());
-        m_conjunct_ids.emplace(key, fresh);
-        ids.push_back(fresh);
+        // Any requirement lowering to this conjunct stands for all of them,
+        // the rules being sound for the formula whichever one is asked.
+        auto& stored = m_conjunct_requirements[conjunct_id];
+        if (!stored.has_value() && requirement != nullptr) {
+            stored = *requirement;
+        }
+        ids.push_back(conjunct_id);
     }
     std::sort(ids.begin(), ids.end());
     ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
@@ -310,6 +356,80 @@ std::optional<bool> RealizabilityChecker::subsumed_verdict(
     return std::nullopt;
 }
 
+bool RealizabilityChecker::rule_implies(int stronger, int weaker) {
+    const std::uint64_t key = (static_cast<std::uint64_t>(stronger) << 32U) |
+                              static_cast<std::uint32_t>(weaker);
+    const auto found = m_rule_verdicts.find(key);
+    if (found != m_rule_verdicts.end()) {
+        return found->second;
+    }
+    const std::optional<Requirement>& strong =
+        m_conjunct_requirements[stronger];
+    const std::optional<Requirement>& weak = m_conjunct_requirements[weaker];
+    const bool holds = strong.has_value() && weak.has_value() &&
+                       requirement_implies(*strong, *weak);
+    m_rule_verdicts.emplace(key, holds);
+    return holds;
+}
+
+// The monotone argument of subsumed_verdict with the inclusions relaxed: a
+// conjunct one side lacks may be implied by one the other side replaced it
+// with. A query differs from an earlier one mostly by a mutated requirement or
+// two, which inclusion never matches and the rules often order.
+std::optional<bool> RealizabilityChecker::rule_subsumed_verdict(
+    const std::string& scope, const std::vector<int>& assumptions,
+    const std::vector<int>& guarantees) {
+    const auto bucket = m_decided.find(scope);
+    if (bucket == m_decided.end()) {
+        return std::nullopt;
+    }
+    const std::uint64_t assumption_signature = signature_of(assumptions);
+    const std::uint64_t guarantee_signature = signature_of(guarantees);
+    // Every id in @p needed implied by one in @p offered.
+    const auto covered = [this](const std::vector<int>& needed,
+                                const std::vector<int>& offered) {
+        return std::all_of(needed.begin(), needed.end(), [&](int weaker) {
+            return std::any_of(
+                offered.begin(), offered.end(),
+                [&](int stronger) { return rule_implies(stronger, weaker); });
+        });
+    };
+    std::vector<int> entry_assumptions;
+    std::vector<int> query_assumptions;
+    std::vector<int> entry_guarantees;
+    std::vector<int> query_guarantees;
+    for (const Decided& entry : bucket->second) {
+        if (!bounded_difference(entry.m_assumptions,
+                                entry.m_assumption_signature, assumptions,
+                                assumption_signature, entry_assumptions) ||
+            !bounded_difference(
+                assumptions, assumption_signature, entry.m_assumptions,
+                entry.m_assumption_signature, query_assumptions) ||
+            !bounded_difference(entry.m_guarantees, entry.m_guarantee_signature,
+                                guarantees, guarantee_signature,
+                                entry_guarantees) ||
+            !bounded_difference(guarantees, guarantee_signature,
+                                entry.m_guarantees, entry.m_guarantee_signature,
+                                query_guarantees)) {
+            continue;
+        }
+        if (entry.m_realizable) {
+            // The query's premise implies the entry's, and the entry's
+            // guarantees imply the query's.
+            if (covered(entry_assumptions, query_assumptions) &&
+                covered(query_guarantees, entry_guarantees)) {
+                return true;
+            }
+            continue;
+        }
+        if (covered(query_assumptions, entry_assumptions) &&
+            covered(entry_guarantees, query_guarantees)) {
+            return false;
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<bool> RealizabilityChecker::check_realizability(
     const Specification& specification) {
     const std::string conj_ltl = specification.to_ltl();
@@ -317,11 +437,13 @@ std::optional<bool> RealizabilityChecker::check_realizability(
     for (const Requirement& requirement : specification.m_assumptions) {
         if (!requirement.m_removed) {
             sides.m_assumptions.push_back(requirement.m_ltl);
+            sides.m_assumption_requirements.push_back(&requirement);
         }
     }
     for (const Requirement& requirement : specification.m_guarantees) {
         if (!requirement.m_removed) {
             sides.m_guarantees.push_back(requirement.m_ltl);
+            sides.m_guarantee_requirements.push_back(&requirement);
         }
     }
     return check_realizability_ltl(conj_ltl, environment_signals(specification),
@@ -371,8 +493,10 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
             return found->second;
         }
         if (have_sides) {
-            assumption_ids = intern_side(sides.m_assumptions);
-            guarantee_ids = intern_side(sides.m_guarantees);
+            assumption_ids = intern_side(sides.m_assumptions,
+                                         sides.m_assumption_requirements);
+            guarantee_ids =
+                intern_side(sides.m_guarantees, sides.m_guarantee_requirements);
             if (const auto verdict =
                     subsumed_verdict(scope, assumption_ids, guarantee_ids,
                                      signature_of(assumption_ids),
@@ -380,6 +504,12 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
                 n_subsumed++;
                 // Memoised like any other answer, so the scan is paid once per
                 // distinct query rather than once per occurrence.
+                m_cache.emplace(cache_key, verdict);
+                return verdict;
+            }
+            if (const auto verdict = rule_subsumed_verdict(
+                    scope, assumption_ids, guarantee_ids)) {
+                n_rule_subsumed++;
                 m_cache.emplace(cache_key, verdict);
                 return verdict;
             }

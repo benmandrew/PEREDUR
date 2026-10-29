@@ -210,7 +210,10 @@ namespace {
 //
 // 36 added implication.rule_covered: the requirements a structural rule
 // proved implied while building that shortened destination.
-constexpr int k_schema_version = 36;
+//
+// 37 added caches.realizability.rule_subsumed: the realizability queries
+// settled from a decided one by ordering the requirements they replaced.
+constexpr int k_schema_version = 37;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -384,12 +387,14 @@ nlohmann::json caches_json() {
         {"satisfiability", row(SatisfiabilityChecker::n_cache_hits,
                                SatisfiabilityChecker::n_cache_misses)},
         {"realizability",
-         nlohmann::json{{"hits", RealizabilityChecker::n_cache_hits},
-                        {"misses", RealizabilityChecker::n_cache_misses},
-                        // Answered from the monotone subsumption table rather
-                        // than by an exec. Not a hit: a hit is the same
-                        // question asked twice.
-                        {"subsumed", RealizabilityChecker::n_subsumed}}},
+         nlohmann::json{
+             {"hits", RealizabilityChecker::n_cache_hits},
+             {"misses", RealizabilityChecker::n_cache_misses},
+             // Answered from the monotone subsumption table rather
+             // than by an exec. Not a hit: a hit is the same
+             // question asked twice.
+             {"subsumed", RealizabilityChecker::n_subsumed},
+             {"rule_subsumed", RealizabilityChecker::n_rule_subsumed}}},
         {"count_traces",
          row(CountTracesStats::n_hits, CountTracesStats::n_misses)},
         {"ltl2tgba",

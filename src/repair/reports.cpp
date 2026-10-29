@@ -74,6 +74,11 @@ void print_cache_report() {
                      "rather than by an exec: "
                   << RealizabilityChecker::n_subsumed << "\n";
     }
+    if (RealizabilityChecker::n_rule_subsumed > 0) {
+        std::cout << "realizability queries answered by ordering the "
+                     "requirements they replaced: "
+                  << RealizabilityChecker::n_rule_subsumed << "\n";
+    }
 }
 
 void print_diagnostics_report() {
