@@ -453,6 +453,11 @@ TEST(test_count_traces_beyond_128_bits) {
         {"G(a | b)", 10, 20, power_of_three(20) * exact_power_of_two(8 * 20)},
     };
     for (const WideCase& wide : cases) {
+        // Where long double is only a double (arm64), 2^1024 is the ceiling and
+        // the deep cases' expected counts are already infinite.
+        if (!std::isfinite(wide.m_expected)) {
+            continue;
+        }
         const TransferSystem system =
             build_transfer_system_from_ltl(wide.m_ltl, wide.m_n_atoms);
         expect_exact_count(
@@ -559,7 +564,8 @@ TEST(test_count_traces_rounds_faithfully_above_64_bits) {
         actual > exact_power_of_two(64),
         "precondition: the count must exceed 2^64 for rounding to be in play");
     const Count relative_error = std::fabs(actual - reference) / reference;
-    expect(relative_error < 1e-16,
+    // About 1e-16 for x87's 64-bit mantissa, scaled for a narrower one.
+    expect(relative_error < 1024 * std::numeric_limits<Count>::epsilon(),
            "count_traces: a count past 2^64 must round faithfully (relative "
            "error " +
                std::to_string(static_cast<double>(relative_error)) + ")");

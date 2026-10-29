@@ -1,7 +1,10 @@
 #include <algorithm>
+#include <chrono>
+#include <cstddef>
 #include <functional>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -10,6 +13,7 @@
 #include "requirement.hpp"
 #include "runner/formaliser.hpp"
 #include "runner/ltlfilt.hpp"
+#include "runner/process.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
 
@@ -69,6 +73,47 @@ Scope make_scope(ScopeKind kind) {
 // to a.
 bool ltl_implies(const std::string& lhs, const std::string& rhs) {
     return ltl_equivalent("(" + lhs + ") & (" + rhs + ")", "(" + lhs + ")");
+}
+
+struct Implication {
+    std::string m_lhs;
+    std::string m_rhs;
+};
+
+// Decides every `lhs -> rhs` in one ltlfilt run. ltl_implies pays one exec per
+// query, 9.6 ms each on the debug build, and the order table alone asks 1,232.
+// An implication holds exactly when lhs & !rhs is unsatisfiable, and %L prints
+// the input line of each satisfiable one. Where ltl_equivalent passes an
+// inconclusive answer, this fails the test.
+std::vector<bool> ltl_implications(const std::vector<Implication>& queries) {
+    std::string input;
+    for (const Implication& query : queries) {
+        input += "(" + query.m_lhs + ") & !(" + query.m_rhs + ")\n";
+    }
+    const ProcessResult result = execute_and_capture_with_input(
+        {ltlfilt_path(), "--satisfiable", "--format=%L", "-F", "-"}, input,
+        std::chrono::milliseconds{60'000});
+    // ltlfilt exits 0 when some line matched and 1 when none did.
+    expect(result.m_exit_code == 0 || result.m_exit_code == 1,
+           "scope: ltlfilt could not decide the implication batch (exit " +
+               std::to_string(result.m_exit_code) + "): " + result.m_output);
+    std::vector<bool> holds(queries.size(), true);
+    std::istringstream lines(result.m_output);
+    std::string line;
+    while (std::getline(lines, line)) {
+        const bool numeric =
+            !line.empty() &&
+            std::all_of(line.begin(), line.end(), [](char character) {
+                return character >= '0' && character <= '9';
+            });
+        expect(numeric, "scope: stray ltlfilt output `" + line + "`");
+        const std::size_t number = std::stoul(line);
+        expect(number >= 1 && number <= queries.size(),
+               "scope: ltlfilt named line " + line + " of " +
+                   std::to_string(queries.size()));
+        holds[number - 1] = false;
+    }
+    return holds;
 }
 
 // --- The lowering against the vendored FRET formaliser --------------------
@@ -169,11 +214,20 @@ std::vector<Edge> expected_edges(const Timing& tim, ConditionType ctype) {
     return {{ScopeKind::Global, ScopeKind::Before}, notin_before};
 }
 
-// Checks every ordered pair of scopes at one (timing, condition type) cell
-// against what scope_order claims for it. The non-edges are checked too: a
-// missing edge that actually holds costs the search reach, and a claimed edge
-// that does not hold is unsound.
-void check_order_cell(const Timing& tim, ConditionType ctype) {
+// One ordered pair of scopes at one (timing, condition type) cell, and whether
+// scope_order claims the edge between them.
+struct OrderQuery {
+    Implication m_implication;
+    std::string m_where;
+    bool m_claimed = false;
+};
+
+// Queues every ordered pair of scopes at one (timing, condition type) cell, to
+// be checked against what scope_order claims for it. The non-edges are checked
+// too: a missing edge that actually holds costs the search reach, and a
+// claimed edge that does not hold is unsound.
+void collect_order_cell(const Timing& tim, ConditionType ctype,
+                        std::vector<OrderQuery>& queries) {
     const std::vector<Edge> edges = expected_edges(tim, ctype);
     const auto claimed = [&edges](ScopeKind from, ScopeKind target) {
         return std::any_of(
@@ -186,9 +240,6 @@ void check_order_cell(const Timing& tim, ConditionType ctype) {
             if (lhs.m_kind == rhs.m_kind) {
                 continue;
             }
-            const bool holds =
-                ltl_implies(scoped(make_scope(lhs.m_kind), tim, ctype).m_ltl,
-                            scoped(make_scope(rhs.m_kind), tim, ctype).m_ltl);
             std::string where(lhs.m_name);
             where += " => ";
             where += rhs.m_name;
@@ -196,14 +247,11 @@ void check_order_cell(const Timing& tim, ConditionType ctype) {
             where += to_string(tim);
             where +=
                 ctype == ConditionType::Trigger ? " / trigger" : " / continual";
-            if (claimed(lhs.m_kind, rhs.m_kind)) {
-                expect(
-                    holds,
-                    "scope_order claims an edge that does not hold: " + where);
-            } else {
-                expect(!holds,
-                       "scope_order is missing an edge that holds: " + where);
-            }
+            queries.push_back(
+                {{scoped(make_scope(lhs.m_kind), tim, ctype).m_ltl,
+                  scoped(make_scope(rhs.m_kind), tim, ctype).m_ltl},
+                 where,
+                 claimed(lhs.m_kind, rhs.m_kind)});
         }
     }
 }
@@ -272,6 +320,9 @@ TEST(test_environment_signals_appends_modes) {
 // expands far larger.
 TEST(test_scope_agrees_with_formaliser) {
     RequirementFormaliser formaliser(formaliser_command());
+    // Equivalence as an implication each way, so one ltlfilt run decides all.
+    std::vector<Implication> implications;
+    std::vector<std::string> messages;
     for (const ScopeCase& scope_case : scope_cases()) {
         for (const ConditionType ctype :
              {ConditionType::Trigger, ConditionType::Continual}) {
@@ -300,9 +351,15 @@ TEST(test_scope_agrees_with_formaliser) {
                 message += "\n  FRETish: " + fretish;
                 message += "\n  ours:    " + req.m_ltl;
                 message += "\n  CLI:     " + cli;
-                expect(ltl_equivalent(req.m_ltl, cli), message);
+                implications.push_back({req.m_ltl, cli});
+                implications.push_back({cli, req.m_ltl});
+                messages.push_back(message);
             }
         }
+    }
+    const std::vector<bool> holds = ltl_implications(implications);
+    for (std::size_t idx = 0; idx < messages.size(); ++idx) {
+        expect(holds[2 * idx] && holds[(2 * idx) + 1], messages[idx]);
     }
 }
 
@@ -357,6 +414,10 @@ TEST(test_scope_lowering_parses_to_its_own_atoms) {
 // coinciding cell to the dual timing. The converse is checked too, since a
 // cell that stopped being strict would make the arm a no-op there.
 TEST(test_condition_type_order_is_pinned) {
+    // Per cell, continual => trigger then trigger => continual.
+    std::vector<Implication> implications;
+    std::vector<std::string> wheres;
+    std::vector<bool> coincides;
     for (const ScopeCase& scope_case : scope_cases()) {
         for (const Timing& tim : timing_cases()) {
             const Scope scope = make_scope(scope_case.m_kind);
@@ -364,19 +425,25 @@ TEST(test_condition_type_order_is_pinned) {
                 scoped(scope, tim, ConditionType::Continual).m_ltl;
             const std::string trigger =
                 scoped(scope, tim, ConditionType::Trigger).m_ltl;
-            const std::string where =
-                std::string(scope_case.m_name) + " / " + to_string(tim);
-            expect(ltl_implies(continual, trigger),
-                   "condition type: continual must imply trigger at " + where);
-            const bool coincide =
+            implications.push_back({continual, trigger});
+            implications.push_back({trigger, continual});
+            wheres.push_back(std::string(scope_case.m_name) + " / " +
+                             to_string(tim));
+            coincides.push_back(
                 is_only_scope(scope_case.m_kind)
                     ? std::holds_alternative<timing::Eventually>(tim)
-                    : std::holds_alternative<timing::Always>(tim);
-            expect(ltl_implies(trigger, continual) == coincide,
-                   std::string("condition type: trigger ") +
-                       (coincide ? "must" : "must not") +
-                       " imply continual at " + where);
+                    : std::holds_alternative<timing::Always>(tim));
         }
+    }
+    const std::vector<bool> holds = ltl_implications(implications);
+    for (std::size_t idx = 0; idx < wheres.size(); ++idx) {
+        expect(
+            holds[2 * idx],
+            "condition type: continual must imply trigger at " + wheres[idx]);
+        expect(holds[(2 * idx) + 1] == coincides[idx],
+               std::string("condition type: trigger ") +
+                   (coincides[idx] ? "must" : "must not") +
+                   " imply continual at " + wheres[idx]);
     }
 }
 
@@ -386,10 +453,27 @@ TEST(test_scope_order_is_pinned) {
     std::vector<Timing> timings = timing_cases();
     timings.push_back(timing::until(Formula("s & t")));
     timings.push_back(timing::before(Formula("s & t")));
+    std::vector<OrderQuery> queries;
     for (const ConditionType ctype :
          {ConditionType::Trigger, ConditionType::Continual}) {
         for (const Timing& tim : timings) {
-            check_order_cell(tim, ctype);
+            collect_order_cell(tim, ctype, queries);
+        }
+    }
+    std::vector<Implication> implications;
+    implications.reserve(queries.size());
+    for (const OrderQuery& query : queries) {
+        implications.push_back(query.m_implication);
+    }
+    const std::vector<bool> holds = ltl_implications(implications);
+    for (std::size_t idx = 0; idx < queries.size(); ++idx) {
+        if (queries[idx].m_claimed) {
+            expect(holds[idx],
+                   "scope_order claims an edge that does not hold: " +
+                       queries[idx].m_where);
+        } else {
+            expect(!holds[idx], "scope_order is missing an edge that holds: " +
+                                    queries[idx].m_where);
         }
     }
 }

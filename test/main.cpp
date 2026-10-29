@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <chrono>
+#include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <stdexcept>
@@ -105,10 +107,21 @@ void expect_every_test_is_reachable() {
     }
 }
 
+// PEREDUR_TEST_TIMES=1 prints each test's wall time to stderr, which is how a
+// slow suite is narrowed to the test worth shrinking.
 void run_registered(std::string_view registry_suite) {
+    static const bool print_times =
+        std::getenv("PEREDUR_TEST_TIMES") != nullptr;
     for (const TestCase& test : test_registry()) {
         if (test.m_suite == registry_suite) {
+            const auto start = std::chrono::steady_clock::now();
             test.m_run();
+            if (print_times) {
+                const std::chrono::duration<double, std::milli> elapsed =
+                    std::chrono::steady_clock::now() - start;
+                std::cerr << test.m_suite << '.' << test.m_name << ' '
+                          << elapsed.count() << " ms\n";
+            }
         }
     }
 }
