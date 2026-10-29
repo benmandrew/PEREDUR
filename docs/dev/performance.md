@@ -52,7 +52,7 @@ The gate now takes the run's status objective (`status_objective_of`) and grades
 
 ## Implication prefilter
 
-The implication filter already runs saturated, so it gets cheaper only by asking the solver fewer pairs. `fingerprint::prefilter` (`src/fingerprint/prefilter.hpp`) evaluates each lowered formula on 256 *lasso words* (ultimately periodic, at most five positions) and packs the results into a bitset. A word that A accepts and B rejects refutes `A -> B`, so `refutes_implication` compares two machine words. On a 421-candidate `round-robin-arbiter-aurus` set it refuted 95.9% of ordered pairs; the FRETISH rate is unmeasured.
+The implication filter already runs saturated, so it gets cheaper only by asking the solver fewer pairs. `fingerprint::prefilter` (`src/fingerprint/prefilter.hpp`) evaluates each lowered formula on 256 *lasso words* (ultimately periodic, at most five positions) and packs the results into a bitset. A word that A accepts and B rejects refutes `A -> B`, so `refutes_implication` compares two machine words. On a 421-candidate `round-robin-arbiter-aurus` set it refuted 95.9% of ordered pairs. On FRETISH (seed 1, population 100, 10 generations) it refuted 39.6% on `mode-arbiter` and 52.6% on `fsm-combined`, and none on `lift-plus-cruise-mini`. That spec has 48 guarantees over 20 outputs and no inputs, and none of its 56 written repairs accepts any of the 256 words, so every fingerprint is zero and no word separates a pair. Random words cannot refute anything on a spec whose guarantees constrain most of its signals at every step.
 
 It is sound because a word can refute an implication but never confirm one, so unrefuted pairs still reach the solver and output is byte-identical. For the same reason there is no config key.
 
