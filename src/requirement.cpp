@@ -405,6 +405,103 @@ bool is_only_scope(ScopeKind kind) {
            kind == ScopeKind::OnlyAfter;
 }
 
+namespace {
+
+// The Global-scope order behind timing_implies, reflexive.
+bool global_timing_implies(const Timing& upper, const Timing& lower) {
+    if (upper == lower) {
+        return true;
+    }
+    return std::visit(
+        [](const auto& strong, const auto& weak) -> bool {
+            using S = std::decay_t<decltype(strong)>;
+            using W = std::decay_t<decltype(weak)>;
+            constexpr bool from_for = std::is_same_v<S, timing::ForTicks>;
+            constexpr bool from_point =
+                std::is_same_v<S, timing::Immediately> ||
+                std::is_same_v<S, timing::NextTimepoint>;
+            constexpr bool from_deadline =
+                std::is_same_v<S, timing::WithinTicks> ||
+                std::is_same_v<S, timing::AfterTicks>;
+            constexpr bool from_bottom_or_stop =
+                std::is_same_v<S, timing::Eventually> ||
+                timing::k_carries_stop<S>;
+            constexpr bool into_within = std::is_same_v<W, timing::WithinTicks>;
+            constexpr bool into_point_or_within =
+                std::is_same_v<W, timing::Immediately> ||
+                std::is_same_v<W, timing::NextTimepoint> || into_within;
+            if constexpr (std::is_same_v<S, timing::Always>) {
+                return !std::is_same_v<W, timing::AfterTicks> &&
+                       !std::is_same_v<W, timing::Before>;
+            } else if constexpr (std::is_same_v<W, timing::Eventually>) {
+                return !timing::k_carries_stop<S>;
+            } else if constexpr (from_for) {
+                if constexpr (std::is_same_v<W, timing::ForTicks>) {
+                    return strong.m_ticks > weak.m_ticks;
+                }
+                return into_point_or_within;
+            } else if constexpr (from_point) {
+                return into_within;
+            } else if constexpr (from_deadline) {
+                if constexpr (into_within) {
+                    return weak.m_ticks > strong.m_ticks;
+                }
+                return false;
+            } else if constexpr (from_bottom_or_stop) {
+                return false;
+            } else {
+                static_assert(timing::k_unhandled_timing<S>);
+            }
+        },
+        upper, lower);
+}
+
+}  // namespace
+
+bool timing_implies(const Timing& stronger, const Timing& weaker,
+                    ScopeKind scope) {
+    switch (scope) {
+        case ScopeKind::Global:
+        case ScopeKind::After:
+            return global_timing_implies(stronger, weaker);
+        case ScopeKind::In:
+        case ScopeKind::NotIn:
+        case ScopeKind::Before: {
+            const bool discharged_at_boundary =
+                std::holds_alternative<timing::NextTimepoint>(stronger) ||
+                std::holds_alternative<timing::WithinTicks>(stronger) ||
+                std::holds_alternative<timing::AfterTicks>(stronger);
+            if (discharged_at_boundary &&
+                std::holds_alternative<timing::Eventually>(weaker)) {
+                return false;
+            }
+            return global_timing_implies(stronger, weaker);
+        }
+        case ScopeKind::OnlyIn:
+        case ScopeKind::OnlyBefore:
+        case ScopeKind::OnlyAfter: {
+            if (std::holds_alternative<timing::Eventually>(stronger) &&
+                std::holds_alternative<timing::Before>(weaker)) {
+                return true;
+            }
+            if (std::holds_alternative<timing::Always>(weaker)) {
+                if (std::holds_alternative<timing::Until>(stronger)) {
+                    return false;
+                }
+                const bool for_or_next =
+                    std::holds_alternative<timing::ForTicks>(stronger) ||
+                    std::holds_alternative<timing::NextTimepoint>(stronger);
+                if (scope != ScopeKind::OnlyBefore && for_or_next) {
+                    return false;
+                }
+            }
+            return global_timing_implies(weaker, stronger);
+        }
+    }
+    assert(false);
+    __builtin_unreachable();
+}
+
 Requirement::Requirement(Formula condition, Formula response, Timing timing,
                          ConditionType condition_type, bool weakenable,
                          bool removed, Scope scope)

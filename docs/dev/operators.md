@@ -92,6 +92,14 @@ A weaker guarantee timing helps realizability and costs nothing on similarity, s
 
 `move_off_extreme` reads the pool before touching the `RandomSource`, so an empty pool costs no draw, and no golden specification has an Always guarantee.
 
+## Scope-aware timing moves
+
+Every timing step above is an edge of the Global order, and a scope changes which edges hold. `timing_implies` (`src/requirement.cpp`) states the order for each scope, measured with SPOT over 14 timings, 8 scopes and both condition types (2,912 ordered pairs, condition type moving none). `test_timing_order_is_pinned` re-derives every edge and non-edge with tick counts up to 4.
+
+The After scope keeps the Global order. In, NotIn and Before drop the edges from `next`, `within n` and `after n` into Eventually, because the bounded lowering discharges those three when the interval closes (`boundary | X r`), while a bounded Eventually (`!boundary U r`) is not discharged. The only scopes negate the obligation through `dual_timing`, so their order is the Global one reversed, with `eventually` also above `before s`. In that reversed order `until s` is not below Always, and under OnlyIn and OnlyAfter neither `for n` nor `next` is.
+
+`mutate_timing` takes the requirement's scope. Under an only scope it runs the opposite operator, which is a step in the asked direction once the order is reversed. Any step that is not an edge of the scope's order returns the timing unchanged. The step is drawn before the check, so the draw count is the same under every scope, and under Global and After no step is refused (an `assert` holds this). The two moves refused under In, NotIn and Before are the Eventually branch of `weaken_within_timing` and a strengthened Eventually drawing a donated `next`. `test_timing_mutation_moves_in_direction_under_every_scope` checks each move against SPOT, and the Global-only operator fails it at its first weakening under In.
+
 ## Removable guarantees
 
 `p_remove_guarantee` (default 0.05, matching `p_add_assumption`) deletes one FRETISH guarantee or one TLSF conjunct from PRESET, ASSERT and GUARANTEE. Some ideals need it: amba, full-arbiter, load-balancer, prioritized-arbiter and round-robin-arbiter have only `drop-*` ideals. `lint-ideals`' `reachable` check asserts a guarantee side may shrink, never grow, to a floor of one.

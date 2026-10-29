@@ -636,13 +636,25 @@ std::vector<Timing> collect_timing_pool(const Specification& specification) {
     return pool;
 }
 
-Timing mutate_timing(const Timing& timing, Direction direction,
+Timing mutate_timing(const Timing& timing, Direction direction, ScopeKind scope,
                      const std::vector<Timing>& timing_pool,
                      const RandomSource& random_source) {
     assert(random_source);
-    return direction == Direction::Strengthen
-               ? strengthen_timing(timing, timing_pool, random_source)
-               : weaken_timing(timing, timing_pool, random_source);
+    // Both operators step through the Global order, which the only scopes
+    // reverse, so there the opposite operator is the one moving in direction.
+    const bool strengthen =
+        (direction == Direction::Strengthen) != is_only_scope(scope);
+    Timing moved = strengthen
+                       ? strengthen_timing(timing, timing_pool, random_source)
+                       : weaken_timing(timing, timing_pool, random_source);
+    // The other scopes drop edges from the Global order, and a step along a
+    // dropped edge is refused. Every step is an edge under Global and After,
+    // so their moves, and the draws that pick them, are unchanged.
+    const bool sound = direction == Direction::Strengthen
+                           ? timing_implies(moved, timing, scope)
+                           : timing_implies(timing, moved, scope);
+    assert(sound || (scope != ScopeKind::Global && scope != ScopeKind::After));
+    return sound ? moved : timing;
 }
 
 Requirement mutate_requirement(const Requirement& requirement,
@@ -671,6 +683,7 @@ Requirement mutate_requirement(const Requirement& requirement,
     }
     if (random_source.next_real() < cfg.p_timing) {
         mutated.m_timing = mutate_timing(requirement.m_timing, direction,
+                                         requirement.m_scope.m_kind,
                                          timing_pool, random_source);
     }
     // Read off the mutated timing, which the arm above may have just moved onto

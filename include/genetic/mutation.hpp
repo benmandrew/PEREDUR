@@ -54,14 +54,23 @@ enum class Direction : std::uint8_t { Weaken, Strengthen };
 /// Timings are the same kind of resource as atom names in mutate_formula: drawn
 /// from the specification, not invented.
 ///
+/// The steps above are those of the Global order, and @p scope decides what
+/// they mean (timing_implies). Under Global and After every step moves in
+/// @p direction. The only scopes reverse the order, so the opposite step is
+/// taken. A step that is not an edge of @p scope's order returns @p timing
+/// unchanged, at the same cost in draws: under In, NotIn and Before a step
+/// into Eventually from `next` or `within`, and under the only scopes a step
+/// into Always from `until s`, or from `for n` under OnlyIn and OnlyAfter.
+///
 /// @param timing        The timing value to mutate
 /// @param direction     Whether to weaken or strengthen the timing
+/// @param scope         The scope of the requirement carrying @p timing
 /// @param timing_pool   Timings occurring in the specification, donating the
 ///                      timings a weakened Always or strengthened Eventually
 ///                      may take
 /// @param random_source Random source for branch and selector choices
 /// @return              A mutated timing value
-Timing mutate_timing(const Timing& timing, Direction direction,
+Timing mutate_timing(const Timing& timing, Direction direction, ScopeKind scope,
                      const std::vector<Timing>& timing_pool,
                      const RandomSource& random_source);
 

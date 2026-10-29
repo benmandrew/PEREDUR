@@ -151,6 +151,34 @@ inline Scope global_scope() { return Scope{}; }
 /// obligation and applies it outside the named interval.
 bool is_only_scope(ScopeKind kind);
 
+/// Whether a requirement on timing @p stronger implies the same requirement on
+/// timing @p weaker under a @p scope of that kind, all other fields equal.
+/// Reflexive. The condition type moves no edge.
+///
+/// Measured with SPOT for all 14 timings, 8 scopes and both condition types,
+/// and pinned by test_timing_order_is_pinned. An edge holds for any condition,
+/// response, mode and stop, since the measurement takes each as a free atom
+/// and an implication stays valid under uniform substitution. A missing edge
+/// is only a non-implication for some field values, and where the order
+/// generalises a tick count the test samples further counts.
+///
+/// - Global and After: `always` is above everything but `after n` and
+///   `before s`; `for n` is above `for m` (m < n), `immediately`, `next` and
+///   every `within`; `immediately` and `next` are above every `within`;
+///   `within n` and `after n` are above `within m` (m > n); everything without
+///   a stop is above `eventually`.
+/// - In, NotIn and Before: the same, without the edges from `next`, `within`
+///   and `after` into `eventually`. A bounded `next` or `within` is discharged
+///   when the interval closes, and a bounded `eventually` is not.
+/// - The only scopes negate the obligation, so the order runs the other way,
+///   with `eventually` also above `before s`. `until s` is not below `always`,
+///   and under OnlyIn and OnlyAfter neither `for n` nor `next` is.
+///
+/// False wherever an edge is not established, which is sound for every caller
+/// that reads true as an implication.
+bool timing_implies(const Timing& stronger, const Timing& weaker,
+                    ScopeKind scope);
+
 /// A FRET requirement specifying a system obligation. Consists of a condition
 /// and a response that must be satisfied according to the specified timing
 /// constraint. These are used as the basic units for repair and for computing

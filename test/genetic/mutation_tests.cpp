@@ -184,8 +184,9 @@ TEST(test_timing_mutation_single_steps) {
          timing::after_ticks(4)},
     };
     for (const TimingStep& step : steps) {
-        const Timing mutated = mutate_timing(step.m_start, step.m_direction, {},
-                                             make_source(step.m_values, 0U));
+        const Timing mutated =
+            mutate_timing(step.m_start, step.m_direction, ScopeKind::Global, {},
+                          make_source(step.m_values, 0U));
         const std::string label = std::string("timing: ") + step.m_name +
                                   ", got " + to_string(mutated);
         expect(mutated.index() == step.m_expected.index(), label + " (kind)");
@@ -202,13 +203,14 @@ TEST(test_timing_weaken_always_without_donor_is_unchanged) {
                                            timing::eventually()};
     for (std::size_t draw = 0; draw < 6; ++draw) {
         const Timing mutated =
-            mutate_timing(timing::always(), Direction::Weaken, no_donors,
-                          make_source({}, draw));
+            mutate_timing(timing::always(), Direction::Weaken,
+                          ScopeKind::Global, no_donors, make_source({}, draw));
         expect(std::holds_alternative<timing::Always>(mutated),
                "weaken: always with no donor timing should be unchanged");
     }
-    const Timing empty_pool = mutate_timing(timing::always(), Direction::Weaken,
-                                            {}, make_source({}, 0U));
+    const Timing empty_pool =
+        mutate_timing(timing::always(), Direction::Weaken, ScopeKind::Global,
+                      {}, make_source({}, 0U));
     expect(std::holds_alternative<timing::Always>(empty_pool),
            "weaken: always with an empty pool should be unchanged");
 }
@@ -224,8 +226,9 @@ TEST(test_timing_weaken_always_takes_donated_timings) {
     bool seen_immediately = false;
     bool seen_next_timepoint = false;
     for (std::size_t draw = 0; draw < 40; ++draw) {
-        const Timing mutated = mutate_timing(
-            timing::always(), Direction::Weaken, donors, make_source({}, draw));
+        const Timing mutated =
+            mutate_timing(timing::always(), Direction::Weaken,
+                          ScopeKind::Global, donors, make_source({}, draw));
         if (const auto* for_ticks = std::get_if<timing::ForTicks>(&mutated)) {
             seen_for_ticks.push_back(for_ticks->m_ticks);
             continue;
@@ -258,8 +261,9 @@ TEST(test_timing_weaken_always_never_becomes_within_or_after) {
     const std::vector<Timing> donors = {timing::within_ticks(4),
                                         timing::after_ticks(9)};
     for (std::size_t draw = 0; draw < 40; ++draw) {
-        const Timing mutated = mutate_timing(
-            timing::always(), Direction::Weaken, donors, make_source({}, draw));
+        const Timing mutated =
+            mutate_timing(timing::always(), Direction::Weaken,
+                          ScopeKind::Global, donors, make_source({}, draw));
         expect(!std::holds_alternative<timing::WithinTicks>(mutated) &&
                    !std::holds_alternative<timing::AfterTicks>(mutated),
                "weaken: always must never take a donor's kind, only its count");
@@ -274,7 +278,7 @@ TEST(test_timing_strengthen_eventually_without_donor_is_unchanged) {
     for (std::size_t draw = 0; draw < 6; ++draw) {
         const Timing mutated =
             mutate_timing(timing::eventually(), Direction::Strengthen,
-                          no_donors, make_source({}, draw));
+                          ScopeKind::Global, no_donors, make_source({}, draw));
         expect(std::holds_alternative<timing::Eventually>(mutated),
                "strengthen: eventually with no donor timing should be "
                "unchanged");
@@ -292,8 +296,8 @@ TEST(test_timing_strengthen_eventually_takes_donated_timings) {
     bool seen_next_timepoint = false;
     for (std::size_t draw = 0; draw < 40; ++draw) {
         const Timing mutated =
-            mutate_timing(timing::eventually(), Direction::Strengthen, donors,
-                          make_source({}, draw));
+            mutate_timing(timing::eventually(), Direction::Strengthen,
+                          ScopeKind::Global, donors, make_source({}, draw));
         if (const auto* for_ticks = std::get_if<timing::ForTicks>(&mutated)) {
             seen_for_ticks.push_back(for_ticks->m_ticks);
             continue;
@@ -326,8 +330,8 @@ TEST(test_timing_strengthen_eventually_never_becomes_within) {
                                         timing::for_ticks(9)};
     for (std::size_t draw = 0; draw < 40; ++draw) {
         const Timing mutated =
-            mutate_timing(timing::eventually(), Direction::Strengthen, donors,
-                          make_source({}, draw));
+            mutate_timing(timing::eventually(), Direction::Strengthen,
+                          ScopeKind::Global, donors, make_source({}, draw));
         expect(!std::holds_alternative<timing::WithinTicks>(mutated),
                "strengthen: eventually must never become within-ticks, even "
                "when a within-ticks donates the count");
@@ -337,8 +341,8 @@ TEST(test_timing_strengthen_eventually_never_becomes_within) {
 TEST(test_timing_strengthen_within_one_tick_becomes_qualitative) {
     // within 1 tick has no numeric room: it steps up to the qualitative pair.
     const Timing one =
-        mutate_timing(timing::within_ticks(1), Direction::Strengthen, {},
-                      make_source({}, 0U));
+        mutate_timing(timing::within_ticks(1), Direction::Strengthen,
+                      ScopeKind::Global, {}, make_source({}, 0U));
     expect(
         std::holds_alternative<timing::Immediately>(one) ||
             std::holds_alternative<timing::NextTimepoint>(one),
@@ -353,7 +357,7 @@ TEST(test_timing_strengthen_after_ticks_is_unchanged) {
         for (std::size_t draw = 0; draw < 6; ++draw) {
             const Timing mutated =
                 mutate_timing(timing::after_ticks(ticks), Direction::Strengthen,
-                              {}, make_source({}, draw));
+                              ScopeKind::Global, {}, make_source({}, draw));
             const auto* after = std::get_if<timing::AfterTicks>(&mutated);
             expect(after != nullptr && after->m_ticks == ticks,
                    "strengthen: after-ticks has no strengthening and should be "
@@ -385,7 +389,8 @@ TEST(test_timing_mutation_directions_are_monotone) {
         for (const Timing& start : starts) {
             for (std::size_t draw = 0; draw < 12; ++draw) {
                 const Timing stronger = mutate_timing(
-                    start, Direction::Strengthen, pool, make_source({}, draw));
+                    start, Direction::Strengthen, ScopeKind::Global, pool,
+                    make_source({}, draw));
                 expect(!std::holds_alternative<timing::Eventually>(stronger) ||
                            std::holds_alternative<timing::Eventually>(start),
                        "strengthen: no branch may fall to the bottom of the "
@@ -394,8 +399,9 @@ TEST(test_timing_mutation_directions_are_monotone) {
                            timing_stop(stronger) == nullptr,
                        "strengthen: eventually must not move to a stop timing, "
                        "which does not imply it");
-                const Timing weaker = mutate_timing(
-                    start, Direction::Weaken, pool, make_source({}, draw));
+                const Timing weaker =
+                    mutate_timing(start, Direction::Weaken, ScopeKind::Global,
+                                  pool, make_source({}, draw));
                 expect(!std::holds_alternative<timing::Always>(weaker) ||
                            std::holds_alternative<timing::Always>(start),
                        "weaken: no branch may rise to the top of the order");
@@ -413,16 +419,17 @@ TEST(test_timing_stop_edges) {
     const Timing until_s = timing::until(Formula("s"));
     const Timing before_t = timing::before(Formula("t"));
     for (std::size_t draw = 0; draw < 4; ++draw) {
-        expect(std::holds_alternative<timing::Always>(mutate_timing(
-                   until_s, Direction::Strengthen, {}, make_source({}, draw))),
+        expect(std::holds_alternative<timing::Always>(
+                   mutate_timing(until_s, Direction::Strengthen,
+                                 ScopeKind::Global, {}, make_source({}, draw))),
                "strengthen: until s should move to always");
-        expect(mutate_timing(until_s, Direction::Weaken, {until_s},
-                             make_source({}, draw)) == until_s,
+        expect(mutate_timing(until_s, Direction::Weaken, ScopeKind::Global,
+                             {until_s}, make_source({}, draw)) == until_s,
                "weaken: until s has no weaker kind and should be unchanged");
         for (const Direction direction :
              {Direction::Strengthen, Direction::Weaken}) {
-            expect(mutate_timing(before_t, direction, {before_t},
-                                 make_source({}, draw)) == before_t,
+            expect(mutate_timing(before_t, direction, ScopeKind::Global,
+                                 {before_t}, make_source({}, draw)) == before_t,
                    "timing: before t is incomparable with every kind and "
                    "should be unchanged");
         }
@@ -431,11 +438,13 @@ TEST(test_timing_stop_edges) {
     const std::vector<Timing> expected = {timing::for_ticks(2), until_s,
                                           timing::until(Formula("t"))};
     for (std::size_t draw = 0; draw < expected.size(); ++draw) {
-        expect(mutate_timing(timing::always(), Direction::Weaken, pool,
+        expect(mutate_timing(timing::always(), Direction::Weaken,
+                             ScopeKind::Global, pool,
                              make_source({draw}, 0)) == expected[draw],
                "weaken: always should draw from for 2, then until s and until "
                "t, in that order");
-        expect(mutate_timing(timing::eventually(), Direction::Strengthen, pool,
+        expect(mutate_timing(timing::eventually(), Direction::Strengthen,
+                             ScopeKind::Global, pool,
                              make_source({draw}, 0)) == timing::for_ticks(2),
                "strengthen: eventually should draw only the stop-free for 2");
     }

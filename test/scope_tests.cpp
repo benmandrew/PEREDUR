@@ -10,6 +10,8 @@
 #include <variant>
 #include <vector>
 
+#include "genetic/mutation.hpp"
+#include "genetic/random_source.hpp"
 #include "requirement.hpp"
 #include "runner/formaliser.hpp"
 #include "runner/ltlfilt.hpp"
@@ -62,6 +64,12 @@ Requirement scoped(const Scope& scope, const Timing& tim,
                    ConditionType condition_type) {
     return Requirement(Formula("c"), Formula("r"), tim, condition_type,
                        /*weakenable=*/true, /*removed=*/false, scope);
+}
+
+// A source answering @p draw, reduced modulo each bound, at every call.
+RandomSource constant_source(std::size_t draw) {
+    return RandomSource(
+        [draw](std::size_t upper_bound) { return draw % upper_bound; });
 }
 
 Scope make_scope(ScopeKind kind) {
@@ -521,6 +529,115 @@ TEST(test_stop_timing_order_is_pinned) {
            "stop order: until false must be equivalent to always");
     expect(ltl_equivalent(ltl(timing::before(Formula("false"))), "true"),
            "stop order: before false must be valid");
+}
+
+// Re-derives every edge and non-edge timing_implies claims, in every cell. The
+// tick counts reach past the 1 to 3 the order was measured on, since the
+// predicate generalises them. One stop throughout: across different stops the
+// predicate claims no edge, and some hold.
+TEST(test_timing_order_is_pinned) {
+    const std::vector<Timing> timings = {
+        timing::immediately(),       timing::next_timepoint(),
+        timing::within_ticks(1),     timing::within_ticks(2),
+        timing::within_ticks(4),     timing::for_ticks(1),
+        timing::for_ticks(2),        timing::for_ticks(4),
+        timing::after_ticks(1),      timing::after_ticks(3),
+        timing::eventually(),        timing::always(),
+        timing::until(Formula("s")), timing::before(Formula("s"))};
+    std::vector<OrderQuery> queries;
+    for (const ScopeCase& scope_case : scope_cases()) {
+        const Scope scope = make_scope(scope_case.m_kind);
+        for (const ConditionType ctype :
+             {ConditionType::Trigger, ConditionType::Continual}) {
+            for (const Timing& lhs : timings) {
+                for (const Timing& rhs : timings) {
+                    if (lhs == rhs) {
+                        continue;
+                    }
+                    std::string where = to_string(lhs) + " => ";
+                    where += to_string(rhs) + " under ";
+                    where += scope_case.m_name;
+                    where += ctype == ConditionType::Trigger ? " / trigger"
+                                                             : " / continual";
+                    queries.push_back(
+                        {{scoped(scope, lhs, ctype).m_ltl,
+                          scoped(scope, rhs, ctype).m_ltl},
+                         where,
+                         timing_implies(lhs, rhs, scope_case.m_kind)});
+                }
+            }
+        }
+    }
+    std::vector<Implication> implications;
+    implications.reserve(queries.size());
+    for (const OrderQuery& query : queries) {
+        implications.push_back(query.m_implication);
+    }
+    const std::vector<bool> holds = ltl_implications(implications);
+    for (std::size_t idx = 0; idx < queries.size(); ++idx) {
+        if (queries[idx].m_claimed) {
+            expect(holds[idx],
+                   "timing_implies claims an edge that does not hold: " +
+                       queries[idx].m_where);
+        } else {
+            expect(!holds[idx],
+                   "timing_implies is missing an edge that holds: " +
+                       queries[idx].m_where);
+        }
+    }
+}
+
+// The timing arm moves in its direction under every scope, which before the
+// scope reached it held only under Global and After. Each fallback draw from
+// 0 to 5 reaches every branch of the two operators, and the pool donates to
+// both extremes.
+TEST(test_timing_mutation_moves_in_direction_under_every_scope) {
+    const std::vector<Timing> pool = {
+        timing::within_ticks(3), timing::after_ticks(2), timing::immediately(),
+        timing::next_timepoint(), timing::until(Formula("s"))};
+    std::vector<Timing> starts = timing_cases();
+    starts.push_back(timing::within_ticks(1));
+    starts.push_back(timing::for_ticks(1));
+    std::vector<Implication> implications;
+    std::vector<std::string> wheres;
+    std::size_t moved = 0;
+    for (const ScopeCase& scope_case : scope_cases()) {
+        const Scope scope = make_scope(scope_case.m_kind);
+        for (const Timing& start : starts) {
+            for (const Direction direction :
+                 {Direction::Weaken, Direction::Strengthen}) {
+                for (std::size_t draw = 0; draw < 6; ++draw) {
+                    const Timing mutated =
+                        mutate_timing(start, direction, scope_case.m_kind, pool,
+                                      constant_source(draw));
+                    if (mutated == start) {
+                        continue;
+                    }
+                    ++moved;
+                    const std::string from =
+                        scoped(scope, start, ConditionType::Continual).m_ltl;
+                    const std::string into =
+                        scoped(scope, mutated, ConditionType::Continual).m_ltl;
+                    const bool weaken = direction == Direction::Weaken;
+                    implications.push_back(weaken ? Implication{from, into}
+                                                  : Implication{into, from});
+                    std::string where =
+                        weaken ? "weakening " : "strengthening ";
+                    where += to_string(start) + " to " + to_string(mutated);
+                    where += " under ";
+                    where += scope_case.m_name;
+                    wheres.push_back(where);
+                }
+            }
+        }
+    }
+    const std::vector<bool> holds = ltl_implications(implications);
+    for (std::size_t idx = 0; idx < wheres.size(); ++idx) {
+        expect(holds[idx],
+               "timing mutation moved the wrong way: " + wheres[idx]);
+    }
+    // Without this the loop above passes on an arm that never moves.
+    expect(moved > 0, "timing mutation: no draw moved any timing");
 }
 
 }  // namespace
