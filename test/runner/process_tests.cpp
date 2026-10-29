@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "runner/process.hpp"
@@ -334,6 +335,56 @@ TEST(test_exec_failure_is_reported) {
            "\"" +
                too_long.m_output + "\"");
 #endif
+}
+
+// The pid of the contained child the helper spawned, as it reports it, or 0.
+pid_t contained_child_of(const PipedChild& helper) {
+    const std::pair<std::string, bool> read =
+        read_until_eof(helper.m_read_fd, milliseconds{10'000});
+    if (read.second || read.first.empty()) {
+        return 0;
+    }
+    return static_cast<pid_t>(std::stoi(read.first));
+}
+
+// GNU timeout setpgid's itself and, on expiry, signals that whole group, and
+// Ctrl-C and a harness killing by group do the same. A macOS reaper still in
+// PEREDUR's group died with it, and every tool, in a group of its own, ran on
+// unattended: a `timeout 2400` run left two ltlsynt at 87% CPU for three
+// hours. SIGKILL is in here because only leaving the group survives it.
+TEST(test_a_signal_to_the_parents_group_still_kills_its_child) {
+    for (const int signal_number : {SIGTERM, SIGKILL}) {
+        const PipedChild helper =
+            spawn_piped_child({PEREDUR_CONTAINED_CHILD_HELPER},
+                              ParentDeathPolicy::SurviveParentThread,
+                              ExecutableLookup::AbsolutePath);
+        const pid_t child = contained_child_of(helper);
+        close(helper.m_write_fd);
+        close(helper.m_read_fd);
+        if (child <= 0) {
+            killpg(helper.m_pid, SIGKILL);
+            waitpid(helper.m_pid, nullptr, 0);
+            fail("process: the helper never reported its child's pid");
+        }
+        killpg(helper.m_pid, signal_number);
+        int status = 0;
+        waitpid(helper.m_pid, &status, 0);
+
+        bool alive = true;
+        for (int attempt = 0; attempt < 500 && alive; ++attempt) {
+            alive = kill(child, 0) == 0;
+            if (alive) {
+                std::this_thread::sleep_for(milliseconds{10});
+            }
+        }
+        if (alive) {
+            killpg(child, SIGKILL);
+        }
+        expect(!alive, "process: signal " + std::to_string(signal_number) +
+                           " to the parent's process group left its "
+                           "contained child " +
+                           std::to_string(child) + " running");
+    }
 }
 
 }  // namespace

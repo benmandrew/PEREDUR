@@ -49,6 +49,7 @@ BINARIES = (
     "realize",
     "signal_tracer",
     "test/peredur_tests",
+    "test/contained_child_helper",
 )
 
 # The measured tree. `include/` is half the code -- the templates and the inline

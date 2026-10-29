@@ -62,6 +62,12 @@ target_include_directories(peredur_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(peredur_tests PRIVATE peredur_fitness)
 
+# A process of its own that spawns a contained child, so process_runner can
+# signal a whole process group the way timeout does without killing itself.
+add_executable(contained_child_helper runner/contained_child_helper.cpp)
+target_link_libraries(contained_child_helper PRIVATE peredur_fitness)
+add_dependencies(peredur_tests contained_child_helper)
+
 # The end-to-end suites spawn the drivers rather than calling into the library,
 # so the binaries have to exist before ctest runs and the suite has to know
 # where they landed. Every driver is built into the same directory, so one
@@ -70,7 +76,8 @@ add_dependencies(peredur_tests
     peredur compare keyword-terms lint-ideals ltl maximal mucs realize
     signal_tracer)
 target_compile_definitions(peredur_tests PRIVATE
-    PEREDUR_DRIVER_DIR="$<TARGET_FILE_DIR:peredur>")
+    PEREDUR_DRIVER_DIR="$<TARGET_FILE_DIR:peredur>"
+    PEREDUR_CONTAINED_CHILD_HELPER="$<TARGET_FILE:contained_child_helper>")
 
 if(MSVC)
     target_compile_options(peredur_tests PRIVATE /W4 /permissive-)

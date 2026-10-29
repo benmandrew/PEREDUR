@@ -324,6 +324,21 @@ class SpawnGuard {
 // window, since a parent that dies before the registration lands has not let
 // anything escape yet. When PEREDUR dies, every copy of the write end closes,
 // the reaper reads end of file and kills every group still registered.
+//
+// The reaper leaves PEREDUR's process group as soon as it is forked. A signal
+// aimed at that group would otherwise kill it alongside PEREDUR, while every
+// tool, being in a group of its own, never sees the signal and is left
+// running. That is what GNU timeout does on expiry (it setpgid's itself and
+// signals the group), what Ctrl-C does to the foreground group, and what a
+// harness that kills by group does; a run under `timeout 2400` stranded two
+// ltlsynt at 87% CPU for three hours that way. Leaving the group is the only
+// defence against SIGKILL, which timeout -s KILL sends. The reaper also
+// ignores the signals that ask a process to exit, since `pkill peredur` names
+// it as readily as PEREDUR. Ignoring SIGHUP matters for a second reason: once
+// PEREDUR is gone the reaper's group is orphaned, and if the reaper had been
+// stopped the kernel sends it SIGHUP and then SIGCONT, which must resume it
+// rather than kill it. It never needs to be told to exit, as end of file is
+// its exit.
 constexpr std::size_t k_max_tracked_groups = 4096;
 
 // Set once, then only read. -1 means the reaper could not be started, in which
@@ -333,8 +348,16 @@ std::atomic<int> g_reaper_write_fd{-1};
 // Everything below runs in a forked child of a multithreaded process, so it
 // may touch nothing that another thread could have held mid-update at the
 // fork: no allocation, no locks, no iostreams. A fixed array plus
-// read/close/killpg/_exit is the whole vocabulary.
+// setpgid/sigaction/read/close/killpg/_exit is the whole vocabulary.
 [[noreturn]] void reaper_main(int read_fd) {
+    // The parent repeats this after the fork; see start_reaper_once.
+    setpgid(0, 0);
+    struct sigaction ignore{};
+    ignore.sa_handler = SIG_IGN;
+    sigemptyset(&ignore.sa_mask);
+    for (const int signal_number : {SIGHUP, SIGINT, SIGQUIT, SIGTERM}) {
+        sigaction(signal_number, &ignore, nullptr);
+    }
     static std::array<pid_t, k_max_tracked_groups> tracked{};
     std::size_t tracked_count = 0;
     while (true) {
@@ -457,6 +480,11 @@ void start_reaper_once() {
             close_every_descriptor_except(fds[0], highest_fd);
             reaper_main(fds[0]);
         }
+        // As adopt_child_process_group does for a tool: whichever side runs
+        // first, the reaper is out of PEREDUR's group before this returns and
+        // before any tool can be registered with it.
+        [[maybe_unused]] const int setpgid_result =
+            setpgid(reaper_pid, reaper_pid);
         close(fds[0]);
         g_reaper_write_fd.store(fds[1], std::memory_order_release);
     });
