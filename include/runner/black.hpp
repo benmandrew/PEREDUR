@@ -93,6 +93,15 @@ class SatisfiabilityChecker {
         const std::string& ltl_formula,
         QueryPolarity polarity = QueryPolarity::ExpectSat);
 
+    /// As check_satisfiability, with black asked first and SPOT not at all.
+    /// For a realizability query over no inputs, whose formula is a whole
+    /// specification: on `lift-plus-cruise-mini` SPOT's first stage ran out
+    /// its 500ms on 2,141 of 3,674 such queries, while black decided them in
+    /// a median 28ms. Only a decided answer is cached, so an undecided one
+    /// leaves the formula for a later check_satisfiability to try SPOT on.
+    std::optional<bool> check_satisfiability_by_black(
+        const std::string& ltl_formula);
+
     void set_timeout(std::chrono::milliseconds timeout) { m_timeout = timeout; }
 
     /// SPOT's own per-query budget, before any escalation to black. 500ms is

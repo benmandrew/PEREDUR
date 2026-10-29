@@ -23,7 +23,10 @@
 
 #include "filter/implication_check.hpp"
 #include "formula_key.hpp"
+#include "prop_formula.hpp"
+#include "prop_formula/atoms.hpp"
 #include "requirement.hpp"
+#include "runner/black.hpp"
 #include "runner/formula_input.hpp"
 #include "runner/ltlfilt.hpp"
 #include "runner/process.hpp"
@@ -279,6 +282,31 @@ bool bounded_difference(const std::vector<int>& lhs,
     return true;
 }
 
+// Whether ltlsynt would play @p ltl with no environment inputs. With no
+// declared inputs it is told `--outs`, and any atom outside that list becomes
+// an input, so every atom the formula mentions must be a declared output. A
+// formula the parser cannot read is left to ltlsynt.
+bool plays_without_environment(const std::string& ltl,
+                               const std::vector<std::string>& inputs,
+                               const std::vector<std::string>& outputs) {
+    if (!inputs.empty()) {
+        return false;
+    }
+    const std::optional<Formula> parsed = Formula::try_parse(ltl);
+    if (!parsed.has_value()) {
+        return false;
+    }
+    std::unordered_set<std::string> atoms;
+    collect_atoms(*parsed, atoms);
+    const std::unordered_set<std::string> output_set(outputs.begin(),
+                                                     outputs.end());
+    return std::all_of(
+        atoms.begin(), atoms.end(), [&output_set](const std::string& name) {
+            return name == "true" || name == "false" || name == "1" ||
+                   name == "0" || output_set.count(name) != 0;
+        });
+}
+
 }  // namespace
 
 std::vector<int> RealizabilityChecker::intern_side(
@@ -514,6 +542,45 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
                 return verdict;
             }
         }
+    }
+    // Recorded exactly as an ltlsynt verdict is, so the subsumption passes
+    // read a routed answer like any other. Called under m_cache_mutex.
+    const auto remember = [&](const std::optional<bool>& verdict) {
+        m_cache.emplace(cache_key, verdict);
+        // Only a decided verdict joins the table. An undecided one is memoised
+        // like any other, but it carries no direction, so nothing follows
+        // from it about any other query.
+        if (have_sides && verdict.has_value()) {
+            m_decided[scope].push_back(Decided{
+                assumption_ids, guarantee_ids, signature_of(assumption_ids),
+                signature_of(guarantee_ids), *verdict});
+        }
+    };
+    // With no inputs the environment makes no choice, so the query is
+    // satisfiability: a satisfying word is a strategy the system plays blind,
+    // and Mealy and Moore coincide. On lift-plus-cruise-mini, 72 queries took
+    // a median 0.538s in ltlsynt and 0.028s in black, with every verdict
+    // agreeing. black goes first because SPOT's satisfiability stage is the
+    // slow side on whole specifications. An undecided or failed answer falls
+    // through to ltlsynt, which may still decide it within its own budget.
+    if (m_route_input_free &&
+        plays_without_environment(conj_ltl, inputs, outputs)) {
+        std::optional<bool> satisfiable;
+        try {
+            satisfiable =
+                global_sat_checker().check_satisfiability_by_black(conj_ltl);
+        } catch (const std::exception&) {
+            satisfiable.reset();
+        }
+        if (satisfiable.has_value()) {
+            std::scoped_lock lock(m_cache_mutex);
+            n_satisfiability_routed++;
+            remember(satisfiable);
+            return satisfiable;
+        }
+    }
+    {
+        std::scoped_lock lock(m_cache_mutex);
         n_cache_misses++;
     }
     const std::string ltlsynt = ltlsynt_path();
@@ -556,15 +623,7 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
     // exists to avoid. What #74 had to remove was caching a *verdict* nobody
     // decided; nullopt is not one, so every caller still picks its own
     // direction on every hit.
-    m_cache.emplace(cache_key, realizable);
-    // Only a decided verdict joins the table. An undecided one is memoised
-    // above like any other, but it carries no direction, so nothing follows
-    // from it about any other query.
-    if (have_sides && realizable.has_value()) {
-        m_decided[scope].push_back(
-            Decided{assumption_ids, guarantee_ids, signature_of(assumption_ids),
-                    signature_of(guarantee_ids), *realizable});
-    }
+    remember(realizable);
     return realizable;
 }
 

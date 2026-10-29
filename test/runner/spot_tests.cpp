@@ -290,6 +290,90 @@ TEST(test_rule_subsumption_agrees_with_ltlsynt) {
            "replacements without an exec");
 }
 
+// With no environment inputs, realizability is satisfiability, and the checker
+// asks the satisfiability checker instead of ltlsynt. A wrong answer here is
+// silent, so each routed verdict is checked against ltlsynt's on a checker
+// with the routing off. The guarantees are those of examples/takeoff, which
+// cannot all hold at once; the assumption-carrying queries are realizable
+// because the system can falsify an assumption over its own outputs.
+TEST(test_input_free_routing_agrees_with_ltlsynt) {
+    const auto requirement = [](const std::string& condition,
+                                const std::string& response,
+                                const std::string& timing) {
+        return R"({"condition": ")" + condition +
+               R"(", "condition-type": "trigger", "response": ")" + response +
+               R"(", "timing": )" + timing + "}";
+    };
+    const std::string roll = requirement("true", "takeoff_roll",
+                                         R"({"type": "ForTicks", "ticks": 5})");
+    const std::string lift =
+        requirement("true", "!(takeoff_roll) & (lift_off)",
+                    R"({"type": "WithinTicks", "ticks": 5})");
+    const std::string after = requirement(
+        "!takeoff_roll", "lift_off", R"({"type": "AfterTicks", "ticks": 1})");
+    const std::string grounded =
+        requirement("true", "!lift_off", R"({"type": "Always"})");
+    const std::string flies =
+        requirement("true", "lift_off", R"({"type": "Always"})");
+    const auto spec = [](const std::vector<std::string>& assumptions,
+                         const std::vector<std::string>& guarantees,
+                         const std::string& in_atoms) {
+        const auto join = [](const std::vector<std::string>& items) {
+            std::string joined;
+            for (const std::string& item : items) {
+                joined += (joined.empty() ? "" : ", ") + item;
+            }
+            return joined;
+        };
+        return parse_specification_json(
+            R"({"assumptions": [)" + join(assumptions) +
+            R"(], "guarantees": [)" + join(guarantees) + R"(], "in_atoms": [)" +
+            in_atoms + R"(], "out_atoms": ["takeoff_roll", "lift_off"]})");
+    };
+    struct Query {
+        Specification m_specification;
+        bool m_realizable = false;
+    };
+    const std::vector<Query> queries = {
+        {spec({}, {roll, lift, after}, ""), false},
+        {spec({}, {roll, after}, ""), true},
+        {spec({}, {lift, grounded}, ""), false},
+        {spec({flies}, {lift, grounded}, ""), true},
+        {spec({flies}, {roll, lift, after}, ""), true},
+    };
+    RealizabilityChecker routed;
+    const std::size_t before = RealizabilityChecker::n_satisfiability_routed;
+    for (const Query& query : queries) {
+        RealizabilityChecker tool;
+        tool.set_satisfiability_routing(false);
+        const bool from_tool = realizable(tool, query.m_specification);
+        expect(realizable(routed, query.m_specification) == from_tool,
+               "spot-runner: the satisfiability route disagreed with ltlsynt "
+               "on " +
+                   query.m_specification.to_ltl());
+        expect(from_tool == query.m_realizable,
+               "spot-runner: ltlsynt gave an unexpected verdict on " +
+                   query.m_specification.to_ltl());
+    }
+    expect(RealizabilityChecker::n_satisfiability_routed ==
+               before + queries.size(),
+           "spot-runner: every input-free query should be routed");
+    // An atom outside the declared outputs is an input to ltlsynt, so a query
+    // naming one is played against an environment and keeps the exec.
+    const Specification with_input = spec({}, {roll, lift, after}, "");
+    RealizabilityChecker fresh;
+    expect(fresh.check_realizability_ltl(with_input.to_ltl() + " & G(iap_wind)",
+                                         {}, with_input.m_out_atoms) ==
+               std::optional<bool>{false},
+           "spot-runner: an undeclared atom should leave the query to ltlsynt");
+    const Specification declared_input = spec({}, {roll, after}, R"("wind")");
+    expect(realizable(fresh, declared_input),
+           "spot-runner: a declared input should leave the query to ltlsynt");
+    expect(RealizabilityChecker::n_satisfiability_routed ==
+               before + queries.size(),
+           "spot-runner: a query with an input should not be routed");
+}
+
 // SPOT 2.15.1's ltl2tgba exits 2 with "print_hoa(): automaton is complete but
 // prop_complete()==false" on formulae that reduce to a tautology. The wrapper
 // must treat that as the trivially-true (universal) automaton rather than

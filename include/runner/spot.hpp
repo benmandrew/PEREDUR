@@ -107,6 +107,11 @@ class RealizabilityChecker {
     /// requirements, each replacement ordered by `requirement_implies`.
     /// Disjoint from n_subsumed, which needs inclusion of the conjunct sets.
     inline static std::size_t n_rule_subsumed = 0;
+    /// Queries over no environment inputs, decided by satisfiability rather
+    /// than by an ltlsynt exec. Disjoint from n_cache_misses, which counts the
+    /// execs: a routed query that comes back undecided falls through to
+    /// ltlsynt and is counted there instead.
+    inline static std::size_t n_satisfiability_routed = 0;
     inline static double total_time_s = 0.0;
     inline static double total_cpu_s = 0.0;
     /// ltlsynt calls abandoned at the per-call timeout, reported as nullopt.
@@ -193,6 +198,16 @@ class RealizabilityChecker {
     /// Config::ltlsynt_timeout.
     static void set_timeout(std::chrono::milliseconds timeout);
 
+    /// Whether a query with no environment inputs goes to the global
+    /// SatisfiabilityChecker before ltlsynt. With no inputs the environment
+    /// makes no choice, so `A -> G` is realizable exactly when it is
+    /// satisfiable: a satisfying word is a strategy the system plays blind,
+    /// and Mealy and Moore semantics coincide. On by default; a test turns it
+    /// off to compare the routed verdict against ltlsynt's.
+    void set_satisfiability_routing(bool enabled) {
+        m_route_input_free = enabled;
+    }
+
    private:
     /// One decided query, with its two sides interned to integer ids so that
     /// the inclusion tests are over small sorted vectors rather than over
@@ -239,6 +254,7 @@ class RealizabilityChecker {
     /// safe in a way caching a fabricated `false` was not, because nullopt is
     /// not a verdict: each caller still resolves it in its own direction.
     std::unordered_map<std::string, std::optional<bool>> m_cache;
+    bool m_route_input_free = true;
 };
 
 /// Returns the process-lifetime RealizabilityChecker instance. All callers

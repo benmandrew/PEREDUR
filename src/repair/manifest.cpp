@@ -213,7 +213,12 @@ namespace {
 //
 // 37 added caches.realizability.rule_subsumed: the realizability queries
 // settled from a decided one by ordering the requirements they replaced.
-constexpr int k_schema_version = 37;
+//
+// 38 added caches.realizability.satisfiability_routed: the realizability
+// queries over no environment inputs decided by satisfiability rather than by
+// ltlsynt. tool_calls.ltlsynt.calls no longer counts them, so a run on such a
+// specification reads far fewer ltlsynt calls than one at 37.
+constexpr int k_schema_version = 38;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -394,7 +399,10 @@ nlohmann::json caches_json() {
              // than by an exec. Not a hit: a hit is the same
              // question asked twice.
              {"subsumed", RealizabilityChecker::n_subsumed},
-             {"rule_subsumed", RealizabilityChecker::n_rule_subsumed}}},
+             {"rule_subsumed", RealizabilityChecker::n_rule_subsumed},
+             // Decided by satisfiability, the query having no inputs.
+             {"satisfiability_routed",
+              RealizabilityChecker::n_satisfiability_routed}}},
         {"count_traces",
          row(CountTracesStats::n_hits, CountTracesStats::n_misses)},
         {"ltl2tgba",

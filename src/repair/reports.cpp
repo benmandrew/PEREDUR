@@ -79,6 +79,11 @@ void print_cache_report() {
                      "requirements they replaced: "
                   << RealizabilityChecker::n_rule_subsumed << "\n";
     }
+    if (RealizabilityChecker::n_satisfiability_routed > 0) {
+        std::cout << "realizability queries over no inputs answered by "
+                     "satisfiability rather than by ltlsynt: "
+                  << RealizabilityChecker::n_satisfiability_routed << "\n";
+    }
 }
 
 void print_diagnostics_report() {

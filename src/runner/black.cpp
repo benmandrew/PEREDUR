@@ -176,6 +176,32 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
     return answer;
 }
 
+std::optional<bool> SatisfiabilityChecker::check_satisfiability_by_black(
+    const std::string& ltl_formula) {
+    const std::string cache_key = formula_key::renamed(ltl_formula);
+    {
+        std::shared_lock lock(m_cache_mutex);
+        const auto found = m_cache.find(cache_key);
+        if (found != m_cache.end()) {
+            n_cache_hits++;
+            return found->second;
+        }
+    }
+    if (const std::optional<bool> decided = constant_answer(ltl_formula)) {
+        n_constant_folded++;
+        std::scoped_lock lock(m_cache_mutex);
+        m_cache.emplace(cache_key, decided);
+        return decided;
+    }
+    n_cache_misses++;
+    const std::optional<bool> answer = black_answer(ltl_formula, m_timeout);
+    if (answer.has_value()) {
+        std::scoped_lock lock(m_cache_mutex);
+        m_cache.emplace(cache_key, answer);
+    }
+    return answer;
+}
+
 std::optional<bool> SatisfiabilityChecker::implication_answer(
     const std::string& ltl_formula, std::chrono::milliseconds spot_budget) {
     // SPOT's blowup case is a large automaton, which happens on satisfiable
