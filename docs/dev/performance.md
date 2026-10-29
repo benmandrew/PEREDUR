@@ -72,6 +72,19 @@ There is no config key, by the argument the prefilter is recorded under: the sho
 
 On FRETISH a requirement can also be dropped, or an assumption accepted, when a rule proves the implication instead of identity. `requirement_implies` (`src/filter/implication_check.cpp`) looks for a chain from one requirement to the other that changes one field per step. Each step is an implication in the context the other fields give it: a response or stop moves along its polarity, a continual condition moves backwards, a trigger's condition only to an equivalent one, and the timing, scope and condition type move along their orders (`timing_implies`, `scope_implies`). The propositional steps are decided by `count_models_exhaustively`, so no step launches a process, and the search tries every order of the five fields (32 states). Rules only ever compare a requirement with the one in its own slot, because slots pair by index across repairs of one original and lift-plus-cruise-mini's 48 guarantees would otherwise give 48 candidates for each uncovered one. A pair the rules cannot prove still reaches the shortened query, so the rules change cost and never a verdict. `test_requirement_implies_is_sound` sends every proved pair of a 31,284-pair sample to SPOT: SPOT confirms all 1,976 proved pairs, and finds 2,070 implications among the sample, so the rules reach 95.5% of them. `implication.rule_covered` in `run.json` counts the requirements a rule proved.
 
+Both changes were measured together with `maximal --timeout 1` (the engine's `black_timeout_ms`) on fixed candidate sets taken from seed-1 runs at population 100 and 10 generations. The release builds of `60dff11` and of the rule commit ran interleaved per case, three times each, and the figures are medians:
+
+| Case | Candidates | Wall time | Timeouts | Survivors | Rule-covered |
+|---|---|---|---|---|---|
+| `lift-plus-cruise-mini` | 70 | 207.0 s → 31.9 s | 1,326 → 22 | 56 → 38 | 1,820 |
+| `lift-plus-cruise-full` | 51 | 363.9 s → 97.8 s | 3,213 → 677 | 51 → 31 | 1,174 |
+| `fsm-combined` | 21 | 0.78 s → 0.23 s | 0 → 0 | 12 → 12 | 23 |
+| `mode-arbiter` | 43 | 0.25 s → 0.10 s | 0 → 0 | 14 → 14 | 27 |
+| `round-robin-arbiter-aurus` | 73 | 0.39 s → 0.33 s | 0 → 0 | 27 → 27 | n/a |
+| `prioritized-arbiter-aurus` | 9 | 0.06 s → 0.04 s | 0 → 0 | 6 → 6 | n/a |
+
+Each arm gave the same survivors in all three runs, and the new survivors are a subset of the old ones in every case. The survivor counts fall only where queries timed out: a timeout reads as no implication, so the old sweep keeps both sides of every pair whose query ran out, and the new one proves those dominations. Each proved domination also skips the dominated candidate's remaining pairs, which is why `lift-plus-cruise-mini` runs 1,091 comparisons instead of 2,111. The TLSF sets gain least, since only identical conjuncts are dropped there and neither set timed out to begin with. `ventilator-controller` wrote no candidates within 40 minutes at this size, and `rad` and `full-arbiter-aurus` wrote none.
+
 ## Implication model probe
 
 An implication query between two whole specifications is `(A) & !(B)`, and on the large TLSF families SPOT cannot build its automaton in time. Over 48 sampled `humanoid-742` repair pairs `ltlfilt --satisfiable` took a median 7.96 s, and 5 ran past 20 s. Every one of the 43 it decided was satisfiable: implications between repairs rarely hold. black found a model for all 48 in 51 ms at the median and 70 ms at worst. Under the old route, with SPOT alone at a 1 s budget, nearly every such pair timed out and was kept.
