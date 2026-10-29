@@ -47,6 +47,11 @@ struct ImplicationFilterStats {
     /// Ordered implication checks settled true with no query, every guarantee
     /// of the destination being one the source carries.
     inline static std::atomic<std::size_t> n_residual_settled{0};
+    /// Requirements a rule proved implied while `spec_implies` built a
+    /// residual: an assumption of the source implied by the destination's in
+    /// its slot, or a guarantee of the destination implied by the source's.
+    /// Identical lowerings are not counted. FRETISH only.
+    inline static std::atomic<std::size_t> n_rule_covered{0};
 };
 
 /// Ranks candidates within one equivalence class, higher surviving. Returning

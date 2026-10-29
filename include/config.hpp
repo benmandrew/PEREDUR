@@ -410,7 +410,7 @@ struct Config {
     /// FRETISH only: per-requirement probability of moving the scope along its
     /// implication order. That order depends on the timing and the condition
     /// type, since a scope boundary relaxes a bounded obligation but tightens
-    /// an unbounded one; scope_order in src/genetic/mutation.cpp holds the
+    /// an unbounded one; scope_edges in src/requirement.cpp holds the
     /// measured table. A move onto a non-Global scope needs a declared mode, so
     /// on a specification declaring none -- which is every example under
     /// examples/ but mode-arbiter -- the arm can only reach Global. Defaults to

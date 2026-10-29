@@ -207,7 +207,10 @@ namespace {
 // 35 added implication.residual_queries and implication.residual_settled: the
 // implication checks that dropped shared guarantees from the negated side, and
 // those settled true with nothing left to ask.
-constexpr int k_schema_version = 35;
+//
+// 36 added implication.rule_covered: the requirements a structural rule
+// proved implied while building that shortened destination.
+constexpr int k_schema_version = 36;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -355,7 +358,7 @@ nlohmann::json tool_calls_json() {
 // which a sampled word refuted never reaches `comparisons` at all.
 // `residual_queries` and `residual_settled` count ordered checks too: those
 // that dropped shared guarantees before querying, and those left nothing to
-// query.
+// query. `rule_covered` counts requirements, not checks.
 nlohmann::json implication_json() {
     return {
         {"comparisons", ImplicationFilterStats::n_comparisons.load()},
@@ -367,8 +370,8 @@ nlohmann::json implication_json() {
         {"fingerprint_refuted",
          ImplicationFilterStats::n_fingerprint_refuted.load()},
         {"residual_queries", ImplicationFilterStats::n_residual_queries.load()},
-        {"residual_settled",
-         ImplicationFilterStats::n_residual_settled.load()}};
+        {"residual_settled", ImplicationFilterStats::n_residual_settled.load()},
+        {"rule_covered", ImplicationFilterStats::n_rule_covered.load()}};
 }
 
 nlohmann::json caches_json() {

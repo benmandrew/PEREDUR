@@ -223,6 +223,8 @@ TEST(test_residual_agrees_with_whole_query) {
         Specification({assume_b}, {respond_late, hold}, ins, outs),
         Specification({}, {respond, f_req("d")}, ins, outs),
         Specification({}, {respond}, ins, outs),
+        Specification({g_req("a & b")}, {respond_late, hold}, ins, outs),
+        Specification({g_req("a & b")}, {respond, f_req("d")}, ins, outs),
     };
     const std::size_t residual_before =
         ImplicationFilterStats::n_residual_queries.load();
@@ -251,6 +253,29 @@ TEST(test_residual_agrees_with_whole_query) {
            "spec_implies: some pair must have asked a shortened query");
     expect(ImplicationFilterStats::n_residual_settled.load() > settled_before,
            "spec_implies: some pair must have been settled with no query");
+}
+
+// Neither specification's requirements match the other's verbatim, and the
+// rules still settle the pair: the destination's assumption implies the
+// source's in its slot, and the source's guarantee implies the destination's.
+TEST(test_residual_settles_by_rule) {
+    const Requirement respond(Formula("a"), Formula("c"),
+                              timing::within_ticks(2));
+    const Requirement respond_late(Formula("a"), Formula("c | d"),
+                                   timing::within_ticks(3));
+    const Specification tight({g_req("a")}, {respond}, {"a", "b"}, {"c", "d"});
+    const Specification loose({g_req("a & b")}, {respond_late}, {"a", "b"},
+                              {"c", "d"});
+    const std::size_t covered_before =
+        ImplicationFilterStats::n_rule_covered.load();
+    const std::optional<Specification> residual =
+        residual_destination(tight, loose);
+    expect(residual.has_value() && count_live(residual->m_guarantees) == 0,
+           "residual_destination: the rules must cover the whole destination");
+    expect(ImplicationFilterStats::n_rule_covered.load() == covered_before + 2,
+           "residual_destination: one assumption and one guarantee by rule");
+    expect(!residual_destination(loose, tight).has_value(),
+           "residual_destination: the converse must decline");
 }
 
 // An assumption of the source missing from the destination declines the

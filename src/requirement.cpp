@@ -502,6 +502,66 @@ bool timing_implies(const Timing& stronger, const Timing& weaker,
     __builtin_unreachable();
 }
 
+// The scope order depends on the timing and the condition type, because the
+// scope boundary relaxes a bounded obligation but *tightens* an unbounded one:
+// `in m ... eventually r` demands the response arrive before the mode ends,
+// which global scope does not, so `global => in` holds at `always` and fails at
+// `eventually`. Measured tick counts 2 and 4 give identical orders, so the
+// table is independent of n. `until` and `before`, measured at an atom stop and
+// at a conjunction, fall in the same cells as the tick-bounded timings, so it
+// is independent of the stop too.
+//
+// `notin => before` is the one edge holding in every cell: the interval
+// strictly before the first entry into the mode is contained in the set of
+// points where the mode does not hold.
+//
+// The three "only" scopes are an antichain in every cell -- each constrains a
+// different complement -- so a requirement already carrying one cannot move on
+// this field at all.
+std::vector<ScopeEdge> scope_edges(const Timing& timing,
+                                   ConditionType condition_type) {
+    const ScopeEdge notin_before{ScopeKind::NotIn, ScopeKind::Before};
+    std::vector<ScopeEdge> from_global{{ScopeKind::Global, ScopeKind::In},
+                                       {ScopeKind::Global, ScopeKind::NotIn},
+                                       {ScopeKind::Global, ScopeKind::Before},
+                                       {ScopeKind::Global, ScopeKind::After},
+                                       notin_before};
+    const bool is_eventually =
+        std::holds_alternative<timing::Eventually>(timing);
+    const bool is_always = std::holds_alternative<timing::Always>(timing);
+    if (is_eventually) {
+        // Under `eventually` the boundary turns `F r` into `!boundary U r`, a
+        // strengthening, so global sits below three of the four scopes.
+        if (condition_type == ConditionType::Continual) {
+            return {{ScopeKind::Global, ScopeKind::After}, notin_before};
+        }
+        return {notin_before};
+    }
+    if (condition_type == ConditionType::Continual || is_always) {
+        return from_global;
+    }
+    // A trigger's rising edge is itself confined by the boundary, which costs
+    // the three edges a continual condition keeps.
+    return {{ScopeKind::Global, ScopeKind::Before}, notin_before};
+}
+
+bool scope_implies(const Scope& stronger, const Scope& weaker,
+                   const Timing& timing, ConditionType condition_type) {
+    if (stronger == weaker) {
+        return true;
+    }
+    // Global implies the scoped form for every mode; between two scoped forms
+    // an edge holds one mode at a time.
+    if (!stronger.is_global() && stronger.m_mode != weaker.m_mode) {
+        return false;
+    }
+    const std::vector<ScopeEdge> edges = scope_edges(timing, condition_type);
+    return std::any_of(edges.begin(), edges.end(), [&](const ScopeEdge& edge) {
+        return edge.m_stronger == stronger.m_kind &&
+               edge.m_weaker == weaker.m_kind;
+    });
+}
+
 Requirement::Requirement(Formula condition, Formula response, Timing timing,
                          ConditionType condition_type, bool weakenable,
                          bool removed, Scope scope)

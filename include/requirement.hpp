@@ -179,6 +179,29 @@ bool is_only_scope(ScopeKind kind);
 bool timing_implies(const Timing& stronger, const Timing& weaker,
                     ScopeKind scope);
 
+/// One edge of the scope order: a requirement under @p m_stronger implies the
+/// same requirement under @p m_weaker, the mode held fixed.
+struct ScopeEdge {
+    ScopeKind m_stronger;
+    ScopeKind m_weaker;
+};
+
+/// The edges of the scope order at one timing and condition type, measured
+/// with `ltlfilt` and pinned by test_scope_order_is_pinned. The order depends
+/// on both: the scope boundary relaxes a bounded obligation and tightens an
+/// unbounded one. The three only scopes are an antichain in every cell.
+/// mutate_requirement draws among these in this order, so reordering them
+/// moves the breeding stream.
+std::vector<ScopeEdge> scope_edges(const Timing& timing,
+                                   ConditionType condition_type);
+
+/// Whether a requirement under @p stronger implies the same requirement under
+/// @p weaker, at @p timing and @p condition_type. Reflexive. Global implies a
+/// scoped form for any mode, and two scoped forms are related only over one
+/// mode.
+bool scope_implies(const Scope& stronger, const Scope& weaker,
+                   const Timing& timing, ConditionType condition_type);
+
 /// A FRET requirement specifying a system obligation. Consists of a condition
 /// and a response that must be satisfied according to the specified timing
 /// constraint. These are used as the basic units for repair and for computing

@@ -10,6 +10,7 @@
 #include <variant>
 #include <vector>
 
+#include "filter/implication_check.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/random_source.hpp"
 #include "requirement.hpp"
@@ -191,7 +192,7 @@ TEST(test_scope_zero_ticks_is_unrelaxed) {
 
 // --- The mutation order table --------------------------------------------
 
-// Re-derives every edge scope_order claims, so a wrong entry fails here rather
+// Re-derives every edge scope_edges claims, so a wrong entry fails here rather
 // than surfacing later as a directional mutation that moved the wrong way. The
 // non-edges are checked too: a missing edge that actually holds costs the
 // search reach, and an edge that does not hold is unsound.
@@ -200,7 +201,7 @@ struct Edge {
     ScopeKind m_weaker;
 };
 
-// The table in src/genetic/mutation.cpp, restated independently so that a
+// The table in src/requirement.cpp, restated independently so that a
 // single edit cannot move both.
 std::vector<Edge> expected_edges(const Timing& tim, ConditionType ctype) {
     const Edge notin_before{ScopeKind::NotIn, ScopeKind::Before};
@@ -223,7 +224,7 @@ std::vector<Edge> expected_edges(const Timing& tim, ConditionType ctype) {
 }
 
 // One ordered pair of scopes at one (timing, condition type) cell, and whether
-// scope_order claims the edge between them.
+// scope_edges claims the edge between them.
 struct OrderQuery {
     Implication m_implication;
     std::string m_where;
@@ -231,7 +232,7 @@ struct OrderQuery {
 };
 
 // Queues every ordered pair of scopes at one (timing, condition type) cell, to
-// be checked against what scope_order claims for it. The non-edges are checked
+// be checked against what scope_edges claims for it. The non-edges are checked
 // too: a missing edge that actually holds costs the search reach, and a
 // claimed edge that does not hold is unsound.
 void collect_order_cell(const Timing& tim, ConditionType ctype,
@@ -456,7 +457,7 @@ TEST(test_condition_type_order_is_pinned) {
 }
 
 TEST(test_scope_order_is_pinned) {
-    // A conjunction stop alongside timing_cases()' atom, since scope_order
+    // A conjunction stop alongside timing_cases()' atom, since scope_edges
     // reads only the timing's kind and so claims its cells for every stop.
     std::vector<Timing> timings = timing_cases();
     timings.push_back(timing::until(Formula("s & t")));
@@ -477,10 +478,10 @@ TEST(test_scope_order_is_pinned) {
     for (std::size_t idx = 0; idx < queries.size(); ++idx) {
         if (queries[idx].m_claimed) {
             expect(holds[idx],
-                   "scope_order claims an edge that does not hold: " +
+                   "scope_edges claims an edge that does not hold: " +
                        queries[idx].m_where);
         } else {
-            expect(!holds[idx], "scope_order is missing an edge that holds: " +
+            expect(!holds[idx], "scope_edges is missing an edge that holds: " +
                                     queries[idx].m_where);
         }
     }
@@ -587,6 +588,41 @@ TEST(test_timing_order_is_pinned) {
     }
 }
 
+// Queues, for each start and direction under @p scope_case, the implication
+// every move of the timing arm away from that start claims.
+void collect_timing_moves(const ScopeCase& scope_case,
+                          const std::vector<Timing>& starts,
+                          const std::vector<Timing>& pool,
+                          std::vector<Implication>& implications,
+                          std::vector<std::string>& wheres) {
+    const Scope scope = make_scope(scope_case.m_kind);
+    for (const Timing& start : starts) {
+        for (const Direction direction :
+             {Direction::Weaken, Direction::Strengthen}) {
+            for (std::size_t draw = 0; draw < 6; ++draw) {
+                const Timing mutated =
+                    mutate_timing(start, direction, scope_case.m_kind, pool,
+                                  constant_source(draw));
+                if (mutated == start) {
+                    continue;
+                }
+                const std::string from =
+                    scoped(scope, start, ConditionType::Continual).m_ltl;
+                const std::string into =
+                    scoped(scope, mutated, ConditionType::Continual).m_ltl;
+                const bool weaken = direction == Direction::Weaken;
+                implications.push_back(weaken ? Implication{from, into}
+                                              : Implication{into, from});
+                std::string where = weaken ? "weakening " : "strengthening ";
+                where += to_string(start) + " to " + to_string(mutated);
+                where += " under ";
+                where += scope_case.m_name;
+                wheres.push_back(where);
+            }
+        }
+    }
+}
+
 // The timing arm moves in its direction under every scope, which before the
 // scope reached it held only under Global and After. Each fallback draw from
 // 0 to 5 reaches every branch of the two operators, and the pool donates to
@@ -600,36 +636,8 @@ TEST(test_timing_mutation_moves_in_direction_under_every_scope) {
     starts.push_back(timing::for_ticks(1));
     std::vector<Implication> implications;
     std::vector<std::string> wheres;
-    std::size_t moved = 0;
     for (const ScopeCase& scope_case : scope_cases()) {
-        const Scope scope = make_scope(scope_case.m_kind);
-        for (const Timing& start : starts) {
-            for (const Direction direction :
-                 {Direction::Weaken, Direction::Strengthen}) {
-                for (std::size_t draw = 0; draw < 6; ++draw) {
-                    const Timing mutated =
-                        mutate_timing(start, direction, scope_case.m_kind, pool,
-                                      constant_source(draw));
-                    if (mutated == start) {
-                        continue;
-                    }
-                    ++moved;
-                    const std::string from =
-                        scoped(scope, start, ConditionType::Continual).m_ltl;
-                    const std::string into =
-                        scoped(scope, mutated, ConditionType::Continual).m_ltl;
-                    const bool weaken = direction == Direction::Weaken;
-                    implications.push_back(weaken ? Implication{from, into}
-                                                  : Implication{into, from});
-                    std::string where =
-                        weaken ? "weakening " : "strengthening ";
-                    where += to_string(start) + " to " + to_string(mutated);
-                    where += " under ";
-                    where += scope_case.m_name;
-                    wheres.push_back(where);
-                }
-            }
-        }
+        collect_timing_moves(scope_case, starts, pool, implications, wheres);
     }
     const std::vector<bool> holds = ltl_implications(implications);
     for (std::size_t idx = 0; idx < wheres.size(); ++idx) {
@@ -637,7 +645,115 @@ TEST(test_timing_mutation_moves_in_direction_under_every_scope) {
                "timing mutation moved the wrong way: " + wheres[idx]);
     }
     // Without this the loop above passes on an arm that never moves.
-    expect(moved > 0, "timing mutation: no draw moved any timing");
+    expect(!wheres.empty(), "timing mutation: no draw moved any timing");
 }
 
+// --- Structural requirement implication -----------------------------------
+
+// Every pair requirement_implies proves must hold under SPOT. The pools give
+// each field an implication chain and an incomparable value, and a second mode
+// so that scope edges must keep theirs. A sample of requirements is paired
+// with every requirement one or two fields away, which is where a rule chain
+// has the most room to go wrong while staying short.
+TEST(test_requirement_implies_is_sound) {
+    const std::vector<Formula> conditions = {Formula("a"), Formula("a & b"),
+                                             Formula("a | b")};
+    const std::vector<Formula> responses = {Formula("x"), Formula("x | y"),
+                                            Formula("x & y")};
+    const std::vector<Timing> timings = {
+        timing::immediately(),        timing::next_timepoint(),
+        timing::within_ticks(2),      timing::within_ticks(3),
+        timing::for_ticks(2),         timing::after_ticks(1),
+        timing::eventually(),         timing::always(),
+        timing::until(Formula("s")),  timing::until(Formula("s | t")),
+        timing::before(Formula("s")), timing::before(Formula("s | t"))};
+    const std::vector<Scope> scopes = {Scope{},
+                                       Scope{ScopeKind::In, "m"},
+                                       Scope{ScopeKind::NotIn, "m"},
+                                       Scope{ScopeKind::Before, "m"},
+                                       Scope{ScopeKind::After, "m"},
+                                       Scope{ScopeKind::OnlyIn, "m"},
+                                       Scope{ScopeKind::OnlyAfter, "m"},
+                                       Scope{ScopeKind::In, "n"}};
+    struct Index {
+        std::size_t m_condition, m_response, m_timing, m_ctype, m_scope;
+    };
+    const auto build = [&](const Index& idx) {
+        return Requirement(conditions[idx.m_condition],
+                           responses[idx.m_response], timings[idx.m_timing],
+                           idx.m_ctype == 0 ? ConditionType::Continual
+                                            : ConditionType::Trigger,
+                           /*weakenable=*/true, /*removed=*/false,
+                           scopes[idx.m_scope]);
+    };
+    // Every combination, decoded from one counter in mixed radix.
+    const std::size_t n_combinations = conditions.size() * responses.size() *
+                                       timings.size() * 2 * scopes.size();
+    std::vector<Index> all;
+    for (std::size_t code = 0; code < n_combinations; ++code) {
+        std::size_t rest = code;
+        Index idx{};
+        idx.m_scope = rest % scopes.size();
+        rest /= scopes.size();
+        idx.m_ctype = rest % 2;
+        rest /= 2;
+        idx.m_timing = rest % timings.size();
+        rest /= timings.size();
+        idx.m_response = rest % responses.size();
+        idx.m_condition = rest / responses.size();
+        all.push_back(idx);
+    }
+    const auto distance = [](const Index& lhs, const Index& rhs) {
+        return static_cast<int>(lhs.m_condition != rhs.m_condition) +
+               static_cast<int>(lhs.m_response != rhs.m_response) +
+               static_cast<int>(lhs.m_timing != rhs.m_timing) +
+               static_cast<int>(lhs.m_ctype != rhs.m_ctype) +
+               static_cast<int>(lhs.m_scope != rhs.m_scope);
+    };
+    std::vector<Implication> implications;
+    std::vector<std::string> wheres;
+    std::size_t asked = 0;
+    for (std::size_t i = 0; i < all.size(); i += 11) {
+        const Requirement stronger = build(all[i]);
+        for (const Index& other : all) {
+            const int apart = distance(all[i], other);
+            if (apart == 0 || apart > 2) {
+                continue;
+            }
+            ++asked;
+            const Requirement weaker = build(other);
+            if (!requirement_implies(stronger, weaker)) {
+                continue;
+            }
+            implications.push_back({stronger.m_ltl, weaker.m_ltl});
+            wheres.push_back(stronger.to_string() + " => " +
+                             weaker.to_string());
+        }
+    }
+    const std::vector<bool> holds = ltl_implications(implications);
+    for (std::size_t idx = 0; idx < wheres.size(); ++idx) {
+        expect(holds[idx],
+               "requirement_implies proved a non-implication: " + wheres[idx]);
+    }
+    expect(!wheres.empty() && wheres.size() < asked,
+           "requirement_implies: the sample must prove some pairs, not all");
+}
+
+// One pair that moves every field at once, and needs its scope moved before
+// its condition type: Global to In holds for a continual `within`, and not
+// for a triggered one.
+TEST(test_requirement_implies_chains_every_field) {
+    const Requirement tight(Formula("a"), Formula("x"), timing::within_ticks(2),
+                            ConditionType::Continual);
+    const Requirement loose(Formula("a & b"), Formula("x | y"),
+                            timing::within_ticks(3), ConditionType::Trigger,
+                            /*weakenable=*/true, /*removed=*/false,
+                            Scope{ScopeKind::In, "m"});
+    expect(requirement_implies(tight, loose),
+           "requirement_implies: the five-field chain must be proved");
+    expect(ltl_implications({{tight.m_ltl, loose.m_ltl}}).front(),
+           "requirement_implies: the five-field chain must hold");
+    expect(!requirement_implies(loose, tight),
+           "requirement_implies: the converse must not be proved");
+}
 }  // namespace

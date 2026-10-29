@@ -246,6 +246,7 @@ inline void reset_stats() {
                                                      std::memory_order_relaxed);
     ImplicationFilterStats::n_residual_settled.store(0,
                                                      std::memory_order_relaxed);
+    ImplicationFilterStats::n_rule_covered.store(0, std::memory_order_relaxed);
 }
 
 }  // namespace antichain
