@@ -11,6 +11,16 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
+        # One LLVM release for clang and the coverage tools. On
+        # darwin it is also the shell's compiler: the compiler-rt 21.1.8 ASan
+        # runtime deadlocks during its own initialisation on macOS 26, before
+        # main, so every debug-preset test hangs.
+        llvm = pkgs.llvmPackages_22;
+        mkShell =
+          if pkgs.stdenv.hostPlatform.isDarwin
+          then pkgs.mkShell.override { stdenv = llvm.stdenv; }
+          else pkgs.mkShell;
+
         # ctcache (matus-chochlik/ctcache) — result cache for clang-tidy. Its
         # client is a single stdlib-only Python script (server-only extras like
         # flask/redis are lazily imported and unused in local CTCACHE_DIR mode),
@@ -30,7 +40,7 @@
             ${ctcacheSrc}/src/ctcache/clang_tidy_cache.py "$@"
         '';
       in {
-        devShells.default = pkgs.mkShell {
+        devShells.default = mkShell {
           packages = with pkgs; [
             # clang-tidy result cache (used whenever present; see above)
             clang-tidy-cache
@@ -50,7 +60,10 @@
             # cpptrace: libunwind-based stack unwinding (CPPTRACE_UNWIND_WITH_LIBUNWIND=ON)
             libunwind
 
-            # Lint targets (clang-tidy, clang-format, cppcheck, cpplint)
+            # Lint targets (clang-tidy, clang-format, cppcheck, cpplint). Left
+            # on the nixpkgs default rather than `llvm`: clang-tidy 22 reports
+            # about 740 findings under .clang-tidy that 21 does not, 690 of
+            # them bugprone-throwing-static-initialization on TEST registrars.
             clang-tools
             cppcheck
             cpplint
@@ -60,7 +73,7 @@
             # equivalent, so the fuzz target is built with its own clang++
             # invocation (see fuzz/CMakeLists.txt) rather than the project's
             # normal GCC-based build.
-            clang
+            llvm.clang
 
             # Coverage (`cmake --workflow --preset coverage`, then
             # scripts/coverage_badge.py): llvm-profdata merges the profiles the
@@ -68,7 +81,7 @@
             # be the same LLVM release as the clang above, since the profile
             # format is versioned -- an older llvm-profdata reports a current
             # profile as malformed rather than as out of date.
-            llvmPackages.llvm
+            llvm.llvm
 
             # Docs targets (doxygen + sphinx), and z3's Python bindings for
             # scripts/import_fret.py, which asks z3 which combinations of

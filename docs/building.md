@@ -142,7 +142,7 @@ The badge is a committed file rather than a call out to a badge service, so the 
 
 The measurement covers every instrumented binary rather than the test binary alone: `peredur`, `compare`, `keyword-terms`, `lint-ideals`, `ltl`, `maximal`, `mucs`, `realize`, `signal_tracer` and `test/peredur_tests`. Over all ten it was 91.0% on 2026-10-07. What remains uncovered is mostly error and terminal branches, such as `include/status_line.hpp` at 54.8% for its tty-only paths. The crash handler's signal path also reads as uncovered, although an end-to-end test runs it, because the handler leaves through `_exit` and skips the profile write. A new binary goes into `BINARIES` in the script, which fails loudly when a name it holds is not built.
 
-`llvm-profdata` and `llvm-cov` must come from the same LLVM release as the clang that built the tree. The profile format is versioned, so an older tool reports a current profile as malformed. The Nix dev shell carries `llvmPackages.llvm` for this; on a host with several LLVMs installed, `LLVM_COV` and `LLVM_PROFDATA` override the lookup.
+`llvm-profdata` and `llvm-cov` must come from the same LLVM release as the clang that built the tree. The profile format is versioned, so an older tool reports a current profile as malformed. The Nix dev shell takes clang and `llvm` from the one `llvmPackages_22` set for this; on a host with several LLVMs installed, `LLVM_COV` and `LLVM_PROFDATA` override the lookup.
 
 Without help, the first coverage configure rebuilds Spot, black and Ganak into `build-coverage/third_party`, and Spot alone is a 30-minute build. `PEREDUR_THIRD_PARTY_DIR` points a preset at a tree that already exists, and `cmake/spot.cmake` skips the external project when its done-stamp is there:
 
