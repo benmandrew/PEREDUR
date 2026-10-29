@@ -11,8 +11,8 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        # One LLVM release for clang and the coverage tools. On
-        # darwin it is also the shell's compiler: the compiler-rt 21.1.8 ASan
+        # One LLVM release for clang, the coverage tools and the lint tools.
+        # On darwin it is also the shell's compiler: the compiler-rt 21.1.8 ASan
         # runtime deadlocks during its own initialisation on macOS 26, before
         # main, so every debug-preset test hangs.
         llvm = pkgs.llvmPackages_22;
@@ -60,11 +60,10 @@
             # cpptrace: libunwind-based stack unwinding (CPPTRACE_UNWIND_WITH_LIBUNWIND=ON)
             libunwind
 
-            # Lint targets (clang-tidy, clang-format, cppcheck, cpplint). Left
-            # on the nixpkgs default rather than `llvm`: clang-tidy 22 reports
-            # about 740 findings under .clang-tidy that 21 does not, 690 of
-            # them bugprone-throwing-static-initialization on TEST registrars.
-            clang-tools
+            # Lint targets (clang-tidy, clang-format, cppcheck, cpplint).
+            # clang-tidy and clang-format come from `llvm`, the same release
+            # as the clang below.
+            llvm.clang-tools
             cppcheck
             cpplint
 
