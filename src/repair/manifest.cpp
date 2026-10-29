@@ -218,7 +218,12 @@ namespace {
 // queries over no environment inputs decided by satisfiability rather than by
 // ltlsynt. tool_calls.ltlsynt.calls no longer counts them, so a run on such a
 // specification reads far fewer ltlsynt calls than one at 37.
-constexpr int k_schema_version = 38;
+//
+// 39 added implication.model_words and implication.model_refuted: the solver
+// models the prefilter adds to its sampled words, and the ordered pairs only
+// a model word refuted. From this version `fingerprint_refuted` counts those
+// pairs too, so it reads higher than at 38 wherever a model separated a pair.
+constexpr int k_schema_version = 39;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -364,6 +369,9 @@ nlohmann::json tool_calls_json() {
 // equivalent, a class of k members contributing k-1. `fingerprint_refuted`
 // counts ordered pairs, two per unordered pair, so a pair both directions of
 // which a sampled word refuted never reaches `comparisons` at all.
+// `model_words` counts the solver models among those words, summed over the
+// tables a streamed sweep draws per batch, and `model_refuted` the ordered
+// pairs within `fingerprint_refuted` that only a model word refuted.
 // `residual_queries` and `residual_settled` count ordered checks too: those
 // that dropped shared guarantees before querying, and those left nothing to
 // query. `rule_covered` counts requirements, not checks.
@@ -377,6 +385,8 @@ nlohmann::json implication_json() {
          ImplicationFilterStats::n_equivalent_collapsed.load()},
         {"fingerprint_refuted",
          ImplicationFilterStats::n_fingerprint_refuted.load()},
+        {"model_words", ImplicationFilterStats::n_model_words.load()},
+        {"model_refuted", ImplicationFilterStats::n_model_refuted.load()},
         {"residual_queries", ImplicationFilterStats::n_residual_queries.load()},
         {"residual_settled", ImplicationFilterStats::n_residual_settled.load()},
         {"rule_covered", ImplicationFilterStats::n_rule_covered.load()}};

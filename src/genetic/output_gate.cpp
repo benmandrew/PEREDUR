@@ -145,8 +145,11 @@ std::unique_ptr<StreamingMaximalFilter<Spec>> make_maximal_stream(
         return stream_implies(lhs, rhs, checker);
     };
     rules.similarity = syntactic_similarity_key(original, cfg);
+    // On the background queue with the stream's own checks, so its black
+    // calls never hold up the search's regions.
     rules.fingerprints = [](const std::vector<Spec>& specs) {
-        return fingerprint::prefilter::fingerprints_of(specs);
+        return fingerprint::prefilter::fingerprints_of(
+            specs, TaskPriority::Background);
     };
     return std::make_unique<StreamingMaximalFilter<Spec>>(
         cfg, std::move(rules),

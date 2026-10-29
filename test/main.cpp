@@ -53,6 +53,7 @@ const std::vector<Suite>& suites() {
         suite_named("prop_formula_similarity"),
         suite_named("prop_formula_temporal"),
         suite_named("fingerprint_lasso"),
+        suite_named("fingerprint_prefilter"),
         suite_named("semantic_similarity"),
         suite_named("syntactic_similarity"),
         suite_named("fitness_function"),

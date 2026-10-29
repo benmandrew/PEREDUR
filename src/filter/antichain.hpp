@@ -69,11 +69,11 @@ std::vector<double> keys_of(const std::vector<Spec>& specs, const Key& key) {
     return keys;
 }
 
-// True when a sampled word refutes `specs[lhs] -> specs[rhs]`. @p prints is
-// either empty or one entry per spec, and an entry may itself be empty: the
-// streaming filter samples each batch separately and a batch whose lowering
-// the parser cannot read back has no table. All tables are drawn from the same
-// words over the same signals, so entries from different batches compare.
+// True when a sampled or model word refutes `specs[lhs] -> specs[rhs]`.
+// @p prints is either empty or one entry per spec, and an entry may itself be
+// empty, a table having been lost. Every non-empty entry must come from one
+// `fingerprints_of` call, since the model words are those of the specs that
+// call was given.
 inline bool refutes(const std::vector<fingerprint::PackedFingerprint>& prints,
                     std::size_t lhs, std::size_t rhs) {
     return !prints.empty() && !prints[lhs].empty() && !prints[rhs].empty() &&
@@ -163,12 +163,20 @@ std::vector<std::uint8_t> merge_subsumed(
     // 3361 calls at 18x for 6.4s -- fewer calls and three times the wall.
     std::vector<std::pair<std::size_t, std::size_t>> pairs;
     std::size_t refuted_directions = 0;
+    std::size_t model_directions = 0;
+    const auto by_model = [&prints](std::size_t lhs, std::size_t rhs) {
+        return static_cast<std::size_t>(
+            fingerprint::prefilter::refuted_by_model_alone(prints[lhs],
+                                                           prints[rhs]));
+    };
     for (std::size_t i = 0; i < n_specs; ++i) {
         for (std::size_t j = std::max(i + 1, n_settled); j < n_specs; ++j) {
             const bool forward = refutes(prints, i, j);
             const bool backward = refutes(prints, j, i);
             refuted_directions += static_cast<std::size_t>(forward) +
                                   static_cast<std::size_t>(backward);
+            model_directions += (forward ? by_model(i, j) : 0) +
+                                (backward ? by_model(j, i) : 0);
             if (!forward || !backward) {
                 pairs.emplace_back(i, j);
             }
@@ -176,6 +184,8 @@ std::vector<std::uint8_t> merge_subsumed(
     }
     ImplicationFilterStats::n_fingerprint_refuted.fetch_add(
         refuted_directions, std::memory_order_relaxed);
+    ImplicationFilterStats::n_model_refuted.fetch_add(
+        model_directions, std::memory_order_relaxed);
     std::vector<std::atomic<std::uint8_t>> subsumed(n_specs);
     for (std::atomic<std::uint8_t>& flag : subsumed) {
         flag.store(0, std::memory_order_relaxed);
@@ -242,6 +252,8 @@ inline void reset_stats() {
         0, std::memory_order_relaxed);
     ImplicationFilterStats::n_fingerprint_refuted.store(
         0, std::memory_order_relaxed);
+    ImplicationFilterStats::n_model_words.store(0, std::memory_order_relaxed);
+    ImplicationFilterStats::n_model_refuted.store(0, std::memory_order_relaxed);
     ImplicationFilterStats::n_residual_queries.store(0,
                                                      std::memory_order_relaxed);
     ImplicationFilterStats::n_residual_settled.store(0,

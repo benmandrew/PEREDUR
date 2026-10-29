@@ -36,6 +36,14 @@ struct ImplicationFilterStats {
     /// all. Both paths sample, over the specification's declared signals --
     /// inputs, outputs, and on the FRETISH path the modes a scope names.
     inline static std::atomic<std::size_t> n_fingerprint_refuted{0};
+    /// Solver models the prefilter added to its sampled words, summed over
+    /// the tables the sweep drew: one per specification black found a model
+    /// of. The streamed sweep draws a table per batch, over the maximal set so
+    /// far and the batch, so a member's model counts once per batch it meets.
+    inline static std::atomic<std::size_t> n_model_words{0};
+    /// The part of n_fingerprint_refuted that only a model word refuted, no
+    /// sampled word separating the pair.
+    inline static std::atomic<std::size_t> n_model_refuted{0};
     /// Pairs found mutually equivalent, each of which dropped one side. This
     /// is the width of the population's equivalence classes, which nothing
     /// else records: a class of k members contributes k-1 here.

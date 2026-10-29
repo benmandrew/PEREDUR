@@ -39,7 +39,8 @@ void print_implication_summary(double elapsed) {
               << ImplicationFilterStats::n_duplicates << " dup, "
               << ImplicationFilterStats::n_equivalent_collapsed << " equiv, "
               << ImplicationFilterStats::n_timeouts << " timeout, "
-              << ImplicationFilterStats::n_fingerprint_refuted << " refuted)\n";
+              << ImplicationFilterStats::n_fingerprint_refuted << " refuted, "
+              << ImplicationFilterStats::n_model_refuted << " by model)\n";
 }
 
 }  // namespace
@@ -233,7 +234,8 @@ filter_maximal_specifications(
                   << " equiv, " << ImplicationFilterStats::n_timeouts
                   << " timeout, "
                   << ImplicationFilterStats::n_fingerprint_refuted
-                  << " refuted)" << std::flush;
+                  << " refuted, " << ImplicationFilterStats::n_model_refuted
+                  << " by model)" << std::flush;
     };
     // A checker of the stage's own, as on the TLSF path (tlsf/pipeline.cpp)
     // and in `maximal` and `compare`. Both final filters ask implications

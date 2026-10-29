@@ -50,6 +50,7 @@ add_executable(peredur_tests
     tlsf/monotone_tests.cpp
     tlsf/pipeline_tests.cpp
     fingerprint/lasso_tests.cpp
+    fingerprint/prefilter_tests.cpp
     drivers/e2e_tests.cpp
     test_registry.cpp
 )
@@ -114,6 +115,7 @@ set(peredur_test_suites
     prop_formula_similarity
     prop_formula_temporal
     fingerprint_lasso
+    fingerprint_prefilter
     semantic_similarity
     syntactic_similarity
     fitness_function

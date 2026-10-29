@@ -393,6 +393,20 @@ int run(const Args& args, SatisfiabilityChecker& checker) {
     if (reported > 0) {
         std::cerr << "\n";
     }
+    // The sweep's own counters, on stderr so the report a script parses keeps
+    // its shape. Read before the quotient, whose prefilter is not the sweep's.
+    std::cerr << "stats comparisons " << ImplicationFilterStats::n_comparisons
+              << " skipped " << ImplicationFilterStats::n_skipped
+              << " timeouts " << ImplicationFilterStats::n_timeouts
+              << " equivalent "
+              << ImplicationFilterStats::n_equivalent_collapsed
+              << " fingerprint_refuted "
+              << ImplicationFilterStats::n_fingerprint_refuted
+              << " model_words " << ImplicationFilterStats::n_model_words
+              << " model_refuted " << ImplicationFilterStats::n_model_refuted
+              << " residual_queries "
+              << ImplicationFilterStats::n_residual_queries << " rule_covered "
+              << ImplicationFilterStats::n_rule_covered << "\n";
 
     const Quotient quotient = quotient_by_equivalence<Spec>(
         maximal, checker, fingerprint::prefilter::fingerprints_of(maximal));

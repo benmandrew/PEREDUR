@@ -6,16 +6,22 @@
 #include <array>
 #include <cassert>
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "formula_key.hpp"
+#include "profile.hpp"
 #include "prop_formula/identifier.hpp"
 #include "runner/ltlfilt.hpp"
 #include "runner/process.hpp"
@@ -90,6 +96,50 @@ std::optional<bool> constant_answer(const std::string& formula) {
         return true;
     }
     return std::nullopt;
+}
+
+// A formula as black is to read it: weak operators rewritten away, which
+// black_answer explains, and the constants respelled. Every step is an
+// equivalence, so a verdict or a model of the text is one of the formula.
+struct BlackQuery {
+    std::string m_text;
+    // Set when the rewrite folded the formula to a constant, leaving no text.
+    std::optional<bool> m_constant;
+    // Set when a weak operator could not be rewritten away, leaving no text.
+    bool m_unresolved = false;
+};
+
+BlackQuery prepare_black_query(const std::string& formula) {
+    BlackQuery prepared;
+    std::string query = formula;
+    if (has_weak_operator(query)) {
+        const std::optional<std::string> rewritten =
+            rewrite_weak_operators(query);
+        if (!rewritten.has_value()) {
+            prepared.m_unresolved = true;
+            return prepared;
+        }
+        query = *rewritten;
+        if (const std::optional<bool> decided = constant_answer(query)) {
+            prepared.m_constant = decided;
+            return prepared;
+        }
+    }
+    prepared.m_text = to_black_constants(query);
+    return prepared;
+}
+
+// black's -t takes whole seconds, so a budget rounds up (black_answer gives
+// the reasons).
+std::int64_t black_timeout_seconds(std::chrono::milliseconds budget) {
+    return std::chrono::ceil<std::chrono::seconds>(budget).count();
+}
+
+// The one-state model of a formula already decided valid.
+LassoModel any_word_model() {
+    LassoModel model;
+    model.m_states.emplace_back();
+    return model;
 }
 
 }  // namespace
@@ -272,8 +322,7 @@ std::optional<bool> SatisfiabilityChecker::black_answer(
     // budget stays zero, which disables both sides at once and leaves nothing
     // bounding the solve; the config default is 1000 ms and no shipped
     // configuration sets zero.
-    const auto timeout_s =
-        std::chrono::ceil<std::chrono::seconds>(budget).count();
+    const std::int64_t timeout_s = black_timeout_seconds(budget);
     // The formula is black-compatible because it comes from requirement_to_ltl
     // or implication check construction, never from SPOT's printer: black
     // rejects "0"/"1" and does not support "xor".
@@ -297,26 +346,21 @@ std::optional<bool> SatisfiabilityChecker::black_answer(
     // its loop rules do cover. Guarded by a lexical scan, so the overwhelming
     // majority of queries -- every FRETISH one, since requirement_to_ltl never
     // emits W -- pay nothing.
-    std::string query = ltl_formula;
-    if (has_weak_operator(query)) {
-        const std::optional<std::string> rewritten =
-            rewrite_weak_operators(query);
-        if (!rewritten.has_value()) {
-            // No answer beats a wrong one: every caller treats nullopt
-            // conservatively and keeps the candidate, whereas black's answer
-            // here would be confidently wrong in the direction that admits a
-            // vacuous repair.
-            n_weak_operator_unresolved++;
-            return std::nullopt;
-        }
-        query = *rewritten;
-        // --remove-wm routinely folds to a constant a formula the guard above
-        // saw unfolded. Cache it: the answer cost an ltlfilt exec, and it is
-        // the same answer for every query sharing the key.
-        if (const std::optional<bool> decided = constant_answer(query)) {
-            n_constant_folded++;
-            return decided;
-        }
+    const BlackQuery query = prepare_black_query(ltl_formula);
+    if (query.m_unresolved) {
+        // No answer beats a wrong one: every caller treats nullopt
+        // conservatively and keeps the candidate, whereas black's answer
+        // here would be confidently wrong in the direction that admits a
+        // vacuous repair.
+        n_weak_operator_unresolved++;
+        return std::nullopt;
+    }
+    // --remove-wm routinely folds to a constant a formula the guard above
+    // saw unfolded. Cache it: the answer cost an ltlfilt exec, and it is
+    // the same answer for every query sharing the key.
+    if (query.m_constant.has_value()) {
+        n_constant_folded++;
+        return query.m_constant;
     }
     // On stdin (`-` names it) rather than as `-f`, for the argv limit
     // execute_and_capture_with_input describes. black reads the whole input
@@ -324,8 +368,8 @@ std::optional<bool> SatisfiabilityChecker::black_answer(
     const std::vector<std::string> command = {black, "solve", "-t",
                                               std::to_string(timeout_s), "-"};
     n_black_calls++;
-    const ProcessResult result = execute_and_capture_with_input(
-        command, to_black_constants(query), budget);
+    const ProcessResult result =
+        execute_and_capture_with_input(command, query.m_text, budget);
     std::scoped_lock lock(m_cache_mutex);
     record_exec<SatisfiabilityChecker>(result);
     if (result.m_timed_out) {
@@ -352,4 +396,86 @@ std::optional<bool> SatisfiabilityChecker::black_answer(
                                  result.m_output);
     }
     return sat;
+}
+
+std::optional<LassoModel> parse_black_model(const std::string& json) {
+    const nlohmann::json parsed =
+        nlohmann::json::parse(json, nullptr, /*allow_exceptions=*/false);
+    if (parsed.is_discarded() || !parsed.is_object() ||
+        parsed.value("result", "") != "SAT") {
+        return std::nullopt;
+    }
+    const auto model = parsed.find("model");
+    if (model == parsed.end() || !model->is_object()) {
+        return std::nullopt;
+    }
+    const auto states = model->find("states");
+    const auto loop = model->find("loop");
+    // No loop is a finite-trace model, which no lasso word represents.
+    if (states == model->end() || !states->is_array() || states->empty() ||
+        loop == model->end() || !loop->is_number_unsigned()) {
+        return std::nullopt;
+    }
+    LassoModel out;
+    out.m_states.reserve(states->size());
+    for (const nlohmann::json& state : *states) {
+        if (!state.is_object()) {
+            return std::nullopt;
+        }
+        std::unordered_map<std::string, bool> values;
+        for (const auto& [atom, value] : state.items()) {
+            if (!value.is_string()) {
+                return std::nullopt;
+            }
+            const auto& text = value.get_ref<const std::string&>();
+            if (text == "true" || text == "false") {
+                values.emplace(atom, text == "true");
+            } else if (text != "undef") {
+                return std::nullopt;
+            }
+        }
+        out.m_states.push_back(std::move(values));
+    }
+    // black's loop index is the state the last one is followed by. At the
+    // model's size it marks a model found with nothing left to fulfil, whose
+    // every continuation is a model: black's own trace checker reads the
+    // states past it as unconstrained.
+    const auto loop_index = loop->get<std::size_t>();
+    if (loop_index > out.m_states.size()) {
+        return std::nullopt;
+    }
+    out.m_loop = std::min(loop_index, out.m_states.size() - 1);
+    return out;
+}
+
+std::optional<LassoModel> black_model(const std::string& ltl_formula,
+                                      std::chrono::milliseconds budget) {
+    PEREDUR_PROFILE_SCOPE("black/model");
+    if (const std::optional<bool> decided = constant_answer(ltl_formula)) {
+        return *decided ? std::optional<LassoModel>{any_word_model()}
+                        : std::nullopt;
+    }
+    const BlackQuery query = prepare_black_query(ltl_formula);
+    if (query.m_unresolved) {
+        return std::nullopt;
+    }
+    if (query.m_constant.has_value()) {
+        return *query.m_constant ? std::optional<LassoModel>{any_word_model()}
+                                 : std::nullopt;
+    }
+    const std::vector<std::string> command = {
+        black_executable_path(),
+        "solve",
+        "-m",
+        "-o",
+        "json",
+        "-t",
+        std::to_string(black_timeout_seconds(budget)),
+        "-"};
+    const ProcessResult result =
+        execute_and_capture_with_input(command, query.m_text, budget);
+    if (result.m_timed_out) {
+        return std::nullopt;
+    }
+    return parse_black_model(result.m_output);
 }

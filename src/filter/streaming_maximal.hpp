@@ -146,7 +146,6 @@ class StreamingMaximalFilter {
         std::string name;
         std::size_t sequence{0};
         double key{0.0};
-        fingerprint::PackedFingerprint print;
     };
 
     void close_and_join() {
@@ -207,30 +206,26 @@ class StreamingMaximalFilter {
         }
         const std::vector<double> incoming_keys =
             antichain::keys_of(incoming, m_rules.similarity);
-        std::vector<fingerprint::PackedFingerprint> incoming_prints;
-        if (m_rules.fingerprints) {
-            incoming_prints = m_rules.fingerprints(incoming);
-        }
-        // A batch whose table was lost compares on the solver alone; the
-        // members' tables are still good against each other.
-        incoming_prints.resize(incoming.size());
 
         const std::size_t n_settled = m_members.size();
         std::vector<Spec> specs;
         std::vector<double> keys;
-        std::vector<fingerprint::PackedFingerprint> prints;
         specs.reserve(n_settled + incoming.size());
         keys.reserve(n_settled + incoming.size());
-        prints.reserve(n_settled + incoming.size());
         for (const Member& member : m_members) {
             specs.push_back(member.spec);
             keys.push_back(member.key);
-            prints.push_back(member.print);
         }
         specs.insert(specs.end(), incoming.begin(), incoming.end());
         keys.insert(keys.end(), incoming_keys.begin(), incoming_keys.end());
-        prints.insert(prints.end(), incoming_prints.begin(),
-                      incoming_prints.end());
+        // Drawn over the members and the batch together rather than kept per
+        // member: the table's model words are those of the specs it is drawn
+        // over, so a member's old fingerprint lacks the batch's. The models
+        // themselves are memoised, so a member costs black one call in all.
+        std::vector<fingerprint::PackedFingerprint> prints;
+        if (m_rules.fingerprints) {
+            prints = m_rules.fingerprints(specs);
+        }
 
         const std::vector<std::uint8_t> subsumed = antichain::merge_subsumed(
             specs, keys, prints, n_settled,
@@ -254,8 +249,7 @@ class StreamingMaximalFilter {
                        members.back().sequence < batch[idx].sequence);
                 members.push_back({std::move(batch[idx].spec),
                                    std::move(batch[idx].name),
-                                   batch[idx].sequence, incoming_keys[idx],
-                                   std::move(incoming_prints[idx])});
+                                   batch[idx].sequence, incoming_keys[idx]});
             }
         }
         m_members = std::move(members);

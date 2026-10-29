@@ -13,6 +13,7 @@
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 /// Returns the path to the black binary: `PEREDUR_BLACK_PATH` when that
 /// environment variable is set and non-empty, and otherwise the
@@ -160,3 +161,30 @@ class SatisfiabilityChecker {
 /// that do not need test isolation should use this instead of constructing
 /// their own, so they share the memoisation cache.
 SatisfiabilityChecker& global_sat_checker();
+
+/// An ultimately periodic model of an LTL formula, as black prints one: the
+/// value of each atom at each state, the last state being followed by state
+/// `m_loop`. An atom a state does not name is unconstrained there, which is how
+/// black's `undef` is read.
+struct LassoModel {
+    std::size_t m_loop = 0;
+    std::vector<std::unordered_map<std::string, bool>> m_states;
+};
+
+/// The model in the JSON `black solve -m -o json` prints, or nullopt for any
+/// other result (UNSAT, UNKNOWN) or for output of another shape.
+///
+/// black reports a `loop` equal to the model's size when it found the model
+/// with no obligation left open at the last state, so every continuation
+/// satisfies the formula. That continuation is taken to be the last state
+/// repeated, which keeps the model within its own states.
+std::optional<LassoModel> parse_black_model(const std::string& json);
+
+/// A model of @p ltl_formula from one black solve within @p budget, or nullopt
+/// on UNSAT, UNKNOWN, a timeout, or a weak operator that could not be
+/// rewritten away. Prepared as `SatisfiabilityChecker` prepares a query: W and
+/// M are rewritten in terms of U and R, and the constants respelled. Both
+/// rewrites are equivalences, so a model of the query black reads is a model of
+/// @p ltl_formula.
+std::optional<LassoModel> black_model(const std::string& ltl_formula,
+                                      std::chrono::milliseconds budget);
