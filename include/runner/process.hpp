@@ -105,7 +105,8 @@ ProcessResult execute_and_capture_with_input(
 /// for anything longer-lived.
 ///
 /// macOS has no mechanism that survives the exec, so the request is made of a
-/// reaper process of PEREDUR's own instead (see src/runner/process.cpp). That
+/// reaper process of PEREDUR's own instead (see src/runner/process.cpp), by
+/// the parent while the posix_spawn'd child is still suspended. That
 /// is a weaker guarantee — it depends on the reaper being alive and
 /// schedulable, where the Linux one holds with every thread of PEREDUR wedged
 /// — and it is process-scoped rather than thread-scoped. The distinction below
@@ -151,11 +152,12 @@ struct PipedChild {
 /// own exec, so its reader never sees end of file.
 ///
 /// This and execute_and_capture (which execute_and_capture_with_input shares)
-/// are the only two forks a caller can reach, and nothing may add a third
-/// outside process.cpp — which holds one more, for the macOS reaper.
-/// posix_spawn would be the cheaper primitive, but it has no attribute for
-/// PR_SET_PDEATHSIG — the one mechanism that stops a killed run from stranding
-/// multi-GB tool processes (PR #47).
+/// are the only two spawns a caller can reach, and nothing may add a third
+/// outside process.cpp — which holds one more, for the macOS reaper. macOS
+/// uses posix_spawn, a fixed 74 ms cheaper per call than a fork from an ASan
+/// build, and forks only if it fails. Linux always forks: posix_spawn has no
+/// attribute for PR_SET_PDEATHSIG, the one mechanism that stops a killed run
+/// from stranding multi-GB tool processes (PR #47).
 PipedChild spawn_piped_child(const std::vector<std::string>& arguments,
                              ParentDeathPolicy policy, ExecutableLookup lookup);
 
@@ -170,7 +172,8 @@ std::pair<std::string, bool> read_until_eof(int read_fd,
 /// process group, and applies `policy`. Call only between fork() and exec(),
 /// where it must stay async-signal-safe; under KillWithParentThread it _exit()s
 /// if the parent is already gone. Both forks in process.cpp call it themselves,
-/// and they are its only callers.
+/// and they are its only callers. A macOS posix_spawn child never runs it; see
+/// spawn_without_fork in process.cpp for how its work is done there.
 ///
 /// `parent_pid` is the caller's own pid, read *before* the fork: that is what
 /// "already gone" is tested against. Testing for reparenting to pid 1 instead

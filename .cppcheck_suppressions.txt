@@ -36,3 +36,8 @@ constParameterReference:*/genetic/random_source.hpp
 # that configuration. Scoped to the one file that spawns, so the check still
 # fires on a genuinely dead local anywhere else.
 unusedVariable:*/runner/process.cpp
+
+# spawn_without_fork is a stub returning -1 on Linux, so in that configuration
+# the fork fallback after it is always taken. On macOS it is the posix_spawn
+# path, and the fallback runs only when that fails.
+knownConditionTrueFalse:*/runner/process.cpp

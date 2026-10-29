@@ -8,8 +8,10 @@
 #include <unistd.h>
 
 #ifdef __APPLE__
+#include <crt_externs.h>
 #include <libproc.h>
 #include <mach/mach.h>
+#include <spawn.h>
 
 #include <mutex>
 #else
@@ -27,6 +29,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
+#include <initializer_list>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -557,6 +560,86 @@ void report_exec_failure(const char* path, int error_number) {
     _exit(127);
 }
 
+// One of the child's standard descriptors and the parent's descriptor it is
+// copied from. A negative source leaves the target as inherited.
+struct ChildDescriptor {
+    int m_source = -1;
+    int m_target = -1;
+};
+
+#ifdef __APPLE__
+// macOS starts children without forking where it can. A fork from an ASan
+// build costs a fixed 74 ms here, whatever the heap holds, against 1.2 ms for
+// posix_spawn, and a debug test run is mostly tool calls.
+//
+// harden_child_after_fork's work moves into spawn attributes and the parent.
+// POSIX_SPAWN_SETPGROUP gives the child its own group atomically, so there is
+// no window for adopt_child_process_group to close. Under KillWithParentThread
+// the child starts suspended, is registered with the reaper, and only then
+// resumes, which closes the window the getppid check closes after a fork: if
+// PEREDUR dies before the registration lands, the stopped child's group is
+// orphaned and the kernel's SIGHUP kills it. SIGHUP is reset to its default
+// for that, since a run under nohup would otherwise hand down SIG_IGN.
+//
+// Returns -1 when posix_spawn fails, and the caller forks instead, so a failed
+// exec is still reported by report_exec_failure in the child's own output.
+pid_t spawn_without_fork(const std::vector<char*>& argv,
+                         ExecutableLookup lookup, ParentDeathPolicy policy,
+                         std::initializer_list<ChildDescriptor> descriptors) {
+    posix_spawn_file_actions_t actions;
+    posix_spawn_file_actions_init(&actions);
+    for (const ChildDescriptor& descriptor : descriptors) {
+        if (descriptor.m_source >= 0) {
+            posix_spawn_file_actions_adddup2(&actions, descriptor.m_source,
+                                             descriptor.m_target);
+        }
+    }
+    posix_spawnattr_t attributes;
+    posix_spawnattr_init(&attributes);
+    const bool contained = policy == ParentDeathPolicy::KillWithParentThread;
+    int flags = POSIX_SPAWN_SETPGROUP;
+    if (contained) {
+        flags |= POSIX_SPAWN_START_SUSPENDED | POSIX_SPAWN_SETSIGDEF;
+        sigset_t hangup;
+        sigemptyset(&hangup);
+        sigaddset(&hangup, SIGHUP);
+        posix_spawnattr_setsigdefault(&attributes, &hangup);
+    }
+    posix_spawnattr_setflags(&attributes, static_cast<std::int16_t>(flags));
+    posix_spawnattr_setpgroup(&attributes, 0);
+    pid_t child_pid = -1;
+    const int error =
+        lookup == ExecutableLookup::SearchPath
+            ? posix_spawnp(&child_pid, argv[0], &actions, &attributes,
+                           argv.data(), *_NSGetEnviron())
+            : posix_spawn(&child_pid, argv[0], &actions, &attributes,
+                          argv.data(), *_NSGetEnviron());
+    posix_spawnattr_destroy(&attributes);
+    posix_spawn_file_actions_destroy(&actions);
+    if (error != 0) {
+        return -1;
+    }
+    if (contained) {
+        const int reaper_fd = g_reaper_write_fd.load(std::memory_order_acquire);
+        if (reaper_fd >= 0) {
+            [[maybe_unused]] const ssize_t written =
+                write(reaper_fd, &child_pid, sizeof(child_pid));
+        }
+        kill(child_pid, SIGCONT);
+    }
+    return child_pid;
+}
+#else
+// Linux always forks: PR_SET_PDEATHSIG has to be set in the child, and
+// posix_spawn has no attribute for it.
+pid_t spawn_without_fork(
+    const std::vector<char*>& /*argv*/, ExecutableLookup /*lookup*/,
+    ParentDeathPolicy /*policy*/,
+    std::initializer_list<ChildDescriptor> /*descriptors*/) {
+    return -1;
+}
+#endif
+
 // A close-on-exec descriptor holding `content`, positioned at its start, for
 // the child to take as its stdin. A file rather than a pipe, so the whole
 // payload is in place before the fork: nothing is written while the child's
@@ -700,29 +783,34 @@ PipedChild spawn_piped_child(const std::vector<std::string>& arguments,
     // Read before the fork, since after it the child cannot tell its original
     // parent from any other pid. See harden_child_after_fork.
     const pid_t parent_pid = getpid();
-    const pid_t child_pid = fork();
+    pid_t child_pid = spawn_without_fork(
+        argv, lookup, policy,
+        {{stdin_pipe[0], STDIN_FILENO}, {stdout_pipe[1], STDOUT_FILENO}});
     if (child_pid < 0) {
-        close(stdin_pipe[0]);
-        close(stdin_pipe[1]);
-        close(stdout_pipe[0]);
-        close(stdout_pipe[1]);
-        assert(false);
-        __builtin_unreachable();
-    }
-    if (child_pid == 0) {
-        close(stdin_pipe[1]);
-        close(stdout_pipe[0]);
-        // The dup2 copies clear O_CLOEXEC, which is what lets the child keep
-        // exactly the two descriptors it needs across the exec.
-        if (dup2(stdin_pipe[0], STDIN_FILENO) < 0 ||
-            dup2(stdout_pipe[1], STDOUT_FILENO) < 0) {
-            _exit(127);
+        child_pid = fork();
+        if (child_pid < 0) {
+            close(stdin_pipe[0]);
+            close(stdin_pipe[1]);
+            close(stdout_pipe[0]);
+            close(stdout_pipe[1]);
+            assert(false);
+            __builtin_unreachable();
         }
-        close(stdin_pipe[0]);
-        close(stdout_pipe[1]);
-        exec_child(argv, lookup, policy, parent_pid);
+        if (child_pid == 0) {
+            close(stdin_pipe[1]);
+            close(stdout_pipe[0]);
+            // The dup2 copies clear O_CLOEXEC, which is what lets the child
+            // keep exactly the two descriptors it needs across the exec.
+            if (dup2(stdin_pipe[0], STDIN_FILENO) < 0 ||
+                dup2(stdout_pipe[1], STDOUT_FILENO) < 0) {
+                _exit(127);
+            }
+            close(stdin_pipe[0]);
+            close(stdout_pipe[1]);
+            exec_child(argv, lookup, policy, parent_pid);
+        }
+        adopt_child_process_group(child_pid);
     }
-    adopt_child_process_group(child_pid);
     close(stdin_pipe[0]);
     close(stdout_pipe[1]);
     return {child_pid, stdin_pipe[1], stdout_pipe[0],
@@ -837,25 +925,32 @@ ProcessResult run_and_capture(const std::vector<std::string>& arguments,
         rss_floor_kb = self_resident_kb();
         // See the same capture in spawn_piped_child.
         const pid_t parent_pid = getpid();
-        child_pid = fork();
+        child_pid = spawn_without_fork(argv, lookup,
+                                       ParentDeathPolicy::KillWithParentThread,
+                                       {{pipe_fds[1], STDOUT_FILENO},
+                                        {pipe_fds[1], STDERR_FILENO},
+                                        {input_fd, STDIN_FILENO}});
         if (child_pid < 0) {
-            close(pipe_fds[0]);
-            close(pipe_fds[1]);
-            assert(false);
-            __builtin_unreachable();
-        }
-        if (child_pid == 0) {
-            close(pipe_fds[0]);
-            if (dup2(pipe_fds[1], STDOUT_FILENO) < 0 ||
-                dup2(pipe_fds[1], STDERR_FILENO) < 0 ||
-                (input_fd >= 0 && dup2(input_fd, STDIN_FILENO) < 0)) {
-                _exit(127);
+            child_pid = fork();
+            if (child_pid < 0) {
+                close(pipe_fds[0]);
+                close(pipe_fds[1]);
+                assert(false);
+                __builtin_unreachable();
             }
-            close(pipe_fds[1]);
-            exec_child(argv, lookup, ParentDeathPolicy::KillWithParentThread,
-                       parent_pid);
+            if (child_pid == 0) {
+                close(pipe_fds[0]);
+                if (dup2(pipe_fds[1], STDOUT_FILENO) < 0 ||
+                    dup2(pipe_fds[1], STDERR_FILENO) < 0 ||
+                    (input_fd >= 0 && dup2(input_fd, STDIN_FILENO) < 0)) {
+                    _exit(127);
+                }
+                close(pipe_fds[1]);
+                exec_child(argv, lookup,
+                           ParentDeathPolicy::KillWithParentThread, parent_pid);
+            }
+            adopt_child_process_group(child_pid);
         }
-        adopt_child_process_group(child_pid);
         close(pipe_fds[1]);
         if (input_fd >= 0) {
             close(input_fd);
