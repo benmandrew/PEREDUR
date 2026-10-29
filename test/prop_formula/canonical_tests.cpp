@@ -109,6 +109,19 @@ TEST(test_double_negation_is_dropped) {
         "prop-formula-canonical: !!p should canonicalise to p, got " + negated);
 }
 
+// A chain operand that canonicalises to the chain's own kind joins the chain:
+// `!!(a & c)` becomes a conjunction, so its operands sort among the others.
+TEST(test_double_negated_operand_joins_the_chain) {
+    const std::string flat =
+        Formula("((a) & (b)) & (c)").canonical().to_string();
+    const std::string nested =
+        Formula("(b) & (!(!((c) & (a))))").canonical().to_string();
+    expect(flat == nested,
+           "prop-formula-canonical: !!(c & a) inside a conjunction should "
+           "flatten into it, got " +
+               nested + " against " + flat);
+}
+
 // Iff is commutative and associative but not idempotent: `a <-> a` is the
 // constant true, so deduplicating its operands would change what it says.
 TEST(test_iff_is_ordered_but_not_deduplicated) {

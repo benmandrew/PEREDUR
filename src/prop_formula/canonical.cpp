@@ -68,24 +68,34 @@ Formula Formula::canonical() const {
     if (!children) {
         return *this;
     }
-    const Formula left = children->first.canonical();
-    const Formula right = children->second.canonical();
     if (!is_commutative(kind())) {
-        return make_binary(kind(), left, right);
+        return make_binary(kind(), children->first.canonical(),
+                           children->second.canonical());
     }
     // Iff is commutative and associative, but not idempotent -- `a <-> a` is
     // the constant true rather than `a` -- so its operands are ordered and
     // neither flattened nor deduplicated. Deduplicating there would change
     // what the formula says.
     if (kind() == Kind::Iff) {
+        const Formula left = children->first.canonical();
+        const Formula right = children->second.canonical();
         const bool ordered = left < right;
         const Formula& first = ordered ? left : right;
         const Formula& second = ordered ? right : left;
         return make_binary(kind(), first, second);
     }
+    // The whole chain at once. Canonicalising each side first would flatten,
+    // sort and rebuild every operand below at each level of a left-leaning
+    // chain, n^2 operand copies for n conjuncts. A canonical operand is
+    // flattened again, since `!!(a & b)` comes back as an And. Sorting and
+    // deduplicating a union does not depend on how it was grouped, so the
+    // result is the one the per-level rebuild gave.
+    std::vector<Formula> chain_operands;
+    flatten(*this, kind(), chain_operands);
     std::vector<Formula> operands;
-    flatten(left, kind(), operands);
-    flatten(right, kind(), operands);
+    for (const Formula& operand : chain_operands) {
+        flatten(operand.canonical(), kind(), operands);
+    }
     std::sort(operands.begin(), operands.end());
     operands.erase(std::unique(operands.begin(), operands.end()),
                    operands.end());
