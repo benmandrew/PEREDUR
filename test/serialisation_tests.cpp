@@ -124,9 +124,9 @@ TEST(test_timing_until_and_before) {
            "Timing: two untils over different stops must not be equal");
     expect(!(timing::until(Formula("s")) == timing::before(Formula("s"))),
            "Timing: until and before over one stop must not be equal");
-    expect(std::hash<Timing>{}(timing::until(Formula("s"))) !=
-               std::hash<Timing>{}(timing::until(Formula("t"))),
-           "hash<Timing>: the stop must reach the hash");
+    expect(TimingHash()(timing::until(Formula("s"))) !=
+               TimingHash()(timing::until(Formula("t"))),
+           "TimingHash: the stop must reach the hash");
 }
 
 // The stop is tagged with the atom prefix like the condition, and stripped

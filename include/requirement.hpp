@@ -392,11 +392,9 @@ Specification add_atom_prefix(const Specification& spec);
 /// removes a leading k_atom_prefix from each atom-vector entry if present.
 Specification strip_atom_prefix(const Specification& spec);
 
-/// \cond
-namespace std {  // NOLINT(build/namespaces)
-
-template <>
-struct hash<Timing> {
+/// Hashes a Timing. Timing is a std::variant, a standard-library type, so
+/// specialising std::hash for it would modify namespace std.
+struct TimingHash {
     // std::visit is specified as throwing bad_variant_access on a
     // valueless variant. Every Timing alternative is nothrow-copyable, so
     // Timing can never become valueless and the throw is unreachable.
@@ -424,12 +422,15 @@ struct hash<Timing> {
     }
 };
 
+/// \cond
+namespace std {  // NOLINT(build/namespaces)
+
 template <>
 struct hash<Requirement> {
     std::size_t operator()(const Requirement& req) const noexcept {
         std::size_t seed = std::hash<Formula>{}(req.m_condition);
         seed = hash_combine(seed, std::hash<Formula>{}(req.m_response));
-        seed = hash_combine(seed, std::hash<Timing>{}(req.m_timing));
+        seed = hash_combine(seed, TimingHash()(req.m_timing));
         seed = hash_combine(seed, std::hash<bool>{}(req.m_condition_type ==
                                                     ConditionType::Trigger));
         seed = hash_combine(seed,
