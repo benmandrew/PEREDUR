@@ -269,6 +269,13 @@ class RealizabilityChecker {
     std::vector<int> intern_side(
         const std::vector<std::string>& conjuncts,
         const std::vector<const Requirement*>& requirements);
+    /// Memoises @p verdict and, when decided, records it for the subsumption
+    /// passes. Called under m_cache_mutex.
+    void remember_verdict(const std::string& cache_key,
+                          const std::string& scope, bool have_sides,
+                          const std::vector<int>& assumption_ids,
+                          const std::vector<int>& guarantee_ids,
+                          const std::optional<bool>& verdict);
 
     /// A query the controller store may answer: its interned sides, with the
     /// canonical formula behind each id, copied out so that the checks run

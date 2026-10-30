@@ -350,7 +350,43 @@ bool plays_without_environment(const std::string& ltl,
         });
 }
 
+// With no inputs the environment makes no choice, so the query is
+// satisfiability: a satisfying word is a strategy the system plays blind, and
+// Mealy and Moore coincide. On lift-plus-cruise-mini, 72 queries took a median
+// 0.538s in ltlsynt and 0.028s in black, with every verdict agreeing. black
+// goes first because SPOT's satisfiability stage is the slow side on whole
+// specifications. Returns nullopt for a query with an environment, and for an
+// undecided or failed answer, which falls through to ltlsynt: it may still
+// decide the query within its own budget.
+std::optional<bool> decide_without_environment(
+    const std::string& ltl, const std::vector<std::string>& inputs,
+    const std::vector<std::string>& outputs) {
+    if (!plays_without_environment(ltl, inputs, outputs)) {
+        return std::nullopt;
+    }
+    try {
+        return global_sat_checker().check_satisfiability_by_black(ltl);
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
 }  // namespace
+
+void RealizabilityChecker::remember_verdict(
+    const std::string& cache_key, const std::string& scope, bool have_sides,
+    const std::vector<int>& assumption_ids,
+    const std::vector<int>& guarantee_ids, const std::optional<bool>& verdict) {
+    m_cache.emplace(cache_key, verdict);
+    // Only a decided verdict joins the table. An undecided one is memoised
+    // like any other, but it carries no direction, so nothing follows from it
+    // about any other query.
+    if (have_sides && verdict.has_value()) {
+        m_decided[scope].push_back(
+            Decided{assumption_ids, guarantee_ids, signature_of(assumption_ids),
+                    signature_of(guarantee_ids), *verdict});
+    }
+}
 
 std::vector<int> RealizabilityChecker::intern_side(
     const std::vector<std::string>& conjuncts,
@@ -1214,39 +1250,15 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
             }
         }
     }
-    // Recorded exactly as an ltlsynt verdict is, so the subsumption passes
-    // read a routed answer like any other. Called under m_cache_mutex.
-    const auto remember = [&](const std::optional<bool>& verdict) {
-        m_cache.emplace(cache_key, verdict);
-        // Only a decided verdict joins the table. An undecided one is memoised
-        // like any other, but it carries no direction, so nothing follows
-        // from it about any other query.
-        if (have_sides && verdict.has_value()) {
-            m_decided[scope].push_back(Decided{
-                assumption_ids, guarantee_ids, signature_of(assumption_ids),
-                signature_of(guarantee_ids), *verdict});
-        }
-    };
-    // With no inputs the environment makes no choice, so the query is
-    // satisfiability: a satisfying word is a strategy the system plays blind,
-    // and Mealy and Moore coincide. On lift-plus-cruise-mini, 72 queries took
-    // a median 0.538s in ltlsynt and 0.028s in black, with every verdict
-    // agreeing. black goes first because SPOT's satisfiability stage is the
-    // slow side on whole specifications. An undecided or failed answer falls
-    // through to ltlsynt, which may still decide it within its own budget.
-    if (m_route_input_free &&
-        plays_without_environment(conj_ltl, inputs, outputs)) {
-        std::optional<bool> satisfiable;
-        try {
-            satisfiable =
-                global_sat_checker().check_satisfiability_by_black(conj_ltl);
-        } catch (const std::exception&) {
-            satisfiable.reset();
-        }
-        if (satisfiable.has_value()) {
+    if (m_route_input_free) {
+        if (const std::optional<bool> satisfiable =
+                decide_without_environment(conj_ltl, inputs, outputs)) {
+            // Recorded exactly as an ltlsynt verdict is, so the subsumption
+            // passes read a routed answer like any other.
             std::scoped_lock lock(m_cache_mutex);
             n_satisfiability_routed++;
-            remember(satisfiable);
+            remember_verdict(cache_key, scope, have_sides, assumption_ids,
+                             guarantee_ids, satisfiable);
             return satisfiable;
         }
     }
@@ -1303,7 +1315,8 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
     // exists to avoid. What #74 had to remove was caching a *verdict* nobody
     // decided; nullopt is not one, so every caller still picks its own
     // direction on every hit.
-    remember(realizable);
+    remember_verdict(cache_key, scope, have_sides, assumption_ids,
+                     guarantee_ids, realizable);
     return realizable;
 }
 
