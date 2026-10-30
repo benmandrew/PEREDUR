@@ -40,15 +40,11 @@
 #include <vector>
 
 #include "driver_support.hpp"
-#include "filter/implication_check.hpp"
-#include "filter/vacuity.hpp"
 #include "filter/well_separation.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
-#include "serialisation.hpp"
-#include "tlsf/filter.hpp"
-#include "tlsf/parser.hpp"
+#include "spec_format.hpp"
 #include "tlsf/specification.hpp"
 
 namespace {
@@ -112,8 +108,8 @@ bool failed(std::optional<bool> value) { return value.has_value() && !*value; }
 // can express rather than on what one configuration turns on, so this reports
 // an ideal as reachable whichever probability the run that scores it uses,
 // including zero.
-void check_tlsf_reachable(const tlsf::Specification& spec,
-                          const tlsf::Specification& ideal, Verdict& verdict) {
+void check_reachable(const tlsf::Specification& spec,
+                     const tlsf::Specification& ideal, Verdict& verdict) {
     const std::size_t spec_guarantees =
         spec.m_preset.size() + spec.m_assert.size() + spec.m_guarantee.size();
     const std::size_t ideal_guarantees = ideal.m_preset.size() +
@@ -163,8 +159,8 @@ void check_tlsf_reachable(const tlsf::Specification& spec,
 // condition, response and timing (requirement.hpp:82), so scope and component
 // changes are already outside what a loaded ideal can express and need no
 // check here.
-void check_fretish_reachable(const Specification& spec,
-                             const Specification& ideal, Verdict& verdict) {
+void check_reachable(const Specification& spec, const Specification& ideal,
+                     Verdict& verdict) {
     if (ideal.m_guarantees.size() > spec.m_guarantees.size()) {
         verdict.reachable = false;
         verdict.unreachable_reason =
@@ -223,16 +219,19 @@ std::vector<std::filesystem::path> ideal_paths(
 // some repair implies some ideal, so where A implies B the weaker B always
 // governs and A cannot change the score. Equivalent pairs are duplication and
 // are called out separately, since one of the two is simply dead weight.
-template <typename SpecT, typename ImpliesFn>
+template <typename Spec>
 void report_redundancy(const std::vector<std::string>& names,
-                       const std::vector<SpecT>& specs, ImpliesFn implies) {
+                       const std::vector<Spec>& specs,
+                       SatisfiabilityChecker& sat) {
     for (std::size_t i = 0; i < specs.size(); ++i) {
         for (std::size_t j = 0; j < specs.size(); ++j) {
             if (i == j) {
                 continue;
             }
-            const std::optional<bool> forward = implies(specs[i], specs[j]);
-            const std::optional<bool> backward = implies(specs[j], specs[i]);
+            const std::optional<bool> forward =
+                SpecFormat<Spec>::implies(specs[i], specs[j], sat);
+            const std::optional<bool> backward =
+                SpecFormat<Spec>::implies(specs[j], specs[i], sat);
             if (!forward.value_or(false)) {
                 continue;
             }
@@ -270,61 +269,16 @@ void print_header() {
               << "reachable" << "\n";
 }
 
-// Runs every check over one TLSF subject. Returns the number of failures.
-std::size_t lint_tlsf(const std::filesystem::path& dir,
-                      const std::filesystem::path& spec_path,
-                      SatisfiabilityChecker& sat, RealizabilityChecker& real) {
-    const tlsf::Specification spec =
-        tlsf::parse(read_file_or_throw(spec_path.string(), "cannot read file"));
-    const std::vector<std::filesystem::path> paths =
-        ideal_paths(dir / "fixes", ".tlsf");
-    if (paths.empty()) {
-        std::cout << subject_name(dir) << ": no ideals\n";
-        return 0;
-    }
-    std::cout << subject_name(dir) << " (" << paths.size() << " ideals)\n";
-    print_header();
-
-    std::vector<tlsf::Specification> ideals;
-    std::vector<std::string> names;
-    std::size_t failures = 0;
-    for (const auto& path : paths) {
-        const tlsf::Specification ideal =
-            tlsf::parse(read_file_or_throw(path.string(), "cannot read file"));
-        Verdict verdict;
-        verdict.name = path.filename().string();
-        verdict.weakening = tlsf_spec_implies(spec, ideal, sat);
-        verdict.realisable = real.check_realizability_ltl(
-            ideal.to_ltl(), ideal.m_inputs, ideal.m_outputs);
-        const bool ill_separated =
-            specification_is_not_well_separated(ideal, real);
-        verdict.separated = !ill_separated;
-        verdict.nontrivial = !tlsf_has_valid_guarantee(ideal, sat);
-        check_tlsf_reachable(spec, ideal, verdict);
-        print_row(verdict);
-        failures += static_cast<std::size_t>(
-            failed(verdict.weakening) || failed(verdict.realisable) ||
-            failed(verdict.separated) || failed(verdict.nontrivial) ||
-            !verdict.reachable);
-        ideals.push_back(ideal);
-        names.push_back(verdict.name);
-    }
-    report_redundancy(names, ideals,
-                      [&sat](const tlsf::Specification& from,
-                             const tlsf::Specification& dest) {
-                          return tlsf_spec_implies(from, dest, sat);
-                      });
-    return failures;
-}
-
-// The FRETISH path. Same checks, different loaders and library entry points.
-std::size_t lint_fretish(const std::filesystem::path& dir,
+// Runs every check over one subject. Returns the number of failures.
+template <typename Spec>
+std::size_t lint_subject(const std::filesystem::path& dir,
                          const std::filesystem::path& spec_path,
                          SatisfiabilityChecker& sat,
                          RealizabilityChecker& real) {
-    const Specification spec = load_specification(spec_path.string());
+    using Format = SpecFormat<Spec>;
+    const Spec spec = Format::load(spec_path.string(), "cannot read file");
     const std::vector<std::filesystem::path> paths =
-        ideal_paths(dir / "fixes", ".json");
+        ideal_paths(dir / "fixes", Format::k_extension);
     if (paths.empty()) {
         std::cout << subject_name(dir) << ": no ideals\n";
         return 0;
@@ -332,18 +286,18 @@ std::size_t lint_fretish(const std::filesystem::path& dir,
     std::cout << subject_name(dir) << " (" << paths.size() << " ideals)\n";
     print_header();
 
-    std::vector<Specification> ideals;
+    std::vector<Spec> ideals;
     std::vector<std::string> names;
     std::size_t failures = 0;
     for (const auto& path : paths) {
-        const Specification ideal = load_specification(path.string());
+        const Spec ideal = Format::load(path.string(), "cannot read file");
         Verdict verdict;
         verdict.name = path.filename().string();
-        verdict.weakening = spec_implies(spec, ideal, sat);
-        verdict.realisable = real.check_realizability(ideal);
+        verdict.weakening = Format::implies(spec, ideal, sat);
+        verdict.realisable = Format::realisable(ideal, real);
         verdict.separated = !specification_is_not_well_separated(ideal, real);
-        verdict.nontrivial = !specification_has_valid_guarantee(ideal, sat);
-        check_fretish_reachable(spec, ideal, verdict);
+        verdict.nontrivial = !Format::has_valid_guarantee(ideal, sat);
+        check_reachable(spec, ideal, verdict);
         print_row(verdict);
         failures += static_cast<std::size_t>(
             failed(verdict.weakening) || failed(verdict.realisable) ||
@@ -352,11 +306,7 @@ std::size_t lint_fretish(const std::filesystem::path& dir,
         ideals.push_back(ideal);
         names.push_back(verdict.name);
     }
-    report_redundancy(
-        names, ideals,
-        [&sat](const Specification& from, const Specification& dest) {
-            return spec_implies(from, dest, sat);
-        });
+    report_redundancy(names, ideals, sat);
     return failures;
 }
 
@@ -387,9 +337,11 @@ int main(int argc, char** argv) {
             const std::filesystem::path tlsf_spec = dir / "spec.tlsf";
             const std::filesystem::path json_spec = dir / "spec.json";
             if (std::filesystem::exists(tlsf_spec)) {
-                failures += lint_tlsf(dir, tlsf_spec, sat, real);
+                failures += lint_subject<tlsf::Specification>(dir, tlsf_spec,
+                                                              sat, real);
             } else if (std::filesystem::exists(json_spec)) {
-                failures += lint_fretish(dir, json_spec, sat, real);
+                failures +=
+                    lint_subject<Specification>(dir, json_spec, sat, real);
             } else {
                 std::cerr << name << ": no spec.tlsf or spec.json\n";
                 return 2;

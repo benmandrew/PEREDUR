@@ -44,6 +44,19 @@ std::vector<double> crowding_distances(
     const std::vector<std::vector<double>>& objectives,
     const std::vector<std::size_t>& ranks);
 
+/// Each element's per-objective vector, in population order: the matrix the
+/// free functions above take.
+template <typename Spec>
+std::vector<std::vector<double>> objectives_of(
+    const std::vector<Scored<Spec>>& population) {
+    std::vector<std::vector<double>> objectives;
+    objectives.reserve(population.size());
+    for (const Scored<Spec>& scored : population) {
+        objectives.push_back(scored.objectives);
+    }
+    return objectives;
+}
+
 /// Computes non-domination ranks and crowding distances from each element's
 /// objectives, stores them on the elements, and stable-sorts the population by
 /// the crowded-comparison operator: front rank ascending, then crowding
@@ -54,11 +67,8 @@ void nsga2_sort(std::vector<Scored<Spec>>& population) {
     if (population.empty()) {
         return;
     }
-    std::vector<std::vector<double>> objectives;
-    objectives.reserve(population.size());
-    for (const Scored<Spec>& scored : population) {
-        objectives.push_back(scored.objectives);
-    }
+    const std::vector<std::vector<double>> objectives =
+        objectives_of(population);
     const std::vector<std::size_t> ranks = non_domination_ranks(objectives);
     const std::vector<double> distances = crowding_distances(objectives, ranks);
     for (std::size_t i = 0; i < population.size(); ++i) {

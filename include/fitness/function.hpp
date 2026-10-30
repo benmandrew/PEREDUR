@@ -5,6 +5,7 @@
 ///        AggregateWeightedFitnessFunction, and the factory
 ///        get_fitness_function.
 
+#include <cassert>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -71,6 +72,10 @@ using FitnessDecompositionT = std::function<ObjectiveWork(const Spec&)>;
 /// The default weight is given by k_default_fitness_weight.
 template <typename Spec>
 struct WeightedFitnessFunctionT {
+    /// The whole objective in one call. May be empty when `decompose` is set,
+    /// and then the serial path runs the parts in order and folds them. The
+    /// status objective keeps both, because its whole walk stops at the first
+    /// unsatisfiable component and its parts cannot.
     FitnessFunctionT<Spec> function;
     double weight = k_default_fitness_weight;
     std::string name;
@@ -79,6 +84,22 @@ struct WeightedFitnessFunctionT {
     /// three-field brace initialisations of this aggregate keep compiling under
     /// -Wmissing-field-initializers.
     FitnessDecompositionT<Spec> decompose = nullptr;
+
+    /// Scores @p spec on the calling thread: `function` where there is one,
+    /// otherwise every part of `decompose` in order, folded by its `combine`.
+    double operator()(const Spec& spec) const {
+        if (function) {
+            return function(spec);
+        }
+        assert(decompose);
+        const ObjectiveWork work = decompose(spec);
+        std::vector<double> values;
+        values.reserve(work.parts.size());
+        for (const FitnessPart& part : work.parts) {
+            values.push_back(part.run());
+        }
+        return work.combine(values);
+    }
 };
 
 /// Aggregates multiple WeightedFitnessFunctionT instances into a single
@@ -141,7 +162,7 @@ class AggregateWeightedFitnessFunctionT {
         values.reserve(m_fitness_functions.size());
         for (std::size_t i = 0; i < m_fitness_functions.size(); ++i) {
             const profile::Scope scope(*m_profile_sites[i]);
-            values.push_back(m_fitness_functions[i].function(spec));
+            values.push_back(m_fitness_functions[i](spec));
         }
         std::scoped_lock lock(*m_cache_mutex);
         return m_cache.emplace(spec, std::move(values)).first->second;

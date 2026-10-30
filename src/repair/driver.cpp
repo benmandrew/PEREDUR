@@ -13,22 +13,24 @@
 #include <utility>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "crash/crash_handler.hpp"
 #include "dashboard.hpp"
 #include "evolution.hpp"
-#include "filter/correctness.hpp"
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
 #include "genetic/filter_report.hpp"
 #include "genetic/generation.hpp"
+#include "genetic/generation_loop.hpp"
 #include "genetic/output_gate.hpp"
 #include "genetic/random_source.hpp"
 #include "manifest.hpp"
 #include "profile.hpp"
+#include "repair_steps.hpp"
 #include "reports.hpp"
 #include "requirement.hpp"
-#include "runner/atom_names.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
 #include "serialisation.hpp"
@@ -68,18 +70,50 @@ void warn_ignored_keys(const Config& cfg, RepairInput input) {
     }
 }
 
-RandomSource init_random_source(const std::optional<std::size_t>& seed) {
+// Warns about the other path's config keys, fixes the seed, and registers the
+// crash metadata: what both runs do before reading their input. Returns the
+// seed the run uses, drawn from the random device when @p seed is absent.
+std::size_t begin_run(const Config& cfg, const std::string& input_path,
+                      const std::optional<std::size_t>& seed,
+                      RepairInput input) {
+    warn_ignored_keys(cfg, input);
+    std::size_t effective_seed = 0;
     if (seed.has_value()) {
-        return make_random_source_from_seed(*seed);
+        effective_seed = *seed;
+    } else {
+        std::random_device rng_dev;
+        effective_seed = static_cast<std::size_t>(rng_dev());
     }
-    std::random_device rng_dev;
-    return make_random_source_from_seed(static_cast<std::size_t>(rng_dev()));
+    register_crash_metadata(
+        format_crash_metadata(effective_seed, input_path, cfg));
+    return effective_seed;
 }
 
-double seconds_since(std::chrono::steady_clock::time_point start) {
-    return std::chrono::duration<double>(std::chrono::steady_clock::now() -
-                                         start)
-        .count();
+// The reports both runs end with, and then the manifest and the closing
+// `Done in` line. Every figure is read from @p budget's clock, which has the
+// same origin as the manifest's wall_s.
+void end_run(const Config& cfg, const std::vector<FilterRunStats>& filter_stats,
+             const std::string& input_path, const std::string& output_dir,
+             std::size_t seed, const SearchBudget& budget, RepairInput input) {
+    print_scoring_report();
+    if (cfg.report_diagnostics) {
+        print_filter_report(filter_stats);
+        print_diagnostics_report();
+    }
+    if (cfg.report_cpu_timing) {
+        print_cpu_report(budget.elapsed_s());
+    }
+    // The per-tool rows say how long each tool took; the scope profile says
+    // where inside a call that went. No-op unless PEREDUR_PROFILE is set, so
+    // it is not tied to --diagnostics.
+    profile::report_if_enabled();
+    // After the reports, so the per-tool counts it records are the run's
+    // totals.
+    write_run_manifest(output_dir, input_path, seed, cfg, budget.elapsed_s(),
+                       budget, input);
+    // Last, so the figure covers the same work on both paths.
+    std::cout << "Done in " << std::fixed << std::setprecision(2)
+              << budget.elapsed_s() << "s\n";
 }
 
 }  // namespace
@@ -87,54 +121,37 @@ double seconds_since(std::chrono::steady_clock::time_point start) {
 int run_tlsf_repair(const Config& cfg, const std::string& input_path,
                     const std::string& output_dir,
                     const std::optional<std::size_t>& seed) {
-    const auto wall_start = std::chrono::steady_clock::now();
-    warn_ignored_keys(cfg, RepairInput::Tlsf);
-    RandomSource random_source = init_random_source(seed);
-    const std::optional<std::size_t> effective_seed = random_source.seed();
-    if (effective_seed.has_value()) {
-        register_crash_metadata(
-            format_crash_metadata(*effective_seed, input_path, cfg));
-    }
-    // Measured from the same origin as the run's reported wall_s, on both
-    // paths: a deadline the manifest's own clock disagrees with would put a
+    // Measured from process start, the same origin as the run's reported
+    // wall_s: a deadline the manifest's own clock disagrees with would put a
     // run over its cap and record it under.
-    SearchBudget budget(cfg, wall_start);
+    SearchBudget budget(cfg, std::chrono::steady_clock::now());
+    const std::size_t effective_seed =
+        begin_run(cfg, input_path, seed, RepairInput::Tlsf);
+    const RandomSource random_source =
+        make_random_source_from_seed(effective_seed);
     try {
-        const int result = tlsf::run_repair(input_path, output_dir, cfg,
-                                            random_source, budget);
-        print_scoring_report();
-        if (cfg.report_diagnostics) {
-            print_diagnostics_report();
+        const std::optional<std::vector<FilterRunStats>> filter_stats =
+            tlsf::run_repair(input_path, output_dir, cfg, random_source,
+                             budget);
+        if (!filter_stats.has_value()) {
+            return 1;
         }
-        if (cfg.report_cpu_timing) {
-            print_cpu_report(seconds_since(wall_start));
-        }
-        // The per-tool rows say how long each tool took; the scope profile says
-        // where inside a call that went. No-op unless PEREDUR_PROFILE is set,
-        // so it is not tied to --diagnostics.
-        profile::report_if_enabled();
-        // After the reports, so the per-tool counts it records are the run's
-        // totals. Skipped when run_repair failed to read or parse the input,
-        // since there is then no output directory worth describing.
-        if (result == 0 && effective_seed.has_value()) {
-            write_run_manifest(output_dir, input_path, *effective_seed, cfg,
-                               seconds_since(wall_start), budget,
-                               RepairInput::Tlsf);
-        }
-        // Last on both paths, so the figure covers the same work either way.
-        std::cout << "Done in " << std::fixed << std::setprecision(2)
-                  << seconds_since(wall_start) << "s\n";
-        return result;
+        end_run(cfg, *filter_stats, input_path, output_dir, effective_seed,
+                budget, RepairInput::Tlsf);
     } catch (const std::exception& exc) {
         std::cerr << "fatal: " << exc.what() << "\n";
         return 1;
     }
+    return 0;
 }
 
 int run_fretish_repair(const Config& cfg, const std::string& input_path,
                        const std::string& output_dir,
                        const std::optional<std::size_t>& seed) {
-    warn_ignored_keys(cfg, RepairInput::Fretish);
+    const std::size_t effective_seed =
+        begin_run(cfg, input_path, seed, RepairInput::Fretish);
+    const RandomSource random_source =
+        make_random_source_from_seed(effective_seed);
     Specification original_spec;
     try {
         original_spec = load_specification(input_path);
@@ -142,129 +159,62 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
         std::cerr << exc.what() << "\n";
         return 1;
     }
-    // Before the screens, because an unsafe name makes every realizability
-    // verdict below meaningless rather than merely suspect.
-    if (const std::optional<std::string> unsafe =
-            runner::first_unsafe_atom_name(environment_signals(original_spec),
-                                           original_spec.m_out_atoms)) {
-        std::cerr << "fatal: " << input_path << ": " << *unsafe << "\n";
+    if (!screen_original(
+            original_spec, input_path, environment_signals(original_spec),
+            original_spec.m_out_atoms,
+            [&original_spec] {
+                return global_real_checker().check_realizability(original_spec);
+            },
+            cfg)) {
         return 1;
     }
-    // Screened before anything is built from it. The seed population is
-    // population_size copies of this specification and no filter ever sees
-    // them, so a property the gate will reject at the output is worth saying
-    // out loud at the start of the run rather than at the end of it.
-    std::cerr << screen_input(
-        original_spec,
-        correctness_checks(global_sat_checker(), global_real_checker()));
-    // After the input screen and before anything is scored: the query is
-    // memoised, so this is the call the original population was about to make
-    // anyway, timed.
-    std::cerr << ltlsynt_budget_screen(
-        [&original_spec] {
-            return global_real_checker().check_realizability(original_spec);
-        },
-        cfg.ltlsynt_timeout);
     AggregateWeightedFitnessFunction fitness_function =
         get_fitness_function(original_spec, cfg);
     const std::vector<FilterFunction> filter_functions =
         get_filter_functions(original_spec, global_sat_checker());
     std::vector<ScoredSpecification> population = original_population(
         original_spec, fitness_function, cfg.population_size);
-    RandomSource random_source = init_random_source(seed);
-    const std::optional<std::size_t> maybe_seed = random_source.seed();
-    if (!maybe_seed.has_value()) {
-        std::cerr << "fatal: random source has no seed\n";
-        return 1;
-    }
-    const std::size_t effective_seed = *maybe_seed;
-    std::cout << "Seed: " << effective_seed << "\n";
-    register_crash_metadata(
-        format_crash_metadata(effective_seed, input_path, cfg));
 
     DashboardWriter dashboard(output_dir, cfg.dashboard);
-    dashboard.run_start(input_path, cfg.generations, population.size(),
-                        effective_seed,
-                        fitness_objective_names(fitness_function),
-                        generation_stage_names(filter_functions));
-    const std::string page = dashboard.write_page();
-    if (!page.empty()) {
-        std::cout << "Progress: " << dashboard.path() << "\n"
-                  << "  view with: python3 -m http.server -d " << output_dir
-                  << " 8000\n";
-    }
+    announce_run(dashboard, input_path, output_dir, cfg, effective_seed,
+                 objective_names(fitness_function),
+                 generation_stage_names(filter_functions));
 
-    const auto wall_start = std::chrono::steady_clock::now();
     // Started here rather than at process start, matching AuRUS: its
     // startRunningTime is set on entry to evolve(count), after the initial
     // population has been built and scored, so neither tool's deadline is
     // charged for loading its input.
-    SearchBudget budget(cfg, wall_start);
+    SearchBudget budget(cfg, std::chrono::steady_clock::now());
     try {
         // Null unless the implication filter is on, and then the final screens
         // run while the search does; destroyed unfinished if anything below
         // throws.
         const std::unique_ptr<StreamingMaximalFilter<Specification>> stream =
             make_maximal_stream(original_spec, cfg, output_dir);
-        RepairAccumulator<Specification>::Sink sink;
-        if (stream) {
-            sink = [&stream](const Specification& spec,
-                             const std::string& name) {
-                stream->push(spec, name);
-            };
-        }
-        EvolutionResult evolved = run_evolution(
+        RepairAccumulator<Specification> accumulator =
+            make_repair_accumulator<Specification>(
+                output_dir, ".json",
+                [](const Specification& spec) {
+                    const nlohmann::json jobj = spec;
+                    return jobj.dump(2) + "\n";
+                },
+                budget, stream.get());
+        SearchResult<Specification> evolved = run_generations(
             cfg, std::move(population), fitness_function, filter_functions,
-            random_source, dashboard, output_dir, budget, std::move(sink));
-        population = std::move(evolved.population);
-        std::vector<FilterRunStats> filter_stats =
-            std::move(evolved.filter_stats);
-        std::vector<Specification> realizable_vec =
-            collect_realizable_specifications(cfg, population);
-        // The accumulated candidates passed this same gate in the generation
-        // they were collected in, so they are merged rather than re-checked;
-        // the final filters below screen the union as one set.
-        AccumulatorStats::n_contributed +=
-            merge_accumulated(realizable_vec, evolved.accumulated);
-        auto [maximal, final_filter_stats] =
-            stream ? finish_maximal_stream(*stream, realizable_vec)
-                   : dedup_realizable_specifications(realizable_vec);
-        const std::vector<ScoredSpecification> scored_maximal =
-            score_and_sort_specifications(cfg, maximal, fitness_function);
-        write_specifications(scored_maximal, fitness_function, output_dir);
-        std::cout << "Realizable specifications: " << realizable_vec.size();
-        if (cfg.run_implication_filter) {
-            std::cout << " (" << maximal.size() << " maximal)";
-        }
-        // Only when something was written: the line otherwise names an output
-        // directory that the run left empty, which reads as success.
-        if (!scored_maximal.empty()) {
-            std::cout << ", written to " << output_dir << "/";
-        }
-        std::cout << "\n";
+            random_source, dashboard, accumulator, budget);
+        const SearchOutput<Specification> output =
+            finish_search(cfg, std::move(evolved), accumulator.specifications(),
+                          fitness_function, stream.get());
+        write_specifications(output.repairs, fitness_function, output_dir);
+        print_repair_summary(output.n_realizable, output.repairs.size(),
+                             cfg.run_implication_filter, output_dir);
         if (cfg.report_repair_summary) {
-            print_repair_changes(original_spec, scored_maximal);
+            print_repair_changes(original_spec, output.repairs);
         }
-        dashboard.run_end(budget.generations(), realizable_vec.size(),
-                          maximal.size(), seconds_since(wall_start));
-        filter_stats.insert(filter_stats.end(), final_filter_stats.begin(),
-                            final_filter_stats.end());
-        print_scoring_report();
-        if (cfg.report_diagnostics) {
-            print_filter_report(filter_stats, EmptyFilterReport::Heading);
-            print_diagnostics_report();
-        }
-        if (cfg.report_cpu_timing) {
-            print_cpu_report(seconds_since(wall_start));
-        }
-        profile::report_if_enabled();
-        // After the reports, so the per-tool counts it records are the run's
-        // totals.
-        write_run_manifest(output_dir, input_path, effective_seed, cfg,
-                           seconds_since(wall_start), budget,
-                           RepairInput::Fretish);
-        std::cout << "Done in " << std::fixed << std::setprecision(2)
-                  << seconds_since(wall_start) << "s\n";
+        dashboard.run_end(budget.generations(), output.n_realizable,
+                          output.repairs.size(), budget.elapsed_s());
+        end_run(cfg, output.filter_stats, input_path, output_dir,
+                effective_seed, budget, RepairInput::Fretish);
     } catch (const std::exception& exc) {
         std::cerr << "fatal: " << exc.what() << "\n";
         return 1;

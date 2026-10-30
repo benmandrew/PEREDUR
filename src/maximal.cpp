@@ -7,24 +7,19 @@
 #include <iostream>
 #include <optional>
 #include <string>
-#include <system_error>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "driver_support.hpp"
 #include "filter/implication.hpp"
-#include "filter/implication_check.hpp"
 #include "fingerprint/lasso.hpp"
 #include "fingerprint/prefilter.hpp"
-#include "genetic/generation.hpp"
 #include "repair/manifest.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
-#include "serialisation.hpp"
+#include "spec_format.hpp"
 #include "thread_pool.hpp"
-#include "tlsf/filter.hpp"
-#include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
 
 // Runs PEREDUR's maximality filter over a directory of specifications that
@@ -117,95 +112,6 @@ std::optional<Args> parse_args(int argc, const char* const* argv) {
     return args;
 }
 
-// Everything one front end contributes, so the sweep, the quotient and the
-// report below are written once. The pair of specialisations is the whole of
-// the format split; adding a third format means adding one of these.
-template <typename Spec>
-struct SpecOps;
-
-template <>
-struct SpecOps<Specification> {
-    static constexpr const char* k_extension = ".json";
-    static constexpr const char* k_alphabet = "atom alphabets";
-
-    static Specification parse(const std::string& text) {
-        return parse_specification_json(text);
-    }
-
-    static bool same_alphabet(const Specification& lhs,
-                              const Specification& rhs) {
-        return lhs.m_in_atoms == rhs.m_in_atoms &&
-               lhs.m_out_atoms == rhs.m_out_atoms && lhs.m_modes == rhs.m_modes;
-    }
-
-    static std::optional<bool> implies(const Specification& from,
-                                       const Specification& dest,
-                                       SatisfiabilityChecker& checker) {
-        return spec_implies(from, dest, checker);
-    }
-
-    static FilterFunctionT<Specification> maximality_filter(
-        SatisfiabilityChecker& checker,
-        const GenerationProgressCallback& on_progress) {
-        // No original specification here -- `maximal` takes a bare directory of
-        // repairs -- so an equivalence class collapses on operator< with no
-        // similarity to rank it.
-        return make_implication_filter<Specification>(checker, nullptr,
-                                                      on_progress);
-    }
-};
-
-template <>
-struct SpecOps<tlsf::Specification> {
-    static constexpr const char* k_extension = ".tlsf";
-    static constexpr const char* k_alphabet = "signal alphabets";
-
-    static tlsf::Specification parse(const std::string& text) {
-        return tlsf::parse(text);
-    }
-
-    static bool same_alphabet(const tlsf::Specification& lhs,
-                              const tlsf::Specification& rhs) {
-        return lhs.m_inputs == rhs.m_inputs && lhs.m_outputs == rhs.m_outputs;
-    }
-
-    static std::optional<bool> implies(const tlsf::Specification& from,
-                                       const tlsf::Specification& dest,
-                                       SatisfiabilityChecker& checker) {
-        return tlsf_spec_implies(from, dest, checker);
-    }
-
-    static FilterFunctionT<tlsf::Specification> maximality_filter(
-        SatisfiabilityChecker& checker,
-        const GenerationProgressCallback& on_progress) {
-        return make_implication_filter<tlsf::Specification>(checker, nullptr,
-                                                            on_progress);
-    }
-};
-
-// Route by input format, as compare.cpp does. A .tlsf extension on any
-// argument, or any .tlsf file in any directory argument, selects the TLSF
-// path; otherwise FRETISH JSON. Mixing the formats across the arguments is not
-// supported, and the FRETISH side then finds no .json files and says so.
-bool wants_tlsf(const std::vector<std::string>& paths) {
-    for (const std::string& path : paths) {
-        if (std::filesystem::path(path).extension() == ".tlsf") {
-            return true;
-        }
-        std::error_code err_code;
-        const std::filesystem::directory_iterator iter(path, err_code);
-        const bool found =
-            std::any_of(std::filesystem::begin(iter),
-                        std::filesystem::end(iter), [](const auto& entry) {
-                            return entry.path().extension() == ".tlsf";
-                        });
-        if (found) {
-            return true;
-        }
-    }
-    return false;
-}
-
 std::vector<std::string> expand_paths(const std::vector<std::string>& paths,
                                       const std::string& extension) {
     std::vector<std::string> files;
@@ -261,7 +167,7 @@ Corpus<Spec> load_corpus(const std::vector<std::string>& files) {
         }
         Spec spec;
         try {
-            spec = SpecOps<Spec>::parse(*contents);
+            spec = SpecFormat<Spec>::parse(*contents);
         } catch (const std::exception& exc) {
             std::cerr << file << ": " << exc.what() << "\n";
             ++corpus.m_parse_failures;
@@ -314,9 +220,9 @@ Quotient quotient_by_equivalence(
                  fingerprint::refutes_implication(prints[j], prints[i]))) {
                 continue;
             }
-            if (SpecOps<Spec>::implies(maximal[i], maximal[j], checker)
+            if (SpecFormat<Spec>::implies(maximal[i], maximal[j], checker)
                     .value_or(false) &&
-                SpecOps<Spec>::implies(maximal[j], maximal[i], checker)
+                SpecFormat<Spec>::implies(maximal[j], maximal[i], checker)
                     .value_or(false)) {
                 out.m_class_of[i] = out.m_class_of[j];
                 placed = true;
@@ -361,9 +267,9 @@ void print_report(const std::vector<Spec>& maximal, const Quotient& quotient,
 template <typename Spec>
 int run(const Args& args, SatisfiabilityChecker& checker) {
     const std::vector<std::string> files =
-        expand_paths(args.paths, SpecOps<Spec>::k_extension);
+        expand_paths(args.paths, SpecFormat<Spec>::k_extension);
     if (files.empty()) {
-        std::cerr << "no " << SpecOps<Spec>::k_extension << " files found\n";
+        std::cerr << "no " << SpecFormat<Spec>::k_extension << " files found\n";
         return 1;
     }
     const Corpus<Spec> corpus = load_corpus<Spec>(files);
@@ -374,17 +280,20 @@ int run(const Args& args, SatisfiabilityChecker& checker) {
     // Implication between specs over different alphabets is not the relation
     // this reports, so say so rather than printing a number that means nothing.
     for (const Spec& spec : corpus.m_distinct) {
-        if (!SpecOps<Spec>::same_alphabet(spec, corpus.m_distinct.front())) {
+        if (!SpecFormat<Spec>::same_alphabet(spec, corpus.m_distinct.front())) {
             std::cerr << "warning: the input set mixes "
-                      << SpecOps<Spec>::k_alphabet
+                      << SpecFormat<Spec>::k_alphabet
                       << "; implication across them is not meaningful\n";
             break;
         }
     }
 
     std::size_t reported = 0;
-    const std::vector<Spec> maximal = SpecOps<Spec>::maximality_filter(
-        checker, [&reported](std::size_t done, std::size_t total) {
+    // No original specification here -- `maximal` takes a bare directory of
+    // repairs -- so an equivalence class collapses on operator< with no
+    // similarity to rank it.
+    const std::vector<Spec> maximal = make_implication_filter<Spec>(
+        checker, nullptr, [&reported](std::size_t done, std::size_t total) {
             reported = done;
             if (done % 500 == 0 || done == total) {
                 std::cerr << "\r  pairs " << done << "/" << total << std::flush;
@@ -437,6 +346,6 @@ int main(int argc, const char* const argv[]) {
         std::chrono::milliseconds{args.timeout_s * 1000}, true);
     set_thread_pool_size(args.jobs);
 
-    return wants_tlsf(args.paths) ? run<tlsf::Specification>(args, checker)
-                                  : run<Specification>(args, checker);
+    return selects_tlsf(args.paths) ? run<tlsf::Specification>(args, checker)
+                                    : run<Specification>(args, checker);
 }

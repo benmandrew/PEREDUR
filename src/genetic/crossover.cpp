@@ -8,24 +8,9 @@
 #include <utility>
 #include <vector>
 
-namespace {
+#include "genetic/binary_kind.hpp"
 
-Formula::Kind pick_binary_kind(const RandomSource& random_source) {
-    const int selector = static_cast<int>(random_source.next_index(4));
-    switch (selector) {
-        case 0:
-            return Formula::Kind::And;
-        case 1:
-            return Formula::Kind::Or;
-        case 2:
-            return Formula::Kind::Implies;
-        case 3:
-            return Formula::Kind::Iff;
-        default:
-            assert(false);
-            __builtin_unreachable();
-    }
-}
+namespace {
 
 Formula select_subformula(const Formula& formula,
                           const RandomSource& random_source) {

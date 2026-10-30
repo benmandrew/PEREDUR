@@ -63,9 +63,10 @@ TEST(test_run_repair_end_to_end) {
 
     const RandomSource random_source = make_random_source_from_seed(1234);
     SearchBudget budget(cfg, SearchBudget::Clock::now());
-    const int status = tlsf::run_repair(input_path.string(), dir.string(), cfg,
-                                        random_source, budget);
-    expect(status == 0, "pipeline: run_repair returns 0");
+    expect(tlsf::run_repair(input_path.string(), dir.string(), cfg,
+                            random_source, budget)
+               .has_value(),
+           "pipeline: run_repair succeeds");
 
     for (const auto& entry : std::filesystem::directory_iterator(dir)) {
         if (entry.path().extension() != ".tlsf" ||

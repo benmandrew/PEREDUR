@@ -541,14 +541,6 @@ template <typename Spec>
 std::vector<FilterFunctionT<Spec>> get_filter_functions(
     const Spec& original, SatisfiabilityChecker& checker);
 
-/// Scores each specification in @p specs and returns them ordered best-first
-/// according to @p cfg's selection scheme: descending weighted fitness for
-/// WeightedAverage, or the NSGA-II crowded-comparison order for
-/// Nsga2Apportion.
-std::vector<ScoredSpecification> score_and_sort_specifications(
-    const Config& cfg, const std::vector<Specification>& specs,
-    const AggregateWeightedFitnessFunction& fitness_function);
-
 /// Wraps each filter as a named pipeline stage, so a consumer walking the stage
 /// list sees one entry per active filter. The filters keep their own n_in/n_out
 /// tallies, which the drivers still fold into their end-of-run reports.

@@ -1,7 +1,7 @@
 #pragma once
 
-// What a finished run leaves behind: the repair files in the output directory
-// and the closing summary line on stdout.
+// What a finished TLSF run leaves behind: the repair files in the output
+// directory, and what each one changed.
 
 #include <cstddef>
 #include <string>
@@ -24,9 +24,5 @@ void write_survivors(
 // file name and then what it changed against @p original.
 void print_repair_changes(const Specification& original,
                           const std::vector<Scored<Specification>>& survivors);
-
-void print_repair_summary(std::size_t n_realizable, std::size_t n_written,
-                          bool implication_filter_run,
-                          const std::string& output_dir);
 
 }  // namespace tlsf::internal

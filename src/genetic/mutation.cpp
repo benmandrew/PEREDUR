@@ -10,27 +10,11 @@
 #include <variant>
 #include <vector>
 
+#include "genetic/binary_kind.hpp"
 #include "genetic/monotone.hpp"
 #include "prop_formula.hpp"
 
 namespace {
-
-Formula::Kind pick_binary_kind(const RandomSource& random_source) {
-    const int selector = static_cast<int>(random_source.next_index(4));
-    switch (selector) {
-        case 0:
-            return Formula::Kind::And;
-        case 1:
-            return Formula::Kind::Or;
-        case 2:
-            return Formula::Kind::Implies;
-        case 3:
-            return Formula::Kind::Iff;
-        default:
-            assert(false);
-            __builtin_unreachable();
-    }
-}
 
 std::string random_atom(const std::vector<std::string>& atoms,
                         const RandomSource& random_source) {
@@ -671,25 +655,27 @@ Requirement mutate_requirement(const Requirement& requirement,
 
 namespace {
 
+// Appends @p offset plus the index of each requirement in @p reqs that is
+// weakenable and not removed. Rewriting or removing a removed requirement
+// spends the operator on content nothing reads.
+void append_live_weakenable(const std::vector<Requirement>& reqs,
+                            std::size_t offset,
+                            std::vector<std::size_t>& indices) {
+    for (std::size_t i = 0; i < reqs.size(); ++i) {
+        if (reqs[i].m_weakenable && !reqs[i].m_removed) {
+            indices.push_back(offset + i);
+        }
+    }
+}
+
 // Global indices (assumptions first, then guarantees) of requirements that may
-// be mutated. Non-weakenable and removed requirements are excluded: rewriting a
-// removed requirement spends the mutation on content nothing reads.
+// be mutated.
 std::vector<std::size_t> collect_weakenable_indices(
     const Specification& specification) {
-    const std::size_t n_assumptions = specification.m_assumptions.size();
     std::vector<std::size_t> indices;
-    for (std::size_t i = 0; i < n_assumptions; ++i) {
-        const Requirement& req = specification.m_assumptions[i];
-        if (req.m_weakenable && !req.m_removed) {
-            indices.push_back(i);
-        }
-    }
-    for (std::size_t i = 0; i < specification.m_guarantees.size(); ++i) {
-        const Requirement& req = specification.m_guarantees[i];
-        if (req.m_weakenable && !req.m_removed) {
-            indices.push_back(n_assumptions + i);
-        }
-    }
+    append_live_weakenable(specification.m_assumptions, 0, indices);
+    append_live_weakenable(specification.m_guarantees,
+                           specification.m_assumptions.size(), indices);
     return indices;
 }
 
@@ -795,12 +781,7 @@ Specification add_assumption(const Specification& specification,
 std::vector<std::size_t> removable_guarantee_indices(
     const Specification& specification) {
     std::vector<std::size_t> indices;
-    for (std::size_t i = 0; i < specification.m_guarantees.size(); ++i) {
-        const Requirement& req = specification.m_guarantees[i];
-        if (req.m_weakenable && !req.m_removed) {
-            indices.push_back(i);
-        }
-    }
+    append_live_weakenable(specification.m_guarantees, 0, indices);
     return indices;
 }
 

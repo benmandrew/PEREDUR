@@ -9,6 +9,7 @@
 #include <iostream>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -16,14 +17,12 @@
 
 #include "bounded_async.hpp"
 #include "driver_support.hpp"
-#include "filter/implication_check.hpp"
 #include "repair/manifest.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
 #include "serialisation.hpp"
+#include "spec_format.hpp"
 #include "thread_pool.hpp"
-#include "tlsf/filter.hpp"
-#include "tlsf/parser.hpp"
 #include "tlsf/specification.hpp"
 
 namespace {
@@ -70,61 +69,14 @@ std::optional<Args> parse_args(int argc, const char* const* argv) {
     return args;
 }
 
-// A repair's display name and its optional weighted fitness. Both the FRETISH
-// and TLSF paths reduce their loaded repairs to this before reporting, so the
-// report loop is agnostic to which format produced them.
-struct RepairMeta {
+// A loaded repair or ideal. Only a repair carries a fitness, and only when its
+// run recorded one.
+template <typename Spec>
+struct Entry {
     std::string name;
+    Spec spec;
     std::optional<double> fitness;
 };
-
-std::vector<std::pair<std::string, serialisation::ScoredSpecification>>
-load_repairs(const std::string& dir) {
-    std::vector<std::pair<std::string, serialisation::ScoredSpecification>>
-        repairs;
-    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
-        if (entry.path().extension() != ".json") {
-            continue;
-        }
-        // A repairs directory is a run's output directory, so it also holds the
-        // run manifest write_run_manifest left there. Loading that as a
-        // specification throws, and the throw aborts the whole comparison --
-        // which reads downstream as implies_ideal = 0 for a run whose repairs
-        // were never scored at all, not as an error. The TLSF loader below is
-        // immune only because repairs are .tlsf there and the manifest is
-        // .json.
-        if (entry.path().filename() == k_run_manifest_name) {
-            continue;
-        }
-        repairs.emplace_back(entry.path().filename().string(),
-                             load_scored_specification(entry.path().string()));
-    }
-    std::sort(repairs.begin(), repairs.end(),
-              [](const auto& lhs, const auto& rhs) {
-                  const double lfit =
-                      lhs.second.fitness ? lhs.second.fitness->total : 0.0;
-                  const double rfit =
-                      rhs.second.fitness ? rhs.second.fitness->total : 0.0;
-                  return lfit > rfit;
-              });
-    return repairs;
-}
-
-std::vector<std::pair<std::string, Specification>> load_ideals(
-    const std::string& dir) {
-    std::vector<std::pair<std::string, Specification>> ideals;
-    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
-        if (entry.path().extension() != ".json") {
-            continue;
-        }
-        ideals.emplace_back(entry.path().filename().string(),
-                            load_specification(entry.path().string()));
-    }
-    std::sort(
-        ideals.begin(), ideals.end(),
-        [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
-    return ideals;
-}
 
 // PEREDUR writes each TLSF repair as repair_N.tlsf alongside a
 // repair_N.fitness.json carrying its weighted total. The fitness file is
@@ -147,45 +99,74 @@ std::optional<double> read_tlsf_fitness(
     }
 }
 
-struct TlsfRepair {
-    std::string name;
-    tlsf::Specification spec;
-    std::optional<double> fitness;
-};
-
-std::vector<TlsfRepair> load_tlsf_repairs(const std::string& dir) {
-    std::vector<TlsfRepair> repairs;
-    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
-        if (entry.path().extension() != ".tlsf") {
-            continue;
+// FRETISH repairs carry their fitness inline, TLSF ones in a sibling file.
+template <typename Spec>
+Entry<Spec> load_repair(const std::filesystem::path& path) {
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        serialisation::ScoredSpecification scored =
+            load_scored_specification(path.string());
+        std::optional<double> fitness;
+        if (scored.fitness) {
+            fitness = scored.fitness->total;
         }
-        repairs.push_back({entry.path().filename().string(),
-                           tlsf::parse(read_file_or_throw(entry.path().string(),
-                                                          "cannot open file")),
-                           read_tlsf_fitness(entry.path())});
+        return {path.filename().string(), std::move(scored.spec), fitness};
+    } else {
+        return {path.filename().string(),
+                SpecFormat<Spec>::load(path.string(), "cannot open file"),
+                read_tlsf_fitness(path)};
     }
-    std::sort(repairs.begin(), repairs.end(),
-              [](const TlsfRepair& lhs, const TlsfRepair& rhs) {
-                  return lhs.fitness.value_or(0.0) > rhs.fitness.value_or(0.0);
-              });
-    return repairs;
 }
 
-std::vector<std::pair<std::string, tlsf::Specification>> load_tlsf_ideals(
-    const std::string& dir) {
-    std::vector<std::pair<std::string, tlsf::Specification>> ideals;
+// Repairs sort best-first by fitness, ideals by name.
+template <typename Spec>
+std::vector<Entry<Spec>> load_entries(const std::string& dir, bool repairs) {
+    std::vector<Entry<Spec>> entries;
     for (const auto& entry : std::filesystem::directory_iterator(dir)) {
-        if (entry.path().extension() != ".tlsf") {
+        if (entry.path().extension() != SpecFormat<Spec>::k_extension) {
             continue;
         }
-        ideals.emplace_back(entry.path().filename().string(),
-                            tlsf::parse(read_file_or_throw(
-                                entry.path().string(), "cannot open file")));
+        if (!repairs) {
+            entries.push_back({entry.path().filename().string(),
+                               SpecFormat<Spec>::load(entry.path().string(),
+                                                      "cannot open file"),
+                               std::nullopt});
+            continue;
+        }
+        // A repairs directory is a run's output directory, so it also holds the
+        // run manifest write_run_manifest left there. Loading that as a
+        // specification throws, and the throw aborts the whole comparison --
+        // which reads downstream as implies_ideal = 0 for a run whose repairs
+        // were never scored at all, not as an error. TLSF is immune only
+        // because repairs are .tlsf there and the manifest is .json.
+        if (entry.path().filename() != k_run_manifest_name) {
+            entries.push_back(load_repair<Spec>(entry.path()));
+        }
     }
-    std::sort(
-        ideals.begin(), ideals.end(),
-        [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
-    return ideals;
+    std::sort(entries.begin(), entries.end(),
+              [repairs](const Entry<Spec>& lhs, const Entry<Spec>& rhs) {
+                  return repairs ? lhs.fitness.value_or(0.0) >
+                                       rhs.fitness.value_or(0.0)
+                                 : lhs.name < rhs.name;
+              });
+    return entries;
+}
+
+template <typename Spec>
+bool load_or_report(const std::string& dir, bool repairs,
+                    std::vector<Entry<Spec>>& entries) {
+    try {
+        entries = load_entries<Spec>(dir, repairs);
+    } catch (const std::exception& exc) {
+        std::cerr << "Error loading " << (repairs ? "repairs" : "ideals")
+                  << ": " << exc.what() << "\n";
+        return false;
+    }
+    if (entries.empty()) {
+        std::cerr << "No " << SpecFormat<Spec>::k_extension
+                  << " files found in: " << dir << "\n";
+        return false;
+    }
+    return true;
 }
 
 // Priority: equivalent > stronger > weaker > incomparable > timeout
@@ -233,15 +214,13 @@ Relation classify(std::optional<bool> fwd, std::optional<bool> rev) {
 }
 
 // Runs the n_repairs x n_ideals implication grid and prints, for each repair,
-// its strongest relation to any ideal plus a summary. `spawn(rep, ide)` returns
-// a callable that computes that pair's relation when the dispatcher runs it, so
-// the FRETISH and TLSF paths differ only in which spec type and implication
-// function they close over.
-template <typename Spawn>
-void run_and_report(const std::vector<RepairMeta>& repairs,
-                    const std::vector<std::string>& ideal_names, Spawn spawn) {
+// its strongest relation to any ideal plus a summary.
+template <typename Spec>
+void run_and_report(const std::vector<Entry<Spec>>& repairs,
+                    const std::vector<Entry<Spec>>& ideals,
+                    SatisfiabilityChecker& checker) {
     const std::size_t n_repairs = repairs.size();
-    const std::size_t n_ideals = ideal_names.size();
+    const std::size_t n_ideals = ideals.size();
     const std::size_t n_tasks = n_repairs * n_ideals;
     const std::size_t max_in_flight = dispatch_window();
 
@@ -256,7 +235,13 @@ void run_and_report(const std::vector<RepairMeta>& repairs,
         [&](std::size_t task_idx) {
             const std::size_t rep = task_idx / n_ideals;
             const std::size_t ide = task_idx % n_ideals;
-            return spawn(rep, ide);
+            return [&, rep, ide] {
+                return classify(
+                    SpecFormat<Spec>::implies(repairs[rep].spec,
+                                              ideals[ide].spec, checker),
+                    SpecFormat<Spec>::implies(ideals[ide].spec,
+                                              repairs[rep].spec, checker));
+            };
         },
         [&](std::size_t task_idx, Relation rel) {
             const std::size_t rep = task_idx / n_ideals;
@@ -273,7 +258,7 @@ void run_and_report(const std::vector<RepairMeta>& repairs,
         std::cout << std::left << std::setw(24) << repairs[idx].name << " : ";
         std::cout << info.detail;
         if (info.names_ideal) {
-            std::cout << ideal_names[best_per_repair[idx].ideal_idx];
+            std::cout << ideals[best_per_repair[idx].ideal_idx].name;
         }
         ++counts[static_cast<std::size_t>(best)];
         const std::optional<double>& fitness = repairs[idx].fitness;
@@ -299,113 +284,15 @@ void run_and_report(const std::vector<RepairMeta>& repairs,
     std::cout << "\n";
 }
 
-bool dir_has_extension(const std::string& dir, const std::string& ext) {
-    std::error_code err_code;
-    const std::filesystem::directory_iterator iter(dir, err_code);
-    return std::any_of(
-        std::filesystem::begin(iter), std::filesystem::end(iter),
-        [&ext](const auto& entry) { return entry.path().extension() == ext; });
-}
-
-int run_tlsf(const Args& args, SatisfiabilityChecker& checker) {
-    std::vector<TlsfRepair> repairs;
-    try {
-        repairs = load_tlsf_repairs(args.repairs_dir);
-    } catch (const std::exception& exc) {
-        std::cerr << "Error loading repairs: " << exc.what() << "\n";
+template <typename Spec>
+int run(const Args& args, SatisfiabilityChecker& checker) {
+    std::vector<Entry<Spec>> repairs;
+    std::vector<Entry<Spec>> ideals;
+    if (!load_or_report(args.repairs_dir, true, repairs) ||
+        !load_or_report(args.ideals_dir, false, ideals)) {
         return 1;
     }
-    if (repairs.empty()) {
-        std::cerr << "No .tlsf files found in: " << args.repairs_dir << "\n";
-        return 1;
-    }
-
-    std::vector<std::pair<std::string, tlsf::Specification>> ideals;
-    try {
-        ideals = load_tlsf_ideals(args.ideals_dir);
-    } catch (const std::exception& exc) {
-        std::cerr << "Error loading ideals: " << exc.what() << "\n";
-        return 1;
-    }
-    if (ideals.empty()) {
-        std::cerr << "No .tlsf files found in: " << args.ideals_dir << "\n";
-        return 1;
-    }
-
-    std::vector<RepairMeta> repair_meta;
-    repair_meta.reserve(repairs.size());
-    for (const TlsfRepair& repair : repairs) {
-        repair_meta.push_back({repair.name, repair.fitness});
-    }
-    std::vector<std::string> ideal_names;
-    ideal_names.reserve(ideals.size());
-    for (const auto& ideal : ideals) {
-        ideal_names.push_back(ideal.first);
-    }
-
-    run_and_report(
-        repair_meta, ideal_names, [&](std::size_t rep, std::size_t ide) {
-            return [&, rep, ide] {
-                return classify(tlsf_spec_implies(repairs[rep].spec,
-                                                  ideals[ide].second, checker),
-                                tlsf_spec_implies(ideals[ide].second,
-                                                  repairs[rep].spec, checker));
-            };
-        });
-    return 0;
-}
-
-int run_fretish(const Args& args, SatisfiabilityChecker& checker) {
-    std::vector<std::pair<std::string, serialisation::ScoredSpecification>>
-        repairs;
-    try {
-        repairs = load_repairs(args.repairs_dir);
-    } catch (const std::exception& exc) {
-        std::cerr << "Error loading repairs: " << exc.what() << "\n";
-        return 1;
-    }
-    if (repairs.empty()) {
-        std::cerr << "No .json files found in: " << args.repairs_dir << "\n";
-        return 1;
-    }
-
-    std::vector<std::pair<std::string, Specification>> ideals;
-    try {
-        ideals = load_ideals(args.ideals_dir);
-    } catch (const std::exception& exc) {
-        std::cerr << "Error loading ideals: " << exc.what() << "\n";
-        return 1;
-    }
-    if (ideals.empty()) {
-        std::cerr << "No .json files found in: " << args.ideals_dir << "\n";
-        return 1;
-    }
-
-    std::vector<RepairMeta> repair_meta;
-    repair_meta.reserve(repairs.size());
-    for (const auto& repair : repairs) {
-        repair_meta.push_back(
-            {repair.first,
-             repair.second.fitness
-                 ? std::optional<double>(repair.second.fitness->total)
-                 : std::nullopt});
-    }
-    std::vector<std::string> ideal_names;
-    ideal_names.reserve(ideals.size());
-    for (const auto& ideal : ideals) {
-        ideal_names.push_back(ideal.first);
-    }
-
-    run_and_report(repair_meta, ideal_names,
-                   [&](std::size_t rep, std::size_t ide) {
-                       return [&, rep, ide] {
-                           return classify(
-                               spec_implies(repairs[rep].second.spec,
-                                            ideals[ide].second, checker),
-                               spec_implies(ideals[ide].second,
-                                            repairs[rep].second.spec, checker));
-                       };
-                   });
+    run_and_report(repairs, ideals, checker);
     return 0;
 }
 
@@ -431,15 +318,7 @@ int main(int argc, const char* const argv[]) {
     SatisfiabilityChecker& checker =
         configure_offline_checkers(std::chrono::milliseconds{20'000}, true);
 
-    // Route by input format. A .tlsf extension on either directory path, or any
-    // .tlsf file in either directory, selects the TLSF path; otherwise FRETISH
-    // JSON. Mixing formats across the two directories is not supported, and the
-    // per-path loaders reject a directory holding none of their extension.
-    const bool tlsf =
-        std::filesystem::path(args.repairs_dir).extension() == ".tlsf" ||
-        std::filesystem::path(args.ideals_dir).extension() == ".tlsf" ||
-        dir_has_extension(args.repairs_dir, ".tlsf") ||
-        dir_has_extension(args.ideals_dir, ".tlsf");
-
-    return tlsf ? run_tlsf(args, checker) : run_fretish(args, checker);
+    return selects_tlsf({args.repairs_dir, args.ideals_dir})
+               ? run<tlsf::Specification>(args, checker)
+               : run<Specification>(args, checker);
 }

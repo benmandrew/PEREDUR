@@ -7,9 +7,10 @@
 #include <vector>
 
 #include "config.hpp"
-#include "evolve.hpp"
+#include "dashboard.hpp"
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
+#include "genetic/output_gate.hpp"
 #include "genetic/pipeline.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
@@ -17,15 +18,16 @@
 
 namespace tlsf::internal {
 
-// Evolves the whole spec once and collects its realizable survivors.
+// Evolves the whole spec once and returns the repairs the post-search tail
+// keeps, scored against it.
 // @p output_dir is where the accumulator streams each gate-passing candidate as
 // it finds it. A non-null @p stream is handed each candidate as it is
 // accumulated.
-std::vector<Scored<Specification>> run_monolithic(
+SearchOutput<Specification> run_monolithic(
     const Specification& original, const Config& cfg,
     const RandomSource& random_source,
     const AggregateWeightedFitnessFunctionT<Specification>& fitness,
-    const DashboardProgress& progress, const std::string& output_dir,
+    DashboardWriter& dashboard, const std::string& output_dir,
     SearchBudget& budget, StreamingMaximalFilter<Specification>* stream);
 
 }  // namespace tlsf::internal

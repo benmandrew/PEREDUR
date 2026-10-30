@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <functional>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "filter/well_separation.hpp"
@@ -11,7 +10,6 @@
 #include "fitness/semantic_similarity.hpp"
 #include "fitness/status.hpp"
 #include "fitness/syntactic_similarity.hpp"
-#include "genetic/generation.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
@@ -23,11 +21,6 @@ struct FretishScorers {
                             const Specification& original,
                             const Config& /*cfg*/) {
         return syntactic_similarity(spec, original);
-    }
-
-    static double semantic(const Specification& spec,
-                           const Specification& original, const Config& cfg) {
-        return semantic_similarity(spec, original, cfg);
     }
 
     static std::vector<std::function<double()>> semantic_terms(
@@ -96,22 +89,4 @@ AggregateWeightedFitnessFunction get_fitness_function(
     const Specification& original_spec, const Config& cfg) {
     return make_fitness_function<Specification, FretishScorers>(original_spec,
                                                                 cfg);
-}
-
-std::vector<ScoredSpecification> score_and_sort_specifications(
-    const Config& cfg, const std::vector<Specification>& specs,
-    const AggregateWeightedFitnessFunction& fitness_function) {
-    std::vector<ScoredSpecification> scored;
-    scored.reserve(specs.size());
-    for (const Specification& spec : specs) {
-        auto [objectives, fitness] =
-            fitness_function.objectives_and_fitness(spec);
-        ScoredSpecification entry;
-        entry.specification = spec;
-        entry.fitness = fitness;
-        entry.objectives = std::move(objectives);
-        scored.push_back(std::move(entry));
-    }
-    order_population(cfg, scored);
-    return scored;
 }

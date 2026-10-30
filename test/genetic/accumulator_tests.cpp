@@ -67,11 +67,14 @@ std::filesystem::path accumulated_dir(const TempDir& dir) {
     return dir.path() / "accumulated";
 }
 
-AccumulatedRepairWriter<Specification> json_writer(const TempDir& dir) {
-    return {dir.string(), ".json", [](const Specification& spec) {
-                const nlohmann::json jobj = spec;
-                return jobj.dump(2) + "\n";
-            }};
+std::string render_json(const Specification& spec) {
+    const nlohmann::json jobj = spec;
+    return jobj.dump(2) + "\n";
+}
+
+RepairAccumulator<Specification> json_accumulator(const TempDir& dir) {
+    return RepairAccumulator<Specification>(
+        AccumulatedRepairWriter(dir.string(), ".json"), render_json);
 }
 
 // The specification files alone. index.tsv sits in the same directory and is
@@ -184,7 +187,7 @@ TEST(test_merge_reports_only_what_it_added) {
 // found no repair adds nothing to a campaign's output tree.
 TEST(test_nothing_is_written_before_the_first_insert) {
     const TempDir dir("accumulator_tests");
-    const RepairAccumulator<Specification> accumulator(json_writer(dir));
+    const RepairAccumulator<Specification> accumulator = json_accumulator(dir);
     expect(accumulator.specifications().empty() &&
                !std::filesystem::exists(accumulated_dir(dir)),
            "accumulator: nothing accumulated creates no accumulated directory");
@@ -195,7 +198,7 @@ TEST(test_nothing_is_written_before_the_first_insert) {
 // next one is inserted.
 TEST(test_one_file_per_accumulated_specification) {
     const TempDir dir("accumulator_tests");
-    RepairAccumulator<Specification> accumulator(json_writer(dir));
+    RepairAccumulator<Specification> accumulator = json_accumulator(dir);
     accumulator.insert(make_spec("x"), 1);
     expect(written_files(dir).size() == 1,
            "accumulator: the first insertion is on disk before the second");
@@ -213,7 +216,7 @@ TEST(test_one_file_per_accumulated_specification) {
 
 TEST(test_written_files_parse_back_to_what_was_accumulated) {
     const TempDir dir("accumulator_tests");
-    RepairAccumulator<Specification> accumulator(json_writer(dir));
+    RepairAccumulator<Specification> accumulator = json_accumulator(dir);
     accumulator.insert(make_spec("x"), 1);
     accumulator.insert(make_spec("y"), 2);
     const std::vector<std::filesystem::path> paths = written_files(dir);
@@ -233,7 +236,7 @@ TEST(test_written_files_parse_back_to_what_was_accumulated) {
 // generation but no clock.
 TEST(test_the_index_carries_a_row_per_specification) {
     const TempDir dir("accumulator_tests");
-    RepairAccumulator<Specification> accumulator(json_writer(dir));
+    RepairAccumulator<Specification> accumulator = json_accumulator(dir);
     accumulator.insert(make_spec("x"), 1);
     accumulator.insert(make_spec("y"), 3);
     // Already accumulated, so neither a new file nor a new row.
@@ -256,7 +259,7 @@ TEST(test_the_index_carries_a_row_per_specification) {
 // than the row being absent, so a reader never has to handle a ragged index.
 TEST(test_the_index_reports_zero_without_a_clock) {
     const TempDir dir("accumulator_tests");
-    RepairAccumulator<Specification> accumulator(json_writer(dir));
+    RepairAccumulator<Specification> accumulator = json_accumulator(dir);
     accumulator.insert(make_spec("x"), 1);
     const std::vector<std::string> rows = index_rows(dir);
     expect(rows.size() == 2 && rows[1] == "gen01_0000.json\t1\t0.000000",
@@ -269,18 +272,14 @@ TEST(test_the_index_reports_zero_without_a_clock) {
 // this pins is that the writer asks the clock at all.
 TEST(test_the_index_records_the_clock_it_was_given) {
     const TempDir dir("accumulator_tests");
-    double now = 0.0;
-    AccumulatedRepairWriter<Specification> writer(
-        dir.string(), ".json",
-        [](const Specification& spec) {
-            const nlohmann::json jobj = spec;
-            return jobj.dump(2) + "\n";
-        },
-        [&now] { return now; });
-    RepairAccumulator<Specification> accumulator(std::move(writer));
-    now = 1.5;
+    // One reading per row, in order.
+    const std::vector<double> readings = {1.5, 4.25};
+    std::size_t next = 0;
+    RepairAccumulator<Specification> accumulator(
+        AccumulatedRepairWriter(dir.string(), ".json",
+                                [&] { return readings.at(next++); }),
+        render_json);
     accumulator.insert(make_spec("x"), 1);
-    now = 4.25;
     accumulator.insert(make_spec("y"), 2);
 
     const std::vector<std::string> rows = index_rows(dir);
@@ -298,11 +297,8 @@ TEST(test_the_index_records_the_clock_it_was_given) {
 TEST(test_the_tlsf_serialiser_round_trips) {
     const TempDir dir("accumulator_tests");
     const tlsf::Specification spec = tlsf::parse(k_tlsf_spec);
-    AccumulatedRepairWriter<tlsf::Specification> writer(
-        dir.string(), ".tlsf", [](const tlsf::Specification& candidate) {
-            return tlsf::write(candidate);
-        });
-    writer.write(2, spec);
+    AccumulatedRepairWriter writer(dir.string(), ".tlsf");
+    writer.write(2, tlsf::write(spec));
     const std::vector<std::filesystem::path> paths = written_files(dir);
     expect(
         paths.size() == 1 && paths[0].filename().string() == "gen02_0000.tlsf",

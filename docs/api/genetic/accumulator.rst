@@ -9,7 +9,7 @@ Every run accumulates; see :doc:`../../configuration`.
   Collects gate-passing specifications across generations, deduplicated and uncapped, in the order they were first seen. It only ever reads, and never draws from the ``RandomSource``, so it leaves the seed stream as it found it.
 
 ``AccumulatedRepairWriter``
-  Writes each newly accumulated specification into ``<output-dir>/accumulated/`` the moment it is accumulated, one file per specification, closed on the spot so a killed run keeps what it had already found. It writes through the path's own serialiser — ``to_json`` or ``tlsf::write`` — so an accumulated file is a specification document with its tombstoned guarantees omitted. These are raw gate-passing candidates; ``repair_N.json`` / ``repair_N.tlsf`` remain the run's only filtered output.
+  Writes each newly accumulated specification into ``<output-dir>/accumulated/`` the moment it is accumulated, one file per specification, closed on the spot so a killed run keeps what it had already found. It writes the document the accumulator renders through the path's own serialiser — ``to_json`` or ``tlsf::write`` — so an accumulated file is a specification document with its tombstoned guarantees omitted, and the writer itself never sees a specification. These are raw gate-passing candidates; ``repair_N.json`` / ``repair_N.tlsf`` remain the run's only filtered output.
 
 ``merge_accumulated``
   Appends the accumulated specifications a collection does not already hold, returning how many were added. The accumulated members already passed the gate, so they are merged rather than re-checked.

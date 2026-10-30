@@ -20,7 +20,7 @@ How a `peredur` run proceeds from input to `run.json`, and the design record beh
 
 Three keys give PEREDUR and AuRUS the same search budget: `[genetic] termination` (`"generations"`, the default, or `"individuals"`), `max_individuals` (0) and `max_wall_s` (0), all no-ops at those values. AuRUS's `GeneticAlgorithm.java` stops mid-generation once `numberOfVisitedIndividuals` reaches `GA_MAX_NUM_INDIVIDUALS` (1000), counting once per new mutant and once per crossover offspring. That is 1000 *bred individuals*, never 1000 solutions: the counts sit inside the breeding loops, and none of 600 archived `2026-08-14-aurus-h2h` runs reached 1000 solutions. The GECCO '23 paper does not say how an individual is counted, so `SearchBudget` is a code-level match and should be described as one.
 
-An offspring counts only where it differs from its parent, as in AuRUS. The budget is checked inside `breed_offspring` (`include/genetic/pipeline.hpp`) between slots and at the head of each driver's generation loop, because a boundary check alone would overshoot by up to 20% of a 1000-individual cap at population 200. `SearchBudget` is owned by the driver and passed by reference through `run_evolution` (FRETISH) and `tlsf::run_repair` → `run_monolithic` → `evolve_population` (TLSF).
+An offspring counts only where it differs from its parent, as in AuRUS. The budget is checked inside `breed_offspring` (`include/genetic/pipeline.hpp`) between slots and at the head of each driver's generation loop, because a boundary check alone would overshoot by up to 20% of a 1000-individual cap at population 200. `SearchBudget` is owned by the driver and passed by reference to `run_generations` (`src/genetic/generation_loop.hpp`), the one generation loop both paths run.
 
 `scripts/gen_configs.py` emits `--termination` and `--max-individuals` only away from their no-op values, so existing grids stay byte-identical, and both keys are in `GEN_CONFIGS_FIELDS` in `scripts/check_config_schema.py`, a fifth site beyond the four in "Config keys". Matching AuRUS also needs `--population-size 100`, as the `matched` profile in `run_experiments.py` did until `c704970` retired it; `generations` must stay well above what the cap needs (at least 12 at population 100), and `stopped_by` reading `generations` means a campaign measured a different budget.
 
@@ -34,7 +34,7 @@ stdout shows a run in progress: the per-generation status line, the repair count
 
 Anything that moves the cursor must go through `stdout_is_tty()` (`include/status_line.hpp`), because runs are usually redirected to `<output-dir>/run.log` and unguarded `\r`/`\033[J` keeps every frame (59KB of escape codes for 1.2KB of content). `StatusLine` columns may be *transient*, shown live but dropped from the committed line.
 
-Report "best fitness" as the population maximum, never `population[0]`/`front()`. NSGA-II orders the population by front rank and crowding distance, so the leading individual need not have the highest weighted scalar and the printed best would fall while the search improves (`src/repair/evolution.cpp`, `src/tlsf/evolve.cpp`).
+Report "best fitness" as the population maximum, never `population[0]`/`front()`. NSGA-II orders the population by front rank and crowding distance, so the leading individual need not have the highest weighted scalar and the printed best would fall while the search improves (`run_generations` in `src/genetic/generation_loop.hpp`).
 
 `peredur` rejects unknown arguments (`find_unknown_arg`), so a new flag must be added to the table in `src/main.cpp`.
 

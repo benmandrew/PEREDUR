@@ -111,6 +111,7 @@ target_sources(peredur_fitness PRIVATE
     src/fitness/status.cpp
     src/fitness/syntactic_similarity.cpp
     src/fitness/transfer_matrix.cpp
+    src/genetic/accumulator.cpp
     src/genetic/crossover.cpp
     src/genetic/generation.cpp
     src/genetic/monotone.cpp
@@ -125,15 +126,14 @@ target_sources(peredur_fitness PRIVATE
     src/tlsf/mucs.cpp
     src/tlsf/guarantee_parts.cpp
     src/tlsf/pipeline.cpp
-    src/tlsf/evolve.cpp
     src/genetic/filter_report.cpp
     src/genetic/output_gate.cpp
     src/tlsf/repair_modes.cpp
     src/tlsf/repair_output.cpp
-    src/tlsf/survivors.cpp
     src/config_io.cpp
     src/dashboard.cpp
     src/driver_support.cpp
+    src/repair_steps.cpp
 )
 target_include_directories(peredur_fitness PUBLIC include)
 # As peredur_core does, and for the same reason: src/tlsf/filter.cpp names

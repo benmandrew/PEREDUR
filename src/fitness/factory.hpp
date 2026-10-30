@@ -83,7 +83,7 @@ WeightedFitnessFunctionT<Spec> status_objective(const Spec& original,
 // The fitness factory both front ends build from. What differs between them is
 // how a specification is scored, which @p Scorers supplies as static members:
 //
-//   syntactic(spec, original, cfg), semantic(spec, original, cfg)
+//   syntactic(spec, original, cfg)
 //   semantic_terms(spec, original, cfg)  one term per changed slot
 //   status(spec, cfg, order, ComponentCheck)
 //   status_components(spec)              the component satisfiability queries
@@ -104,17 +104,20 @@ AggregateWeightedFitnessFunctionT<Spec> make_fitness_function(
     std::vector<WeightedFitnessFunctionT<Spec>> functions;
     const auto ctx = std::make_shared<const SimilarityContext>(
         SimilarityContext{original, cfg});
+    // The similarity objectives are defined by their parts alone; the serial
+    // path runs those parts in order and folds them, so it scores exactly what
+    // a split scoring region does.
     if (cfg.fitness_weight_syntactic > 0.0) {
-        auto synsim = [ctx](const Spec& spec) -> double {
-            return Scorers::syntactic(spec, ctx->original, ctx->cfg);
-        };
         // One part, and the cheapest kind there is: this objective never leaves
         // the process, so splitting its arithmetic across workers would cost
         // more in dispatch than it could save. It is still declared rather than
         // left undecomposed, so the launch order knows it is free.
-        auto split = [synsim](const Spec& spec) {
+        auto split = [ctx](const Spec& spec) {
             ObjectiveWork work;
-            work.parts.push_back({[synsim, &spec] { return synsim(spec); },
+            work.parts.push_back({[ctx, &spec] {
+                                      return Scorers::syntactic(
+                                          spec, ctx->original, ctx->cfg);
+                                  },
                                   k_part_cost_in_process});
             work.combine = [](const std::vector<double>& values) {
                 return values.front();
@@ -122,12 +125,9 @@ AggregateWeightedFitnessFunctionT<Spec> make_fitness_function(
             return work;
         };
         functions.push_back(
-            {synsim, cfg.fitness_weight_syntactic, "syntactic", split});
+            {nullptr, cfg.fitness_weight_syntactic, "syntactic", split});
     }
     if (cfg.fitness_weight_semantic > 0.0) {
-        auto semsim = [ctx](const Spec& spec) -> double {
-            return Scorers::semantic(spec, ctx->original, ctx->cfg);
-        };
         // One part per changed slot, each three bounded model counts over a
         // formula pair independent of every other slot's.
         auto split = [ctx](const Spec& spec) {
@@ -141,7 +141,7 @@ AggregateWeightedFitnessFunctionT<Spec> make_fitness_function(
             return work;
         };
         functions.push_back(
-            {semsim, cfg.fitness_weight_semantic, "semantic", split});
+            {nullptr, cfg.fitness_weight_semantic, "semantic", split});
     }
     if (cfg.fitness_weight_status > 0.0) {
         functions.push_back(status_objective<Spec, Scorers>(original, cfg));

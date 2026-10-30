@@ -448,6 +448,14 @@ class PipelineStage {
     mutable std::size_t m_n_out{0};
 };
 
+/// One filter's input and output population sizes, summed over every
+/// generation it ran in: a row of the filter report.
+struct FilterRunStats {
+    std::string name;
+    std::size_t total_in = 0;
+    std::size_t total_out = 0;
+};
+
 /// What a consumer learns about one completed stage.
 struct StageObservation {
     std::string name;

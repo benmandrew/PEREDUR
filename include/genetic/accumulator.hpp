@@ -5,14 +5,8 @@
 ///        the incremental writer that puts each one on disk as it is found.
 
 #include <cstddef>
-#include <filesystem>
-#include <fstream>
 #include <functional>
-#include <iomanip>
-#include <iostream>
-#include <sstream>
 #include <string>
-#include <system_error>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -46,67 +40,33 @@ struct AccumulatorStats {
 ///
 /// Nothing touches the filesystem before the first write, so neither the
 /// directory nor a file exists until a candidate is accumulated.
-template <typename Spec>
 class AccumulatedRepairWriter {
    public:
-    /// Renders one specification as the document to write. Pass the path's own
-    /// serialiser -- `to_json` or `tlsf::write` -- so an accumulated file reads
-    /// exactly like a repair of the same specification, tombstoned guarantees
-    /// omitted (see "Removable guarantees" in docs/dev/operators.md).
-    using Serialiser = std::function<std::string(const Spec&)>;
-
     /// A default-constructed writer writes nothing, for the callers that
     /// accumulate in memory alone, such as the tests.
     AccumulatedRepairWriter() = default;
 
+    /// @p extension names the path's own format, `.json` or `.tlsf`.
     /// @p elapsed reports seconds since the search began, and is what stamps
     /// each candidate into the index. A writer given none still writes the
     /// specification files; its index reports an elapsed time of zero, which is
     /// what the tests want and what a caller with no run clock can offer.
     AccumulatedRepairWriter(const std::string& output_dir,
-                            std::string extension, Serialiser serialise,
-                            std::function<double()> elapsed = {})
-        : m_directory(
-              (std::filesystem::path(output_dir) / k_subdirectory).string()),
-          m_extension(std::move(extension)),
-          m_serialise(std::move(serialise)),
-          m_elapsed(std::move(elapsed)) {}
+                            std::string extension,
+                            std::function<double()> elapsed = {});
 
-    /// @p generation is 1-indexed and names the file, so the origin of an
-    /// accumulated repair is legible without opening it; a run-wide sequence
-    /// number follows it, which makes a collision impossible whatever order the
-    /// generations contribute in. Returns the file's name within the
-    /// accumulated directory, or an empty string where nothing was written.
-    std::string write(std::size_t generation, const Spec& spec) {
-        if (!m_serialise || m_failed) {
-            return {};
-        }
-        if (!m_created && !create_directory()) {
-            return {};
-        }
-        std::ostringstream name;
-        name << "gen" << std::setw(2) << std::setfill('0') << generation << "_"
-             << std::setw(4) << std::setfill('0') << m_sequence << m_extension;
-        const std::string path =
-            (std::filesystem::path(m_directory) / name.str()).string();
-        std::ofstream file(path, std::ios::out | std::ios::trunc);
-        if (!file) {
-            warn("could not open " + path);
-            return {};
-        }
-        file << m_serialise(spec);
-        // Closed here rather than left to the destructor: the buffer has to
-        // reach the kernel before the next candidate is scored, or a kill in
-        // between loses a repair that this call reported as written.
-        file.close();
-        if (!file) {
-            warn("could not write " + path);
-            return {};
-        }
-        append_index_row(name.str(), generation);
-        ++m_sequence;
-        return name.str();
-    }
+    /// False for a default-constructed writer and after the first failure, so
+    /// a caller can skip rendering a document nothing will write.
+    [[nodiscard]] bool active() const;
+
+    /// Writes @p document, one specification already rendered by the path's
+    /// own serialiser. @p generation is 1-indexed and names the file, so the
+    /// origin of an accumulated repair is legible without opening it; a
+    /// run-wide sequence number follows it, which makes a collision impossible
+    /// whatever order the generations contribute in. Returns the file's name
+    /// within the accumulated directory, or an empty string where nothing was
+    /// written.
+    std::string write(std::size_t generation, const std::string& document);
 
     /// The directory under `<output-dir>` the files go into.
     static constexpr const char* k_subdirectory = "accumulated";
@@ -114,59 +74,12 @@ class AccumulatedRepairWriter {
    private:
     static constexpr const char* k_index_name = "index.tsv";
 
-    /// One flushed row per accumulated candidate: which file, which generation,
-    /// and how many seconds into the search it passed the gate.
-    ///
-    /// The generation is already in the file name and is repeated here so a
-    /// reader needs no filename parsing, and the elapsed time is here rather
-    /// than in the name because the name is an artefact format that campaign
-    /// scripts already glob. Opened in append mode and closed per row, for the
-    /// reason the specification files are: a run killed by a wall-clock cap has
-    /// to keep the rows it had already written.
-    void append_index_row(const std::string& file_name,
-                          std::size_t generation) {
-        const std::string path =
-            (std::filesystem::path(m_directory) / k_index_name).string();
-        const bool first = m_sequence == 0;
-        std::ofstream index(path, std::ios::out | std::ios::app);
-        if (!index) {
-            warn("could not open " + path);
-            return;
-        }
-        if (first) {
-            index << "file\tgeneration\telapsed_s\n";
-        }
-        index << file_name << "\t" << generation << "\t" << std::fixed
-              << std::setprecision(6) << (m_elapsed ? m_elapsed() : 0.0)
-              << "\n";
-        index.close();
-        if (!index) {
-            warn("could not write " + path);
-        }
-    }
-
-    bool create_directory() {
-        std::error_code error;
-        std::filesystem::create_directories(m_directory, error);
-        if (error) {
-            warn("could not create " + m_directory + ": " + error.message());
-            return false;
-        }
-        m_created = true;
-        return true;
-    }
-
-    /// Reports once and then stops trying. Losing the accumulated files must
-    /// never take the repair run with them, as with the dashboard's log.
-    void warn(const std::string& message) {
-        m_failed = true;
-        std::cerr << "warning: " << message
-                  << "; the run continues without accumulated repair files\n";
-    }
+    void append_index_row(const std::string& file_name, std::size_t generation);
+    bool create_directory();
+    void warn(const std::string& message);
 
     std::string m_directory;
     std::string m_extension;
-    Serialiser m_serialise;
     std::function<double()> m_elapsed;
     std::size_t m_sequence{0};
     bool m_created{false};
@@ -192,9 +105,19 @@ class RepairAccumulator {
     /// none. The streaming implication filter is fed through this.
     using Sink = std::function<void(const Spec&, const std::string&)>;
 
-    explicit RepairAccumulator(AccumulatedRepairWriter<Spec> writer = {},
-                               Sink sink = {})
-        : m_writer(std::move(writer)), m_sink(std::move(sink)) {}
+    /// Renders one specification as the document @p writer puts on disk. Pass
+    /// the path's own serialiser -- `to_json` or `tlsf::write` -- so an
+    /// accumulated file reads exactly like a repair of the same specification,
+    /// tombstoned guarantees omitted (see "Removable guarantees" in
+    /// docs/dev/operators.md).
+    using Render = std::function<std::string(const Spec&)>;
+
+    /// With no @p render, nothing is written whatever @p writer is.
+    explicit RepairAccumulator(AccumulatedRepairWriter writer = {},
+                               Render render = {}, Sink sink = {})
+        : m_writer(std::move(writer)),
+          m_render(std::move(render)),
+          m_sink(std::move(sink)) {}
 
     /// @p generation is 1-indexed, and reaches the writer as part of the file
     /// name.
@@ -208,7 +131,10 @@ class RepairAccumulator {
             return;
         }
         m_specifications.push_back(spec);
-        const std::string name = m_writer.write(generation, spec);
+        const std::string name =
+            m_render && m_writer.active()
+                ? m_writer.write(generation, m_render(spec))
+                : std::string();
         if (m_sink) {
             m_sink(spec, name);
         }
@@ -221,7 +147,8 @@ class RepairAccumulator {
     }
 
    private:
-    AccumulatedRepairWriter<Spec> m_writer;
+    AccumulatedRepairWriter m_writer;
+    Render m_render;
     Sink m_sink;
     std::unordered_set<Spec> m_seen;
     std::vector<Spec> m_specifications;

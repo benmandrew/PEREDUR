@@ -223,12 +223,6 @@ struct TlsfScorers {
         return tlsf_syntactic_similarity(spec, original, cfg);
     }
 
-    static double semantic(const tlsf::Specification& spec,
-                           const tlsf::Specification& original,
-                           const Config& cfg) {
-        return tlsf_semantic_similarity(spec, original, cfg);
-    }
-
     static std::vector<std::function<double()>> semantic_terms(
         const tlsf::Specification& spec, const tlsf::Specification& original,
         const Config& cfg) {

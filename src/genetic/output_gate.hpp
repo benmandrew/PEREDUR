@@ -1,19 +1,22 @@
 #pragma once
 
-// The output gate both front ends judge their repairs by, and the streaming
-// final screen fed from what it admits. Instantiated for Specification and
-// tlsf::Specification.
+// The output gate both front ends judge their repairs by, the streaming final
+// screen fed from what it admits, and the post-search tail built on both.
+// Instantiated for Specification and tlsf::Specification.
 
 #include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "config.hpp"
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/filter_report.hpp"
+#include "genetic/pipeline.hpp"
 #include "genetic/scored.hpp"
 
 // True if @p spec counts as a repair: its status on cfg.status_grading is the
@@ -65,3 +68,66 @@ std::size_t accumulate_gate_passing(
 template <typename Spec>
 std::unique_ptr<StreamingMaximalFilter<Spec>> make_maximal_stream(
     const Spec& original, const Config& cfg, const std::string& output_dir);
+
+// What the post-search tail hands back for writing out.
+// What one search leaves behind: the final population, and each
+// per-generation filter's in/out totals summed over every generation.
+template <typename Spec>
+struct SearchResult {
+    std::vector<Scored<Spec>> population;
+    std::vector<FilterRunStats> filter_stats;
+};
+
+template <typename Spec>
+struct SearchOutput {
+    // The repairs to write, scored and ordered best-first under
+    // cfg.selection_scheme, which is the order repair_N numbers them in.
+    std::vector<Scored<Spec>> repairs;
+    // Distinct gate-passing specifications, accumulated ones included.
+    std::size_t n_realizable = 0;
+    // The search's per-generation filter rows, then one per final filter, for
+    // the filter report.
+    std::vector<FilterRunStats> filter_stats;
+};
+
+// The post-search tail both front ends run: gates the population @p searched
+// ended on, merges the @p accumulated repairs, applies the final filters,
+// deduplication alone or the implication filter streamed through @p stream
+// where that is non-null, and scores and orders what is left.
+template <typename Spec>
+SearchOutput<Spec> finish_search(
+    const Config& cfg, SearchResult<Spec> searched,
+    const std::vector<Spec>& accumulated,
+    const AggregateWeightedFitnessFunctionT<Spec>& fitness,
+    StreamingMaximalFilter<Spec>* stream);
+
+// The closing line: how many realizable specifications the run found, how
+// many of them were maximal and how many equivalent pairs collapsed when the
+// implication filter ran, and where they were written.
+void print_repair_summary(std::size_t n_realizable, std::size_t n_written,
+                          bool implication_filter_run,
+                          const std::string& output_dir);
+
+// The accumulator a run collects gate-passing repairs into: each one is
+// written under `<output_dir>/accumulated/` as @p render makes it, with
+// @p extension, stamped with @p budget's elapsed time, and then pushed into
+// @p stream when there is one. @p render is the serialiser the path writes
+// repair_N through, so an accumulated file is a specification document and
+// nothing else -- these are gate-passing candidates, not the run's filtered
+// output.
+template <typename Spec>
+RepairAccumulator<Spec> make_repair_accumulator(
+    const std::string& output_dir, const std::string& extension,
+    typename RepairAccumulator<Spec>::Render render, const SearchBudget& budget,
+    StreamingMaximalFilter<Spec>* stream) {
+    typename RepairAccumulator<Spec>::Sink sink;
+    if (stream != nullptr) {
+        sink = [stream](const Spec& spec, const std::string& name) {
+            stream->push(spec, name);
+        };
+    }
+    return RepairAccumulator<Spec>(
+        AccumulatedRepairWriter(output_dir, extension,
+                                [&budget] { return budget.elapsed_s(); }),
+        std::move(render), std::move(sink));
+}

@@ -4,7 +4,9 @@
 /// @brief End-to-end TLSF genetic-repair pipeline: parse, evolve, collect the
 ///        realizable survivors, and write them as repair files.
 
+#include <optional>
 #include <string>
+#include <vector>
 
 #include "config.hpp"
 #include "genetic/pipeline.hpp"
@@ -29,9 +31,11 @@ namespace tlsf {
 /// @param random_source Seeded random source driving crossover and mutation.
 /// @param budget        The run's termination budget, owned by the caller so it
 ///                      can be read back for the manifest.
-/// @return 0 on success; 1 on a read or parse error.
-int run_repair(const std::string& input_path, const std::string& output_dir,
-               const Config& cfg, const RandomSource& random_source,
-               SearchBudget& budget);
+/// @return The filter report's rows, for the caller's closing reports; nullopt
+///         after a read, parse or unsafe-atom-name error, already reported on
+///         stderr.
+std::optional<std::vector<FilterRunStats>> run_repair(
+    const std::string& input_path, const std::string& output_dir,
+    const Config& cfg, const RandomSource& random_source, SearchBudget& budget);
 
 }  // namespace tlsf

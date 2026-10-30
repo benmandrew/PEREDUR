@@ -83,8 +83,7 @@ bool specification_has_valid_guarantee(const Specification& specification,
 /// mutates.
 ///
 /// Shared by the per-generation filter below and the final repair screen in
-/// collect_realizable_specifications — elites bypass the offspring filters, so
-/// the screen cannot rely on the filter having seen what it is about to write
-/// out.
+/// finish_search — elites bypass the offspring filters, so the screen cannot
+/// rely on the filter having seen what it is about to write out.
 bool specification_is_vacuous(const Specification& specification,
                               SatisfiabilityChecker& checker);
