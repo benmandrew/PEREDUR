@@ -22,7 +22,7 @@ set(PEREDUR_FUZZ_SOURCE
 add_custom_command(
     OUTPUT "${PEREDUR_FUZZ_BINARY}"
     COMMAND "${PEREDUR_FUZZ_CLANGXX}"
-            -std=c++17 -O1 -g
+            -std=c++17 -O1 -g -Wall -Wextra -Wpedantic -Werror
             -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=all
             "-I${CMAKE_SOURCE_DIR}/include"
             "${PEREDUR_FUZZ_SOURCE}"

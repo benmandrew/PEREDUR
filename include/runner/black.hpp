@@ -69,7 +69,8 @@ class SatisfiabilityChecker {
     inline static std::atomic<std::size_t> n_spot_decided{0};
     /// black subprocesses actually launched, which is no longer the same as
     /// the cache-miss count: only an `ExpectSat` query SPOT left undecided
-    /// gets one.
+    /// gets one. black_model's probes count here too, as they do in the
+    /// time and timeout totals below.
     inline static std::atomic<std::size_t> n_black_calls{0};
     /// Queries SPOT left undecided that were not escalated, because their
     /// polarity says black would exhaust its bound and answer nothing.
@@ -144,8 +145,8 @@ class SatisfiabilityChecker {
         const std::string& ltl_formula, std::chrono::milliseconds spot_budget);
     /// One black solve within @p budget, weak operators rewritten away first.
     /// Leaves the cache to the caller.
-    std::optional<bool> black_answer(const std::string& ltl_formula,
-                                     std::chrono::milliseconds budget);
+    static std::optional<bool> black_answer(const std::string& ltl_formula,
+                                            std::chrono::milliseconds budget);
 
     std::chrono::milliseconds m_timeout{1000};
     std::chrono::milliseconds m_spot_budget{500};

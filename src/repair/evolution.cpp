@@ -147,11 +147,17 @@ EvolutionResult run_evolution(
         // The stage index is assigned here rather than by the pipeline: the
         // observer sees stages in order, and the dashboard needs their order
         // without the pipeline having to number them.
+        // Left empty with the dashboard off: the pipeline hashes the whole
+        // population after every stage for an observer, so a no-op one costs
+        // a distinct-count per stage that nothing reads.
         std::size_t stage_index = 0;
-        auto on_stage = [&dashboard, &stage_index,
-                         gen = gen_idx + 1](const StageObservation& obs) {
-            dashboard.stage(gen, stage_index++, obs);
-        };
+        StageObserver on_stage;
+        if (dashboard.enabled()) {
+            on_stage = [&dashboard, &stage_index,
+                        gen = gen_idx + 1](const StageObservation& obs) {
+                dashboard.stage(gen, stage_index++, obs);
+            };
+        }
 
         population = evolve_generation(
             cfg, population, sizes.selection, sizes.elitism, fitness_function,

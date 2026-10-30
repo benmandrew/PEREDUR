@@ -142,6 +142,13 @@ LassoModel any_word_model() {
     return model;
 }
 
+// Guards SatisfiabilityChecker's static exec totals. Static like them, since
+// black_model has no checker instance and every instance adds to one total.
+std::mutex& black_stats_mutex() {
+    static std::mutex mutex;
+    return mutex;
+}
+
 }  // namespace
 
 SatisfiabilityChecker& global_sat_checker() {
@@ -370,7 +377,7 @@ std::optional<bool> SatisfiabilityChecker::black_answer(
     n_black_calls++;
     const ProcessResult result =
         execute_and_capture_with_input(command, query.m_text, budget);
-    std::scoped_lock lock(m_cache_mutex);
+    std::scoped_lock lock(black_stats_mutex());
     record_exec<SatisfiabilityChecker>(result);
     if (result.m_timed_out) {
         return std::nullopt;
@@ -472,8 +479,13 @@ std::optional<LassoModel> black_model(const std::string& ltl_formula,
         "-t",
         std::to_string(black_timeout_seconds(budget)),
         "-"};
+    SatisfiabilityChecker::n_black_calls++;
     const ProcessResult result =
         execute_and_capture_with_input(command, query.m_text, budget);
+    {
+        const std::scoped_lock lock(black_stats_mutex());
+        record_exec<SatisfiabilityChecker>(result);
+    }
     if (result.m_timed_out) {
         return std::nullopt;
     }

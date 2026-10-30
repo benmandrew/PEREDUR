@@ -254,12 +254,6 @@ include(cmake/docs.cmake)
 include(cmake/format.cmake)
 include(cmake/lint.cmake)
 include(cmake/githooks.cmake)
-
-foreach(peredur_target peredur_core peredur_fitness peredur compare realize ltl maximal)
-    if(MSVC)
-        target_compile_options(${peredur_target} PRIVATE /W4 /permissive-)
-    else()
-        target_compile_options(${peredur_target} PRIVATE -Wall -Wextra -Wpedantic -Werror)
-    endif()
-endforeach()
+# Last, so it sees every target the tree defines.
+include(cmake/warnings.cmake)
 

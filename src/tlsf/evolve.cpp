@@ -141,14 +141,17 @@ std::vector<Scored<Specification>> evolve_population(
         // the dashboard is given a number that keeps climbing across
         // iterations; muc_iter carries the structure that flattens away.
         const std::size_t dashboard_gen = progress.gen_offset + gen + 1;
+        // Left empty with the dashboard off, as the pipeline then skips the
+        // per-stage distinct count.
         std::size_t stage_index = 0;
-        auto on_stage = [&progress, &stage_index,
-                         dashboard_gen](const StageObservation& obs) {
-            if (progress.writer != nullptr) {
+        StageObserver on_stage;
+        if (progress.writer != nullptr && progress.writer->enabled()) {
+            on_stage = [&progress, &stage_index,
+                        dashboard_gen](const StageObservation& obs) {
                 progress.writer->stage(dashboard_gen, stage_index++, obs,
                                        progress.muc_iter);
-            }
-        };
+            };
+        }
         population = evolve_generation_generic(
             cfg, population, sizes.selection, sizes.elitism, fitness,
             per_gen_filters, tlsf_operators(), random_source, on_progress,

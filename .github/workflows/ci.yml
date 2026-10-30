@@ -237,7 +237,11 @@ jobs:
           # all, and was rejected because that preset is the one everybody
           # builds locally -- it would slow the daily loop and drop a .profraw
           # in whatever directory a binary was run from.
-          debug='{"preset":"debug","build_dir":"build"}'
+          # debug also compiles the libFuzzer target (fuzz/CMakeLists.txt),
+          # which nothing else builds: it takes the dev shell's clang++ and
+          # the libraries this leg builds anyway, so it costs one translation
+          # unit. It is built, not run; fuzzing is a local job.
+          debug='{"preset":"debug","build_dir":"build","cmake_args":"-DPEREDUR_FUZZ=ON"}'
           release='{"preset":"release","build_dir":"build-release"}'
           gcc='{"preset":"debug","build_dir":"build","compiler":"gcc","cmake_args":"-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++"}'
           tsan='{"preset":"tsan","build_dir":"build-tsan"}'

@@ -141,6 +141,12 @@ Binaries
 ``maximal``
   Reports which specifications in a set are maximal under the implication order, then quotients the survivors by mutual implication.  Takes any directory of specification files, so a foreign tool's output can be measured on the definition ``peredur`` applies to its own.  Both front ends, selected by the extension present as ``compare`` selects, since a maximality curve over a FRETISH campaign reads the same accumulated candidates a TLSF one does.  The two oracles ask the same question, each lowering a whole specification to one formula and asking a complete query, so a count from one format is comparable with a count from the other.
 
+``lint-ideals``
+  Checks the ideal repairs under each ``examples/`` subject: that the specification implies each ideal, and the other properties ``--help`` lists.
+
+``keyword-terms``
+  Writes the per-requirement-pair and per-specification keyword-order terms of a set of FRETISH candidates against an original, for offline analysis of the ``"semantic"`` keyword mix.
+
 ``signal_tracer`` is an internal helper rather than a user-facing tool: the crash handler runs it out-of-process to symbolise a stack trace, because unwinding in-process from a signal handler is not safe. Run any of the others with ``--help`` for its options, or with ``--version`` for the commit it was built from.
 
 External tools

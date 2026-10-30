@@ -23,12 +23,6 @@ add_executable(peredur_bench
 target_include_directories(peredur_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(peredur_bench PRIVATE peredur_fitness benchmark::benchmark)
 
-if(MSVC)
-    target_compile_options(peredur_bench PRIVATE /W4 /permissive-)
-else()
-    target_compile_options(peredur_bench PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
 # Regression-detection test: asserts black-call counts are correct.
 add_test(NAME peredur_bench.assertions
          COMMAND peredur_bench --check-assertions)

@@ -80,12 +80,6 @@ target_compile_definitions(peredur_tests PRIVATE
     PEREDUR_DRIVER_DIR="$<TARGET_FILE_DIR:peredur>"
     PEREDUR_CONTAINED_CHILD_HELPER="$<TARGET_FILE:contained_child_helper>")
 
-if(MSVC)
-    target_compile_options(peredur_tests PRIVATE /W4 /permissive-)
-else()
-    target_compile_options(peredur_tests PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
 # One entry per suite in the table in main.cpp, which also fixes which tests
 # each runs. The drivers' end-to-end suites are separate entries so a failure
 # names the driver rather than a suite covering eight of them.
