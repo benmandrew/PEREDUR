@@ -110,7 +110,7 @@ The container image is the packaged form of the same install tree, with the five
 ctest --preset debug                       # run all tests
 ctest --preset debug -R syntactic          # run tests matching a regex
 
-cmake --build build --target lint          # cpplint + clang-tidy + cppcheck + config key parity
+cmake --build build --target lint          # cpplint + clang-tidy + cppcheck + gen_configs defaults
 cmake --build build --target format        # apply clang-format in-place
 cmake --build build --target format-ci     # dry-run, fails if unformatted
 ```

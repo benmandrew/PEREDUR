@@ -8,15 +8,15 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "generations":     { "type": "integer", "minimum": 1, "description": "Number of evolution rounds." },
-        "population_size": { "type": "integer", "minimum": 1, "description": "Candidates per generation." },
-        "selection_rate":  { "type": "number",  "minimum": 0, "maximum": 1, "description": "Fraction of population selected as parents each generation." },
-        "elitism_rate":    { "type": "number",  "minimum": 0, "maximum": 1, "default": 0.1, "description": "Fraction of the population carried over verbatim each generation, bypassing crossover, mutation, and filters. Must be less than selection_rate. Redundant on paper under either NSGA-II scheme, whose (mu+lambda) survivor step is already elitist, and kept at 0.1 for wall time alone: the only measured difference is that 0 costs 4.0% more, yield and quality being level." },
-        "crossover_rate":  { "type": "number",  "minimum": 0, "maximum": 1, "description": "Probability of crossover between parents." },
-        "mutation_rate":   { "type": "number",  "minimum": 0, "maximum": 1, "description": "Probability of mutating an offspring." },
-        "termination":     { "type": "string", "enum": ["generations", "individuals"], "default": "generations", "description": "Which budget ends the search. 'generations' is PEREDUR's own: the [genetic] generations rounds, whatever they cost. 'individuals' is AuRUS's, for a head-to-head where both tools get the same number of offspring rather than the same wall clock -- its GA stops once numberOfVisitedIndividuals reaches GA_MAX_NUM_INDIVIDUALS, counted per offspring admitted to the new population and checked between offspring rather than at a generation boundary. generations still bounds the run under 'individuals', as GA_GENERATIONS does for AuRUS, and max_wall_s is honoured under both. Requires max_individuals >= 1." },
+        "generations": { "type": "integer", "minimum": 1, "default": 10, "description": "Number of evolution rounds." },
+        "population_size": { "type": "integer", "minimum": 1, "default": 200, "description": "Candidates per generation." },
+        "selection_rate": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5, "description": "Fraction of population selected as parents each generation." },
+        "elitism_rate": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.1, "description": "Fraction of the population carried over verbatim each generation, bypassing crossover, mutation, and filters. Must be less than selection_rate. Redundant on paper under either NSGA-II scheme, whose (mu+lambda) survivor step is already elitist, and kept at 0.1 for wall time alone: the only measured difference is that 0 costs 4.0% more, yield and quality being level." },
+        "crossover_rate": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.1, "description": "Probability of crossover between parents." },
+        "mutation_rate": { "type": "number", "minimum": 0, "maximum": 1, "default": 1.0, "description": "Probability of mutating an offspring." },
         "max_individuals": { "type": "integer", "minimum": 0, "default": 0, "description": "Offspring budget for the whole run under termination = 'individuals'; ignored under 'generations'. An offspring counts only when it differs from the parent it was bred from, matching what AuRUS counts. Zero is rejected under 'individuals' rather than meaning unlimited." },
-        "max_wall_s":      { "type": "integer", "minimum": 0, "default": 0, "description": "Wall-clock deadline for the whole run in seconds; 0 is no deadline. Independent of termination and honoured under both. The search stops at the first generation boundary or bred offspring past the deadline and then writes its output normally, which is why this beats the harness's external kill: a killed run leaves no run.json and is censored with nothing recorded, where a run that stops itself reports what it found and which budget ended it. Measured from the same origin as the manifest's wall_s. Filters, scoring and the final realizability gate are not interrupted, so a run overruns by whatever the generation it was in had left." },
+        "max_wall_s": { "type": "integer", "minimum": 0, "default": 0, "description": "Wall-clock deadline for the whole run in seconds; 0 is no deadline. Independent of termination and honoured under both. The search stops at the first generation boundary or bred offspring past the deadline and then writes its output normally, which is why this beats the harness's external kill: a killed run leaves no run.json and is censored with nothing recorded, where a run that stops itself reports what it found and which budget ended it. Measured from the same origin as the manifest's wall_s. Filters, scoring and the final realizability gate are not interrupted, so a run overruns by whatever the generation it was in had left." },
+        "termination": { "type": "string", "enum": ["generations", "individuals"], "default": "generations", "description": "Which budget ends the search. 'generations' is PEREDUR's own: the [genetic] generations rounds, whatever they cost. 'individuals' is AuRUS's, for a head-to-head where both tools get the same number of offspring rather than the same wall clock -- its GA stops once numberOfVisitedIndividuals reaches GA_MAX_NUM_INDIVIDUALS, counted per offspring admitted to the new population and checked between offspring rather than at a generation boundary. generations still bounds the run under 'individuals', as GA_GENERATIONS does for AuRUS, and max_wall_s is honoured under both. Requires max_individuals >= 1." },
         "selection_scheme": { "type": "string", "enum": ["weighted", "nsga2-apportion"], "default": "nsga2-apportion", "description": "Selection scheme: 'nsga2-apportion' (default) ranks the (mu + lambda) pool by Pareto non-domination and crowding distance over the individual fitness components, deduplicating the pool first and apportioning the population_size slots over the distinct survivors by 1 / (1 + rank) under the largest-remainder (Hamilton) method; 'weighted' ranks by the weighted-average fitness scalar, but converges prematurely and is retained for comparison. Spelled 'nsga2' and 'nsga2-replicate' before 2026-08-06, and 'nsga2-truncate' was removed on 2026-10-30; those values are rejected, so reproduce an archived campaign at the commit its PROVENANCE.json names." }
       }
     },
@@ -25,8 +25,8 @@
       "additionalProperties": false,
       "properties": {
         "weight_syntactic": { "type": "number", "minimum": 0, "default": 0.1, "description": "Syntactic similarity component weight. The defaults match AuRUS's Settings.java: 0.1 syntactic, 0.2 semantic (its lost and won models at 0.1 each) and 0.7 status." },
-        "weight_semantic":  { "type": "number", "minimum": 0, "default": 0.2, "description": "Semantic similarity (model counting) component weight." },
-        "weight_status":    { "type": "number", "minimum": 0, "default": 0.7, "description": "Realizability status weight." },
+        "weight_semantic": { "type": "number", "minimum": 0, "default": 0.2, "description": "Semantic similarity (model counting) component weight." },
+        "weight_status": { "type": "number", "minimum": 0, "default": 0.7, "description": "Realizability status weight." },
         "status_grading": { "type": "string", "enum": ["mrs", "aurus"], "default": "mrs", "description": "How the status objective grades below realizability: 'mrs' (default) scores 0 for an unsatisfiable component or specification, and otherwise the greedy maximal-realizable-subset fraction, admitting guarantee-side parts in the order mrs_admission_order sets and scoring the fraction kept. The three-point 'tiered' scale was removed on 2026-10-30, after the 2026-08-11 campaign measured mrs at 410/480 repairs against its 367/480. 'aurus' is AuRUS's own six-level ladder (0, 0.05, 0.1, 0.2, 0.5, 1.0), graded by which side of the specification is satisfiable on its own; it is the only scale that does not fold well-separation into its realizability query, because AuRUS never asks that question, and it exists for an ablation against the design peredur derives from." },
         "mrs_admission_order": { "type": "string", "enum": ["spec", "degree"], "default": "degree", "description": "Which order the MRS walk admits guarantee-side parts in, read only under status_grading = 'mrs'. 'spec' is the specification's own index order. 'degree' (default) admits parts by ascending pairwise-conflict degree, so a part that cannot be held with most of the others is deferred rather than blocking them; it costs n(n-1)/2 + n subset queries once, before the search starts. Both are constant across a run, which is what the walk needs for seed reproducibility and for RealizabilityChecker's cache. Measured over populations of mutants across six TLSF specifications, degree scores 0.587 against spec order's 0.529 at 1.02x the ltlsynt execs." }
       }
@@ -35,16 +35,44 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "p_trigger":  { "type": "number", "minimum": 0, "maximum": 1, "description": "Per-requirement probability of mutating the trigger." },
-        "p_response": { "type": "number", "minimum": 0, "maximum": 1, "description": "Per-requirement probability of mutating the response." },
-        "p_timing":   { "type": "number", "minimum": 0, "maximum": 1, "description": "Per-requirement probability of mutating the timing." },
+        "p_trigger": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5, "description": "Per-requirement probability of mutating the trigger." },
+        "p_response": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5, "description": "Per-requirement probability of mutating the response." },
+        "p_timing": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.15, "description": "Per-requirement probability of mutating the timing." },
         "p_condition_type": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.15, "description": "FRETISH only: per-requirement probability of moving the condition type along its implication order (Continual strengthens, Trigger weakens)." },
-        "p_scope":    { "type": "number", "minimum": 0, "maximum": 1, "default": 0.15, "description": "FRETISH only: per-requirement probability of moving the scope along its implication order. Needs a declared mode to reach any non-Global scope." },
-        "p_stop":     { "type": "number", "minimum": 0, "maximum": 1, "default": 0.15, "description": "FRETISH only: per-requirement probability of rewriting the stop condition of an until or before timing. Draws nothing on a requirement without one." },
+        "p_scope": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.15, "description": "FRETISH only: per-requirement probability of moving the scope along its implication order. Needs a declared mode to reach any non-Global scope." },
+        "p_stop": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.15, "description": "FRETISH only: per-requirement probability of rewriting the stop condition of an until or before timing. Draws nothing on a requirement without one." },
         "p_monotone": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.25, "description": "Both modes: probability that a rewrite takes the monotone form, whose result is comparable to what it replaces under implication. On the FRETISH path it is offered inside the condition and response rewrites and takes the requirement's own direction; on the TLSF path it is offered ahead of the temporal and propositional rewrites, its direction a fair coin." },
-        "p_add_assumption": { "type": "number", "minimum": 0, "maximum": 1, "description": "Both modes: probability a mutation appends a new environment assumption (fairness over an input) instead of rewriting an existing requirement/formula." },
-        "p_remove_guarantee": { "type": "number", "minimum": 0, "maximum": 1, "description": "Both modes: probability a mutation deletes one guarantee instead of rewriting a requirement/formula. The mirror of p_add_assumption; never removes the last live guarantee. Set to 0 to reproduce a run from before the operator existed." },
-        "p_conditional_assumption": { "type": "number", "minimum": 0, "maximum": 1, "description": "Of the appended assumptions, the fraction guarded by a random input atom rather than by 'true'." }
+        "p_add_assumption": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.05, "description": "Both modes: probability a mutation appends a new environment assumption (fairness over an input) instead of rewriting an existing requirement/formula." },
+        "p_remove_guarantee": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.05, "description": "Both modes: probability a mutation deletes one guarantee instead of rewriting a requirement/formula. The mirror of p_add_assumption; never removes the last live guarantee. Set to 0 to reproduce a run from before the operator existed." },
+        "p_conditional_assumption": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.25, "description": "Of the appended assumptions, the fraction guarded by a random input atom rather than by 'true'." }
+      }
+    },
+    "model_counting": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_bound": { "type": "integer", "minimum": 1, "default": 20, "description": "Trace-length bound k for bounded model counting." }
+      }
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run_implication": { "type": "boolean", "default": true, "description": "Enable final implication maximality filter." }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "black_timeout_ms": { "type": "integer", "minimum": 0, "default": 1000, "description": "Timeout per black SAT query in milliseconds." },
+        "ltlsynt_timeout_ms": { "type": "integer", "minimum": 0, "default": 10000, "description": "Per-call ltlsynt realizability timeout in milliseconds. Default 10000; 0 is no timeout. A call exceeding it is killed and reported as undecided, which does not admit a repair and drops the candidate at the well-separation filter. It was 500, on the measurement that call durations are bimodal (95% finish under 50 ms, and a 500 ms cap abandons within 0.1% of what a 10 s cap does) -- a per-corpus statistic that hides the per-specification failure: where a specification's own realizability query exceeds the budget it loses not 0.1% of its calls but all of them, and even a correct repair is rejected at the final gate. The startup budget screen warns when the input specification is in that position." },
+        "ltl2tgba_timeout_ms": { "type": "integer", "minimum": 0, "default": 60000, "description": "Per-call ltl2tgba automaton-construction timeout in milliseconds. Default 60000; 0 is no timeout. Looser than the ltlsynt budget because a legitimate determinisation can take tens of seconds. A call exceeding it drops the individual against max_scoring_failure_rate." },
+        "ltlfilt_timeout_ms": { "type": "integer", "minimum": 0, "default": 10000, "description": "Per-call ltlfilt simplification timeout in milliseconds. Default 10000; 0 is no timeout. An abandoned call returns the formula unsimplified rather than failing." },
+        "parallel": { "type": "integer", "minimum": 1, "description": "Thread pool size. Omit to use the hardware concurrency, narrowed by the CPU affinity mask and the cgroup CPU quota." },
+        "mrs_speculation_depth": { "type": "integer", "minimum": 0, "default": 2, "description": "How many steps ahead the MRS walk queries both outcomes of the steps it has not yet settled, on pool workers that would otherwise sit idle; read only under status_grading = 'mrs'. 0 turns it off. The walk asks the same queries in the same order either way, so scores are unchanged; only wall time and the ltlsynt execs spent on untaken branches move. Depth d keeps up to 2^(d+1) - 2 queries in flight beside the walk's own. Values above 8 read as 8." },
+        "dashboard": { "type": "boolean", "default": false, "description": "Stream progress to <output-dir>/progress.jsonl and copy the live dashboard page beside it. Off by default; --dashboard also enables it." },
+        "max_scoring_failure_rate": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.15, "description": "Fraction of a generation whose fitness scoring may throw before the run aborts. A single failure per generation is always tolerated. Default 0.15, because the ltl2tgba budget drops individuals by design and enough land in one generation on the heavy TLSF specifications to trip a tighter bound." }
       }
     },
     "tlsf": {
@@ -56,39 +84,11 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "p_assumption": { "type": "number", "minimum": 0, "maximum": 1, "description": "Probability of mutating an assumption-side section (INITIALLY/REQUIRE/ASSUME); the guarantee side (PRESET/ASSERT/GUARANTEE) takes the complement." },
-            "p_temporal":   { "type": "number", "minimum": 0, "maximum": 1, "description": "Probability that a chosen section formula is rewritten by the temporal-structure mutation (may insert/drop/swap X/F/G/U/R/W) rather than the skeleton-preserving propositional rewrite." },
-            "p_clone_assumption": { "type": "number", "minimum": 0, "maximum": 1, "description": "Of the assumptions p_add_assumption appends, the fraction that copy an existing live ASSUME conjunct rather than build one from the template; ordinary mutation then edits the copy. Falls back to the template when there is nothing live to copy." }
+            "p_assumption": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.3, "description": "Probability of mutating an assumption-side section (INITIALLY/REQUIRE/ASSUME); the guarantee side (PRESET/ASSERT/GUARANTEE) takes the complement." },
+            "p_temporal": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.2, "description": "Probability that a chosen section formula is rewritten by the temporal-structure mutation (may insert/drop/swap X/F/G/U/R/W) rather than the skeleton-preserving propositional rewrite." },
+            "p_clone_assumption": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.25, "description": "Of the assumptions p_add_assumption appends, the fraction that copy an existing live ASSUME conjunct rather than build one from the template; ordinary mutation then edits the copy. Falls back to the template when there is nothing live to copy." }
           }
         }
-      }
-    },
-    "model_counting": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "default_bound": { "type": "integer", "minimum": 1, "description": "Trace-length bound k for bounded model counting." }
-      }
-    },
-    "filters": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "run_implication": { "type": "boolean", "description": "Enable final implication maximality filter." }
-      }
-    },
-    "runtime": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "black_timeout_ms":  { "type": "integer", "minimum": 0, "description": "Timeout per black SAT query in milliseconds." },
-        "ltlsynt_timeout_ms": { "type": "integer", "minimum": 0, "default": 10000, "description": "Per-call ltlsynt realizability timeout in milliseconds. Default 10000; 0 is no timeout. A call exceeding it is killed and reported as undecided, which does not admit a repair and drops the candidate at the well-separation filter. It was 500, on the measurement that call durations are bimodal (95% finish under 50 ms, and a 500 ms cap abandons within 0.1% of what a 10 s cap does) -- a per-corpus statistic that hides the per-specification failure: where a specification's own realizability query exceeds the budget it loses not 0.1% of its calls but all of them, and even a correct repair is rejected at the final gate. The startup budget screen warns when the input specification is in that position." },
-        "ltl2tgba_timeout_ms": { "type": "integer", "minimum": 0, "default": 60000, "description": "Per-call ltl2tgba automaton-construction timeout in milliseconds. Default 60000; 0 is no timeout. Looser than the ltlsynt budget because a legitimate determinisation can take tens of seconds. A call exceeding it drops the individual against max_scoring_failure_rate." },
-        "ltlfilt_timeout_ms": { "type": "integer", "minimum": 0, "description": "Per-call ltlfilt simplification timeout in milliseconds. Default 10000; 0 is no timeout. An abandoned call returns the formula unsimplified rather than failing." },
-        "parallel":          { "type": "integer", "minimum": 1, "description": "Thread pool size. Omit to use the hardware concurrency, narrowed by the CPU affinity mask and the cgroup CPU quota." },
-        "mrs_speculation_depth": { "type": "integer", "minimum": 0, "maximum": 8, "default": 2, "description": "How many steps ahead the MRS walk queries both outcomes of the steps it has not yet settled, on pool workers that would otherwise sit idle; read only under status_grading = 'mrs'. 0 turns it off. The walk asks the same queries in the same order either way, so scores are unchanged; only wall time and the ltlsynt execs spent on untaken branches move. Depth d keeps up to 2^(d+1) - 2 queries in flight beside the walk's own. Values above 8 read as 8." },
-        "max_scoring_failure_rate": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.15, "description": "Fraction of a generation whose fitness scoring may throw before the run aborts. A single failure per generation is always tolerated. Default 0.15, because the ltl2tgba budget drops individuals by design and enough land in one generation on the heavy TLSF specifications to trip a tighter bound." },
-        "dashboard": { "type": "boolean", "description": "Stream progress to <output-dir>/progress.jsonl and copy the live dashboard page beside it. Off by default; --dashboard also enables it." }
       }
     }
   }

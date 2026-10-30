@@ -5,6 +5,7 @@
 #include <string>
 
 #include "config.hpp"
+#include "config/reference.hpp"
 #include "config_io.hpp"
 #include "crash/crash_handler.hpp"
 #include "driver_support.hpp"
@@ -27,7 +28,8 @@ int main(int argc, const char* const argv[]) {
     // stops the run rather than being read past.
     const std::optional<std::string> unknown = find_unknown_arg(
         argc, argv,
-        {"--input", "--output-dir", "--config", "--format", "--seed"},
+        {"--input", "--output-dir", "--config", "--format", "--seed",
+         "--write-config-reference", "--check-config-reference"},
         {"--dashboard", "--cpu-report", "--diagnostics", "--repair-summary",
          "--version", "-h", "--help"});
     if (unknown.has_value()) {
@@ -36,6 +38,15 @@ int main(int argc, const char* const argv[]) {
                   << "Search parameters such as generations and population size"
                   << " are config keys, set with --config <file>.\n";
         return 1;
+    }
+    // Hidden: the config-reference build target and its ctest entry.
+    for (const bool check : {false, true}) {
+        const std::optional<std::string> root = parse_string_arg(
+            argc, argv,
+            check ? "--check-config-reference" : "--write-config-reference");
+        if (root.has_value()) {
+            return config_reference(*root, check);
+        }
     }
     Config cfg;
     const std::optional<std::string> config_path =

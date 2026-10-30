@@ -3,8 +3,8 @@
 #
 # Every section and key is optional; absent keys use the built-in defaults. Every
 # value below IS that default, so copying this file whole changes nothing.
-# scripts/check_config_schema.py enforces that against include/config.hpp as part
-# of the lint target -- a default may not drift from this template.
+# This file is generated from src/config/keys.hpp; regenerate it with
+# `cmake --build build --target config-reference` rather than editing it.
 #
 # What each key means is in schemas/config-schema.json, which an editor reads via
 # the #:schema line above. What to set and why -- the measurements behind each
@@ -12,15 +12,31 @@
 # of those records.
 
 [genetic]
-generations     = 10
+generations = 10
 population_size = 200
-selection_rate  = 0.5
-elitism_rate    = 0.1  # elites are a subset of the parents, so this must stay < selection_rate.
-                       # Redundant on paper under NSGA-II, and kept at 0.1 for wall time
-                       # alone: the 2026-08-23 monotone campaign puts 0 at 4.0% more wall
-                       # time and level on yield and quality -- see include/config.hpp.
-crossover_rate  = 0.1
-mutation_rate   = 1.0  # per offspring, unlike the per-requirement rates in [mutation]
+selection_rate = 0.5
+# elites are a subset of the parents, so this must stay < selection_rate.
+# Redundant on paper under NSGA-II, and kept at 0.1 for wall time
+# alone: the 2026-08-23 monotone campaign puts 0 at 4.0% more wall
+# time and level on yield and quality -- see docs/configuration.rst.
+elitism_rate = 0.1
+crossover_rate = 0.1
+# per offspring, unlike the per-requirement rates in [mutation]
+mutation_rate = 1.0
+# Offspring budget under termination = "individuals"; ignored otherwise, and
+# rejected at 0 there rather than read as unlimited.
+max_individuals = 0
+# Wall-clock deadline for the whole run in seconds, 0 for none. Honoured under
+# both termination modes. A run that stops on its own deadline still writes
+# run.json and its repairs, where one killed by the harness writes neither.
+max_wall_s = 0
+# What ends the search. "generations" is PEREDUR's own budget: the rounds above,
+# whatever they cost. "individuals" is AuRUS's, for a head-to-head where both
+# tools get the same number of offspring rather than the same wall clock; it
+# stops once max_individuals offspring have been bred, counted per offspring
+# that differs from its parent and checked between offspring rather than at a
+# generation boundary. generations still bounds the run under either.
+termination = "generations"
 # "nsga2-apportion" | "weighted". Under NSGA-II
 # the [fitness] weights only select which components are active (weight > 0);
 # they no longer bias selection, and the (mu+lambda) survivor pooling is already
@@ -29,73 +45,53 @@ mutation_rate   = 1.0  # per offspring, unlike the per-requirement rates in [mut
 # stays at 0.1.
 # "nsga2-truncate", the default until 2026-08-14, was removed on 2026-10-30.
 selection_scheme = "nsga2-apportion"
-# What ends the search. "generations" is PEREDUR's own budget: the rounds above,
-# whatever they cost. "individuals" is AuRUS's, for a head-to-head where both
-# tools get the same number of offspring rather than the same wall clock; it
-# stops once max_individuals offspring have been bred, counted per offspring
-# that differs from its parent and checked between offspring rather than at a
-# generation boundary. generations still bounds the run under either.
-termination     = "generations"
-# Offspring budget under termination = "individuals"; ignored otherwise, and
-# rejected at 0 there rather than read as unlimited.
-max_individuals = 0
-# Wall-clock deadline for the whole run in seconds, 0 for none. Honoured under
-# both termination modes. A run that stops on its own deadline still writes
-# run.json and its repairs, where one killed by the harness writes neither.
-max_wall_s      = 0
 
 [fitness]
 # AuRUS's weights (Settings.java): its lost- and won-model terms, 0.1 each, are
 # the one semantic term here.
 weight_syntactic = 0.1
-weight_semantic  = 0.2
-weight_status    = 0.7
+weight_semantic = 0.2
+weight_status = 0.7
 # "mrs" grades the unrealizable region by the fraction of guarantee-side parts a
 # greedy sweep keeps realizable.
 # "aurus" is AuRUS's own ladder, graded by which side is satisfiable alone, and
 # is the one scale that does not penalise a candidate realizable only by
 # defeating its own assumptions -- it is there to be ablated against, not used.
-status_grading   = "mrs"  # or "aurus"
+# or "aurus"
+status_grading = "mrs"
 # Which order that sweep admits parts in. "degree" defers the parts that
 # conflict with most others, costing one pairwise pass over the input before the
 # search starts; "spec" is the specification's own index order.
-mrs_admission_order = "degree"  # or "spec"
+# or "spec"
+mrs_admission_order = "degree"
 
 [mutation]
 # Per-requirement probabilities of rewriting each part of a FRETISH requirement.
-p_trigger  = 0.5
+p_trigger = 0.5
 p_response = 0.5
-p_timing   = 0.15
+p_timing = 0.15
 # FRETISH only, at p_timing's rate. p_scope needs the specification to declare a
 # mode to have anywhere to go. Set either to 0 to reproduce a run from before
 # 2026-09-11, when both defaulted off.
 p_condition_type = 0.15
-p_scope          = 0.15
+p_scope = 0.15
 # FRETISH only: rewrites the stop condition of an `until` or `before` timing,
 # and draws nothing on a requirement without one.
-p_stop           = 0.15
+p_stop = 0.15
 # Both modes: the share of rewrites that take the monotone form, moving a
 # formula along the implication order rather than rewriting it freely. On the
 # FRETISH path it is offered inside the condition and response rewrites, on the
 # TLSF path ahead of the temporal and propositional ones.
-p_monotone       = 0.25
+p_monotone = 0.25
 # Both modes: the probability that a mutation instead appends a new environment
 # assumption, and the fraction of those guarded by a random input atom rather
 # than by `true`.
-p_add_assumption         = 0.05
-p_conditional_assumption = 0.25
+p_add_assumption = 0.05
 # The mirror action: delete a guarantee outright, never the last live one.
 # Some repairs are unreachable without it. Set to 0 to reproduce a run from
 # before the operator existed.
-p_remove_guarantee       = 0.05
-
-[tlsf.mutation]
-p_assumption = 0.3
-p_temporal   = 0.2
-# Of the assumptions [mutation] p_add_assumption appends, the fraction that copy
-# an existing one instead of building from the template, which emits at most
-# seven nodes where the assumption-shaped ideals run to thirty.
-p_clone_assumption = 0.25
+p_remove_guarantee = 0.05
+p_conditional_assumption = 0.25
 
 [model_counting]
 default_bound = 20
@@ -108,18 +104,26 @@ run_implication = true
 # counting is the fitness function's real work, so a slow count is usually a
 # legitimately hard one rather than a blowup. The rest are bounded because an
 # unbounded call can stall a whole run.
-black_timeout_ms    = 1000
-ltlsynt_timeout_ms  = 10000
+black_timeout_ms = 1000
+ltlsynt_timeout_ms = 10000
 ltl2tgba_timeout_ms = 60000
-ltlfilt_timeout_ms  = 10000
-# 0.15, not 0.05: the ltl2tgba budget drops individuals by design, and enough
-# land in one generation on the heavy TLSF specs to trip a tighter bound.
-max_scoring_failure_rate     = 0.15
-dashboard = false
+ltlfilt_timeout_ms = 10000
+# Thread pool size; the default is the hardware concurrency narrowed by
+# the CPU affinity mask and the cgroup CPU quota, so this key has no fixed
+# default to pin and stays commented out.
+# parallel = 8
 # How many steps ahead the MRS walk queries both outcomes into idle workers.
 # Scores are unchanged at any value; 0 turns it off.
 mrs_speculation_depth = 2
-# parallel = 8   # thread pool size; the default is the hardware concurrency
-                 # narrowed by the CPU affinity mask and the cgroup CPU quota,
-                 # so this key has no fixed default to pin and stays commented
-                 # out.
+dashboard = false
+# 0.15, not 0.05: the ltl2tgba budget drops individuals by design, and enough
+# land in one generation on the heavy TLSF specs to trip a tighter bound.
+max_scoring_failure_rate = 0.15
+
+[tlsf.mutation]
+p_assumption = 0.3
+p_temporal = 0.2
+# Of the assumptions [mutation] p_add_assumption appends, the fraction that copy
+# an existing one instead of building from the template, which emits at most
+# seven nodes where the assumption-shaped ideals run to thirty.
+p_clone_assumption = 0.25

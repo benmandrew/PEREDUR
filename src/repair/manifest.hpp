@@ -8,13 +8,24 @@
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "config.hpp"
 #include "genetic/pipeline.hpp"
+
+struct ConfigKey;
 
 /// The manifest's filename within a run's output directory. Exposed because
 /// that directory is also the one `compare --repairs` is pointed at, so every
 /// reader walking it for repairs has to know which entry is not one.
 inline constexpr const char* k_run_manifest_name = "run.json";
+
+/// The effective config as `run.json` records it, one field per
+/// `k_config_keys` entry, nested as the TOML sections are.
+nlohmann::json config_json(const Config& cfg);
+
+/// Where `entry` sits in config_json(), as a JSON pointer.
+nlohmann::json::json_pointer config_pointer(const ConfigKey& entry);
 
 /// Which of the two repair paths a run took, for the config keys only the
 /// other one reads.

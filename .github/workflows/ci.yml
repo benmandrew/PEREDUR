@@ -135,12 +135,11 @@ jobs:
             docs=false
             if changed include docs | grep -q .; then docs=true; fi
 
-            # The config parity check compares config_io.cpp, the JSON schema,
-            # the annotated template and the checker itself. Editing any but the
-            # first touches no C/C++ file, so they need their own trigger or the
-            # check never sees the change that broke it.
+            # The config defaults check compares gen_configs.DEFAULTS with the
+            # generated template. Neither is a C/C++ file, so they need their
+            # own trigger or the check never sees the change that broke it.
             config=false
-            if changed src/config_io.cpp schemas example-config.toml \
+            if changed scripts/gen_configs.py example-config.toml \
                        scripts/check_config_schema.py | grep -q .; then
               config=true
             fi
@@ -165,6 +164,7 @@ jobs:
             build=false
             if changed src include test web cmake vendor .github \
                        CMakeLists.txt CMakePresets.json flake.nix flake.lock \
+                       schemas example-config.toml \
                        scripts/coverage_badge.py | grep -q .; then
               build=true
             fi
@@ -350,7 +350,7 @@ jobs:
               # The lint aggregate would have covered this. A schema- or
               # template-only change skips that but still needs checking.
               if [ "$CONFIG_CHANGED" = "true" ]; then
-                echo "::group::Check config key parity"
+                echo "::group::Check gen_configs defaults"
                 cmake --build --preset debug --target lint-config-schema
                 echo "::endgroup::"
               fi

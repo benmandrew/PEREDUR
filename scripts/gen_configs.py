@@ -62,8 +62,9 @@ METRIC_DIR = "log"
 
 # Mirrors the built-in defaults from include/config.hpp. Every entry tracks the
 # binary except those enumerated below, and check_config_schema.py enforces
-# that: it walks this table against config.hpp's in-class initialisers and fails
-# on any key that is neither mapped to a member nor listed there as exempt. A
+# that: it walks this table against example-config.toml, which is generated
+# with the binary's defaults, and fails on any key that is neither mapped to a
+# TOML path nor listed there as exempt. A
 # key whose C++ default moves is therefore corrected here rather than noticed
 # later — which matters most for the VINTAGE_KEYS, since --pin-vintage writes
 # *these* values into the generated configs.
@@ -120,7 +121,7 @@ DEFAULTS: dict = {
     "p_remove_guarantee": 0.05,
     "default_bound": 20,
     "run_implication": True,
-    # Keys in VINTAGE_KEYS must follow config.hpp rather than be pinned, because
+    # Keys in VINTAGE_KEYS must follow the binary rather than be pinned, because
     # VINTAGE_KEYS sources its written-out values from this table -- a stale
     # entry here is a wrong value written into every config generated with
     # --pin-vintage, by the mechanism that exists to stop a moved default going

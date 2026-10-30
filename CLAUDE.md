@@ -14,7 +14,7 @@ Detail lives in `docs/dev/`. Read the file covering an area before changing it. 
 | `docs/dev/operators.md` | Crossover, Operator repairs of 2026-08-19, Implication in the TLSF grammar, Monotone rewrites, Cloned assumptions, Assumption construction, Timing donation, Scope-aware timing moves, Removable guarantees |
 | `docs/dev/fretish-scopes.md` | FRETISH scopes |
 | `docs/dev/performance.md` | Cache keys, Scoring dispatch, Implication prefilter, Implication residual query, Tool subprocesses, Profiling |
-| `docs/dev/config-and-provenance.md` | Config keys (including config vintage and retired keys), Commit provenance |
+| `docs/dev/config-and-provenance.md` | Config keys (including config vintage and retired keys), Commit provenance, Run manifest schema versions |
 | `docs/dev/campaigns.md` | Campaigns: the operating manual for `scripts/campaign.py` |
 | `docs/dev/testing.md` | Tests, Coverage |
 | `docs/dev/tooling.md` | Build, Lint & Format, Docs |
@@ -31,7 +31,7 @@ cmake --build build                  # incremental
 ctest --preset debug [-R <regex>]
 node --test "test/web/*.test.mjs"    # dashboard page script
 
-cmake --build build --target lint    # cpplint + clang-tidy + cppcheck + config parity
+cmake --build build --target lint    # cpplint + clang-tidy + cppcheck + gen_configs defaults
 cmake --build build --target format  # format-ci for a dry run
 ```
 
@@ -57,9 +57,9 @@ Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves w
 
 ### Config and output
 
-- A new TOML key is one row in `k_config_keys` (`src/config/keys.hpp`), which drives the parser, the key spec and `config_json()`; a new enum type also needs its `EnumNames` array in `src/config/enum_names.hpp` and a `ConfigMember` alternative. It also touches `schemas/config-schema.json`, `example-config.toml` (whose values must equal the built-in defaults), and `DEFAULT_FIELDS` or `GEN_CONFIGS_FIELDS` in `scripts/check_config_schema.py`. `lint` checks them against each other.
+- A new TOML key is one row in `k_config_keys` (`src/config/keys.hpp`), which drives the parser, the key spec and `config_json()`; a new enum type also needs its `EnumNames` array in `src/config/enum_names.hpp` and a `ConfigMember` alternative. Its row carries the schema description and template comment; regenerate `schemas/config-schema.json` and `example-config.toml` with `cmake --build build --target config-reference` (the `config_reference` test fails while they are stale). A key in `DEFAULTS` in `scripts/gen_configs.py` is spelt as the TOML key it mirrors, or is in `GEN_CONFIGS_EXEMPT` in `scripts/check_config_schema.py`.
 - Moving a C++ default changes what every archived config means: record it under "Config vintage" in `docs/dev/config-and-provenance.md`. Removing a key retires the sweeps and runner profiles that emit it.
-- A new `--diagnostics` counter also joins `write_run_manifest` and bumps `k_schema_version`.
+- A new `--diagnostics` counter also joins `write_run_manifest` and bumps `k_schema_version`, with a line under "Run manifest schema versions".
 - A new `peredur` flag joins the table in `src/main.cpp`, or `find_unknown_arg` rejects it.
 - Anything that moves the cursor goes through `stdout_is_tty()` (`include/status_line.hpp`). Most runs are redirected to `run.log`.
 - The scoring report's `N individual(s) dropped` line prints unconditionally; `run_experiments.py` parses it.

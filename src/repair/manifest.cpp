@@ -1,6 +1,5 @@
 #include "manifest.hpp"
 
-#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -44,239 +43,21 @@ struct EnumNames<StopReason> {
 namespace {
 
 // Bumped when a key changes meaning or leaves, so a reader can tell which
-// shape it is holding rather than guessing from which keys are present.
-// 2 added fitness_cache, n_constant_folded and n_tautology_substitutions, when
-// those counters stopped printing to stdout by default and this became their
-// only unconditional record. Anything print_diagnostics_report shows has to
-// appear here too, or turning the flag off loses it.
-// 3 added input_screen, so a campaign can partition its runs on whether the
-// input itself failed a correctness check rather than grepping the log for the
-// warning.
-// 4 added n_weak_operator_unresolved. It counts satisfiability queries
-// abandoned rather than answered, so a run that reports repairs with a
-// non-zero count screened less than a run reporting the same repairs with
-// zero -- which is not visible from any other field.
-// 5 added budget_screen, so a zero-yield run can be told apart from one whose
-// ltlsynt budget could not decide its own input specification.
-// 6 added fitness.status_grading, since the status objective now has two
-// scales and a manifest that does not name the one in use cannot be read.
-// 7 dropped fitness.weight_halstead along with the objective it weighted, so
-// the objective vector is one shorter and a reader keying on its position
-// against an older manifest reads the wrong component.
-// 8 added mutation.p_remove_guarantee. The operator can delete a guarantee, so
-// a repair may hold fewer requirements than the specification it came from, and
-// a reader comparing counts needs to know whether the run could do that.
-// 9 added n_spot_decided and n_escalations_declined, and redefined
-// tool_calls.black.calls as black's own exec count rather than the
-// satisfiability cache-miss count, which SPOT taking the first stage split in
-// two. Comparing black.calls across the boundary compares different things.
-// 10 added n_well_separation_errors. The well-separation query used to let an
-// ltlsynt error end the run, so a run that finished implies zero of them; from
-// this version a finished run may have dropped candidates on a non-answer, and
-// only this field says how many.
-// 11 added input_screen_error. Before it, a screen that raised ended the run
-// before any manifest was written, so `input_screen: null` meant the input
-// passed every check. From this version the run survives, and null means either
-// that or a screen that never produced a verdict -- this field is what tells
-// them apart.
-// 12 added fitness.mrs_admission_order. The MRS walk's score depends on the
-// order it admits parts in, so two runs on one specification under one grading
-// scale are not comparable without it.
-// 13 added genetic.accumulate_repairs and n_accumulated_repairs. Before it a
-// run's repairs all came from its final population, so the output was a
-// function of the last generation alone; from this version the key can union
-// in the repairs earlier generations found, and only this field says how many
-// of them the run would otherwise have thrown away.
-//
-// 14 added genetic.repaired_operators. It selected between two mutation and
-// crossover grammars with different RNG draw streams, so two runs of the same
-// seed agreed only when they agreed on this key.
-//
-// 15 removed genetic.repaired_operators. The repaired grammar is now the only
-// one, so the key no longer selects anything; a manifest at this version or
-// later was written by a binary that has only that grammar.
-//
-// 16 added n_ltlsynt_capability_errors. Before it, an ltlsynt run that reported
-// a limit of its own instead of a verdict ended the run and no manifest was
-// written at all; from this version the query resolves as undecided and this
-// field is the only record that it happened.
-// 20 redefined tool_calls.ltlfilt.calls and added the caches block. `calls`
-// counted simplify_ltl's and rewrite_weak_operators' cache misses, while
-// `total_s` beside it also covered every spot_satisfiable exec, which is
-// memoised nowhere -- so the field understated ltlfilt's true exec count by
-// 35.5% over a 14-specification corpus and the seconds per call derived from
-// the pair were over two different sets. It is now the exec count total_s is
-// actually over. `caches` reports the hits and misses of every memo in the
-// run, which no field carried before: the satisfiability cache's miss count
-// reached no field at all (the black row reports black's own exec count,
-// deliberately, since SPOT takes the first stage), and it is the largest cache
-// in a run at 237,969 lookups over that corpus.
-//
-// 21 added stopped_by, generations_run and individuals_bred, with
-// genetic.termination, genetic.max_individuals and genetic.max_wall_s beside
-// them in the config block. A run could end only by exhausting
-// genetic.generations before this version, so its wall time and its generation
-// count said everything there was to say about how it stopped; from this
-// version it can also spend an offspring budget or pass a deadline, and only
-// stopped_by separates the three. individuals_bred is null wherever no budget
-// was active, an unbudgeted run not paying for the count.
-//
-// 22 added mutation.p_condition_type and mutation.p_scope, the two directional
-// arms over a requirement's scope and condition type.
-//
-// 23 added the implication block. The pairwise sweep's counters reached no
-// field at all before it, so a run's diagnostics carried them and a campaign
-// reading run.json could not: n_equivalent_collapsed in particular is the only
-// record of how much of the output was one repair written twice, and it is
-// unreadable without n_comparisons beside it to say how many pairs were asked.
-//
-// 24 added "aurus" to the values fitness.status_grading can take. It exists to
-// be ablated against rather than to be run: it reproduces AuRUS's own ladder so
-// a campaign can cross PEREDUR's grading against the design PEREDUR derives
-// from, and it is the one scale that does not cap a candidate gaming its own
-// assumptions. A reader keying on that field against an older manifest can
-// assume it names one of two scales that do; from this version it may name a
-// third that does not, so the status objective of two runs is comparable only
-// where the field agrees.
-//
-// 25 added mutation.p_monotone, the FRETISH monotone rewrite arm. Its TLSF
-// twin tlsf.mutation.p_monotone has been in the config block since the block
-// existed, so a reader keying on the name alone now finds two.
-//
-// 26 added implication.fingerprint_refuted, the ordered pairs a sampled word
-// settled ahead of the solver. It is the only reading of whether the prefilter
-// worked on a given run, the pairs it refutes never reaching `comparisons`.
-// The same version is where the FRETISH implication check stopped decomposing
-// per requirement, so `comparisons`, `timeouts` and the repair counts beside
-// them are not comparable across it on that path.
-//
-// 27 removed tlsf.mutation.p_monotone (folded into mutation.p_monotone, which
-// both paths now read), tlsf.mutation.connective_implies and the two
-// tlsf.mutation.monotone_*_rules gates (all now unconditional), and
-// filters.run_weakening and filters.run_well_separation (the stages are gone).
-// It also removed filters.run_vacuity (vacuity always runs per generation),
-// mutation.allow_output_assumptions (always allowed),
-// tlsf.mutation.p_remove_assumption and p_burst_continue (their operators are
-// gone), runtime.ganak_timeout_ms (ganak runs untimed) and
-// runtime.max_concurrent_realizability (no ltlsynt concurrency cap), and
-// dropped tool_calls.ganak.timeouts with the timeout it counted.
-// The same version moved the fitness weights to AuRUS's 0.1/0.2/0.7 and
-// mutation.p_condition_type, p_scope and p_monotone off 0.
-//
-// 28 moved both paths onto one implication sweep and runs it during the
-// search. On TLSF, `comparisons`, `skipped` and `duplicates` read 0 on every
-// earlier manifest, the TLSF sweep having counted none of them, and
-// `fingerprint_refuted` was never reset; all four now carry the sweep's own
-// figures, as they already did on FRETISH. `timeouts` still reads 0 there,
-// tlsf_spec_implies counting none. Wherever the run accumulates, the
-// implication figures are the streamed sweep's, whose batches ask the pairs
-// within a batch and between it and the maximal set so far, so `comparisons`
-// and `skipped` do not compare with any earlier run's; `duplicates` reads 0,
-// the stream deduplicating before its sweep sees anything. No key selects
-// between the two routes, so a manifest at 28 or above carries the streamed
-// figures whenever accumulate_repairs and filters.run_implication are both on.
-//
-// 29 added mutation.p_stop, the FRETISH arm rewriting the stop condition of an
-// `until` or `before` timing. It draws nothing on a specification without one,
-// so an earlier run's search is what it would have been at any value.
-//
-// 30 counts implication.timeouts on TLSF, where tlsf_spec_implies counted none
-// and the field read 0 on every earlier TLSF manifest.
-//
-// 31 records the config keys a path never reads as null on that path: the
-// FRETISH-only [mutation] rewrite arms on a TLSF run, and [tlsf]
-// muc_max_iterations and [tlsf.mutation] on a FRETISH run. An earlier
-// manifest records whatever the config said, which the search ignored.
-//
-// 32 added fitness.keyword_similarity and fitness.semantic_trace_weight, which
-// place the FRETISH timing, scope and condition-type measures in the syntactic
-// or the semantic objective. The default reproduces every earlier run, so an
-// older manifest reads as keyword_similarity = "syntactic". Both are
-// FRETISH-only and read null on a TLSF run.
-//
-// 33 added mrs_screen: how often the MRS walk's whole-specification
-// satisfiability screen ran, fired and was left undecided. Zero under any
-// other status grading, and absent before the screen existed.
-//
-// 34 added n_model_probe_sat: implication queries black answered SAT between
-// SPOT's first look and its full budget. tool_calls.black.calls now counts
-// those probes too, so an implication-heavy run reads far more black calls
-// than one at 33, and n_escalations_declined still counts only the queries
-// left undecided.
-//
-// 35 added implication.residual_queries and implication.residual_settled: the
-// implication checks that dropped shared guarantees from the negated side, and
-// those settled true with nothing left to ask.
-//
-// 36 added implication.rule_covered: the requirements a structural rule
-// proved implied while building that shortened destination.
-//
-// 37 added caches.realizability.rule_subsumed: the realizability queries
-// settled from a decided one by ordering the requirements they replaced.
-//
-// 38 added caches.realizability.satisfiability_routed: the realizability
-// queries over no environment inputs decided by satisfiability rather than by
-// ltlsynt. tool_calls.ltlsynt.calls no longer counts them, so a run on such a
-// specification reads far fewer ltlsynt calls than one at 37.
-//
-// 39 added implication.model_words and implication.model_refuted: the solver
-// models the prefilter adds to its sampled words, and the ordered pairs only
-// a model word refuted. From this version `fingerprint_refuted` counts those
-// pairs too, so it reads higher than at 38 wherever a model separated a pair.
-//
-// 40 added caches.realizability.controller_reuse: the realizability queries
-// put to a stored controller, those it answered, and the guarantee checks
-// that cost; and tool_calls.controller_check, the ltl2tgba and autfilt execs
-// behind them. tool_calls.ltlsynt.calls falls by the hits.
-//
-// 41 added runtime.mrs_speculation_depth and mrs_speculation: the MRS walk's
-// lookahead queries issued, started and later asked by the walk itself. The
-// lookahead moves no score, but its untaken branches add ltlsynt execs, so
-// tool_calls.ltlsynt.calls reads higher than at 40 at the default depth.
-//
-// 42 removed caches.simplify_ltl with the simplify_ltl pass, which no engine
-// path had called for many versions; its row read zero hits and misses.
-// tool_calls.ltlfilt.cache_hits, which counted that pass's hits and so read
-// zero too, now counts the remove_wm memo's hits.
-//
-// 43 removed tlsf.mutation.max_assumption_width and p_bare_assumption, retired
-// at their no-op defaults.
-//
-// 44 removed tlsf.repair_mode and tlsf.muc_max_iterations with the MUC-guided
-// repair mode; every TLSF run is monolithic.
-//
-// 45 removed fitness.keyword_similarity and fitness.semantic_trace_weight; the
-// FRETISH keyword orders always join the semantic objective at weight 1/2.
-//
-// 46 removed genetic.accumulate_repairs; every run accumulates.
-// 47 removed model_counting.metric; trace counts always combine as logarithms.
+// shape it is holding. Each version is described under "Run manifest schema
+// versions" in docs/dev/config-and-provenance.md.
 constexpr int k_schema_version = 47;
 
-// A config key that only one of the two repair paths reads, as a JSON pointer
-// into config_json().
-struct SinglePathKey {
-    const char* pointer;
-    RepairInput reader;
-};
-
-constexpr std::array<SinglePathKey, 9> k_single_path_keys{{
-    {"/mutation/p_trigger", RepairInput::Fretish},
-    {"/mutation/p_response", RepairInput::Fretish},
-    {"/mutation/p_timing", RepairInput::Fretish},
-    {"/mutation/p_condition_type", RepairInput::Fretish},
-    {"/mutation/p_scope", RepairInput::Fretish},
-    {"/mutation/p_stop", RepairInput::Fretish},
-    {"/tlsf/mutation/p_assumption", RepairInput::Tlsf},
-    {"/tlsf/mutation/p_temporal", RepairInput::Tlsf},
-    {"/tlsf/mutation/p_clone_assumption", RepairInput::Tlsf},
-}};
-
-// "/tlsf/mutation/p_temporal" -> "tlsf.mutation.p_temporal", the spelling a
-// config file and a warning use.
-std::string dotted(const char* pointer) {
-    std::string path(pointer + 1);
-    std::replace(path.begin(), path.end(), '/', '.');
-    return path;
+// True for a key only the other repair path reads.
+bool unread_on(const ConfigKey& entry, RepairInput input) {
+    switch (entry.reader) {
+        case KeyReader::Both:
+            return false;
+        case KeyReader::Fretish:
+            return input != RepairInput::Fretish;
+        case KeyReader::Tlsf:
+            return input != RepairInput::Tlsf;
+    }
+    return false;
 }
 
 std::string utc_timestamp() {
@@ -314,6 +95,16 @@ std::size_t count_repairs(const std::filesystem::path& dir) {
     return indices.size();
 }
 
+}  // namespace
+
+nlohmann::json::json_pointer config_pointer(const ConfigKey& entry) {
+    std::string pointer;
+    for (const std::string_view name : section_path(entry.section)) {
+        pointer += "/" + std::string(name);
+    }
+    return nlohmann::json::json_pointer(pointer + "/" + entry.key);
+}
+
 nlohmann::json config_json(const Config& cfg) {
     // Mirrors the TOML section layout so a manifest diffs directly against a
     // config file rather than needing a key-by-key translation.
@@ -341,6 +132,8 @@ nlohmann::json config_json(const Config& cfg) {
     }
     return out;
 }
+
+namespace {
 
 nlohmann::json tool_calls_json() {
     auto row = [](std::size_t calls, std::size_t cache_hits,
@@ -476,13 +269,10 @@ std::vector<std::string> ignored_non_default_keys(const Config& cfg,
     const nlohmann::json actual = config_json(cfg);
     const nlohmann::json defaults = config_json(Config{});
     std::vector<std::string> ignored;
-    for (const SinglePathKey& key : k_single_path_keys) {
-        if (key.reader == input) {
-            continue;
-        }
-        const nlohmann::json::json_pointer pointer(key.pointer);
-        if (actual.at(pointer) != defaults.at(pointer)) {
-            ignored.push_back(dotted(key.pointer));
+    for (const ConfigKey& entry : k_config_keys) {
+        if (unread_on(entry, input) && actual.at(config_pointer(entry)) !=
+                                           defaults.at(config_pointer(entry))) {
+            ignored.push_back(std::string(entry.section) + "." + entry.key);
         }
     }
     return ignored;
@@ -494,9 +284,9 @@ void write_run_manifest(const std::string& output_dir,
                         const SearchBudget& budget, RepairInput input) {
     const std::filesystem::path dir(output_dir);
     nlohmann::json config = config_json(cfg);
-    for (const SinglePathKey& key : k_single_path_keys) {
-        if (key.reader != input) {
-            config[nlohmann::json::json_pointer(key.pointer)] = nullptr;
+    for (const ConfigKey& entry : k_config_keys) {
+        if (unread_on(entry, input)) {
+            config[config_pointer(entry)] = nullptr;
         }
     }
     const nlohmann::json manifest{

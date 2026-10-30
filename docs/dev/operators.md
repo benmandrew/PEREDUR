@@ -57,7 +57,7 @@ Five extra rules fill the `Release`, `Next` and `Iff` menus: `phi R psi` weakens
 
 ## Cloned assumptions
 
-`tlsf_add_assumption` emits at most 7 nodes, while assumption-shaped ideals are far larger (`gyro-var2`'s is about 29). Under `[tlsf.mutation] p_clone_assumption` (default 0.25) the operator instead appends a copy of a live ASSUME conjunct for later mutation to edit. PEREDUR's crossover draws one conjunct per side and cannot union subsets as AuRUS's level-1 crossover does, so the move belongs to mutation.
+`tlsf_add_assumption` emits at most 7 nodes, while assumption-shaped ideals are far larger (`gyro-var2`'s is about 29). Before the clone arm, 112 emitted `gyro-var2` repairs appended only 6 assumptions, every one template-shaped. Under `[tlsf.mutation] p_clone_assumption` (default 0.25) the operator instead appends a copy of a live ASSUME conjunct for later mutation to edit. PEREDUR's crossover draws one conjunct per side and cannot union subsets as AuRUS's level-1 crossover does, so the move belongs to mutation.
 
 Only ASSUME is drawn from, since copying INITIALLY or REQUIRE into ASSUME changes its meaning. Tombstones are skipped, and with nothing live the template stands in. The template keeps the majority of the draw as the only form that introduces a new fairness property.
 

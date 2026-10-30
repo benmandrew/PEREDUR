@@ -190,6 +190,7 @@ target_compile_definitions(peredur_fitness PRIVATE
 
 add_executable(peredur
     src/main.cpp
+    src/config/reference.cpp
     src/crash/crash_handler.cpp
     src/repair/cli.cpp
     src/repair/driver.cpp
@@ -201,6 +202,14 @@ target_link_libraries(peredur PRIVATE peredur_fitness cpptrace::cpptrace)
 # The FRETISH driver reaches src/filter/streaming_maximal.hpp and the
 # fingerprint prefilter behind it, as maximal does below.
 target_include_directories(peredur PRIVATE src)
+
+# schemas/config-schema.json and example-config.toml are generated from
+# k_config_keys; the config_reference test fails while either is stale.
+add_custom_target(config-reference
+    COMMAND peredur --write-config-reference ${CMAKE_SOURCE_DIR}
+    COMMENT "Writing schemas/config-schema.json and example-config.toml"
+    VERBATIM
+)
 
 add_executable(signal_tracer src/crash/signal_tracer.cpp)
 target_link_libraries(signal_tracer PRIVATE cpptrace::cpptrace)

@@ -8,61 +8,43 @@
 
 /// Selection scheme driving parent and survivor selection during evolution.
 /// Nsga2Apportion (the default) ranks by Pareto non-domination and crowding
-/// distance over the individual objectives, searching for the Pareto front
-/// rather than one weighted compromise, and is named for its survivor step: it
-/// deduplicates the pooled (mu + lambda) parents and offspring, ranks the
-/// distinct set, and apportions the target size's slots over it by
-/// 1 / (1 + rank) under the largest-remainder (Hamilton) method. Cutting the
-/// pool at the target size instead, as the removed Nsga2Truncate did, leaves a
-/// handful of distinct specifications across its slots, so the cut runs
-/// arbitrarily through the Pareto front; apportioning makes breeding pressure
-/// proportional to rank without discarding any distinct candidate.
-/// WeightedAverage ranks by the single blended fitness scalar; it converges
-/// prematurely and is retained for comparison rather than use.
+/// distance over the individual objectives. Its survivor step deduplicates the
+/// pooled (mu + lambda) parents and offspring, ranks the distinct set, and
+/// apportions the target size's slots over it by 1 / (1 + rank) under the
+/// largest-remainder (Hamilton) method, so breeding pressure follows rank
+/// without discarding any distinct candidate. WeightedAverage ranks by the
+/// blended fitness scalar; it converges prematurely and is kept for
+/// comparison.
 enum class SelectionScheme : std::uint8_t { WeightedAverage, Nsga2Apportion };
 
 /// How the status objective grades the region below realizability. Mrs (the
 /// default) is the greedy maximal-realizable-subset fraction: the guarantee
-/// side is split into parts, and the score is what fraction of them can be kept
-/// while the accumulated subset stays realizable against the full, unchanged
-/// environment side.
+/// side is split into parts, and the score is the fraction that can be kept
+/// while the subset stays realizable against the full environment side.
 ///
-/// A three-point Tiered scale was removed on 2026-10-30. Over the 21
-/// specifications in `examples/` it scored every one of them 0.5, where Mrs
-/// spreads them over 14 distinct values with a median of 6 grade levels per
-/// specification.
 /// Aurus is AuRUS's own six-level ladder, reproduced value for value (see
-/// @ref status_score_aurus). It exists so an ablation can cross PEREDUR's
-/// grading against the design this search derives from, which is why it is
-/// faithful rather than improved: it grades below realizability by which side
-/// of the specification survives on its own, and it is the one scale here that
-/// does *not* fold well-separation into its realizability query, AuRUS never
-/// asking that question anywhere in its search.
+/// @ref status_score_aurus) so that an ablation can cross PEREDUR's grading
+/// against it. It grades by which side of the specification survives on its
+/// own, and it is the one scale that does not fold well-separation into its
+/// realizability query, as AuRUS never asks that question.
 enum class StatusGrading : std::uint8_t { Mrs, Aurus };
 
 /// Which order the MRS walk admits guarantee-side parts in (see
-/// @ref status_score_mrs). Spec is the index order the walk shipped with;
-/// Degree is @ref conflict_degree_order, computed once on the input
-/// specification and replayed on every candidate.
-///
-/// Both are constant across a run, which is what the walk needs: the cache and
-/// the seed reproducibility both turn on every candidate walking the *same*
-/// order, not on which one. Only Degree pays to choose it, at n(n-1)/2 + n
-/// subset queries once.
+/// @ref status_score_mrs). Spec is the index order; Degree is
+/// @ref conflict_degree_order, computed once on the input specification and
+/// replayed on every candidate, at n(n-1)/2 + n subset queries. Either is
+/// constant across a run, which the cache and seed reproducibility need.
 enum class MrsAdmissionOrder : std::uint8_t { Spec, Degree };
 
 /// What ends the search (see @ref Config::termination).
 ///
 /// Generations is PEREDUR's own budget: `Config::generations` rounds, whatever
-/// they cost. Individuals is AuRUS's, and exists so the two tools can be given
-/// the same budget in the same currency -- its GA stops once
-/// `numberOfVisitedIndividuals` reaches `GA_MAX_NUM_INDIVIDUALS`, counted per
-/// offspring admitted to the new population rather than per generation, and
-/// checked between offspring rather than at a generation boundary. A cap
-/// expressed in generations cannot be converted to one in individuals after the
-/// fact, the offspring per generation being a function of `population_size`,
-/// `selection_rate` and `elitism_rate`, so matching budgets across the two
-/// tools needs the counter rather than arithmetic on the results.
+/// they cost. Individuals is AuRUS's, so that the two tools can be given the
+/// same budget: its GA stops once `numberOfVisitedIndividuals` reaches
+/// `GA_MAX_NUM_INDIVIDUALS`, counted per offspring admitted and checked
+/// between offspring. A cap in generations cannot be converted to one in
+/// individuals afterwards, as the offspring per generation depend on
+/// `population_size`, `selection_rate` and `elitism_rate`.
 ///
 /// `Config::generations` bounds the run under both, as `GA_GENERATIONS` does
 /// for AuRUS, and @ref Config::max_wall_s is independent of the choice.
@@ -72,223 +54,83 @@ struct Config {
     std::size_t generations = 10;
     /// Offspring budget for the whole run under
     /// `termination = "individuals"`, ignored under Generations. Zero is
-    /// rejected in that mode rather than meaning unlimited, a run with no
-    /// budget at all being the other mode.
+    /// rejected in that mode rather than meaning unlimited.
     ///
     /// An offspring counts when it differs from the parent it was bred from,
-    /// which is what AuRUS counts: its mutation arm increments only on
-    /// `!chromosome.equals(mutated)` and its crossover arm only for offspring
-    /// distinct from the first parent, so a slot whose draws both declined
-    /// costs nothing on either side.
+    /// which is what AuRUS counts, so a slot whose draws both declined costs
+    /// nothing on either side.
     std::size_t max_individuals = 0;
     /// Wall-clock deadline for the whole run in seconds; zero is no deadline.
     /// Independent of @ref termination, and honoured under both.
     ///
     /// The search stops at the first generation boundary or bred offspring past
-    /// the deadline and then writes its output normally, which is the whole
-    /// reason to prefer it to the harness's external kill: a killed run leaves
-    /// no `run.json`, so it is censored with nothing recorded, where a run that
-    /// stops itself reports what it found and which budget ended it. Filters,
-    /// scoring and the final realizability gate are not interrupted, so a run
-    /// overruns by whatever the generation it was in had left.
+    /// the deadline and then writes its output normally. A run killed from
+    /// outside leaves no `run.json`. Filters, scoring and the final gate are
+    /// not interrupted, so a run overruns by what its generation had left.
     std::size_t max_wall_s = 0;
     std::size_t population_size = 200;
     /// Objective weights for the weighted scalar, matching AuRUS's
     /// `Settings.java`: STATUS_FACTOR 0.7, LOST_MODELS_FACTOR and
-    /// WON_MODELS_FACTOR 0.1 each (0.2 together, PEREDUR's one semantic
-    /// objective), and SYNTACTIC_FACTOR 0.1. Only the weighted selection scheme
-    /// ranks by the scalar; the NSGA-II schemes read the objectives apart.
+    /// WON_MODELS_FACTOR 0.1 each (together PEREDUR's one semantic objective),
+    /// and SYNTACTIC_FACTOR 0.1. Only the weighted scheme ranks by the scalar.
     double fitness_weight_syntactic = 0.1;
     double fitness_weight_semantic = 0.2;
     double fitness_weight_status = 0.7;
     /// How the status objective grades below realizability (see StatusGrading).
-    /// Mrs costs more realizability queries per candidate -- a median of 4.6x
-    /// one whole-specification check across `examples/`, falling to 2.2x over a
-    /// population, since the greedy prefixes recur across near-identical
-    /// candidates and RealizabilityChecker memoises by formula string.
-    ///
-    /// Mrs is the default on the 2026-08-11 status-grading campaign, which
-    /// paired the two over 20 TLSF specifications x 24 seeds: yield 410/480
-    /// against 367/480 (50 Mrs-only pairs to 7, sign test \f$p < 10^{-4}\f$),
-    /// repair quality unchanged where both arms yield, at a median paired wall
-    /// cost of 1.15x. The gain concentrates where Tiered could not grade at all
-    /// -- `arbiter` moves 0/24 to 22/24 and `rg1` 7/24 to 24/24.
     StatusGrading status_grading = StatusGrading::Mrs;
 
-    /// Which budget ends the search (see TerminationMode). Generations is
-    /// PEREDUR's own and the default; Individuals matches AuRUS's, for a
-    /// head-to-head where both tools get the same number of offspring.
+    /// Which budget ends the search (see TerminationMode).
     TerminationMode termination = TerminationMode::Generations;
     /// Which order the MRS walk admits parts in (see MrsAdmissionOrder). Read
     /// only under StatusGrading::Mrs.
-    ///
-    /// Degree is the default on a population measurement rather than on a
-    /// campaign, which is weaker evidence than status_grading above rests on.
-    /// Over populations of `tlsf_mutate` mutants across six TLSF
-    /// specifications, scored in isolation, Degree scores 0.587 against Spec's
-    /// 0.529 at 1.02x the ltlsynt execs, and scored no lower than Spec on any
-    /// of the six. Those populations carry no selection pressure, so what the
-    /// finer gradient does to yield or implies_ideal is still unmeasured, and a
-    /// paired campaign is still owed.
-    ///
-    /// Moving this default changes what every archived config *means*, since
-    /// none of them state a key that did not exist when they ran. See "Config
-    /// vintage" in docs/dev/config-and-provenance.md, and VINTAGE_KEYS in
-    /// scripts/gen_configs.py.
     MrsAdmissionOrder mrs_admission_order = MrsAdmissionOrder::Degree;
     std::size_t default_model_counting_bound = 20;
     bool run_implication_filter = true;
     std::chrono::milliseconds black_timeout{1000};
-    /// Per-call wall-clock budget for ltlsynt realizability checks. Unlike
-    /// black, ltlsynt has no internal timeout, and the genetic search
-    /// occasionally generates synthesis queries that run for minutes with no
-    /// upper bound, stalling a run on the tail. A call exceeding this is killed
-    /// and reported as undecided, which each caller resolves its own way: no
-    /// repair is admitted on it, and the well-separation check rejects the
-    /// candidate. 0 disables the timeout.
-    ///
-    /// 10 s by default. It was 500 ms, on the measurement that the call
-    /// durations are sharply bimodal: 95% of an archived TLSF campaign's calls
-    /// finished under 50 ms, the 0.5-1 s band was almost empty, and a 500 ms
-    /// cap abandoned within 0.1% of the calls a 10 s cap did. That statistic is
-    /// true and was the wrong one to tune on, because it counts calls across
-    /// the corpus rather than per specification. A specification whose *own*
-    /// realizability query exceeds the budget does not lose 0.1% of its calls,
-    /// it loses all of them: every candidate comes back undecided, the status
-    /// objective becomes a constant costing a full budget per distinct
-    /// candidate, and the final gate rejects even a correct repair. `amba` is
-    /// exactly that case -- 1.5 s for the unrealizable original and 6.1 s to
-    /// prove its known-good repair realizable, against a 500 ms budget.
-    ///
-    /// 10 s clears the corpus worst case by well over a factor of one and is
-    /// the value the four archived configs that overrode 500 ms chose. It
-    /// still cuts the minutes-long tail the timeout exists for. Losing one
-    /// candidate out of a population to that tail is the same noise
-    /// max_scoring_failure_rate already tolerates; an unbounded call costs the
-    /// whole run. Raising this does not rescue a run already under way: an
-    /// undecided verdict is memoised like any other (see RealizabilityChecker),
-    /// so a formula abandoned once stays undecided for the rest of the run.
-    ///
-    /// scripts/gen_configs.py carries its own TLSF_LTLSYNT_TIMEOUT_MS, which a
-    /// generated TLSF campaign emits explicitly and which therefore overrides
-    /// this default rather than following it.
+    /// Per-call wall-clock budget for ltlsynt realizability checks; 0 disables
+    /// it. ltlsynt has no internal timeout, and the search occasionally builds
+    /// queries that run for minutes. A call over budget is killed and reported
+    /// as undecided: no repair is admitted on it, and the well-separation check
+    /// rejects the candidate. An undecided verdict is memoised like any other
+    /// (see RealizabilityChecker), so a formula abandoned once stays undecided
+    /// for the rest of the run.
     std::chrono::milliseconds ltlsynt_timeout{10'000};
-    /// Per-call wall-clock budget for the ltl2tgba model-counting exec. Like
-    /// ltlsynt, ltl2tgba has no internal timeout, and the deterministic (-D)
-    /// construction blows up super-exponentially on the deeply nested formulae
-    /// the search occasionally builds (multi-GB, minutes-to-hours). A call
-    /// exceeding this is killed and the individual is dropped (counted against
-    /// max_scoring_failure_rate). 0 disables the timeout.
-    ///
-    /// 60 s by default, the value every archived TLSF campaign set. Far looser
-    /// than the ltlsynt budget because a legitimate determinisation can take
-    /// tens of seconds, where an ltlsynt call that has not finished in half a
-    /// second is in the tail. This is the budget that bounds the multi-GB
-    /// blowups: an untimed construction has been seen to run for hours and
-    /// leak orphaned processes across a long run.
+    /// Per-call wall-clock budget for the ltl2tgba model-counting exec; 0
+    /// disables it. The deterministic (-D) construction can blow up
+    /// super-exponentially on deeply nested formulae (multi-GB, minutes to
+    /// hours). A call over budget is killed and the individual is dropped,
+    /// counted against max_scoring_failure_rate. Looser than the ltlsynt
+    /// budget because a legitimate determinisation can take tens of seconds.
     std::chrono::milliseconds ltl2tgba_timeout{60'000};
-    /// Per-call wall-clock budget for each ltlfilt exec. Unlike the budgets
-    /// above this defaults to a real value rather than to "off": its passes
-    /// can blow up on the deep nested-X conjunctions the search builds, and an
-    /// abandoned call costs one undecided query, never an individual.
+    /// Per-call wall-clock budget for each ltlfilt exec. Its passes can blow up
+    /// on the deep nested-X conjunctions the search builds, and an abandoned
+    /// call costs one undecided query, never an individual.
     std::chrono::milliseconds ltlfilt_timeout{10'000};
-    /// When true, print the CPU-attribution report (your code vs. the external
-    /// CLI tools, via getrusage + per-tool wait4). Set by `peredur
-    /// --cpu-report` alone; deliberately not a TOML key, because it asks a
-    /// question about one interactive run rather than about the search, exactly
-    /// as PEREDUR_PROFILE does for the scope profiler.
+    /// Print the CPU-attribution report (own code against the external tools,
+    /// via getrusage and per-tool wait4). Set by `peredur --cpu-report` alone:
+    /// it asks about one interactive run rather than about the search, so it is
+    /// not a TOML key.
     bool report_cpu_timing = false;
-    /// When true, print the filter report and the engine-internal counters at
-    /// exit: per-filter population counts, per-tool call and cache totals, the
-    /// ltl2tgba tautology substitutions, the constant-folded count, and the
-    /// fitness cache hit rate. Set by `peredur --diagnostics` alone, a flag
-    /// rather than a TOML key for the same reason report_cpu_timing is. Off by
-    /// default because stdout is for watching a run in progress and none of
-    /// these say anything about the run's repairs. Nothing is lost by omitting
-    /// them: every one is written to
-    /// `<output-dir>/run.json` on every successful run either way.
+    /// Print the filter report and the engine-internal counters at exit. Set
+    /// by `peredur --diagnostics` alone, like report_cpu_timing. Every figure
+    /// is also written to `<output-dir>/run.json` on every successful run.
     bool report_diagnostics = false;
-    /// When true, follow the closing count with what each written repair
-    /// changed: the formulae it dropped and the ones it put in their place,
-    /// under the repair's file name. Without it a repair is a whole
-    /// specification that has to be compared with the input by hand. Set by
-    /// `peredur --repair-summary` alone, a flag rather than a TOML key for the
-    /// same reason report_cpu_timing is.
+    /// Follow the closing count with what each written repair changed: the
+    /// formulae it dropped and the ones it put in their place. Set by
+    /// `peredur --repair-summary` alone, like report_cpu_timing.
     bool report_repair_summary = false;
-    /// When true, stream per-stage and per-generation progress to
+    /// Stream per-stage and per-generation progress to
     /// `<output-dir>/progress.jsonl` and copy the dashboard page beside it.
-    /// Opt-in
-    /// because a campaign of many runs pays for the extra file and its flushes
-    /// without anyone watching. The `--dashboard` flag turns it on for one run
-    /// without editing the config.
+    /// Off by default, since a campaign pays for the file and its flushes with
+    /// nobody watching. `--dashboard` turns it on for one run.
     bool dashboard = false;
-    /// Survivor step for the two NSGA-II schemes, which rank identically.
-    /// Apportion since 2026-08-14, on the `2026-08-11-selection-default`
-    /// campaign: it finds a repair more often on both paths (FRETISH 0.654 to
-    /// 0.704, TLSF 0.857 to 0.887) and returns more of them (+1.82 per TLSF
-    /// run, up on 19 of 20 specifications), for 1.35x the FRETISH wall time and
-    /// 1.15x the TLSF.
-    ///
-    /// That campaign's pre-registered rule said *no*, and this default was
-    /// changed against it. Three of its five criteria failed: FRETISH quality
-    /// against the compute-matched arm (-0.0250, interval reaching -0.0536),
-    /// and the yield gain against both comparators, whose intervals include 1
-    /// (TLSF against compute-matched: odds ratio 1.786, p = 0.078). They failed
-    /// on interval width rather than direction -- every yield point estimate
-    /// favours apportion, and per unit of extra compute it beats spending the
-    /// same budget on more generations. The measured loss is 5 FRETISH runs in
-    /// 280 that stop matching an ideal, against 14 more that find a repair at
-    /// all. docs/configuration.rst records both sides and the untested ground.
     SelectionScheme selection_scheme = SelectionScheme::Nsga2Apportion;
     double selection_rate = 0.5;
-    /// Elitism: the top elitism_rate fraction of the population carries over
-    /// into the next generation verbatim, bypassing crossover, mutation, and
-    /// the offspring filters, so the best candidates are never lost to a
-    /// stochastic operator. Must be strictly less than selection_rate (the
-    /// elites are a subset of the selected parents).
-    ///
-    /// Under either NSGA-II scheme this is redundant on paper -- the
-    /// (mu+lambda) survivor step already pools parents with offspring and keeps
-    /// the best -- and it costs something, because elites bypass the offspring
-    /// filter chain, so this fraction of every generation skips the correctness
-    /// stages. That costs search pressure rather than output correctness, the
-    /// gate in step 5 screening what elites carried in either way (d7733fc).
-    /// Both arguments point at 0. Two campaigns have measured the setting, and
-    /// they do not agree.
-    ///
-    /// The first ran on 2026-08-07 at nsga2-truncate, over 600 paired FRETISH
-    /// runs and 796 paired TLSF runs. Quality was non-inferior at 0, with
-    /// implies_ideal moving -0.023 on FRETISH and -0.008 on TLSF against a
-    /// +0.05 margin fixed before launch, and TLSF yield was better at 0: 0.746
-    /// against 0.714, on 37 discordant pairs against 11, McNemar p = 0.0002.
-    /// Running at 0 cost 16.2% more wall time on TLSF and 8.2% more on FRETISH,
-    /// against a bound of 10%.
-    ///
-    /// That TLSF yield advantage did not replicate. The 2026-08-23 monotone
-    /// campaign (TLSF sweep T) asked the same question
-    /// at nsga2-apportion over the 25-family AuRUS TLSF corpus, 500 paired
-    /// (spec, seed) runs, with accumulate_repairs on in both arms and under the
-    /// monotone operator grammar. Yield is 472 of 500 at 0.1 against 470 at 0,
-    /// per-family implies_ideal 0.510 against 0.508 at exact Wilcoxon
-    /// p = 0.7188 over 9 non-tied families, and the run-level exact McNemar
-    /// reads p = 1.0000 on 28 gains against 29 losses. The wall-time cost did
-    /// replicate, four times smaller: 0 costs 4.0% more, 101.1 h against 97.1 h
-    /// over the same 500 runs, median 49.0 s against 42.2 s, exact Wilcoxon
-    /// p = 2.9e-15 over 491 non-tied pairs.
-    ///
-    /// The cost narrowed because accumulate_repairs is on in both arms, so a
-    /// repair found in an early generation is kept whether or not an elite
-    /// carried it forward. The only measured difference between the two
-    /// settings on the corpus PEREDUR is now benchmarked against is that 0
-    /// costs 4.0% more wall time, so the default stays at 0.1. Only 0 and 0.1
-    /// have ever been measured, so nothing speaks to intermediate rates.
-    ///
-    /// The lily02 anecdote this comment used to cite is retired. That campaign
-    /// audited every written repair for a guarantee that reduces to `true` and
-    /// found them in both arms (3 runs at 0, 4 at 0.1), so they never measured
-    /// elitism: each one is `black` answering SAT on the negation of a valid
-    /// weak-until formula, which fb4c3ed fixed by rewriting `W` away before
-    /// querying it.
+    /// The top elitism_rate fraction of the population carries over into the
+    /// next generation verbatim, bypassing crossover, mutation and the
+    /// offspring filters. Must be strictly less than selection_rate, as the
+    /// elites are a subset of the selected parents. The output gate still
+    /// screens what elites carry in.
     double elitism_rate = 0.1;
     double crossover_rate = 0.1;
     double mutation_rate = 1.0;
@@ -300,30 +142,24 @@ struct Config {
     /// and every timing, so strengthening picks Continual and weakening
     /// Trigger. The two coincide at `always` under a plain scope and at
     /// `eventually` under an `only` one, and differ strictly elsewhere.
-    /// Defaults to 0.15, matching p_timing, the sibling arm on the same
-    /// requirement. No campaign has measured it.
     double p_condition_type = 0.15;
     /// FRETISH only: per-requirement probability of moving the scope along its
     /// implication order. That order depends on the timing and the condition
     /// type, since a scope boundary relaxes a bounded obligation but tightens
-    /// an unbounded one; scope_edges in src/requirement.cpp holds the
-    /// measured table. A move onto a non-Global scope needs a declared mode, so
-    /// on a specification declaring none -- which is every example under
-    /// examples/ but mode-arbiter -- the arm can only reach Global. Defaults to
-    /// 0.15 on the same terms as p_condition_type.
+    /// an unbounded one; scope_edges in src/requirement.cpp holds the table. A
+    /// move onto a non-Global scope needs a declared mode.
     double p_scope = 0.15;
     /// FRETISH only: per-requirement probability of rewriting the stop
     /// condition of an `until` or `before` timing. The stop occurs positively
     /// in `until` and negatively in `before`, so a directional rewrite moves it
     /// the opposite way under `before`. The arm is read only on a requirement
     /// holding a stop timing, before the RandomSource is touched, so it costs
-    /// no draw on a specification without one at any value. Defaults to 0.15,
-    /// matching p_timing, since the stop belongs to the timing.
+    /// no draw on a specification without one.
     double p_stop = 0.15;
     /// Probability that a rewrite is a *monotone* one (monotone_rewrite,
     /// include/genetic/monotone.hpp), whose result is comparable to the formula
-    /// it replaces under implication. Shared by both paths since 2026-09-11,
-    /// when the TLSF-only `[tlsf.mutation] p_monotone` folded into this key.
+    /// it replaces under implication. The general rewriters leave the
+    /// implication order.
     ///
     /// On the TLSF path it is a third rewrite arm for a chosen section formula,
     /// offered ahead of the temporal and propositional ones, and the direction
@@ -333,57 +169,31 @@ struct Config {
     /// sits out a field whose polarity in the lowered requirement is not
     /// determinate: a trigger's rising edge `(!c & Xc)` holds its condition at
     /// both polarities, and `after n ticks` does the same to its response.
-    ///
-    /// This exists because the general rewriters leave the implication order:
-    /// the 2026-08-14 head-to-head audit measured them changing the AST shape
-    /// 93.6% of the time. AuRUS draws uniformly among three mutation visitors,
-    /// two of them monotone by construction, so its monotone share is 2 in 3,
-    /// and 0.25 is a conservative first value against that. The campaign that
-    /// tunes it is owed.
     double p_monotone = 0.25;
-    /// Low-probability structural mutation, shared by both modes: append a new
-    /// environment assumption (over input atoms) rather than rewriting an
-    /// existing requirement/formula. This is how the algorithm can repair
-    /// unrealizability that requires strengthening the environment (e.g. adding
-    /// a fairness assumption to an unrealizable GR(1) spec), which the
-    /// rewrite-only operators cannot express.
+    /// Shared by both modes: append a new environment assumption (over input
+    /// atoms) rather than rewriting an existing requirement or formula. This
+    /// repairs unrealizability that needs a stronger environment (such as a
+    /// fairness assumption), which the rewrite-only operators cannot express.
     double p_add_assumption = 0.05;
     /// The mirror of p_add_assumption, shared by both modes: delete one
-    /// guarantee rather than rewriting it. Some repairs drop a guarantee
-    /// outright and are unreachable without this — every `drop-*` ideal in
-    /// `examples/` is one, and five TLSF subjects have no other scoreable
-    /// ideal. A deleted guarantee is tombstoned in place rather than erased, so
-    /// that comparisons against the original stay aligned; see
+    /// guarantee rather than rewriting it. Some repairs are unreachable
+    /// without it. A deleted guarantee is tombstoned in place rather than
+    /// erased, so that comparisons against the original stay aligned; see
     /// Requirement::m_removed.
     ///
-    /// Defaults to 0.05, matching p_add_assumption: the two are the same move
-    /// in opposite directions and there is no reason for the environment to be
-    /// easier to strengthen than the system is to relax. The operators are
-    /// offered as a cascade with early return, p_add_assumption tested first
-    /// and this one only where that did not fire, so the realised rate is 0.95
-    /// × 0.05 = 0.0475 rather than 0.05. Setting it to 0 restores the search
-    /// exactly as it ran before the operator existed — the probability is read
-    /// before the RNG is drawn, so a zero never costs a draw — which is what
-    /// reproducing a campaign archived before 2026-08-13 requires (see the
-    /// config vintage note in docs/dev/config-and-provenance.md).
-    ///
-    /// The risk to watch is that removal is monotonically good for
-    /// realizability, so the status objective pays for it while the similarity
-    /// objectives do not, and under NSGA-II a heavily gutted candidate is
-    /// non-dominated. TLSF sweep D in scripts/gen_configs.py exists to measure
-    /// whether that costs repair quality.
+    /// The operators are a cascade with early return, p_add_assumption tested
+    /// first, so the realised rate is 0.95 × 0.05 = 0.0475. The probability is
+    /// read before the RNG is drawn, so at 0 the search runs exactly as it did
+    /// before the operator existed.
     double p_remove_guarantee = 0.05;
     /// Of the assumptions p_add_assumption appends, the fraction guarded by a
     /// random input atom rather than by `true`. `G F <input>` is strictly
-    /// stronger than `G(c -> F <input>)` and so the more powerful repair, which
-    /// is why the
-    /// unconditional form keeps the majority of the draw.
+    /// stronger than `G(c -> F <input>)`, so the unconditional form keeps the
+    /// majority of the draw.
     double p_conditional_assumption = 0.25;
     /// TLSF-mode mutation: probability of mutating an assumption-side section
     /// (INITIALLY/REQUIRE/ASSUME) rather than a guarantee-side one
-    /// (PRESET/ASSERT/GUARANTEE) when mutating a tlsf::Specification. The
-    /// guarantee side takes the complement. This was once a pair of weights
-    /// normalised by their sum, which spent two keys on one degree of freedom.
+    /// (PRESET/ASSERT/GUARANTEE). The guarantee side takes the complement.
     double tlsf_p_assumption = 0.3;
     /// TLSF-mode mutation: once a section formula has been chosen for
     /// rewriting, the probability of applying the temporal-structure mutation
@@ -395,25 +205,11 @@ struct Config {
     /// TLSF-mode mutation: of the assumptions p_add_assumption appends, the
     /// fraction that are a copy of an existing live ASSUME conjunct rather
     /// than a fresh one built from the template. Ordinary mutation then edits
-    /// the copy on later generations.
-    ///
-    /// The template emits at most seven nodes -- `G F l` or
-    /// `G(guard -> o l)` -- and the assumption-shaped ideals are far larger:
-    /// gyro-var2's single ideal is roughly a 29-node assumption, the polarity
-    /// mirror of the specification's own third assumption, and over 112
-    /// emitted gyro-var2 repairs PEREDUR appended only 6 assumptions, every
-    /// one template-shaped. AuRUS reaches a near-duplicate assumption through
-    /// its level-1 crossover, which unions conjunct subsets; PEREDUR's
-    /// crossover draws one conjunct per side and cannot, so the move belongs
-    /// to mutation here.
-    ///
-    /// The default is 0.25, matching p_conditional_assumption: the template
-    /// keeps the majority because it is the only form that can introduce a
-    /// fairness property no existing assumption carries, which is the repair
-    /// the operator was added for. Setting it to 0 restores the search
-    /// exactly as it ran before -- the probability is read before the RNG is
-    /// drawn, so a zero never costs a draw. Falls back to the template when
-    /// the ASSUME section holds nothing live to copy.
+    /// the copy on later generations. The template emits at most seven nodes,
+    /// far fewer than the assumption-shaped ideals, but it is the only form
+    /// that can introduce a fairness property no existing assumption carries.
+    /// Falls back to the template when the ASSUME section holds nothing live
+    /// to copy.
     double tlsf_p_clone_assumption = 0.25;
 
     /// Scoring thread pool size. The default is available_parallelism(), which
@@ -428,32 +224,22 @@ struct Config {
     /// score is unchanged; what moves is wall time, and the ltlsynt execs
     /// spent on the branches the walk does not take.
     ///
-    /// 2 by default. Depth d keeps up to 2^(d+1) - 2 queries in flight beside
-    /// the walk's own, so 2 fills the six or seven of eight workers seen idle
-    /// behind one straggling walk on `lift-plus-cruise-full`, and lets the walk
-    /// settle up to three steps per query time where it settled one. Each
-    /// deeper level doubles the queries for one more step, and only one query
-    /// per level is ever used. Values above 8 read as 8.
+    /// Depth d keeps up to 2^(d+1) - 2 queries in flight beside the walk's
+    /// own, and lets the walk settle up to d + 1 steps per query time where it
+    /// settled one. Each deeper level doubles the queries for one more step,
+    /// and only one query per level is ever used. Values above 8 read as 8.
     std::size_t mrs_speculation_depth = 2;
     /// A fitness function that throws (in practice an external tool failing on
-    /// one evolved formula) costs that individual rather than the whole run:
-    /// the search is stochastic, so one candidate lost out of a population is
-    /// noise, while aborting at generation 23 of 40 loses everything. Above
-    /// this fraction of a generation the tooling is broken rather than the
-    /// formula, and the run aborts instead of evolving noise into the output.
-    /// A single failure is always tolerated, whatever the population size.
-    ///
-    /// 0.15 rather than 0.05 because the ltl2tgba budget now drops
-    /// individuals by design: an abandoned call is a lost candidate, and on the
-    /// heavy TLSF specifications enough of them land in one generation to trip
-    /// a 5% bound. Every archived TLSF campaign raised it to 0.15 for that
-    /// reason. It still catches genuinely broken tooling, which fails on
-    /// essentially every candidate rather than on a tail of them.
+    /// one evolved formula) costs that individual rather than the whole run.
+    /// Above this fraction of a generation the tooling is broken rather than
+    /// the formula, and the run aborts. A single failure is always tolerated,
+    /// whatever the population size. The ltl2tgba budget drops individuals by
+    /// design, and on the heavy TLSF specifications enough land in one
+    /// generation to trip a 5% bound.
     double max_scoring_failure_rate = 0.15;
 };
 
 /// Applies every per-tool timeout in `cfg` to the process-global runner
-/// singletons. Drivers must call this rather than setting the tools they happen
-/// to remember: compare did the latter and, for as long as the ltlsynt and
-/// ltl2tgba budgets had existed, ran both unbounded whatever the config said.
+/// singletons. Drivers call this rather than setting the tools they remember,
+/// so none runs unbounded whatever the config says.
 void apply_tool_timeouts(const Config& cfg);

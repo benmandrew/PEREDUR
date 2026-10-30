@@ -166,13 +166,11 @@ else()
     )
 endif()
 
-# --- config key parity ---
+# --- gen_configs defaults ---
 
-# Checks config_io.cpp's key spec, schemas/config-schema.json, and
-# example-config.toml against each other. Unlike the linters above this ignores
-# PEREDUR_LINT_FILES_OVERRIDE: it is a whole-tree consistency check costing
-# milliseconds, and restricting it to changed files would miss exactly the
-# case it exists for (one of the three edited without the others).
+# Checks gen_configs.DEFAULTS against the defaults in example-config.toml.
+# Unlike the linters above this ignores PEREDUR_LINT_FILES_OVERRIDE: it is a
+# whole-tree check costing milliseconds.
 find_program(PYTHON3_EXE NAMES python3 python)
 
 if(PYTHON3_EXE)
@@ -180,7 +178,7 @@ if(PYTHON3_EXE)
         COMMAND ${PYTHON3_EXE}
             ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_config_schema.py
             --root ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Checking TOML config key parity"
+        COMMENT "Checking gen_configs defaults"
         VERBATIM
     )
 else()

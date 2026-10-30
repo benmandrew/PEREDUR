@@ -21,7 +21,7 @@ cmake --build "$REPO_ROOT/build" --target lint-cpplint lint-cppcheck
 # Guarded so the hook still works on branches predating the target, where
 # ninja would abort with "unknown target".
 if [ -f "$REPO_ROOT/scripts/check_config_schema.py" ]; then
-    echo "Checking config key parity..."
+    echo "Checking gen_configs defaults..."
     cmake --build "$REPO_ROOT/build" --target lint-config-schema
 fi
 

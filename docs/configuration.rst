@@ -19,7 +19,7 @@ Every section and key is optional; absent keys keep their built-in defaults. Sec
    parallel = 16              # override thread pool size
    dashboard = true           # stream progress.jsonl + the live dashboard page
 
-``example-config.toml`` in the repository root is an annotated template listing every key with a comment explaining it. Every value in it **is** that key's default, so copying the file whole changes nothing; ``scripts/check_config_schema.py`` enforces this against ``include/config.hpp`` as part of the ``lint`` target.
+``example-config.toml`` in the repository root is an annotated template listing every key with a comment explaining it. Every value in it **is** that key's default, so copying the file whole changes nothing. It and ``schemas/config-schema.json`` are generated from the key table in ``src/config/keys.hpp``.
 
 Fitness weights
 ---------------

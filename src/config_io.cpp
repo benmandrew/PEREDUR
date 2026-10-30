@@ -76,12 +76,8 @@ const char* complaint(KeyCheck check, T value) {
                                                 : nullptr;
         case KeyCheck::NonNegative:
             return value < T{0} ? " must be >= 0" : nullptr;
-        case KeyCheck::NotNegative:
-            return value < T{0} ? " must not be negative" : nullptr;
         case KeyCheck::Positive:
             return value <= T{0} ? " must be positive" : nullptr;
-        case KeyCheck::AtLeastOne:
-            return value < T{1} ? " must be >= 1" : nullptr;
     }
     return nullptr;
 }

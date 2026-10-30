@@ -161,6 +161,10 @@ add_test(NAME peredur_tests.thread_pool_sized COMMAND peredur_tests thread_pool)
 set_tests_properties(peredur_tests.thread_pool_sized PROPERTIES
     ENVIRONMENT "PEREDUR_TEST_POOL_SIZE=3")
 
+# The checked-in schema and template must equal what k_config_keys generates.
+add_test(NAME config_reference
+         COMMAND peredur --check-config-reference ${CMAKE_SOURCE_DIR})
+
 # The dashboard page ships as one self-contained HTML file, so its script is
 # tested by extracting it from the page and running it under node -- the same
 # node the FRET formaliser already needs at run time. It is not a build
