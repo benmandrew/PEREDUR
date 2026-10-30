@@ -1,3 +1,4 @@
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <optional>
@@ -8,6 +9,7 @@
 
 #include "requirement.hpp"
 #include "runner/atom_names.hpp"
+#include "runner/process.hpp"
 #include "runner/spot.hpp"
 #include "runner/tool_paths.hpp"
 #include "serialisation.hpp"
@@ -690,6 +692,40 @@ TEST(test_timeout_is_undecided_and_cached) {
     expect(realizable(uncached, spec),
            "spot-runner: the formula itself is realizable once a workable "
            "budget is allowed");
+}
+
+// A cancelled query answers nothing, so it must leave nothing behind: not an
+// undecided memo entry, as a timeout does, and not a row in the subsumption
+// table. The same checker then asks it for real and gets a verdict.
+TEST(test_cancelled_query_is_not_cached) {
+    RealizabilityChecker checker;
+    const Requirement req =
+        make_req("p", "q", timing::immediately(), "G((p) -> (q))");
+    const Specification spec({}, {req}, {"p"}, {"q"});
+    const std::size_t timeouts = RealizabilityChecker::n_timeouts;
+    bool raised = false;
+    {
+        const std::atomic<bool> cancel{true};
+        const ExecCancelScope scope(cancel);
+        try {
+            (void)checker.check_realizability(spec);
+        } catch (const ExecCancelled&) {
+            raised = true;
+        }
+    }
+    expect(raised, "spot-runner: a cancelled query should raise");
+    expect(RealizabilityChecker::n_timeouts == timeouts,
+           "spot-runner: a cancelled query is not a timeout");
+    const std::size_t hits = RealizabilityChecker::n_cache_hits;
+    const std::size_t subsumed = RealizabilityChecker::n_subsumed;
+    const std::size_t misses = RealizabilityChecker::n_cache_misses;
+    expect(realizable(checker, spec),
+           "spot-runner: the query should be decided once asked uncancelled");
+    expect(RealizabilityChecker::n_cache_hits == hits &&
+               RealizabilityChecker::n_subsumed == subsumed &&
+               RealizabilityChecker::n_cache_misses == misses + 1,
+           "spot-runner: the uncancelled ask should run ltlsynt, finding "
+           "nothing the cancelled one left");
 }
 
 // The counting path's abandonment is memoised the same way, and re-raised as

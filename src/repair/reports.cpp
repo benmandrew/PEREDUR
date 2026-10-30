@@ -175,7 +175,8 @@ void print_diagnostics_report() {
               << MrsScreenStats::n_undecided << " undecided\n";
     std::cout << "MRS walk lookahead: " << MrsSpeculationStats::n_issued
               << " issued, " << MrsSpeculationStats::n_started << " started, "
-              << MrsSpeculationStats::n_consumed << " consumed by the walk\n";
+              << MrsSpeculationStats::n_consumed << " consumed by the walk, "
+              << MrsSpeculationStats::n_killed << " killed once unreachable\n";
     std::cout << "\nRepairs contributed by the cross-generation accumulator: "
               << AccumulatorStats::n_contributed << "\n";
     print_cache_report();

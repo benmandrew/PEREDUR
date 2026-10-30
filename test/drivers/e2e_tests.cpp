@@ -262,7 +262,7 @@ nlohmann::json expect_run_manifest(const std::filesystem::path& dir,
             label + ": the manifest reports implication." + std::string(name));
     }
     const nlohmann::json& speculation = manifest.at("mrs_speculation");
-    for (const char* name : {"issued", "started", "consumed"}) {
+    for (const char* name : {"issued", "started", "consumed", "killed"}) {
         expect(speculation.contains(name),
                label + ": the manifest reports mrs_speculation." +
                    std::string(name));

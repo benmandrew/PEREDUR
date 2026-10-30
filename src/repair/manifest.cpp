@@ -45,7 +45,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 48;
+constexpr int k_schema_version = 49;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -351,7 +351,8 @@ void write_run_manifest(const std::string& output_dir,
         {"mrs_speculation",
          {{"issued", MrsSpeculationStats::n_issued.load()},
           {"started", MrsSpeculationStats::n_started.load()},
-          {"consumed", MrsSpeculationStats::n_consumed.load()}}},
+          {"consumed", MrsSpeculationStats::n_consumed.load()},
+          {"killed", MrsSpeculationStats::n_killed.load()}}},
         // Repairs the cross-generation accumulator added that the final
         // population's own collection did not already hold. Zero when every
         // accumulated repair happened to survive to the last generation.

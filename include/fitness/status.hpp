@@ -141,6 +141,11 @@ struct MrsSpeculationStats {
     /// Of those started, the ones the walk later asked for itself, finding
     /// the answer cached or waiting for it to land rather than asking twice.
     inline static std::atomic<std::size_t> n_consumed{0};
+    /// Of those started, the ones stopped once the walk could no longer read
+    /// them: a branch it settled the other way, or a query still running when
+    /// it returned. Each one's exec in flight was killed, or its next one never
+    /// started, and nothing it was asking was cached.
+    inline static std::atomic<std::size_t> n_killed{0};
 };
 
 /// Scores a candidate on the greedy maximal-realizable-subset (MRS) scale,

@@ -7,6 +7,7 @@
 
 #include <sys/types.h>  // NOLINT(build/include_order) — pid_t
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -27,6 +28,34 @@ struct ProcessResult {
     /// True if the deadline expired: the output is partial and the process
     /// group was killed.
     bool m_timed_out = false;
+};
+
+/// Raised by execute_and_capture and execute_and_capture_with_input when the
+/// calling thread's ExecCancelScope flag is set, after the child is killed and
+/// reaped, or before any child is started.
+///
+/// Deliberately not a std::exception. The runners and filters turn a
+/// std::exception from a tool into an undecided answer, and some memoise it.
+/// A cancelled exec answers nothing, so it must pass every such handler and
+/// reach the code that installed the scope, leaving no cache entry behind.
+struct ExecCancelled {};
+
+/// Installs `flag` as the calling thread's cancellation signal for as long as
+/// the scope lives, restoring the previous one on exit. While the flag is set,
+/// every exec on this thread kills its process group, as a timeout does, and
+/// raises ExecCancelled. With no scope installed, an exec polls nothing and
+/// behaves as before.
+class ExecCancelScope {
+   public:
+    explicit ExecCancelScope(const std::atomic<bool>& flag);
+    ~ExecCancelScope();
+    ExecCancelScope(const ExecCancelScope&) = delete;
+    ExecCancelScope& operator=(const ExecCancelScope&) = delete;
+    ExecCancelScope(ExecCancelScope&&) = delete;
+    ExecCancelScope& operator=(ExecCancelScope&&) = delete;
+
+   private:
+    const std::atomic<bool>* m_previous;
 };
 
 /// How to resolve arguments[0] to a binary.

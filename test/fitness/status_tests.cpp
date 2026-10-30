@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -18,6 +19,7 @@
 #include "fixtures.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
+#include "runner/process.hpp"
 #include "runner/spot.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
@@ -539,6 +541,55 @@ TEST(test_mrs_lookahead_swallows_an_error_on_an_untaken_branch) {
     expect(score == 4.0 / 5.0,
            "mrs lookahead: an error the walk never asks for should not reach "
            "its score");
+}
+
+// Every set off the serial walk's path runs a child that would sleep for 30 s,
+// as an ltlsynt call on a hard branch runs to its timeout. The walk never asks
+// those sets, so each one it abandons, or leaves running when it returns, is
+// killed rather than waited out, and the walk's own queries are never touched.
+TEST(test_mrs_lookahead_kills_what_the_walk_abandons) {
+    SatisfiabilityChecker sat;
+    RecordingOracle serial{{}, mixed_verdict};
+    status_score_mrs(
+        {"p"}, 8, sat,
+        [&serial](const std::vector<std::size_t>& idx) { return serial(idx); },
+        mixed_order());
+    const std::set<std::vector<std::size_t>> on_path(serial.queries.begin(),
+                                                     serial.queries.end());
+    std::atomic<int> running{0};
+    const auto oracle = [&on_path,
+                         &running](const std::vector<std::size_t>& indices) {
+        ++running;
+        struct Leave {
+            std::atomic<int>& count;
+            ~Leave() { --count; }
+        } leave{running};
+        if (on_path.count(indices) == 0) {
+            (void)execute_and_capture({"/bin/sh", "-c", "sleep 30"});
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        return mixed_verdict(indices);
+    };
+
+    const std::size_t killed = MrsSpeculationStats::n_killed;
+    const auto start = std::chrono::steady_clock::now();
+    const double score =
+        status_score_mrs({"p"}, 8, sat, oracle, mixed_order(), {}, 2);
+    const double took =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
+            .count();
+    expect(score == 5.0 / 8.0,
+           "mrs lookahead: killing untaken branches should not move the score");
+    expect(took < 10.0,
+           "mrs lookahead: the walk should not wait out an abandoned query, "
+           "took " +
+               std::to_string(took) + " s");
+    expect(running.load() == 0,
+           "mrs lookahead: no killed query should outlive the walk");
+    expect(MrsSpeculationStats::n_killed > killed,
+           "mrs lookahead: an abandoned running query should be counted as "
+           "killed");
 }
 
 TEST(test_mrs_empty_guarantee_side_scores_realizable) {

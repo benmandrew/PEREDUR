@@ -89,6 +89,7 @@ Archived *results* still join. `scheme_of()` in `run_experiments.py` reads the s
 - **46** removed `genetic.accumulate_repairs`; every run accumulates.
 - **47** removed `model_counting.metric`; trace counts always combine as logarithms.
 - **48** removed `runtime.dashboard` with the live dashboard and its `progress.jsonl` stream.
+- **49** added `mrs_speculation.killed`: lookahead queries stopped once the walk could no longer read them, their exec killed rather than run to the ltlsynt timeout. `tool_calls.ltlsynt` counts no killed exec, so its calls and timeouts read lower than at 48.
 
 ## Where the campaign records are
 

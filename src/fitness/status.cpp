@@ -23,6 +23,7 @@
 #include "filter/well_separation.hpp"
 #include "profile.hpp"
 #include "requirement.hpp"
+#include "runner/process.hpp"
 #include "thread_pool.hpp"
 
 namespace {
@@ -69,12 +70,17 @@ class WalkLookahead {
 
     // A started task borrows m_oracle, which the caller owns, so none may
     // outlive the walk. A cancelled one can still sit in the pool's queue, but
-    // it holds its own node and m_shared and touches nothing else.
+    // it holds its own node and m_shared and touches nothing else. The walk has
+    // asked its last query, so every node still here is one it will never
+    // read, and a running one is killed rather than waited out.
     ~WalkLookahead() {
         for (const auto& entry : m_nodes) {
             if (!cancel(*entry.second)) {
-                wait_done(*entry.second);
+                kill(*entry.second);
             }
+        }
+        for (const auto& entry : m_nodes) {
+            wait_done(*entry.second);
         }
         for (const std::shared_ptr<Node>& node : m_abandoned) {
             wait_done(*node);
@@ -108,6 +114,10 @@ class WalkLookahead {
     struct Node {
         std::vector<std::size_t> m_set;
         std::atomic<State> m_state{State::Pending};
+        // Set by the walk once the node can no longer be read, which kills
+        // the task's exec in flight (see ExecCancelScope). Never set on a node
+        // the walk is waiting for.
+        std::atomic<bool> m_kill{false};
         // Written before m_state turns Done, and read only after.
         bool m_answered = false;
     };
@@ -124,8 +134,13 @@ class WalkLookahead {
         return node.m_state.compare_exchange_strong(expected, State::Cancelled);
     }
 
+    static void kill(Node& node) {
+        node.m_kill.store(true, std::memory_order_release);
+    }
+
     void wait_done(const Node& node) {
-        if (node.m_state.load() == State::Done) {
+        const State state = node.m_state.load();
+        if (state == State::Done || state == State::Cancelled) {
             return;
         }
         PEREDUR_PROFILE_SCOPE("status/mrs-lookahead-wait");
@@ -176,6 +191,7 @@ class WalkLookahead {
             }
             if (!cancel(*entry->second) &&
                 entry->second->m_state.load() != State::Done) {
+                kill(*entry->second);
                 m_abandoned.push_back(entry->second);
             }
             entry = m_nodes.erase(entry);
@@ -216,8 +232,14 @@ class WalkLookahead {
                 MrsSpeculationStats::n_started++;
                 bool answered = false;
                 try {
+                    // A killed exec raises past the runners' own handlers,
+                    // which is what keeps it out of every cache: they memoise
+                    // only an answer that came back.
+                    const ExecCancelScope scope(node->m_kill);
                     (void)(*oracle)(node->m_set);
                     answered = true;
+                } catch (const ExecCancelled&) {
+                    MrsSpeculationStats::n_killed++;
                 } catch (...) {
                     // Left for the walk to meet if it asks this query itself;
                     // on a branch it does not take, the error buys nothing.

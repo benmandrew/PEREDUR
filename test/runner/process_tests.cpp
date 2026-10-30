@@ -1,6 +1,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <chrono>
 #include <csignal>
 #include <cstddef>
@@ -233,6 +234,61 @@ TEST(test_unread_input_is_harmless) {
         {"/bin/sh", "-c", "printf done"}, input, milliseconds{10'000});
     expect(result.m_exit_code == 0 && result.m_output == "done",
            "process: a child that ignores its input should still finish");
+}
+
+// A cancelled exec is killed mid-run, as a timeout would kill it, but raises
+// rather than returning a result a caller could memoise. A flag already set
+// starts no child at all, and a call outside any scope never looks at one.
+TEST(test_cancel_flag_kills_a_running_child_and_raises) {
+    std::atomic<bool> cancel{false};
+    bool raised = false;
+    const auto start = Clock::now();
+    {
+        const ExecCancelScope scope(cancel);
+        std::thread canceller([&cancel] {
+            std::this_thread::sleep_for(milliseconds{200});
+            cancel.store(true);
+        });
+        try {
+            (void)execute_and_capture({"/bin/sh", "-c", "sleep 30"},
+                                      milliseconds{20'000});
+        } catch (const ExecCancelled&) {
+            raised = true;
+        }
+        canceller.join();
+    }
+    const double took = elapsed_ms(start);
+    expect(raised, "process: a cancelled exec should raise ExecCancelled");
+    expect(took < 5'000.0,
+           "process: cancellation should kill the child promptly, took " +
+               std::to_string(took) + "ms");
+
+    bool refused = false;
+    {
+        const ExecCancelScope scope(cancel);
+        try {
+            (void)execute_and_capture({"/bin/sh", "-c", "printf ran"});
+        } catch (const ExecCancelled&) {
+            refused = true;
+        }
+    }
+    expect(refused, "process: a flag set before the exec should start nothing");
+
+    const ProcessResult after =
+        execute_and_capture({"/bin/sh", "-c", "printf ok"});
+    expect(after.m_output == "ok" && !after.m_timed_out,
+           "process: leaving the scope should leave later execs unaffected");
+}
+
+// A scope whose flag is never set changes nothing but the read's wake-ups.
+TEST(test_cancel_flag_unset_leaves_the_exec_alone) {
+    const std::atomic<bool> cancel{false};
+    const ExecCancelScope scope(cancel);
+    const ProcessResult result = execute_and_capture(
+        {"/bin/sh", "-c", "sleep 0.1; printf ok"}, milliseconds{10'000});
+    expect(result.m_output == "ok" && result.m_exit_code == 0 &&
+               !result.m_timed_out,
+           "process: an exec under an unset flag should run as before");
 }
 
 // A failed exec used to be exit 127 with empty output, which the runners read
