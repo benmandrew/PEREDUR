@@ -21,8 +21,7 @@
 struct AccumulatorStats {
     /// Specifications the accumulator contributed that the final population's
     /// own collection did not already hold. Zero when every accumulated repair
-    /// happened to survive into the last generation, and zero whenever
-    /// `Config::accumulate_repairs` is turned off.
+    /// happened to survive into the last generation.
     inline static std::size_t n_contributed{0};
 };
 
@@ -46,8 +45,7 @@ struct AccumulatorStats {
 /// well have rejected.
 ///
 /// Nothing touches the filesystem before the first write, so neither the
-/// directory nor a file exists until a candidate is accumulated, and a run with
-/// `Config::accumulate_repairs` turned off creates neither at all.
+/// directory nor a file exists until a candidate is accumulated.
 template <typename Spec>
 class AccumulatedRepairWriter {
    public:
@@ -58,7 +56,7 @@ class AccumulatedRepairWriter {
     using Serialiser = std::function<std::string(const Spec&)>;
 
     /// A default-constructed writer writes nothing, for the callers that
-    /// accumulate in memory alone: the tests, and MUC repair's inert instance.
+    /// accumulate in memory alone, such as the tests.
     AccumulatedRepairWriter() = default;
 
     /// @p elapsed reports seconds since the search began, and is what stamps
@@ -184,11 +182,8 @@ class AccumulatedRepairWriter {
 /// is judged existentially over the emitted set, so keeping such a candidate
 /// can only add to what the run reports.
 ///
-/// A disabled instance drops every insertion, so a caller need not branch: with
-/// the key off the accumulator costs one test per candidate and nothing else,
-/// and its writer never opens a file. It only ever reads, and never draws from
-/// the RandomSource, so the seed stream is the same whichever way the key is
-/// set.
+/// It only ever reads, and never draws from the RandomSource, so it leaves the
+/// seed stream as it found it.
 template <typename Spec>
 class RepairAccumulator {
    public:
@@ -197,14 +192,9 @@ class RepairAccumulator {
     /// none. The streaming implication filter is fed through this.
     using Sink = std::function<void(const Spec&, const std::string&)>;
 
-    explicit RepairAccumulator(bool enabled,
-                               AccumulatedRepairWriter<Spec> writer = {},
+    explicit RepairAccumulator(AccumulatedRepairWriter<Spec> writer = {},
                                Sink sink = {})
-        : m_enabled(enabled),
-          m_writer(std::move(writer)),
-          m_sink(std::move(sink)) {}
-
-    [[nodiscard]] bool enabled() const { return m_enabled; }
+        : m_writer(std::move(writer)), m_sink(std::move(sink)) {}
 
     /// @p generation is 1-indexed, and reaches the writer as part of the file
     /// name.
@@ -214,7 +204,7 @@ class RepairAccumulator {
     /// `gate_verdicts` has already returned -- so neither is inside the scoring
     /// pool and neither the set nor the writer needs a lock.
     void insert(const Spec& spec, std::size_t generation) {
-        if (!m_enabled || !m_seen.insert(spec).second) {
+        if (!m_seen.insert(spec).second) {
             return;
         }
         m_specifications.push_back(spec);
@@ -231,7 +221,6 @@ class RepairAccumulator {
     }
 
    private:
-    bool m_enabled;
     AccumulatedRepairWriter<Spec> m_writer;
     Sink m_sink;
     std::unordered_set<Spec> m_seen;

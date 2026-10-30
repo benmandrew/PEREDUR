@@ -31,16 +31,10 @@ std::vector<Scored<Specification>> merge_accumulated_survivors(
     const std::vector<Specification>& accumulated, const Config& cfg,
     const AggregateWeightedFitnessFunctionT<Specification>& fitness);
 
-// Keeps the survivors not dominated by another, mirroring the FRETISH final
-// implication filter. Equivalent survivors collapse to the one closest to
-// @p original under syntactic similarity.
-std::vector<Scored<Specification>> keep_maximal(
-    const std::vector<Scored<Specification>>& survivors,
-    const Specification& original, const Config& cfg,
-    SatisfiabilityChecker& checker);
-
-// What keep_maximal returns, from @p stream instead: pushes the survivors
-// the accumulator did not already hand it and waits for the last batch.
+// Keeps the survivors not dominated by another, from @p stream: pushes the
+// survivors the accumulator did not already hand it and waits for the last
+// batch. Equivalent survivors collapse to the one closest to the original under
+// syntactic similarity.
 std::vector<Scored<Specification>> finish_maximal_stream(
     const std::vector<Scored<Specification>>& survivors,
     StreamingMaximalFilter<Specification>& stream);

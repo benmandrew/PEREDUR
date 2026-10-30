@@ -1,5 +1,6 @@
 #include "config_io.hpp"
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -24,30 +25,44 @@
 
 namespace {
 
-/// Names the replacement for a selection_scheme spelling retired by the
-/// 2026-08-06 rename, as a clause to fold into the error, or "" for any other
-/// value. The retired spellings are matched here rather than listed in
-/// EnumNames<SelectionScheme>, which both a reader and
-/// scripts/check_config_schema.py take to be the values the parser accepts --
+/// A value a kept key no longer accepts, renamed or removed with the arm it
+/// selected. Matched here rather than listed in EnumNames, which both a reader
+/// and scripts/check_config_schema.py take to be the values the parser accepts:
 /// these are rejected, and the schema's enum must not list them.
+struct RetiredValue {
+    std::string_view path;
+    std::string_view value;
+    std::string_view fate;
+};
+
+constexpr std::array<RetiredValue, 4> k_retired_values{{
+    {"genetic.selection_scheme", "nsga2",
+     "was renamed to \"nsga2-truncate\" on 2026-08-06, and that was removed "
+     "on 2026-10-30"},
+    {"genetic.selection_scheme", "nsga2-replicate",
+     "was renamed to \"nsga2-apportion\" on 2026-08-06"},
+    {"genetic.selection_scheme", "nsga2-truncate", "was removed on 2026-10-30"},
+    {"fitness.status_grading", "tiered", "was removed on 2026-10-30"},
+}};
+
+/// Says what became of a value listed in k_retired_values, as a clause to fold
+/// into the error, or "" for any other value.
 ///
-/// Rejected rather than aliased: every archived campaign config pins one of
-/// them, so each fails against a current binary, deliberately. Reproduce those
-/// at the commit their PROVENANCE.json names, which is what the vendored
+/// Rejected rather than aliased or mapped onto a survivor: an archived config
+/// that pins one fails against a current binary, deliberately. Reproduce it at
+/// the commit its PROVENANCE.json names, which is what the vendored
 /// per-campaign scripts/ exists for. Archived *results* are the separate half
 /// and still join, via canonical_scheme() in the harness scripts.
-std::string retired_scheme_hint(const std::string& value) {
-    std::string replacement;
-    if (value == "nsga2") {
-        replacement = "nsga2-truncate";
-    } else if (value == "nsga2-replicate") {
-        replacement = "nsga2-apportion";
-    } else {
-        return "";
+std::string retired_value_hint(const std::string& path,
+                               const std::string& value) {
+    for (const RetiredValue& retired : k_retired_values) {
+        if (retired.path == path && retired.value == value) {
+            return " = \"" + value + "\" " + std::string(retired.fate) +
+                   "; to reproduce an archived campaign, build the commit its "
+                   "PROVENANCE.json names. It";
+        }
     }
-    return "= \"" + value + "\" was renamed on 2026-08-06 to \"" + replacement +
-           "\"; to reproduce an archived campaign, build the commit its "
-           "PROVENANCE.json names rather than editing its config. It ";
+    return "";
 }
 
 // The complaint for a value that fails its key's check, or nullptr.
@@ -67,8 +82,6 @@ const char* complaint(KeyCheck check, T value) {
             return value <= T{0} ? " must be positive" : nullptr;
         case KeyCheck::AtLeastOne:
             return value < T{1} ? " must be >= 1" : nullptr;
-        case KeyCheck::WidthAtLeastOne:
-            return value < T{1} ? " must be at least 1" : nullptr;
     }
     return nullptr;
 }
@@ -76,9 +89,7 @@ const char* complaint(KeyCheck check, T value) {
 template <typename T>
 void require(KeyCheck check, T value, const std::string& path) {
     if (const char* problem = complaint(check, value)) {
-        const char* prefix =
-            check == KeyCheck::WidthAtLeastOne ? "" : "config: ";
-        throw std::runtime_error(prefix + path + problem);
+        throw std::runtime_error("config: " + path + problem);
     }
 }
 
@@ -93,14 +104,8 @@ void read_enum(toml::node_view<const toml::node> node, const std::string& path,
     }
     const std::optional<Enum> parsed = enum_from_name<Enum>(*val);
     if (!parsed) {
-        if constexpr (std::is_same_v<Enum, SelectionScheme>) {
-            throw std::runtime_error(
-                "config: genetic.selection_scheme " +
-                retired_scheme_hint(*val) +
-                "must be \"weighted\", \"nsga2-truncate\", or "
-                "\"nsga2-apportion\"");
-        }
-        throw std::runtime_error("config: " + path + " must be " +
+        throw std::runtime_error("config: " + path +
+                                 retired_value_hint(path, *val) + " must be " +
                                  enum_alternatives<Enum>());
     }
     out = *parsed;
@@ -223,6 +228,28 @@ std::string retired_key_hint(const std::string& path) {
     }
     if (path == "runtime.ganak_timeout_ms") {
         return " (removed: ganak runs without a timeout)";
+    }
+    if (path == "tlsf.mutation.max_assumption_width") {
+        return " (removed: an appended assumption's body is one literal)";
+    }
+    if (path == "tlsf.mutation.p_bare_assumption") {
+        return " (removed: an appended fairness assumption is always G F)";
+    }
+    if (path == "model_counting.metric") {
+        return " (removed: trace counts always combine on the logarithmic"
+               " metric)";
+    }
+    if (path == "genetic.accumulate_repairs") {
+        return " (removed: every run accumulates gate-passing repairs)";
+    }
+    if (path == "fitness.keyword_similarity" ||
+        path == "fitness.semantic_trace_weight") {
+        return " (removed: the keyword orders always join the semantic"
+               " objective, at weight 1/2)";
+    }
+    if (path == "tlsf.repair_mode" || path == "tlsf.muc_max_iterations") {
+        return " (removed: TLSF repair always evolves the whole specification;"
+               " the mucs tool still extracts cores)";
     }
     if (path == "runtime.max_concurrent_realizability") {
         return " (removed: no concurrency cap; bound RAM with"

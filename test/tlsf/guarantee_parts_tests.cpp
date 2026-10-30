@@ -129,8 +129,7 @@ TEST(test_subset_restores_each_part_to_its_own_section) {
 
 TEST(test_full_subset_reproduces_the_specification) {
     // The walk's last step asks about every part, and that query must be the
-    // one the tiered scale would have asked -- otherwise 1.0 would not mean
-    // what it means there.
+    // whole specification -- otherwise 1.0 would not mean realizable.
     const tlsf::Specification spec =
         tlsf::parse(std::string("INFO { TITLE: \"t\" DESCRIPTION: \"d\" "
                                 "SEMANTICS: Mealy TARGET: Mealy }\n"

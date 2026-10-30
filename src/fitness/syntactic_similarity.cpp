@@ -332,9 +332,9 @@ double keyword_order_similarity(const Requirement& requirement,
 
 // --- Keyword tokens --------------------------------------------------------
 //
-// The pure-syntax counterparts of the order measures above, scored under
-// KeywordSimilarity::Semantic, where the orders move to the semantic objective
-// and the syntactic one may read nothing into a keyword but its spelling.
+// The pure-syntax counterparts of the order measures above. The syntactic
+// objective scores these, and may read nothing into a keyword but its
+// spelling; the orders belong to the semantic objective.
 
 namespace {
 
@@ -418,24 +418,17 @@ namespace {
 
 enum class KeywordField : std::uint8_t { Timing, Scope, ConditionType };
 
-// One keyword term of a requirement pair, by the measure @p mode assigns the
-// syntactic objective: the implication order under Syntactic, the token alone
-// under Semantic.
+// One keyword term of a requirement pair, compared as a token.
 double keyword_term(const Requirement& lhs, const Requirement& rhs,
-                    KeywordSimilarity mode, KeywordField field) {
-    const bool tokens = mode == KeywordSimilarity::Semantic;
+                    KeywordField field) {
     switch (field) {
         case KeywordField::Timing:
-            return tokens ? timing_token_similarity(lhs.m_timing, rhs.m_timing)
-                          : timing_order_similarity(lhs.m_timing, rhs.m_timing);
+            return timing_token_similarity(lhs.m_timing, rhs.m_timing);
         case KeywordField::Scope:
-            return tokens ? scope_token_similarity(lhs.m_scope, rhs.m_scope)
-                          : scope_order_similarity(lhs.m_scope, rhs.m_scope);
+            return scope_token_similarity(lhs.m_scope, rhs.m_scope);
         case KeywordField::ConditionType:
-            return tokens ? condition_type_token_similarity(
-                                lhs.m_condition_type, rhs.m_condition_type)
-                          : condition_type_order_similarity(
-                                lhs.m_condition_type, rhs.m_condition_type);
+            return condition_type_token_similarity(lhs.m_condition_type,
+                                                   rhs.m_condition_type);
     }
     assert(false);
     __builtin_unreachable();
@@ -490,7 +483,7 @@ Formula conjoin_responses(const Specification& spec) {
 // came from, slot i of a candidate descending from slot i of the original.
 double average_keyword_similarity(const Specification& spec1,
                                   const Specification& spec2,
-                                  KeywordSimilarity mode, KeywordField field) {
+                                  KeywordField field) {
     const std::size_t common_assumptions =
         std::min(spec1.m_assumptions.size(), spec2.m_assumptions.size());
     const std::size_t common_guarantees =
@@ -504,12 +497,12 @@ double average_keyword_similarity(const Specification& spec1,
     // A slot removed on one side alone has no keyword to compare against, and
     // removal is the largest change that slot can undergo, so it scores zero.
     // Removed on both sides, the slot matches.
-    const auto pair_similarity = [mode, field](const Requirement& lhs,
-                                               const Requirement& rhs) {
+    const auto pair_similarity = [field](const Requirement& lhs,
+                                         const Requirement& rhs) {
         if (lhs.m_removed || rhs.m_removed) {
             return lhs.m_removed && rhs.m_removed ? 1.0 : 0.0;
         }
-        return keyword_term(lhs, rhs, mode, field);
+        return keyword_term(lhs, rhs, field);
     };
     double sum = 0.0;
     for (std::size_t i = 0; i < common_assumptions; ++i) {
@@ -524,27 +517,24 @@ double average_keyword_similarity(const Specification& spec1,
 }  // namespace
 
 double syntactic_similarity(const Requirement& requirement,
-                            const Requirement& other_requirement,
-                            const Config& cfg) {
+                            const Requirement& other_requirement) {
     double condition_similarity = requirement.m_condition.syntactic_similarity(
         other_requirement.m_condition);
     double response_similarity = requirement.m_response.syntactic_similarity(
         other_requirement.m_response);
-    const KeywordSimilarity mode = cfg.keyword_similarity;
-    double timing_similarity = keyword_term(requirement, other_requirement,
-                                            mode, KeywordField::Timing);
+    double timing_similarity =
+        keyword_term(requirement, other_requirement, KeywordField::Timing);
     double scope_similarity =
-        keyword_term(requirement, other_requirement, mode, KeywordField::Scope);
+        keyword_term(requirement, other_requirement, KeywordField::Scope);
     double condition_type_similarity = keyword_term(
-        requirement, other_requirement, mode, KeywordField::ConditionType);
+        requirement, other_requirement, KeywordField::ConditionType);
     return (condition_similarity + response_similarity + timing_similarity +
             scope_similarity + condition_type_similarity) /
            5.0;
 }
 
 double syntactic_similarity(const Specification& specification,
-                            const Specification& other_specification,
-                            const Config& cfg) {
+                            const Specification& other_specification) {
     PEREDUR_PROFILE_SCOPE("fitness/syntactic_similarity_spec");
     assert((!specification.m_assumptions.empty() ||
             !specification.m_guarantees.empty()) &&
@@ -556,13 +546,12 @@ double syntactic_similarity(const Specification& specification,
     const double response_similarity =
         conjoin_responses(specification)
             .syntactic_similarity(conjoin_responses(other_specification));
-    const KeywordSimilarity mode = cfg.keyword_similarity;
     double timing_similarity = average_keyword_similarity(
-        specification, other_specification, mode, KeywordField::Timing);
+        specification, other_specification, KeywordField::Timing);
     double scope_similarity = average_keyword_similarity(
-        specification, other_specification, mode, KeywordField::Scope);
+        specification, other_specification, KeywordField::Scope);
     double condition_type_similarity = average_keyword_similarity(
-        specification, other_specification, mode, KeywordField::ConditionType);
+        specification, other_specification, KeywordField::ConditionType);
     return (trigger_similarity + response_similarity + timing_similarity +
             scope_similarity + condition_type_similarity) /
            5.0;

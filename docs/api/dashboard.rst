@@ -14,9 +14,9 @@ The page polls once a second. ``?poll=<seconds>`` on the URL changes that — ``
 
 No stage name is written down anywhere. ``run_start`` carries the roster of every stage a generation *can* run, built by ``generation_stage_names`` from the same pipeline the run uses, so it cannot drift from it; the ``stage`` records then say which of them actually ran. A new filter or pipeline stage therefore appears without either side being taught about it.
 
-The roster exists so the page can lay the stage chart out at a fixed height with each stage on a fixed row. A generation need not report every stage in the roster — MUC repair evolves a fresh core per iteration, and a filter the config disables is never constructed — and a chart sized to whichever stages happened to run would change height underneath the reader. Stages absent from a generation keep their row, struck through and greyed.
+The roster exists so the page can lay the stage chart out at a fixed height with each stage on a fixed row. A generation need not report every stage in the roster — a filter the config disables is never constructed — and a chart sized to whichever stages happened to run would change height underneath the reader. Stages absent from a generation keep their row, struck through and greyed.
 
-Optional fields are omitted rather than defaulted. ``n_realizable`` is absent when the driver does not measure it per generation — the TLSF path checks realizability only at the end of a run — so the page can distinguish "not measured" from "none found". ``muc_iter`` appears only under MUC-guided repair, which restarts its generation count per core.
+Optional fields are omitted rather than defaulted. ``n_realizable`` is absent when the driver does not measure it per generation — the TLSF path checks realizability only at the end of a run — so the page can distinguish "not measured" from "none found".
 
 A writer that cannot open its file reports once and then does nothing: losing the progress log must never take a repair run with it.
 

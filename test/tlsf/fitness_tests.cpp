@@ -32,33 +32,6 @@ TEST(test_semantic_self_similarity_is_one) {
            "similarity is 1.0");
 }
 
-// The metric config must reach the TLSF path, not only the FRETISH one. A
-// non-equivalent guarantee pair (G(r -> g) strictly implies G(r -> F g)) scores
-// differently under the two metrics, so their cross-scores must diverge -- were
-// the config ignored, the TLSF path would stay on direct and the two would be
-// identical.
-TEST(test_semantic_similarity_honours_configured_metric) {
-    Config cfg;
-    cfg.default_model_counting_bound = 4;
-    const tlsf::Specification original =
-        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> F g); }");
-    const tlsf::Specification candidate =
-        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> g); }");
-
-    cfg.similarity_metric = SimilarityMetric::Direct;
-    const double direct = tlsf_semantic_similarity(candidate, original, cfg);
-    cfg.similarity_metric = SimilarityMetric::Logarithmic;
-    const double logarithmic =
-        tlsf_semantic_similarity(candidate, original, cfg);
-
-    expect(direct >= 0.0 && direct <= 1.0 && logarithmic >= 0.0 &&
-               logarithmic <= 1.0,
-           "semantic: both metrics stay within [0, 1] on the TLSF path");
-    expect(std::fabs(direct - logarithmic) > 1e-9,
-           "semantic: the configured metric must reach the TLSF path, so the "
-           "direct and logarithmic scores diverge for a non-equivalent pair");
-}
-
 TEST(test_status_realizable_is_one) {
     const Config cfg;
     const tlsf::Specification spec =
@@ -77,24 +50,10 @@ TEST(test_status_individually_unsatisfiable_formula_is_zero) {
            "component tier");
 }
 
-TEST(test_status_jointly_unsatisfiable_guarantees_are_unrealizable) {
-    // `g` and `!g` are each satisfiable alone, so no component tier fires.
-    // Their conjunction is not realizable, which the realizability query
-    // reports -- the guarantee-side satisfiability tier this used to occupy
-    // was dropped as unpopulated. Pinned to the tiered scale, since the MRS
-    // default screens the whole specification first.
-    Config cfg;
-    cfg.status_grading = StatusGrading::Tiered;
-    const tlsf::Specification spec =
-        parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { g; !g; }");
-    expect(tlsf_status(spec, cfg) == k_status_unrealizable,
-           "status: jointly contradictory guarantees score the unrealizable "
-           "tier");
-}
-
 TEST(test_status_mrs_jointly_unsatisfiable_guarantees_are_zero) {
-    // The same pair under the MRS walk, which screens the whole specification
-    // for satisfiability first, so the pair never reaches the walk.
+    // `g` and `!g` are each satisfiable alone, so no component tier fires. The
+    // MRS walk screens the whole specification for satisfiability first, so
+    // the pair never reaches the walk.
     Config cfg;
     cfg.status_grading = StatusGrading::Mrs;
     const tlsf::Specification spec =
@@ -134,17 +93,16 @@ TEST(test_status_aurus_grades_by_which_side_survives) {
 }
 
 // The divergence, on the TLSF path: `ASSUME { G F g }` is over the system's own
-// output, so the system defeats it by never asserting g. The shared scale caps
-// that at the unrealizable tier; the AuRUS ladder does not ask the question,
-// because AuRUS does not.
+// output, so the system defeats it by never asserting g. The MRS walk rejects
+// the guarantee that relies on that; the AuRUS ladder does not ask the
+// question, because AuRUS does not.
 TEST(test_status_aurus_does_not_penalise_an_ill_separated_spec) {
     Config cfg;
     const tlsf::Specification spec = parse_main(
         "INPUTS { r; } OUTPUTS { g; } ASSUME { G F g; } "
         "GUARANTEE { G (r -> g); }");
-    cfg.status_grading = StatusGrading::Tiered;
-    expect(tlsf_status(spec, cfg) == k_status_unrealizable,
-           "aurus: the tiered scale caps an ill-separated spec at 0.5");
+    expect(tlsf_status(spec, cfg) < k_status_realizable,
+           "aurus: the MRS walk keeps an ill-separated spec below 1.0");
     cfg.status_grading = StatusGrading::Aurus;
     expect(tlsf_status(spec, cfg) == k_status_realizable,
            "aurus: the AuRUS ladder scores an ill-separated but realizable "

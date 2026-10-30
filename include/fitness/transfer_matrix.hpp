@@ -24,10 +24,9 @@
 // NOLINTNEXTLINE(google-runtime-float): the range above is the point.
 using Count = long double;
 
-// Three things below depend on Count being floating-point and break silently
-// under an integral one: the isfinite overflow checks here, max_exponent in
-// semantic_similarity's max_representable_step_count, and the unconverted
-// division in its ratio_or_throw -- which would truncate every ratio to 0.
+// Two things below depend on Count being floating-point and break silently
+// under an integral one: the isfinite overflow checks here, and max_exponent in
+// semantic_similarity's max_representable_step_count.
 static_assert(std::is_floating_point_v<Count>, "Count must be floating-point");
 
 // x87 80-bit long double gives the 2^64-exact mantissa and 2^16384 range the

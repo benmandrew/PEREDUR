@@ -386,12 +386,8 @@ TEST_IN("driver_peredur", test_peredur_repairs_fretish) {
                     "only on the TLSF path"),
            "peredur: a FRETISH run warns about a changed TLSF-only key");
     const nlohmann::json& config_block = manifest.at("config");
-    expect(config_block.at("tlsf").at("mutation").at("p_temporal").is_null() &&
-               config_block.at("tlsf").at("muc_max_iterations").is_null(),
+    expect(config_block.at("tlsf").at("mutation").at("p_temporal").is_null(),
            "peredur: a FRETISH manifest records TLSF-only keys as null");
-    expect(config_block.at("tlsf").at("repair_mode").is_string(),
-           "peredur: a FRETISH manifest still records the repair_mode it "
-           "enforced");
     expect(config_block.at("mutation").at("p_trigger").is_number(),
            "peredur: a FRETISH manifest records the FRETISH keys");
     for (const auto& repair : repair_files(out)) {
@@ -871,27 +867,17 @@ population_size = 8
 parallel = 1
 )";
 
-// With the accumulator off the final filters run once over the last
-// population, rather than streaming while the search does, which is the only
-// way a run reaches the batch maximality filter.
-const char* const k_config_batch_final_filters = R"([genetic]
-generations = 2
-population_size = 8
-accumulate_repairs = false
-
-[runtime]
-parallel = 1
-)";
-
-const char* const k_config_muc = R"([genetic]
+// With the implication filter off nothing streams, and the final screen is
+// deduplication alone.
+const char* const k_config_no_implication = R"([genetic]
 generations = 2
 population_size = 8
 
+[filters]
+run_implication = false
+
 [runtime]
 parallel = 1
-
-[tlsf]
-repair_mode = "muc"
 )";
 
 // Long enough that the run is still searching whenever the signal lands.
@@ -964,19 +950,6 @@ TEST_IN("driver_peredur", test_peredur_rejects_bad_values) {
 TEST_IN("driver_peredur", test_peredur_rejects_unusable_inputs) {
     const TempDir dir("e2e_peredur_inputs");
     const std::string out = dir.string();
-
-    // repair_mode is read only on the TLSF path, and a FRETISH run that
-    // ignored it would record a mode in its manifest that it never ran.
-    const std::string fretish =
-        write_text(dir.path() / "spec.json", k_fretish_unrealizable).string();
-    const std::string muc =
-        write_text(dir.path() / "muc.toml", k_config_muc).string();
-    const DriverRun mode = run_driver(
-        "peredur", {"--input", fretish, "--output-dir", out, "--config", muc});
-    expect(mode.m_exit_code == 1,
-           "peredur: a FRETISH run under repair_mode = muc is refused");
-    expect(contains(mode.m_output, "repair_mode is TLSF-only"),
-           "peredur: the refusal names the TLSF-only key");
 
     const std::string malformed =
         write_text(dir.path() / "malformed.json", "{\"guarantees\": [")
@@ -1095,36 +1068,31 @@ TEST_IN("driver_peredur", test_peredur_reports_on_request) {
     expect(n_events >= 2, "peredur: the progress file records the run");
 }
 
-TEST_IN("driver_peredur", test_peredur_runs_tlsf_muc_mode) {
-    const TempDir dir("e2e_peredur_muc");
+TEST_IN("driver_peredur", test_peredur_tlsf_reports_on_request) {
+    const TempDir dir("e2e_peredur_tlsf_reports");
     const std::string input =
         write_text(dir.path() / "spec.tlsf", k_unrealizable).string();
     const std::string config =
-        write_text(dir.path() / "config.toml", k_config_muc).string();
+        write_text(dir.path() / "config.toml", k_config_small).string();
     const std::filesystem::path out = dir.path() / "out";
     std::filesystem::create_directories(out);
 
     const DriverRun run = run_driver(
         "peredur", {"--input", input, "--output-dir", out.string(), "--config",
                     config, "--seed", "4", "--diagnostics", "--cpu-report"});
-    expect(run.m_exit_code == 0, "peredur: a muc-mode run exits zero");
-    expect(contains(run.m_output, "muc iteration 1/"),
-           "peredur: muc mode reports its first core iteration");
+    expect(run.m_exit_code == 0, "peredur: a TLSF run with reports exits zero");
     expect(contains(run.m_output, "Tool timing report:") &&
                contains(run.m_output, "CPU attribution (wall "),
            "peredur: a TLSF run prints the reports it was asked for");
-    const nlohmann::json manifest =
-        expect_run_manifest(out, input, 4, "peredur/muc");
-    expect(manifest.at("config").at("tlsf").at("repair_mode") == "muc",
-           "peredur: the manifest records the mode the run used");
+    expect_run_manifest(out, input, 4, "peredur/tlsf-reports");
 }
 
-TEST_IN("driver_peredur", test_peredur_filters_without_the_accumulator) {
-    const TempDir dir("e2e_peredur_batch");
+TEST_IN("driver_peredur", test_peredur_filters_without_implication) {
+    const TempDir dir("e2e_peredur_dedup");
     const std::string input =
         write_text(dir.path() / "spec.json", k_fretish_unrealizable).string();
     const std::string config =
-        write_text(dir.path() / "config.toml", k_config_batch_final_filters)
+        write_text(dir.path() / "config.toml", k_config_no_implication)
             .string();
     const std::filesystem::path out = dir.path() / "out";
     std::filesystem::create_directories(out);
@@ -1133,10 +1101,11 @@ TEST_IN("driver_peredur", test_peredur_filters_without_the_accumulator) {
         "peredur", {"--input", input, "--output-dir", out.string(), "--config",
                     config, "--seed", "4", "--diagnostics"});
     expect(run.m_exit_code == 0,
-           "peredur: a run with the accumulator off exits zero");
-    expect(contains(run.m_output, "final/implication"),
-           "peredur: the batch final filters report their own rows");
-    expect_run_manifest(out, input, 4, "peredur/batch");
+           "peredur: a run with the implication filter off exits zero");
+    expect(contains(run.m_output, "final/dedup") &&
+               !contains(run.m_output, "final/implication"),
+           "peredur: the final screen reports deduplication alone");
+    expect_run_manifest(out, input, 4, "peredur/dedup");
 }
 
 // The crash log lands in a `crashes/` directory under the working directory,

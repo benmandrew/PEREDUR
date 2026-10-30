@@ -60,30 +60,23 @@ TEST(test_status_scores_each_shape_at_its_tier) {
         // G(i -> o): controller mirrors the input. Strategy o := i always
         // works.
         {"realizable", realizable, std::nullopt, k_status_realizable},
-        {"realizable under mrs", realizable, StatusGrading::Mrs,
-         k_status_realizable},
         {"realizable under aurus", realizable, StatusGrading::Aurus,
          k_status_realizable},
-        // Realizable, so the old three-point scale scored the ill-separated
-        // spec 1.0 -- level with a genuine repair. It now scores level with
-        // unrealizable instead, which is the whole of the change: the search
-        // is paid for repairing, not for cheating.
+        // Realizable, but only by defeating its own assumption, so the walk
+        // rejects its one guarantee: the search is paid for repairing, not
+        // for cheating.
         {"realizable only by defeating its own assumption",
-         assuming_always("o"), std::nullopt, k_status_unrealizable},
-        // The counterparts, so the tier above is not passing for the wrong
+         assuming_always("o"), std::nullopt, 0.0},
+        // The counterpart, so the case above is not passing for the wrong
         // reason.
         {"assumption over inputs alone", assuming_always("i"), std::nullopt,
          k_status_realizable},
-        {"assumption over inputs alone under mrs", assuming_always("i"),
-         StatusGrading::Mrs, k_status_realizable},
-        // The divergence, asserted rather than only commented. Tiered folds
-        // well-separation into its realizability query and scores the
-        // ill-separated spec 0.5; the AuRUS ladder does not ask the question
-        // at all, because AuRUS does not -- WellSeparationAnalysis.java has no
+        // The divergence, asserted rather than only commented. The MRS walk
+        // folds well-separation into its realizability query; the AuRUS
+        // ladder does not ask the question at all, because AuRUS does not --
+        // WellSeparationAnalysis.java has no
         // caller in its search -- and scores it full marks. An arm that graded
         // it would not be the ladder it is named after.
-        {"ill-separated under an explicit tiered", assuming_always("o"),
-         StatusGrading::Tiered, k_status_unrealizable},
         {"ill-separated under aurus, which never asks about well-separation",
          assuming_always("o"), StatusGrading::Aurus, k_status_realizable},
     };
@@ -151,7 +144,7 @@ TEST(test_status_screen_skips_the_response_under_a_stop_condition) {
     }
 }
 
-TEST(test_status_unrealizable_returns_point_five) {
+TEST(test_status_unrealizable_keeps_half_its_guarantees) {
     // Two guarantees whose propositional projections are all satisfiable but
     // whose combined LTL is unrealizable:
     //   G(true -> F o)  — output must eventually be true, infinitely often
@@ -164,6 +157,8 @@ TEST(test_status_unrealizable_returns_point_five) {
     //   conj_a  = (true) & (o)       — SAT
     //   conj_g  = (o) & (i)          — SAT
     //   conj_ag = (true & o) & (o & i) = (o & i) — SAT
+    //
+    // The walk keeps the first guarantee and rejects the second, scoring 1/2.
     SatisfiabilityChecker sat;
     RealizabilityChecker real;
     const Specification spec(
@@ -171,9 +166,8 @@ TEST(test_status_unrealizable_returns_point_five) {
         {Requirement(Formula("true"), Formula("o"), timing::eventually()),
          Requirement(Formula("o"), Formula("i"), timing::immediately())},
         {"i"}, {"o"});
-    expect(specification_status(spec, sat, real) == k_status_unrealizable,
-           "status: satisfiable but unrealizable spec should score the "
-           "unrealizable tier");
+    expect(specification_status(spec, sat, real) == 0.5,
+           "status: one of two guarantees kept should score 1/2");
 }
 
 TEST(test_status_no_guarantees_skips_the_solver) {
@@ -567,8 +561,7 @@ TEST(test_mrs_grades_an_unrealizable_spec_between_the_tiers) {
     //   G F o      -- o must hold infinitely often
     //   G(o -> i)  -- o only where i already holds
     // The environment plays i false forever, so the third forbids o and the
-    // second demands it. Greedy keeps the first two, scoring 2/3 -- a value the
-    // tiered scale cannot express, on a spec it scores 0.5.
+    // second demands it. Greedy keeps the first two, scoring 2/3.
     SatisfiabilityChecker sat;
     RealizabilityChecker real;
     const Specification spec(
@@ -577,8 +570,6 @@ TEST(test_mrs_grades_an_unrealizable_spec_between_the_tiers) {
          Requirement(Formula("true"), Formula("o"), timing::eventually()),
          Requirement(Formula("o"), Formula("i"), timing::immediately())},
         {"i"}, {"o"});
-    expect(specification_status(spec, sat, real) == k_status_unrealizable,
-           "mrs: the tiered scale should score this spec 0.5");
     expect(
         specification_status(spec, sat, real, StatusGrading::Mrs) == 2.0 / 3.0,
         "mrs: two of three guarantees kept should score 2/3");
@@ -587,8 +578,7 @@ TEST(test_mrs_grades_an_unrealizable_spec_between_the_tiers) {
 TEST(test_mrs_scores_zero_when_requirements_contradict_through_timing) {
     // Each requirement is satisfiable on its own, condition and response
     // alike, so the component tier passes. Together they demand o always and
-    // o eventually false, which only the whole-specification query sees. The
-    // tiered scale has no such query and grades the spec as unrealizable.
+    // o eventually false, which only the whole-specification query sees.
     SatisfiabilityChecker sat;
     RealizabilityChecker real;
     const Specification spec(
@@ -596,8 +586,6 @@ TEST(test_mrs_scores_zero_when_requirements_contradict_through_timing) {
         {Requirement(Formula("true"), Formula("o"), timing::always()),
          Requirement(Formula("true"), Formula("!o"), timing::eventually())},
         {"i"}, {"o"});
-    expect(specification_status(spec, sat, real) == k_status_unrealizable,
-           "mrs: the tiered scale should score this spec 0.5");
     expect(specification_status(spec, sat, real, StatusGrading::Mrs) ==
                k_status_component_unsatisfiable,
            "mrs: jointly contradictory requirements should score 0");
@@ -606,8 +594,7 @@ TEST(test_mrs_scores_zero_when_requirements_contradict_through_timing) {
 TEST(test_mrs_ill_separated_spec_does_not_score_one) {
     // Well-separation is folded into the subset oracle, so a guarantee only
     // reachable by defeating the specification's own assumption is rejected
-    // rather than kept. 1.0 keeps meaning what it means on the tiered scale:
-    // realizable for a real reason.
+    // rather than kept, so 1.0 keeps meaning realizable for a real reason.
     SatisfiabilityChecker sat;
     RealizabilityChecker real;
     const Specification spec = assuming_always("o");
@@ -617,15 +604,15 @@ TEST(test_mrs_ill_separated_spec_does_not_score_one) {
            "not score 1.0");
 }
 
-TEST(test_mrs_defaults_to_the_tiered_scale) {
-    // The default argument matters: every existing caller that passes no
-    // grading must keep the behaviour it had.
+TEST(test_status_defaults_to_mrs) {
+    // The default argument matches Config's, so a caller that passes no
+    // grading scores as a default run does.
     SatisfiabilityChecker sat;
     RealizabilityChecker real;
     const auto spec = make_spec("i", "o", {"i"}, {"o"});
     expect(specification_status(spec, sat, real) ==
-               specification_status(spec, sat, real, StatusGrading::Tiered),
-           "mrs: the default grading should be the tiered scale");
+               specification_status(spec, sat, real, StatusGrading::Mrs),
+           "status: the default grading should be mrs");
 }
 
 // --- specification_status under StatusGrading::Aurus ---

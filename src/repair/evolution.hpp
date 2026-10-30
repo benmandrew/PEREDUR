@@ -32,8 +32,8 @@ std::vector<ScoredSpecification> original_population(
     std::size_t population_size);
 
 // What one search leaves behind: the final population, the per-filter totals
-// summed over every generation, and -- only under cfg.accumulate_repairs -- the
-// gate-passing candidates seen along the way.
+// summed over every generation, and the gate-passing candidates seen along the
+// way.
 struct EvolutionResult {
     std::vector<ScoredSpecification> population;
     std::vector<FilterRunStats> filter_stats;
@@ -41,9 +41,8 @@ struct EvolutionResult {
 };
 
 // @p output_dir is where the accumulator streams each gate-passing candidate
-// as it finds it, under cfg.accumulate_repairs; nothing is created there
-// otherwise. @p sink is handed each candidate as it is accumulated, with the
-// name of the file it went to.
+// as it finds it. @p sink is handed each candidate as it is accumulated, with
+// the name of the file it went to.
 EvolutionResult run_evolution(
     const Config& cfg, std::vector<ScoredSpecification> population,
     const AggregateWeightedFitnessFunction& fitness_function,
@@ -57,16 +56,16 @@ EvolutionResult run_evolution(
 std::vector<Specification> collect_realizable_specifications(
     const Config& cfg, const std::vector<ScoredSpecification>& population);
 
-// Applies the final screens to the realizable specifications: deduplication,
-// then the implication (maximality) filter when run_implication_filter is set.
+// The final screen where the implication filter is off: deduplication alone,
+// with its row for the filter report.
 std::pair<std::vector<Specification>, std::vector<FilterRunStats>>
-filter_maximal_specifications(const Config& cfg, const Specification& original,
-                              const std::vector<Specification>& realizable_vec);
+dedup_realizable_specifications(
+    const std::vector<Specification>& realizable_vec);
 
-// What filter_maximal_specifications returns, from @p stream instead: pushes
+// The final screens where the implication filter is on, from @p stream: pushes
 // the realizable specifications the accumulator did not already hand it, waits
 // for the last batch, and returns the maximal set in @p realizable_vec's order
-// with the same per-screen accounting.
+// with a row each for deduplication and implication.
 std::pair<std::vector<Specification>, std::vector<FilterRunStats>>
 finish_maximal_stream(StreamingMaximalFilter<Specification>& stream,
                       const std::vector<Specification>& realizable_vec);

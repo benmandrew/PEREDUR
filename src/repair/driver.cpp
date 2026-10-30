@@ -56,10 +56,9 @@ std::string format_crash_metadata(std::size_t seed,
     return out.str();
 }
 
-// Warned rather than rejected, unlike a non-default repair_mode on FRETISH:
-// campaign configs and example-config.toml set every key, so a shared config
-// always carries the other path's keys, and only a changed value says the
-// config asked for something this run will not do.
+// Warned rather than rejected: campaign configs and example-config.toml set
+// every key, so a shared config always carries the other path's keys, and only
+// a changed value says the config asked for something this run will not do.
 void warn_ignored_keys(const Config& cfg, RepairInput input) {
     const char* const reader = input == RepairInput::Tlsf ? "FRETISH" : "TLSF";
     const char* const run = input == RepairInput::Tlsf ? "TLSF" : "FRETISH";
@@ -135,15 +134,6 @@ int run_tlsf_repair(const Config& cfg, const std::string& input_path,
 int run_fretish_repair(const Config& cfg, const std::string& input_path,
                        const std::string& output_dir,
                        const std::optional<std::size_t>& seed) {
-    // Rejected rather than ignored. Only the TLSF path reads repair_mode, so a
-    // FRETISH run carrying this key used to evolve monolithically while its
-    // manifest recorded "muc", which makes an archived run say what it did not
-    // do.
-    if (cfg.repair_mode != RepairMode::Monolithic) {
-        std::cerr << "fatal: [tlsf] repair_mode is TLSF-only; this input is "
-                     "FRETISH JSON\n";
-        return 1;
-    }
     warn_ignored_keys(cfg, RepairInput::Fretish);
     Specification original_spec;
     try {
@@ -211,8 +201,9 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
     // charged for loading its input.
     SearchBudget budget(cfg, wall_start);
     try {
-        // Null unless the key is on, and then the final screens run while the
-        // search does; destroyed unfinished if anything below throws.
+        // Null unless the implication filter is on, and then the final screens
+        // run while the search does; destroyed unfinished if anything below
+        // throws.
         const std::unique_ptr<StreamingMaximalFilter<Specification>> stream =
             make_maximal_stream(original_spec, cfg, output_dir);
         RepairAccumulator<Specification>::Sink sink;
@@ -237,8 +228,7 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
             merge_accumulated(realizable_vec, evolved.accumulated);
         auto [maximal, final_filter_stats] =
             stream ? finish_maximal_stream(*stream, realizable_vec)
-                   : filter_maximal_specifications(cfg, original_spec,
-                                                   realizable_vec);
+                   : dedup_realizable_specifications(realizable_vec);
         const std::vector<ScoredSpecification> scored_maximal =
             score_and_sort_specifications(cfg, maximal, fitness_function);
         write_specifications(scored_maximal, fitness_function, output_dir);

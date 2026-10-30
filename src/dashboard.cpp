@@ -91,8 +91,7 @@ void DashboardWriter::run_start(const std::string& input,
 }
 
 void DashboardWriter::stage(std::size_t gen, std::size_t index,
-                            const StageObservation& observation,
-                            std::size_t muc_iter) {
+                            const StageObservation& observation) {
     nlohmann::json record{{"type", "stage"},
                           {"gen", gen},
                           {"i", index},
@@ -101,17 +100,13 @@ void DashboardWriter::stage(std::size_t gen, std::size_t index,
                           {"n_out", observation.n_out},
                           {"distinct", observation.distinct},
                           {"elapsed_s", observation.elapsed_s}};
-    if (muc_iter > 0) {
-        record["muc_iter"] = muc_iter;
-    }
     write_line(record.dump());
 }
 
 void DashboardWriter::generation(
     std::size_t gen, double elapsed_s, double best_fitness, double mean_fitness,
     const std::vector<std::pair<std::string, double>>& objectives,
-    std::optional<std::size_t> n_realizable, std::size_t population,
-    std::size_t muc_iter) {
+    std::optional<std::size_t> n_realizable, std::size_t population) {
     nlohmann::json means = nlohmann::json::object();
     for (const auto& objective : objectives) {
         means[objective.first] = objective.second;
@@ -123,9 +118,6 @@ void DashboardWriter::generation(
         {"population", population}};
     if (n_realizable.has_value()) {
         record["n_realizable"] = *n_realizable;
-    }
-    if (muc_iter > 0) {
-        record["muc_iter"] = muc_iter;
     }
     write_line(record.dump());
 }

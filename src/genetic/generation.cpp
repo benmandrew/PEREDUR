@@ -95,16 +95,3 @@ template std::vector<FilterFunctionT<Specification>> get_filter_functions(
     const Specification&, SatisfiabilityChecker&);
 template std::vector<FilterFunctionT<tlsf::Specification>> get_filter_functions(
     const tlsf::Specification&, SatisfiabilityChecker&);
-
-std::vector<FilterFunction> get_final_filter_functions(
-    const Config& cfg, Specification original, SatisfiabilityChecker& checker,
-    const GenerationProgressCallback& on_impl_progress) {
-    std::vector<FilterFunction> filters;
-    filters.push_back(make_dedup_filter());
-    if (cfg.run_implication_filter) {
-        filters.push_back(make_implication_filter(
-            checker, syntactic_similarity_key(std::move(original), cfg),
-            on_impl_progress));
-    }
-    return filters;
-}

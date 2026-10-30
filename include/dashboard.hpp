@@ -67,10 +67,8 @@ class DashboardWriter {
     ///                    elapsed time, and `distinct`: how many of the
     ///                    survivors are distinct specifications, which is what
     ///                    no population size can show
-    /// @param muc_iter    1-indexed MUC repair iteration, or 0 when the run is
-    ///                    not MUC-guided; emitted only when non-zero
     void stage(std::size_t gen, std::size_t index,
-               const StageObservation& observation, std::size_t muc_iter = 0);
+               const StageObservation& observation);
 
     /// @param gen          1-indexed generation
     /// @param elapsed_s    Wall time this generation took
@@ -84,14 +82,11 @@ class DashboardWriter {
     ///                     driver counts them; std::nullopt omits the key
     ///                     rather than reporting a zero the run never measured
     /// @param population   Population size at the end of the generation
-    /// @param muc_iter     1-indexed MUC repair iteration, or 0 when the run is
-    ///                     not MUC-guided; emitted only when non-zero
     void generation(
         std::size_t gen, double elapsed_s, double best_fitness,
         double mean_fitness,
         const std::vector<std::pair<std::string, double>>& objectives,
-        std::optional<std::size_t> n_realizable, std::size_t population,
-        std::size_t muc_iter = 0);
+        std::optional<std::size_t> n_realizable, std::size_t population);
 
     void run_end(std::size_t generations_run, std::size_t n_realizable,
                  std::size_t n_maximal, double elapsed_s);

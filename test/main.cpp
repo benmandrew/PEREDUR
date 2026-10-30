@@ -76,7 +76,6 @@ const std::vector<Suite>& suites() {
         Suite{"tlsf_mucs", true, "tlsf_guarantee_parts"},
         suite_named("tlsf_genetic"),
         suite_named("tlsf_monotone"),
-        suite_named("tlsf_assumption"),
         suite_named("tlsf_pipeline"),
         suite_named("driver_peredur"),
         suite_named("driver_realize"),

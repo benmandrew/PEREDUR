@@ -28,9 +28,9 @@
 
 namespace {
 
-// The grading is the run's on both paths: hard-coding Tiered here made a run
-// configured `status_grading = "aurus"` score its search on the six-level
-// ladder and then judge its output on the three-point one. No admission order
+// The grading is the run's on both paths: hard-coding one scale here made a
+// run configured `status_grading = "aurus"` score its search on the six-level
+// ladder and then judge its output on another. No admission order
 // is passed: it changes which queries the MRS walk memoises, never whether the
 // top tier is reached.
 double gate_status(const Specification& spec, const Config& cfg) {
@@ -112,17 +112,13 @@ std::vector<char> gate_verdicts(const std::vector<Scored<Spec>>& population,
     return keep;
 }
 
-// Not free: nothing else in a generation asks the gate, so with the accumulator
-// off this sweep would be a solver call per candidate the run would not
-// otherwise make. Hence the early return rather than a caller-side branch.
+// Not free: nothing else in a generation asks the gate, so this sweep is a
+// solver call per candidate, memoised from scoring.
 template <typename Spec>
-std::optional<std::size_t> accumulate_gate_passing(
-    const std::vector<Scored<Spec>>& population, const Config& cfg,
-    std::size_t generation, RepairAccumulator<Spec>& accumulator,
-    const FitnessFunctionT<Spec>& status) {
-    if (!accumulator.enabled()) {
-        return std::nullopt;
-    }
+std::size_t accumulate_gate_passing(const std::vector<Scored<Spec>>& population,
+                                    const Config& cfg, std::size_t generation,
+                                    RepairAccumulator<Spec>& accumulator,
+                                    const FitnessFunctionT<Spec>& status) {
     const std::vector<char> keep = gate_verdicts(population, cfg, status);
     std::size_t n_gate_passing = 0;
     for (std::size_t idx = 0; idx < population.size(); ++idx) {
@@ -169,10 +165,10 @@ template std::vector<char> gate_verdicts(
 template std::vector<char> gate_verdicts(
     const std::vector<Scored<tlsf::Specification>>&, const Config&,
     const FitnessFunctionT<tlsf::Specification>&);
-template std::optional<std::size_t> accumulate_gate_passing(
+template std::size_t accumulate_gate_passing(
     const std::vector<Scored<Specification>>&, const Config&, std::size_t,
     RepairAccumulator<Specification>&, const FitnessFunctionT<Specification>&);
-template std::optional<std::size_t> accumulate_gate_passing(
+template std::size_t accumulate_gate_passing(
     const std::vector<Scored<tlsf::Specification>>&, const Config&, std::size_t,
     RepairAccumulator<tlsf::Specification>&,
     const FitnessFunctionT<tlsf::Specification>&);

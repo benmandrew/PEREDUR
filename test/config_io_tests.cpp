@@ -45,7 +45,6 @@ generations     = 5
 population_size = 100
 crossover_rate  = 0.2
 mutation_rate   = 0.8
-accumulate_repairs = false
 
 [fitness]
 weight_syntactic = 0.3
@@ -79,12 +78,6 @@ dashboard        = true
            "config_io: crossover_rate should be parsed from TOML");
     expect(cfg.mutation_rate == 0.8,
            "config_io: mutation_rate should be parsed from TOML");
-    expect(!cfg.accumulate_repairs,
-           "config_io: accumulate_repairs should be parsed from TOML");
-    expect(Config{}.accumulate_repairs,
-           "config_io: accumulate_repairs defaults on since 2026-08-25; "
-           "every archived config omits the key and now means something "
-           "new, which the config vintage note records");
     expect(cfg.fitness_weight_syntactic == 0.3,
            "config_io: fitness weight_syntactic should be parsed from TOML");
     expect(cfg.fitness_weight_semantic == 0.4,
@@ -145,23 +138,6 @@ TEST(test_config_io_out_of_range_probability_throws) {
         "config_io: out-of-range probability should throw", "p_trigger");
 }
 
-TEST(test_config_io_semantic_trace_weight) {
-    expect(Config{}.semantic_trace_weight == 0.5,
-           "config_io: fitness.semantic_trace_weight should default to 0.5");
-    const Config cfg = config_from_toml_string(
-        "[fitness]\nkeyword_similarity = \"semantic\"\n"
-        "semantic_trace_weight = 0.25\n");
-    expect(cfg.keyword_similarity == KeywordSimilarity::Semantic &&
-               cfg.semantic_trace_weight == 0.25,
-           "config_io: fitness.semantic_trace_weight should be parsed");
-    expect_throws(
-        [&] {
-            config_from_toml_string("[fitness]\nsemantic_trace_weight = 1.5\n");
-        },
-        "config_io: an out-of-range semantic_trace_weight should throw",
-        "semantic_trace_weight");
-}
-
 TEST(test_config_io_elitism_rate_parsed) {
     const Config cfg = config_from_toml_string(
         "[genetic]\nselection_rate = 0.6\nelitism_rate = 0.2\n");
@@ -218,7 +194,8 @@ void expect_enum_key(const EnumKey<Enum>& key) {
 TEST(test_config_io_enum_keys) {
     // Pinned because the default is what an archived config inherits wherever
     // it states no scheme. It has moved three times -- WeightedAverage, Nsga2
-    // (renamed Nsga2Truncate), and Nsga2Apportion from 2026-08-14 -- and only
+    // (renamed Nsga2Truncate, since removed), and Nsga2Apportion from
+    // 2026-08-14 -- and only
     // the 64 `sweep_B_pop50_takeoff_*` configs under 2026-07-13-fretish-sweeps
     // are exposed.
     // See "Config vintage" in docs/dev/config-and-provenance.md before moving
@@ -229,24 +206,21 @@ TEST(test_config_io_enum_keys) {
          &Config::selection_scheme,
          SelectionScheme::Nsga2Apportion,
          {{"weighted", SelectionScheme::WeightedAverage},
-          {"nsga2-truncate", SelectionScheme::Nsga2Truncate},
           {"nsga2-apportion", SelectionScheme::Nsga2Apportion}},
          "pareto",
          true});
     // Pinned because the default is what every archived config inherits: the
     // key did not exist before 2026-08-11, so no archived config can state it,
-    // and moving this back to Tiered silently re-reads every one of them under
-    // a different status objective. See "Config vintage" in
-    // docs/dev/config-and-provenance.md.
-    expect_enum_key<StatusGrading>({"fitness",
-                                    "status_grading",
-                                    &Config::status_grading,
-                                    StatusGrading::Mrs,
-                                    {{"tiered", StatusGrading::Tiered},
-                                     {"mrs", StatusGrading::Mrs},
-                                     {"aurus", StatusGrading::Aurus}},
-                                    "greedy",
-                                    false});
+    // and its value before that date, "tiered", is now rejected. See "Config
+    // vintage" in docs/dev/config-and-provenance.md.
+    expect_enum_key<StatusGrading>(
+        {"fitness",
+         "status_grading",
+         &Config::status_grading,
+         StatusGrading::Mrs,
+         {{"mrs", StatusGrading::Mrs}, {"aurus", StatusGrading::Aurus}},
+         "greedy",
+         false});
     expect_enum_key<MrsAdmissionOrder>({"fitness",
                                         "mrs_admission_order",
                                         &Config::mrs_admission_order,
@@ -255,35 +229,6 @@ TEST(test_config_io_enum_keys) {
                                          {"degree", MrsAdmissionOrder::Degree}},
                                         "rotate",
                                         false});
-    // Pinned because the default is what every archived config inherits. It
-    // moved from Syntactic to Semantic on 2026-10-06; see "Config vintage" in
-    // docs/dev/config-and-provenance.md.
-    expect_enum_key<KeywordSimilarity>(
-        {"fitness",
-         "keyword_similarity",
-         &Config::keyword_similarity,
-         KeywordSimilarity::Semantic,
-         {{"syntactic", KeywordSimilarity::Syntactic},
-          {"semantic", KeywordSimilarity::Semantic}},
-         "lexical",
-         false});
-    expect_enum_key<SimilarityMetric>(
-        {"model_counting",
-         "metric",
-         &Config::similarity_metric,
-         SimilarityMetric::Logarithmic,
-         {{"direct", SimilarityMetric::Direct},
-          {"logarithmic", SimilarityMetric::Logarithmic}},
-         "geometric",
-         true});
-    expect_enum_key<RepairMode>(
-        {"tlsf",
-         "repair_mode",
-         &Config::repair_mode,
-         RepairMode::Monolithic,
-         {{"muc", RepairMode::Muc}, {"monolithic", RepairMode::Monolithic}},
-         "iterative",
-         true});
 }
 
 // Pinned because every archived config omits these keys and inherits whatever
@@ -364,12 +309,28 @@ void expect_retired_spelling_rejected(const std::string& spelling) {
                spelling);
 }
 
+TEST(test_config_io_status_grading_tiered_rejected) {
+    const std::string msg = expect_throws(
+        [] {
+            config_from_toml_string("[fitness]\nstatus_grading = \"tiered\"\n");
+        },
+        "config_io: the removed tiered grading should be rejected", "tiered");
+    expect(msg.find("PROVENANCE.json") != std::string::npos &&
+               msg.find("\"mrs\"") != std::string::npos,
+           "config_io: the error should name the surviving gradings and say "
+           "how to reproduce an archived campaign");
+}
+
 TEST(test_config_io_selection_scheme_retired_nsga2_rejected) {
     expect_retired_spelling_rejected("nsga2");
 }
 
 TEST(test_config_io_selection_scheme_retired_replicate_rejected) {
     expect_retired_spelling_rejected("nsga2-replicate");
+}
+
+TEST(test_config_io_selection_scheme_removed_truncate_rejected) {
+    expect_retired_spelling_rejected("nsga2-truncate");
 }
 
 TEST(test_config_io_empty_string_gives_defaults) {
@@ -379,19 +340,6 @@ TEST(test_config_io_empty_string_gives_defaults) {
            "config_io: empty TOML should give default generations");
     expect(cfg.population_size == defaults.population_size,
            "config_io: empty TOML should give default population_size");
-}
-
-TEST(test_config_io_muc_max_iterations_parsed) {
-    const Config cfg =
-        config_from_toml_string("[tlsf]\nmuc_max_iterations = 7\n");
-    expect(cfg.muc_max_iterations == 7,
-           "config_io: tlsf.muc_max_iterations should be parsed");
-}
-
-TEST(test_config_io_muc_max_iterations_nonpositive_throws) {
-    expect_throws(
-        [&] { config_from_toml_string("[tlsf]\nmuc_max_iterations = 0\n"); },
-        "config_io: muc_max_iterations = 0 should throw");
 }
 
 // Every key k_config_keys declares, none of which may warn "unknown key". A
@@ -406,15 +354,12 @@ selection_rate   = 0.5
 elitism_rate     = 0.1
 crossover_rate   = 0.2
 mutation_rate    = 0.8
-selection_scheme = "nsga2-truncate"
-accumulate_repairs = true
+selection_scheme = "nsga2-apportion"
 
 [fitness]
 weight_syntactic = 0.3
 weight_semantic  = 0.4
 weight_status    = 0.6
-keyword_similarity    = "semantic"
-semantic_trace_weight = 0.25
 
 [mutation]
 p_trigger                = 0.3
@@ -425,10 +370,6 @@ p_conditional_assumption = 0.25
 p_remove_guarantee       = 0.05
 p_monotone               = 0.25
 
-[tlsf]
-repair_mode        = "muc"
-muc_max_iterations = 32
-
 [tlsf.mutation]
 p_assumption       = 0.3
 p_temporal         = 0.2
@@ -436,7 +377,6 @@ p_clone_assumption = 0.25
 
 [model_counting]
 default_bound = 10
-metric        = "direct"
 
 [filters]
 run_implication = false
@@ -483,6 +423,14 @@ TEST(test_config_io_removed_operator_keys_warn_and_are_ignored) {
         {"tlsf.mutation", "p_burst_continue = 0.5"},
         {"runtime", "ganak_timeout_ms = 4000"},
         {"runtime", "max_concurrent_realizability = 6"},
+        {"tlsf.mutation", "max_assumption_width = 3"},
+        {"tlsf.mutation", "p_bare_assumption = 0.25"},
+        {"tlsf", "repair_mode = \"muc\""},
+        {"fitness", "keyword_similarity = \"semantic\""},
+        {"genetic", "accumulate_repairs = false"},
+        {"model_counting", "metric = \"direct\""},
+        {"fitness", "semantic_trace_weight = 0.5"},
+        {"tlsf", "muc_max_iterations = 32"},
     };
     for (const auto& [section, line] : removed) {
         const std::string key = line.substr(0, line.find(' '));

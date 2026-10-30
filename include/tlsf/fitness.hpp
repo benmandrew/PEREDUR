@@ -33,15 +33,15 @@ double tlsf_semantic_similarity(const tlsf::Specification& spec,
                                 const tlsf::Specification& original,
                                 const Config& cfg);
 
-/// Realizability status of @p spec on the shared scale of `fitness/status.hpp`:
-///   0.0 — some section formula is individually unsatisfiable
-///   0.5 — every section formula is satisfiable but the lowering is
-///         unrealizable
-///   1.0 — the lowering is realizable
+/// Realizability status of @p spec on the scale Config::status_grading picks
+/// from `fitness/status.hpp`. Under StatusGrading::Mrs, the default:
+///   0.0 — some section formula, or the whole specification, is unsatisfiable
+///   k/n — the greedy walk keeps k of the n guarantee parts realizable
+///   1.0 — every part is kept, so the lowering is realizable
 ///
 /// The components are the individual formulae of all six sections. Scoring is
-/// delegated to `status_score`, which the FRETISH path also uses, so the two
-/// front ends cannot drift onto different scales again.
+/// delegated to `status_score_mrs`, which the FRETISH path also uses, so the
+/// two front ends cannot drift onto different scales again.
 ///
 /// Under StatusGrading::Aurus the scale is instead AuRUS's six-level ladder
 /// over the two sides as whole formulae (`assumption_ltl()` against

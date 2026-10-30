@@ -89,8 +89,6 @@ TEST(test_unmeasured_fields_are_omitted_not_defaulted) {
         // so a zero here would be a measurement the run never made.
         writer.generation(1, 1.0, 0.5, 0.4, {}, std::nullopt, 10);
         writer.generation(2, 1.0, 0.5, 0.4, {}, 0, 10);
-        writer.stage(1, 0, observation("breed", 10, 8));
-        writer.stage(1, 0, observation("breed", 10, 8), 3);
     }
     const std::vector<nlohmann::json> records =
         read_records(dir.string() + "/progress.jsonl");
@@ -100,11 +98,6 @@ TEST(test_unmeasured_fields_are_omitted_not_defaulted) {
     expect(
         records[1].contains("n_realizable") && records[1]["n_realizable"] == 0,
         "dashboard: a measured count of zero should still be reported");
-    expect(!records[2].contains("muc_iter"),
-           "dashboard: a non-MUC run should not carry a MUC iteration");
-    expect(records[3]["muc_iter"] == 3,
-           "dashboard: a MUC-guided run should record which core a generation "
-           "belonged to");
 }
 
 TEST(test_writer_survives_an_unwritable_directory) {

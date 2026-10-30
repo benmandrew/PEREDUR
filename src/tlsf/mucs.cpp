@@ -211,43 +211,6 @@ MinimalUnrealizableCore extract_muc(const Specification& spec) {
     return result;
 }
 
-std::vector<CoreFormula> non_core_formulae(
-    const Specification& spec, const std::vector<CoreFormula>& core) {
-    std::vector<bool> consumed(core.size(), false);
-    std::vector<CoreFormula> result;
-    // Live conjuncts only, matching guarantee_side_candidates: a deleted
-    // conjunct is in neither the core nor what is carried over around it.
-    auto collect = [&](std::size_t section_id, const Section& section) {
-        for (const Formula& formula : live_formulae(section)) {
-            bool matched = false;
-            for (std::size_t i = 0; i < core.size(); ++i) {
-                if (!consumed[i] && core[i].section_id == section_id &&
-                    core[i].formula == formula) {
-                    consumed[i] = true;
-                    matched = true;
-                    break;
-                }
-            }
-            if (!matched) {
-                result.push_back({section_id, formula});
-            }
-        }
-    };
-    collect(k_preset, spec.m_preset);
-    collect(k_assert, spec.m_assert);
-    collect(k_guarantee, spec.m_guarantee);
-    return result;
-}
-
-Specification reintegrate(const Specification& repaired_subspec,
-                          const std::vector<CoreFormula>& non_core) {
-    Specification result = repaired_subspec;
-    for (const CoreFormula& entry : non_core) {
-        append_by_section(result, entry);
-    }
-    return result;
-}
-
 const char* section_name(std::size_t section_id) {
     switch (section_id) {
         case 0:

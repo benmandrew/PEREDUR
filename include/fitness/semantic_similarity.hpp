@@ -55,24 +55,21 @@ struct CountTracesStats {
 /// rather than aborting. Callers must clamp their bound to this.
 std::size_t max_representable_step_count(std::size_t n_atoms);
 
-/// Combines the three trace counts into a similarity score in [0, 1]. Both
-/// metrics take the harmonic mean of two directional containment terms and
-/// differ only in that term: @c SimilarityMetric::Direct uses the count ratio
-/// (a Sorensen-Dice overlap, clamped to [0, 1] since rounding can push
-/// @c m_conjunction_count a few ulps past an individual count now that
-/// @c Count is a float), @c SimilarityMetric::Logarithmic the ratio of the
-/// counts' logarithms (a bound-stable growth-rate comparison). Exposed for
+/// Combines the three trace counts into a similarity score in [0, 1]: the
+/// harmonic mean of two directional containment terms, each the ratio of the
+/// shared count's logarithm to an individual count's (a bound-stable
+/// growth-rate comparison, clamped to [0, 1] since rounding can push
+/// @c m_conjunction_count a few ulps past an individual count). Exposed for
 /// testing; the @c Requirement overloads are the normal entry points.
-double semantic_similarity_from_counts(
-    const SemanticSimilarityCounts& counts,
-    SimilarityMetric metric = SimilarityMetric::Direct);
+double semantic_similarity_from_counts(const SemanticSimilarityCounts& counts);
 
 /// Computes the semantic similarity between two requirements using bounded
-/// model counting of satisfying traces. With @c SimilarityMetric::Direct the
-/// score is the harmonic mean of the two directional count ratios:
-///   2 * shared / (count(req) + count(other))   [over length-k traces]
+/// model counting of satisfying traces. The score is the harmonic mean of the
+/// two directional log ratios:
+///   2 * log shared / (log count(req) + log count(other))   [length-k traces]
 /// where shared(req, other, k) is the number of traces of length k satisfying
 /// both requirements, and count(req, k) is the number of traces satisfying req.
+/// A count of 1 falls back to membership, since log 1 == 0.
 /// Returns a value between 0 and 1, where 1 indicates identical trace
 /// semantics. Zero counts are boundary cases rather than errors: two
 /// unsatisfiable requirements score 1.0, and one unsatisfiable against one
@@ -81,32 +78,23 @@ double semantic_similarity_from_counts(
 /// @param requirement       The first requirement to compare
 /// @param other_requirement The second requirement to compare
 /// @param step_count        The bound k on trace length for model counting
-/// @param metric            Whether to combine counts directly or via logarithm
 /// @return                  A semantic similarity score in [0, 1]
 double semantic_similarity(const Requirement& requirement,
                            const Requirement& other_requirement,
-                           std::size_t step_count,
-                           SimilarityMetric metric = SimilarityMetric::Direct);
+                           std::size_t step_count);
 
 /// The semantic score of one requirement pair as the specification-level score
-/// averages it. Under KeywordSimilarity::Syntactic it is the trace-count score
-/// alone. Under KeywordSimilarity::Semantic it is
-/// `w * trace + (1 - w) * keyword` for w = @p trace_weight, where `trace` is
-/// the trace-count score and `keyword` is keyword_order_similarity; a side
-/// with zero weight is not computed.
+/// averages it: the mean of the trace-count score and keyword_order_similarity,
+/// so the order measures that read meaning into a FRETISH keyword sit in the
+/// semantic objective rather than the syntactic one.
 ///
 /// @param requirement        The first requirement to compare
 /// @param other_requirement  The second requirement to compare
 /// @param step_count         The bound k on trace length for model counting
-/// @param metric             Whether to combine counts directly or via log
-/// @param keyword_similarity Whether the keyword orders join the score
-/// @param trace_weight       w, in [0, 1]; read only under Semantic
 /// @return                   A semantic similarity score in [0, 1]
-double semantic_pair_similarity(
-    const Requirement& requirement, const Requirement& other_requirement,
-    std::size_t step_count, SimilarityMetric metric = SimilarityMetric::Direct,
-    KeywordSimilarity keyword_similarity = KeywordSimilarity::Syntactic,
-    double trace_weight = 0.5);
+double semantic_pair_similarity(const Requirement& requirement,
+                                const Requirement& other_requirement,
+                                std::size_t step_count);
 
 /// Computes semantic similarity between two specifications by pairing
 /// assumptions with assumptions and guarantees with guarantees, by index. The
@@ -120,17 +108,10 @@ double semantic_pair_similarity(
 /// @param specification       The first specification to compare (non-empty)
 /// @param other_specification The second specification to compare (non-empty)
 /// @param step_count          The bound k on trace length for model counting
-/// @param metric              Whether to combine counts directly or via log
-/// @param keyword_similarity  Whether each pair mixes in the keyword orders
-///                            (see @ref semantic_pair_similarity)
-/// @param trace_weight        The trace-count weight of that mix
 /// @return                    A semantic similarity score in [0, 1]
-double semantic_similarity(
-    const Specification& specification,
-    const Specification& other_specification, std::size_t step_count,
-    SimilarityMetric metric = SimilarityMetric::Direct,
-    KeywordSimilarity keyword_similarity = KeywordSimilarity::Syntactic,
-    double trace_weight = 0.5);
+double semantic_similarity(const Specification& specification,
+                           const Specification& other_specification,
+                           std::size_t step_count);
 
 /// Overload of specification-level semantic_similarity using the bound from
 /// @p cfg.
@@ -184,14 +165,7 @@ std::vector<ChangedRequirementPair> changed_requirement_pairs(
 /// @param specification       The first specification to compare (non-empty)
 /// @param other_specification The second specification to compare (non-empty)
 /// @param step_count          The bound k on trace length for model counting
-/// @param metric              Whether to combine counts directly or via log
-/// @param keyword_similarity  Whether each pair mixes in the keyword orders
-///                            (see @ref semantic_pair_similarity)
-/// @param trace_weight        The trace-count weight of that mix
 /// @return                    One term per changed pair, each scoring in [0, 1]
 std::vector<std::function<double()>> semantic_similarity_terms(
     const Specification& specification,
-    const Specification& other_specification, std::size_t step_count,
-    SimilarityMetric metric,
-    KeywordSimilarity keyword_similarity = KeywordSimilarity::Syntactic,
-    double trace_weight = 0.5);
+    const Specification& other_specification, std::size_t step_count);

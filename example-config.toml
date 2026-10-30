@@ -21,26 +21,14 @@ elitism_rate    = 0.1  # elites are a subset of the parents, so this must stay <
                        # time and level on yield and quality -- see include/config.hpp.
 crossover_rate  = 0.1
 mutation_rate   = 1.0  # per offspring, unlike the per-requirement rates in [mutation]
-# "nsga2-truncate" | "nsga2-apportion" | "weighted". Under either NSGA-II scheme
+# "nsga2-apportion" | "weighted". Under NSGA-II
 # the [fitness] weights only select which components are active (weight > 0);
 # they no longer bias selection, and the (mu+lambda) survivor pooling is already
 # elitist, so elitism_rate = 0 is the natural companion on paper -- though it
 # measured slower in both campaigns that tested it, which is why the default
 # stays at 0.1.
-# The two NSGA-II schemes rank identically and differ only in the survivor step.
-# "nsga2-truncate" was the default until 2026-08-14; it costs about 26% less
-# wall time on FRETISH and 13% less on TLSF, and is the arm to reach for when
-# throughput matters more than how many repairs come back.
+# "nsga2-truncate", the default until 2026-08-14, was removed on 2026-10-30.
 selection_scheme = "nsga2-apportion"
-# Report every candidate that passed the output gate in any generation, not only
-# the ones the final population still holds. On since 2026-08-25, on 200 paired
-# TLSF runs: implies_ideal gained on 6 pairs and lost on none (McNemar
-# p = 0.0312) for a median paired wall ratio of 1.034. That campaign made it a
-# candidate default subject to a FRETISH replication that has not been run.
-# Free on the FRETISH path, one gate sweep per generation on the TLSF one;
-# live under [tlsf] repair_mode = "muc" too, over the reintegrated whole
-# specifications rather than the core populations.
-accumulate_repairs = true
 # What ends the search. "generations" is PEREDUR's own budget: the rounds above,
 # whatever they cost. "individuals" is AuRUS's, for a head-to-head where both
 # tools get the same number of offspring rather than the same wall clock; it
@@ -63,23 +51,15 @@ weight_syntactic = 0.1
 weight_semantic  = 0.2
 weight_status    = 0.7
 # "mrs" grades the unrealizable region by the fraction of guarantee-side parts a
-# greedy sweep keeps realizable; "tiered" collapses that whole region to 0.5.
+# greedy sweep keeps realizable.
 # "aurus" is AuRUS's own ladder, graded by which side is satisfiable alone, and
 # is the one scale that does not penalise a candidate realizable only by
 # defeating its own assumptions -- it is there to be ablated against, not used.
-status_grading   = "mrs"  # or "tiered", "aurus"
+status_grading   = "mrs"  # or "aurus"
 # Which order that sweep admits parts in. "degree" defers the parts that
 # conflict with most others, costing one pairwise pass over the input before the
 # search starts; "spec" is the specification's own index order.
 mrs_admission_order = "degree"  # or "spec"
-# FRETISH only. "syntactic" scores the timing, scope and condition-type
-# keywords in the syntactic objective through their implication orders;
-# "semantic" moves those order measures into the semantic objective, mixed per
-# requirement with the trace count as w * trace + (1 - w) * keyword, and leaves
-# the syntactic objective comparing keywords as tokens only.
-keyword_similarity    = "semantic"  # or "syntactic"
-# w above, read only under "semantic".
-semantic_trace_weight = 0.5
 
 [mutation]
 # Per-requirement probabilities of rewriting each part of a FRETISH requirement.
@@ -109,13 +89,6 @@ p_conditional_assumption = 0.25
 # before the operator existed.
 p_remove_guarantee       = 0.05
 
-[tlsf]
-# TLSF mode only (a .tlsf input or --format tlsf). A FRETISH run carrying any
-# value but "monolithic" exits 1, rather than evolving monolithically under a
-# manifest that records "muc".
-repair_mode        = "monolithic"  # or "muc"
-muc_max_iterations = 32            # muc mode only
-
 [tlsf.mutation]
 p_assumption = 0.3
 p_temporal   = 0.2
@@ -123,23 +96,9 @@ p_temporal   = 0.2
 # an existing one instead of building from the template, which emits at most
 # seven nodes where the assumption-shaped ideals run to thirty.
 p_clone_assumption = 0.25
-# The two keys below stand at their no-op values. The campaign that measured
-# them (experiments/2026-08-26-assumption-reach) read null on its registered
-# primary, so each stays off. At these values the RNG stream is what it was
-# before the keys existed, and no archived config changes meaning.
-#
-# Widest disjunction an appended assumption's body may be: between 1 and this
-# many distinct input literals. 1 draws no width, which is the no-op. Clamped
-# to the input count.
-max_assumption_width = 1
-# Probability of leaving an appended assumption as `F body` rather than
-# `G F body`. lily11's whole ideal is a bare `F req`, which no G-wrapped
-# assumption rewrites into. 0 is the no-op.
-p_bare_assumption = 0.0
 
 [model_counting]
 default_bound = 20
-metric        = "logarithmic"  # or "direct"
 
 [filters]
 run_implication = true

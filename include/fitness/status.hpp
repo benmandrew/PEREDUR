@@ -1,8 +1,8 @@
 #pragma once
 
 /// @file status.hpp
-/// @brief Realizability status fitness score, on the three-point scale shared
-///        by the FRETISH and TLSF front ends.
+/// @brief Realizability status fitness scores shared by the FRETISH and TLSF
+///        front ends: the MRS walk and the AuRUS ladder.
 
 #include <atomic>
 #include <cstddef>
@@ -28,68 +28,12 @@ enum class ComponentCheck : std::uint8_t { Included, Skipped };
 
 /// Some component formula of the candidate is unsatisfiable on its own.
 inline constexpr double k_status_component_unsatisfiable = 0.0;
-/// Every component is satisfiable, but the candidate is not realizable for a
-/// reason worth anything: either no strategy exists, or the only strategy is to
-/// defeat the candidate's own assumptions. See status_score on why those two
-/// share a tier rather than being graded apart.
+/// Both sides are satisfiable together, but the candidate is not realizable:
+/// the level @ref status_score_aurus pays below its top.
 inline constexpr double k_status_unrealizable = 0.5;
-/// The candidate is realizable, and well-separated with it.
+/// The candidate is realizable. Under @ref status_score_mrs it is also
+/// well-separated.
 inline constexpr double k_status_realizable = 1.0;
-
-/// Scores a candidate on the shared status scale, given its component formulae
-/// and a way to decide realizability. Both front ends route through this, so
-/// the scale lives in one place; only the decomposition into components and
-/// the realizability query differ between them.
-///
-/// The scale is deliberately coarse. Earlier revisions graded the region below
-/// realizability more finely -- separate tiers for an unsatisfiable guarantee
-/// side and an unsatisfiable assumption side, mirroring the design this search
-/// is derived from. Instrumenting both front ends over 887k scored candidates
-/// found those tiers hold under 0.32% of the population between them.
-///
-/// The two failed for different reasons. The guarantee-side tier was measured:
-/// nothing filters a jointly unsatisfiable guarantee side, and it fired on 46
-/// candidates out of 15,115 on the TLSF path, all on one specification. The
-/// assumption-side tier never fired at all, and could not have: its predicate
-/// is exactly the vacuity filter's, and candidate filters run on offspring
-/// *before* those offspring are scored, so such a candidate is discarded
-/// before it reaches this function. The vacuity filter always runs, so the
-/// tier was unreachable -- it re-asked a question a filter had already acted
-/// on.
-///
-/// Grading *within* unrealizability needs a measure of how far a candidate is
-/// from realizable, which a satisfiability query cannot express.
-///
-/// The top tier means realizable *for a real reason*: both callers fold
-/// well-separation into @p is_realizable, so a candidate the system can satisfy
-/// only by forcing its own assumptions to fail scores k_status_unrealizable
-/// rather than k_status_realizable. That is a correction to what the top tier
-/// meant, not a fourth tier. A tier between the two would rank cheating above
-/// failing, and ill-separation is cheap for mutation to reach and expensive to
-/// leave, so the intermediate score would be a broad plateau that the search
-/// settles on -- the shape the aggregate fitness already shows for gutted,
-/// vacuous repairs. Scoring it level with unrealizable keeps the candidate in
-/// the population as breeding material, which is the whole value of not simply
-/// dropping it, and pays it nothing for the cheat.
-///
-/// Reachable only because well-separation no longer runs as a pre-scoring
-/// filter by default. A tier whose predicate a filter has already acted on is
-/// unreachable by construction, which is what happened to the assumption-side
-/// tier above.
-///
-/// @param components    Formulae to test individually; any one unsatisfiable
-///                      scores k_status_component_unsatisfiable
-/// @param sat           Satisfiability checker (black)
-/// @param is_realizable Consulted only once every component is satisfiable, so
-///                      a caller may fold in a cheap shortcut for candidates
-///                      whose realizability is known without a solver call, and
-///                      both fold in the well-separation query behind the
-///                      realizability one so it is asked only where it can
-///                      change the answer
-/// @return              One of the three k_status_* constants
-double status_score(const std::vector<std::string>& components,
-                    SatisfiabilityChecker& sat,
-                    const std::function<bool()>& is_realizable);
 
 /// Only the guarantee side is satisfiable: the candidate's assumptions cannot
 /// hold at all. See @ref status_score_aurus.
@@ -130,7 +74,7 @@ inline constexpr double k_status_aurus_contradictory = 0.20;
 /// The two differ in AuRUS as they differ here.
 ///
 /// **This scale must not fold well-separation into @p is_realizable**, which is
-/// the one place it diverges from every other scale in this file. AuRUS never
+/// the one place it diverges from @ref status_score_mrs. AuRUS never
 /// asks the question: `WellSeparationAnalysis.java` has no caller anywhere in
 /// its `src`, so a candidate realizable only by forcing its own assumptions to
 /// fail scores full marks there. An arm that folded the query in would grade
@@ -150,7 +94,7 @@ inline constexpr double k_status_aurus_contradictory = 0.20;
 /// @param sat           Satisfiability checker (black)
 /// @param is_realizable Consulted only once both sides and their conjunction
 ///                      are satisfiable, and *without* the well-separation
-///                      query the other two scales fold in
+///                      query the MRS walk folds in
 /// @return              One of the six levels above
 double status_score_aurus(const std::string& assumptions,
                           const std::string& guarantees,
@@ -162,11 +106,9 @@ double status_score_aurus(const std::string& assumptions,
 /// caller's own part list, so both front ends share the walk below without
 /// sharing a representation of a specification.
 ///
-/// The oracle must fold well-separation in behind realizability, as
-/// @ref status_score's `is_realizable` does, and must resolve an undecided
-/// query as false, matching how status_score treats an unanswered
-/// satisfiability check: a timeout must not promote a candidate above one that
-/// was decided.
+/// The oracle must fold well-separation in behind realizability, and must
+/// resolve an undecided query as false: a timeout must not promote a candidate
+/// above one that was decided.
 using SubsetRealizability =
     std::function<bool(const std::vector<std::size_t>& indices)>;
 
@@ -204,9 +146,9 @@ struct MrsSpeculationStats {
 /// Scores a candidate on the greedy maximal-realizable-subset (MRS) scale,
 /// selected by Config::status_grading. Below realizability the score is the
 /// fraction of the guarantee side that can be kept, which grades a region
-/// @ref status_score collapses to one value: over the 21 specifications in
-/// `examples/` the tiered score reads 0.5 for every one, where this spreads
-/// them over 14 distinct values.
+/// the retired three-point scale collapsed to one value: over the 21
+/// specifications in `examples/` that scale read 0.5 for every one, where this
+/// spreads them over 14 distinct values.
 ///
 /// The walk admits parts in @p admission_order, taking each one whose addition
 /// leaves the accumulated subset realizable. Order matters, since greedy
@@ -232,16 +174,16 @@ struct MrsSpeculationStats {
 ///
 /// Well-separation belongs *inside* @p subset_realizable rather than as a
 /// post-hoc cap on a full-marks score. Folding it in costs an ill-separated
-/// candidate the part that made it so, and leaves 1.0 meaning what it means on
-/// the tiered scale -- realizable for a real reason. Capping instead would need
-/// a value just below 1.0, which would rank a candidate that games its own
-/// assumptions above one honestly missing a single guarantee, the ordering the
-/// tiered scale's notes above refuse.
+/// candidate the part that made it so, and leaves 1.0 meaning realizable for
+/// a real reason. Capping instead would need a value just below 1.0, which
+/// would rank a candidate that games its own assumptions above one honestly
+/// missing a single guarantee. Ill-separation is cheap for mutation to reach
+/// and expensive to leave, so that score would be a broad plateau the search
+/// settles on.
 ///
-/// The component test is unchanged and runs first, so
-/// k_status_component_unsatisfiable still means what it did. That tier earns
-/// its keep here more than on the tiered scale: it costs satisfiability queries
-/// rather than synthesis ones, and it fires exactly where the greedy walk would
+/// The component test runs first and scores k_status_component_unsatisfiable.
+/// That tier earns its keep: it costs satisfiability queries rather than
+/// synthesis ones, and it fires exactly where the greedy walk would
 /// otherwise pay @p n_parts realizability queries to learn nothing.
 ///
 /// A satisfiability query over the whole specification runs after the
@@ -272,7 +214,9 @@ struct MrsSpeculationStats {
 /// borrow what it likes from the caller's frame, but it must be safe to call
 /// from several threads at once.
 ///
-/// @param components        Formulae to test individually, as for status_score
+/// @param components        Formulae to test individually; any one
+///                          unsatisfiable scores
+///                          k_status_component_unsatisfiable
 /// @param n_parts           Number of guarantee-side parts the oracle addresses
 /// @param sat               Satisfiability checker (black)
 /// @param subset_realizable Realizability of a subset of those parts
@@ -354,8 +298,7 @@ std::vector<std::size_t> conflict_degree_order(
 /// rather than a formula, so splitting one would produce a part no
 /// Specification can hold and no realizability query can be built from through
 /// RealizabilityChecker::check_realizability. The corpus carries 3 to 5
-/// guarantees per specification, so the scale still has 4 to 6 levels against
-/// the tiered scale's 3.
+/// guarantees per specification, so the scale still has 4 to 6 levels.
 ///
 /// @p slot_order addresses guarantees by their index in `m_guarantees` rather
 /// than by their position in the walk, which runs over the live guarantees
@@ -383,7 +326,7 @@ std::vector<std::size_t> conflict_degree_order(
 ///                      StatusGrading::Mrs
 double specification_status(
     const Specification& specification, SatisfiabilityChecker& sat,
-    RealizabilityChecker& real, StatusGrading grading = StatusGrading::Tiered,
+    RealizabilityChecker& real, StatusGrading grading = StatusGrading::Mrs,
     const std::vector<std::size_t>& slot_order = {},
     ComponentCheck component_check = ComponentCheck::Included,
     std::size_t speculation_depth = 0);

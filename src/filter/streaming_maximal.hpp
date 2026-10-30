@@ -36,11 +36,10 @@
 #include "runner/black.hpp"
 #include "thread_pool.hpp"
 
-// Whether @p cfg streams the implication filter. Streaming is the route
-// whenever both its inputs are there: nothing queues without the accumulator,
-// and there is nothing to run without the filter.
+// Whether @p cfg streams the implication filter: whenever the filter runs at
+// all, since the accumulator always feeds it.
 inline bool implication_streams(const Config& cfg) {
-    return cfg.accumulate_repairs && cfg.run_implication_filter;
+    return cfg.run_implication_filter;
 }
 
 // What the streaming filter asks of a specification, per front end. Every

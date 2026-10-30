@@ -37,8 +37,8 @@ from pathlib import Path
 
 # Keys whose accepted values are a closed set, checked against the schema's
 # "enum". Names are unique across sections, so the section need not be given.
-ENUM_KEYS = ("selection_scheme", "metric", "repair_mode", "status_grading",
-             "mrs_admission_order", "keyword_similarity")
+ENUM_KEYS = ("selection_scheme", "status_grading",
+             "mrs_admission_order")
 
 
 # --- src/config/keys.hpp -----------------------------------------------------
@@ -180,8 +180,7 @@ def toml_values(table, prefix=""):
 # --- include/config.hpp ------------------------------------------------------
 
 # TOML path -> the Config member holding its default. Keys absent here are not
-# value-checked: genetic.selection_scheme, tlsf.repair_mode and
-# model_counting.metric are enums already covered by the enum check above, and
+# value-checked: genetic.selection_scheme is an enum already covered by the enum check above, and
 # runtime.parallel defaults to hardware concurrency, which is not a constant to
 # pin. Everything else must appear, so a new key cannot quietly skip the check.
 DEFAULT_FIELDS = {
@@ -191,13 +190,11 @@ DEFAULT_FIELDS = {
     "genetic.elitism_rate": "elitism_rate",
     "genetic.crossover_rate": "crossover_rate",
     "genetic.mutation_rate": "mutation_rate",
-    "genetic.accumulate_repairs": "accumulate_repairs",
     "genetic.max_individuals": "max_individuals",
     "genetic.max_wall_s": "max_wall_s",
     "fitness.weight_syntactic": "fitness_weight_syntactic",
     "fitness.weight_semantic": "fitness_weight_semantic",
     "fitness.weight_status": "fitness_weight_status",
-    "fitness.semantic_trace_weight": "semantic_trace_weight",
     "mutation.p_trigger": "p_trigger",
     "mutation.p_response": "p_response",
     "mutation.p_timing": "p_timing",
@@ -208,12 +205,9 @@ DEFAULT_FIELDS = {
     "mutation.p_add_assumption": "p_add_assumption",
     "mutation.p_remove_guarantee": "p_remove_guarantee",
     "mutation.p_conditional_assumption": "p_conditional_assumption",
-    "tlsf.muc_max_iterations": "muc_max_iterations",
     "tlsf.mutation.p_assumption": "tlsf_p_assumption",
     "tlsf.mutation.p_temporal": "tlsf_p_temporal",
     "tlsf.mutation.p_clone_assumption": "tlsf_p_clone_assumption",
-    "tlsf.mutation.max_assumption_width": "tlsf_max_assumption_width",
-    "tlsf.mutation.p_bare_assumption": "tlsf_p_bare_assumption",
     "model_counting.default_bound": "default_model_counting_bound",
     "filters.run_implication": "run_implication_filter",
     "runtime.black_timeout_ms": "black_timeout",
@@ -229,11 +223,8 @@ DEFAULT_FIELDS = {
 UNPINNED_KEYS = {
     "genetic.selection_scheme",
     "genetic.termination",
-    "tlsf.repair_mode",
-    "model_counting.metric",
     "fitness.status_grading",
     "fitness.mrs_admission_order",
-    "fitness.keyword_similarity",
     "runtime.parallel",
 }
 
@@ -302,36 +293,27 @@ GEN_CONFIGS_FIELDS = {
     "p_remove_guarantee": "p_remove_guarantee",
     "default_bound": "default_model_counting_bound",
     "run_implication": "run_implication_filter",
-    "accumulate_repairs": "accumulate_repairs",
     "black_timeout_ms": "black_timeout",
     "status_grading": "status_grading",
     "mrs_admission_order": "mrs_admission_order",
-    "keyword_similarity": "keyword_similarity",
-    "semantic_trace_weight": "semantic_trace_weight",
-    "repair_mode": "repair_mode",
     "p_assumption": "tlsf_p_assumption",
     "p_temporal": "tlsf_p_temporal",
     "p_monotone": "p_monotone",
     "p_clone_assumption": "tlsf_p_clone_assumption",
-    "max_assumption_width": "tlsf_max_assumption_width",
-    "p_bare_assumption": "tlsf_p_bare_assumption",
     "max_wall_s": "max_wall_s",
     "termination": "termination",
     "max_individuals": "max_individuals",
 }
 
 # Entries that deliberately do not track config.hpp, each with the reason it
-# must not be "corrected" into agreement. The first two are results-CSV key
-# columns and the next three are emitted unconditionally, so following the
+# must not be "corrected" into agreement. The first is a results-CSV key
+# column and the next three are emitted unconditionally, so following the
 # binary would put every new row at odds with the archived ones; the
-# last four are sentinels make_toml reads as "emit nothing", not mirrors of a
+# last five are sentinels make_toml reads as "emit nothing", not mirrors of a
 # C++ value at all.
 GEN_CONFIGS_EXEMPT = {
-    "metric":
-        "pinned 'direct': `metric` is a KEY_FIELDS column and flat configs are "
-        "attributed to LEGACY_METRIC",
     "selection_scheme":
-        "pinned 'nsga2-truncate': the scheme is the config directory name read "
+        "pinned 'nsga2-apportion': the scheme is the config directory name read "
         "back into the `selection` KEY_FIELDS column",
     "weight_syntactic":
         "pinned 0.33 and emitted unconditionally, so every archived config "

@@ -33,10 +33,13 @@ TEST(test_semantic_similarity_formula_value_explicit_step_count) {
                                         timing::immediately()};
     const double score = semantic_similarity(requirement, other_requirement, 1);
     // (P -> Q) traces are a strict subset of (P -> P|Q) traces, so the
-    // conjunction count equals the (P -> Q) count exactly: first == 1.0,
-    // second == 0.75, harmonic mean == 2*1.0*0.75/1.75 == 6/7.
-    expect(std::fabs(score - (6.0 / 7.0)) < 1e-12,
-           "semantic-similarity: expected score 6/7 from formula");
+    // conjunction count equals the (P -> Q) count exactly: 3 of the 4 one-step
+    // traces against all 4. first == log 3 / log 3 == 1, second == log 3 /
+    // log 4, and the harmonic mean is 2 log 3 / (log 3 + log 4).
+    const double expected =
+        2.0 * std::log(3.0) / (std::log(3.0) + std::log(4.0));
+    expect(std::fabs(score - expected) < 1e-12,
+           "semantic-similarity: expected score 2 log 3 / log 12 from formula");
 }
 
 TEST(test_semantic_similarity_default_overload_matches_explicit_step_count) {
@@ -44,21 +47,14 @@ TEST(test_semantic_similarity_default_overload_matches_explicit_step_count) {
                                   timing::immediately()};
     const Requirement other_requirement{Formula("P"), Formula("P|Q"),
                                         timing::immediately()};
-    // Syntactic keeps the keyword measures out of the semantic objective, so
-    // only the trace count is compared. The Config overload takes
-    // specifications, so each requirement is the one guarantee of its own.
-    Config cfg;
-    cfg.keyword_similarity = KeywordSimilarity::Syntactic;
+    // The Config overload takes specifications, so each requirement is the one
+    // guarantee of its own.
+    const Config cfg;
     const Specification spec({}, {requirement}, {"P"}, {"Q"});
     const Specification other_spec({}, {other_requirement}, {"P"}, {"Q"});
     const double with_default = semantic_similarity(spec, other_spec, cfg);
-    // Pin both the bound and the metric explicitly: the Config overload carries
-    // both, so comparing against a bound-only call (which defaults the metric
-    // to Direct) would conflate them now that Config defaults the metric to
-    // Logarithmic. This isolates the bound-wiring this test is about.
-    const double with_explicit = semantic_similarity(
-        requirement, other_requirement, Config{}.default_model_counting_bound,
-        Config{}.similarity_metric);
+    const double with_explicit = semantic_pair_similarity(
+        requirement, other_requirement, cfg.default_model_counting_bound);
     expect(std::fabs(with_default - with_explicit) < 1e-12,
            "semantic-similarity: Config overload should use the config's bound "
            "and metric");
@@ -119,30 +115,12 @@ TEST(test_semantic_similarity_specification_averages_requirements) {
     const Specification spec2({}, {req_next, req_within, req_after}, {"P"},
                               {"Q"});
     const double score = semantic_similarity(spec1, spec2, 1);
-    const double expected = (semantic_similarity(req_imm, req_next, 1) +
-                             semantic_similarity(req_for, req_after, 1)) /
+    const double expected = (semantic_pair_similarity(req_imm, req_next, 1) +
+                             semantic_pair_similarity(req_for, req_after, 1)) /
                             2.0;
     expect(std::fabs(score - expected) < 1e-12,
            "semantic-similarity: specification score should average only the "
            "requirement pairs that differ, excluding unchanged pairs");
-}
-
-// A requirement weakened to a tautology (trigger entails response trivially,
-// so it accepts every trace) trivially contains the original's accepting
-// set, making the "recall" ratio exactly 1 regardless of how small the
-// original's footprint is. Under the old arithmetic mean of the two
-// directional ratios this floored the score at 0.5 no matter how vacuous the
-// weakening was; the harmonic mean lets a near-zero "precision" ratio pull
-// the score down toward 0 instead.
-TEST(test_semantic_similarity_tautology_scores_near_zero) {
-    const Requirement original{Formula("P"), Formula("Q"),
-                               timing::after_ticks(1)};
-    const Requirement tautology{Formula("Q"), Formula("Q"),
-                                timing::within_ticks(2)};
-    const double score = semantic_similarity(tautology, original, 20);
-    expect(score < 0.01,
-           "semantic-similarity: a requirement weakened to a tautology "
-           "should score near 0, not float at the old 0.5 floor");
 }
 
 // Two distinct eventually-timing requirements. Their conjunction produces a
@@ -232,13 +210,13 @@ TEST(test_semantic_similarity_atom_rich_deep_horizon_in_range) {
 // -- driving a directional ratio above 1. Feeding that straight in checks the
 // [0, 1] clamp in semantic_similarity_from_counts: without it the harmonic mean
 // would exceed 1. The overshoot (2^30 against a 2^70 count) is deliberately
-// coarser than double epsilon so it survives ratio_or_throw's cast to double,
-// which a mere ulp of long double would not.
+// coarser than double epsilon so it survives the cast to double before the
+// logarithm, which a mere ulp of long double would not.
 TEST(test_semantic_similarity_from_counts_clamps_rounding_overshoot) {
     const Count base = std::ldexp(Count{1}, 70);
     // base + 2^30 is exact and strictly greater in long double's 64-bit
     // mantissa (the two differ by 40 bits), so the conjunction count exceeds
-    // the individual counts and the directional ratios land just above 1.
+    // the individual counts and the directional log ratios land just above 1.
     const Count overshoot = base + std::ldexp(Count{1}, 30);
     const SemanticSimilarityCounts counts{base, base, overshoot};
     const double score = semantic_similarity_from_counts(counts);
@@ -311,34 +289,23 @@ TEST(test_semantic_similarity_propequiv_responses_score_equal) {
                std::to_string(score2) + " vs " + std::to_string(score13) + ")");
 }
 
-// Direct and logarithmic metrics agree on identical languages but diverge on a
-// strict subset. With 2^10 shared traces out of 2^20 the direct metric returns
-// the count ratio 2^-10, while the logarithmic metric returns
-// log(2^10)/log(2^20) == 1/2 -- the ratio of growth rates, which is what keeps
-// it stable as the counting bound (and hence the counts' magnitude) grows.
-// Exercises the metric branch through semantic_similarity_from_counts, without
+// With 2^10 shared traces out of 2^20 the count ratio would be 2^-10, while
+// the metric returns log(2^10)/log(2^20) == 1/2 -- the ratio of growth rates,
+// which is what keeps it stable as the counting bound (and hence the counts'
+// magnitude) grows. Exercised through semantic_similarity_from_counts, without
 // invoking the model counter.
-TEST(test_semantic_similarity_metric_direct_vs_logarithmic) {
+TEST(test_semantic_similarity_compares_growth_rates) {
     const Count whole = std::ldexp(Count{1}, 20);
     const Count shared = std::ldexp(Count{1}, 10);
     const SemanticSimilarityCounts counts{whole, whole, shared};
 
-    const double direct =
-        semantic_similarity_from_counts(counts, SimilarityMetric::Direct);
-    expect(std::fabs(direct - std::ldexp(1.0, -10)) < 1e-12,
-           "semantic-similarity: the direct metric must return the count ratio "
-           "2^-10 for a 2^10-of-2^20 overlap");
-
-    const double logarithmic =
-        semantic_similarity_from_counts(counts, SimilarityMetric::Logarithmic);
+    const double logarithmic = semantic_similarity_from_counts(counts);
     expect(std::fabs(logarithmic - 0.5) < 1e-12,
            "semantic-similarity: the logarithmic metric must return the "
            "growth-rate ratio 1/2 for a 2^10-of-2^20 overlap");
 
     const SemanticSimilarityCounts identical{whole, whole, whole};
-    expect(std::fabs(semantic_similarity_from_counts(
-                         identical, SimilarityMetric::Logarithmic) -
-                     1.0) < 1e-12,
+    expect(std::fabs(semantic_similarity_from_counts(identical) - 1.0) < 1e-12,
            "semantic-similarity: the logarithmic metric must score identical "
            "counts exactly 1");
 }
@@ -359,7 +326,7 @@ TEST(test_semantic_similarity_terms_mean_matches_the_score) {
     const Specification spec2({}, {req_next, req_within, req_after}, {"P"},
                               {"Q"});
     const std::vector<std::function<double()>> terms =
-        semantic_similarity_terms(spec1, spec2, 1, SimilarityMetric::Direct);
+        semantic_similarity_terms(spec1, spec2, 1);
     expect(terms.size() == 2,
            "semantic-similarity: one term per changed slot, and the unchanged "
            "slot should contribute none");
@@ -368,32 +335,23 @@ TEST(test_semantic_similarity_terms_mean_matches_the_score) {
         total += term();
     }
     const double mean = total / static_cast<double>(terms.size());
-    expect(
-        std::fabs(mean - semantic_similarity(spec1, spec2, 1,
-                                             SimilarityMetric::Direct)) < 1e-12,
-        "semantic-similarity: the mean of the terms must equal the score "
-        "the same arguments return, or the split scoring path grades "
-        "differently from the serial one");
+    expect(std::fabs(mean - semantic_similarity(spec1, spec2, 1)) < 1e-12,
+           "semantic-similarity: the mean of the terms must equal the score "
+           "the same arguments return, or the split scoring path grades "
+           "differently from the serial one");
 }
 
 TEST(test_semantic_similarity_terms_are_empty_when_nothing_differs) {
     const Requirement req{Formula("P"), Formula("Q"), timing::immediately()};
     const Specification spec({}, {req}, {"P"}, {"Q"});
-    expect(semantic_similarity_terms(spec, spec, 1, SimilarityMetric::Direct)
-               .empty(),
+    expect(semantic_similarity_terms(spec, spec, 1).empty(),
            "semantic-similarity: identical specifications should yield no "
            "terms, which the fold reads as a perfect match");
 }
 
-// --- keyword placement ---
+// --- keyword orders ---
 
-Config semantic_keywords(double trace_weight, std::size_t bound) {
-    Config cfg;
-    cfg.keyword_similarity = KeywordSimilarity::Semantic;
-    cfg.semantic_trace_weight = trace_weight;
-    cfg.default_model_counting_bound = bound;
-    return cfg;
-}
+constexpr std::size_t k_keyword_bound = 5;
 
 // Slot 0 unchanged, slot 1 differs in timing and condition type, slot 2 in its
 // response alone, so the score averages two changed pairs. Every slot within a
@@ -401,6 +359,7 @@ Config semantic_keywords(double trace_weight, std::size_t bound) {
 struct KeywordFixture {
     Specification m_original;
     Specification m_moved;
+    double m_trace_mean = 0.0;
     double m_keyword_mean = 0.0;
 };
 
@@ -416,63 +375,29 @@ KeywordFixture keyword_fixture() {
         Specification({}, {same, timed, narrow}, {"P"}, {"Q"}),
         Specification({}, {same, retimed, wider}, {"P"}, {"Q"}),
         0.0,
+        0.0,
     };
+    fixture.m_trace_mean =
+        (semantic_similarity(timed, retimed, k_keyword_bound) +
+         semantic_similarity(narrow, wider, k_keyword_bound)) /
+        2.0;
     fixture.m_keyword_mean = (keyword_order_similarity(timed, retimed) +
                               keyword_order_similarity(narrow, wider)) /
                              2.0;
     return fixture;
 }
 
-TEST(test_keyword_similarity_trace_weight_one_is_the_trace_score) {
+TEST(test_semantic_score_averages_trace_and_keyword_orders) {
     const KeywordFixture fixture = keyword_fixture();
-    const Config cfg = semantic_keywords(1.0, 5);
-    const double trace_only = semantic_similarity(
-        fixture.m_original, fixture.m_moved, 5, cfg.similarity_metric);
-    expect(semantic_similarity(fixture.m_original, fixture.m_moved, cfg) ==
-               trace_only,
-           "keyword-similarity: at w = 1 the semantic score is the trace "
-           "count alone");
-    expect(semantic_similarity(fixture.m_original, fixture.m_moved,
-                               semantic_keywords(0.3, 5)) != trace_only,
-           "keyword-similarity: below w = 1 the keyword orders move the score");
-    Config syntactic_mode = cfg;
-    syntactic_mode.keyword_similarity = KeywordSimilarity::Syntactic;
-    syntactic_mode.semantic_trace_weight = 0.0;
-    expect(semantic_similarity(fixture.m_original, fixture.m_moved,
-                               syntactic_mode) == trace_only,
-           "keyword-similarity: syntactic mode ignores the weight and scores "
-           "the trace count alone");
-}
-
-TEST(test_keyword_similarity_trace_weight_zero_is_the_keyword_mean) {
-    const KeywordFixture fixture = keyword_fixture();
-    const double at_five = semantic_similarity(
-        fixture.m_original, fixture.m_moved, semantic_keywords(0.0, 5));
-    const double at_twenty = semantic_similarity(
-        fixture.m_original, fixture.m_moved, semantic_keywords(0.0, 20));
-    expect(std::fabs(at_five - fixture.m_keyword_mean) < 1e-12,
-           "keyword-similarity: at w = 0 the score is the mean of the "
+    const double mixed = semantic_similarity(fixture.m_original,
+                                             fixture.m_moved, k_keyword_bound);
+    expect(std::fabs(mixed - ((fixture.m_trace_mean + fixture.m_keyword_mean) /
+                              2.0)) < 1e-12,
+           "keyword-similarity: the score averages the trace count and the "
            "keyword orders over the changed pairs");
-    expect(at_five == at_twenty,
-           "keyword-similarity: at w = 0 nothing is counted, so the bound "
-           "cannot move the score");
-}
-
-TEST(test_keyword_similarity_trace_weight_half_averages_the_two) {
-    const KeywordFixture fixture = keyword_fixture();
-    const Config cfg = semantic_keywords(0.5, 5);
-    const double trace_only = semantic_similarity(
-        fixture.m_original, fixture.m_moved, 5, cfg.similarity_metric);
-    const double mixed =
-        semantic_similarity(fixture.m_original, fixture.m_moved, cfg);
-    expect(std::fabs(mixed - ((trace_only + fixture.m_keyword_mean) / 2.0)) <
-               1e-12,
-           "keyword-similarity: at w = 1/2 the score averages the trace count "
-           "and the keyword orders");
     const std::vector<std::function<double()>> terms =
-        semantic_similarity_terms(fixture.m_original, fixture.m_moved, 5,
-                                  cfg.similarity_metric, cfg.keyword_similarity,
-                                  cfg.semantic_trace_weight);
+        semantic_similarity_terms(fixture.m_original, fixture.m_moved,
+                                  k_keyword_bound);
     double total = 0.0;
     for (const std::function<double()>& term : terms) {
         total += term();
@@ -482,9 +407,9 @@ TEST(test_keyword_similarity_trace_weight_half_averages_the_two) {
 }
 
 // The semantic objective scores changed_requirement_pairs' rows, so the mean of
-// w * trace + (1 - w) * keyword over them, a removed slot scoring 0 and no rows
-// scoring 1, has to be the semantic score a run computes.
-TEST(test_changed_requirement_pairs_rebuild_the_weighted_score) {
+// (trace + keyword) / 2 over them, a removed slot scoring 0 and no rows scoring
+// 1, has to be the semantic score a run computes.
+TEST(test_changed_requirement_pairs_rebuild_the_score) {
     const Scope in_mode{ScopeKind::In, "m"};
     const Requirement same{Formula("P"), Formula("Q"), timing::immediately()};
     const Requirement timed{Formula("P"), Formula("Q"),
@@ -507,32 +432,23 @@ TEST(test_changed_requirement_pairs_rebuild_the_weighted_score) {
                pairs[2].m_removed && pairs[2].m_is_guarantee,
            "changed-pairs: the unchanged slot is skipped and the tombstoned "
            "one is marked removed");
-    constexpr std::size_t bound = 5;
-    constexpr SimilarityMetric metric = SimilarityMetric::Logarithmic;
-    for (const double weight : {0.0, 0.5, 1.0}) {
-        double total = 0.0;
-        for (const ChangedRequirementPair& pair : pairs) {
-            if (pair.m_removed) {
-                continue;
-            }
-            const double trace = semantic_similarity(
-                *pair.m_requirement, *pair.m_other_requirement, bound, metric);
-            const double keyword = keyword_order_similarity(
-                *pair.m_requirement, *pair.m_other_requirement);
-            total += (weight * trace) + ((1.0 - weight) * keyword);
+    double total = 0.0;
+    for (const ChangedRequirementPair& pair : pairs) {
+        if (pair.m_removed) {
+            continue;
         }
-        const double rebuilt = total / static_cast<double>(pairs.size());
-        const double scored =
-            semantic_similarity(moved, original, bound, metric,
-                                KeywordSimilarity::Semantic, weight);
-        expect(std::fabs(rebuilt - scored) < 1e-12,
-               "changed-pairs: the weighted mean over the pairs is the "
-               "semantic score at w = " +
-                   std::to_string(weight));
+        const double trace = semantic_similarity(
+            *pair.m_requirement, *pair.m_other_requirement, k_keyword_bound);
+        const double keyword = keyword_order_similarity(
+            *pair.m_requirement, *pair.m_other_requirement);
+        total += (trace + keyword) / 2.0;
     }
+    const double rebuilt = total / static_cast<double>(pairs.size());
+    const double scored = semantic_similarity(moved, original, k_keyword_bound);
+    expect(std::fabs(rebuilt - scored) < 1e-12,
+           "changed-pairs: the mean over the pairs is the semantic score");
     expect(changed_requirement_pairs(original, original).empty() &&
-               semantic_similarity(original, original, bound, metric,
-                                   KeywordSimilarity::Semantic, 0.5) == 1.0,
+               semantic_similarity(original, original, k_keyword_bound) == 1.0,
            "changed-pairs: no pair differs, and the score is 1");
 }
 

@@ -83,7 +83,6 @@ EvolutionResult run_evolution(
     // is a specification document and nothing else -- no fitness record, since
     // these are gate-passing candidates rather than the run's filtered output.
     RepairAccumulator<Specification> accumulator(
-        cfg.accumulate_repairs,
         AccumulatedRepairWriter<Specification>(
             output_dir, ".json",
             [](const Specification& spec) {
@@ -103,15 +102,7 @@ EvolutionResult run_evolution(
     const std::size_t col_pct = status.add("%", true);
     const std::size_t col_time = status.add("time");
     const std::size_t col_best = status.add("best");
-    // Only where the sweep below runs: a column that reads the same number
-    // every generation because nothing measured it is worse than no column.
-    //
-    // A flag and a plain index rather than an optional index: gcc 11 at -O3
-    // reports the optional's payload as maybe-uninitialized inside the
-    // has_value() guard below, which -Werror turns into a failed build on the
-    // lab hosts.
-    const bool show_real = accumulator.enabled();
-    const std::size_t col_real = show_real ? status.add("real") : 0;
+    const std::size_t col_real = status.add("real");
 
     auto format_elapsed = [](double secs) -> std::string {
         std::ostringstream oss;
@@ -179,14 +170,9 @@ EvolutionResult run_evolution(
             oss << std::fixed << std::setprecision(3) << summary.best;
             status.set(col_best, oss.str());
         }
-        const std::optional<std::size_t> n_real = accumulate_gate_passing(
+        const std::size_t n_real = accumulate_gate_passing(
             population, cfg, gen_idx + 1, accumulator, gate_status);
-        // n_real and show_real are both governed by accumulator.enabled(), so
-        // either test decides the other; the pair is what lets the checker
-        // see it.
-        if (show_real && n_real.has_value()) {
-            status.set(col_real, std::to_string(*n_real));
-        }
+        status.set(col_real, std::to_string(n_real));
         status.finish();
 
         dashboard.generation(
@@ -215,67 +201,18 @@ std::vector<Specification> collect_realizable_specifications(
 }
 
 std::pair<std::vector<Specification>, std::vector<FilterRunStats>>
-filter_maximal_specifications(
-    const Config& cfg, const Specification& original,
+dedup_realizable_specifications(
     const std::vector<Specification>& realizable_vec) {
-    const auto impl_start = std::chrono::steady_clock::now();
-    auto on_impl_progress = [&impl_start](std::size_t done, std::size_t total) {
-        // Off a terminal this frame is never overwritten, so it would land in
-        // the log once per comparison; the committed line below says the same
-        // thing once.
-        if (!stdout_is_tty()) {
-            return;
-        }
-        const double elapsed =
-            std::chrono::duration<double>(std::chrono::steady_clock::now() -
-                                          impl_start)
-                .count();
-        std::cout << "\r\033[KImplication filter: " << std::setw(3)
-                  << (done * 100 / total) << "%  " << std::fixed
-                  << std::setprecision(2) << elapsed << "s  ("
-                  << ImplicationFilterStats::n_comparisons << " cmp, "
-                  << ImplicationFilterStats::n_skipped << " skip, "
-                  << ImplicationFilterStats::n_duplicates << " dup, "
-                  << ImplicationFilterStats::n_equivalent_collapsed
-                  << " equiv, " << ImplicationFilterStats::n_timeouts
-                  << " timeout, "
-                  << ImplicationFilterStats::n_fingerprint_refuted
-                  << " refuted, " << ImplicationFilterStats::n_model_refuted
-                  << " by model)" << std::flush;
-    };
-    // A checker of the stage's own, as on the TLSF path (tlsf/pipeline.cpp)
-    // and in `maximal` and `compare`. Both final filters ask implications
-    // between whole specifications, which is not the shape the search's
-    // checker is tuned for, and the FRETISH path was left on the search's
-    // settings only because its per-requirement queries had not been measured.
-    // The 500ms SPOT budget costs output as well as time, measured at 40
-    // generations of 1000: takeoff declined 109 escalations, each an
-    // ExpectUnsat query left undecided and so read as "does not imply", each
-    // keeping a repair the filter had grounds to drop. It starts cold, but
-    // these queries are between survivors rather than about one requirement,
-    // so there is nothing in the search's cache to inherit.
-    SatisfiabilityChecker final_checker;
-    final_checker.set_timeout(cfg.black_timeout);
-    final_checker.set_spot_budget(cfg.black_timeout);
-    const std::vector<FilterFunction> filters = get_final_filter_functions(
-        cfg, original, final_checker, on_impl_progress);
-    const std::vector<Specification> result =
+    const std::vector<FilterFunction> filters{
+        make_dedup_filter<Specification>()};
+    std::vector<Specification> result =
         filter_population(realizable_vec, filters);
     // A final filter drops repairs from the output, so it owes the same
     // accounting as a per-generation one; the report is built from the
-    // per-generation list alone and would otherwise not mention these.
-    std::vector<FilterRunStats> stats;
-    stats.reserve(filters.size());
-    for (const FilterFunction& flt : filters) {
-        stats.push_back({"final/" + flt.name(), flt.n_in(), flt.n_out()});
-    }
-    if (cfg.run_implication_filter) {
-        print_implication_summary(
-            std::chrono::duration<double>(std::chrono::steady_clock::now() -
-                                          impl_start)
-                .count());
-    }
-    return {result, std::move(stats)};
+    // per-generation list alone and would otherwise not mention it.
+    std::vector<FilterRunStats> stats{
+        {"final/" + filters[0].name(), filters[0].n_in(), filters[0].n_out()}};
+    return {std::move(result), std::move(stats)};
 }
 
 std::pair<std::vector<Specification>, std::vector<FilterRunStats>>
@@ -289,9 +226,9 @@ finish_maximal_stream(StreamingMaximalFilter<Specification>& stream,
         stream.push(spec, {});
     }
     const std::vector<Specification> streamed = stream.finish();
-    // The stream returns push order, accumulated specifications first. The
-    // batch filters return @p realizable_vec's, and repair_N is numbered after
-    // a sort that keeps the order of fitness ties, so the order is restored.
+    // The stream returns push order, accumulated specifications first.
+    // repair_N is numbered after a sort that keeps the order of fitness ties,
+    // so @p realizable_vec's order is restored.
     const std::unordered_set<Specification> kept(streamed.begin(),
                                                  streamed.end());
     std::unordered_set<Specification> emitted;

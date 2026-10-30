@@ -22,8 +22,6 @@ Algorithm flow
 
 7. **Score, sort, and write** each surviving spec to the output directory — ``repair_N.json`` on the FRETISH path, ``repair_N.tlsf`` on the TLSF path, each paired with a ``repair_N.fitness.json`` holding its score.
 
-On the TLSF path, step 4 has a second mode. ``[tlsf] repair_mode = "muc"`` replaces the single whole-spec search with a loop that extracts a *minimal unrealisable core*, evolves only that sub-specification, and reintegrates the repaired core with the untouched non-core guarantees. :doc:`tlsf` describes it.
-
 The generation pipeline
 -----------------------
 
@@ -63,7 +61,7 @@ Breeding is a single stage by design. Crossover and mutation interleave per offs
 Selection
 ---------
 
-``stage_select`` follows ``Config::selection_scheme``. Both NSGA-II schemes rank candidates by non-dominated sorting and crowding distance over the individual objectives (``include/genetic/nsga2.hpp``) and pool parents with offspring. ``Nsga2Truncate`` truncates that pool at ``population_size``. The default, ``Nsga2Apportion``, deduplicates the pool first and apportions the slots over the distinct survivors. ``WeightedAverage`` ranks by the aggregate scalar instead; it converges prematurely on the FRETISH corpus, and on TLSF it trades repair quality for yield — see :doc:`configuration`.
+``stage_select`` follows ``Config::selection_scheme``. The default, ``Nsga2Apportion``, ranks candidates by non-dominated sorting and crowding distance over the individual objectives (``include/genetic/nsga2.hpp``), pools parents with offspring, deduplicates the pool and apportions the slots over the distinct survivors. ``WeightedAverage`` ranks by the aggregate scalar instead; it converges prematurely on the FRETISH corpus, and on TLSF it trades repair quality for yield — see :doc:`configuration`.
 
 Every scheme carries both the per-objective vector and the weighted scalar on each ``Scored<Spec>``, so outputs stay comparable across runs. :doc:`configuration` gives the measured differences between the three.
 

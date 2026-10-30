@@ -49,19 +49,20 @@ python scripts/gen_configs.py
 ```
 
 Writes one TOML file per (scheme, sweep, level) to
-`experiments/configs/<scheme>/`. Safe to re-run — existing files are
-overwritten, and regenerating reproduces them byte-for-byte.
+`experiments/configs/<scheme>/[wkoff/]log/`. Safe to re-run — existing files
+are overwritten, and regenerating reproduces them byte-for-byte.
 
 The whole grid is generated once per selection scheme, so `selection_scheme` is
 a factor of the design rather than a constant. The scheme lives in the
 directory because `run_experiments.py` parses (sweep, level) out of the
 filename and reads the scheme back off the parent directory.
 
-Every generated config pins `selection_scheme` explicitly. That matters:
-`config.hpp` defaults to `weighted`, so a config omitting the key hands the run
-to weighted selection without saying so. Check with
-`grep -rc nsga2-truncate experiments/configs/nsga2-truncate/` if a run's results look unexpectedly
-poor.
+Every generated config pins `selection_scheme` explicitly, so a change of the
+`config.hpp` default cannot move an archived grid onto another scheme. The
+schemes offered are `nsga2-apportion` and `weighted`; `nsga2-truncate` is no
+longer generated because the binary is retiring it. Check with
+`grep -rc selection_scheme experiments/configs/` if a run's results look
+unexpectedly poor.
 
 Sweeps generated, each holding every other parameter at its default:
 
@@ -84,11 +85,13 @@ The directory stays because `weakening` is one of `KEY_FIELDS`, and a flat
 config is attributed to the legacy `wkon`, so a new campaign should pass
 `--weakening off` to keep its rows from reading as the screen being on.
 
-`--metric both` crosses `model_counting.metric` in as a factor, nesting it
-under `<scheme>/[wkoff/][<direct|log>/]`. The directory label is the short
-`direct`/`log`; the TOML value written is the full `direct`/`logarithmic` the
-C++ parser accepts. Omitting a flag keeps the flat layout and takes that factor
-from the defaults, so a no-arg run reproduces the pre-factor grid.
+Every config runs `model_counting.metric = "logarithmic"` and sits under a
+`log/` directory, because `metric` is a `KEY_FIELDS` column read back off the
+path and a config without the directory is attributed to the legacy `direct`.
+No repair-mode directory or `[tlsf] repair_mode` key is written: monolithic
+repair is the only mode left, and a config without the directory reads as
+`mono`. The `--metric` and `--repair` flags that crossed these factors went
+with the values the binary is retiring.
 
 `--weights SYNTACTIC SEMANTIC STATUS` moves the baseline aggregate-fitness
 weights for one campaign. They are the one part of `DEFAULTS` deliberately not
@@ -136,8 +139,10 @@ humanoid-531 — take about three minutes each even at the `gen10/pop200`
 baseline, against a few seconds for the FRETISH specs. So the grid is a coarse
 four-level cross per axis (seven distinct operating points, sharing the
 baseline) rather than the fine FRETISH grid: the budget is spent on seeds
-instead of gradations. It reads its own `experiments/configs-tlsf/nsga2-truncate/` grid,
-so generate it with `--tlsf` first:
+instead of gradations. It reads its own `experiments/configs-tlsf/nsga2-truncate/`
+grid, generated with `--tlsf` before `nsga2-truncate` and the flat metric layout
+were retired; `--tlsf` now writes `configs-tlsf/nsga2-apportion/log/`, so a new
+TLSF campaign needs a profile pointing there:
 
 ```sh
 python scripts/gen_configs.py --tlsf

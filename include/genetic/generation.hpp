@@ -530,8 +530,9 @@ std::vector<Spec> filter_population(
 /// Returns the standard set of filter functions used during evolution, in
 /// order: deduplication, a bloat cap and the per-generation rows of the
 /// correctness table. Every one runs on every generation; the implication
-/// screen is not here but in get_final_filter_functions, which runs once over
-/// the survivors. Instantiated for Specification and tlsf::Specification.
+/// screen is not here but streams over the accumulated repairs (see
+/// make_maximal_stream). Instantiated for Specification and
+/// tlsf::Specification.
 ///
 /// @param original  The reference specification the bloat cap is sized against
 /// @param checker   Satisfiability checker; captured by reference, must
@@ -540,26 +541,10 @@ template <typename Spec>
 std::vector<FilterFunctionT<Spec>> get_filter_functions(
     const Spec& original, SatisfiabilityChecker& checker);
 
-/// Returns the set of filter functions applied to the final realizable
-/// population after evolution: deduplication, then (if run_implication_filter)
-/// the implication filter.
-///
-/// @param cfg              Algorithm configuration (run_implication_filter)
-/// @param original         The specification under repair; the implication
-///                         filter keeps the member of an equivalence class
-///                         closest to it
-/// @param checker          Satisfiability checker for the implication filter;
-///                         captured by reference, must outlive the filters
-/// @param on_impl_progress Optional progress callback forwarded to the
-///                         implication filter
-std::vector<FilterFunction> get_final_filter_functions(
-    const Config& cfg, Specification original, SatisfiabilityChecker& checker,
-    const GenerationProgressCallback& on_impl_progress = nullptr);
-
 /// Scores each specification in @p specs and returns them ordered best-first
 /// according to @p cfg's selection scheme: descending weighted fitness for
-/// WeightedAverage, or the NSGA-II crowded-comparison order for Nsga2Truncate
-/// and Nsga2Apportion.
+/// WeightedAverage, or the NSGA-II crowded-comparison order for
+/// Nsga2Apportion.
 std::vector<ScoredSpecification> score_and_sort_specifications(
     const Config& cfg, const std::vector<Specification>& specs,
     const AggregateWeightedFitnessFunction& fitness_function);
@@ -638,7 +623,7 @@ std::vector<std::string> generation_stage_names(
 /// Evolves a population for one generation:
 ///   1. Order the population best-first under @p cfg's selection scheme —
 ///      descending weighted fitness for WeightedAverage, the NSGA-II
-///      crowded-comparison order for Nsga2Truncate and Nsga2Apportion — and
+///      crowded-comparison order for Nsga2Apportion — and
 ///      take the top target_size as parents
 ///   2. Carry the best elitism_size parents over verbatim as elites (they skip
 ///      crossover, mutation, and the offspring filters)
@@ -649,13 +634,12 @@ std::vector<std::string> generation_stage_names(
 ///   5. Pad survivors back to target_size by duplicating them if filtering
 ///      reduced the population
 ///   6. Score the resulting population with fitness functions
-///   7. Choose the survivors: under Nsga2Truncate and Nsga2Apportion the
-///      parents are pooled with the scored offspring and ranked under the
-///      crowded-comparison order ((mu+lambda) elitism), Nsga2Truncate keeping
-///      the best target_size of that union and Nsga2Apportion deduplicating
-///      the pool before ranking it and apportioning the target_size slots
-///      over the distinct survivors; under WeightedAverage the scored
-///      population is re-sorted by the weighted scalar
+///   7. Choose the survivors: under Nsga2Apportion the parents are pooled
+///      with the scored offspring, deduplicated and ranked under the
+///      crowded-comparison order ((mu+lambda) elitism), and the target_size
+///      slots are apportioned over the distinct survivors; under
+///      WeightedAverage the scored population is re-sorted by the weighted
+///      scalar
 ///
 /// If the population is smaller than target_size, all of it is used as
 /// parents. elitism_size is clamped to the number of parents.

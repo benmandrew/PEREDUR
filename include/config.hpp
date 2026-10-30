@@ -7,57 +7,30 @@
 #include "thread_pool.hpp"
 
 /// Selection scheme driving parent and survivor selection during evolution.
-/// The two NSGA-II schemes rank identically -- by Pareto non-domination and
-/// crowding distance over the individual objectives, searching for the Pareto
-/// front rather than one weighted compromise -- and are named for the only step
-/// where they differ, the survivor step. Nsga2Truncate ranks the pooled
-/// (mu + lambda) parents and offspring and cuts the pool at the target size.
-/// Nsga2Apportion (the default) deduplicates the pool first, ranks the distinct
-/// set, and apportions the target size's slots over it by 1 / (1 + rank) under
-/// the largest-remainder (Hamilton) method. A truncated pool holds only a
+/// Nsga2Apportion (the default) ranks by Pareto non-domination and crowding
+/// distance over the individual objectives, searching for the Pareto front
+/// rather than one weighted compromise, and is named for its survivor step: it
+/// deduplicates the pooled (mu + lambda) parents and offspring, ranks the
+/// distinct set, and apportions the target size's slots over it by
+/// 1 / (1 + rank) under the largest-remainder (Hamilton) method. Cutting the
+/// pool at the target size instead, as the removed Nsga2Truncate did, leaves a
 /// handful of distinct specifications across its slots, so the cut runs
-/// arbitrarily through the Pareto front; apportioning instead makes breeding
-/// pressure proportional to rank without discarding any distinct candidate.
+/// arbitrarily through the Pareto front; apportioning makes breeding pressure
+/// proportional to rank without discarding any distinct candidate.
 /// WeightedAverage ranks by the single blended fitness scalar; it converges
 /// prematurely and is retained for comparison rather than use.
-enum class SelectionScheme : std::uint8_t {
-    WeightedAverage,
-    Nsga2Truncate,
-    Nsga2Apportion
-};
+enum class SelectionScheme : std::uint8_t { WeightedAverage, Nsga2Apportion };
 
-/// Metric turning the bounded trace counts into a semantic-similarity score.
-/// Direct takes the ratio of counts -- the fraction of one requirement's
-/// satisfying traces that also satisfy the other, a Sorensen-Dice overlap.
-/// Logarithmic (the default) takes the ratio of the counts' logarithms,
-/// comparing the languages' growth rates instead: unlike the direct ratio it
-/// stays roughly constant as the counting bound grows, rather than decaying
-/// toward zero for requirements of differing permissiveness. It is the default
-/// because it recovered more ideal repairs across every spec in the direct-vs-
-/// log campaign (overall implies-ideal 68.8% vs 61.5%, decisively on fsm).
-enum class SimilarityMetric : std::uint8_t { Direct, Logarithmic };
-
-/// How TLSF repair searches. Monolithic (the default) evolves the whole
-/// specification at once. Muc repairs iteratively: it extracts a minimal
-/// unrealizable core, evolves only that sub-specification, reintegrates the
-/// repaired core with the untouched non-core guarantees, and repeats on the
-/// recombined spec until it is realizable (or the iteration cap trips). The
-/// mode is TLSF-only; the FRETISH path rejects any value but Monolithic and
-/// exits 1.
-enum class RepairMode : std::uint8_t { Monolithic, Muc };
-
-/// How the status objective grades the region below realizability. Tiered is
-/// the three-point scale in fitness/status.hpp. Mrs (the default) replaces its
-/// middle tier with the greedy maximal-realizable-subset fraction: the
-/// guarantee side is split into parts, and the score is what fraction of them
-/// can be kept while the accumulated subset stays realizable against the full,
-/// unchanged environment side.
+/// How the status objective grades the region below realizability. Mrs (the
+/// default) is the greedy maximal-realizable-subset fraction: the guarantee
+/// side is split into parts, and the score is what fraction of them can be kept
+/// while the accumulated subset stays realizable against the full, unchanged
+/// environment side.
 ///
-/// The two stay crossed as an experiment factor, so a campaign can still ask
-/// for Tiered by name. Grading is the whole point: over the 21 specifications
-/// in `examples/`, Tiered scores
-/// every one of them 0.5, where Mrs spreads them over 14 distinct values with a
-/// median of 6 grade levels per specification.
+/// A three-point Tiered scale was removed on 2026-10-30. Over the 21
+/// specifications in `examples/` it scored every one of them 0.5, where Mrs
+/// spreads them over 14 distinct values with a median of 6 grade levels per
+/// specification.
 /// Aurus is AuRUS's own six-level ladder, reproduced value for value (see
 /// @ref status_score_aurus). It exists so an ablation can cross PEREDUR's
 /// grading against the design this search derives from, which is why it is
@@ -65,7 +38,7 @@ enum class RepairMode : std::uint8_t { Monolithic, Muc };
 /// of the specification survives on its own, and it is the one scale here that
 /// does *not* fold well-separation into its realizability query, AuRUS never
 /// asking that question anywhere in its search.
-enum class StatusGrading : std::uint8_t { Tiered, Mrs, Aurus };
+enum class StatusGrading : std::uint8_t { Mrs, Aurus };
 
 /// Which order the MRS walk admits guarantee-side parts in (see
 /// @ref status_score_mrs). Spec is the index order the walk shipped with;
@@ -77,26 +50,6 @@ enum class StatusGrading : std::uint8_t { Tiered, Mrs, Aurus };
 /// order, not on which one. Only Degree pays to choose it, at n(n-1)/2 + n
 /// subset queries once.
 enum class MrsAdmissionOrder : std::uint8_t { Spec, Degree };
-
-/// Where the FRETISH keyword fields -- timing, scope and condition type --
-/// are scored for how close a candidate stays to the original.
-///
-/// Syntactic (the default) scores them inside the syntactic objective through
-/// their implication orders: timing by the Jaccard overlap of downsets, scope
-/// by the overlap of the timepoint regions it enforces over (averaged with
-/// whether the mode matches), and condition type by its two-element order.
-///
-/// Semantic moves those order-based measures into the semantic objective,
-/// mixed per requirement pair with the trace-count score as
-/// `w * trace + (1 - w) * keyword` for w = @ref Config::semantic_trace_weight.
-/// The syntactic objective then compares the keywords as tokens only: equal or
-/// not, and for a timing that carries a tick count or a stop formula, whether
-/// that argument matches too. Under it the syntactic objective rests on syntax
-/// alone, and everything that reads meaning into a keyword sits in the
-/// semantic one.
-///
-/// The TLSF path has no keyword fields and ignores the choice.
-enum class KeywordSimilarity : std::uint8_t { Syntactic, Semantic };
 
 /// What ends the search (see @ref Config::termination).
 ///
@@ -158,8 +111,8 @@ struct Config {
     /// paired the two over 20 TLSF specifications x 24 seeds: yield 410/480
     /// against 367/480 (50 Mrs-only pairs to 7, sign test \f$p < 10^{-4}\f$),
     /// repair quality unchanged where both arms yield, at a median paired wall
-    /// cost of 1.15x. The gain concentrates where Tiered cannot grade at all --
-    /// `arbiter` moves 0/24 to 22/24 and `rg1` 7/24 to 24/24.
+    /// cost of 1.15x. The gain concentrates where Tiered could not grade at all
+    /// -- `arbiter` moves 0/24 to 22/24 and `rg1` 7/24 to 24/24.
     StatusGrading status_grading = StatusGrading::Mrs;
 
     /// Which budget ends the search (see TerminationMode). Generations is
@@ -183,18 +136,7 @@ struct Config {
     /// vintage" in docs/dev/config-and-provenance.md, and VINTAGE_KEYS in
     /// scripts/gen_configs.py.
     MrsAdmissionOrder mrs_admission_order = MrsAdmissionOrder::Degree;
-    /// Which objective scores the FRETISH keyword fields (see
-    /// KeywordSimilarity). Semantic since 2026-10-06; Syntactic reproduces
-    /// every run before then. Ignored on the TLSF path.
-    KeywordSimilarity keyword_similarity = KeywordSimilarity::Semantic;
-    /// The weight w of the trace-count score in the per-requirement semantic
-    /// term `w * trace + (1 - w) * keyword`, read only under
-    /// KeywordSimilarity::Semantic. At 1 the term is the trace count alone and
-    /// at 0 the keyword orders alone, and neither computes the side it gives no
-    /// weight. Ignored on the TLSF path.
-    double semantic_trace_weight = 0.5;
     std::size_t default_model_counting_bound = 20;
-    SimilarityMetric similarity_metric = SimilarityMetric::Logarithmic;
     bool run_implication_filter = true;
     std::chrono::milliseconds black_timeout{1000};
     /// Per-call wall-clock budget for ltlsynt realizability checks. Unlike
@@ -298,52 +240,6 @@ struct Config {
     /// 280 that stop matching an ideal, against 14 more that find a repair at
     /// all. docs/configuration.rst records both sides and the untested ground.
     SelectionScheme selection_scheme = SelectionScheme::Nsga2Apportion;
-    /// Report every candidate that passed the output gate in *any* generation,
-    /// not only those the final population still holds. A candidate that was
-    /// gate-passing in generation 3 and was not selected into generation 4 is
-    /// otherwise discarded, even though repair quality is judged existentially
-    /// over what the run emits, so a larger pool can only help it.
-    ///
-    /// On by default since 2026-08-25, on the `2026-08-19-accumulator`
-    /// campaign: over 200 paired TLSF runs, 100 (spec, seed) pairs per arm, it
-    /// gained `implies_ideal` on 6 pairs and lost it on none, at exact McNemar
-    /// p = 0.0312, and yield moved from 79 to 81 of 100. The median paired wall
-    /// ratio was 1.034 (mean 1.055, max 1.51), under the bound of 1.25 fixed
-    /// before launch, and both arms timed out on 16 runs. It costs nothing on
-    /// the FRETISH path, whose per-generation "real" counter already asks the
-    /// gate; on the TLSF path, which asks it once after evolution, it buys the
-    /// extra repairs with one gate sweep per generation.
-    ///
-    /// That campaign recorded the key as a *candidate* default, subject to the
-    /// FRETISH replication its plan names, and that replication has not been
-    /// run. The default is flipped on TLSF evidence alone, as a departure from
-    /// the campaign's own pre-registered condition, and the replication remains
-    /// owed. Two further limits sit on the same evidence. Its 240s per-spec cap
-    /// falls between the aurus-h2h corpus's p75 of 161s and its p90 of 684s, so
-    /// it cannot say whether the advantage grows with the budget; and four
-    /// seeds per family carry no per-family claim, the primary drawing its
-    /// power from the 200 paired runs instead.
-    ///
-    /// An archived campaign config that omits the key therefore means something
-    /// it did not; see the config vintage note in
-    /// docs/dev/config-and-provenance.md.
-    ///
-    /// Live under `[tlsf] repair_mode = "muc"` as well, since 2026-09-18: the
-    /// core populations themselves are never accumulated, because a candidate
-    /// that repairs a core is realizable only against that core, but every
-    /// reintegrated whole specification that passes the output gate is. Before
-    /// that date the MUC loop kept one repair per run and the key did nothing
-    /// there.
-    ///
-    /// It has an on-disk side effect: with the key on, each newly accumulated
-    /// specification is written to `<output-dir>/accumulated/` as it is found,
-    /// one file per specification, flushed and closed on the spot, so a run
-    /// killed by an external wall-clock cap keeps what it had already
-    /// accumulated. Those files hold raw gate-passing candidates rather than
-    /// the run's filtered output, which stays `repair_N.json` /
-    /// `repair_N.tlsf` alone. The directory is created on the first write, so
-    /// with the key off nothing is created.
-    bool accumulate_repairs = true;
     double selection_rate = 0.5;
     /// Elitism: the top elitism_rate fraction of the population carries over
     /// into the next generation verbatim, bypassing crossover, mutation, and
@@ -520,74 +416,6 @@ struct Config {
     /// the ASSUME section holds nothing live to copy.
     double tlsf_p_clone_assumption = 0.25;
 
-    /// Widest disjunction `tlsf_add_assumption` may draw for the body of an
-    /// appended assumption: the body is a disjunction of between 1 and this
-    /// many *distinct* input literals, the width drawn uniformly.
-    ///
-    /// A single literal was all it could draw until 2026-08-25, which put a
-    /// class of ideal off the grammar rather than merely far from it. `lift`'s
-    /// ideal is `G F (b1 | b2 | b3)` over its three inputs and PEREDUR reached
-    /// it in 0 of 60 runs across the three arms of the 2026-08-23 campaign;
-    /// the atom-growth move in `mutate_atom_formula` widens an *existing*
-    /// atom, so it can only act after an assumption is in the population, and
-    /// an assumption that is wrong when appended is dominated before it can be
-    /// widened.
-    ///
-    /// At 1 no width is drawn, so the `RandomSource` stream is exactly what it
-    /// was before this existed and an archived campaign reproduces byte for
-    /// byte by writing `max_assumption_width = 1`. Values above the input
-    /// count are clamped to it, there being no fourth distinct literal to draw
-    /// from three inputs.
-    ///
-    /// It defaults to 1, its no-op value, and so does the key below it. Both
-    /// are argued from the corpus rather than measured. Here the argument is
-    /// that 3 is the width `lift` needs and the widest the corpus's ideals
-    /// reach in plain literals, and that is the whole case for it. p_monotone
-    /// and tlsf_p_clone_assumption shipped on exactly that footing in August
-    /// 2026. The campaign that tested them, `experiments/2026-08-23-monotone`,
-    /// came back null, and its pre-registered rule had to be overridden to keep
-    /// them, which that archive's `REPORT.md` records. Shipping more the same
-    /// way would repeat that knowingly, so both stay off until a campaign
-    /// decides them.
-    ///
-    /// Two consequences follow, both of them gains. No "Config vintage" entry
-    /// is owed for either: every archived config omits both keys and, at
-    /// these defaults, still means exactly what it meant. And each
-    /// key costs no `RandomSource` draw at its no-op value, so the shipped
-    /// binary's breeding stream is byte-identical to what it was before the
-    /// keys existed; `test/tlsf/assumption_tests.cpp` asserts that each
-    /// draws only above that value.
-    ///
-    /// `experiments/2026-08-26-assumption-reach` measured them, at five keys:
-    /// a fifth, `tlsf.mutation.p_union_assumption`, was removed rather than
-    /// kept at its no-op, because it cannot reach what it was written for.
-    /// See "Assumption construction" in docs/dev/operators.md. The two that
-    /// remain stay at their no-op defaults, that campaign's registered
-    /// primary having read null; p_remove_assumption and p_burst_continue
-    /// were removed with their operators.
-    std::size_t tlsf_max_assumption_width = 1;
-
-    /// Probability that an appended unconditional assumption is left as
-    /// `F body` rather than wrapped as `G F body`.
-    ///
-    /// Every appended assumption was G-wrapped until 2026-08-25, which made a
-    /// bare eventuality unreachable rather than unlikely. `examples/lily11`'s
-    /// whole ideal is `F req`, and `G F req` is strictly stronger, so no
-    /// rewriting of a G-wrapped assumption arrives at it; PEREDUR repairs that
-    /// family in 19 of 60 runs against AuRUS's 50.
-    ///
-    /// Drawn rather than substituted, the bare form being the weaker of the
-    /// two and so the harder to repair with. Read before the `RandomSource` is
-    /// touched, so at 0 it costs no draw. It defaults to 0, off, on the
-    /// argument recorded at tlsf_max_assumption_width.
-    double tlsf_p_bare_assumption = 0.0;
-
-    /// TLSF repair strategy (see RepairMode). Muc mode caps its outer
-    /// extract-repair-reintegrate loop at muc_max_iterations, so a spec whose
-    /// core never becomes realizable ends the run without a repair rather than
-    /// looping forever.
-    RepairMode repair_mode = RepairMode::Monolithic;
-    std::size_t muc_max_iterations = 32;
     /// Scoring thread pool size. The default is available_parallelism(), which
     /// is the hardware concurrency narrowed by the CPU affinity mask and the
     /// cgroup CPU quota where those apply -- so a containerised run is sized by

@@ -53,10 +53,9 @@ std::vector<char> gate_verdicts(const std::vector<Scored<Spec>>& population,
                                 const FitnessFunctionT<Spec>& status = nullptr);
 
 // Offers every gate-passing entry of @p population to @p accumulator, in
-// population order, and returns how many passed. Empty, and nothing asked, when
-// the accumulator is disabled.
+// population order, and returns how many passed.
 template <typename Spec>
-std::optional<std::size_t> accumulate_gate_passing(
+std::size_t accumulate_gate_passing(
     const std::vector<Scored<Spec>>& population, const Config& cfg,
     std::size_t generation, RepairAccumulator<Spec>& accumulator,
     const FitnessFunctionT<Spec>& status = nullptr);

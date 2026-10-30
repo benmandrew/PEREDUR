@@ -290,9 +290,10 @@ WEAKENING_DIRS: tuple[str, ...] = ("wkon", "wkoff")
 # and merge matching those rows rather than re-running them.
 LEGACY_METRIC = "direct"
 
-# Directory names gen_configs.py --metric emits (the short label, not the TOML
-# value "logarithmic"). A config with no such ancestor predates the factor and
-# is read as LEGACY_METRIC.
+# Metric directory names (the short label, not the TOML value "logarithmic").
+# gen_configs.py now writes log/ under every config; direct/ survives in archived
+# grids. A config with no such ancestor predates the factor and is read as
+# LEGACY_METRIC.
 METRIC_DIRS: tuple[str, ...] = ("direct", "log")
 
 # Rows written before `repair_mode` existed ran monolithic repair (the
@@ -301,8 +302,9 @@ METRIC_DIRS: tuple[str, ...] = ("direct", "log")
 # and merge matching those rows rather than re-running them.
 LEGACY_REPAIR = "mono"
 
-# Directory names gen_configs.py --repair emits (the short label, not the TOML
-# value "monolithic"). A config with no such ancestor predates the factor and is
+# Repair-mode directory names (the short label, not the TOML value
+# "monolithic"). Only archived grids carry one; gen_configs.py writes none, since
+# monolithic repair is the only mode left, and a config with no such ancestor is
 # read as LEGACY_REPAIR.
 REPAIR_DIRS: tuple[str, ...] = ("mono", "muc")
 
@@ -381,6 +383,11 @@ TLSF_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
 # sweeps absent from the map keep every level found in `configs_dir`.
 # `timeout_caps` is a per-spec cap in seconds, and must name every spec the
 # profile runs.
+#
+# The generator lines quoted with each profile below ran before gen_configs.py
+# stopped writing nsga2-truncate, the direct metric and the flat metric layout.
+# At this commit they no longer reproduce those grids: regenerate one at the
+# commit its campaign archive names.
 #
 # `configs_dir` and `results_dir` are per-profile because run_id names collide
 # across profiles: the same (sweep, level, scheme, spec, seed) is one directory

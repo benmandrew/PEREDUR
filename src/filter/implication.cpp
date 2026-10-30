@@ -32,8 +32,8 @@ std::optional<bool> implies(const tlsf::Specification& from,
 }
 
 double similarity_to(const Specification& spec, const Specification& original,
-                     const Config& cfg) {
-    return syntactic_similarity(spec, original, cfg);
+                     const Config& /*cfg*/) {
+    return syntactic_similarity(spec, original);
 }
 
 double similarity_to(const tlsf::Specification& spec,

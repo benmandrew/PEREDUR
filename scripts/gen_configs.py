@@ -2,7 +2,8 @@
 """Generate TOML config files for all experiment sweeps.
 
 Writes one file per (selection scheme, sweep, level) to
-experiments/configs/<scheme>/. Safe to re-run — existing files are overwritten.
+experiments/configs/<scheme>/[wkoff/]log/. Safe to re-run — existing files are
+overwritten.
 
 The scheme lives in the directory rather than the filename because
 run_experiments.py parses (sweep, level) out of the filename, and it reads the
@@ -11,14 +12,13 @@ which makes selection_scheme a factor of the design rather than a constant.
 
 Usage:
     python scripts/gen_configs.py                       # the standard grid
-    python scripts/gen_configs.py --schemes nsga2-truncate   # one scheme only
+    python scripts/gen_configs.py --schemes nsga2-apportion  # one scheme only
     python scripts/gen_configs.py --sweeps A C          # specific sweeps
     python scripts/gen_configs.py --sweeps C --levels default,status-only
                                                         # specific levels only
     python scripts/gen_configs.py --generations 40 --population-size 1000 \\
         --out-dir experiments/configs-cj-large          # a larger operating point
     python scripts/gen_configs.py --weakening off       # nest under <scheme>/wkoff/
-    python scripts/gen_configs.py --metric both         # cross direct/log metric in
     python scripts/gen_configs.py --tlsf                # the TLSF campaign grid
 """
 
@@ -28,17 +28,16 @@ from pathlib import Path
 CONFIGS_DIR = Path(__file__).parent.parent / "experiments" / "configs"
 
 # Selection schemes the whole grid is duplicated across. Every generated config
-# pins the scheme explicitly rather than relying on the config.hpp default,
-# which is "nsga2-apportion" and so is *not* the head of this list.
-# nsga2-apportion is appended rather than ordered next to nsga2-truncate so the
-# first two entries keep the positions the earlier grids were generated under.
+# pins the scheme explicitly rather than relying on the config.hpp default.
+# nsga2-truncate is not offered: the binary is retiring it, so a new grid runs
+# nsga2-apportion, and weighted stays as the comparison arm.
 #
 # Each string here is also a config *directory* name: scheme_of() in
 # run_experiments.py reads it back into the `selection` column of every results
 # CSV, and that column joins KEY_FIELDS in merge_experiments.py -- the natural
 # key for resume and merge. config_io.cpp rejects the old spellings "nsga2" and
 # "nsga2-replicate" of the two NSGA-II schemes.
-SCHEMES: list[str] = ["nsga2-truncate", "weighted", "nsga2-apportion"]
+SCHEMES: list[str] = ["nsga2-apportion", "weighted"]
 
 # The weakening directory names a state and sets none: the binary never weakens
 # and no config states a key. The directory stays because `weakening` is one of
@@ -49,32 +48,20 @@ WEAKENINGS: dict[str, list[str]] = {
     "off": ["wkoff"],
 }
 
-# model_counting.metric as a crossed factor, exactly like WEAKENINGS above.
-# Each entry is (dir_label, toml_value): the directory + CSV label is the short
-# "direct"/"log", but the TOML value must be the full "direct"/"logarithmic"
-# string config_io.cpp's apply_model_counting accepts, or the run aborts. Like
-# --weakening, --metric defaults to None so the flat layout and the metric from
-# DEFAULTS stay byte-identical to the pre-factor grids.
-METRICS: dict[str, list[tuple[str, str]]] = {
-    "direct": [("direct", "direct")],
-    "log":    [("log", "logarithmic")],
-    "both":   [("direct", "direct"), ("log", "logarithmic")],
-}
+# Every config runs the logarithmic metric, the only one the binary has, and
+# nests under a log/ directory. The TOML no longer names it, since the binary
+# warns about the retired key. The directory is not decoration: `metric` is
+# one of merge_experiments.KEY_FIELDS, metric_of() in run_experiments.py reads
+# it back off the path, and a flat config is attributed to LEGACY_METRIC
+# ("direct"), which would mislabel every row. METRIC_DIR is the short CSV label.
+METRIC_DIR = "log"
 
-# tlsf.repair_mode as a crossed factor, exactly like WEAKENINGS/METRICS above.
-# Each entry is (dir_label, toml_value): the directory + CSV label is the short
-# "mono"/"muc", and here the TOML value happens to differ only for "mono"
-# ("monolithic"), the string EnumNames<RepairMode> spells. Like
-# --weakening/--metric, --repair defaults to None so the flat layout and the
-# repair_mode from DEFAULTS stay byte-identical to the pre-factor grids.
-REPAIRS: dict[str, list[tuple[str, str]]] = {
-    "mono": [("mono", "monolithic")],
-    "muc":  [("muc", "muc")],
-    "both": [("mono", "monolithic"), ("muc", "muc")],
-}
+# No repair-mode directory is written: monolithic repair is the only mode left,
+# and repair_mode_of() reads a config without one as LEGACY_REPAIR ("mono"),
+# which is correct.
 
 # Mirrors the built-in defaults from include/config.hpp. Every entry tracks the
-# binary except the eight enumerated below, and check_config_schema.py enforces
+# binary except those enumerated below, and check_config_schema.py enforces
 # that: it walks this table against config.hpp's in-class initialisers and fails
 # on any key that is neither mapped to a member nor listed there as exempt. A
 # key whose C++ default moves is therefore corrected here rather than noticed
@@ -83,18 +70,6 @@ REPAIRS: dict[str, list[tuple[str, str]]] = {
 #
 # The deliberate divergences, and why each one does not follow the binary:
 #
-#   * metric — pinned "direct"; config.hpp defaults it to "logarithmic". A flat
-#     config carries no metric directory, so metric_of() in run_experiments.py
-#     attributes it to LEGACY_METRIC ("direct"), and `metric` is one of
-#     merge_experiments.KEY_FIELDS, so the emitted value has to keep matching
-#     that recorded CSV column or archived rows stop joining their own
-#     key. Cross the metric explicitly with --metric to exercise
-#     "logarithmic".
-#   * selection_scheme — pinned "nsga2-truncate"; config.hpp defaults it to
-#     "nsga2-apportion". Same argument again: the scheme is the config
-#     *directory* name that scheme_of() reads back into the `selection` CSV key
-#     column, and every generated config pins it explicitly, so the first entry
-#     of SCHEMES has to stay the one past grids were generated under.
 #   * weight_syntactic / weight_semantic / weight_status — pinned 0.33 each;
 #     config.hpp reads 0.1 / 0.2 / 0.7, AuRUS's weights. These three are emitted
 #     *unconditionally* into every config, so every archived config states them
@@ -110,7 +85,7 @@ REPAIRS: dict[str, list[tuple[str, str]]] = {
 DEFAULTS: dict = {
     "generations": 10,
     "population_size": 200,
-    "selection_scheme": "nsga2-truncate",
+    "selection_scheme": "nsga2-apportion",
     "crossover_rate": 0.1,
     "mutation_rate": 1.0,
     # Fraction of the population carried over verbatim, mirroring config.hpp.
@@ -144,7 +119,6 @@ DEFAULTS: dict = {
     # no draw, so a run reproduces one from before the operator existed.
     "p_remove_guarantee": 0.05,
     "default_bound": 20,
-    "metric": "direct",
     "run_implication": True,
     # Keys in VINTAGE_KEYS must follow config.hpp rather than be pinned, because
     # VINTAGE_KEYS sources its written-out values from this table -- a stale
@@ -152,27 +126,15 @@ DEFAULTS: dict = {
     # --pin-vintage, by the mechanism that exists to stop a moved default going
     # unrecorded. check_config_schema.py enforces the agreement for every key
     # of this table that is not deliberately exempt.
-    # Report every gate-passing candidate of every generation rather than only
-    # the final population's. Emitted into [genetic] only when a sweep
-    # overrides it (see make_toml), so every existing grid stays
-    # byte-identical.
-    "accumulate_repairs": True,
     "black_timeout_ms": 1000,
-    "repair_mode": "monolithic",
     # Mirrors include/config.hpp. Emitted into [fitness] only when a sweep
     # overrides it (see make_toml), so every existing grid stays
     # byte-identical; it is in VINTAGE_KEYS.
     "status_grading": "mrs",
     # Mirrors include/config.hpp. Emitted into [fitness] only when a sweep
     # overrides it (see make_toml), so every existing grid stays
-    # byte-identical. Read only under status_grading = "mrs", so pinning it
-    # says nothing about a tiered arm either way.
+    # byte-identical.
     "mrs_admission_order": "degree",
-    # FRETISH keyword placement (see config.hpp). Both mirror the C++ defaults
-    # and are emitted into [fitness] only when a sweep overrides them, so every
-    # existing grid stays byte-identical.
-    "keyword_similarity": "semantic",
-    "semantic_trace_weight": 0.5,
     # TLSF-only [tlsf.mutation] split (see config.hpp). Emitted only when a sweep
     # overrides one of them (see make_toml), so the FRETISH and A/B TLSF grids
     # stay byte-identical to the pre-factor output. They divide mutation's
@@ -185,11 +147,6 @@ DEFAULTS: dict = {
     # [mutation], is read by both paths, and is in VINTAGE_KEYS.
     "p_monotone": 0.25,
     "p_clone_assumption": 0.25,
-    # A width for the disjunctive body tlsf_add_assumption draws and a bare-F
-    # form for an appended assumption (see config.hpp). Both default to their
-    # no-op value in the binary, so a config that omits them is unchanged.
-    "max_assumption_width": 1,
-    "p_bare_assumption": 0.0,
     # Per-call ltlsynt timeout in ms; 0 = no timeout, matching config.hpp.
     # Emitted only when positive, so the standard grids stay byte-identical. The
     # heavy TLSF specs set it to cut ltlsynt's multi-minute realizability tail.
@@ -267,8 +224,6 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         f"mutation_rate   = {_fmt(d['mutation_rate'])}",
     ] + ([f"elitism_rate    = {_fmt(d['elitism_rate'])}"]
          if "elitism_rate" in overrides else []) + (
-        [f"accumulate_repairs = {_fmt(d['accumulate_repairs'])}"]
-        if "accumulate_repairs" in overrides else []) + (
         [f"max_wall_s      = {d['max_wall_s']}"]
         if d.get("max_wall_s") else []) + (
         [f'termination     = "{d["termination"]}"']
@@ -284,11 +239,7 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         f'status_grading   = "{d["status_grading"]}"',
     ] if "status_grading" in overrides else []) + ([
         f'mrs_admission_order = "{d["mrs_admission_order"]}"',
-    ] if "mrs_admission_order" in overrides else []) + ([
-        f'keyword_similarity = "{d["keyword_similarity"]}"',
-    ] if "keyword_similarity" in overrides else []) + ([
-        f"semantic_trace_weight = {_fmt(d['semantic_trace_weight'])}",
-    ] if "semantic_trace_weight" in overrides else []) + [
+    ] if "mrs_admission_order" in overrides else []) + [
         "",
         "[mutation]",
         f"p_trigger  = {_fmt(d['p_trigger'])}",
@@ -309,7 +260,6 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         "",
         "[model_counting]",
         f"default_bound = {d['default_bound']}",
-        f'metric = "{d["metric"]}"',
         "",
         "[filters]",
         f"run_implication = {_fmt(d['run_implication'])}",
@@ -325,25 +275,15 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         [f"max_scoring_failure_rate = {_fmt(d['max_scoring_failure_rate'])}"]
         if d.get("max_scoring_failure_rate") else []) + (
         [f"dashboard = {_fmt(d['dashboard'])}"]
-        if d.get("dashboard") else []) + [
-        "",
-        "[tlsf]",
-        f'repair_mode = "{d["repair_mode"]}"',
-    ] + ([
+        if d.get("dashboard") else []) + ([
         "",
         "[tlsf.mutation]",
         f"p_assumption = {_fmt(d['p_assumption'])}",
         f"p_temporal   = {_fmt(d['p_temporal'])}",
     ] + ([f"p_clone_assumption = {_fmt(d['p_clone_assumption'])}"]
-        if "p_clone_assumption" in overrides else []) + (
-        [f"max_assumption_width = {d['max_assumption_width']}"]
-        if "max_assumption_width" in overrides else []) + (
-        [f"p_bare_assumption = {_fmt(d['p_bare_assumption'])}"]
-        if "p_bare_assumption" in overrides else [])
+        if "p_clone_assumption" in overrides else [])
         if overrides.keys() & {"p_assumption", "p_temporal",
-                               "p_clone_assumption",
-                               "max_assumption_width",
-                               "p_bare_assumption"}
+                               "p_clone_assumption"}
         else []) + [
         "",
     ])
@@ -412,7 +352,6 @@ SWEEP_R: list[tuple[str, dict]] = [
 VINTAGE_KEYS: tuple[str, ...] = (
     "status_grading", "mrs_admission_order",
     "p_condition_type", "p_scope", "p_monotone",
-    "keyword_similarity", "semantic_trace_weight",
 )
 
 
@@ -539,21 +478,9 @@ def parse_args() -> argparse.Namespace:
                              "results' weakening column reads wkoff. Names the "
                              "directory only: the weakening filter no longer "
                              "exists and no key is written (choices: "
-                             f"{', '.join(WEAKENINGS)}). Omit for the flat "
-                             "layout, which run_experiments.py attributes to "
-                             "the legacy wkon")
-    parser.add_argument("--metric", choices=list(METRICS), default=None,
-                        metavar="METRIC",
-                        help="Cross model_counting.metric in as a factor, "
-                             "writing <scheme>/[<weakening>/]<direct|log>/ "
-                             f"(choices: {', '.join(METRICS)}). Omit to keep the "
-                             "flat layout and take metric from the defaults")
-    parser.add_argument("--repair", choices=list(REPAIRS), default=None,
-                        metavar="MODE",
-                        help="Cross tlsf.repair_mode in as a factor, writing "
-                             "<scheme>/[<weakening>/][<metric>/]<mono|muc>/ "
-                             f"(choices: {', '.join(REPAIRS)}). Omit to keep the "
-                             "flat layout and take repair_mode from the defaults")
+                             f"{', '.join(WEAKENINGS)}). Omit to leave the "
+                             "directory out, which run_experiments.py "
+                             "attributes to the legacy wkon")
     parser.add_argument("--out-dir", type=Path, default=CONFIGS_DIR, metavar="PATH",
                         help=f"Directory to write <scheme>/ dirs into (default: "
                              f"{CONFIGS_DIR})")
@@ -564,10 +491,11 @@ def parse_args() -> argparse.Namespace:
                              "off for a full campaign, on for a subset")
     parser.add_argument("--tlsf", action="store_true",
                         help="Emit the TLSF campaign grid: a coarse "
-                             "generations x population cross (sweeps A, B) for "
-                             "nsga2-truncate only, into configs-tlsf. Unless "
-                             "overridden, sets --schemes nsga2-truncate and "
-                             "--out-dir configs-tlsf")
+                             "generations x population cross (sweeps A, B) and "
+                             "the elitism sweep R, for nsga2-apportion only, "
+                             "into configs-tlsf. Unless overridden, sets "
+                             "--schemes nsga2-apportion and --out-dir "
+                             "configs-tlsf")
     parser.add_argument("--pin-vintage", action="store_true",
                         help="Write every key whose built-in default has moved "
                              f"({', '.join(VINTAGE_KEYS)}) into each config "
@@ -674,7 +602,7 @@ def main() -> None:
     if args.tlsf:
         sweep_table = TLSF_SWEEPS
         if schemes == SCHEMES:
-            schemes = ["nsga2-truncate"]
+            schemes = ["nsga2-apportion"]
         if out_dir == CONFIGS_DIR:
             out_dir = TLSF_CONFIGS_DIR
         if ltlsynt_timeout is None:
@@ -716,20 +644,6 @@ def main() -> None:
         [(d, {}) for d in WEAKENINGS[args.weakening]]
         if args.weakening else [(None, {})]
     )
-    # (subdirectory, metric override). None ⇒ flat layout with the metric from
-    # DEFAULTS, mirroring the weakening default. The metric directory nests
-    # below the weakening one: <scheme>/[<weakening>/]<direct|log>/.
-    metrics: list[tuple[str | None, dict]] = (
-        [(d, {"metric": v}) for d, v in METRICS[args.metric]]
-        if args.metric else [(None, {})]
-    )
-    # (subdirectory, repair_mode override). None ⇒ flat layout with repair_mode
-    # from DEFAULTS, mirroring weakening/metric. The repair directory nests
-    # below the metric one: <scheme>/[<weakening>/][<metric>/]<mono|muc>/.
-    repairs: list[tuple[str | None, dict]] = (
-        [(d, {"repair_mode": v}) for d, v in REPAIRS[args.repair]]
-        if args.repair else [(None, {})]
-    )
 
     # Keys whose C++ default has moved at least once, written out explicitly so
     # the archive states them rather than inheriting whatever the binary means
@@ -740,26 +654,19 @@ def main() -> None:
     count = 0
     for scheme in schemes:
         for wk_dir, wk_override in weakenings:
-            for mx_dir, mx_override in metrics:
-                for rp_dir, rp_override in repairs:
-                    out = out_dir / scheme
-                    for seg in (wk_dir, mx_dir, rp_dir):
-                        if seg is not None:
-                            out = out / seg
-                    out.mkdir(parents=True, exist_ok=True)
-                    for sweep_name, levels in sweeps:
-                        for level_name, overrides in levels:
-                            path = out / f"sweep_{sweep_name}_{level_name}.toml"
-                            path.write_text(make_toml(
-                                {**pinned, **overrides,
-                                 "selection_scheme": scheme,
-                                 **wk_override, **mx_override, **rp_override},
-                                defaults))
-                            count += 1
-                    label = "/".join(p for p in (scheme, wk_dir, mx_dir, rp_dir)
-                                     if p is not None)
-                    print(f"  {label:24} "
-                          f"{len(list(out.glob('sweep_*.toml'))):3} configs")
+            segments = [p for p in (scheme, wk_dir, METRIC_DIR) if p is not None]
+            out = out_dir.joinpath(*segments)
+            out.mkdir(parents=True, exist_ok=True)
+            for sweep_name, levels in sweeps:
+                for level_name, overrides in levels:
+                    path = out / f"sweep_{sweep_name}_{level_name}.toml"
+                    path.write_text(make_toml(
+                        {**pinned, **overrides, "selection_scheme": scheme,
+                         **wk_override},
+                        defaults))
+                    count += 1
+            print(f"  {'/'.join(segments):24} "
+                  f"{len(list(out.glob('sweep_*.toml'))):3} configs")
     print(f"\nGenerated {count} config files in {out_dir}")
 
 

@@ -1,7 +1,7 @@
 #pragma once
 
 // The search itself: the per-generation filter set and the generation loop
-// both TLSF repair modes run over a specification.
+// TLSF repair runs over a specification.
 
 #include <cstddef>
 #include <string>
@@ -20,21 +20,15 @@
 
 namespace tlsf::internal {
 
-// Says where one evolve run should report its progress, and how to place it in
-// a run that evolves more than once. MUC repair calls evolve_population per
-// core, so gen_offset keeps the dashboard's generation numbering monotonic
-// across those calls while muc_iter records which core a generation belonged
-// to. A null writer disables reporting entirely.
+// Says where one evolve run should report its progress. A null writer
+// disables reporting entirely.
 struct DashboardProgress {
     DashboardWriter* writer = nullptr;
     std::vector<std::string> objective_names;
-    std::size_t gen_offset = 0;
-    std::size_t muc_iter = 0;
 };
 
 // Evolves `spec` under `cfg` against `fitness`, returning the final scored
 // population and, via `filter_stats_out`, this run's per-filter in/out totals.
-// Shared by both repair modes; in MUC mode `spec` is a core sub-specification.
 //
 // Gate-passing candidates are offered to `accumulator_out` at the end of each
 // generation. Unlike the FRETISH path this costs a gate sweep the run would not

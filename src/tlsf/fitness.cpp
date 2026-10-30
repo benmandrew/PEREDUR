@@ -31,12 +31,10 @@ constexpr std::size_t k_n_sections = 6;
 // (the union of both formulae's atoms, so the conjunction count never exceeds
 // either individual count), then hands the three counts to the shared
 // semantic_similarity_from_counts -- the same routine the FRETISH requirement
-// pairs use -- so the configured metric (direct or logarithmic) and its [0, 1]
-// clamp apply here too.
+// pairs use -- so the logarithmic metric and its [0, 1] clamp apply here too.
 double formula_pair_semantic_similarity(const Formula& first,
                                         const Formula& second,
-                                        std::size_t bound,
-                                        SimilarityMetric metric) {
+                                        std::size_t bound) {
     std::unordered_set<std::string> atoms;
     collect_atoms(first, atoms);
     collect_atoms(second, atoms);
@@ -64,7 +62,7 @@ double formula_pair_semantic_similarity(const Formula& first,
         cached_count_traces(ltl_first, n_atoms, step_count),
         cached_count_traces(ltl_second, n_atoms, step_count),
         cached_count_traces(conjunction, n_atoms, step_count)};
-    return semantic_similarity_from_counts(counts, metric);
+    return semantic_similarity_from_counts(counts);
 }
 
 }  // namespace
@@ -105,7 +103,6 @@ std::vector<std::function<double()>> tlsf_semantic_similarity_terms(
     const tlsf::Specification& spec, const tlsf::Specification& original,
     const Config& cfg) {
     const std::size_t bound = cfg.default_model_counting_bound;
-    const SimilarityMetric metric = cfg.similarity_metric;
     std::vector<std::function<double()>> terms;
     const auto spec_sections = tlsf::sections_of(spec);
     const auto original_sections = tlsf::sections_of(original);
@@ -127,9 +124,8 @@ std::vector<std::function<double()>> tlsf_semantic_similarity_terms(
                 continue;
             }
             terms.emplace_back([&first = lhs[i].m_formula,
-                                &second = rhs[i].m_formula, bound, metric] {
-                return formula_pair_semantic_similarity(first, second, bound,
-                                                        metric);
+                                &second = rhs[i].m_formula, bound] {
+                return formula_pair_semantic_similarity(first, second, bound);
             });
         }
     }
@@ -155,7 +151,7 @@ std::vector<std::string> tlsf_status_components(
     const tlsf::Specification& spec) {
     // A TLSF specification's components are the individual formulae of its six
     // sections; the FRETISH path decomposes differently but scores on the same
-    // scale, which is why both route through status_score.
+    // scale, which is why both route through status_score_mrs.
     std::vector<std::string> components;
     for (const Section* section : tlsf::sections_of(spec)) {
         for (const SectionEntry& entry : *section) {
@@ -184,7 +180,7 @@ double tlsf_status(const tlsf::Specification& spec, const Config& cfg,
         return status_score_aurus(
             spec.assumption_ltl(), spec.guarantee_ltl(), sat, [&spec, &real] {
                 // Realizability alone, with no well-separation query behind
-                // it, unlike either branch below. See status_score_aurus.
+                // it, unlike the walk below. See status_score_aurus.
                 return real
                     .check_realizability_ltl(spec.to_ltl(), spec.m_inputs,
                                              spec.m_outputs,
@@ -193,43 +189,29 @@ double tlsf_status(const tlsf::Specification& spec, const Config& cfg,
             });
     }
     // An empty component list passes the tier vacuously, which is exactly what
-    // ComponentCheck::Skipped asks for; both scales below already handle it.
+    // ComponentCheck::Skipped asks for; the walk below already handles it.
     const std::vector<std::string> components =
         component_check == ComponentCheck::Included
             ? tlsf_status_components(spec)
             : std::vector<std::string>{};
-    if (cfg.status_grading == StatusGrading::Mrs) {
-        const std::vector<tlsf::CoreFormula> parts =
-            tlsf::split_guarantee_parts(spec);
-        return status_score_mrs(
-            components, parts.size(), sat,
-            [&spec, &parts, &real](const std::vector<std::size_t>& indices) {
-                const tlsf::Specification subset =
-                    tlsf::build_part_subset(spec, parts, indices);
-                // Undecided resolves as unrealizable, so the part is rejected:
-                // a timed-out query must not buy a candidate a point.
-                return real.check_realizability_ltl(
-                               subset.to_ltl(), subset.m_inputs,
-                               subset.m_outputs,
-                               tlsf::specification_sides(subset))
-                           .value_or(false) &&
-                       !specification_is_not_well_separated(subset, real);
-            },
-            admission_order,
-            "(" + spec.assumption_ltl() + ") & (" + spec.guarantee_ltl() + ")",
-            cfg.mrs_speculation_depth);
-    }
-
-    return status_score(components, sat, [&spec, &real] {
-        const bool realizable =
-            real.check_realizability_ltl(spec.to_ltl(), spec.m_inputs,
-                                         spec.m_outputs,
-                                         tlsf::specification_sides(spec))
-                .value_or(false);
-        // Behind the realizability query, as on the FRETISH path: an
-        // unrealizable candidate cannot be realizable for the wrong reason.
-        return realizable && !specification_is_not_well_separated(spec, real);
-    });
+    const std::vector<tlsf::CoreFormula> parts =
+        tlsf::split_guarantee_parts(spec);
+    return status_score_mrs(
+        components, parts.size(), sat,
+        [&spec, &parts, &real](const std::vector<std::size_t>& indices) {
+            const tlsf::Specification subset =
+                tlsf::build_part_subset(spec, parts, indices);
+            // Undecided resolves as unrealizable, so the part is rejected:
+            // a timed-out query must not buy a candidate a point.
+            return real.check_realizability_ltl(
+                           subset.to_ltl(), subset.m_inputs, subset.m_outputs,
+                           tlsf::specification_sides(subset))
+                       .value_or(false) &&
+                   !specification_is_not_well_separated(subset, real);
+        },
+        admission_order,
+        "(" + spec.assumption_ltl() + ") & (" + spec.guarantee_ltl() + ")",
+        cfg.mrs_speculation_depth);
 }
 
 namespace {
@@ -271,8 +253,7 @@ struct TlsfScorers {
                static_cast<double>(tlsf::count_live_guarantees(spec));
     }
 
-    // Built on the specification being evolved, which under repair_mode = "muc"
-    // is each core's sub-specification in turn.
+    // Built on the specification being evolved.
     static std::vector<std::size_t> admission_order(
         const tlsf::Specification& original) {
         const std::vector<tlsf::CoreFormula> parts =

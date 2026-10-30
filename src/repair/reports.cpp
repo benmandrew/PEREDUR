@@ -176,8 +176,7 @@ void print_diagnostics_report() {
     std::cout << "MRS walk lookahead: " << MrsSpeculationStats::n_issued
               << " issued, " << MrsSpeculationStats::n_started << " started, "
               << MrsSpeculationStats::n_consumed << " consumed by the walk\n";
-    std::cout << "\nRepairs contributed by the cross-generation accumulator "
-                 "(0 unless genetic.accumulate_repairs is set): "
+    std::cout << "\nRepairs contributed by the cross-generation accumulator: "
               << AccumulatorStats::n_contributed << "\n";
     print_cache_report();
     std::cout << "\nFitness cache: " << FitnessCacheStats::n_hits << " hits / "

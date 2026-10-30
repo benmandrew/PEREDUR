@@ -37,8 +37,7 @@ enum class PopulationView : std::uint8_t { Scored, Unscored };
 /// True for the selection schemes that rank by the NSGA-II crowded-comparison
 /// order rather than the blended fitness scalar.
 inline bool uses_nsga2_ranking(const Config& cfg) {
-    return cfg.selection_scheme == SelectionScheme::Nsga2Truncate ||
-           cfg.selection_scheme == SelectionScheme::Nsga2Apportion;
+    return cfg.selection_scheme == SelectionScheme::Nsga2Apportion;
 }
 
 /// What ended a run, reported as `stopped_by` in the run manifest so a survival
@@ -49,11 +48,9 @@ enum class StopReason : std::uint8_t { Generations, Individuals, Deadline };
 /// The run-level half of termination: the budgets that span generations rather
 /// than living inside one.
 ///
-/// One instance per run, shared by every generation and -- under
-/// `[tlsf] repair_mode = "muc"` -- by every core the loop evolves, since the
-/// budget belongs to the run and run_muc restarts the generation count per
-/// core. Inactive unless a config asks for it, and then it costs one comparison
-/// against the parent per bred offspring plus one steady_clock read.
+/// One instance per run, shared by every generation. Inactive unless a config
+/// asks for it, and then it costs one comparison against the parent per bred
+/// offspring plus one steady_clock read.
 class SearchBudget {
    public:
     using Clock = std::chrono::steady_clock;
@@ -77,9 +74,7 @@ class SearchBudget {
     void count_offspring() { ++m_bred; }
 
     /// Counts one completed generation. Called by the driver whatever the
-    /// budget is, since the manifest reports the count on every run, and under
-    /// `[tlsf] repair_mode = "muc"` it accumulates over every core rather than
-    /// restarting with the generation index.
+    /// budget is, since the manifest reports the count on every run.
     void count_generation() { ++m_generations; }
 
     [[nodiscard]] std::size_t generations() const { return m_generations; }
@@ -140,7 +135,7 @@ class SearchBudget {
 /// Orders a scored population best-first according to @p cfg's selection
 /// scheme: descending weighted fitness for WeightedAverage, or the NSGA-II
 /// crowded-comparison order (front rank ascending, crowding descending) for
-/// Nsga2Truncate and Nsga2Apportion. The sort is stable in both cases so a
+/// Nsga2Apportion. The sort is stable in both cases so a
 /// fixed RNG seed is reproducible.
 template <typename Spec>
 void order_population(const Config& cfg,
@@ -561,11 +556,10 @@ void stage_select(GenerationContext<Spec>& ctx) {
         return;
     }
     // (mu + lambda) survivor selection: pool the incoming parents with the
-    // freshly scored offspring, rank the union by the crowded-comparison order,
-    // and keep the best target_size. This is NSGA-II's elitism, so no
-    // non-dominated candidate is ever lost; padding duplicates carry zero
-    // crowding distance and are shed first. Parents keep their cached objective
-    // vectors, so pooling adds no re-scoring.
+    // freshly scored offspring, rank the distinct union by the
+    // crowded-comparison order, and keep the best target_size. This is
+    // NSGA-II's elitism, so no non-dominated candidate is ever lost. Parents
+    // keep their cached objective vectors, so pooling adds no re-scoring.
     //
     // The pool takes m_parents, in their original order, not m_sorted_parents:
     // nsga2_sort is stable, so pre-sorting the parents would settle ties
@@ -574,19 +568,15 @@ void stage_select(GenerationContext<Spec>& ctx) {
     pool.insert(pool.end(), std::make_move_iterator(ctx.m_scored.begin()),
                 std::make_move_iterator(ctx.m_scored.end()));
 
-    const bool apportion =
-        ctx.m_cfg.selection_scheme == SelectionScheme::Nsga2Apportion;
-    if (apportion) {
-        // Ranking the distinct specifications rather than the ~target_size
-        // slots holding them stops the truncation below from cutting
-        // arbitrarily through the rank-0 front.
-        pool = generation_detail::dedup_by_specification(std::move(pool));
-    }
+    // Ranking the distinct specifications rather than the ~target_size slots
+    // holding them stops the truncation below from cutting arbitrarily through
+    // the rank-0 front.
+    pool = generation_detail::dedup_by_specification(std::move(pool));
     nsga2_sort(pool);
 
     if (pool.size() > ctx.m_target_size) {
         pool.resize(ctx.m_target_size);
-    } else if (apportion && pool.size() < ctx.m_target_size) {
+    } else if (pool.size() < ctx.m_target_size) {
         // Deduplication alone would leave too few slots to breed from, so
         // selection pressure is re-expressed as replication multiplicity.
         pool = generation_detail::replicate_to_size(pool, ctx.m_target_size);

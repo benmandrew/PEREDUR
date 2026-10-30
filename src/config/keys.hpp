@@ -20,16 +20,13 @@ enum class KeyCheck : std::uint8_t {
     NotNegative,  // "must not be negative"
     Positive,     // "must be positive"
     AtLeastOne,   // "must be >= 1"
-    // "must be at least 1", and the only message without the "config: " prefix
-    WidthAtLeastOne,
 };
 
 using ConfigMember =
     std::variant<double Config::*, std::size_t Config::*, bool Config::*,
                  std::chrono::milliseconds Config::*, SelectionScheme Config::*,
                  TerminationMode Config::*, StatusGrading Config::*,
-                 MrsAdmissionOrder Config::*, SimilarityMetric Config::*,
-                 RepairMode Config::*, KeywordSimilarity Config::*>;
+                 MrsAdmissionOrder Config::*>;
 
 struct ConfigKey {
     const char* section;  // dotted, as in "tlsf.mutation"
@@ -44,7 +41,7 @@ struct ConfigKey {
 // more than one. A new key also needs schemas/config-schema.json and
 // example-config.toml; scripts/check_config_schema.py reads this table to hold
 // them to it.
-inline constexpr std::array<ConfigKey, 46> k_config_keys{{
+inline constexpr std::array<ConfigKey, 38> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive},
     {"genetic", "population_size", &Config::population_size,
      KeyCheck::Positive},
@@ -54,8 +51,6 @@ inline constexpr std::array<ConfigKey, 46> k_config_keys{{
     {"genetic", "crossover_rate", &Config::crossover_rate,
      KeyCheck::Probability},
     {"genetic", "mutation_rate", &Config::mutation_rate, KeyCheck::Probability},
-    {"genetic", "accumulate_repairs", &Config::accumulate_repairs,
-     KeyCheck::None},
     {"genetic", "max_individuals", &Config::max_individuals,
      KeyCheck::NotNegative},
     {"genetic", "max_wall_s", &Config::max_wall_s, KeyCheck::NotNegative},
@@ -70,10 +65,6 @@ inline constexpr std::array<ConfigKey, 46> k_config_keys{{
     {"fitness", "status_grading", &Config::status_grading, KeyCheck::None},
     {"fitness", "mrs_admission_order", &Config::mrs_admission_order,
      KeyCheck::None},
-    {"fitness", "keyword_similarity", &Config::keyword_similarity,
-     KeyCheck::None},
-    {"fitness", "semantic_trace_weight", &Config::semantic_trace_weight,
-     KeyCheck::Probability},
     {"mutation", "p_trigger", &Config::p_trigger, KeyCheck::Probability},
     {"mutation", "p_response", &Config::p_response, KeyCheck::Probability},
     {"mutation", "p_timing", &Config::p_timing, KeyCheck::Probability},
@@ -90,7 +81,6 @@ inline constexpr std::array<ConfigKey, 46> k_config_keys{{
      KeyCheck::Probability},
     {"model_counting", "default_bound", &Config::default_model_counting_bound,
      KeyCheck::Positive},
-    {"model_counting", "metric", &Config::similarity_metric, KeyCheck::None},
     {"filters", "run_implication", &Config::run_implication_filter,
      KeyCheck::None},
     {"runtime", "black_timeout_ms", &Config::black_timeout,
@@ -113,13 +103,6 @@ inline constexpr std::array<ConfigKey, 46> k_config_keys{{
      KeyCheck::Probability},
     {"tlsf.mutation", "p_clone_assumption", &Config::tlsf_p_clone_assumption,
      KeyCheck::Probability},
-    {"tlsf.mutation", "p_bare_assumption", &Config::tlsf_p_bare_assumption,
-     KeyCheck::Probability},
-    {"tlsf.mutation", "max_assumption_width",
-     &Config::tlsf_max_assumption_width, KeyCheck::WidthAtLeastOne},
-    {"tlsf", "repair_mode", &Config::repair_mode, KeyCheck::None},
-    {"tlsf", "muc_max_iterations", &Config::muc_max_iterations,
-     KeyCheck::Positive},
 }};
 
 // The table names along a dotted section, outermost first.

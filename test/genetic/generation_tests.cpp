@@ -379,14 +379,14 @@ AggregateWeightedFitnessFunction two_objective_fns() {
                                               1.0, "b"}});
 }
 
-Config nsga2_truncate_config() {
+Config nsga2_apportion_config() {
     Config cfg;
-    cfg.selection_scheme = SelectionScheme::Nsga2Truncate;
+    cfg.selection_scheme = SelectionScheme::Nsga2Apportion;
     return cfg;
 }
 
-TEST(test_evolve_generation_nsga2_truncate_produces_target_size) {
-    const Config cfg = nsga2_truncate_config();
+TEST(test_evolve_generation_nsga2_apportion_trims_to_target_size) {
+    const Config cfg = nsga2_apportion_config();
     const AggregateWeightedFitnessFunction fns = two_objective_fns();
     const std::vector<ScoredSpecification> pop = score_population(
         cfg, {make_spec("p", "q"), make_spec("r", "s"), make_spec("t", "u")},
@@ -394,13 +394,12 @@ TEST(test_evolve_generation_nsga2_truncate_produces_target_size) {
     const auto next_gen =
         evolve_generation(cfg, pop, 2, 0, fns, {}, make_source({}, 0));
     expect(next_gen.size() == 2,
-           "evolve_generation/nsga2-truncate: (mu+lambda) pooling still yields "
-           "exactly "
-           "target_size survivors");
+           "evolve_generation/nsga2-apportion: (mu+lambda) pooling still "
+           "yields exactly target_size survivors");
 }
 
-TEST(test_evolve_generation_nsga2_truncate_preserves_front_no_elitism) {
-    Config cfg = nsga2_truncate_config();
+TEST(test_evolve_generation_nsga2_apportion_preserves_front_no_elitism) {
+    Config cfg = nsga2_apportion_config();
     cfg.crossover_rate = 0.0;
     cfg.mutation_rate = 0.0;
     const AggregateWeightedFitnessFunction fns = two_objective_fns();
@@ -422,31 +421,9 @@ TEST(test_evolve_generation_nsga2_truncate_preserves_front_no_elitism) {
                         return first_condition(scored.specification) == "p";
                     });
     expect(p_survived,
-           "evolve_generation/nsga2-truncate: the Pareto-optimal parent "
-           "survives via "
-           "(mu+lambda) pooling even with no elitism and its offspring "
-           "filtered out");
-}
-
-TEST(test_evolve_generation_nsga2_truncate_is_deterministic) {
-    const Config cfg = nsga2_truncate_config();
-    const AggregateWeightedFitnessFunction fns = two_objective_fns();
-    const std::vector<ScoredSpecification> pop = score_population(
-        cfg, {make_spec("p", "q"), make_spec("r", "s"), make_spec("t", "u")},
-        fns);
-    const auto first =
-        evolve_generation(cfg, pop, 2, 0, fns, {}, make_source({1, 2, 3}, 0));
-    const auto second =
-        evolve_generation(cfg, pop, 2, 0, fns, {}, make_source({1, 2, 3}, 0));
-    bool identical = first.size() == second.size();
-    for (std::size_t i = 0; identical && i < first.size(); ++i) {
-        identical = first_condition(first[i].specification) ==
-                    first_condition(second[i].specification);
-    }
-    expect(
-        identical,
-        "evolve_generation/nsga2-truncate: identical inputs and RNG produce an "
-        "identical, stably-ordered generation");
+           "evolve_generation/nsga2-apportion: the Pareto-optimal parent "
+           "survives via (mu+lambda) pooling even with no elitism and its "
+           "offspring filtered out");
 }
 
 // --- dedup_by_specification / replicate_to_size ---
@@ -601,12 +578,6 @@ std::size_t distinct_specifications(
     return hashes.size();
 }
 
-Config nsga2_apportion_config() {
-    Config cfg;
-    cfg.selection_scheme = SelectionScheme::Nsga2Apportion;
-    return cfg;
-}
-
 TEST(test_evolve_generation_nsga2_apportion_produces_target_size) {
     const Config cfg = nsga2_apportion_config();
     const AggregateWeightedFitnessFunction fns = two_objective_fns();
@@ -626,26 +597,22 @@ TEST(test_evolve_generation_nsga2_apportion_produces_target_size) {
 
 TEST(test_evolve_generation_nsga2_apportion_retains_distinct_candidates) {
     const AggregateWeightedFitnessFunction fns = two_objective_fns();
-    // "p" dominates both others on both objectives, so under nsga2-truncate its
-    // three copies fill the rank-0 front and truncation keeps the copies in
-    // preference to the distinct candidates behind them.
+    // "p" dominates both others on both objectives, so its three copies would
+    // fill the rank-0 front of an undeduplicated pool, and cutting that pool at
+    // target_size would keep the copies in preference to the distinct
+    // candidates behind them. Deduplicating first leaves at least the three
+    // distinct parents to fill the slots.
     const std::vector<Specification> specs = {
         make_spec("p", "q"), make_spec("p", "q"), make_spec("p", "q"),
         make_spec("r", "s"), make_spec("t", "u")};
-    const Config truncating = nsga2_truncate_config();
     const Config apportioning = nsga2_apportion_config();
-    const auto truncated_next =
-        evolve_generation(truncating, score_population(truncating, specs, fns),
-                          4, 0, fns, {}, make_source({1, 2, 3}, 0));
     const auto apportioned_next = evolve_generation(
         apportioning, score_population(apportioning, specs, fns), 4, 0, fns, {},
         make_source({1, 2, 3}, 0));
-    expect(
-        distinct_specifications(apportioned_next) >
-            distinct_specifications(truncated_next),
-        "evolve_generation/nsga2-apportion: deduplicating before truncation "
-        "should hold strictly more distinct specifications than nsga2-truncate "
-        "when duplicates crowd the rank-0 front");
+    expect(distinct_specifications(apportioned_next) >= 3,
+           "evolve_generation/nsga2-apportion: deduplicating before truncation "
+           "should keep at least the three distinct parents when duplicates "
+           "crowd the rank-0 front");
 }
 
 TEST(test_evolve_generation_nsga2_apportion_is_deterministic) {

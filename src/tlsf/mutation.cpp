@@ -308,72 +308,6 @@ Formula mutate_propositional_parts(const Formula& formula,
     }
 }
 
-// The body of an appended assumption, drawn from a small grammar rather than
-// emitted from one template:
-//
-//     term := [F] (literal & ... & literal)      1..w literals
-//     body := term | ... | term                  1..w terms
-//
-// A single literal was all this could draw until 2026-08-25, which put a class
-// of ideal off the grammar rather than merely far from it. The corpus wants
-// both connectives and wants them nested. examples/lift needs
-// `G F (b1 | b2 | b3)`, a disjunction of literals. examples/humanoid-503 needs
-// `G F (!m0 & !m1 & m2 & !button)`, a conjunction of four. examples/gyro-var2
-// needs a disjunction of five terms, three of them conjunctive triples and two
-// of those under F. No sequence of draws reached any of them: the atom-growth
-// move in mutate_atom_formula grafts onto an *existing* atom, so it can widen a
-// body only once the assumption is in the population, and an assumption that is
-// wrong when appended is dominated before it can be widened.
-//
-// Distinct atoms within a term, drawn without replacement, so a term cannot
-// contradict itself into `false` or repeat a literal into a no-op. Across terms
-// the pool is redrawn, gyro's ideal disjoining two conjunctions over the same
-// three signals.
-//
-// At width 1 no width is drawn and no F is drawn, so the RandomSource stream is
-// exactly what it was before this existed and an archived campaign reproduces
-// byte for byte by writing max_assumption_width = 1.
-Formula draw_assumption_term(const std::vector<std::string>& inputs,
-                             const RandomSource& random_source,
-                             std::size_t ceiling) {
-    const std::size_t width = 1 + random_source.next_index(ceiling);
-    std::vector<std::string> pool = inputs;
-    Formula term = Formula::make_atom("true");
-    for (std::size_t drawn = 0; drawn < width; ++drawn) {
-        const std::size_t choice = random_source.next_index(pool.size());
-        const Formula atom = Formula::make_atom(pool[choice]);
-        const Formula literal =
-            random_source.next_bool()
-                ? Formula::make_unary(Formula::Kind::Not, atom)
-                : atom;
-        pool.erase(pool.begin() + static_cast<std::ptrdiff_t>(choice));
-        term = drawn == 0
-                   ? literal
-                   : Formula::make_binary(Formula::Kind::And, term, literal);
-    }
-    return random_source.next_bool()
-               ? Formula::make_unary(Formula::Kind::Eventually, term)
-               : term;
-}
-
-Formula draw_assumption_body(const std::vector<std::string>& inputs,
-                             const RandomSource& random_source,
-                             const Config& cfg) {
-    const std::size_t ceiling =
-        std::min(cfg.tlsf_max_assumption_width, inputs.size());
-    if (ceiling <= 1) {
-        return draw_literal(inputs, random_source);
-    }
-    const std::size_t terms = 1 + random_source.next_index(ceiling);
-    Formula body = draw_assumption_term(inputs, random_source, ceiling);
-    for (std::size_t drawn = 1; drawn < terms; ++drawn) {
-        const Formula next =
-            draw_assumption_term(inputs, random_source, ceiling);
-        body = Formula::make_binary(Formula::Kind::Or, body, next);
-    }
-    return body;
-}
-
 // Modality of a conditional assumption's consequent, o ∈ {F, X, nothing}.
 // `F` was hard-wired here until 2026-08-19, which put two whole families of
 // ideal beyond the operator: rg1's `G(!valid -> X !cancel)` and minepump's
@@ -462,27 +396,11 @@ tlsf::Specification tlsf_add_assumption(const tlsf::Specification& spec,
         return spec;
     }
     tlsf::Specification mutated = spec;
-    const Formula body =
-        draw_assumption_body(spec.m_inputs, random_source, cfg);
+    const Formula body = draw_literal(spec.m_inputs, random_source);
     if (random_source.next_real() >= cfg.p_conditional_assumption) {
-        // `F body` as well as `G F body`. Every appended assumption was
-        // wrapped in G until 2026-08-25, which made a bare eventuality
-        // unreachable rather than unlikely: examples/lily11's whole ideal is
-        // `F req`, and `G F req` is strictly stronger, so no amount of
-        // rewriting a G-wrapped assumption arrives at it. The bare form is the
-        // weaker assumption of the two, so it constrains the environment less
-        // and is the harder of the pair to repair with -- which is why it is
-        // drawn rather than substituted.
-        //
-        // Read before the RandomSource is touched, so at 0 it costs no draw.
-        const Formula fairness =
-            Formula::make_unary(Formula::Kind::Eventually, body);
-        const bool bare =
-            cfg.tlsf_p_bare_assumption > 0.0 &&
-            random_source.next_real() < cfg.tlsf_p_bare_assumption;
-        mutated.m_assume.emplace_back(
-            bare ? fairness
-                 : Formula::make_unary(Formula::Kind::Globally, fairness));
+        mutated.m_assume.emplace_back(Formula::make_unary(
+            Formula::Kind::Globally,
+            Formula::make_unary(Formula::Kind::Eventually, body)));
         return mutated;
     }
     std::vector<std::string> guard_pool = spec.m_inputs;

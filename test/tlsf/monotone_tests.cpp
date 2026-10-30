@@ -198,13 +198,6 @@ TEST(test_zero_probability_costs_no_draw) {
         parse_main("INPUTS { a; } OUTPUTS { c; }\nGUARANTEE { G (a -> F c); }");
     Config off;
     off.p_monotone = 0.0;
-    // Pinned rather than left to the defaults, the discipline golden_config()
-    // follows in the determinism suite: this golden is an absolute draw count,
-    // so an operator added later at a non-zero default moves it and the
-    // failure reads as a regression in the key actually under test. Each of
-    // these is a no-op at the value set here and costs no draw.
-    off.tlsf_max_assumption_width = 1;
-    off.tlsf_p_bare_assumption = 0.0;
     std::size_t drawn = 0;
     for (std::size_t seed = 0; seed < 8; ++seed) {
         const auto counter = std::make_shared<std::size_t>(0);

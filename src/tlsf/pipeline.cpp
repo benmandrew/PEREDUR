@@ -46,25 +46,6 @@ std::optional<std::string> read_file(const std::string& path) {
     return contents.str();
 }
 
-// The batch route to the final screen, taken wherever the stream is not.
-void apply_final_filters(std::vector<Scored<Specification>>& survivors,
-                         const Specification& original, const Config& cfg) {
-    // The final filter asks whole-specification implications, `(A) & !(B)`
-    // over the lowered specifications, which the search's checker is not
-    // tuned for. SPOT's 500ms budget is sized for single-requirement
-    // queries, and an `ExpectUnsat` query it leaves undecided is never
-    // escalated, so it reads as "keep both". A checker of the stage's own
-    // keeps the search path byte-identical. It starts cold, but no query it
-    // is asked was asked during the search, so there is nothing to inherit.
-    SatisfiabilityChecker final_checker;
-    final_checker.set_timeout(cfg.black_timeout);
-    final_checker.set_spot_budget(cfg.black_timeout);
-    if (cfg.run_implication_filter && survivors.size() > 1) {
-        survivors =
-            internal::keep_maximal(survivors, original, cfg, final_checker);
-    }
-}
-
 }  // namespace
 
 int run_repair(const std::string& input_path, const std::string& output_dir,
@@ -94,9 +75,7 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
 
     // As on the FRETISH path: the seed population is copies of this
     // specification and no filter screens them, so the run says at the start
-    // what the gate would otherwise only reveal at the end. MUC repair needs no
-    // separate screen -- extraction leaves the environment side untouched, and
-    // well-separation reads only that side.
+    // what the gate would otherwise only reveal at the end.
     std::cerr << screen_input(
         original, correctness_checks<Specification>(global_sat_checker(),
                                                     global_real_checker()));
@@ -125,9 +104,7 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
     for (const WeightedFitnessFunctionT<Specification>& objective : fitness) {
         progress.objective_names.push_back(objective.name);
     }
-    // Built from the original spec purely to name the stages. MUC repair
-    // rebuilds these per core, but the filter set, and so the roster, is the
-    // same whichever sub-specification is being evolved.
+    // Built from the original spec purely to name the stages.
     dashboard.run_start(input_path, cfg.generations, cfg.population_size,
                         maybe_seed.value_or(0), progress.objective_names,
                         generation_stage_names(get_filter_functions(
@@ -139,22 +116,17 @@ int run_repair(const std::string& input_path, const std::string& output_dir,
                   << " 8000\n";
     }
 
-    // Null unless the key is on, and then the final screens run while the
-    // search does; destroyed unfinished if anything below throws.
+    // Null unless the implication filter is on, and then the final screens
+    // run while the search does; destroyed unfinished if anything below
+    // throws.
     const std::unique_ptr<StreamingMaximalFilter<Specification>> stream =
         make_maximal_stream(original, cfg, output_dir);
     std::vector<Scored<Specification>> survivors =
-        cfg.repair_mode == RepairMode::Muc
-            ? internal::run_muc(original, cfg, random_source, fitness, progress,
-                                output_dir, budget, stream.get())
-            : internal::run_monolithic(original, cfg, random_source, fitness,
-                                       progress, output_dir, budget,
-                                       stream.get());
+        internal::run_monolithic(original, cfg, random_source, fitness,
+                                 progress, output_dir, budget, stream.get());
     const std::size_t n_realizable = survivors.size();
     if (stream) {
         survivors = internal::finish_maximal_stream(survivors, *stream);
-    } else {
-        apply_final_filters(survivors, original, cfg);
     }
     internal::write_survivors(survivors, fitness, output_dir);
     // budget.generations() rather than cfg.generations: the parameter is the

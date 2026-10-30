@@ -217,49 +217,6 @@ tlsf::Specification without(const tlsf::Specification& base,
     return reduced;
 }
 
-// non_core_formulae returns the guarantee-side formulae NOT in the core, with
-// multiset semantics (one occurrence removed per core member).
-TEST(test_non_core_formulae) {
-    tlsf::Specification spec;
-    spec.m_preset = {Formula::make_atom("p")};
-    spec.m_guarantee = {Formula::make_atom("a"), Formula::make_atom("a"),
-                        Formula::make_atom("b"), Formula::make_atom("c")};
-    const std::vector<tlsf::CoreFormula> core = {{5, Formula::make_atom("a")},
-                                                 {5, Formula::make_atom("c")}};
-
-    const std::vector<tlsf::CoreFormula> rest =
-        tlsf::non_core_formulae(spec, core);
-    // One 'a' consumed by the core, the other survives; 'b' survives; 'p'
-    // (preset, never in this core) survives; 'c' consumed.
-    std::vector<std::string> names;
-    names.reserve(rest.size());
-    for (const tlsf::CoreFormula& entry : rest) {
-        names.push_back(entry.formula.to_string());
-    }
-    std::sort(names.begin(), names.end());
-    expect(names == std::vector<std::string>({"a", "b", "p"}),
-           "non-core keeps the untouched guarantees with multiset semantics");
-}
-
-// reintegrate appends the carried-over non-core formulae back onto a repaired
-// sub-specification, each into its tagged section.
-TEST(test_reintegrate) {
-    tlsf::Specification repaired;
-    repaired.m_outputs = {"y"};
-    repaired.m_guarantee = {Formula::make_atom("a_repaired")};
-    const std::vector<tlsf::CoreFormula> non_core = {
-        {1, Formula::make_atom("p")}, {5, Formula::make_atom("b")}};
-
-    const tlsf::Specification whole = tlsf::reintegrate(repaired, non_core);
-    expect(whole.m_preset.size() == 1 &&
-               whole.m_preset[0].m_formula.to_string() == "p",
-           "reintegrate restores the preset formula");
-    expect(whole.m_guarantee.size() == 2, "reintegrate keeps repaired + b");
-    expect(whole.m_guarantee[0].m_formula.to_string() == "a_repaired" &&
-               whole.m_guarantee[1].m_formula.to_string() == "b",
-           "reintegrate appends non-core after the repaired core");
-}
-
 // End-to-end against ltlsynt on the unrealizable arbiter fixture: the core
 // must be a strict, still-unrealizable subset, minimal in that dropping any
 // one member restores realizability.

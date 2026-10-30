@@ -46,7 +46,6 @@ add_executable(peredur_tests
     tlsf/mucs_tests.cpp
     tlsf/guarantee_parts_tests.cpp
     tlsf/genetic_tests.cpp
-    tlsf/assumption_tests.cpp
     tlsf/monotone_tests.cpp
     tlsf/pipeline_tests.cpp
     fingerprint/lasso_tests.cpp
@@ -131,7 +130,6 @@ set(peredur_test_suites
     tlsf_mucs
     tlsf_genetic
     tlsf_monotone
-    tlsf_assumption
     tlsf_pipeline
     driver_peredur
     driver_realize

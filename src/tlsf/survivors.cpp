@@ -57,7 +57,7 @@ std::vector<Scored<Specification>> keep_matching(
     // implication filter collapses structurally equal specs to a single copy,
     // so an any_of match would hand that copy to all of them and put the
     // duplicates straight back. TLSF dedups per generation rather than at the
-    // end, and accumulate_repairs unions across generations, so duplicates do
+    // end, and the accumulator unions across generations, so duplicates do
     // reach here.
     std::vector<bool> claimed(kept.size(), false);
     for (const Scored<Specification>& scored : survivors) {
@@ -104,9 +104,9 @@ std::vector<Scored<Specification>> merge_accumulated_survivors(
     std::vector<Scored<Specification>> survivors,
     const std::vector<Specification>& accumulated, const Config& cfg,
     const AggregateWeightedFitnessFunctionT<Specification>& fitness) {
-    // With the key off this is every TLSF run's path, and the work below --
-    // a copy of the survivors, a hash set over them and a second ordering --
-    // would all be spent arriving back at the argument.
+    // With nothing accumulated the work below -- a copy of the survivors, a
+    // hash set over them and a second ordering -- would all be spent arriving
+    // back at the argument.
     if (accumulated.empty()) {
         return survivors;
     }
@@ -118,17 +118,6 @@ std::vector<Scored<Specification>> merge_accumulated_survivors(
     }
     order_population(cfg, survivors);
     return survivors;
-}
-
-std::vector<Scored<Specification>> keep_maximal(
-    const std::vector<Scored<Specification>>& survivors,
-    const Specification& original, const Config& cfg,
-    SatisfiabilityChecker& checker) {
-    const std::vector<Specification> specs = specifications_of(survivors);
-    const std::vector<Specification> maximal =
-        make_implication_filter<Specification>(
-            checker, syntactic_similarity_key(original, cfg))(specs);
-    return keep_matching(survivors, maximal);
 }
 
 std::vector<Scored<Specification>> finish_maximal_stream(

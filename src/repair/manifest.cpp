@@ -238,32 +238,37 @@ namespace {
 // path had called for many versions; its row read zero hits and misses.
 // tool_calls.ltlfilt.cache_hits, which counted that pass's hits and so read
 // zero too, now counts the remove_wm memo's hits.
-constexpr int k_schema_version = 42;
+//
+// 43 removed tlsf.mutation.max_assumption_width and p_bare_assumption, retired
+// at their no-op defaults.
+//
+// 44 removed tlsf.repair_mode and tlsf.muc_max_iterations with the MUC-guided
+// repair mode; every TLSF run is monolithic.
+//
+// 45 removed fitness.keyword_similarity and fitness.semantic_trace_weight; the
+// FRETISH keyword orders always join the semantic objective at weight 1/2.
+//
+// 46 removed genetic.accumulate_repairs; every run accumulates.
+// 47 removed model_counting.metric; trace counts always combine as logarithms.
+constexpr int k_schema_version = 47;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
-// into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
-// non-default value outright rather than ignoring it, so what the manifest
-// records there is what ran.
+// into config_json().
 struct SinglePathKey {
     const char* pointer;
     RepairInput reader;
 };
 
-constexpr std::array<SinglePathKey, 14> k_single_path_keys{{
+constexpr std::array<SinglePathKey, 9> k_single_path_keys{{
     {"/mutation/p_trigger", RepairInput::Fretish},
     {"/mutation/p_response", RepairInput::Fretish},
     {"/mutation/p_timing", RepairInput::Fretish},
     {"/mutation/p_condition_type", RepairInput::Fretish},
     {"/mutation/p_scope", RepairInput::Fretish},
     {"/mutation/p_stop", RepairInput::Fretish},
-    {"/fitness/keyword_similarity", RepairInput::Fretish},
-    {"/fitness/semantic_trace_weight", RepairInput::Fretish},
-    {"/tlsf/muc_max_iterations", RepairInput::Tlsf},
     {"/tlsf/mutation/p_assumption", RepairInput::Tlsf},
     {"/tlsf/mutation/p_temporal", RepairInput::Tlsf},
     {"/tlsf/mutation/p_clone_assumption", RepairInput::Tlsf},
-    {"/tlsf/mutation/max_assumption_width", RepairInput::Tlsf},
-    {"/tlsf/mutation/p_bare_assumption", RepairInput::Tlsf},
 }};
 
 // "/tlsf/mutation/p_temporal" -> "tlsf.mutation.p_temporal", the spelling a
@@ -558,10 +563,8 @@ void write_run_manifest(const std::string& output_dir,
           {"started", MrsSpeculationStats::n_started.load()},
           {"consumed", MrsSpeculationStats::n_consumed.load()}}},
         // Repairs the cross-generation accumulator added that the final
-        // population's own collection did not already hold. Zero when
-        // genetic.accumulate_repairs is off, and also when every accumulated
-        // repair happened to survive to the last generation, so it is read
-        // against the config key rather than on its own.
+        // population's own collection did not already hold. Zero when every
+        // accumulated repair happened to survive to the last generation.
         {"n_accumulated_repairs", AccumulatorStats::n_contributed},
         // ltlsynt calls that reported SPOT's acceptance-set ceiling rather than
         // a verdict, resolved as undecided rather than ending the run.

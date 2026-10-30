@@ -79,19 +79,6 @@ MinimalUnrealizableCore extract_muc(const Specification& spec,
 /// As above, using the process-wide RealizabilityChecker (ltlsynt) as oracle.
 MinimalUnrealizableCore extract_muc(const Specification& spec);
 
-/// The guarantee-side formulae of `spec` NOT present in `core` (set difference
-/// by value, one occurrence removed per core member). These are the formulae a
-/// MUC repair carries over untouched when reintegrating a repaired core.
-std::vector<CoreFormula> non_core_formulae(
-    const Specification& spec, const std::vector<CoreFormula>& core);
-
-/// Reintegrates a repaired sub-specification into the full context by appending
-/// the carried-over `non_core` formulae to the matching sections of
-/// `repaired_subspec`. Pair with non_core_formulae() taken from the spec the
-/// core was extracted from.
-Specification reintegrate(const Specification& repaired_subspec,
-                          const std::vector<CoreFormula>& non_core);
-
 /// Human-readable name of a section id, for reporting (e.g. "GUARANTEE").
 const char* section_name(std::size_t section_id);
 

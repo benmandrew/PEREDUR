@@ -6,18 +6,6 @@
 #include <iostream>
 #include <vector>
 
-void accumulate_filter_stats(std::vector<FilterRunStats>& aggregate,
-                             const std::vector<FilterRunStats>& run) {
-    if (aggregate.empty()) {
-        aggregate = run;
-        return;
-    }
-    for (std::size_t i = 0; i < run.size() && i < aggregate.size(); ++i) {
-        aggregate[i].total_in += run[i].total_in;
-        aggregate[i].total_out += run[i].total_out;
-    }
-}
-
 void print_filter_report(const std::vector<FilterRunStats>& stats,
                          EmptyFilterReport when_empty) {
     const auto reported = [](const FilterRunStats& stat) {

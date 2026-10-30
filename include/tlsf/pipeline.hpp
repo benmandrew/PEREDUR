@@ -23,20 +23,12 @@ namespace tlsf {
 /// the survivors to the maximal ones before they are written, unless
 /// `cfg.run_implication_filter` is unset.
 ///
-/// That describes `cfg.repair_mode == RepairMode::Monolithic`, the default.
-/// Under `[tlsf] repair_mode = "muc"` the run instead loops extract-core /
-/// evolve-core / reintegrate up to `cfg.muc_max_iterations` times and writes at
-/// most one repair, the recombined specification, if it ends realizable
-/// (PR #30).
-///
 /// @param input_path    Path to the input TLSF file.
 /// @param output_dir    Existing directory for the repair outputs.
 /// @param cfg           Algorithm configuration.
 /// @param random_source Seeded random source driving crossover and mutation.
 /// @param budget        The run's termination budget, owned by the caller so it
-///                      can be read back for the manifest. Shared across every
-///                      core a MUC-mode run evolves, the budget being the
-///                      run's rather than the core's.
+///                      can be read back for the manifest.
 /// @return 0 on success; 1 on a read or parse error.
 int run_repair(const std::string& input_path, const std::string& output_dir,
                const Config& cfg, const RandomSource& random_source,

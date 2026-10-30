@@ -18,31 +18,15 @@ struct EnumNames;
 
 template <>
 struct EnumNames<SelectionScheme> {
-    static constexpr std::array<std::pair<SelectionScheme, const char*>, 3>
+    static constexpr std::array<std::pair<SelectionScheme, const char*>, 2>
         k_names{{{SelectionScheme::WeightedAverage, "weighted"},
-                 {SelectionScheme::Nsga2Truncate, "nsga2-truncate"},
                  {SelectionScheme::Nsga2Apportion, "nsga2-apportion"}}};
 };
 
 template <>
-struct EnumNames<SimilarityMetric> {
-    static constexpr std::array<std::pair<SimilarityMetric, const char*>, 2>
-        k_names{{{SimilarityMetric::Direct, "direct"},
-                 {SimilarityMetric::Logarithmic, "logarithmic"}}};
-};
-
-template <>
-struct EnumNames<RepairMode> {
-    static constexpr std::array<std::pair<RepairMode, const char*>, 2> k_names{
-        {{RepairMode::Monolithic, "monolithic"}, {RepairMode::Muc, "muc"}}};
-};
-
-template <>
 struct EnumNames<StatusGrading> {
-    static constexpr std::array<std::pair<StatusGrading, const char*>, 3>
-        k_names{{{StatusGrading::Tiered, "tiered"},
-                 {StatusGrading::Mrs, "mrs"},
-                 {StatusGrading::Aurus, "aurus"}}};
+    static constexpr std::array<std::pair<StatusGrading, const char*>, 2>
+        k_names{{{StatusGrading::Mrs, "mrs"}, {StatusGrading::Aurus, "aurus"}}};
 };
 
 template <>
@@ -50,13 +34,6 @@ struct EnumNames<MrsAdmissionOrder> {
     static constexpr std::array<std::pair<MrsAdmissionOrder, const char*>, 2>
         k_names{{{MrsAdmissionOrder::Spec, "spec"},
                  {MrsAdmissionOrder::Degree, "degree"}}};
-};
-
-template <>
-struct EnumNames<KeywordSimilarity> {
-    static constexpr std::array<std::pair<KeywordSimilarity, const char*>, 2>
-        k_names{{{KeywordSimilarity::Syntactic, "syntactic"},
-                 {KeywordSimilarity::Semantic, "semantic"}}};
 };
 
 template <>

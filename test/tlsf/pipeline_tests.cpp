@@ -49,46 +49,6 @@ TEST(test_arbiter_realizability) {
            "arbiter: spec with fairness assumptions is realizable");
 }
 
-// MUC-mode repair on the same unrealizable arbiter: the iterative
-// extract-repair-reintegrate loop must converge to a written, realizable
-// repair. gen5/pop50/bound3 at seed 0 is the smallest budget observed to
-// repair this fixture reliably across seeds.
-TEST(test_muc_repair_end_to_end) {
-    const TempDir temp_dir("tlsf_muc_test");
-    const std::filesystem::path& dir = temp_dir.path();
-    const std::filesystem::path input_path =
-        write_text(dir / "spec.tlsf", k_unrealizable_arbiter);
-
-    Config cfg;
-    cfg.generations = 5;
-    cfg.population_size = 50;
-    cfg.parallel = 1;
-    cfg.default_model_counting_bound = 3;
-    cfg.repair_mode = RepairMode::Muc;
-
-    const RandomSource random_source = make_random_source_from_seed(0);
-    SearchBudget budget(cfg, SearchBudget::Clock::now());
-    const int status = tlsf::run_repair(input_path.string(), dir.string(), cfg,
-                                        random_source, budget);
-    expect(status == 0, "muc: run_repair returns 0");
-
-    std::size_t n_repairs = 0;
-    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
-        if (entry.path().extension() != ".tlsf" ||
-            entry.path().filename() == "spec.tlsf") {
-            continue;
-        }
-        std::ifstream repair(entry.path());
-        std::ostringstream contents;
-        contents << repair.rdbuf();
-        const tlsf::Specification spec = tlsf::parse(contents.str());
-        expect(is_realizable(spec),
-               "muc: each written repair re-parses and is realizable");
-        ++n_repairs;
-    }
-    expect(n_repairs >= 1, "muc: repair produced at least one realizable spec");
-}
-
 TEST(test_run_repair_end_to_end) {
     const TempDir temp_dir("tlsf_pipeline_test");
     const std::filesystem::path& dir = temp_dir.path();

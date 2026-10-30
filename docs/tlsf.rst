@@ -73,20 +73,3 @@ The ``mucs`` tool prints that core, and nothing else:
 The core is the third guarantee alone — the formula that 25 of the 26 repairs rewrite, arrived at by a different route. Where the search discovers it by trying edits and keeping what works, the extractor proves it by elimination, in a handful of synthesis calls rather than a population.
 
 The environment side is held fixed in every query. Relaxing an assumption can only make synthesis harder, so it can never be part of a core. That leaves unrealisability monotone in the guarantee-side set: adding a system obligation can never restore realisability. Monotonicity is what makes a minimal unrealisable subset well defined, and what lets the extractor use *QuickXplain* (Junker 2004), at ``O(k log(n/k))`` synthesis calls for a core of size ``k`` out of ``n`` formulae. On an already-realisable input ``mucs`` prints ``REALIZABLE (no core)``. It is TLSF-only; FRETISH input is not supported.
-
-MUC-guided repair
-~~~~~~~~~~~~~~~~~
-
-The same extraction drives an alternative repair strategy, selected with ``[tlsf] repair_mode = "muc"``:
-
-.. code-block:: toml
-
-   [tlsf]
-   repair_mode = "muc"
-   muc_max_iterations = 32
-
-Rather than evolving the whole specification at once, it extracts a core and evolves only that sub-specification. It then reintegrates the repaired core with the untouched non-core guarantees, and repeats on the recombined specification until the whole thing is realisable or ``muc_max_iterations`` trips. The search space each round is the core rather than the entire guarantee side, and the formulae that were never at fault are carried through unedited instead of being exposed to mutation.
-
-It returns a single repair rather than a ranked set, so it answers a different question from ``monolithic``: not "what are the plausible repairs, best first" but "give me one repair, having edited as little as possible". Expect its repair to strengthen, too. Nothing constrains a mutation to weaken, and evolving a core in isolation gives the search a narrow target it can hit by strengthening, reaching realisability while forbidding behaviour the original allowed. No screen catches that since the final weakening screen was removed on 2026-09-11. ``scripts/gen_configs.py --repair both`` crosses the two modes as an experiment factor.
-
-Between them the two modes trade breadth against locality. The monolithic search says how many ways out of an unrealisable specification there are; the core says which formulae the search should have been looking at all along.

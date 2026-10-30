@@ -44,10 +44,7 @@ double seconds_since(std::chrono::steady_clock::time_point start) {
 // A class of its own to keep evolve_population's loop about the search.
 class GenerationStatus {
    public:
-    // @p with_real adds the gate count column, only where the gate sweep runs,
-    // as on the FRETISH path: a column that reads the same number every
-    // generation because nothing measured it is worse than no column.
-    GenerationStatus(std::size_t generations, bool with_real)
+    explicit GenerationStatus(std::size_t generations)
         : m_total(std::to_string(generations)),
           m_col_gen(m_status.add("gen")),
           // Transient: within-generation progress is the reason the line
@@ -56,9 +53,7 @@ class GenerationStatus {
           m_col_pct(m_status.add("%", true)),
           m_col_time(m_status.add("time")),
           m_col_best(m_status.add("best")),
-          m_col_real(with_real
-                         ? std::optional<std::size_t>(m_status.add("real"))
-                         : std::nullopt) {}
+          m_col_real(m_status.add("real")) {}
 
     void begin(std::size_t gen) {
         m_start = std::chrono::steady_clock::now();
@@ -74,16 +69,13 @@ class GenerationStatus {
 
     // Commits the generation's line and returns its elapsed seconds. @p best
     // is empty for an empty population, which has no best to report.
-    double commit(std::optional<double> best,
-                  std::optional<std::size_t> n_real) {
+    double commit(std::optional<double> best, std::size_t n_real) {
         const double elapsed = seconds_since(m_start);
         m_status.set(m_col_time, format_fixed(elapsed, 2) + "s");
         if (best.has_value()) {
             m_status.set(m_col_best, format_fixed(*best, 3));
         }
-        if (m_col_real.has_value() && n_real.has_value()) {
-            m_status.set(*m_col_real, std::to_string(*n_real));
-        }
+        m_status.set(m_col_real, std::to_string(n_real));
         m_status.finish();
         return elapsed;
     }
@@ -95,7 +87,7 @@ class GenerationStatus {
     std::size_t m_col_pct;
     std::size_t m_col_time;
     std::size_t m_col_best;
-    std::optional<std::size_t> m_col_real;
+    std::size_t m_col_real;
     std::chrono::steady_clock::time_point m_start;
 };
 
@@ -121,14 +113,12 @@ std::vector<Scored<Specification>> evolve_population(
     const GenerationSizes sizes = generation_sizes(cfg, cfg.population_size);
     filter_stats_out = empty_filter_stats(per_gen_filters);
 
-    GenerationStatus status(cfg.generations, accumulator_out.enabled());
+    GenerationStatus status(cfg.generations);
     const auto gate_status = status_objective_of(fitness);
 
     for (std::size_t gen = 0; gen < cfg.generations; ++gen) {
         // Before the generation as well as between offspring, matching
-        // checkTermination() at the head of AuRUS's evolve(count) loop. The
-        // budget spans the whole run, so under MUC repair a core that opens
-        // with it already spent evolves nothing rather than restarting it.
+        // checkTermination() at the head of AuRUS's evolve(count) loop.
         if (budget.active() && budget.exhausted()) {
             break;
         }
@@ -136,10 +126,7 @@ std::vector<Scored<Specification>> evolve_population(
         auto on_progress = [&status](std::size_t done, std::size_t total) {
             status.progress(done, total);
         };
-        // MUC repair restarts its generation count on every core it evolves, so
-        // the dashboard is given a number that keeps climbing across
-        // iterations; muc_iter carries the structure that flattens away.
-        const std::size_t dashboard_gen = progress.gen_offset + gen + 1;
+        const std::size_t dashboard_gen = gen + 1;
         // Left empty with the dashboard off, as the pipeline then skips the
         // per-stage distinct count.
         std::size_t stage_index = 0;
@@ -147,8 +134,7 @@ std::vector<Scored<Specification>> evolve_population(
         if (progress.writer != nullptr && progress.writer->enabled()) {
             on_stage = [&progress, &stage_index,
                         dashboard_gen](const StageObservation& obs) {
-                progress.writer->stage(dashboard_gen, stage_index++, obs,
-                                       progress.muc_iter);
+                progress.writer->stage(dashboard_gen, stage_index++, obs);
             };
         }
         population = evolve_generation(
@@ -157,7 +143,7 @@ std::vector<Scored<Specification>> evolve_population(
         budget.count_generation();
         fold_filter_stats(per_gen_filters, filter_stats_out);
         const FitnessSummary summary = summarise_fitness(population);
-        const std::optional<std::size_t> n_real = accumulate_gate_passing(
+        const std::size_t n_real = accumulate_gate_passing(
             population, cfg, dashboard_gen, accumulator_out, gate_status);
         const double elapsed = status.commit(
             population.empty() ? std::nullopt
@@ -166,13 +152,9 @@ std::vector<Scored<Specification>> evolve_population(
         if (progress.writer != nullptr) {
             progress.writer->generation(
                 dashboard_gen, elapsed, summary.best, summary.mean,
-                // The gate count where the accumulator swept the population,
-                // nothing otherwise: without the sweep this path checks
-                // realizability once, after evolution, so any number here
-                // would be one the run never measured.
                 mean_objectives(progress.objective_names,
                                 objectives_of(population)),
-                n_real, population.size(), progress.muc_iter);
+                n_real, population.size());
         }
     }
     return population;

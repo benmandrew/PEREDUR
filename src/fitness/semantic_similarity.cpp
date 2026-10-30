@@ -21,33 +21,23 @@
 
 namespace {
 
-double ratio_or_throw(Count numerator, Count denominator) {
-    assert(denominator != 0);
-    return static_cast<double>(numerator / denominator);
-}
-
 // One directional containment term: how much of @p whole's satisfying traces
-// are shared. Direct is the plain ratio, clamped to [0, 1] because rounding can
-// push shared a few ulps past whole now that Count is a float. Logarithmic
-// takes the ratio of the counts' logarithms, which -- since trace counts grow
-// like lambda^k -- tends to the ratio of the two languages' growth rates and
-// stays roughly constant as the bound grows, where the plain ratio decays
+// are shared, as the ratio of the counts' logarithms. Since trace counts grow
+// like lambda^k, that tends to the ratio of the two languages' growth rates and
+// stays roughly constant as the bound grows, where the plain count ratio decays
 // toward 0. A count of 1 has no exponential regime to compare (log 1 == 0), so
-// the log branch falls back to membership at that boundary.
-double directional_containment(Count shared, Count whole,
-                               SimilarityMetric metric) {
-    if (metric == SimilarityMetric::Logarithmic) {
-        if (whole <= 1) {
-            return shared >= whole ? 1.0 : 0.0;
-        }
-        if (shared <= 1) {
-            return 0.0;
-        }
-        return std::clamp(std::log(static_cast<double>(shared)) /
-                              std::log(static_cast<double>(whole)),
-                          0.0, 1.0);
+// the term falls back to membership at that boundary. The clamp holds it to
+// [0, 1] when rounding pushes shared a few ulps past whole.
+double directional_containment(Count shared, Count whole) {
+    if (whole <= 1) {
+        return shared >= whole ? 1.0 : 0.0;
     }
-    return std::clamp(ratio_or_throw(shared, whole), 0.0, 1.0);
+    if (shared <= 1) {
+        return 0.0;
+    }
+    return std::clamp(std::log(static_cast<double>(shared)) /
+                          std::log(static_cast<double>(whole)),
+                      0.0, 1.0);
 }
 
 // The number of timepoints a timing constrains, i.e. the first step count at
@@ -164,8 +154,7 @@ std::size_t max_representable_step_count(std::size_t n_atoms) {
     return n_atoms == 0 ? max_exponent - 1 : (max_exponent - 1) / n_atoms;
 }
 
-double semantic_similarity_from_counts(const SemanticSimilarityCounts& counts,
-                                       SimilarityMetric metric) {
+double semantic_similarity_from_counts(const SemanticSimilarityCounts& counts) {
     if (counts.m_requirement_count == 0 &&
         counts.m_other_requirement_count == 0) {
         return 1.0;
@@ -174,10 +163,10 @@ double semantic_similarity_from_counts(const SemanticSimilarityCounts& counts,
         counts.m_other_requirement_count == 0) {
         return 0.0;
     }
-    const double first = directional_containment(
-        counts.m_conjunction_count, counts.m_requirement_count, metric);
+    const double first = directional_containment(counts.m_conjunction_count,
+                                                 counts.m_requirement_count);
     const double second = directional_containment(
-        counts.m_conjunction_count, counts.m_other_requirement_count, metric);
+        counts.m_conjunction_count, counts.m_other_requirement_count);
     // Harmonic mean of the two directional containment terms: unlike the
     // arithmetic mean, this can't be pulled up to 0.5 by one term alone
     // hitting 1 (e.g. a requirement weakened to a tautology, which trivially
@@ -192,36 +181,20 @@ double semantic_similarity_from_counts(const SemanticSimilarityCounts& counts,
 
 double semantic_similarity(const Requirement& requirement,
                            const Requirement& other_requirement,
-                           std::size_t step_count, SimilarityMetric metric) {
+                           std::size_t step_count) {
     const SemanticSimilarityCounts counts = count_semantic_similarity_terms(
         requirement, other_requirement, step_count);
-    return semantic_similarity_from_counts(counts, metric);
+    return semantic_similarity_from_counts(counts);
 }
 
 double semantic_pair_similarity(const Requirement& requirement,
                                 const Requirement& other_requirement,
-                                std::size_t step_count, SimilarityMetric metric,
-                                KeywordSimilarity keyword_similarity,
-                                double trace_weight) {
-    if (keyword_similarity == KeywordSimilarity::Syntactic) {
-        return semantic_similarity(requirement, other_requirement, step_count,
-                                   metric);
-    }
-    assert(trace_weight >= 0.0 && trace_weight <= 1.0);
-    // Each side is computed only when it carries weight: at w = 1 no keyword
-    // order is read, and at w = 0 no trace is counted, so a pure-keyword arm
-    // pays for no model counting.
-    double score = 0.0;
-    if (trace_weight > 0.0) {
-        score +=
-            trace_weight * semantic_similarity(requirement, other_requirement,
-                                               step_count, metric);
-    }
-    if (trace_weight < 1.0) {
-        score += (1.0 - trace_weight) *
-                 keyword_order_similarity(requirement, other_requirement);
-    }
-    return score;
+                                std::size_t step_count) {
+    // Equal weights: the 2026-10-06 keyword weight sweep found 0.25, 0.5 and
+    // 0.75 select the same first front, so the midpoint stands.
+    return (semantic_similarity(requirement, other_requirement, step_count) +
+            keyword_order_similarity(requirement, other_requirement)) /
+           2.0;
 }
 
 std::vector<ChangedRequirementPair> changed_requirement_pairs(
@@ -265,9 +238,7 @@ std::vector<ChangedRequirementPair> changed_requirement_pairs(
 
 std::vector<std::function<double()>> semantic_similarity_terms(
     const Specification& specification,
-    const Specification& other_specification, std::size_t step_count,
-    SimilarityMetric metric, KeywordSimilarity keyword_similarity,
-    double trace_weight) {
+    const Specification& other_specification, std::size_t step_count) {
     std::vector<std::function<double()>> terms;
     for (const ChangedRequirementPair& pair :
          changed_requirement_pairs(specification, other_specification)) {
@@ -281,10 +252,8 @@ std::vector<std::function<double()>> semantic_similarity_terms(
             continue;
         }
         terms.emplace_back([&first = *pair.m_requirement,
-                            &second = *pair.m_other_requirement, step_count,
-                            metric, keyword_similarity, trace_weight] {
-            return semantic_pair_similarity(first, second, step_count, metric,
-                                            keyword_similarity, trace_weight);
+                            &second = *pair.m_other_requirement, step_count] {
+            return semantic_pair_similarity(first, second, step_count);
         });
     }
     return terms;
@@ -292,13 +261,10 @@ std::vector<std::function<double()>> semantic_similarity_terms(
 
 double semantic_similarity(const Specification& specification,
                            const Specification& other_specification,
-                           std::size_t step_count, SimilarityMetric metric,
-                           KeywordSimilarity keyword_similarity,
-                           double trace_weight) {
+                           std::size_t step_count) {
     const std::vector<std::function<double()>> terms =
         semantic_similarity_terms(specification, other_specification,
-                                  step_count, metric, keyword_similarity,
-                                  trace_weight);
+                                  step_count);
     std::vector<double> values;
     values.reserve(terms.size());
     for (const std::function<double()>& term : terms) {
@@ -311,7 +277,5 @@ double semantic_similarity(const Specification& specification,
                            const Specification& other_specification,
                            const Config& cfg) {
     return semantic_similarity(specification, other_specification,
-                               cfg.default_model_counting_bound,
-                               cfg.similarity_metric, cfg.keyword_similarity,
-                               cfg.semantic_trace_weight);
+                               cfg.default_model_counting_bound);
 }

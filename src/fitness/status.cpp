@@ -245,15 +245,6 @@ class WalkLookahead {
 
 }  // namespace
 
-double status_score(const std::vector<std::string>& components,
-                    SatisfiabilityChecker& sat,
-                    const std::function<bool()>& is_realizable) {
-    if (!all_components_satisfiable(components, sat)) {
-        return k_status_component_unsatisfiable;
-    }
-    return is_realizable() ? k_status_realizable : k_status_unrealizable;
-}
-
 double status_score_aurus(const std::string& assumptions,
                           const std::string& guarantees,
                           SatisfiabilityChecker& sat,
@@ -290,9 +281,9 @@ double status_score_aurus(const std::string& assumptions,
     if (!*jointly_sat) {
         return k_status_aurus_contradictory;
     }
-    // No well-separation query behind this one, unlike status_score and
-    // status_score_mrs. See the header: AuRUS never asks it, and an arm that
-    // did would not be the ladder it is named after.
+    // No well-separation query behind this one, unlike status_score_mrs. See
+    // the header: AuRUS never asks it, and an arm that did would not be the
+    // ladder it is named after.
     return is_realizable() ? k_status_realizable : k_status_unrealizable;
 }
 
@@ -576,51 +567,35 @@ double specification_status(const Specification& specification,
             side_conjunction(specification.m_guarantees), sat,
             [&specification, &real] {
                 // Realizability alone. Well-separation is deliberately not
-                // folded in here, where both other scales fold it in; the
-                // header says why. The output gate still asks it.
+                // folded in here, where the MRS walk folds it in; the header
+                // says why. The output gate still asks it.
                 return count_live(specification.m_guarantees) == 0 ||
                        real.check_realizability(specification).value_or(false);
             });
     }
 
     // An empty component list passes the tier vacuously, which is exactly what
-    // ComponentCheck::Skipped asks for; both scales below already handle it.
+    // ComponentCheck::Skipped asks for; the walk below already handles it.
     const std::vector<std::string> components =
         component_check == ComponentCheck::Included
             ? specification_status_components(specification)
             : std::vector<std::string>{};
 
-    if (grading == StatusGrading::Mrs) {
-        const std::vector<std::size_t> slots =
-            live_indices(specification.m_guarantees);
-        return status_score_mrs(
-            components, slots.size(), sat,
-            [&specification, &slots,
-             &real](const std::vector<std::size_t>& indices) {
-                const Specification subset =
-                    with_guarantee_subset(specification, slots, indices);
-                // Undecided resolves as unrealizable, so the part is rejected:
-                // a timed-out query must not buy a candidate a point.
-                return real.check_realizability(subset).value_or(false) &&
-                       !specification_is_not_well_separated(subset, real);
-            },
-            position_order_from_slots(slot_order, slots),
-            "(" + side_conjunction(specification.m_assumptions) + ") & (" +
-                side_conjunction(specification.m_guarantees) + ")",
-            speculation_depth);
-    }
-
-    return status_score(components, sat, [&specification, &real] {
-        // No guarantees leaves the implication with a `true` consequent, which
-        // is realizable whatever the assumptions say; skip the solver rather
-        // than ask it a question with a known answer.
-        const bool realizable =
-            count_live(specification.m_guarantees) == 0 ||
-            real.check_realizability(specification).value_or(false);
-        // Second, and only where the first said yes: a candidate that is
-        // already unrealizable cannot be realizable for the wrong reason, and
-        // the query is a whole ltlsynt call.
-        return realizable &&
-               !specification_is_not_well_separated(specification, real);
-    });
+    const std::vector<std::size_t> slots =
+        live_indices(specification.m_guarantees);
+    return status_score_mrs(
+        components, slots.size(), sat,
+        [&specification, &slots,
+         &real](const std::vector<std::size_t>& indices) {
+            const Specification subset =
+                with_guarantee_subset(specification, slots, indices);
+            // Undecided resolves as unrealizable, so the part is rejected:
+            // a timed-out query must not buy a candidate a point.
+            return real.check_realizability(subset).value_or(false) &&
+                   !specification_is_not_well_separated(subset, real);
+        },
+        position_order_from_slots(slot_order, slots),
+        "(" + side_conjunction(specification.m_assumptions) + ") & (" +
+            side_conjunction(specification.m_guarantees) + ")",
+        speculation_depth);
 }

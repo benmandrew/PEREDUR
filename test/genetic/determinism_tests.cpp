@@ -2,7 +2,7 @@
 //
 // These exist to protect seed reproducibility across refactors of
 // evolve_generation_generic. The pre-existing determinism test
-// (test_evolve_generation_nsga2_truncate_is_deterministic) drives evolution
+// (test_evolve_generation_nsga2_apportion_is_deterministic) drives evolution
 // from a *scripted* RandomSource, so it only shows that equal inputs give equal
 // outputs: reorder the draws and both sides reorder alike and it still passes.
 // The tests here instead record the real mt19937 draw stream and pin it, so a
@@ -104,7 +104,8 @@ std::string render_trace(const DrawTrace& trace) {
 /// unexplained golden break.
 Config golden_config() {
     Config cfg;
-    cfg.selection_scheme = SelectionScheme::Nsga2Truncate;
+    // Re-pinned from Nsga2Truncate when that scheme was removed on 2026-10-30.
+    cfg.selection_scheme = SelectionScheme::Nsga2Apportion;
     // Pinned rather than left to the default, the same discipline
     // p_remove_guarantee follows below: this is the one Config field the
     // breeding path reads whose default has moved before, and a later move
@@ -137,10 +138,6 @@ Config golden_config() {
     // arm returns before the RandomSource at any value. Pinned so a golden that
     // gains one fails here rather than re-recording.
     cfg.p_stop = 0.15;
-    // Pinned at the placement the goldens were recorded under: the default
-    // moved to Semantic on 2026-10-06, and fitness feeds selection, so the
-    // move would otherwise re-record every FRETISH golden.
-    cfg.keyword_similarity = KeywordSimilarity::Syntactic;
     cfg.parallel = 1;
     return cfg;
 }
@@ -307,11 +304,11 @@ TEST(test_trace_hash_distinguishes_order_and_bounds) {
 }
 
 TEST(test_generation_draw_sequence_is_pinned) {
-    constexpr std::size_t k_expected_draws = 187;
-    // Re-pinned when add_assumption began drawing its response from the inputs
-    // alone: the draw count is unchanged, but the response index is now bounded
-    // by the input count rather than by inputs plus outputs.
-    constexpr std::uint64_t k_expected_hash = 785307073646445480ULL;
+    constexpr std::size_t k_expected_draws = 161;
+    // Re-pinned, with the population golden below, when golden_config() moved
+    // from Nsga2Truncate to Nsga2Apportion: selection draws nothing, but it
+    // picks the parents later generations breed from, so the stream moves.
+    constexpr std::uint64_t k_expected_hash = 13845064172576639202ULL;
 
     const GoldenRun run = run_golden_evolution();
     const std::uint64_t hash = fnv1a(render_trace(*run.trace));
@@ -428,7 +425,7 @@ TEST(test_new_arms_cost_no_draw_at_zero) {
 }
 
 TEST(test_evolved_population_is_pinned) {
-    constexpr std::uint64_t k_expected_hash = 6487454080779250071ULL;
+    constexpr std::uint64_t k_expected_hash = 13850672673615569937ULL;
 
     const GoldenRun run = run_golden_evolution();
     const std::uint64_t hash = fnv1a(render_population(run.population));

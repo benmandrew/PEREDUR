@@ -114,27 +114,23 @@ check(factors(BASE.format("nsga2/wkon/direct/muc")),
 check(repair(BASE.format("nsga2/wkon/direct")), R.LEGACY_REPAIR,
       "repair_mode falls back to LEGACY_REPAIR when absent")
 
-# gen_configs REPAIRS maps the short dir label to the TOML value the C++ parser
-# accepts; repair_mode_of must key on the label, not the value.
-check([lbl for lbl, _ in G.REPAIRS["both"]], ["mono", "muc"],
-      "REPAIRS both dir labels")
-check([val for _, val in G.REPAIRS["both"]], ["monolithic", "muc"],
-      "REPAIRS both toml values")
-for lbl, _ in G.REPAIRS["both"]:
-    assert lbl in R.REPAIR_DIRS, f"{lbl} not in REPAIR_DIRS"
-
 # extract_metadata is unaffected by the extra depth.
 p = Path(BASE.format("nsga2/wkon/direct"))
 check(R.extract_metadata(p)[:2], ("C", "default"), "extract_metadata three-deep")
 
-# gen_configs METRICS maps the short dir label to the full TOML value the C++
-# parser accepts; metric_of must key on the label, not the value.
-check([lbl for lbl, _ in G.METRICS["both"]], ["direct", "log"],
-      "METRICS both dir labels")
-check([val for _, val in G.METRICS["both"]], ["direct", "logarithmic"],
-      "METRICS both toml values")
-for lbl, _ in G.METRICS["both"]:
-    assert lbl in R.METRIC_DIRS, f"{lbl} not in METRIC_DIRS"
+# gen_configs nests every config under the log metric directory and leaves the
+# retired key out of the TOML; metric_of must key on the directory label.
+assert G.METRIC_DIR in R.METRIC_DIRS, f"{G.METRIC_DIR} not in METRIC_DIRS"
+check("metric" in G.DEFAULTS, False, "gen_configs writes no metric key")
+check(R.metric_of(Path(BASE.format(f"nsga2-apportion/{G.METRIC_DIR}"))), "log",
+      "a generated config reads back as the log metric")
+
+# None of the values the binary is retiring may reach a generated config.
+toml = G.make_toml({})
+for retired in ('repair_mode', '"direct"', 'nsga2-truncate', 'accumulate_repairs',
+                'keyword_similarity', 'semantic_trace_weight',
+                'max_assumption_width', 'p_bare_assumption', '"tiered"'):
+    assert retired not in toml, f"make_toml still writes {retired}"
 
 # The merge key must carry every crossed factor, or crossed rows collapse.
 import merge_experiments as M  # noqa: E402

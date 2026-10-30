@@ -102,32 +102,23 @@ std::vector<std::string> index_rows(const TempDir& dir) {
     return rows;
 }
 
-TEST(test_disabled_accumulator_keeps_nothing) {
-    RepairAccumulator<Specification> accumulator(false);
-    expect(!accumulator.enabled(), "accumulator: constructed disabled");
-    accumulator.insert(make_spec("x"), 1);
-    accumulator.insert(make_spec("y"), 2);
-    expect(accumulator.specifications().empty(),
-           "accumulator: a disabled instance drops every insertion");
-}
-
-// With the key off the output is what the final population's own collection
-// returned, unchanged and in its own order.
-TEST(test_disabled_accumulator_leaves_the_output_alone) {
-    const RepairAccumulator<Specification> accumulator(false);
+// With nothing accumulated the output is what the final population's own
+// collection returned, unchanged and in its own order.
+TEST(test_empty_accumulator_leaves_the_output_alone) {
+    const RepairAccumulator<Specification> accumulator;
     std::vector<Specification> collected = {make_spec("x"), make_spec("y")};
     const std::size_t added =
         merge_accumulated(collected, accumulator.specifications());
-    expect(added == 0, "accumulator: nothing merged with the key off");
+    expect(added == 0, "accumulator: nothing merged from an empty accumulator");
     expect(collected.size() == 2 && collected[0] == make_spec("x") &&
                collected[1] == make_spec("y"),
-           "accumulator: the collection is untouched with the key off");
+           "accumulator: the collection is untouched by an empty accumulator");
 }
 
 // The case the accumulator exists for: gate-passing in an early generation,
 // gone by the last one.
 TEST(test_early_repair_survives_its_generation) {
-    RepairAccumulator<Specification> accumulator(true);
+    RepairAccumulator<Specification> accumulator;
     const Specification early = make_spec("x");
     const Specification late = make_spec("y");
     accumulator.insert(early, 1);
@@ -145,7 +136,7 @@ TEST(test_early_repair_survives_its_generation) {
 }
 
 TEST(test_repeated_insertions_collapse) {
-    RepairAccumulator<Specification> accumulator(true);
+    RepairAccumulator<Specification> accumulator;
     // The same specification survives many generations, so the gate admits it
     // once per generation; the accumulator is a set, not a log.
     for (std::size_t gen = 0; gen < 5; ++gen) {
@@ -157,7 +148,7 @@ TEST(test_repeated_insertions_collapse) {
 }
 
 TEST(test_first_seen_order_is_kept) {
-    RepairAccumulator<Specification> accumulator(true);
+    RepairAccumulator<Specification> accumulator;
     accumulator.insert(make_spec("y"), 1);
     accumulator.insert(make_spec("x"), 2);
     accumulator.insert(make_spec("y"), 3);
@@ -172,7 +163,7 @@ TEST(test_first_seen_order_is_kept) {
 TEST(test_a_removed_guarantee_is_a_distinct_repair) {
     Specification removed = make_spec("x");
     removed.m_guarantees[0].m_removed = true;
-    RepairAccumulator<Specification> accumulator(true);
+    RepairAccumulator<Specification> accumulator;
     accumulator.insert(make_spec("x"), 1);
     accumulator.insert(removed, 2);
     expect(accumulator.specifications().size() == 2,
@@ -189,15 +180,14 @@ TEST(test_merge_reports_only_what_it_added) {
     expect(collected.size() == 2, "accumulator: the union is deduplicated");
 }
 
-// The key off must cost nothing on disk either: no directory, so nothing for a
-// campaign's output tree to grow that its configs never asked for.
-TEST(test_nothing_is_written_with_the_key_off) {
+// A run that accumulates nothing leaves no directory behind, so a run that
+// found no repair adds nothing to a campaign's output tree.
+TEST(test_nothing_is_written_before_the_first_insert) {
     const TempDir dir("accumulator_tests");
-    RepairAccumulator<Specification> accumulator(false, json_writer(dir));
-    accumulator.insert(make_spec("x"), 1);
-    accumulator.insert(make_spec("y"), 2);
-    expect(!std::filesystem::exists(accumulated_dir(dir)),
-           "accumulator: the key off creates no accumulated directory");
+    const RepairAccumulator<Specification> accumulator(json_writer(dir));
+    expect(accumulator.specifications().empty() &&
+               !std::filesystem::exists(accumulated_dir(dir)),
+           "accumulator: nothing accumulated creates no accumulated directory");
 }
 
 // The point of writing as we go: a run killed mid-search keeps everything it
@@ -205,7 +195,7 @@ TEST(test_nothing_is_written_with_the_key_off) {
 // next one is inserted.
 TEST(test_one_file_per_accumulated_specification) {
     const TempDir dir("accumulator_tests");
-    RepairAccumulator<Specification> accumulator(true, json_writer(dir));
+    RepairAccumulator<Specification> accumulator(json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
     expect(written_files(dir).size() == 1,
            "accumulator: the first insertion is on disk before the second");
@@ -223,7 +213,7 @@ TEST(test_one_file_per_accumulated_specification) {
 
 TEST(test_written_files_parse_back_to_what_was_accumulated) {
     const TempDir dir("accumulator_tests");
-    RepairAccumulator<Specification> accumulator(true, json_writer(dir));
+    RepairAccumulator<Specification> accumulator(json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
     accumulator.insert(make_spec("y"), 2);
     const std::vector<std::filesystem::path> paths = written_files(dir);
@@ -243,7 +233,7 @@ TEST(test_written_files_parse_back_to_what_was_accumulated) {
 // generation but no clock.
 TEST(test_the_index_carries_a_row_per_specification) {
     const TempDir dir("accumulator_tests");
-    RepairAccumulator<Specification> accumulator(true, json_writer(dir));
+    RepairAccumulator<Specification> accumulator(json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
     accumulator.insert(make_spec("y"), 3);
     // Already accumulated, so neither a new file nor a new row.
@@ -266,7 +256,7 @@ TEST(test_the_index_carries_a_row_per_specification) {
 // than the row being absent, so a reader never has to handle a ragged index.
 TEST(test_the_index_reports_zero_without_a_clock) {
     const TempDir dir("accumulator_tests");
-    RepairAccumulator<Specification> accumulator(true, json_writer(dir));
+    RepairAccumulator<Specification> accumulator(json_writer(dir));
     accumulator.insert(make_spec("x"), 1);
     const std::vector<std::string> rows = index_rows(dir);
     expect(rows.size() == 2 && rows[1] == "gen01_0000.json\t1\t0.000000",
@@ -287,7 +277,7 @@ TEST(test_the_index_records_the_clock_it_was_given) {
             return jobj.dump(2) + "\n";
         },
         [&now] { return now; });
-    RepairAccumulator<Specification> accumulator(true, std::move(writer));
+    RepairAccumulator<Specification> accumulator(std::move(writer));
     now = 1.5;
     accumulator.insert(make_spec("x"), 1);
     now = 4.25;

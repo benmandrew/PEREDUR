@@ -67,16 +67,9 @@ The probability is read before the `RandomSource` is touched, so at 0 it costs n
 
 On both paths an appended assumption obliges an *input* literal, and only its guard may draw an output. An assumption obliging an output is one the system defeats by never raising its own signal, and well-separation passes the guarded form `G(<lit> -> F <output>)`, because an environment that never raises the guard satisfies it. A guard equal to the obliged literal is negated at no extra draw, which keeps the tautology `G(l -> F l)` out. With no input, nothing is appended: FRETISH skips the operator's draw, and TLSF can still clone. The FRETISH path (`add_assumption` in `src/genetic/mutation.cpp`) caught up with TLSF on 2026-09-24, which moved its draw stream; `docs/dev/config-and-provenance.md` records the break.
 
-Two keys remain, each at a no-op default (campaign-armed value in brackets):
+The campaign `experiments/2026-08-26-assumption-reach` (sweep U) tested five keys. Its primary is null (exact McNemar p = 1.0000).
 
-- `[tlsf.mutation] max_assumption_width` (1, armed 3): an appended body is drawn from `term := [F](literal & ... & literal)`, `body := term | ... | term`.
-- `[tlsf.mutation] p_bare_assumption` (0.0, armed 0.25): an unconditional assumption may be `F body` rather than `G F body`.
-
-Each is read before the `RandomSource` is touched, pinned per key in `test/tlsf/assumption_tests.cpp`, and needs no "Config vintage" entry, no default having moved.
-
-The campaign is `experiments/2026-08-26-assumption-reach` (sweep U). Its primary is null (exact McNemar p = 1.0000). The keys stay for two reaches: `lift` repaired for the first time, 3 of 12 under `reach-l`, its ideal `G F (b1 || b2 || b3)` being a width-3 body, and `lily11` rising from 5 to 11 of 12 through `p_bare_assumption`, its ideal a bare `F req`.
-
-Three keys are removed. `[tlsf.crossover] p_union_assumption` is unreachable by construction: `gyro-var2`'s ideal is a conjunct of `gyro-var1`'s specification and vice versa, material in a sibling no run sees, and arming it displaced clone-and-edit. `[tlsf.mutation] p_burst_continue` measured a loss (p = 0.0226), PEREDUR already mutating more aggressively than AuRUS's `Poisson(1)`; mutation applies exactly one edit. `[tlsf.mutation] p_remove_assumption` had no reach attributed. Sweep U and the `assumption-reach` profile are retired.
+Five keys are removed. `[tlsf.mutation] max_assumption_width` (a body of up to n literals joined by `&` and `|`) and `p_bare_assumption` (an unconditional `F body` in place of `G F body`) each had one reach: `lift` repaired 3 of 12 under `reach-l`, and `lily11` rose from 5 to 11 of 12. Both stayed at their no-op defaults and were removed on 2026-10-30, so an appended body is one input literal and an unconditional assumption is always `G F`. `[tlsf.crossover] p_union_assumption` is unreachable by construction: `gyro-var2`'s ideal is a conjunct of `gyro-var1`'s specification and vice versa, material in a sibling no run sees, and arming it displaced clone-and-edit. `[tlsf.mutation] p_burst_continue` measured a loss (p = 0.0226), PEREDUR already mutating more aggressively than AuRUS's `Poisson(1)`; mutation applies exactly one edit. `[tlsf.mutation] p_remove_assumption` had no reach attributed. Sweep U and the `assumption-reach` profile are retired.
 
 ## Timing donation
 
