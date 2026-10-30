@@ -222,6 +222,7 @@ DEFAULT_FIELDS = {
     "runtime.ltlfilt_timeout_ms": "ltlfilt_timeout",
     "runtime.max_scoring_failure_rate": "max_scoring_failure_rate",
     "runtime.dashboard": "dashboard",
+    "runtime.mrs_speculation_depth": "mrs_speculation_depth",
 }
 
 # Keys the parser accepts but that carry no pinnable constant default.

@@ -1,12 +1,19 @@
 #include "fitness/status.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
+#include <condition_variable>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <limits>
+#include <map>
+#include <memory>
+#include <mutex>
 #include <numeric>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <variant>
@@ -14,6 +21,7 @@
 
 #include "bounded_async.hpp"
 #include "filter/well_separation.hpp"
+#include "profile.hpp"
 #include "requirement.hpp"
 #include "thread_pool.hpp"
 
@@ -31,6 +39,209 @@ bool all_components_satisfiable(const std::vector<std::string>& components,
             return sat.check_satisfiability(formula).value_or(false);
         });
 }
+
+// Past this the tree of lookahead sets costs more to enumerate each step than
+// a pool's width of workers could ever run.
+constexpr std::size_t k_max_speculation_depth = 8;
+
+std::vector<std::size_t> with_part(std::vector<std::size_t> parts,
+                                   std::size_t part) {
+    parts.insert(std::lower_bound(parts.begin(), parts.end(), part), part);
+    return parts;
+}
+
+// The lookahead behind status_score_mrs. It holds a node per query it has
+// submitted that the walk may still ask. Only the walk moves a node out of
+// Pending, by cancelling it, and only a worker moves it on from Running.
+class WalkLookahead {
+   public:
+    WalkLookahead(const SubsetRealizability& oracle,
+                  const std::vector<std::size_t>& order, std::size_t depth)
+        : m_oracle(oracle),
+          m_order(order),
+          m_depth(std::min(depth, k_max_speculation_depth)),
+          m_shared(std::make_shared<Shared>()) {}
+
+    WalkLookahead(const WalkLookahead&) = delete;
+    WalkLookahead& operator=(const WalkLookahead&) = delete;
+    WalkLookahead(WalkLookahead&&) = delete;
+    WalkLookahead& operator=(WalkLookahead&&) = delete;
+
+    // A started task borrows m_oracle, which the caller owns, so none may
+    // outlive the walk. A cancelled one can still sit in the pool's queue, but
+    // it holds its own node and m_shared and touches nothing else.
+    ~WalkLookahead() {
+        for (const auto& entry : m_nodes) {
+            if (!cancel(*entry.second)) {
+                wait_done(*entry.second);
+            }
+        }
+        for (const std::shared_ptr<Node>& node : m_abandoned) {
+            wait_done(*node);
+        }
+    }
+
+    // Called with the walk about to ask `query`, its step's part inserted.
+    void before_query(std::size_t step, const std::vector<std::size_t>& query) {
+        std::shared_ptr<Node> own;
+        if (const auto found = m_nodes.find(query); found != m_nodes.end()) {
+            own = found->second;
+            m_nodes.erase(found);
+            // Not yet started, so the walk asks it inline rather than wait on
+            // a task that needs a free worker to run.
+            if (cancel(*own)) {
+                own.reset();
+            }
+        }
+        refresh(step, query);
+        if (own) {
+            wait_done(*own);
+            if (own->m_answered) {
+                MrsSpeculationStats::n_consumed++;
+            }
+        }
+    }
+
+   private:
+    enum class State : std::uint8_t { Pending, Running, Done, Cancelled };
+
+    struct Node {
+        std::vector<std::size_t> m_set;
+        std::atomic<State> m_state{State::Pending};
+        // Written before m_state turns Done, and read only after.
+        bool m_answered = false;
+    };
+
+    // Shared with the tasks, which signal through it after the walk may have
+    // stopped waiting on their node.
+    struct Shared {
+        std::mutex m_mutex;
+        std::condition_variable m_done;
+    };
+
+    static bool cancel(Node& node) {
+        State expected = State::Pending;
+        return node.m_state.compare_exchange_strong(expected, State::Cancelled);
+    }
+
+    void wait_done(const Node& node) {
+        if (node.m_state.load() == State::Done) {
+            return;
+        }
+        PEREDUR_PROFILE_SCOPE("status/mrs-lookahead-wait");
+        std::unique_lock<std::mutex> lock(m_shared->m_mutex);
+        m_shared->m_done.wait(
+            lock, [&node] { return node.m_state.load() == State::Done; });
+    }
+
+    // The sets the next m_depth steps can ask under every outcome of the steps
+    // before them: nearest step first, and within a step the branch that
+    // accepted the earlier part ahead of the one that rejected it.
+    [[nodiscard]] std::vector<std::vector<std::size_t>> reachable(
+        std::size_t step, const std::vector<std::size_t>& query) const {
+        std::vector<std::size_t> before = query;
+        before.erase(
+            std::lower_bound(before.begin(), before.end(), m_order[step]));
+        std::vector<std::vector<std::size_t>> bases{std::move(before)};
+        std::vector<std::vector<std::size_t>> sets;
+        for (std::size_t ahead = 1;
+             ahead <= m_depth && step + ahead < m_order.size(); ++ahead) {
+            const std::size_t unsettled = m_order[step + ahead - 1];
+            std::vector<std::vector<std::size_t>> grown;
+            grown.reserve(2 * bases.size());
+            for (std::vector<std::size_t>& base : bases) {
+                grown.push_back(with_part(base, unsettled));
+                grown.push_back(std::move(base));
+            }
+            bases = std::move(grown);
+            for (const std::vector<std::size_t>& base : bases) {
+                sets.push_back(with_part(base, m_order[step + ahead]));
+            }
+        }
+        return sets;
+    }
+
+    void refresh(std::size_t step, const std::vector<std::size_t>& query) {
+        const std::vector<std::vector<std::size_t>> wanted =
+            reachable(step, query);
+        const std::set<std::vector<std::size_t>> live(wanted.begin(),
+                                                      wanted.end());
+        // A set the walk cannot reach now it never can again: the latest step
+        // among its parts fixes which step would ask it, and the others fix
+        // the outcome of every step before that one.
+        for (auto entry = m_nodes.begin(); entry != m_nodes.end();) {
+            if (live.count(entry->first) > 0) {
+                ++entry;
+                continue;
+            }
+            if (!cancel(*entry->second) &&
+                entry->second->m_state.load() != State::Done) {
+                m_abandoned.push_back(entry->second);
+            }
+            entry = m_nodes.erase(entry);
+        }
+        m_abandoned.erase(std::remove_if(m_abandoned.begin(), m_abandoned.end(),
+                                         [](const std::shared_ptr<Node>& node) {
+                                             return node->m_state.load() ==
+                                                    State::Done;
+                                         }),
+                          m_abandoned.end());
+
+        std::size_t budget = global_thread_pool().idle_workers();
+        for (const std::vector<std::size_t>& set : wanted) {
+            if (budget == 0) {
+                break;
+            }
+            if (m_nodes.count(set) == 0) {
+                launch(set);
+                --budget;
+            }
+        }
+    }
+
+    void launch(const std::vector<std::size_t>& set) {
+        auto node = std::make_shared<Node>();
+        node->m_set = set;
+        m_nodes.emplace(set, node);
+        MrsSpeculationStats::n_issued++;
+        // Background as well as gated on idle workers: a scoring part queued
+        // after this one still runs first.
+        global_thread_pool().submit(
+            [shared = m_shared, node, oracle = &m_oracle] {
+                State expected = State::Pending;
+                if (!node->m_state.compare_exchange_strong(expected,
+                                                           State::Running)) {
+                    return;
+                }
+                MrsSpeculationStats::n_started++;
+                bool answered = false;
+                try {
+                    (void)(*oracle)(node->m_set);
+                    answered = true;
+                } catch (...) {
+                    // Left for the walk to meet if it asks this query itself;
+                    // on a branch it does not take, the error buys nothing.
+                    answered = false;
+                }
+                {
+                    const std::scoped_lock lock(shared->m_mutex);
+                    node->m_answered = answered;
+                    node->m_state.store(State::Done);
+                }
+                shared->m_done.notify_all();
+            },
+            TaskPriority::Background);
+    }
+
+    const SubsetRealizability& m_oracle;
+    const std::vector<std::size_t>& m_order;
+    std::size_t m_depth;
+    std::shared_ptr<Shared> m_shared;
+    std::map<std::vector<std::size_t>, std::shared_ptr<Node>> m_nodes;
+    // Started tasks for sets the walk can no longer reach, which it must
+    // still outlast.
+    std::vector<std::shared_ptr<Node>> m_abandoned;
+};
 
 }  // namespace
 
@@ -110,7 +321,8 @@ double status_score_mrs(const std::vector<std::string>& components,
                         std::size_t n_parts, SatisfiabilityChecker& sat,
                         const SubsetRealizability& subset_realizable,
                         const std::vector<std::size_t>& admission_order,
-                        const std::string& whole) {
+                        const std::string& whole,
+                        std::size_t speculation_depth) {
     if (!all_components_satisfiable(components, sat)) {
         return k_status_component_unsatisfiable;
     }
@@ -143,10 +355,21 @@ double status_score_mrs(const std::vector<std::string>& components,
     // the only order it ran.
     std::vector<std::size_t> kept;
     kept.reserve(n_parts);
-    for (const std::size_t part :
-         project_admission_order(admission_order, n_parts)) {
+    const std::vector<std::size_t> order =
+        project_admission_order(admission_order, n_parts);
+    // Declared after `order`, which it borrows, so it is destroyed first, and
+    // its destructor's wait covers an exception out of the oracle too.
+    std::optional<WalkLookahead> lookahead;
+    if (speculation_depth > 0) {
+        lookahead.emplace(subset_realizable, order, speculation_depth);
+    }
+    for (std::size_t step = 0; step < order.size(); ++step) {
+        const std::size_t part = order[step];
         const auto slot = std::lower_bound(kept.begin(), kept.end(), part);
         const auto inserted = kept.insert(slot, part);
+        if (lookahead) {
+            lookahead->before_query(step, kept);
+        }
         if (!subset_realizable(kept)) {
             kept.erase(inserted);
         }
@@ -342,7 +565,8 @@ double specification_status(const Specification& specification,
                             SatisfiabilityChecker& sat,
                             RealizabilityChecker& real, StatusGrading grading,
                             const std::vector<std::size_t>& slot_order,
-                            ComponentCheck component_check) {
+                            ComponentCheck component_check,
+                            std::size_t speculation_depth) {
     if (grading == StatusGrading::Aurus) {
         // Sides rather than requirements, and no component tier: the ladder is
         // AuRUS's whole scale, not a refinement of PEREDUR's. See
@@ -382,7 +606,8 @@ double specification_status(const Specification& specification,
             },
             position_order_from_slots(slot_order, slots),
             "(" + side_conjunction(specification.m_assumptions) + ") & (" +
-                side_conjunction(specification.m_guarantees) + ")");
+                side_conjunction(specification.m_guarantees) + ")",
+            speculation_depth);
     }
 
     return status_score(components, sat, [&specification, &real] {

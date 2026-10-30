@@ -44,7 +44,7 @@ struct ConfigKey {
 // more than one. A new key also needs schemas/config-schema.json and
 // example-config.toml; scripts/check_config_schema.py reads this table to hold
 // them to it.
-inline constexpr std::array<ConfigKey, 45> k_config_keys{{
+inline constexpr std::array<ConfigKey, 46> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive},
     {"genetic", "population_size", &Config::population_size,
      KeyCheck::Positive},
@@ -102,6 +102,8 @@ inline constexpr std::array<ConfigKey, 45> k_config_keys{{
     {"runtime", "ltlfilt_timeout_ms", &Config::ltlfilt_timeout,
      KeyCheck::NonNegative},
     {"runtime", "parallel", &Config::parallel, KeyCheck::AtLeastOne},
+    {"runtime", "mrs_speculation_depth", &Config::mrs_speculation_depth,
+     KeyCheck::NotNegative},
     {"runtime", "dashboard", &Config::dashboard, KeyCheck::None},
     {"runtime", "max_scoring_failure_rate", &Config::max_scoring_failure_rate,
      KeyCheck::Probability},

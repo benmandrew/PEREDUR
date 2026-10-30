@@ -186,6 +186,21 @@ struct MrsScreenStats {
     inline static std::atomic<std::size_t> n_undecided{0};
 };
 
+/// What the MRS walk's lookahead did over a run (see
+/// Config::mrs_speculation_depth). Reported under `--diagnostics` and in
+/// run.json.
+struct MrsSpeculationStats {
+    /// Lookahead queries submitted to the pool.
+    inline static std::atomic<std::size_t> n_issued{0};
+    /// Of those, the ones a worker ran. The rest were cancelled before they
+    /// started, because the walk settled a step the other way or reached the
+    /// query itself first.
+    inline static std::atomic<std::size_t> n_started{0};
+    /// Of those started, the ones the walk later asked for itself, finding
+    /// the answer cached or waiting for it to land rather than asking twice.
+    inline static std::atomic<std::size_t> n_consumed{0};
+};
+
 /// Scores a candidate on the greedy maximal-realizable-subset (MRS) scale,
 /// selected by Config::status_grading. Below realizability the score is the
 /// fraction of the guarantee side that can be kept, which grades a region
@@ -243,6 +258,20 @@ struct MrsScreenStats {
 /// both front ends already apply: no guarantees leaves the implication with a
 /// `true` consequent, which is realizable whatever the assumptions say.
 ///
+/// Each step's query depends on the verdict before it, so the walk is a serial
+/// chain of synthesis queries on one worker. At @p speculation_depth d > 0 it
+/// also submits, as TaskPriority::Background work and only as far as
+/// ThreadPool::idle_workers allows, the queries the next d steps would ask
+/// under every outcome of the steps not yet settled. They run the same oracle
+/// and only warm its cache: the walk still asks every query itself, in the
+/// order it always did, and so reads the verdicts it would have read. A
+/// lookahead query the walk reaches while it is running is waited for rather
+/// than asked twice; one not yet started is cancelled and asked inline, so the
+/// walk never waits on a task that needs a free worker. The walk returns only
+/// once every lookahead query it started has finished, so the oracle may
+/// borrow what it likes from the caller's frame, but it must be safe to call
+/// from several threads at once.
+///
 /// @param components        Formulae to test individually, as for status_score
 /// @param n_parts           Number of guarantee-side parts the oracle addresses
 /// @param sat               Satisfiability checker (black)
@@ -252,13 +281,16 @@ struct MrsScreenStats {
 ///                          order
 /// @param whole             The whole specification as one LTL formula, tested
 ///                          once the components pass; empty skips the query
+/// @param speculation_depth How many steps ahead to query; 0 is the serial
+///                          walk. See Config::mrs_speculation_depth
 /// @return                  k_status_component_unsatisfiable, or |kept|/n_parts
 ///                          in [0, 1]; 1.0 exactly when every part is kept
 double status_score_mrs(const std::vector<std::string>& components,
                         std::size_t n_parts, SatisfiabilityChecker& sat,
                         const SubsetRealizability& subset_realizable,
                         const std::vector<std::size_t>& admission_order = {},
-                        const std::string& whole = {});
+                        const std::string& whole = {},
+                        std::size_t speculation_depth = 0);
 
 /// @p reference restricted to a walk over @p n_parts parts: entries addressing
 /// a part that no longer exists are dropped, and parts the reference does not
@@ -346,11 +378,15 @@ std::vector<std::size_t> conflict_degree_order(
 ///                      order. Read only under StatusGrading::Mrs
 /// @param component_check Whether to test the components here, or take that
 ///                      tier as decided elsewhere; see ComponentCheck
+/// @param speculation_depth The MRS walk's lookahead; see
+///                      @ref status_score_mrs. Read only under
+///                      StatusGrading::Mrs
 double specification_status(
     const Specification& specification, SatisfiabilityChecker& sat,
     RealizabilityChecker& real, StatusGrading grading = StatusGrading::Tiered,
     const std::vector<std::size_t>& slot_order = {},
-    ComponentCheck component_check = ComponentCheck::Included);
+    ComponentCheck component_check = ComponentCheck::Included,
+    std::size_t speculation_depth = 0);
 
 /// The components @ref specification_status tests individually: the condition
 /// and the response of each live requirement as two formulae, assumptions

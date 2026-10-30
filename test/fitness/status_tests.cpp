@@ -1,9 +1,16 @@
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <functional>
+#include <map>
+#include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <utility>
 #include <vector>
 
 #include "config.hpp"
@@ -404,6 +411,140 @@ TEST(test_mrs_satisfiable_whole_specification_reaches_the_walk) {
            "mrs: a satisfiable whole specification should be walked as before");
     expect(oracle.queries.size() == 2,
            "mrs: a satisfiable whole specification should be walked in full");
+}
+
+// --- status_score_mrs with lookahead ---
+
+// Thread-safe and memoising, as RealizabilityChecker is, and slow on a miss, so
+// a lookahead query has time to land before the walk reaches it. The queries
+// asked on the walk's own thread are recorded apart from the rest.
+struct ConcurrentOracle {
+    std::function<bool(const std::vector<std::size_t>&)> admissible;
+    std::thread::id walk_thread = std::this_thread::get_id();
+    std::mutex mutex;
+    std::map<std::vector<std::size_t>, bool> memo;
+    std::vector<std::vector<std::size_t>> walk_queries;
+    std::size_t lookahead_queries = 0;
+    std::atomic<int> running{0};
+
+    explicit ConcurrentOracle(
+        std::function<bool(const std::vector<std::size_t>&)> verdict)
+        : admissible(std::move(verdict)) {}
+
+    bool operator()(const std::vector<std::size_t>& indices) {
+        ++running;
+        struct Leave {
+            std::atomic<int>& count;
+            ~Leave() { --count; }
+        } leave{running};
+        {
+            const std::scoped_lock lock(mutex);
+            if (std::this_thread::get_id() == walk_thread) {
+                walk_queries.push_back(indices);
+            } else {
+                ++lookahead_queries;
+            }
+            const auto found = memo.find(indices);
+            if (found != memo.end()) {
+                return found->second;
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        const bool verdict = admissible(indices);
+        const std::scoped_lock lock(mutex);
+        memo.emplace(indices, verdict);
+        return verdict;
+    }
+};
+
+bool holds(const std::vector<std::size_t>& indices, std::size_t part) {
+    return std::find(indices.begin(), indices.end(), part) != indices.end();
+}
+
+// Parts 0 and 3 conflict, as do 2 and 5, and part 6 is unrealizable alone, so
+// the walk below both accepts and rejects along the way.
+bool mixed_verdict(const std::vector<std::size_t>& indices) {
+    return !(holds(indices, 0) && holds(indices, 3)) &&
+           !(holds(indices, 2) && holds(indices, 5)) && !holds(indices, 6);
+}
+
+std::vector<std::size_t> mixed_order() { return {1, 0, 2, 3, 6, 4, 5, 7}; }
+
+TEST(test_mrs_lookahead_asks_what_the_serial_walk_asks) {
+    SatisfiabilityChecker sat;
+    RecordingOracle serial{{}, mixed_verdict};
+    const double serial_score = status_score_mrs(
+        {"p"}, 8, sat,
+        [&serial](const std::vector<std::size_t>& idx) { return serial(idx); },
+        mixed_order());
+
+    const std::size_t issued = MrsSpeculationStats::n_issued;
+    const std::size_t consumed = MrsSpeculationStats::n_consumed;
+    ConcurrentOracle oracle(mixed_verdict);
+    const double score = status_score_mrs(
+        {"p"}, 8, sat,
+        [&oracle](const std::vector<std::size_t>& idx) { return oracle(idx); },
+        mixed_order(), {}, 2);
+
+    expect(serial_score == 5.0 / 8.0,
+           "mrs lookahead: the mixed walk should keep five of its eight parts");
+    expect(score == serial_score,
+           "mrs lookahead: the score should equal the serial walk's");
+    expect(oracle.walk_queries == serial.queries,
+           "mrs lookahead: the walk should ask the serial walk's queries, in "
+           "its order");
+    expect(oracle.running.load() == 0,
+           "mrs lookahead: no lookahead query should still be running once the "
+           "walk returns");
+    expect(
+        MrsSpeculationStats::n_issued > issued && oracle.lookahead_queries > 0,
+        "mrs lookahead: an idle pool should take lookahead queries");
+    expect(MrsSpeculationStats::n_consumed > consumed,
+           "mrs lookahead: the walk should find some of its queries already "
+           "asked");
+}
+
+TEST(test_mrs_lookahead_depth_zero_is_the_serial_walk) {
+    SatisfiabilityChecker sat;
+    RecordingOracle serial{{}, mixed_verdict};
+    status_score_mrs(
+        {"p"}, 8, sat,
+        [&serial](const std::vector<std::size_t>& idx) { return serial(idx); },
+        mixed_order());
+    const std::size_t issued = MrsSpeculationStats::n_issued;
+    ConcurrentOracle oracle(mixed_verdict);
+    const double score = status_score_mrs(
+        {"p"}, 8, sat,
+        [&oracle](const std::vector<std::size_t>& idx) { return oracle(idx); },
+        mixed_order(), {}, 0);
+    expect(score == 5.0 / 8.0,
+           "mrs lookahead: depth 0 should score as the serial walk does");
+    expect(
+        oracle.walk_queries == serial.queries && oracle.lookahead_queries == 0,
+        "mrs lookahead: depth 0 should ask every query on the walk's own "
+        "thread and no other");
+    expect(MrsSpeculationStats::n_issued == issued,
+           "mrs lookahead: depth 0 should submit nothing to the pool");
+}
+
+TEST(test_mrs_lookahead_swallows_an_error_on_an_untaken_branch) {
+    // Parts 0 and 1 conflict, so the serial walk never asks a set holding both
+    // that is larger than the pair, but the lookahead does.
+    SatisfiabilityChecker sat;
+    ConcurrentOracle oracle([](const std::vector<std::size_t>& indices) {
+        const bool both = holds(indices, 0) && holds(indices, 1);
+        if (both && indices.size() > 2) {
+            throw std::runtime_error("untaken branch");
+        }
+        return !both;
+    });
+    const double score = status_score_mrs(
+        {"p"}, 5, sat,
+        [&oracle](const std::vector<std::size_t>& idx) { return oracle(idx); },
+        {}, {}, 2);
+    expect(score == 4.0 / 5.0,
+           "mrs lookahead: an error the walk never asks for should not reach "
+           "its score");
 }
 
 TEST(test_mrs_empty_guarantee_side_scores_realizable) {

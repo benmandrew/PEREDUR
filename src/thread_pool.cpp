@@ -44,9 +44,11 @@ void ThreadPool::worker_loop() {
         std::function<void()> task;
         {
             std::unique_lock lock(m_mutex);
+            ++m_waiting;
             m_cv.wait(lock, [this] {
                 return m_stop || !m_tasks.empty() || !m_background.empty();
             });
+            --m_waiting;
             std::queue<std::function<void()>>& queue =
                 m_tasks.empty() ? m_background : m_tasks;
             if (queue.empty()) {
@@ -60,6 +62,12 @@ void ThreadPool::worker_loop() {
         }
         task();
     }
+}
+
+std::size_t ThreadPool::idle_workers() {
+    const std::scoped_lock lock(m_mutex);
+    const std::size_t queued = m_tasks.size() + m_background.size();
+    return m_waiting > queued ? m_waiting - queued : 0;
 }
 
 namespace {

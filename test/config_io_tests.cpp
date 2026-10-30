@@ -447,6 +447,7 @@ ltlsynt_timeout_ms           = 30000
 ltl2tgba_timeout_ms          = 1000
 ltlfilt_timeout_ms           = 2000
 parallel                     = 4
+mrs_speculation_depth        = 1
 max_scoring_failure_rate     = 0.05
 dashboard                    = true
 )";

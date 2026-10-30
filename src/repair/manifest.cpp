@@ -228,7 +228,12 @@ namespace {
 // put to a stored controller, those it answered, and the guarantee checks
 // that cost; and tool_calls.controller_check, the ltl2tgba and autfilt execs
 // behind them. tool_calls.ltlsynt.calls falls by the hits.
-constexpr int k_schema_version = 40;
+//
+// 41 added runtime.mrs_speculation_depth and mrs_speculation: the MRS walk's
+// lookahead queries issued, started and later asked by the walk itself. The
+// lookahead moves no score, but its untaken branches add ltlsynt execs, so
+// tool_calls.ltlsynt.calls reads higher than at 40 at the default depth.
+constexpr int k_schema_version = 41;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -545,6 +550,10 @@ void write_run_manifest(const std::string& output_dir,
          {{"screened", MrsScreenStats::n_screened.load()},
           {"unsatisfiable", MrsScreenStats::n_unsatisfiable.load()},
           {"undecided", MrsScreenStats::n_undecided.load()}}},
+        {"mrs_speculation",
+         {{"issued", MrsSpeculationStats::n_issued.load()},
+          {"started", MrsSpeculationStats::n_started.load()},
+          {"consumed", MrsSpeculationStats::n_consumed.load()}}},
         // Repairs the cross-generation accumulator added that the final
         // population's own collection did not already hold. Zero when
         // genetic.accumulate_repairs is off, and also when every accumulated

@@ -176,6 +176,9 @@ void print_diagnostics_report() {
               << MrsScreenStats::n_screened << " screened, "
               << MrsScreenStats::n_unsatisfiable << " unsatisfiable, "
               << MrsScreenStats::n_undecided << " undecided\n";
+    std::cout << "MRS walk lookahead: " << MrsSpeculationStats::n_issued
+              << " issued, " << MrsSpeculationStats::n_started << " started, "
+              << MrsSpeculationStats::n_consumed << " consumed by the walk\n";
     std::cout << "\nRepairs contributed by the cross-generation accumulator "
                  "(0 unless genetic.accumulate_repairs is set): "
               << AccumulatorStats::n_contributed << "\n";

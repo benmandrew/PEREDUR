@@ -274,6 +274,12 @@ nlohmann::json expect_run_manifest(const std::filesystem::path& dir,
             implication.contains(name),
             label + ": the manifest reports implication." + std::string(name));
     }
+    const nlohmann::json& speculation = manifest.at("mrs_speculation");
+    for (const char* name : {"issued", "started", "consumed"}) {
+        expect(speculation.contains(name),
+               label + ": the manifest reports mrs_speculation." +
+                   std::string(name));
+    }
     // ltlfilt's exec count is over all three of its entry points, which is the
     // set its total_s is over; reporting one of them divided a tool's seconds
     // by a fraction of its calls.

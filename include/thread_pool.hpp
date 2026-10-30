@@ -69,6 +69,12 @@ class ThreadPool {
     /// each site reaching for the hardware concurrency independently.
     [[nodiscard]] std::size_t size() const { return m_workers.size(); }
 
+    /// Workers waiting for a task, less the tasks already queued for them to
+    /// take. A snapshot that may be stale as soon as it returns, so it can
+    /// only decide whether optional work is worth submitting, never whether a
+    /// submitted task will start.
+    [[nodiscard]] std::size_t idle_workers();
+
    private:
     void worker_loop();
 
@@ -77,6 +83,7 @@ class ThreadPool {
     std::queue<std::function<void()>> m_background;
     std::mutex m_mutex;
     std::condition_variable m_cv;
+    std::size_t m_waiting = 0;
     bool m_stop = false;
 };
 

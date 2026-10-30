@@ -8,6 +8,7 @@
 // both in sequence, and why CMake registers it twice -- one process per case --
 // the same shape as the profile suite's two registrations.
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -17,6 +18,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -214,6 +216,43 @@ TEST(test_foreground_tasks_run_before_queued_background_ones) {
     expect(order == expected,
            "priority: a queued foreground task should run before every queued "
            "background one, each queue keeping its own submission order");
+}
+
+// Workers reach their wait some time after the pool is built, so the count is
+// polled up to a deadline rather than read once.
+bool idle_workers_reach(ThreadPool& pool, std::size_t expected) {
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (pool.idle_workers() == expected) {
+            return true;
+        }
+        std::this_thread::yield();
+    }
+    return false;
+}
+
+TEST(test_idle_workers_counts_waiting_workers_less_queued_tasks) {
+    ThreadPool pool(2);
+    expect(idle_workers_reach(pool, 2),
+           "idle_workers: a pool with nothing to do should report every "
+           "worker idle");
+    std::promise<void> release;
+    std::shared_future<void> gate = release.get_future().share();
+    std::future<void> first = pool.submit([gate] { gate.wait(); });
+    expect(idle_workers_reach(pool, 1),
+           "idle_workers: a worker running a task should not count as idle");
+    std::future<void> second =
+        pool.submit([gate] { gate.wait(); }, TaskPriority::Background);
+    expect(idle_workers_reach(pool, 0),
+           "idle_workers: a queued or running task should claim the last "
+           "idle worker");
+    release.set_value();
+    first.get();
+    second.get();
+    expect(idle_workers_reach(pool, 2),
+           "idle_workers: workers should count as idle again once their "
+           "tasks finish");
 }
 
 TEST(test_background_region_collects_every_item) {

@@ -157,6 +157,9 @@ ltlfilt_timeout_ms  = 10000
 # land in one generation on the heavy TLSF specs to trip a tighter bound.
 max_scoring_failure_rate     = 0.15
 dashboard = false
+# How many steps ahead the MRS walk queries both outcomes into idle workers.
+# Scores are unchanged at any value; 0 turns it off.
+mrs_speculation_depth = 2
 # parallel = 8   # thread pool size; the default is the hardware concurrency
                  # narrowed by the CPU affinity mask and the cgroup CPU quota,
                  # so this key has no fixed default to pin and stays commented

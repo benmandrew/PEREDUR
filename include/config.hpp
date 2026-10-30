@@ -593,6 +593,20 @@ struct Config {
     /// cgroup CPU quota where those apply -- so a containerised run is sized by
     /// what the container was given rather than by what the host has.
     std::size_t parallel = available_parallelism();
+    /// How many steps past its current one the MRS walk queries ahead, under
+    /// both outcomes of each step it has not yet settled, on pool workers that
+    /// would otherwise sit idle (see status_score_mrs). 0 turns it off. The
+    /// walk still asks every query it asked before, in the same order, so the
+    /// score is unchanged; what moves is wall time, and the ltlsynt execs
+    /// spent on the branches the walk does not take.
+    ///
+    /// 2 by default. Depth d keeps up to 2^(d+1) - 2 queries in flight beside
+    /// the walk's own, so 2 fills the six or seven of eight workers seen idle
+    /// behind one straggling walk on `lift-plus-cruise-full`, and lets the walk
+    /// settle up to three steps per query time where it settled one. Each
+    /// deeper level doubles the queries for one more step, and only one query
+    /// per level is ever used. Values above 8 read as 8.
+    std::size_t mrs_speculation_depth = 2;
     /// A fitness function that throws (in practice an external tool failing on
     /// one evolved formula) costs that individual rather than the whole run:
     /// the search is stochastic, so one candidate lost out of a population is

@@ -43,7 +43,8 @@ struct FretishScorers {
                          ComponentCheck component_check) {
         return specification_status(spec, global_sat_checker(),
                                     global_real_checker(), cfg.status_grading,
-                                    slot_order, component_check);
+                                    slot_order, component_check,
+                                    cfg.mrs_speculation_depth);
     }
 
     static std::vector<std::string> status_components(

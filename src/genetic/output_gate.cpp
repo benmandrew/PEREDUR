@@ -34,8 +34,9 @@ namespace {
 // is passed: it changes which queries the MRS walk memoises, never whether the
 // top tier is reached.
 double gate_status(const Specification& spec, const Config& cfg) {
-    return specification_status(spec, global_sat_checker(),
-                                global_real_checker(), cfg.status_grading);
+    return specification_status(
+        spec, global_sat_checker(), global_real_checker(), cfg.status_grading,
+        {}, ComponentCheck::Included, cfg.mrs_speculation_depth);
 }
 
 double gate_status(const tlsf::Specification& spec, const Config& cfg) {
