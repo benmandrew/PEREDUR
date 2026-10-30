@@ -20,9 +20,9 @@ an argument. ``status`` and ``queue`` are read-only. ``collect`` wraps
 merge_experiments.py and verifies the merge. ``tick`` runs on a host, from
 cron, and runs the next phase of the lowest-numbered queued entry under a lock.
 
-Hosts are reached by their ssh-config alias (``av2``), not by the FQDN in
-merge_experiments.REMOTES: the FQDN form falls through to password auth under
-BatchMode, which a status poll cannot answer.
+Hosts are reached by their ssh-config alias (``av2``), not by a fully
+qualified name: that form falls through to password auth under BatchMode,
+which a status poll cannot answer.
 
 The operating manual is docs/dev/campaigns.md.
 """
@@ -46,6 +46,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import merge_experiments as merge  # noqa: E402
+import run_experiments as R  # noqa: E402
 
 REPO_ROOT = Path(__file__).parent.parent
 
@@ -483,8 +484,8 @@ def option_of_args(args: str, option: str):
     return None
 
 
-def profile_of_args(args: str) -> str:
-    return option_of_args(args, "--profile") or "full"
+def profile_of_args(args: str) -> str | None:
+    return option_of_args(args, "--profile")
 
 
 # -- Gathering ----------------------------------------------------------------
@@ -996,9 +997,9 @@ def cmd_status(args: argparse.Namespace) -> int:
 def resolve_profile(args: argparse.Namespace) -> tuple[str, str | None]:
     """``(csv_name, result_dir_name)`` for the profile, or explicit overrides.
 
-    merge_experiments.PROFILE_CSVS is the authority. A campaign on an unmerged
-    branch is absent from it and needs the overrides; the name is never
-    guessed.
+    merge_experiments.PROFILE_CSVS, derived from run_experiments.PROFILES, is
+    the authority. A campaign on an unmerged branch is absent from it and needs
+    the overrides; the name is never guessed.
     """
     if args.csv or args.results_dir:
         if not args.csv:
@@ -1006,6 +1007,9 @@ def resolve_profile(args: argparse.Namespace) -> tuple[str, str | None]:
         default_dir = Path(args.csv).stem
         return args.csv, (None if args.no_results
                           else (args.results_dir or default_dir))
+    if not args.profile:
+        sys.exit("collect needs --profile, or --csv for a campaign whose "
+                 "profile this checkout does not define.")
     if args.profile not in merge.PROFILE_CSVS:
         sys.exit(f"Unknown profile {args.profile!r}. Known: "
                  f"{', '.join(sorted(merge.PROFILE_CSVS))}\n"
@@ -1444,9 +1448,8 @@ def cmd_collect(args: argparse.Namespace) -> int:
     pulled: dict = {}
     missing: list[str] = []
     for host in hosts:
-        # pull_source is called directly, not through resolve_source, whose
-        # REMOTES entry is the FQDN form. It wraps only the CSV rsync against
-        # failure, so the per-run transfer raises on an unreachable host.
+        # pull_source wraps only the CSV rsync against failure, so the per-run
+        # transfer raises on an unreachable host.
         try:
             path = merge.pull_source(host, source_root(host),
                                      False, tmp_dir, csv_name, result_dir)
@@ -1601,10 +1604,9 @@ def format_seed_range(seeds: list) -> str:
 def known_profiles() -> set:
     """Profiles the runner in *this* checkout defines.
 
-    Imported lazily and never mirrored here.
+    Read from run_experiments and never mirrored here.
     """
-    import run_experiments  # noqa: PLC0415
-    return set(run_experiments.PROFILES)
+    return set(R.PROFILES)
 
 
 def profile_configs_dir(profile: str) -> str:
@@ -1623,10 +1625,9 @@ def profile_results_dir(profile: str) -> str:
 
 
 def profile_dir(profile: str, key: str, what: str) -> str:
-    import run_experiments  # noqa: PLC0415
-    path = Path(run_experiments.PROFILES[profile][key])
+    path = Path(R.PROFILES[profile][key])
     try:
-        return str(path.relative_to(run_experiments.REPO_ROOT))
+        return str(path.relative_to(R.REPO_ROOT))
     except ValueError:
         raise CampaignError(
             f"profile {profile!r} puts its {what} at {path}, outside the "
@@ -1961,16 +1962,6 @@ def parse_sections(text: str) -> dict:
     return out
 
 
-def parse_version_lines(lines: list) -> dict:
-    """``peredur --version`` output as a dict, ignoring anything unkeyed."""
-    out: dict = {}
-    for line in lines:
-        key, sep, value = line.strip().partition("=")
-        if sep:
-            out[key.strip()] = value.strip()
-    return out
-
-
 @dataclass
 class HostProbe:
     """What one host answered. Every field is present on every path.
@@ -2011,7 +2002,7 @@ def parse_stage_probe(text: str, error: str | None = None) -> HostProbe:
         head=git[1] if len(git) > 1 else "?",
         dirty=[ln.strip() for ln in sections.get("dirty", []) if ln.strip()],
         processes=probe_processes(sections.get("ps", [])),
-        binary=parse_version_lines(sections.get("bin", [])),
+        binary=R.parse_version_output("\n".join(sections.get("bin", []))),
         queue=parse_toml_blocks(text, "QFILE"),
     )
 
@@ -2161,13 +2152,12 @@ def probe_host(host: str) -> HostProbe:
 
 
 def git_output(args: list, root: Path | None = None) -> tuple:
-    proc = subprocess.run(["git", "-C", str(root or REPO_ROOT), *args],
-                          capture_output=True, text=True)
-    if proc.returncode != 0:
-        tail = [ln.strip() for ln in proc.stderr.splitlines() if ln.strip()]
-        return None, (tail[-1] if tail else f"git {args[0]} exit "
-                                            f"{proc.returncode}")
-    return proc.stdout.strip(), None
+    """run_experiments.git_result against this checkout unless told otherwise.
+
+    REPO_ROOT is read at call time, which is what lets the tests point it at
+    a fixture repository.
+    """
+    return R.git_result(args, root or REPO_ROOT)
 
 
 def confirm_discard(host: str, probe: HostProbe, refusals: list) -> bool:
@@ -2264,7 +2254,7 @@ def cmd_stage(args: argparse.Namespace) -> int:
             print(f"\n  {host}: {why}")
             rows.append([host, "?", "?", "?", "stage failed"])
             continue
-        version = parse_version_lines(result.get("bin", []))
+        version = R.parse_version_output("\n".join(result.get("bin", [])))
         fresh = version.get("commit") == sha and version.get("dirty") == "0"
         if not fresh:
             ok = False
@@ -2663,7 +2653,7 @@ def build_and_verify(root: Path, entry: dict, log_path: Path):
         return f"no {PEREDUR_BINARY} after the build"
     proc = subprocess.run([str(binary), "--version"], cwd=str(root),
                           capture_output=True, text=True)
-    version = parse_version_lines(proc.stdout.splitlines())
+    version = R.parse_version_output(proc.stdout)
     if version.get("commit") != commit:
         return (f"binary reports {version.get('commit_short') or '?'}, "
                 f"not {commit[:7]}")
@@ -3258,8 +3248,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     collect = sub.add_parser(
         "collect", help="rsync each host's results back, merge and verify.")
-    collect.add_argument("--profile", default="full",
-                         help="Profile whose CSV to collect (default: full).")
+    collect.add_argument("--profile",
+                         help="Profile whose CSV to collect. Required unless "
+                              "--csv or --curves is given.")
     collect.add_argument("--host", choices=list(HOSTS),
                          help="Only this host (default: every host).")
     collect.add_argument("--dry-run", action="store_true",

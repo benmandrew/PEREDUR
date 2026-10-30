@@ -112,4 +112,4 @@ The flag is in `operator<`, `operator==` and `hash`, so a deleted guarantee cann
 
 The probability is tested before the RNG is drawn, so at 0 it costs no draw. Archived configs predate the key, so reproduce them with `p_remove_guarantee = 0.0` (see "Config vintage"). `golden_config()` pins the key.
 
-Deletion helps realizability and costs nothing on similarity, so under NSGA-II a gutted candidate sits on the front; TLSF sweep D measures that, with `prem0` as control.
+Deletion helps realizability and costs nothing on similarity, so under NSGA-II a gutted candidate sits on the front. A sweep measuring that needs a `p_remove_guarantee = 0` arm as its control.

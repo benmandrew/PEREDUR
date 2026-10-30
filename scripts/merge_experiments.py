@@ -1,175 +1,41 @@
-#!/usr/bin/env python3
-"""Pull experiment results from remote machines and merge them into this repo.
+"""Merge per-host results CSVs on their natural key.
 
-Idempotent: run it as many times as you like. Per-run result directories are
-named with their seed (``sweep_A_gen10_fsm_seed17``) so they never collide
-between machines; rsync only transfers what changed. The aggregate CSV is
-merged by its natural key (see KEY_FIELDS), keeping exactly one row per key, so
-re-running never duplicates rows.
+The merge half of ``campaign.py collect``, which pulls each host's results
+with pull_source() and joins them with merge_csv(). Idempotent: the aggregate
+CSV is merged by its natural key (see KEY_FIELDS), keeping exactly one row per
+key, so re-running never duplicates rows. Per-run result directories are named
+with their seed (``sweep_A_gen10_fsm_seed17``) so they never collide between
+machines; rsync only transfers what changed.
 
-``--profile`` selects which CSV to merge, and must match the profile the runs
-were executed under: each profile writes its own CSV, so merging a profile's
-results needs the same ``--profile`` the runs used.
-
-Configure the remote machines in REMOTES below, then:
-
-    python scripts/merge_experiments.py                  # pull from all REMOTES (full)
-    python scripts/merge_experiments.py av2 av3          # only named remotes
-    python scripts/merge_experiments.py --dry-run        # show rsync plan, no writes
-    python scripts/merge_experiments.py /path/to/copy    # merge an already-rsynced dir
-
-A source may be a remote (``host:/path/to/peredur``) or a local path to another
-PEREDUR checkout. Bare hostnames use REMOTE_ROOT as the repo path.
+Vendored into every campaign archive beside run_experiments.py and
+gen_configs.py.
 """
 
-import argparse
 import csv
 import re
 import subprocess
 from pathlib import Path
 
+# The LEGACY_* defaults and canonical_scheme() are run_experiments.py's, so the
+# merge key and the resume key cannot drift apart. Each archive vendors both
+# scripts into one directory, where this import resolves as it does here.
+from run_experiments import (
+    LEGACY_COMMIT, LEGACY_METRIC, LEGACY_REPAIR, LEGACY_SELECTION,
+    LEGACY_WEAKENING, PROFILES, canonical_scheme)
+
 REPO_ROOT = Path(__file__).parent.parent
 
-# ── Configure your machines here ──────────────────────────────────────────────
-# Each entry is an ssh destination as accepted by ssh/rsync. A bare host uses
-# REMOTE_ROOT as the repo path; append ":/custom/path/to/peredur" to override.
-REMOTES: dict[str, str] = {
-    "av1": "benandrew@av1.cs.man.ac.uk",
-    "av2": "benandrew@av2.cs.man.ac.uk",
-    "av3": "benandrew@av3.cs.man.ac.uk",
-}
-
-# Path to the PEREDUR checkout on a remote when only a host is given.
+# Path to the PEREDUR checkout on a lab host.
 REMOTE_ROOT = "/home/benandrew/projects/counter"
-# ──────────────────────────────────────────────────────────────────────────────
 
-# Mirrors the per-profile results_csv names in run_experiments.py's PROFILES.
-# Adding a profile there means adding it here too.
+# The CSV and per-run directory each profile writes, both directly under
+# experiments/ on every host. Derived from run_experiments.PROFILES, so a new
+# profile needs nothing here. A retired profile drops out with its PROFILES
+# entry; collect its archived CSV with ``campaign.py collect --csv``.
 PROFILE_CSVS: dict[str, str] = {
-    "full": "results.csv",
-    "factorial": "results-factorial.csv",
-    "cj-large": "results-cj-large.csv",
-    "metric": "results-metric.csv",
-    "muc": "results-muc.csv",
-    "padd": "results-padd.csv",
-    "tlsf": "results-tlsf.csv",
-    "wellsep": "results-wellsep.csv",
-    # Its own CSV, never wellsep's: the key fields (spec, seed, selection, ...)
-    # overlap, so sharing would interleave two datasets. The profile is
-    # retired, but the entry stays so the archived CSVs remain mergeable.
-    "wellsep-timing": "results-wellsep-timing.csv",
-    "arbiter-hp": "results-arbiter-hp.csv",
-    "arbiter-padd": "results-arbiter-padd.csv",
-    "ablate-fret": "results-ablate-fret.csv",
-    # h2h-tlsf shares ablate-tlsf's CSV (that sharing is its dedup mechanism),
-    # so merging under either profile name merges the same rows.
-    "ablate-tlsf": "results-ablate-tlsf.csv",
-    "h2h-tlsf": "results-ablate-tlsf.csv",
-    # Deliberately NOT sharing the above: the corpus and the cap differ from
-    # h2h-tlsf's and neither is in the resume key, so shared rows collide.
-    "aurus-h2h": "results-aurus-h2h.csv",
-    # Its own CSV for the same reason `aurus-h2h` has one.
-    "aurus-h2h-ship": "results-aurus-h2h-ship.csv",
-    # Retired with sweep U, and kept here for the same reason the ops-*
-    # entries are: the archived CSVs stay mergeable.
-    "assumption-reach": "results-assumption-reach.csv",
-    "monotone": "results-monotone.csv",
-    # Its own CSV rather than sharing `monotone`'s: the corpus and the timeout
-    # caps differ, and neither is in the key.
-    "selection-smoke": "results-selection-smoke.csv",
-    # Two CSVs, never shared: the calibration runs a different corpus and seed
-    # count, and merging its rows in would put both under one key.
-    "curves-calib": "results-curves-calib.csv",
-    "curves": "results-curves.csv",
-    # One CSV per path, never shared, since the two paths run different
-    # corpora at different operating points. All five profiles are retired,
-    # but the entries stay so the archived CSVs remain mergeable.
-    "opswk-fret": "results-opswk-fret.csv",
-    "opswk-tlsf": "results-opswk-tlsf.csv",
-    "ops-pilot": "results-ops-pilot.csv",
-    "ops-tlsf": "results-ops-tlsf.csv",
-    "ops-fret": "results-ops-fret.csv",
-    "replicate": "results-replicate.csv",
-    # replicate-wkoff shares replicate's CSV (the weakening column separates the
-    # rows), so merging under either name merges the same file.
-    "replicate-wkoff": "results-replicate.csv",
-    # replicate-recap likewise: it replaces rows the original caps censored, in
-    # place and under the same keys.
-    "replicate-recap": "results-replicate.csv",
-    "replicate-tlsf": "results-replicate-tlsf.csv",
-    # Its own CSV, never replicate's: sweep R's level names are the same but
-    # the corpus differs, so sharing would interleave two datasets under one
-    # set of keys.
-    "arbiter-probe": "results-arbiter-probe.csv",
-    # Its own CSV, never ablate-tlsf's: same corpus and sweep letter, but sweep
-    # G's arms are the status grading scale rather than ablate-tlsf's C, and the
-    # level names do not overlap.
-    "status-grading": "results-status-grading.csv",
-    "weakening-arbiter": "results-wkarb.csv",
-    # The -cm halves share their R half's CSV deliberately: they are the third
-    # arm of one design, not a separate campaign, and KEY_FIELDS separates them
-    # by sweep and level_name. Merging under either name merges the same file.
-    "seldefault-fret": "results-seldefault.csv",
-    "seldefault-fret-cm": "results-seldefault.csv",
-    "seldefault-tlsf": "results-seldefault-tlsf.csv",
-    "seldefault-tlsf-cm": "results-seldefault-tlsf.csv",
-    "matched": "results-matched.csv",
-    # The calibration keeps its own CSV for the reason `curves-calib` does.
-    "rematch": "results-rematch.csv",
-    "rematch-calib": "results-rematch-calib.csv",
-    # Its own CSV rather than `curves`'s: the corpus and the path differ, and
-    # neither is in the key.
-    "gradsel-fret": "results-gradsel-fret-m.csv",
-}
-
-# Per-run output directory each profile writes under experiments/. Most profiles
-# share "results"; cj-large uses its own so its runs never collide with another
-# profile's per-run dirs. Both the remote source and local dest use this name.
+    name: p["results_csv"].name for name, p in PROFILES.items()}
 PROFILE_RESULT_DIRS: dict[str, str] = {
-    "full": "results",
-    "factorial": "results",
-    "cj-large": "results-cj-large",
-    "metric": "results-metric",
-    "muc": "results-muc",
-    "padd": "results-padd",
-    "tlsf": "results-tlsf",
-    "wellsep": "results-wellsep",
-    "wellsep-timing": "results-wellsep-timing",
-    "arbiter-hp": "results-arbiter-hp",
-    "arbiter-padd": "results-arbiter-padd",
-    "ablate-fret": "results-ablate-fret",
-    "ablate-tlsf": "results-ablate-tlsf",
-    "h2h-tlsf": "results-ablate-tlsf",
-    "aurus-h2h": "results-aurus-h2h",
-    "aurus-h2h-ship": "results-aurus-h2h-ship",
-    # Retired with sweep U, and kept for the same reason as above.
-    "assumption-reach": "results-assumption-reach",
-    "monotone": "results-monotone",
-    "selection-smoke": "results-selection-smoke",
-    "curves-calib": "results-curves-calib",
-    "curves": "results-curves",
-    # Retired with their sweep, and kept for the same reason as above.
-    "opswk-fret": "results-opswk-fret",
-    "opswk-tlsf": "results-opswk-tlsf",
-    "ops-pilot": "results-ops-pilot",
-    "ops-tlsf": "results-ops-tlsf",
-    "ops-fret": "results-ops-fret",
-    "replicate": "results-replicate",
-    "replicate-wkoff": "results-replicate",
-    "replicate-recap": "results-replicate",
-    "replicate-tlsf": "results-replicate-tlsf",
-    "arbiter-probe": "results-arbiter-probe",
-    "status-grading": "results-status-grading",
-    "weakening-arbiter": "results-wkarb",
-    "seldefault-fret": "results-seldefault",
-    "seldefault-fret-cm": "results-seldefault",
-    "seldefault-tlsf": "results-seldefault-tlsf",
-    "seldefault-tlsf-cm": "results-seldefault-tlsf",
-    "matched": "results-matched",
-    "rematch": "results-rematch",
-    "rematch-calib": "results-rematch-calib",
-    "gradsel-fret": "results-gradsel-fret-m",
-}
+    name: p["results_dir"].name for name, p in PROFILES.items()}
 
 # Natural key of a results row: one run per (sweep, level_name, selection,
 # weakening, metric, repair_mode, spec, seed). The factor columns are part of it
@@ -177,8 +43,7 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
 # (factorial), both weakening states (cj-large), both similarity metrics
 # (metric), and both repair modes (muc) — without them the crossed rows collapse
 # onto one key and half are silently dropped. Rows written before any of these
-# columns existed carry the legacy defaults below (see run_experiments.py's
-# LEGACY_* constants).
+# columns existed carry the legacy defaults imported above.
 #
 # `commit` is deliberately NOT a key field. It is not a factor of the design —
 # two rows differing only in the binary that produced them are the same cell,
@@ -186,55 +51,6 @@ PROFILE_RESULT_DIRS: dict[str, str] = {
 # commit at all) miss on resume and silently re-run whole campaigns.
 KEY_FIELDS = ("sweep", "level_name", "selection", "weakening", "metric",
               "repair_mode", "spec", "seed")
-LEGACY_SELECTION = "nsga2"
-LEGACY_WEAKENING = "wkon"
-LEGACY_METRIC = "direct"
-LEGACY_REPAIR = "mono"
-LEGACY_COMMIT = "unknown"
-
-# The two NSGA-II schemes were renamed -- "nsga2" -> "nsga2-truncate" and
-# "nsga2-replicate" -> "nsga2-apportion" -- and the binary rejects the old
-# spellings outright. Only the name moved: the scheme each one selects is
-# unchanged, so a row recorded under either spelling names the same cell of the
-# design. Canonicalising the `selection` value wherever it enters a KEY_FIELDS
-# key is what lets an archived row and a new one join as one row rather than
-# merging into two. Duplicated from run_experiments.py rather
-# than imported, like every other LEGACY_* constant here: both scripts are
-# standalone and are vendored per campaign under experiments/<campaign>/scripts/,
-# where a cross-import would not resolve. The stored `selection` value itself is
-# never rewritten -- the merged CSV keeps whatever each campaign recorded.
-SCHEME_ALIASES: dict[str, str] = {
-    "nsga2": "nsga2-truncate",
-    "nsga2-replicate": "nsga2-apportion",
-}
-
-
-def canonical_scheme(name: str) -> str:
-    """Current spelling of a selection scheme; any other name passes through."""
-    return SCHEME_ALIASES.get(name, name)
-
-
-def resolve_source(name: str) -> tuple[str, str]:
-    """Map a CLI argument to (label, rsync_root).
-
-    ``name`` may be a key in REMOTES, a raw ``host:/path`` / ``host`` spec, or a
-    local filesystem path to another PEREDUR checkout. A ``host`` with no path
-    component gets REMOTE_ROOT appended.
-    """
-    if name in REMOTES:
-        # A configured entry is always an ssh destination — a bare host (no
-        # colon) or an explicit host:path. Append REMOTE_ROOT when no path given.
-        host, sep, path = REMOTES[name].partition(":")
-        root = f"{host}:{path}" if sep else f"{REMOTES[name]}:{REMOTE_ROOT}"
-        return name, root
-    # A raw argument: an existing local path is another checkout to merge;
-    # anything else is treated as a remote spec (host or host:path).
-    local = Path(name).expanduser()
-    if local.exists():
-        return name, str(local)
-    host, sep, _ = name.partition(":")
-    root = name if sep else f"{host}:{REMOTE_ROOT}"
-    return name, root
 
 
 def safe_stem(label: str) -> str:
@@ -387,55 +203,3 @@ def merge_csv(pulled: list[Path], results_csv: Path) -> None:
     seeds = sorted({int(r["seed"]) for r in merged.values() if r.get("seed", "").isdigit()})
     if seeds:
         print(f"Seeds present: {min(seeds)}–{max(seeds)} ({len(seeds)} distinct)")
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    parser.add_argument(
-        "sources", nargs="*", metavar="SOURCE",
-        help="Remotes to pull (names from REMOTES, host:/path specs, or local "
-             "paths). Default: all entries in REMOTES.",
-    )
-    parser.add_argument("--profile", choices=list(PROFILE_CSVS), default="full",
-                        help="Which profile's CSV to merge; must match the profile "
-                             "the runs used (default: full).")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Show the rsync commands without transferring or writing.")
-    parser.add_argument("--no-results", action="store_true",
-                        help="Merge only the CSV; skip rsyncing the (potentially "
-                             "large) per-run result directories.")
-    args = parser.parse_args()
-
-    csv_name = PROFILE_CSVS[args.profile]
-    result_dir = None if args.no_results else PROFILE_RESULT_DIRS[args.profile]
-    results_csv = REPO_ROOT / "experiments" / csv_name
-    print(f"Profile: {args.profile} → {csv_name}\n")
-
-    names = args.sources or list(REMOTES)
-    tmp_dir = REPO_ROOT / "experiments" / ".merge_tmp"
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-
-    pulled: list[Path] = []
-    for name in names:
-        label, root = resolve_source(name)
-        csv_path = pull_source(
-            label, root, args.dry_run, tmp_dir, csv_name, result_dir)
-        if csv_path is not None:
-            pulled.append(csv_path)
-
-    if args.dry_run:
-        print("\nDry run — no files written. CSV merge skipped.")
-        return
-
-    if not pulled:
-        print(f"\nNo {csv_name} found on any source — nothing merged. "
-              f"Did those runs use --profile {args.profile}?")
-        return
-
-    merge_csv(pulled, results_csv)
-
-
-if __name__ == "__main__":
-    main()

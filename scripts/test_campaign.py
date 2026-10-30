@@ -194,10 +194,9 @@ check_true("rows_planned" not in detail["empty-one"],
 check(detail["empty-one"]["rows_from_csv"], True,
       "and falls back to the file's length, marked as such")
 
-# The CSV's length is not this launch's progress. Five of the profiles in
-# merge_experiments.PROFILE_CSVS share three files, and a top-up relaunch
-# rewrites the manifest to a couple of seeds while the file keeps every earlier
-# row. Reading the file's length as done would report 400/40 here and, worse,
+# The CSV's length is not this launch's progress. Profiles may share a CSV, and
+# a top-up relaunch rewrites the manifest to a couple of seeds while the file
+# keeps every earlier row. Reading the file's length as done would report 400/40 here and, worse,
 # call a campaign that started minutes ago finished.
 TOPUP = """##CAMPAIGN replicate
 ##CSVROWS 401
@@ -212,16 +211,6 @@ C.annotate(shared, {"epoch": 1786460000, "processes": []})
 check(shared["state"], "stalled",
       "a just-relaunched campaign must not be reported done")
 
-# Profiles really do share CSVs, which is what makes the whole-file count wrong
-# rather than merely imprecise: results-ablate-tlsf.csv is written by two
-# profiles and results-replicate.csv by three.
-names = list(merge.PROFILE_CSVS.values())
-shared = sorted({n for n in names if names.count(n) > 1})
-check_true(shared, "PROFILE_CSVS still has profiles sharing a CSV")
-check_true(sum(names.count(n) for n in shared) >= 4,
-           "and several profiles on each, so the file's length is not one "
-           "campaign's progress")
-
 
 # ── Process detection ─────────────────────────────────────────────────────────
 
@@ -232,7 +221,7 @@ PS = [
     "zsh -zsh",
     "sshd sshd: benandrew@notty",
     "zsh zsh -c cd /home/benandrew/projects/counter && python3 "
-    "scripts/run_experiments.py --profile full --dry-run",
+    "scripts/run_experiments.py --profile arbiter-probe --dry-run",
     "python3 python3 scripts/run_experiments.py --profile tlsf --jobs 4",
     "peredur /home/benandrew/projects/counter/build-release/peredur --input x",
 ]
@@ -245,12 +234,12 @@ check([p["comm"] for p in C.live_processes([
 check(procs[0]["profile"], "tlsf", "the runner's profile is read off its args")
 
 check(C.live_processes([
-    "python3 python3 scripts/run_experiments.py --profile full --dry-run"]),
+    "python3 python3 scripts/run_experiments.py --profile arbiter-probe --dry-run"]),
     [], "a --dry-run runner is a status probe, not a campaign")
 
-check(C.profile_of_args("python3 scripts/run_experiments.py --jobs 4"), "full",
-      "an unflagged runner is on the default profile")
-check(C.profile_of_args("python3 x.py --profile=muc"), "muc", "--profile=VALUE")
+check(C.profile_of_args("python3 scripts/run_experiments.py --jobs 4"), None,
+      "an unflagged runner names no profile, the flag having no default")
+check(C.profile_of_args("python3 x.py --profile=tlsf"), "tlsf", "--profile=VALUE")
 
 
 # ── The remote scripts must survive the lab's login shell ─────────────────────
@@ -886,7 +875,7 @@ jobs = 2
 specs = ["amba", "lily02"]
 
 [[phases]]
-profile = "muc"
+profile = "aurus-h2h"
 jobs = 4
 """
 
@@ -973,7 +962,7 @@ try:
 name = "badconfigs"
 branch = "feat/x"
 hosts = {{ av2 = "0-1" }}
-phases = [ {{ profile = "full", jobs = 1 }} ]
+phases = [ {{ profile = "arbiter-probe", jobs = 1 }} ]
 {bad}
 """)
         check_true("configs must be a non-empty string" in got,
@@ -985,11 +974,11 @@ phases = [ {{ profile = "full", jobs = 1 }} ]
 name = "twoprofiles"
 branch = "feat/x"
 hosts = { av2 = "0-1" }
-phases = [ { profile = "full", jobs = 1 }, { profile = "tlsf", jobs = 1 } ]
+phases = [ { profile = "arbiter-probe", jobs = 1 }, { profile = "tlsf", jobs = 1 } ]
 """)
     two = C.load_campaign("twoprofiles", decl_root)
     check(two["config_dirs"],
-          sorted({C.profile_configs_dir("full"), C.profile_configs_dir("tlsf")}),
+          sorted({C.profile_configs_dir("arbiter-probe"), C.profile_configs_dir("tlsf")}),
           "a campaign straddling two profiles checks both configs directories")
 
     # The error worth the most noise. Overlapping ranges cost twice the machine
@@ -999,7 +988,7 @@ phases = [ { profile = "full", jobs = 1 }, { profile = "tlsf", jobs = 1 } ]
 name = "overlap"
 branch = "feat/x"
 hosts = { av2 = "0-99", av3 = "90-199" }
-phases = [ { profile = "full", jobs = 1 } ]
+phases = [ { profile = "arbiter-probe", jobs = 1 } ]
 """)
     check_true("share 10 seed(s)" in overlap and "av2" in overlap
                and "av3" in overlap,
@@ -1018,7 +1007,7 @@ phases = [ { profile = "full", jobs = 1 } ]
 name = "malformed"
 branch = "feat/x"
 {text}
-phases = [ {{ profile = "full", jobs = 1 }} ]
+phases = [ {{ profile = "arbiter-probe", jobs = 1 }} ]
 """)
         check_true(expect_in in got, f"{why} must be refused ({got!r})")
 
@@ -1030,7 +1019,7 @@ phases = [ { profile = "no-such-profile", jobs = 1 } ]
 """)
     check_true("defines no profile" in unknown,
                "a profile the runner does not define must be refused")
-    check_true("full" in unknown, "and the known ones listed")
+    check_true("tlsf" in unknown, "and the known ones listed")
 
     # campaign.toml names a profile; it never redefines one. Eighteen archived
     # campaigns vendor their own copy of run_experiments.py, so a second copy
@@ -1040,17 +1029,17 @@ phases = [ { profile = "no-such-profile", jobs = 1 } ]
 
     for text, expect_in, why in (
         ('name = "wrong"\nbranch = "b"\nhosts = { av2 = "0" }\n'
-         'phases = [ { profile = "full" } ]', "directory is",
+         'phases = [ { profile = "arbiter-probe" } ]', "directory is",
          "a name that disagrees with its directory"),
         ('name = "decl"\nbranch = "b"\nhosts = { av2 = "0" }\n'
          'phases = []', "non-empty array", "no phases"),
         ('name = "decl"\nbranch = "b"\nhosts = { }\n'
-         'phases = [ { profile = "full" } ]', "non-empty table", "no hosts"),
+         'phases = [ { profile = "arbiter-probe" } ]', "non-empty table", "no hosts"),
         ('name = "decl"\nbranch = "b"\nseeds = "0-9"\nhosts = { av2 = "0" }\n'
-         'phases = [ { profile = "full" } ]', "unknown key",
+         'phases = [ { profile = "arbiter-probe" } ]', "unknown key",
          "a key nobody reads"),
         ('name = "decl"\nbranch = "b"\nhosts = { av2 = "0" }\n'
-         'phases = [ { profile = "full", jobs = 0 } ]', "positive integer",
+         'phases = [ { profile = "arbiter-probe", jobs = 0 } ]', "positive integer",
          "a job count of zero"),
     ):
         got = declaration_error(decl_root, "decl", text)
@@ -1076,7 +1065,7 @@ hosts = { av2 = "0-34", av3 = "35-69" }
 
 [[phases]]
 name = "wide"
-profile = "full"
+profile = "arbiter-probe"
 jobs = 4
 
 [[phases]]
@@ -1109,7 +1098,7 @@ hosts = { av2 = "0-4" }
 name = "phase-overlap"
 branch = "feat/x"
 hosts = { av2 = "0-34", av3 = "35-69" }
-phases = [ { profile = "full", hosts = { av2 = "0-12", av3 = "10-24" } } ]
+phases = [ { profile = "arbiter-probe", hosts = { av2 = "0-12", av3 = "10-24" } } ]
 """)
     check_true("share 3 seed(s)" in phase_overlap,
                f"a phase's split is held to the overlap rule too: "
@@ -1122,7 +1111,7 @@ phases = [ { profile = "full", hosts = { av2 = "0-12", av3 = "10-24" } } ]
 name = "phase-adds-host"
 branch = "feat/x"
 hosts = { av2 = "0-34" }
-phases = [ { profile = "full", hosts = { av2 = "0-9", local = "10-19" } } ]
+phases = [ { profile = "arbiter-probe", hosts = { av2 = "0-9", local = "10-19" } } ]
 """)
     check_true("not declared at the campaign level" in added and "local" in added,
                f"a phase narrows the split; it cannot add a host: {added!r}")
@@ -1131,7 +1120,7 @@ phases = [ { profile = "full", hosts = { av2 = "0-9", local = "10-19" } } ]
 name = "phase-bad-range"
 branch = "feat/x"
 hosts = { av2 = "0-34" }
-phases = [ { profile = "full", hosts = { av2 = "9-0" } } ]
+phases = [ { profile = "arbiter-probe", hosts = { av2 = "9-0" } } ]
 """)
     check_true("backwards" in phase_bad,
                f"and a malformed phase range is refused: {phase_bad!r}")
@@ -1237,9 +1226,9 @@ phases = [ { kind = "score", results = "experiments/results-rematch" } ]
          "unknown key(s) sweeps on a score phase", "sweeps on a score phase"),
         ('phases = [ { kind = "score", results = "x", specs = ["a"] } ]',
          "unknown key(s) specs on a score phase", "specs on a score phase"),
-        ('phases = [ { profile = "full", workers = 2 } ]',
+        ('phases = [ { profile = "arbiter-probe", workers = 2 } ]',
          "unknown key(s) workers on a run phase", "a budget on a run phase"),
-        ('phases = [ { kind = "grade", profile = "full" } ]',
+        ('phases = [ { kind = "grade", profile = "arbiter-probe" } ]',
          "kind must be one of", "an unknown kind"),
         ('phases = [ { kind = "score", results = "x", workers = 0 } ]',
          "workers must be a positive integer", "zero workers"),
@@ -1588,7 +1577,7 @@ name = "fixture"
 branch = "feat/fixture"
 build = "true"
 hosts = { av2 = "0-1", av3 = "2-3" }
-phases = [ { profile = "full", jobs = 2 } ]
+phases = [ { profile = "arbiter-probe", jobs = 2 } ]
 """
 
 # Stands in for build-release/peredur, reporting the commit the checkout is
@@ -1701,7 +1690,7 @@ try:
     # The failure this exists for. run_experiments.py exits 1 on a configs
     # directory with nothing in it, and a queued campaign spends its attempts
     # discovering that one tick at a time; the stage is where it is cheap.
-    configs_dir = repo / C.profile_configs_dir("full")
+    configs_dir = repo / C.profile_configs_dir("arbiter-probe")
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer):
         code = C.cmd_stage(stage_args(dry_run=False))
@@ -1720,7 +1709,7 @@ try:
 
     # A declared command runs on the host, after the build. This one writes
     # the file the check then finds, which is the whole sequence in order.
-    generated = repo / C.profile_configs_dir("full") / "gen" / "made.toml"
+    generated = repo / C.profile_configs_dir("arbiter-probe") / "gen" / "made.toml"
     # Two commands joined with && , which is what a campaign generating for
     # two profiles writes, and which `! a && b` would mis-bind outside the
     # subshell the step wraps it in.
@@ -1818,7 +1807,7 @@ name = "queued"
 branch = "feat/queued"
 build = "true"
 hosts = { local = "0-3" }
-phases = [ { profile = "full", jobs = 1 }, { profile = "tlsf", jobs = 2 } ]
+phases = [ { profile = "arbiter-probe", jobs = 1 }, { profile = "tlsf", jobs = 2 } ]
 """
 
 OTHER_DECL = """
@@ -1826,7 +1815,7 @@ name = "other"
 branch = "feat/other"
 build = "true"
 hosts = { local = "4-5" }
-phases = [ { profile = "full", jobs = 1 } ]
+phases = [ { profile = "arbiter-probe", jobs = 1 } ]
 """
 
 SCORED_DECL = """
@@ -1835,8 +1824,8 @@ branch = "feat/scored"
 build = "true"
 hosts = { local = "6-7" }
 phases = [
-  { profile = "full", jobs = 1 },
-  { kind = "score", profile = "full", workers = 2, cores = 1, deadline_s = 10 },
+  { profile = "arbiter-probe", jobs = 1 },
+  { kind = "score", profile = "arbiter-probe", workers = 2, cores = 1, deadline_s = 10 },
 ]
 """
 
@@ -1862,7 +1851,7 @@ try:
         path.write_text("generations = 1\n")
         return path
 
-    for profile in ("full", "tlsf"):
+    for profile in ("arbiter-probe", "tlsf"):
         put_config(profile)
     control_dir = queue_root / "stub"
     control_dir.mkdir()
@@ -1943,7 +1932,7 @@ try:
     check(entry["state"], "queued", "and requeues for the second phase")
     check(entry["phase"], 1, "having advanced the phase index")
     check(calls.read_text().count("\n"), 1, "one runner invocation")
-    check_true("--profile full --jobs 1 --seeds 0 1 2 3"
+    check_true("--profile arbiter-probe --jobs 1 --seeds 0 1 2 3"
                in calls.read_text(), "on the declared profile and seeds")
 
     code, printed = tick()
@@ -2111,7 +2100,7 @@ try:
     # its three attempts on it. The tick had no such check at all, so the same
     # failure reached the path with nobody watching.
     calls.unlink() if calls.exists() else None
-    generated = repo / C.profile_configs_dir("full") / "default" / "x.toml"
+    generated = repo / C.profile_configs_dir("arbiter-probe") / "default" / "x.toml"
     generated.unlink()
     entry = only_entry()
     entry.update({"state": "queued", "phase": 0, "attempts": 0,
@@ -2189,7 +2178,7 @@ try:
     check(git(repo, "rev-parse", "HEAD"), only_entry()["commit"],
           "at the commit the entry froze, not wherever the branch now points")
     check_true("staging feat/queued" in printed, "and the tick says it did")
-    check_true("--profile full" in calls.read_text(),
+    check_true("--profile arbiter-probe" in calls.read_text(),
                "then runs the phase it was staged for")
 
     # ── a stage that moves the tick's own sources restarts the tick ───────────
@@ -2253,7 +2242,7 @@ try:
         os.environ.pop(C.TICK_RESTART_ENV, None)
     check(len(execs), 0, "a tick that has already restarted does not again")
     check(code, 0, "and runs the phase on the sources it has")
-    check_true("--profile full" in calls.read_text(),
+    check_true("--profile arbiter-probe" in calls.read_text(),
                "which is the old behaviour, not a refusal")
 
     # The lock is adopted from the descriptor rather than taken again.
@@ -2305,7 +2294,7 @@ try:
     C.write_entry(entry["path"], entry)
     code, printed = tick()
     check(code, 0, "once the build passes, the phase runs")
-    check_true("--profile full" in calls.read_text(), "on the rebuilt binary")
+    check_true("--profile arbiter-probe" in calls.read_text(), "on the rebuilt binary")
     calls.unlink()
 
     entry = only_entry()
@@ -2391,7 +2380,7 @@ try:
     check(code, 0, f"the run phase runs first: {printed}")
     check((last_entry()["state"], last_entry()["phase"]), ("queued", 1),
           "leaving the score phase queued")
-    check_true("--profile full --jobs 1 --seeds 6 7" in calls.read_text(),
+    check_true("--profile arbiter-probe --jobs 1 --seeds 6 7" in calls.read_text(),
                "having run the search over this host's seeds")
     check_true(not scorer_calls.exists(), "and not the scorer")
 
@@ -2400,8 +2389,10 @@ try:
     # would run and what blocks it, and spends nothing.
     code, printed = tick(dry_run=True)
     check(code, 0, "a dry run of the score phase exits 0")
-    check_true(f"would run: {C.SCORER_CMD} --results experiments/results "
-               f"--out experiments/curves --workers 2 --cores 1 --cuts 20 "
+    check_true(f"would run: {C.SCORER_CMD} "
+               f"--results experiments/results-arbiter-probe "
+               f"--out experiments/curves-arbiter-probe "
+               f"--workers 2 --cores 1 --cuts 20 "
                f"--maximal-timeout 900 --compare-timeout 600 --deadline-s 10 "
                f"--wall-cap-s 910 --seeds 6 7" in printed,
                f"printing the scorer command it would run: {printed!r}")
@@ -2414,7 +2405,7 @@ try:
     check(code, 1, "a score phase whose results directory is missing fails")
     entry = last_entry()
     check_true("no results directory" in entry["last_error"]
-               and "experiments/results" in entry["last_error"]
+               and "experiments/results-arbiter-probe" in entry["last_error"]
                and "curves" in entry["last_error"],
                f"with the directory and the phase named in the entry: "
                f"{entry['last_error']!r}")
@@ -2424,7 +2415,7 @@ try:
                "and the scorer never reached, so the reason is the "
                "directory rather than an exit status")
 
-    (repo / "experiments" / "results").mkdir(parents=True)
+    (repo / "experiments" / "results-arbiter-probe").mkdir(parents=True)
     entry.update({"state": "queued", "attempts": 0})
     C.write_entry(entry["path"], entry)
     code, printed = tick()
@@ -2432,7 +2423,8 @@ try:
                    f"{printed}")
     check(last_entry()["state"], "done", "and finishes the entry")
     check(scorer_calls.read_text().strip(),
-          "--results experiments/results --out experiments/curves "
+          "--results experiments/results-arbiter-probe "
+          "--out experiments/curves-arbiter-probe "
           "--workers 2 --cores 1 --cuts 20 --maximal-timeout 900 "
           "--compare-timeout 600 --deadline-s 10 --wall-cap-s 910 "
           "--seeds 6 7",

@@ -12,7 +12,7 @@ which makes selection_scheme a factor of the design rather than a constant.
 Usage:
     python scripts/gen_configs.py                       # the standard grid
     python scripts/gen_configs.py --schemes nsga2-truncate   # one scheme only
-    python scripts/gen_configs.py --sweeps C D E        # specific sweeps
+    python scripts/gen_configs.py --sweeps A C          # specific sweeps
     python scripts/gen_configs.py --sweeps C --levels default,status-only
                                                         # specific levels only
     python scripts/gen_configs.py --generations 40 --population-size 1000 \\
@@ -137,11 +137,11 @@ DEFAULTS: dict = {
     # Probability a mutation appends a new environment (fairness) assumption
     # rather than rewriting an existing requirement/section. Emitted into
     # [mutation] only when a sweep overrides it (see make_toml), so the standard
-    # grids stay byte-identical; the p_add_assumption sweep varies it.
+    # grids stay byte-identical.
     "p_add_assumption": 0.05,
     # The mirror action: delete one guarantee. Emitted into [mutation] only when
-    # a sweep overrides it (see make_toml), like p_add_assumption; TLSF sweep D
-    # varies it, and its prem0 arm is the pre-operator control.
+    # a sweep overrides it (see make_toml), like p_add_assumption. At 0 it costs
+    # no draw, so a run reproduces one from before the operator existed.
     "p_remove_guarantee": 0.05,
     "default_bound": 20,
     "metric": "direct",
@@ -155,13 +155,13 @@ DEFAULTS: dict = {
     # Report every gate-passing candidate of every generation rather than only
     # the final population's. Emitted into [genetic] only when a sweep
     # overrides it (see make_toml), so every existing grid stays
-    # byte-identical; TLSF sweep N crosses it.
+    # byte-identical.
     "accumulate_repairs": True,
     "black_timeout_ms": 1000,
     "repair_mode": "monolithic",
     # Mirrors include/config.hpp. Emitted into [fitness] only when a sweep
     # overrides it (see make_toml), so every existing grid stays
-    # byte-identical; sweep G varies it.
+    # byte-identical; it is in VINTAGE_KEYS.
     "status_grading": "mrs",
     # Mirrors include/config.hpp. Emitted into [fitness] only when a sweep
     # overrides it (see make_toml), so every existing grid stays
@@ -175,16 +175,14 @@ DEFAULTS: dict = {
     "semantic_trace_weight": 0.5,
     # TLSF-only [tlsf.mutation] split (see config.hpp). Emitted only when a sweep
     # overrides one of them (see make_toml), so the FRETISH and A/B TLSF grids
-    # stay byte-identical to the pre-factor output; the mutation-split sweep sets
-    # them to vary how mutation divides its budget between the environment
-    # (assumption) and guarantee sides.
+    # stay byte-identical to the pre-factor output. They divide mutation's
+    # budget between the environment (assumption) and guarantee sides.
     "p_assumption": 0.3,
     "p_temporal": 0.2,
     # The monotone arm and the clone-an-assumption branch of p_add_assumption
     # (see config.hpp). Each is emitted only when a sweep overrides it (see
-    # make_toml), so existing grids stay byte-identical; TLSF sweep T crosses
-    # them. p_monotone sits under [mutation], is read by both paths, and is in
-    # VINTAGE_KEYS.
+    # make_toml), so existing grids stay byte-identical. p_monotone sits under
+    # [mutation], is read by both paths, and is in VINTAGE_KEYS.
     "p_monotone": 0.25,
     "p_clone_assumption": 0.25,
     # A width for the disjunctive body tlsf_add_assumption draws and a bare-F
@@ -393,83 +391,6 @@ SWEEP_C: list[tuple[str, dict]] = [
                          "weight_status": 1.0}),
 ]
 
-# Sweep D: vary the trigger mutation probability
-SWEEP_D: list[tuple[str, dict]] = [
-    ("ptrig0.0",  {"p_trigger": 0.0}),
-    ("ptrig0.1",  {"p_trigger": 0.1}),
-    ("ptrig0.25", {"p_trigger": 0.25}),
-    ("ptrig0.5",  {"p_trigger": 0.5}),   # baseline
-    ("ptrig0.75", {"p_trigger": 0.75}),
-    ("ptrig0.9",  {"p_trigger": 0.9}),
-    ("ptrig1.0",  {"p_trigger": 1.0}),
-]
-
-# Sweep E: vary the response mutation probability
-SWEEP_E: list[tuple[str, dict]] = [
-    ("presp0.0",  {"p_response": 0.0}),
-    ("presp0.1",  {"p_response": 0.1}),
-    ("presp0.25", {"p_response": 0.25}),
-    ("presp0.5",  {"p_response": 0.5}),  # baseline
-    ("presp0.75", {"p_response": 0.75}),
-    ("presp0.9",  {"p_response": 0.9}),
-    ("presp1.0",  {"p_response": 1.0}),
-]
-
-# Sweep F: vary the timing mutation probability
-SWEEP_F: list[tuple[str, dict]] = [
-    ("ptim0.0",  {"p_timing": 0.0}),
-    ("ptim0.05", {"p_timing": 0.05}),
-    ("ptim0.15", {"p_timing": 0.15}),   # baseline
-    ("ptim0.3",  {"p_timing": 0.3}),
-    ("ptim0.5",  {"p_timing": 0.5}),
-    ("ptim0.75", {"p_timing": 0.75}),
-    ("ptim1.0",  {"p_timing": 1.0}),
-]
-
-# Sweep G: vary the bounded model-counting horizon. Raising it costs almost
-# nothing — the bound enters through the transfer matrix, not a SAT call — but
-# it moves the semantic similarity score, so it changes which repairs win.
-SWEEP_G: list[tuple[str, dict]] = [
-    ("bound5",   {"default_bound": 5}),
-    ("bound10",  {"default_bound": 10}),
-    ("bound20",  {"default_bound": 20}),   # baseline
-    ("bound40",  {"default_bound": 40}),
-    ("bound80",  {"default_bound": 80}),
-    ("bound160", {"default_bound": 160}),
-]
-
-# Sweep H: vary the crossover rate. The default of 0.1 leaves the search
-# almost entirely mutation-driven; the 0.0 level tests whether crossover
-# contributes at all.
-SWEEP_H: list[tuple[str, dict]] = [
-    ("cross0.0",  {"crossover_rate": 0.0}),
-    ("cross0.1",  {"crossover_rate": 0.1}),  # baseline
-    ("cross0.25", {"crossover_rate": 0.25}),
-    ("cross0.5",  {"crossover_rate": 0.5}),
-    ("cross0.75", {"crossover_rate": 0.75}),
-    ("cross1.0",  {"crossover_rate": 1.0}),
-]
-
-# Sweep I: vary the mutation rate
-SWEEP_I: list[tuple[str, dict]] = [
-    ("mut0.1",  {"mutation_rate": 0.1}),
-    ("mut0.25", {"mutation_rate": 0.25}),
-    ("mut0.5",  {"mutation_rate": 0.5}),
-    ("mut0.75", {"mutation_rate": 0.75}),
-    ("mut1.0",  {"mutation_rate": 1.0}),   # baseline
-]
-
-# Sweep K: the status objective's grading scale, on the FRETISH path. The TLSF
-# table carries the same three levels under G; the FRETISH G is the model-count
-# bound and was there first, so this is the same factor under a free letter
-# rather than a letter reused across the two tables. K is unused in both, and O
-# and U are avoided as retired rather than free.
-SWEEP_K: list[tuple[str, dict]] = [
-    ("tiered", {"status_grading": "tiered"}),
-    ("mrs",    {"status_grading": "mrs"}),
-    ("aurus",  {"status_grading": "aurus"}),
-]
-
 # Sweep R: vary elitism. Elitism carries the top fraction over verbatim, which
 # re-injects exact duplicates into the pool -- the mechanism nsga2-replicate
 # deduplicates away. Crossing the two states separates "replicate helps" from
@@ -478,19 +399,6 @@ SWEEP_R: list[tuple[str, dict]] = [
     ("elit0",   {"elitism_rate": 0.0}),
     ("elit0.1", {"elitism_rate": 0.1}),   # config.hpp default
 ]
-
-# Sweep S: the compute-matched control for sweep R. nsga2-replicate costs more
-# wall time per run than nsga2 (it breeds from a replicated population), so a
-# raw R comparison confounds "better selection" with "more compute". S is
-# sweep R's levels at a larger generation budget, run under nsga2 only: if
-# replicate beats plain nsga2 at R but not this arm, the gain was the compute.
-#
-# The multiplier is a flag rather than a constant because the campaign fixes it
-# from calibration -- measure replicate's actual cost ratio, then regenerate S
-# with --compute-match-factor set to it. Only `generations` is scaled;
-# population_size is the axis the duplication story is about, so holding it
-# fixed keeps the arms comparable in the dimension under test.
-DEFAULT_COMPUTE_MATCH_FACTOR = 1.5
 
 # Keys whose built-in default has changed at least once since campaigns began
 # being archived. A generated config states a key only where a sweep overrides
@@ -508,28 +416,11 @@ VINTAGE_KEYS: tuple[str, ...] = (
 )
 
 
-def make_sweep_s(generations: int, factor: float) -> list[tuple[str, dict]]:
-    matched = max(1, round(generations * factor))
-    return [(f"cm-{level_name}", {**overrides, "generations": matched})
-            for level_name, overrides in SWEEP_R]
-
-
 SWEEPS: list[tuple[str, list]] = [
     ("A", SWEEP_A),
     ("B", SWEEP_B),
     ("C", SWEEP_C),
-    ("D", SWEEP_D),
-    ("E", SWEEP_E),
-    ("F", SWEEP_F),
-    ("G", SWEEP_G),
-    ("H", SWEEP_H),
-    ("I", SWEEP_I),
-    ("K", SWEEP_K),
     ("R", SWEEP_R),
-    # Placeholder levels at the default operating point and match factor: main()
-    # rebuilds this entry from --generations/--compute-match-factor. It is
-    # tabulated anyway so --sweeps validates "S" and the default set includes it.
-    ("S", make_sweep_s(DEFAULTS["generations"], DEFAULT_COMPUTE_MATCH_FACTOR)),
 ]
 
 # ── TLSF campaign grid ───────────────────────────────────────────────────────
@@ -554,115 +445,16 @@ TLSF_SWEEP_B: list[tuple[str, dict]] = [
     ("pop500", {"population_size": 500}),
 ]
 
-# TLSF sweep M: vary the assumption/guarantee mutation split (TLSF-only). Named
-# by the guarantee share; p_assumption is its complement so the two sides always
-# sum to 1. In monolithic mode this trades environment-side against guarantee-
-# side mutation over the whole spec; in muc mode the environment side is kept at
-# full size while the guarantee side is the minimal core, so the same split
-# spends a larger share of guarantee mutations on the culprit formulae. pg0.7 is
-# the config.hpp baseline (p_assumption=0.3). Crossed with tlsf.repair_mode via
-# `--tlsf --sweeps M --repair both`.
-TLSF_SWEEP_M: list[tuple[str, dict]] = [
-    # Level names still read as the guarantee-side share, which is now
-    # 1 - p_assumption rather than its own key. They are load-bearing: level
-    # names are parsed back out of archived campaign paths, so renaming them
-    # would orphan every muc-campaign row.
-    ("pg0.3", {"p_assumption": 0.7}),
-    ("pg0.5", {"p_assumption": 0.5}),
-    ("pg0.7", {"p_assumption": 0.3}),   # baseline
-    ("pg0.9", {"p_assumption": 0.1}),
-]
-
-# TLSF sweep P: vary p_add_assumption (TLSF-only campaign use, though the key
-# is shared by both modes). Raising it makes mutation append a fairness
-# assumption more often, the structural move needed to reach assumption-side
-# ideals (e.g. arbiter's G F r0 & G F r1). padd0.05 is the config.hpp baseline.
-# Crossed with tlsf.repair_mode.
-TLSF_SWEEP_P: list[tuple[str, dict]] = [
-    ("padd0.05", {"p_add_assumption": 0.05}),   # baseline
-    ("padd0.15", {"p_add_assumption": 0.15}),
-    ("padd0.3",  {"p_add_assumption": 0.3}),
-    ("padd0.5",  {"p_add_assumption": 0.5}),
-]
-
-# TLSF sweep D: vary p_remove_guarantee, the guarantee-deletion operator (D for
-# delete; R is taken by the shared generations sweep). prem0 turns the operator
-# off and so reproduces a run from before it existed, which makes it the control
-# arm; prem0.05 is the config.hpp default. The eight drop-* ideals are
-# unreachable at prem0 and reachable above it, which is what this sweep is for;
-# the open question is the cost, since deleting a guarantee only ever helps
-# realizability and the similarity objectives are the only thing paying for it.
-TLSF_SWEEP_D: list[tuple[str, dict]] = [
-    ("prem0",    {"p_remove_guarantee": 0.0}),   # pre-operator control
-    ("prem0.05", {"p_remove_guarantee": 0.05}),  # baseline, mirrors p_add_assumption
-    ("prem0.15", {"p_remove_guarantee": 0.15}),
-    ("prem0.3",  {"p_remove_guarantee": 0.3}),
-]
-
 # TLSF sweep R: the elitism cross of the FRETISH sweep R, at the TLSF baseline
 # operating point (gen10/pop200) and carrying the TLSF runtime settings --tlsf
 # supplies. Same letter as the FRETISH sweep because it is the same factor; the
 # two never share a table, exactly as A and B do not.
 TLSF_SWEEP_R: list[tuple[str, dict]] = list(SWEEP_R)
 
-# Sweep G: the status objective's grading scale (fitness.status_grading).
-# Expressed as a sweep rather than as a crossed factor directory, deliberately.
-# A crossed factor would need its own CSV column, and that column would have to
-# join KEY_FIELDS in merge_experiments.py to tell the two arms apart -- which
-# means every one of the archived rows, none of which carries the column,
-# would need a legacy default to keep matching. A sweep needs none of that: the
-# arm rides in `level_name`, a field the key already carries, exactly as sweep C
-# carries its weight presets. Cross it as a factor only when a campaign needs it
-# crossed with something else.
-#
-# "mrs" is the greedy maximal-realizable-subset scale and "aurus" is AuRUS's
-# own six-level scale. "aurus" is appended rather than ordered beside "tiered"
-# so the first two levels keep the positions archived rows name. No level name
-# carries a trailing number, so level_value_of() records a null level value.
-TLSF_SWEEP_G: list[tuple[str, dict]] = [
-    ("tiered", {"status_grading": "tiered"}),
-    ("mrs",    {"status_grading": "mrs"}),
-    ("aurus",  {"status_grading": "aurus"}),
-]
-
-# TLSF sweep N: the cross-generation accumulator, off against on. With it off,
-# PEREDUR reports the maximal antichain of its *final* population, so a
-# candidate that passed the output gate in one generation and was not selected
-# into the next is a repair the search found and discarded.
-TLSF_SWEEP_N: list[tuple[str, dict]] = [
-    ("accoff", {"accumulate_repairs": False}),   # control
-    ("accon",  {"accumulate_repairs": True}),
-]
-
-# TLSF sweep T: the monotone rewrite and the cloned assumption, off against on,
-# then with elitism off. Both operators cost no RNG draw at 0, so monooff runs
-# without them exactly. elitism_rate and accumulate_repairs are stated on every
-# arm rather than left to the default, so a later default move cannot change
-# what an arm means.
-TLSF_SWEEP_T: list[tuple[str, dict]] = [
-    ("monooff",  {"p_monotone": 0.0,  "p_clone_assumption": 0.0,
-                  "elitism_rate": 0.1, "accumulate_repairs": True}),
-    ("monoon",   {"p_monotone": 0.25, "p_clone_assumption": 0.25,
-                  "elitism_rate": 0.1, "accumulate_repairs": True}),
-    ("monoship", {"p_monotone": 0.25, "p_clone_assumption": 0.25,
-                  "elitism_rate": 0.0, "accumulate_repairs": True}),
-]
-
 TLSF_SWEEPS: list[tuple[str, list]] = [
     ("A", TLSF_SWEEP_A),
     ("B", TLSF_SWEEP_B),
-    ("M", TLSF_SWEEP_M),
-    ("P", TLSF_SWEEP_P),
-    ("D", TLSF_SWEEP_D),
     ("R", TLSF_SWEEP_R),
-    ("G", TLSF_SWEEP_G),
-    ("N", TLSF_SWEEP_N),
-    ("T", TLSF_SWEEP_T),
-    # The compute-matched control, on the same terms as the FRETISH grid's S:
-    # TLSF_SWEEP_R is SWEEP_R, so make_sweep_s already emits the right levels
-    # and main() rebuilds this entry from --compute-match-factor whichever
-    # table was selected.
-    ("S", make_sweep_s(DEFAULTS["generations"], DEFAULT_COMPUTE_MATCH_FACTOR)),
 ]
 
 TLSF_CONFIGS_DIR = Path(__file__).parent.parent / "experiments" / "configs-tlsf"
@@ -726,15 +518,13 @@ def parse_args() -> argparse.Namespace:
                         metavar="SCHEME",
                         help=f"Selection schemes to emit (default: "
                              f"{' '.join(SCHEMES)})")
-    # TLSF-only sweeps (e.g. M) are selectable but excluded from the default set,
-    # so `--tlsf` alone still emits only A/B and an explicit `--sweeps M` is
-    # needed to reach them.
-    tlsf_only_sweeps = [n for n, _ in TLSF_SWEEPS if n not in dict(SWEEPS)]
+    # Every TLSF sweep letter is also a FRETISH one, so the FRETISH table's
+    # letters are the whole choice list.
     parser.add_argument("--sweeps", nargs="+",
-                        choices=[n for n, _ in SWEEPS] + tlsf_only_sweeps,
+                        choices=[n for n, _ in SWEEPS],
                         default=[n for n, _ in SWEEPS], metavar="SWEEP",
-                        help="Sweeps to emit (default: all FRETISH sweeps; "
-                             f"TLSF-only: {' '.join(tlsf_only_sweeps)})")
+                        help="Sweeps to emit (default: every sweep of the "
+                             "selected table)")
     parser.add_argument("--levels", default=None, metavar="NAMES",
                         help="Comma-separated level names; each selected sweep "
                              "emits only its matching levels (e.g. --levels "
@@ -767,12 +557,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", type=Path, default=CONFIGS_DIR, metavar="PATH",
                         help=f"Directory to write <scheme>/ dirs into (default: "
                              f"{CONFIGS_DIR})")
-    parser.add_argument("--compute-match-factor", type=float,
-                        default=DEFAULT_COMPUTE_MATCH_FACTOR, metavar="X",
-                        help=f"Generation-budget multiplier for sweep S, the "
-                             f"compute-matched control arm (default: "
-                             f"{DEFAULT_COMPUTE_MATCH_FACTOR}). Set it to the "
-                             f"cost ratio measured in calibration")
     parser.add_argument("--dashboard", action="store_true",
                         help="Emit runtime.dashboard = true, so each run writes "
                              "progress.jsonl (per-stage distinct-individual "
@@ -910,12 +694,6 @@ def main() -> None:
     defaults["ltl2tgba_timeout_ms"] = ltl2tgba_timeout or 0
     defaults["max_scoring_failure_rate"] = max_scoring_failure_rate or 0.0
     defaults["dashboard"] = args.dashboard
-    # Sweep S's levels depend on the operating point and the match factor, so
-    # the tabulated placeholder is rebuilt here against the actual arguments.
-    sweep_table = [
-        ("S", make_sweep_s(args.generations, args.compute_match_factor))
-        if name == "S" else (name, levels)
-        for name, levels in sweep_table]
     wanted = set(args.sweeps)
     sweeps = [(name, levels) for name, levels in sweep_table if name in wanted]
     # --levels restricts every selected sweep to the named levels (a sweep left
@@ -956,7 +734,7 @@ def main() -> None:
     # Keys whose C++ default has moved at least once, written out explicitly so
     # the archive states them rather than inheriting whatever the binary means
     # by them next year. Merged first, so a sweep varying one of these on
-    # purpose still wins — sweeps G and T each do.
+    # purpose still wins.
     pinned = {k: defaults[k] for k in VINTAGE_KEYS} if args.pin_vintage else {}
 
     count = 0

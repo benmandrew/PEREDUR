@@ -2,18 +2,17 @@
 """Run parameter sweep experiments and collect metrics to a results CSV.
 
 A profile selects which (sweep, level, spec, seed) combinations run and which
-CSV they land in (see scripts/README.md):
-    full     — every level, all 4 specs, seeds 0-29 → experiments/results.csv
+CSV they land in (see PROFILES below and scripts/README.md). --profile is
+required: there is no default campaign.
 
 Usage:
-    python scripts/run_experiments.py                    # the full sweep
-    python scripts/run_experiments.py --profile full     # the same, explicitly
-    python scripts/run_experiments.py --jobs 8           # 8 parallel runs
-    python scripts/run_experiments.py --sweeps A B       # specific sweeps
-    python scripts/run_experiments.py --specs takeoff    # specific specs
-    python scripts/run_experiments.py --seeds 0 1 2      # specific seeds
-    python scripts/run_experiments.py --dry-run          # print plan, no execution
-    python scripts/run_experiments.py --no-resume        # ignore existing results
+    python scripts/run_experiments.py --profile tlsf                # one profile
+    python scripts/run_experiments.py --profile tlsf --jobs 8       # 8 parallel runs
+    python scripts/run_experiments.py --profile tlsf --sweeps A     # specific sweeps
+    python scripts/run_experiments.py --profile tlsf --specs lift   # specific specs
+    python scripts/run_experiments.py --profile tlsf --seeds 0 1 2  # specific seeds
+    python scripts/run_experiments.py --profile tlsf --dry-run      # print plan only
+    python scripts/run_experiments.py --profile tlsf --no-resume    # ignore results
 
 Every row records the commit the PEREDUR binary was built from, read once at
 startup from `peredur --version` rather than from the working tree — the two
@@ -57,10 +56,7 @@ def _spec(name: str, ext: str) -> dict[str, Path]:
             "ideals_dir": EXAMPLES_DIR / name / "fixes"}
 
 
-# FRETISH (JSON) specs: the original repair benchmark. repair_mode is TLSF-only
-# and a FRETISH run carrying a non-default value exits 1, so the mono-vs-muc
-# factor is never crossed over them — the "muc" profile uses the TLSF specs
-# below.
+# FRETISH (JSON) specs: the original repair benchmark.
 # mode-arbiter is the one scoped family, and the only run that exercises the
 # scope machinery at all: every other example here is global-scoped and declares
 # no modes. Its single ideal, fixes/guard-maintenance.json, is out of reach of
@@ -78,14 +74,6 @@ FRETISH_SPECS: dict[str, dict[str, Path]] = {
     "fsm-combined": _spec("fsm-combined", "json"),
     "mode-arbiter": _spec("mode-arbiter", "json"),
 }
-
-# The four-family FRETISH corpus, frozen under its own name. FRETISH_SPECS is
-# the path registry, not a corpus: a profile that spelled its specs as
-# list(FRETISH_SPECS) would gain every family added there. Profiles name the
-# corpus they want.
-FRETISH_SPECS_2026_07: list[str] = [
-    "takeoff", "fsm", "fsm-timing", "fsm-combined",
-]
 
 # Basic-TLSF specs with ideal fixes. PEREDUR infers the TLSF format from the
 # .tlsf extension, and compare reads the .tlsf ideals the same way. The first
@@ -149,20 +137,11 @@ TLSF_SPECS: dict[str, dict[str, Path]] = {
     "pcar-v2-888": _spec("pcar-v2-888", "tlsf"),
 }
 
-# The original six-family TLSF corpus. The tlsf, muc and padd profiles pin
-# this list rather than list(TLSF_SPECS), so extending the table above does
-# not silently grow what they run.
+# The original six-family TLSF corpus. The tlsf profile pins this list rather
+# than list(TLSF_SPECS), so extending the table above does not silently grow
+# what it runs.
 TLSF_CORE_SPECS: list[str] = [
     "arbiter", "gyro-var1", "humanoid-531", "lift", "lily02", "minepump",
-]
-
-# The 20 fixes-backed TLSF families the ablate-tlsf profile runs.
-TLSF_ABLATION_SPECS: list[str] = [
-    "arbiter", "gyro-var1", "gyro-var2", "humanoid-458", "humanoid-531",
-    "lift", "lily02", "minepump", "amba", "codesample-un1", "codesample-un2",
-    "rg1", "rg2",
-    "arbiter-handshake", "detector", "full-arbiter", "load-balancer",
-    "prioritized-arbiter", "round-robin-arbiter", "simple-arbiter",
 ]
 
 # The head-to-head corpus IS the AuRUS paper's evaluation set: the 26
@@ -257,8 +236,6 @@ ARBITER_PROBE_SPECS: list[str] = [
 
 # Unified lookup for run_one()/--specs; each profile picks its own subset.
 SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **TLSF_SPECS}
-
-N_SEEDS = 30
 
 # compare runs n_repairs * n_ideals * 2 implication checks, each with compare's
 # own 20s black budget. fsm-timing (bounded-interval operators) is slow, and
@@ -376,25 +353,13 @@ DROPPED_RE = re.compile(r"^(\d+) individual\(s\) dropped", re.MULTILINE)
 # most once and emits one CSV row per requested alias — the rows differ only in
 # sweep/level_name/level_value.
 #
-# Aliasing is always within a scheme: nsga2's B/pop200 aliases onto nsga2's
-# A/gen10, never onto weighted's. The byte-identity check below enforces that,
-# since the configs differ on selection_scheme.
+# Aliasing is always within a scheme: one scheme's B/pop200 aliases onto the
+# same scheme's A/gen10, never onto another's. The byte-identity check below
+# enforces that, since the configs differ on selection_scheme.
 #
 # The canonical is per-profile: it must be a level the profile actually runs.
-BASELINE_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
-    ("B", "pop200"): ("A", "gen10"),
-    ("C", "default"): ("A", "gen10"),
-    ("D", "ptrig0.5"): ("A", "gen10"),
-    ("E", "presp0.5"): ("A", "gen10"),
-    ("F", "ptim0.15"): ("A", "gen10"),
-    ("G", "bound20"): ("A", "gen10"),
-    ("H", "cross0.1"): ("A", "gen10"),
-    ("I", "mut1.0"): ("A", "gen10"),
-}
-
 # The tlsf profile runs only sweeps A (generations) and B (population), which
-# cross at the gen10/pop200 baseline, so B/pop200 aliases onto A/gen10 exactly
-# as in the FRETISH grid. The rest of BASELINE_ALIASES has nothing to match.
+# cross at the gen10/pop200 baseline, so B/pop200 aliases onto A/gen10.
 TLSF_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
     ("B", "pop200"): ("A", "gen10"),
 }
@@ -414,95 +379,14 @@ TLSF_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
 # `sweeps` is the set run by default (--sweeps overrides it, so a profile can
 # hold back a sweep until asked). `levels` restricts a sweep to named levels;
 # sweeps absent from the map keep every level found in `configs_dir`.
-# `timeout_caps` is a flat per-spec cap in seconds; None means the
-# peredur_timeout() formula.
+# `timeout_caps` is a per-spec cap in seconds, and must name every spec the
+# profile runs.
 #
 # `configs_dir` and `results_dir` are per-profile because run_id names collide
 # across profiles: the same (sweep, level, scheme, spec, seed) is one directory
 # name regardless of operating point, so two profiles sharing a results_dir
 # would have parse_repair_files() read the other's stale repair_*.json.
 PROFILES: dict[str, dict] = {
-    # The original sweep, pinned to the levels it has always had so its
-    # results.csv stays a single comparable dataset even though gen_configs.py
-    # now emits a finer grid around them.
-    "full": {
-        "schemes": ["nsga2-truncate"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["A", "B", "C"],
-        "levels": {
-            "A": ["gen5", "gen10", "gen20", "gen40"],
-            "B": ["pop50", "pop100", "pop200", "pop500", "pop1000"],
-        },
-        "specs": list(FRETISH_SPECS_2026_07),
-        "seeds": list(range(N_SEEDS)),
-        "timeout_caps": None,
-        "baseline_aliases": BASELINE_ALIASES,
-        "configs_dir": CONFIGS_DIR,
-        "results_dir": RESULTS_DIR,
-        "results_csv": EXPERIMENTS_DIR / "results.csv",
-        "default_jobs": 1,
-    },
-    # Monolithic vs MUC-guided repair (tlsf.repair_mode) crossed with the TLSF
-    # assumption/guarantee mutation split (sweep M), on the TLSF spec corpus —
-    # the FRETISH path rejects repair_mode outright. Operating point
-    # gen10/pop200 (the config defaults). Generate the configs with
-    #   python scripts/gen_configs.py --tlsf --sweeps M --repair both \
-    #       --out-dir experiments/configs-muc
-    # (--tlsf carries the ltlsynt timeout and scoring tolerance the heavy
-    # specs need; --sweeps C would not — TLSF_SWEEPS has no C level.)
-    "muc": {
-        "schemes": ["nsga2-truncate"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": ["mono", "muc"],
-        "sweeps": ["M"],
-        "levels": {"M": ["pg0.3", "pg0.5", "pg0.7", "pg0.9"]},
-        "specs": list(TLSF_CORE_SPECS),
-        # A ceiling. Run disjoint seed ranges per host (pass --seeds on
-        # launch); a deadline kill truncates the seed-major order to a
-        # balanced design.
-        "seeds": list(range(60)),
-        # Per-spec caps sized to the slow (monolithic) arm so it is never
-        # censored, and applied identically to both arms: a cap that bites
-        # records implies_ideal=0 and truncates wall_time_s for a run that
-        # merely ran long.
-        "timeout_caps": {"humanoid-531": 2400, "lift": 600, "gyro-var1": 300,
-                         "arbiter": 120, "lily02": 120, "minepump": 120},
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-muc",
-        "results_dir": EXPERIMENTS_DIR / "results-muc",
-        "results_csv": EXPERIMENTS_DIR / "results-muc.csv",
-        # jobs=1: one PEREDUR process per machine using its full 32-worker pool.
-        # ltlsynt is multi-GB resident per call, so jobs>1 would multiply peak
-        # RAM and risk OOM.
-        "default_jobs": 1,
-    },
-    # p_add_assumption (sweep P) crossed with repair_mode {mono, muc}, on the
-    # core TLSF corpus. humanoid-531 is dropped: it dominates the per-seed
-    # cost and p_add_assumption cannot inform it. Generate with:
-    #   python scripts/gen_configs.py --tlsf --sweeps P --repair both \
-    #       --out-dir experiments/configs-padd
-    "padd": {
-        "schemes": ["nsga2-truncate"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": ["mono", "muc"],
-        "sweeps": ["P"],
-        "levels": {"P": ["padd0.05", "padd0.15", "padd0.3", "padd0.5"]},
-        "specs": [s for s in TLSF_CORE_SPECS if s != "humanoid-531"],
-        # A generous ceiling; a deadline kill truncates the seed-major order
-        # to a balanced design at whatever depth it reaches.
-        "seeds": list(range(160)),
-        "timeout_caps": {"arbiter": 120, "gyro-var1": 300, "lift": 600,
-                         "lily02": 120, "minepump": 120},
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-padd",
-        "results_dir": EXPERIMENTS_DIR / "results-padd",
-        "results_csv": EXPERIMENTS_DIR / "results-padd.csv",
-        "default_jobs": 1,
-    },
     # The basic-TLSF examples swept over generations (A) and population (B), the
     # two operating-point parameters, NSGA-II only, default weakening. These
     # specs are much slower than the FRETISH ones and scale with
@@ -540,85 +424,24 @@ PROFILES: dict[str, dict] = {
         # peak RAM by jobs and risk an OOM.
         "default_jobs": 1,
     },
-    # FRETISH arm of the ablation: a 2x2 factorial of selection scheme
-    # (nsga2/weighted) x similarity metric (log/direct), at the C/default
-    # weight preset — 4 cells, so the interaction is measurable, not just main
-    # effects. Operating point generations=40/population_size=1000. Control
-    # cell: nsga2 / log. Generate with
-    #   python scripts/gen_configs.py --sweeps C --levels default \
-    #       --schemes nsga2-truncate weighted --metric both \
-    #       --generations 40 --population-size 1000 \
-    #       --out-dir experiments/configs-ablate-fret
-    # (--levels keeps sweep C's other levels out of the grid — they would
-    # silently inflate the 4 cells to 16.)
-    "ablate-fret": {
-        "schemes": ["nsga2-truncate", "weighted"],
-        "weakenings": None,
-        "metrics": ["direct", "log"],
-        "repair_modes": None,
-        "sweeps": ["C"],
-        "levels": {"C": ["default"]},
-        "specs": list(FRETISH_SPECS_2026_07),
-        "seeds": list(range(30)),
-        # Generous margin over the worst case at this operating point — a cap
-        # that bites records implies_ideal = 0 for a run that was merely slow.
-        "timeout_caps": {"takeoff": 600, "fsm": 600, "fsm-timing": 600,
-                         "fsm-combined": 900},
-        # Only sweep C runs, so there is no A/gen baseline to alias onto.
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-ablate-fret",
-        "results_dir": EXPERIMENTS_DIR / "results-ablate-fret",
-        "results_csv": EXPERIMENTS_DIR / "results-ablate-fret.csv",
-        "default_jobs": 4,
-    },
-    # TLSF arm of the same 4-cell factorial, over TLSF_ABLATION_SPECS at the
-    # TLSF operating point (gen10/pop200, the config defaults). A flat 600 s
-    # per-run cap bounds the heavy tail; the censoring it introduces is
-    # deliberate and applied identically to every cell. The configs also need
-    # the tlsf-profile runtime settings, passed explicitly because --tlsf swaps
-    # in the TLSF sweep table, which has no sweep C. Generate with
+    # Head-to-head top-up against the AuRUS baseline (scripts/aurus_campaign.py):
+    # the control cell only (nsga2 / log metric / C-default weights), at seeds
+    # 0-19 over H2H_TLSF_SPECS_2026_07. It reads and writes the paths of the
+    # retired ablate-tlsf profile, whose 2x2 factorial contained this cell, and
+    # the resume key (sweep, level, selection, weakening, metric, repair_mode,
+    # spec, seed) fully identifies a control-cell row, so the (spec, seed) rows
+    # that campaign completed are skipped and only the top-up executes.
+    # Its configs were generated with
     #   python scripts/gen_configs.py --sweeps C --levels default \
     #       --schemes nsga2-truncate weighted --metric both \
     #       --ltlsynt-timeout 500 --ltl2tgba-timeout 60000 \
     #       --max-scoring-failure-rate 0.15 \
     #       --out-dir experiments/configs-ablate-tlsf
-    "ablate-tlsf": {
-        "schemes": ["nsga2-truncate", "weighted"],
-        "weakenings": None,
-        "metrics": ["direct", "log"],
-        "repair_modes": None,
-        "sweeps": ["C"],
-        "levels": {"C": ["default"]},
-        "specs": list(TLSF_ABLATION_SPECS),
-        "seeds": list(range(15)),
-        # A flat 600s over the whole set, sized for a 500 ms ltlsynt timeout.
-        # amba does not fit it at a larger ltlsynt budget and is censored.
-        # Recalibrate amba (and re-check the rest) before launching; see
-        # TLSF_LTLSYNT_TIMEOUT_MS in gen_configs.py.
-        "timeout_caps": {s: 600 for s in TLSF_ABLATION_SPECS},
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-ablate-tlsf",
-        "results_dir": EXPERIMENTS_DIR / "results-ablate-tlsf",
-        "results_csv": EXPERIMENTS_DIR / "results-ablate-tlsf.csv",
-        # jobs=1 for the same RAM reason as the tlsf profile: ltlsynt is
-        # multi-GB resident and its concurrency cap is per PEREDUR process.
-        "default_jobs": 1,
-    },
-    # Head-to-head top-up against the AuRUS baseline (scripts/aurus_campaign.py):
-    # the control cell only (nsga2 / log metric / C-default weights), at seeds
-    # 0-19 over H2H_TLSF_SPECS_2026_07. Dedup with ablate-tlsf is by
-    # construction: this profile shares ablate-tlsf's configs dir, results
-    # dir, and results CSV, and the resume key (sweep, level, selection,
-    # weakening, metric, repair_mode, spec, seed) fully identifies a
-    # control-cell row — so the (spec, seed) rows ablate-tlsf already
-    # completed are skipped and only the top-up executes. The same sharing
-    # means the two profiles must not run concurrently on one machine
-    # (interleaved CSV appends and run dirs).
     "h2h-tlsf": {
         "schemes": ["nsga2-truncate"],
         "weakenings": None,
         # ["log"] (not None): keeps the factor-cell key, run_id and CSV metric
-        # column identical to ablate-tlsf's log cell, which is what makes the
+        # column identical to the ablation's log cell, which is what makes the
         # shared-CSV dedup hold.
         "metrics": ["log"],
         "repair_modes": None,
@@ -636,7 +459,7 @@ PROFILES: dict[str, dict] = {
     # The head-to-head at AuRUS's own budget. Separate from `h2h-tlsf` in
     # every path it writes, because it differs from that profile in the two
     # things the resume key does not carry: the corpus and the wall cap.
-    # Sharing ablate-tlsf's CSV as `h2h-tlsf` does would put rows from both
+    # Sharing the ablation's CSV as `h2h-tlsf` does would put rows from both
     # caps under one key and let the merge keep whichever arrived first.
     #
     # 7200s matches AuRUS's `--gato 7200`, the published 2 h budget, so
@@ -788,15 +611,6 @@ def extract_metadata(config_path: Path) -> tuple:
     return parts[1], parts[2], level_value_of(parts[2])
 
 
-def peredur_timeout(level_name: str, level_value) -> int:
-    """Return a generous per-run timeout in seconds (full profile)."""
-    if isinstance(level_value, int) and level_name.startswith("gen"):
-        return max(120, level_value * 90)
-    if isinstance(level_value, int) and level_name.startswith("pop"):
-        return max(120, level_value // 2)
-    return 300
-
-
 # ── Parsing ───────────────────────────────────────────────────────────────────
 
 def parse_repair_files(output_dir: Path) -> tuple[int, float]:
@@ -930,22 +744,36 @@ def binary_version(bin_path: Path) -> dict[str, str]:
     return {**unknown, **fields}
 
 
+def git_result(args: list[str], root: Path,
+               timeout: float | None = None) -> tuple[str | None, str | None]:
+    """``(stripped stdout, None)`` of `git -C root <args>`, or ``(None, why)``.
+
+    `why` is the last line git wrote to stderr, or a note of the exit status
+    when it wrote none. The except stays this wide on purpose: narrowing it to
+    CalledProcessError turns a box without git into a crash at campaign launch
+    rather than an unknown commit. campaign.py shares this for its own calls.
+    """
+    try:
+        proc = subprocess.run(["git", "-C", str(root), *args],
+                              timeout=timeout, capture_output=True, text=True)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, f"git {args[0]}: {exc}"
+    if proc.returncode != 0:
+        tail = [ln.strip() for ln in proc.stderr.splitlines() if ln.strip()]
+        return None, (tail[-1] if tail
+                      else f"git {args[0]} exit {proc.returncode}")
+    return proc.stdout.strip(), None
+
+
 def git_output(*args: str) -> str | None:
     """Stripped stdout of `git -C REPO_ROOT <args>`, or None if there is none.
 
     One None covers every way the answer can be absent — git missing from
     PATH, a non-zero exit, a timeout, empty output — because each caller
-    substitutes the same fallback for all of them. The except stays this wide
-    on purpose: narrowing it to CalledProcessError turns a box without git
-    into a crash at campaign launch rather than an unknown commit.
+    substitutes the same fallback for all of them.
     """
-    try:
-        proc = subprocess.run(
-            ["git", "-C", str(REPO_ROOT), *args],
-            check=True, timeout=60, capture_output=True, text=True)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return proc.stdout.strip() or None
+    out, _ = git_result(list(args), REPO_ROOT, timeout=60)
+    return out or None
 
 
 def working_tree_head() -> str | None:
@@ -1237,8 +1065,8 @@ def run_one(config_path: Path, sweep: str, level_name: str, spec_name: str,
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--profile", choices=list(PROFILES), default="full",
-                        help="Experiment profile (default: full)")
+    parser.add_argument("--profile", choices=list(PROFILES), required=True,
+                        help="Experiment profile")
     parser.add_argument("--jobs", type=int, metavar="N",
                         help="Concurrent runs (default: per profile)")
     parser.add_argument("--sweeps", nargs="+", metavar="SWEEP",
@@ -1500,9 +1328,7 @@ def main() -> None:
          spec_name, seed) = key
         cfg = configs_by_key[
             (scheme, weakening, metric, repair, c_sweep, c_level)]
-        caps = profile["timeout_caps"]
-        timeout = (caps[spec_name] if caps
-                   else peredur_timeout(c_level, level_value_of(c_level)))
+        timeout = profile["timeout_caps"][spec_name]
         # A factor state joins run_id only where the profile crosses it: adding
         # it unconditionally would rename every existing run directory of the
         # profiles that predate the factor, orphaning their results.

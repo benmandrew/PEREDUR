@@ -20,7 +20,7 @@ Test binaries land at `build/test/peredur_tests`. Tests use `expect(bool, messag
 
 ## Python tests
 
-`scripts/test_*.py` are plain scripts with no pytest, each exiting non-zero on a failure. The `python-tests` job in `.github/workflows/ci.yml` runs them once on a pull request or push that touches `scripts/` or `.github/`, under Python 3.12 with `z3-solver` as the only installed package. It sits outside the compiler matrix because the tests import the scripts and run no binary, so each leg would re-derive the same answer. 3.12 is the interpreter the campaign hosts run (av1 to av3), and `campaign.py` needs its `tomllib`. `test_domain_constraints_lpc.py` stays out of CI: it runs the built `realize` over the LPC specifications for up to half an hour.
+`scripts/test_*.py` are plain scripts with no pytest, each exiting non-zero on a failure. The `python-tests` job in `.github/workflows/ci.yml` runs them once on a pull request or push that touches `scripts/` or `.github/`, under Python 3.12 with `z3-solver` as the only installed package. It sits outside the compiler matrix because the tests import the scripts and run no binary, so each leg would re-derive the same answer. 3.12 is the interpreter the campaign hosts run (av1 to av3), and `campaign.py` needs its `tomllib`.
 
 ## Coverage
 

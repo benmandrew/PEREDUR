@@ -168,7 +168,7 @@ python scripts/campaign.py collect --profile tlsf --dry-run
 python scripts/campaign.py collect --profile tlsf
 ```
 
-`collect` rsyncs each host's results and merges on the natural key through `merge_experiments.py`, verifying a union rather than a sum: disjoint ranges overlap on nothing, a re-collect on everything, and only the union separates either from a silent loss. A host that answers with nothing prints INCOMPLETE, since arithmetic over the hosts that answered agrees with itself. For an unmerged branch absent from `merge_experiments.PROFILE_CSVS`, give `--csv` and `--results-dir`; `collect` refuses to guess.
+`collect` rsyncs each host's results and merges on the natural key through `merge_experiments.py`, verifying a union rather than a sum: disjoint ranges overlap on nothing, a re-collect on everything, and only the union separates either from a silent loss. A host that answers with nothing prints INCOMPLETE, since arithmetic over the hosts that answered agrees with itself. For a profile absent from `run_experiments.PROFILES` (an unmerged branch, or a retired campaign), give `--csv` and `--results-dir`; `collect` refuses to guess.
 
 `collect --curves <out>` copies each host's `experiments/<out>/` into `experiments/<out>/<host>/` and joins curves into `experiments/<out>.csv`. Identical duplicates collapse, differing duplicates are MISMATCH, mixed headers are refused, and a silent host is INCOMPLETE. The joined file is written only if every curve passes.
 

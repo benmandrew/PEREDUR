@@ -19,7 +19,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `aurus_campaign.py` | Drives the AuRUS baseline arm of a head-to-head. |
 | `aurus_validate.py` | Re-checks AuRUS's claimed repairs with `realize` and scores them with `compare`. Run it before any AuRUS analysis. |
 | `import_fret.py` | Converts FRET project exports into a FRETISH `spec.json` for `examples/`. Its docstring lists every conversion rule, and its stderr summary names each requirement a lossy rule touched. Comparisons over several variables or arithmetic need z3's Python bindings, which `nix develop` provides. |
-| `test_campaign.py` | Covers `campaign.py`. No pytest; run it directly. CI's `python-tests` job runs every `test_*.py` here but `test_domain_constraints_lpc.py`. |
+| `test_campaign.py` | Covers `campaign.py`. No pytest; run it directly. CI's `python-tests` job runs every `test_*.py` here. |
 | `test_experiment_paths.py` | Covers the factor-path parsers and the resume-key invariants in `run_experiments.py` and `gen_configs.py`. |
 | `test_import_fret.py` | Covers `import_fret.py` over a synthetic export, including property tests of its domain constraints. No pytest; run it directly inside `nix develop`, which provides z3's Python bindings. |
 | `test_domain_constraints_lpc.py` | Checks `import_fret.py`'s domain constraints against the hand-written ones in the two Lift-Plus-Cruise examples, then runs `realize` to confirm they reproduce every realizability claim of the paper. Needs a built `realize` (`PEREDUR_REALIZE`, default `build-release/realize`). |
@@ -70,17 +70,13 @@ Sweeps generated, each holding every other parameter at its default:
 | A | Generations | 5, 10, 15, 20, 30, 40, 60, 80 — `population_size=200` |
 | B | Population size | 50, 75, 100, 150, 200, 300, 500, 750, 1000, 1500 — `generations=10` |
 | C | Fitness weight presets | default, syntactic-heavy, semantic-heavy, status-only |
-| D | `p_trigger` | 0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0 |
-| E | `p_response` | 0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0 |
-| F | `p_timing` | 0.0, 0.05, 0.15, 0.3, 0.5, 0.75, 1.0 |
-| G | `default_bound` | 5, 10, 20, 40, 80, 160 |
-| H | `crossover_rate` | 0.0, 0.1, 0.25, 0.5, 0.75, 1.0 |
-| I | `mutation_rate` | 0.1, 0.25, 0.5, 0.75, 1.0 |
+| R | `elitism_rate` | 0.0, 0.1 |
 
-60 levels per scheme, 120 configs. Because each sweep holds the others at their
-defaults, exactly one level of each is byte-identical to the `A/gen10` baseline
-— the aliasing below collapses those eight onto one run per scheme. Sweep J,
-which crossed `run_weakening`, retired with the key on 2026-09-11.
+`--tlsf` swaps in the TLSF table: A and B as a coarse four-level cross
+(generations 5, 10, 20, 40; population 50, 100, 200, 500) and R as above.
+These are the sweeps a kept profile reads. A sweep no profile reads is removed
+rather than kept for a later campaign; an archived campaign regenerates its
+own grid from the `gen_configs.py` vendored beside it.
 
 `--weakening off` nests configs under `<scheme>/wkoff/` and writes no key, the
 weakening screen having been removed. It is the only value the flag accepts.
@@ -105,48 +101,32 @@ selection scheme alone: under either NSGA-II scheme, ranking, elitism and the
 output gate all read the per-objective vector, and the scalar decides only the
 order repairs are written in and the reported `best_fitness`.
 
-Two of these are worth a note. `G` is nearly free: the bound enters through the
-transfer matrix rather than a SAT call, and bound 160 measures within noise of
-bound 5, but it moves the semantic similarity score and so changes which
-repairs win. `H`'s `cross0.0` level tests whether crossover contributes at all
-— the default of 0.1 leaves the search almost entirely mutation-driven.
-
 ## 3. Run the experiments
 
 ```sh
-python scripts/run_experiments.py                 # the full sweep (default)
-python scripts/run_experiments.py --jobs 4        # four runs at a time
+python scripts/run_experiments.py --profile tlsf            # one profile
+python scripts/run_experiments.py --profile tlsf --jobs 4   # four runs at a time
 ```
 
 Runs the selected combinations of (sweep, level, spec, seed) and appends
 results to the profile's results CSV. Runs are skipped automatically if they
 already appear in the CSV, so the script is safe to interrupt and resume.
-
-All four specs run in every profile — `takeoff`, `fsm`, `fsm-timing`, and
-`fsm-combined`.
+`--profile` is required; there is no default campaign. A campaign runs it
+through `campaign.py`, which passes the profile its declaration names.
 
 ### Profiles
 
-A profile names one (schemes, sweeps, levels, specs, seeds) selection and the
-CSV it writes:
+A profile names one (schemes, sweeps, levels, specs, seeds) selection, the
+per-spec wall-clock caps, and the CSV it writes. `PROFILES` in
+`run_experiments.py` is the only list; `merge_experiments.py` and `campaign.py`
+read it from there.
 
-| Profile | Schemes | Sweeps / levels | Seeds | Results CSV | Wall-clock at `--jobs 4` |
+| Profile | Schemes | Sweeps / levels | Specs | Seeds | Results CSV |
 |---|---|---|---|---|---|
-| `full` (default) | nsga2-truncate | the original 14 levels of A, B, C | 0–29 | `results.csv` | ~29 min (1440 runs) |
-| `tlsf` | nsga2-truncate | A + B, coarse 4-level cross (7 operating points) | 0–59 (ceiling) | `results-tlsf.csv` | ~16 h split across av2+av3 (`--jobs 1`; the six TLSF specs) |
-
-`full` is pinned to the four generation and five population levels it has
-always had, so its `results.csv` stays one comparable dataset even though
-`gen_configs.py` now emits a finer grid around them. It is 1680 rows from 1440
-executions. This README documented 70+ hours for it until `ca46331`, and the
-difference is not a tuning win — `black` was timing out on the implication
-checks the genetic algorithm generates by the thousand, and now the ones SPOT
-folds to a boolean constant are decided without invoking `black` at all.
-
-Measured across two 32-core machines splitting the seeds, each running
-`python scripts/run_experiments.py --profile full --jobs 4`: 690 runs in 13.2
-minutes and 13.9 minutes. The table assumes `--jobs 4`; `full` defaults to
-`--jobs 1`, which serialises the same work into about 115 minutes.
+| `tlsf` | nsga2-truncate | A + B, coarse 4-level cross (7 operating points) | the six core TLSF specs | 0–59 (ceiling) | `results-tlsf.csv` |
+| `h2h-tlsf` | nsga2-truncate, `log` metric | C/default | `H2H_TLSF_SPECS_2026_07` | 0–19 | `results-ablate-tlsf.csv` |
+| `aurus-h2h` | nsga2-apportion, `log` metric | C/default | `H2H_TLSF_READY` | 0–19 | `results-aurus-h2h.csv` |
+| `arbiter-probe` | nsga2-truncate, nsga2-apportion | R/elit0.1 | `ARBITER_PROBE_SPECS` | 0–39 | `results-arbiter-probe.csv` |
 
 `tlsf` runs the six basic-TLSF examples (arbiter, gyro-var1, humanoid-531,
 lift, lily02, minepump) rather than the four FRETISH specs, swept over
@@ -161,15 +141,15 @@ so generate it with `--tlsf` first:
 
 ```sh
 python scripts/gen_configs.py --tlsf
-python scripts/run_experiments.py --profile tlsf --seeds $(seq -s' ' 0 29)   # av2
-python scripts/run_experiments.py --profile tlsf --seeds $(seq -s' ' 30 59)  # av3
-python scripts/merge_experiments.py av2 av3 --profile tlsf
+python scripts/run_experiments.py --profile tlsf
 ```
 
-The seed count is a ceiling, not a commitment: ordering is seed-major, so a
-machine killed at its ~16 h deadline leaves a balanced design at whatever seed
-depth it reached, and the disjoint 0-29 / 30-59 ranges merge to one balanced
-dataset whether or not either finishes.
+On the lab machines, declare the campaign in `campaign.toml` instead and let
+`campaign.py` give each host its seed range (section 4). The seed count is a
+ceiling, not a commitment: ordering is seed-major, so a machine killed at its
+deadline leaves a balanced design at whatever seed depth it reached, and
+disjoint seed ranges merge to one balanced dataset whether or not either
+finishes.
 
 The profile runs at `--jobs 1`, unlike the FRETISH profiles' `--jobs 4`, for two
 reasons. First, `ltlsynt` turns multi-gigabyte resident on these specs, and
@@ -189,20 +169,15 @@ each run's `ltlsynt` timing row. `compare` decides implies-ideal on TLSF the
 same way it does on FRETISH, via the whole-formula implication check, so
 `results-tlsf.csv` carries the same columns.
 
-Reduced `quick` and `smoke` profiles existed until that speedup made them
-pointless — they saved about 27 minutes between them, at the cost of dropping
-`fsm-combined` on the grounds that it never produced a repair. It now finds one
-in 328 of 418 runs (78%), so that exclusion was discarding real data.
-
 `--sweeps`, `--specs`, and `--seeds` narrow a profile without defining a new
-one: `--specs` and `--seeds` replace the profile's set (so `--specs
-fsm-combined` runs that spec alone), and `--sweeps` selects which sweeps run
-(so `--sweeps C` runs all five C levels).
+one: `--specs` and `--seeds` replace the profile's set (so `--specs lift` runs
+that spec alone), and `--sweeps` selects which sweeps run (so `--sweeps A`
+runs the four A levels).
 
 ### Parallel runs (`--jobs`)
 
-`--jobs N` runs N experiments concurrently (`full` defaults to 1, so `--jobs 4`
-is worth passing). The `peredur` binary parallelises internally with a thread
+`--jobs N` runs N experiments concurrently (every profile defaults to 1). The
+`peredur` binary parallelises internally with a thread
 pool sized to the machine's core count by default, so when jobs > 1 the
 runner caps each run's pool: it writes a derived config
 (`<output-dir>/config.toml` — the level's TOML with
@@ -211,20 +186,19 @@ runner caps each run's pool: it writes a derived config
 
 ### Baseline aliasing
 
-Every sweep holds the other parameters at their defaults, so each sweep's
-default level is byte-identical to the `A/gen10` baseline (generations 10,
-population 200, default weights): `B/pop200`, `C/default`, `D/ptrig0.5`,
-`E/presp0.5`, `F/ptim0.15`, `G/bound20`, `H/cross0.1` and `I/mut1.0`.
-The runner executes the canonical `A/gen10` run once per
-(scheme, spec, seed) and emits one CSV row per requested alias — the rows
-differ only in `sweep`/`level_name`/`level_value`. Identity is verified
-byte-for-byte before aliasing; if the files ever diverge the runner warns and
-runs them separately. `--dry-run` tags aliased rows with `(alias of A/gen10)`.
+Every sweep holds the other parameters at their defaults, so a sweep's default
+level can be byte-identical to another sweep's. A profile's `baseline_aliases`
+names such pairs: the `tlsf` profile maps `B/pop200` onto the `A/gen10`
+baseline (generations 10, population 200). The runner executes the canonical
+`A/gen10` run once per (scheme, spec, seed) and emits one CSV row per
+requested alias — the rows differ only in `sweep`/`level_name`/`level_value`.
+Identity is verified byte-for-byte before aliasing; if the files ever diverge
+the runner warns and runs them separately. `--dry-run` tags aliased rows with
+`(alias of A/gen10)`.
 
-Aliasing never crosses schemes: nsga2-truncate's `B/pop200` aliases onto
-nsga2-truncate's
-`A/gen10`, never onto weighted's. The byte-identity check enforces that on its
-own, since the two configs differ on `selection_scheme`.
+Aliasing never crosses schemes: one scheme's `B/pop200` aliases onto the same
+scheme's `A/gen10`, never onto another's. The byte-identity check enforces
+that on its own, since the two configs differ on `selection_scheme`.
 
 ### The `n_dropped` column
 
@@ -283,134 +257,36 @@ deliberate.
 
 ```sh
 # Preview what would run without executing anything
-python scripts/run_experiments.py --dry-run
+python scripts/run_experiments.py --profile tlsf --dry-run
 
 # Run only specific sweeps
-python scripts/run_experiments.py --sweeps A B
+python scripts/run_experiments.py --profile tlsf --sweeps A
 
 # Run only specific specs
-python scripts/run_experiments.py --specs takeoff
+python scripts/run_experiments.py --profile tlsf --specs lift
 
 # Run a small set of seeds for a quick check
-python scripts/run_experiments.py --seeds 0 1 2
+python scripts/run_experiments.py --profile tlsf --seeds 0 1 2
 
 # Re-run even if results already exist in the CSV
-python scripts/run_experiments.py --no-resume
+python scripts/run_experiments.py --profile tlsf --no-resume
 
 # Launch anyway when the binaries do not match the working tree's HEAD
-python scripts/run_experiments.py --allow-stale-binary
+python scripts/run_experiments.py --profile tlsf --allow-stale-binary
 
 # Combine flags
-python scripts/run_experiments.py --sweeps A --specs takeoff --seeds 0 1 2
+python scripts/run_experiments.py --profile tlsf --sweeps A --specs lift --seeds 0 1 2
 ```
 
 Per-run outputs (repair JSON files) land in `experiments/results/<run-id>/`.
 
-## 4. Splitting across machines
-
-Each run is independent, so the work can be divided on any of the three
-filtering axes and recombined afterwards. At ~29 minutes for the full sweep the
-coordination rarely pays for itself now, but the seed split below is how the
-current `results.csv` was collected.
-
-**By seeds** — recommended, parallelises all sweeps and specs evenly:
-
-```sh
-# Machine 1 (seeds 0–14)
-python scripts/run_experiments.py --seeds $(seq -s' ' 0 14)
-
-# Machine 2 (seeds 15–29)
-python scripts/run_experiments.py --seeds $(seq -s' ' 15 29)
-```
-
-**By spec** — useful for isolating `fsm-combined`, the slowest spec at a 6.9s
-mean against `fsm`'s 3.3s:
-
-```sh
-python scripts/run_experiments.py --specs takeoff fsm            # machine 1
-python scripts/run_experiments.py --specs fsm-timing fsm-combined  # machine 2
-```
-
-**By sweep** — useful when sweep C is run separately:
-
-```sh
-python scripts/run_experiments.py --sweeps A B   # machine 1
-python scripts/run_experiments.py --sweeps C     # machine 2
-```
-
-### Merging results
-
-`merge_experiments.py` pulls each machine's results and merges them into this
-checkout. Configure the machines once in its `REMOTES` dict, then:
-
-```sh
-# Pull from every configured remote
-python scripts/merge_experiments.py
-
-# Only named remotes
-python scripts/merge_experiments.py av2 av3
-
-# Show the rsync plan without transferring or writing
-python scripts/merge_experiments.py --dry-run
-
-# Merge another checkout on this machine
-python scripts/merge_experiments.py /path/to/peredur
-```
-
-**`--profile` must match the profile the runs used.** Each profile writes its
-own CSV — `full` → `results.csv`, `tlsf` → `results-tlsf.csv` — and
-the flag defaults to `full`. When no source carries a CSV for the chosen
-profile, the merge stops and names the mismatch rather than writing anything.
-
-The script rsyncs each remote's `experiments/results/` into the local one, then
-merges the CSVs on the natural key
-`(sweep, level_name, selection, weakening, metric, spec, seed)`, keeping one row
-per key. Local rows win, so a machine's own results are never
-overwritten by a remote copy of the same run. Output is sorted by key, which
-makes the file byte-stable and the whole operation idempotent — re-running it
-never duplicates rows. Per-run directories encode their scheme and seed
-(`sweep_A_gen10_nsga2-truncate_fsm_seed17`), so they never collide between machines or
-between schemes.
-
-`selection`, `weakening` and `metric` are part of the key because a profile may
-run every level under both selection schemes, both weakening states or both
-similarity metrics; without them the
-crossed rows collapse onto one key and half are dropped in silence. Rows written
-before a column existed carry its legacy default — nsga2, wkon, direct — so both
-scripts read an absent value as that rather than empty, which keeps resume and
-merge working against the older CSVs.
-
-The selection schemes were renamed on 2026-08-06 — `nsga2` to `nsga2-truncate`,
-`nsga2-replicate` to `nsga2-apportion` — and `gen_configs.py` emits the new
-names, so a `selection` value depends on when its row was written. Only the
-names moved, so `canonical_scheme()` in both scripts maps a retired spelling
-onto its replacement wherever the column is read: at `scheme_of()`, at the
-resume key in `load_done_set()`, and at `key_of()` in `merge_experiments.py`.
-Archived rows therefore still match, and a campaign closed before the rename
-resumes instead of re-running from zero. Row values are never rewritten — a
-merged CSV keeps whatever each campaign recorded, and only the key is
-canonical. Renaming any other factor directory needs the same treatment;
-skipping it is silent, and shows up as a finished campaign re-running.
-
-Sources are reached over ssh. An entry in `~/.ssh/config` must match the
-hostname as written in `REMOTES` — a bare `Host av3` block does not apply to
-`benandrew@av3.cs.man.ac.uk`, so give the block both names and a `HostName`:
-
-```
-Host av3 av3.cs.man.ac.uk
-	HostName av3.cs.man.ac.uk
-	IdentityFile ~/.ssh/id_avlab
-	User benandrew
-```
-
-## 5. Campaign status and collection
+## 4. Campaign status and collection
 
 `campaign.py` covers a campaign's whole life on the lab machines: declaring it,
 staging the hosts, launching it, polling it and bringing its results home.
 Every verb reaches the machines by their ssh-config alias (`av2`) rather than by
-the fully qualified domain name (FQDN) in `merge_experiments.REMOTES` — that
-form falls through to password auth under `BatchMode=yes`, and a status poll
-cannot answer a prompt.
+a fully qualified domain name — that form falls through to password auth under
+`BatchMode=yes`, and a status poll cannot answer a prompt.
 
 `docs/dev/campaigns.md` is the operating manual for the same tool: which verb to
 reach for, what each state means, and how a campaign is closed. This section is
@@ -750,11 +626,28 @@ once where the two copies are byte-identical and reported as MISMATCH where
 they differ, a curve whose header comes from another `score_curves.py`
 vintage is refused, and a host that answers nothing is INCOMPLETE.
 
-`collect` supersedes running `merge_experiments.py` by hand. It rsyncs each
-host's per-run tree and results CSV back and merges them on the same natural
-key through `merge_experiments.py` itself, so nothing is reimplemented, then
-verifies the outcome against three counts — the merged row count, a
-duplicate-key scan, and every source's rows against the merged union.
+`collect` rsyncs each host's per-run tree and results CSV back and merges them
+on the natural key through `merge_experiments.py`, then verifies the outcome
+against three counts — the merged row count, a duplicate-key scan, and every
+source's rows against the merged union.
+
+The key is `KEY_FIELDS` in `merge_experiments.py`, and one row is kept per
+key. Local rows win, so a run already in this checkout is never overwritten by
+a remote copy of it. Output is sorted by key, which makes the file byte-stable
+and the merge idempotent. `selection`, `weakening`, `metric` and `repair_mode`
+are in the key because a profile may cross them; without them the crossed rows
+collapse onto one key and half are dropped in silence. A row written before a
+column existed carries its legacy default (nsga2, wkon, direct, mono), so an
+absent value is read as that rather than as empty.
+
+The selection schemes were renamed on 2026-08-06 — `nsga2` to `nsga2-truncate`,
+`nsga2-replicate` to `nsga2-apportion`. `canonical_scheme()` maps a retired
+spelling onto its replacement wherever the column is read: at `scheme_of()`, at
+the resume key in `load_done_set()`, and at `key_of()` in
+`merge_experiments.py`. Archived rows therefore still match. Row values are
+never rewritten; only the key is canonical. Renaming any other factor
+directory needs the same treatment, and skipping it is silent: it shows up as
+a finished campaign re-running.
 
 The arithmetic is a union rather than a sum. Two hosts on disjoint seed ranges
 overlap on nothing while a re-collect of an already merged campaign overlaps
@@ -774,8 +667,9 @@ would actually transfer. It transfers nothing and writes nothing.
 
 `--csv NAME` and `--results-dir NAME` exist for a campaign whose profile this
 checkout does not define, which is the normal case while the campaign is still
-on its own branch. `merge_experiments.PROFILE_CSVS` is the authority and an
-unmerged profile is absent from it, so `collect` refuses to guess
+on its own branch. `merge_experiments.PROFILE_CSVS`, derived from
+`run_experiments.PROFILES`, is the authority and an unmerged or retired profile
+is absent from it, so `collect` refuses to guess
 `results-<profile>.csv` rather than merge a campaign into a file nobody is
 watching.
 

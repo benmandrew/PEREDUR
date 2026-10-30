@@ -554,10 +554,6 @@ jobs:
   # under, and campaign.py needs its tomllib. z3-solver is the one
   # package outside the standard library they reach: import_fret.py asks it
   # which comparison atoms some values realise.
-  #
-  # test_domain_constraints_lpc.py is left out. It runs the built `realize`
-  # binary over the LPC specifications for up to half an hour, which makes it
-  # a reproduction of a paper claim rather than a unit test.
   python-tests:
     needs: setup
     if: >-
@@ -581,9 +577,6 @@ jobs:
         run: |
           status=0
           for test in scripts/test_*.py; do
-            case "$test" in
-              scripts/test_domain_constraints_lpc.py) continue ;;
-            esac
             echo "::group::$test"
             python "$test" || { echo "::error file=$test::$test failed"; status=1; }
             echo "::endgroup::"

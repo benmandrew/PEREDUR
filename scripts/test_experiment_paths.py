@@ -143,38 +143,26 @@ for f in ("selection", "weakening", "metric", "repair_mode"):
     assert f in R.CSV_FIELDS, f"{f} missing from CSV_FIELDS"
 
 
-# ── Ablation-campaign profile invariants ─────────────────────────────────────
+# ── Head-to-head profile invariants ──────────────────────────────────────────
 
 P = R.PROFILES
 
-# Extending TLSF_SPECS must not grow the corpora of the profiles pinned to the
+# Extending TLSF_SPECS must not grow the corpus of the profile pinned to the
 # original six families.
 check(P["tlsf"]["specs"], R.TLSF_CORE_SPECS, "tlsf profile corpus")
-check(P["muc"]["specs"], R.TLSF_CORE_SPECS, "muc profile corpus")
-check(P["padd"]["specs"],
-      [s for s in R.TLSF_CORE_SPECS if s != "humanoid-531"],
-      "padd profile corpus")
 
-# The two ablation arms are the same 4-cell factorial: 2 schemes x 2 metrics, at
-# the single sweep-C default level.
-check(len(R.TLSF_ABLATION_SPECS), 20, "ablation TLSF corpus size")
-for name in ("ablate-fret", "ablate-tlsf"):
-    check(sorted(P[name]["schemes"]), ["nsga2-truncate", "weighted"],
-          f"{name} schemes")
-    check(P[name]["metrics"], ["direct", "log"], f"{name} metrics")
-    check(P[name]["levels"], {"C": ["default"]}, f"{name} sweep-C levels")
-    check(P[name]["baseline_aliases"], {}, f"{name} has no aliases")
-check(P["ablate-tlsf"]["specs"], R.TLSF_ABLATION_SPECS, "ablate-tlsf corpus")
-
-# h2h-tlsf dedups against ablate-tlsf by sharing its configs dir, results dir
-# and results CSV: the resume key carries every factor, so the control-cell
-# rows ablate-tlsf completed are skipped rather than re-run. If any of these
-# three diverge the dedup silently breaks and the top-up re-runs those rows.
-for field in ("configs_dir", "results_dir", "results_csv"):
-    check(P["h2h-tlsf"][field], P["ablate-tlsf"][field],
-          f"h2h-tlsf shares ablate-tlsf {field}")
+# h2h-tlsf dedups against the retired ablate-tlsf campaign by reading and
+# writing its configs dir, results dir and results CSV: the resume key carries
+# every factor, so the control-cell rows that campaign completed are skipped
+# rather than re-run. If any of these three move the dedup silently breaks and
+# the top-up re-runs those rows.
+for field, name in (("configs_dir", "configs-ablate-tlsf"),
+                    ("results_dir", "results-ablate-tlsf"),
+                    ("results_csv", "results-ablate-tlsf.csv")):
+    check(P["h2h-tlsf"][field].name, name,
+          f"h2h-tlsf keeps the ablation's {field}")
 # ... and it must stay inside the control cell, with the metric crossed (not
-# None/legacy) so its run_id and CSV metric column match ablate-tlsf's log cell.
+# None/legacy) so its run_id and CSV metric column match the ablation's log cell.
 check(P["h2h-tlsf"]["schemes"], ["nsga2-truncate"], "h2h-tlsf control scheme")
 check(P["h2h-tlsf"]["metrics"], ["log"], "h2h-tlsf control metric")
 check(P["h2h-tlsf"]["levels"], {"C": ["default"]}, "h2h-tlsf control level")
@@ -301,23 +289,18 @@ for spec in R.H2H_UNSCOREABLE + R.H2H_PENDING_IMPORT:
 assert V.parse_compare_output is R.parse_compare_output, \
     "aurus_validate must reuse run_experiments.parse_compare_output"
 
-# merge_experiments mirrors the per-profile CSV names and result directories,
-# in two separate tables that nothing but this ties together. Over every profile
-# rather than a named few: an omission surfaces as a KeyError from
-# `campaign.py collect`, after the campaign has finished, which is the worst
-# moment to discover it.
-for name in P:
-    assert name in M.PROFILE_CSVS, \
-        f"profile {name} is missing from merge_experiments.PROFILE_CSVS"
-    assert name in M.PROFILE_RESULT_DIRS, \
-        f"profile {name} is missing from merge_experiments.PROFILE_RESULT_DIRS"
-    check(M.PROFILE_CSVS[name], P[name]["results_csv"].name,
-          f"merge CSV for {name}")
-    check(M.PROFILE_RESULT_DIRS[name], P[name]["results_dir"].name,
-          f"merge result dir for {name}")
+# merge_experiments derives its per-profile CSV and result-directory names from
+# the basenames alone, and pull_source() rebuilds each path as
+# experiments/<name> on the host. A profile writing anywhere deeper would be
+# collected from the wrong place.
+for name, prof in P.items():
+    for key in ("results_csv", "results_dir"):
+        check(prof[key].parent, R.EXPERIMENTS_DIR,
+              f"{name}: {key} sits directly under experiments/")
+check(M.PROFILE_CSVS["tlsf"], "results-tlsf.csv", "merge CSV for tlsf")
 
 # Every spec a profile names must resolve to an on-disk input, and every
-# capped profile must cap every spec it runs (run_one indexes caps[spec]).
+# profile must cap every spec it runs (execute() indexes caps[spec]).
 for name, prof in P.items():
     # A profile's schemes are directory names under configs_dir, and
     # gen_configs.py writes only the current spelling, so a pre-rename name here
@@ -328,8 +311,7 @@ for name, prof in P.items():
     for s in prof["specs"]:
         assert R.SPECS[s]["input"].exists(), \
             f"{name}: missing input for spec {s}"
-        if prof["timeout_caps"] is not None:
-            assert s in prof["timeout_caps"], f"{name}: no timeout cap for {s}"
+        assert s in prof["timeout_caps"], f"{name}: no timeout cap for {s}"
 
 
 # ── Commit provenance ────────────────────────────────────────────────────────
@@ -360,7 +342,6 @@ for f in ("commit", "dirty"):
     assert f in R.CSV_FIELDS, f"{f} missing from CSV_FIELDS"
     assert f not in M.KEY_FIELDS, \
         f"{f} must not be a merge key field: archived rows have no commit"
-check(M.LEGACY_COMMIT, R.LEGACY_COMMIT, "LEGACY_COMMIT agrees across scripts")
 
 # ... and the merge key must be blind to it: the same run recorded by two
 # binaries is one row, not two.
@@ -373,10 +354,6 @@ check(M.key_of({**legacy_row, "commit": "c38f582", "dirty": "0"}),
 
 # ── Selection-scheme rename ──────────────────────────────────────────────────
 
-# Both scripts carry their own copy of the mapping (they are standalone and
-# vendored per campaign), so they can drift; a drift splits every archived row
-# from its new-name counterpart on merge.
-check(M.SCHEME_ALIASES, R.SCHEME_ALIASES, "SCHEME_ALIASES agrees across scripts")
 check(R.canonical_scheme(R.LEGACY_SELECTION), "nsga2-truncate",
       "the legacy selection default canonicalises")
 
