@@ -5,6 +5,7 @@
 ///        front ends: the MRS walk and the AuRUS ladder.
 
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -147,6 +148,11 @@ struct MrsSpeculationStats {
     /// started, and nothing it was asking was cached.
     inline static std::atomic<std::size_t> n_killed{0};
 };
+
+/// Sets how long a lookahead query's exec may run once the MRS walk abandons
+/// its branch before it is killed (see Config::mrs_lookahead_kill_grace).
+/// Called once at startup.
+void set_mrs_lookahead_kill_grace(std::chrono::milliseconds grace);
 
 /// Scores a candidate on the greedy maximal-realizable-subset (MRS) scale,
 /// selected by Config::status_grading. Below realizability the score is the

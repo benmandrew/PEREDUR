@@ -224,6 +224,13 @@ struct Config {
     /// settled one. Each deeper level doubles the queries for one more step,
     /// and only one query per level is ever used. Values above 8 read as 8.
     std::size_t mrs_speculation_depth = 2;
+    /// How long a lookahead query may keep running once the walk has settled
+    /// its branch the other way, before its exec is killed; 0 kills at once.
+    /// A query that finishes inside the grace still fills the caches for later
+    /// candidates, while one heading for the ltlsynt timeout stops costing
+    /// CPU. The walk kills whatever is still running when it returns,
+    /// whatever the grace, since it waits for those tasks.
+    std::chrono::milliseconds mrs_lookahead_kill_grace{2'000};
     /// A fitness function that throws (in practice an external tool failing on
     /// one evolved formula) costs that individual rather than the whole run.
     /// Above this fraction of a generation the tooling is broken rather than

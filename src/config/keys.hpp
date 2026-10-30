@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 37> k_config_keys{{
+inline constexpr std::array<ConfigKey, 38> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -330,6 +330,14 @@ inline constexpr std::array<ConfigKey, 37> k_config_keys{{
      "How many steps ahead the MRS walk queries both outcomes into idle "
      "workers.\n"
      "Scores are unchanged at any value; 0 turns it off.\n"},
+    {"runtime", "mrs_lookahead_kill_grace_ms",
+     &Config::mrs_lookahead_kill_grace, KeyCheck::NonNegative, KeyReader::Both,
+     "How long, in milliseconds, a lookahead query of the MRS walk may keep "
+     "running once the walk has settled its branch the other way, before its "
+     "exec is killed; 0 kills at once. Read only when mrs_speculation_depth "
+     "is above 0. A killed query records no verdict.",
+     "How long an abandoned MRS lookahead query may run before it is "
+     "killed.\n"},
     {"runtime", "max_scoring_failure_rate", &Config::max_scoring_failure_rate,
      KeyCheck::Probability, KeyReader::Both,
      "Fraction of a generation whose fitness scoring may throw before the run "

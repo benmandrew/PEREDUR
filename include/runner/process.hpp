@@ -45,9 +45,23 @@ struct ExecCancelled {};
 /// every exec on this thread kills its process group, as a timeout does, and
 /// raises ExecCancelled. With no scope installed, an exec polls nothing and
 /// behaves as before.
+///
+/// `after_grace`, when given, is a softer signal: while it is set, an exec is
+/// killed only once it has run for `grace`, so one that was nearly done still
+/// returns its answer.
 class ExecCancelScope {
    public:
-    explicit ExecCancelScope(const std::atomic<bool>& flag);
+    /// The signals an exec on this thread polls.
+    struct Signal {
+        const std::atomic<bool>* m_now = nullptr;
+        const std::atomic<bool>* m_after_grace = nullptr;
+        std::int64_t m_grace_ms = 0;
+    };
+
+    explicit ExecCancelScope(
+        const std::atomic<bool>& flag,
+        const std::atomic<bool>* after_grace = nullptr,
+        std::chrono::milliseconds grace = std::chrono::milliseconds{0});
     ~ExecCancelScope();
     ExecCancelScope(const ExecCancelScope&) = delete;
     ExecCancelScope& operator=(const ExecCancelScope&) = delete;
@@ -55,7 +69,7 @@ class ExecCancelScope {
     ExecCancelScope& operator=(ExecCancelScope&&) = delete;
 
    private:
-    const std::atomic<bool>* m_previous;
+    Signal m_previous;
 };
 
 /// How to resolve arguments[0] to a binary.

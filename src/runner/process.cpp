@@ -45,17 +45,29 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
-// The calling thread's ExecCancelScope flag, or null with none installed.
-thread_local const std::atomic<bool>* t_exec_cancel = nullptr;
+// The calling thread's ExecCancelScope signals, both null with none
+// installed.
+thread_local ExecCancelScope::Signal t_exec_cancel;
 
 // How often a read under a cancel flag wakes to look at it. Only a cancelled
 // speculative query waits this long past its cancellation, against the
 // seconds it would otherwise run on.
 constexpr int k_cancel_poll_ms = 20;
 
-bool exec_cancelled() {
-    return t_exec_cancel != nullptr &&
-           t_exec_cancel->load(std::memory_order_acquire);
+bool watched(const ExecCancelScope::Signal& signal) {
+    return signal.m_now != nullptr || signal.m_after_grace != nullptr;
+}
+
+// Whether an exec started at `start` is to be killed now.
+bool exec_cancelled(const ExecCancelScope::Signal& signal,
+                    Clock::time_point start) {
+    if (signal.m_now != nullptr &&
+        signal.m_now->load(std::memory_order_acquire)) {
+        return true;
+    }
+    return signal.m_after_grace != nullptr &&
+           signal.m_after_grace->load(std::memory_order_acquire) &&
+           Clock::now() - start >= std::chrono::milliseconds{signal.m_grace_ms};
 }
 
 double rusage_cpu_seconds(const struct rusage& usage) {
@@ -86,14 +98,15 @@ std::optional<int> poll_timeout_ms(
 }
 
 // Waits until read_fd is readable, returning true, or until `deadline` passes
-// or `cancelled` is set, returning false. With neither, poll blocks
-// indefinitely.
+// or `signal` cancels the exec started at `start`, returning false. With
+// neither, poll blocks indefinitely.
 bool wait_readable(int read_fd,
                    const std::optional<Clock::time_point>& deadline,
-                   const std::atomic<bool>* cancelled) {
+                   const ExecCancelScope::Signal& signal,
+                   Clock::time_point start) {
+    const bool watching = watched(signal);
     while (true) {
-        if (cancelled != nullptr &&
-            cancelled->load(std::memory_order_acquire)) {
+        if (watching && exec_cancelled(signal, start)) {
             return false;
         }
         const std::optional<int> poll_ms = poll_timeout_ms(deadline);
@@ -102,8 +115,8 @@ bool wait_readable(int read_fd,
         }
         // Under a cancel flag the wait is cut into slices, since nothing
         // wakes poll when the flag is set.
-        const bool sliced = cancelled != nullptr &&
-                            (*poll_ms < 0 || *poll_ms > k_cancel_poll_ms);
+        const bool sliced =
+            watching && (*poll_ms < 0 || *poll_ms > k_cancel_poll_ms);
         struct pollfd pfd{};
         pfd.fd = read_fd;
         pfd.events = POLLIN;
@@ -127,12 +140,14 @@ bool wait_readable(int read_fd,
 }
 
 // Reads read_fd until the child closes it (EOF) or `deadline` passes, if there
-// is one, or `cancelled` is set. Returns the bytes read so far and whether it
-// stopped short of EOF; the caller kills and reaps. With no deadline and no
-// cancel flag, poll blocks indefinitely and this only returns on EOF.
+// is one, or `signal` cancels the exec started at `start`. Returns the bytes
+// read so far and whether it stopped short of EOF; the caller kills and reaps.
+// With no deadline and no cancel signal, poll blocks indefinitely and this
+// only returns on EOF.
 std::pair<std::string, bool> read_until(
     int read_fd, const std::optional<Clock::time_point>& deadline,
-    const std::atomic<bool>* cancelled = nullptr) {
+    const ExecCancelScope::Signal& signal = {},
+    Clock::time_point start = Clock::time_point{}) {
     // The child's own runtime: the parent sits in poll()/read() until the tool
     // closes its stdout. Wall greatly exceeding CPU here is expected and
     // healthy -- it means the parent is blocked, not spinning.
@@ -140,7 +155,7 @@ std::pair<std::string, bool> read_until(
     std::string output;
     std::array<char, 4096> read_buf{};
     while (true) {
-        if (!wait_readable(read_fd, deadline, cancelled)) {
+        if (!wait_readable(read_fd, deadline, signal, start)) {
             return {output, true};
         }
         const ssize_t bytes_read =
@@ -808,10 +823,10 @@ ProcessResult run_and_capture(const std::vector<std::string>& arguments,
                               std::chrono::milliseconds timeout,
                               ExecutableLookup lookup) {
     assert(!arguments.empty());
-    if (exec_cancelled()) {
+    const Clock::time_point start = Clock::now();
+    if (watched(t_exec_cancel) && exec_cancelled(t_exec_cancel, start)) {
         throw ExecCancelled{};
     }
-    const Clock::time_point start = Clock::now();
     const std::vector<char*> argv = exec_argv(arguments);
     std::array<int, 2> pipe_fds = {-1, -1};
     pid_t child_pid = -1;
@@ -871,11 +886,13 @@ ProcessResult run_and_capture(const std::vector<std::string>& arguments,
         }
     }
     const std::optional<Clock::time_point> deadline = deadline_after(timeout);
-    auto [output, timed_out] = read_until(pipe_fds[0], deadline, t_exec_cancel);
+    auto [output, timed_out] =
+        read_until(pipe_fds[0], deadline, t_exec_cancel, start);
     close(pipe_fds[0]);
     // Read once the read has stopped, so a flag set after EOF still leaves
     // the call its answer.
-    const bool cancelled = timed_out && exec_cancelled();
+    const bool cancelled = timed_out && watched(t_exec_cancel) &&
+                           exec_cancelled(t_exec_cancel, start);
     if (timed_out) {
         kill_process_tree(child_pid);
     }
@@ -897,9 +914,11 @@ ProcessResult run_and_capture(const std::vector<std::string>& arguments,
 
 }  // namespace
 
-ExecCancelScope::ExecCancelScope(const std::atomic<bool>& flag)
+ExecCancelScope::ExecCancelScope(const std::atomic<bool>& flag,
+                                 const std::atomic<bool>* after_grace,
+                                 std::chrono::milliseconds grace)
     : m_previous(t_exec_cancel) {
-    t_exec_cancel = &flag;
+    t_exec_cancel = Signal{&flag, after_grace, grace.count()};
 }
 
 ExecCancelScope::~ExecCancelScope() { t_exec_cancel = m_previous; }

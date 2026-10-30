@@ -115,6 +115,8 @@ ltlfilt_timeout_ms = 10000
 # How many steps ahead the MRS walk queries both outcomes into idle workers.
 # Scores are unchanged at any value; 0 turns it off.
 mrs_speculation_depth = 2
+# How long an abandoned MRS lookahead query may run before it is killed.
+mrs_lookahead_kill_grace_ms = 2000
 # 0.15, not 0.05: the ltl2tgba budget drops individuals by design, and enough
 # land in one generation on the heavy TLSF specs to trip a tighter bound.
 max_scoring_failure_rate = 0.15

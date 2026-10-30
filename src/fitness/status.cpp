@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <chrono>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
@@ -41,6 +42,10 @@ bool all_components_satisfiable(const std::vector<std::string>& components,
         });
 }
 
+// Set once at startup from Config::mrs_lookahead_kill_grace, read by every
+// lookahead task, hence atomic.
+std::atomic<std::int64_t> g_lookahead_kill_grace_ms{2'000};
+
 // Past this the tree of lookahead sets costs more to enumerate each step than
 // a pool's width of workers could ever run.
 constexpr std::size_t k_max_speculation_depth = 8;
@@ -78,6 +83,9 @@ class WalkLookahead {
             if (!cancel(*entry.second)) {
                 kill(*entry.second);
             }
+        }
+        for (const std::shared_ptr<Node>& node : m_abandoned) {
+            kill(*node);
         }
         for (const auto& entry : m_nodes) {
             wait_done(*entry.second);
@@ -118,6 +126,10 @@ class WalkLookahead {
         // the task's exec in flight (see ExecCancelScope). Never set on a node
         // the walk is waiting for.
         std::atomic<bool> m_kill{false};
+        // Set once the walk settles the node's branch the other way. Its exec
+        // is killed only past Config::mrs_lookahead_kill_grace, so a query
+        // nearly done still lands in the caches for later candidates.
+        std::atomic<bool> m_abandon{false};
         // Written before m_state turns Done, and read only after.
         bool m_answered = false;
     };
@@ -136,6 +148,10 @@ class WalkLookahead {
 
     static void kill(Node& node) {
         node.m_kill.store(true, std::memory_order_release);
+    }
+
+    static void abandon(Node& node) {
+        node.m_abandon.store(true, std::memory_order_release);
     }
 
     void wait_done(const Node& node) {
@@ -191,7 +207,7 @@ class WalkLookahead {
             }
             if (!cancel(*entry->second) &&
                 entry->second->m_state.load() != State::Done) {
-                kill(*entry->second);
+                abandon(*entry->second);
                 m_abandoned.push_back(entry->second);
             }
             entry = m_nodes.erase(entry);
@@ -235,7 +251,10 @@ class WalkLookahead {
                     // A killed exec raises past the runners' own handlers,
                     // which is what keeps it out of every cache: they memoise
                     // only an answer that came back.
-                    const ExecCancelScope scope(node->m_kill);
+                    const ExecCancelScope scope(
+                        node->m_kill, &node->m_abandon,
+                        std::chrono::milliseconds{
+                            g_lookahead_kill_grace_ms.load()});
                     (void)(*oracle)(node->m_set);
                     answered = true;
                 } catch (const ExecCancelled&) {
@@ -328,6 +347,10 @@ std::vector<std::size_t> project_admission_order(
         }
     }
     return order;
+}
+
+void set_mrs_lookahead_kill_grace(std::chrono::milliseconds grace) {
+    g_lookahead_kill_grace_ms.store(grace.count());
 }
 
 double status_score_mrs(const std::vector<std::string>& components,

@@ -291,6 +291,38 @@ TEST(test_cancel_flag_unset_leaves_the_exec_alone) {
            "process: an exec under an unset flag should run as before");
 }
 
+// The deferred flag spares an exec until it has run for the grace: one that
+// finishes inside it returns its answer, and one that runs past it is killed.
+TEST(test_deferred_cancel_waits_out_the_grace) {
+    const std::atomic<bool> now{false};
+    const std::atomic<bool> deferred{true};
+    {
+        const ExecCancelScope scope(now, &deferred, milliseconds{5'000});
+        const ProcessResult result = execute_and_capture(
+            {"/bin/sh", "-c", "sleep 0.1; printf ok"}, milliseconds{20'000});
+        expect(result.m_output == "ok" && !result.m_timed_out,
+               "process: an exec finishing inside the grace should return its "
+               "answer");
+    }
+    bool raised = false;
+    const auto start = Clock::now();
+    {
+        const ExecCancelScope scope(now, &deferred, milliseconds{300});
+        try {
+            (void)execute_and_capture({"/bin/sh", "-c", "sleep 30"},
+                                      milliseconds{20'000});
+        } catch (const ExecCancelled&) {
+            raised = true;
+        }
+    }
+    const double took = elapsed_ms(start);
+    expect(raised,
+           "process: an exec past the grace should raise ExecCancelled");
+    expect(took >= 300.0 && took < 5'000.0,
+           "process: the deferred kill should land just past the grace, took " +
+               std::to_string(took) + "ms");
+}
+
 // A failed exec used to be exit 127 with empty output, which the runners read
 // as an unrecognised answer. It now says what failed, and names E2BIG, the
 // failure an oversized formula argument produces.
