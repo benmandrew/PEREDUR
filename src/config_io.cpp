@@ -251,6 +251,9 @@ std::string retired_key_hint(const std::string& path) {
         return " (removed: no concurrency cap; bound RAM with"
                " runtime.parallel)";
     }
+    if (path == "runtime.dashboard") {
+        return " (removed: the live dashboard no longer exists)";
+    }
     return "";
 }
 

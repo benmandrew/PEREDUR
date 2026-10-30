@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "config.hpp"
-#include "dashboard.hpp"
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
@@ -24,8 +23,8 @@ SearchOutput<Specification> run_monolithic(
     const Specification& original, const Config& cfg,
     const RandomSource& random_source,
     const AggregateWeightedFitnessFunctionT<Specification>& fitness,
-    DashboardWriter& dashboard, const std::string& output_dir,
-    SearchBudget& budget, StreamingMaximalFilter<Specification>* stream) {
+    const std::string& output_dir, SearchBudget& budget,
+    StreamingMaximalFilter<Specification>* stream) {
     RepairAccumulator<Specification> accumulator =
         make_repair_accumulator<Specification>(
             output_dir, ".tlsf",
@@ -35,9 +34,9 @@ SearchOutput<Specification> run_monolithic(
         get_filter_functions(original, global_sat_checker());
     const std::vector<Specification> seed_population(cfg.population_size,
                                                      original);
-    SearchResult<Specification> searched = run_generations(
-        cfg, score_population(cfg, seed_population, fitness), fitness, filters,
-        random_source, dashboard, accumulator, budget);
+    SearchResult<Specification> searched =
+        run_generations(cfg, score_population(cfg, seed_population, fitness),
+                        fitness, filters, random_source, accumulator, budget);
     return finish_search(cfg, std::move(searched), accumulator.specifications(),
                          fitness, stream);
 }

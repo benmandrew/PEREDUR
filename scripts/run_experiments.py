@@ -147,10 +147,7 @@ TLSF_CORE_SPECS: list[str] = [
 # The head-to-head corpus IS the AuRUS paper's evaluation set: the 26
 # specifications the paper's tables evaluate. Both arms target all 26, so this
 # is the campaign's declared scope rather than whatever PEREDUR happens to be
-# able to run today. The paths live in `SPEC_TLSF` in
-# scripts/aurus_campaign.py and the two are held equal by
-# test_experiment_paths.py; that module imports this one, so the names are
-# written here and the paths there rather than either importing the other.
+# able to run today.
 #
 # amba, codesample-un1 and codesample-un2 are not rows in the paper's tables,
 # so they are not in this list. They keep their PEREDUR families and ideals
@@ -177,9 +174,6 @@ H2H_TLSF_SPECS: list[str] = [
 # arm runs `H2H_TLSF_SPECS` minus this list, and `test_experiment_paths.py`
 # asserts the two partition exactly, so importing a family fails that test
 # until it is struck off here.
-#
-# Nothing here blocks the AuRUS arm, which runs all 26 regardless and archives
-# every out.txt, so an import re-scores runs that already exist.
 H2H_PENDING_IMPORT: list[str] = []
 
 # Imported, but permanently unscoreable, so held out of the PEREDUR arm rather
@@ -431,7 +425,7 @@ PROFILES: dict[str, dict] = {
         # peak RAM by jobs and risk an OOM.
         "default_jobs": 1,
     },
-    # Head-to-head top-up against the AuRUS baseline (scripts/aurus_campaign.py):
+    # Head-to-head top-up against the AuRUS baseline:
     # the control cell only (nsga2 / log metric / C-default weights), at seeds
     # 0-19 over H2H_TLSF_SPECS_2026_07. It reads and writes the paths of the
     # retired ablate-tlsf profile, whose 2x2 factorial contained this cell, and

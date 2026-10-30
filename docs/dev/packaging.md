@@ -11,7 +11,7 @@ The external solvers, how their paths resolve, install rules and the container i
 
 ## Packaging
 
-Five paths are compiled in as build-tree absolutes, and each yields to an environment override: `PEREDUR_SPOT_BIN_DIR`, `PEREDUR_GANAK_PATH`, `PEREDUR_BLACK_PATH`, `PEREDUR_FORMALISER_SCRIPT`, `PEREDUR_DASHBOARD_PAGE`. `tool_path_from_env` (`src/runner/tool_paths.hpp`) is the one reader, and callers hold its result in a function-local `static`, since `getenv` races `setenv` across the scoring pool's threads. An empty value reads as unset, because shells and container runtimes export an unset variable as empty.
+Four paths are compiled in as build-tree absolutes, and each yields to an environment override: `PEREDUR_SPOT_BIN_DIR`, `PEREDUR_GANAK_PATH`, `PEREDUR_BLACK_PATH`, `PEREDUR_FORMALISER_SCRIPT`. `tool_path_from_env` (`src/runner/tool_paths.hpp`) is the one reader, and callers hold its result in a function-local `static`, since `getenv` races `setenv` across the scoring pool's threads. An empty value reads as unset, because shells and container runtimes export an unset variable as empty.
 
 Install with `--component peredur` (`cmake/install.cmake`): FetchContent's `add_subdirectory` imports the dependencies' install rules, so an unqualified install writes Eigen's headers and cpptrace's cmake config beside the binaries. Spot's binaries carry an absolute libtool RUNPATH into their build tree, so each is installed behind a wrapper (`cmake/tool-wrapper.sh.in`) setting `LD_LIBRARY_PATH` to a sibling `lib` resolved from `$0`. Without it the first `ltlsynt` call fails silently.
 

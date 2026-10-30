@@ -61,13 +61,10 @@ install(TARGETS
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
             COMPONENT peredur)
 
-# The vendored formaliser script and the dashboard page are read at run time
-# from paths compiled in against the source tree, so an installed binary needs
-# its own copy of both or the FRETISH path and `--dashboard` break the moment
-# the sources are gone.
+# The vendored formaliser script is read at run time from a path compiled in
+# against the source tree, so an installed binary needs its own copy or the
+# FRETISH path breaks the moment the sources are gone.
 install(FILES "${FORMALISER_SCRIPT_PATH}"
-    DESTINATION "${PEREDUR_DATA_DIR}" COMPONENT peredur)
-install(FILES "${PEREDUR_DASHBOARD_PAGE_PATH}"
     DESTINATION "${PEREDUR_DATA_DIR}" COMPONENT peredur)
 
 # Small beside the binaries, and they are what the README quickstart and the

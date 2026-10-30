@@ -162,7 +162,7 @@ jobs:
             # a build job runs, and it needs the instrumented build under it, so
             # it counts as a build input.
             build=false
-            if changed src include test web cmake vendor .github \
+            if changed src include test cmake vendor .github \
                        CMakeLists.txt CMakePresets.json flake.nix flake.lock \
                        schemas example-config.toml \
                        scripts/coverage_badge.py | grep -q .; then

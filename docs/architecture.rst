@@ -25,7 +25,7 @@ Algorithm flow
 The generation pipeline
 -----------------------
 
-``make_generation_pipeline`` (``include/genetic/pipeline.hpp``) returns an ordered vector of named stages, which ``run_generation_pipeline`` executes and reports to an optional ``StageObserver``. The live dashboard derives its stage list from those reports, so a new stage appears there with no change to the page.
+``make_generation_pipeline`` (``include/genetic/pipeline.hpp``) returns an ordered vector of named stages, which ``run_generation_pipeline`` executes and reports to an optional ``StageObserver``.
 
 .. list-table::
    :header-rows: 1
@@ -103,7 +103,6 @@ Module layout
      bounded_async.hpp   — bounded-concurrency async dispatch
      config.hpp          — algorithm parameters and their defaults
      config_io.hpp       — TOML config parsing and key validation
-     dashboard.hpp       — progress.jsonl observer for the live dashboard
      profile.hpp         — scope profiler (PEREDUR_PROFILE)
      prop_formula.hpp    — propositional formula AST (Formula)
      requirement.hpp     — Timing, ConditionType, Requirement, Specification

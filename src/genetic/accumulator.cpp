@@ -97,7 +97,7 @@ bool AccumulatedRepairWriter::create_directory() {
 }
 
 // Reports once and then stops trying. Losing the accumulated files must never
-// take the repair run with them, as with the dashboard's log.
+// take the repair run with them.
 void AccumulatedRepairWriter::warn(const std::string& message) {
     m_failed = true;
     std::cerr << "warning: " << message

@@ -1,6 +1,6 @@
 # Docker
 
-The image carries the eight PEREDUR binaries, the solvers they spawn, the dashboard page and the bundled examples under `/opt/peredur`. It runs as a non-root user with `/work` as its working directory, and it is built from the repository root with the commit it was built from passed in as a build argument. Nothing about the algorithm changes inside it; the container is a way of getting Spot, black and Ganak without building them. [`vm.md`](vm.md) covers a VirtualBox appliance built from this image, for a user who wants a virtual machine rather than a container.
+The image carries the eight PEREDUR binaries, the solvers they spawn and the bundled examples under `/opt/peredur`. It runs as a non-root user with `/work` as its working directory, and it is built from the repository root with the commit it was built from passed in as a build argument. Nothing about the algorithm changes inside it; the container is a way of getting Spot, black and Ganak without building them. [`vm.md`](vm.md) covers a VirtualBox appliance built from this image, for a user who wants a virtual machine rather than a container.
 
 ## Running a command
 
@@ -42,10 +42,6 @@ The image installs `examples/` at `/opt/peredur/share/peredur/examples`, so it d
 $ docker run --rm benmandrew/peredur:<tag> realize /opt/peredur/share/peredur/examples/lily02/spec.tlsf
 UNREALIZABLE
 ```
-
-## The live dashboard
-
-The dashboard needs three things together: `--dashboard` on the command, a published port, and a static server pointed at the same mount the run writes to. It is not the main path into the image, and [`README.md`](../README.md) links the guide that covers what the page shows.
 
 ## Building the image
 

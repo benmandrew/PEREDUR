@@ -67,7 +67,6 @@ run_implication = false
 [runtime]
 black_timeout_ms = 500
 parallel         = 4
-dashboard        = true
 )";
     const Config cfg = config_from_toml_string(toml);
     expect(cfg.generations == 5,
@@ -98,11 +97,6 @@ dashboard        = true
            "config_io: runtime black_timeout_ms should be parsed from TOML");
     expect(cfg.parallel == 4,
            "config_io: runtime parallel should be parsed from TOML");
-    expect(cfg.dashboard,
-           "config_io: runtime dashboard should be parsed from TOML");
-    expect(!Config{}.dashboard,
-           "config_io: the dashboard should be opt-in, so a config that does "
-           "not mention it leaves progress output off");
 }
 
 TEST(test_config_io_partial_overrides_defaults) {
@@ -389,7 +383,6 @@ ltlfilt_timeout_ms           = 2000
 parallel                     = 4
 mrs_speculation_depth        = 1
 max_scoring_failure_rate     = 0.05
-dashboard                    = true
 )";
     const std::string warnings = warnings_from(toml);
     expect(warnings.empty(),
@@ -431,6 +424,7 @@ TEST(test_config_io_removed_operator_keys_warn_and_are_ignored) {
         {"model_counting", "metric = \"direct\""},
         {"fitness", "semantic_trace_weight = 0.5"},
         {"tlsf", "muc_max_iterations = 32"},
+        {"runtime", "dashboard = true"},
     };
     for (const auto& [section, line] : removed) {
         const std::string key = line.substr(0, line.find(' '));

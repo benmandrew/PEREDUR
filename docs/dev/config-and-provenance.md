@@ -35,6 +35,7 @@ An archived config states only the keys its sweep overrides, so moving a C++ def
 - `[fitness] keyword_similarity`, `semantic_trace_weight` (2026-10-30): `gen_configs.py --pin-vintage` wrote both from 2026-10-06; no FRETISH campaign before that date states either.
 - `[genetic] accumulate_repairs` (2026-10-30): the two arms of `2026-08-19-accumulator` and the sweeps that wrote it explicitly.
 - `[model_counting] metric` (2026-10-30): every config `gen_configs.py` wrote, `direct` until 2026-10-30 and `logarithmic` since.
+- `[runtime] dashboard` (2026-10-30): `gen_configs.py --dashboard`, which wrote it only on request; no sweep or profile crossed it.
 
 Retiring a key's *value* goes further, because the parser refuses it. On 2026-08-06 `nsga2` became `nsga2-truncate` and `nsga2-replicate` became `nsga2-apportion`, and the old spellings are rejected by name rather than aliased, so an archived config reproduces only at the commit its `PROVENANCE.json` names. `fitness.status_grading = "tiered"` and `genetic.selection_scheme = "nsga2-truncate"` went the same way on 2026-10-30, with no replacement spelling: each error names the surviving values.
 
@@ -87,6 +88,7 @@ Archived *results* still join. `scheme_of()` in `run_experiments.py` reads the s
 - **45** removed `fitness.keyword_similarity` and `fitness.semantic_trace_weight`; the FRETISH keyword orders always join the semantic objective at weight 1/2.
 - **46** removed `genetic.accumulate_repairs`; every run accumulates.
 - **47** removed `model_counting.metric`; trace counts always combine as logarithms.
+- **48** removed `runtime.dashboard` with the live dashboard and its `progress.jsonl` stream.
 
 ## Where the campaign records are
 
@@ -136,6 +138,7 @@ The campaign archives under `experiments/` and the narrative log `EXPERIMENTS.md
 | 2026-10-30 | `fitness.status_grading` | `tiered` removed | A config that sets `tiered` is rejected with an error naming `mrs` and `aurus`. The `tiered` arm of `2026-08-11-status-grading` sets it, and every campaign before 2026-08-11 ran it without stating the key, so those now score under `mrs` on a current binary. |
 | 2026-10-30 | `[model_counting] metric` | removed | Trace counts always combine as logarithms. `gen_configs.py` wrote `metric = "direct"` into every flat config until that day, and the `direct` arm of the 2026-07-16 `metric` profile set it too; such a config now warns, ignores the key and scores its semantic objective on logarithms. |
 | 2026-10-30 | `genetic.selection_scheme` | `nsga2-truncate` (and `nsga2`) removed | A config that sets either spelling is rejected with an error naming `weighted` and `nsga2-apportion`. Every NSGA-II campaign archived before 2026-08-14 pins one of the two, as do the truncate arms of `2026-08-11-selection-default` and the 2026-08-07 elitism campaign. The determinism goldens were re-recorded under `nsga2-apportion` in the same commit. |
+| 2026-10-30 | `runtime.dashboard` | removed | Removed with the live dashboard and `peredur --dashboard`. It only wrote `progress.jsonl` and the page beside it, and drew nothing from the `RandomSource`, so a config that sets it warns, ignores the key and searches exactly as before. |
 
 The archived *results* of the selection renames stay readable. Their `selection` column still says `nsga2`, and `canonical_scheme()` in `run_experiments.py` and `merge_experiments.py` maps that onto `nsga2-truncate` wherever the column is read, so all 224,861 archived `nsga2` rows keep their resume key and still join new ones for resume, merge and cross-campaign comparison. Nothing under `experiments/` was rewritten to match the new names, because the column records the name the campaign ran under.
 

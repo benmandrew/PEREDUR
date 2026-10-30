@@ -213,51 +213,11 @@ for spec in R.H2H_PENDING_IMPORT:
     assert spec not in R.TLSF_SPECS, \
         f"{spec} has a PEREDUR family now; strike it off H2H_PENDING_IMPORT"
 
-# aurus_campaign runs AuRUS on the whole declared corpus, keyed by the name
-# each row carries so the eleven with PEREDUR families join the h2h rows.
-import aurus_campaign as A  # noqa: E402
-check(sorted(A.SPEC_TLSF), sorted(R.H2H_TLSF_SPECS),
-      "aurus_campaign covers the head-to-head corpus")
-check(A.SPEC_TLSF["arbiter-aurus"], "case-studies/arbiter/arbiter.tlsf",
-      "arbiter-aurus maps to AuRUS's arbiter case study")
-# The paper files Lily02 under SYNTCOMP, and that copy carries the five
-# references the row is scored against; the top-level case-studies/lily02 is a
-# separate one-reference setup with a byte-identical spec.
-check(A.SPEC_TLSF["lily02"],
-      "case-studies/syntcomp-unreal/lily02/lilydemo02.tlsf",
-      "lily02 maps to the paper's SYNTCOMP row, not the top-level copy")
-# The four SYNTECH15 rows the paper takes from examples/ are the reason
-# SPEC_TLSF paths are rooted at <aurus-root> rather than <aurus-root>/
-# case-studies: the case-studies-relative form could not name them at all.
-assert A.SPEC_TLSF["pcar-v2-888"].startswith("examples/icse2019/"), \
-    "pcar-v2-888 maps into AuRUS's examples/ tree, not case-studies"
-
-# -onlyInputsA is matched per group against the AuRUS authors' own drivers, so
-# a typo in a name would silently drop the flag for that spec rather than fail.
-assert A.ONLY_INPUTS_A <= set(A.SPEC_TLSF), \
-    f"unknown specs in ONLY_INPUTS_A: {A.ONLY_INPUTS_A - set(A.SPEC_TLSF)}"
-check(len(A.ONLY_INPUTS_A), 9, "specs run with -onlyInputsA")
-# -factors takes three values in base AuRUS (STATUS,SYN,SEMANTIC), and
-# Settings.setFactors halves the semantic weight into LOST_MODELS and
-# WON_MODELS. A four-value spelling belongs to this project's fork, where the
-# semantic weight was split in two, and prints usage and exits against the
-# base -- so it would produce a campaign of zero-solution rows.
-ga_factors = [f for f in A.BASE_FLAGS if f.startswith("-factors=")]
-check(ga_factors, ["-factors=0.7,0.1,0.2"],
-      "uniform GA factors at the base three-value CLI")
-# Guarantee removal appears in none of the drivers and must stay off.
-assert not any("removeG" in f for f in A.flags_for("arbiter-aurus")), \
-    "AuRUS must not be run with -removeGuarantees"
-
-# aurus_validate scores implies_genuine against examples/<spec>/fixes, so every
-# family it scores must exist and hold .tlsf ideals — a missing or empty fixes
-# dir silently records "unknown" for the whole family rather than erroring. The
-# scorable set is H2H_TLSF_READY, not the whole corpus: AuRUS runs all 26 and
-# the pending imports have no PEREDUR family to score against yet, which is
-# what H2H_PENDING_IMPORT records. And the compare parsing must stay the shared
-# run_experiments function (imported, not copied), or implies_genuine drifts
-# from implies_ideal.
-import aurus_validate as V  # noqa: E402
+# Every family the PEREDUR arm scores is held against examples/<spec>/fixes, so
+# each must exist and hold .tlsf ideals: a missing or empty fixes dir silently
+# records "unknown" for the whole family rather than erroring. The scorable set
+# is H2H_TLSF_READY, not the whole corpus, since the pending imports have no
+# PEREDUR family to score against yet, which is what H2H_PENDING_IMPORT records.
 for spec in R.H2H_TLSF_READY:
     fixes = R.EXAMPLES_DIR / spec / "fixes"
     assert any(fixes.glob("*.tlsf")), f"no .tlsf ideals in {fixes}"
@@ -282,8 +242,6 @@ for spec in R.H2H_UNSCOREABLE + R.H2H_PENDING_IMPORT:
     assert spec in R.H2H_TLSF_SPECS, \
         f"{spec} is held out of a corpus it is not in"
     assert spec not in R.H2H_TLSF_READY, f"{spec} is both held out and ready"
-assert V.parse_compare_output is R.parse_compare_output, \
-    "aurus_validate must reuse run_experiments.parse_compare_output"
 
 # merge_experiments derives its per-profile CSV and result-directory names from
 # the basenames alone, and pull_source() rebuilds each path as

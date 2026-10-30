@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "config.hpp"
-#include "dashboard.hpp"
 #include "driver_support.hpp"
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
@@ -58,12 +57,7 @@ std::optional<std::vector<FilterRunStats>> run_repair(
 
     const AggregateWeightedFitnessFunctionT<Specification> fitness =
         tlsf_get_fitness_function(original, cfg);
-    DashboardWriter dashboard(output_dir, cfg.dashboard);
-    // Built from the original spec purely to name the stages.
-    announce_run(dashboard, input_path, output_dir, cfg, random_source.seed(),
-                 objective_names(fitness),
-                 generation_stage_names(
-                     get_filter_functions(original, global_sat_checker())));
+    announce_seed(random_source.seed());
 
     // Null unless the implication filter is on, and then the final screens
     // run while the search does; destroyed unfinished if anything below
@@ -72,13 +66,8 @@ std::optional<std::vector<FilterRunStats>> run_repair(
         make_maximal_stream(original, cfg, output_dir);
     SearchOutput<Specification> output =
         internal::run_monolithic(original, cfg, random_source, fitness,
-                                 dashboard, output_dir, budget, stream.get());
+                                 output_dir, budget, stream.get());
     internal::write_survivors(output.repairs, fitness, output_dir);
-    // budget.generations() rather than cfg.generations: the parameter is the
-    // count the run actually completed, and a budget can end the run short of
-    // its configured total.
-    dashboard.run_end(budget.generations(), output.n_realizable,
-                      output.repairs.size(), budget.elapsed_s());
     print_repair_summary(output.n_realizable, output.repairs.size(),
                          cfg.run_implication_filter, output_dir);
     if (cfg.report_repair_summary) {

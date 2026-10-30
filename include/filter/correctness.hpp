@@ -25,9 +25,9 @@
 /// per-generation-only filter insufficient (issues #73, #77).
 template <typename Spec>
 struct CorrectnessCheckT {
-    /// Display name, identical to the per-generation stage's. The dashboard
-    /// derives its stage list from these and `run_experiments.py` parses the
-    /// filter report, so a rename is a breaking change to both.
+    /// Display name, identical to the per-generation stage's.
+    /// `run_experiments.py` parses the filter report, so a rename is a breaking
+    /// change to it.
     std::string name;
     /// True when @p spec is admissible under this check.
     std::function<bool(const Spec&)> admissible;

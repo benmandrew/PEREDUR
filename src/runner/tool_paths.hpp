@@ -6,7 +6,7 @@
 ///        default otherwise.
 ///
 /// Private to `src/`: the published resolvers are the per-tool ones in
-/// `include/runner/` and `include/dashboard.hpp`, which this backs.
+/// `include/runner/`, which this backs.
 
 #include <string>
 

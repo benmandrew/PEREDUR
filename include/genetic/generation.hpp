@@ -594,24 +594,6 @@ PopulationRescue<Spec> correctness_rescue(
         };
 }
 
-/// The names of every stage a generation can run, in pipeline order, counting
-/// filters that only run on some generations.
-///
-/// A consumer needs the full roster up front to reserve a layout that does not
-/// move between generations; which stages actually ran in a given generation
-/// still comes from the stage reports. Built from the same pipeline the run
-/// uses, so it cannot drift from it.
-template <typename Spec>
-std::vector<std::string> generation_stage_names(
-    const std::vector<FilterFunctionT<Spec>>& filters) {
-    std::vector<std::string> names;
-    for (const PipelineStage<Spec>& stage : make_generation_pipeline<Spec>(
-             filter_stages(filters), correctness_rescue(filters))) {
-        names.push_back(stage.name());
-    }
-    return names;
-}
-
 /// Evolves a population for one generation:
 ///   1. Order the population best-first under @p cfg's selection scheme —
 ///      descending weighted fitness for WeightedAverage, the NSGA-II
@@ -652,8 +634,8 @@ std::vector<std::string> generation_stage_names(
 /// @param on_progress       Optional callback invoked after each individual is
 ///                          scored; receives (done, total) counts
 /// @param on_stage          Optional callback invoked after each pipeline stage
-///                          completes; receives the stage's name, population
-///                          sizes, and elapsed time
+///                          completes; receives the stage's name and
+///                          population sizes
 /// @param budget            Optional run-level budget; breeding stops part-way
 ///                          through the generation when it runs out, so the
 ///                          result can then be smaller than target_size

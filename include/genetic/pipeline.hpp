@@ -367,27 +367,6 @@ struct GenerationContext {
                                                 : m_candidates.size();
     }
 
-    /// Distinct specifications in whichever representation is currently live.
-    ///
-    /// The population is largely repeats of a handful of specifications -- the
-    /// duplication the replicate selection scheme exists to undo -- and the
-    /// sizes above cannot show it, since a stage that drops nothing still
-    /// changes how many distinct individuals it holds. Hashes the whole
-    /// population, so run_generation_pipeline calls it only with an observer
-    /// attached.
-    [[nodiscard]] std::size_t distinct_population_size() const {
-        std::unordered_set<Spec> seen;
-        seen.reserve(population_size());
-        if (m_view == PopulationView::Scored) {
-            for (const Scored<Spec>& scored : m_scored) {
-                seen.insert(scored.specification);
-            }
-        } else {
-            seen.insert(m_candidates.begin(), m_candidates.end());
-        }
-        return seen.size();
-    }
-
     const Config& m_cfg;
     /// The incoming population in its original order, retained for (mu+lambda)
     /// pooling in the selection stage.
@@ -461,9 +440,6 @@ struct StageObservation {
     std::string name;
     std::size_t n_in{0};
     std::size_t n_out{0};
-    /// Distinct specifications among the n_out, or 0 where it was not measured.
-    std::size_t distinct{0};
-    double elapsed_s{0.0};
 };
 
 /// Invoked after each stage completes, in stage order.
@@ -631,14 +607,9 @@ std::vector<Scored<Spec>> run_generation_pipeline(
     const std::vector<PipelineStage<Spec>>& stages,
     const StageObserver& observe = nullptr) {
     for (const PipelineStage<Spec>& stage : stages) {
-        const auto start = std::chrono::steady_clock::now();
         stage(ctx);
         if (observe) {
-            const double elapsed = std::chrono::duration<double>(
-                                       std::chrono::steady_clock::now() - start)
-                                       .count();
-            observe({stage.name(), stage.n_in(), stage.n_out(),
-                     ctx.distinct_population_size(), elapsed});
+            observe({stage.name(), stage.n_in(), stage.n_out()});
         }
     }
     return std::move(ctx.m_scored);

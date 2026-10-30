@@ -1,13 +1,14 @@
+#include <poll.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <chrono>
 #include <csignal>
 #include <cstddef>
 #include <filesystem>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -150,20 +151,6 @@ p_temporal = 0.4
 [runtime]
 parallel = 1
 )";
-
-std::vector<std::string> tsv_lines(const std::string& text) {
-    std::vector<std::string> lines;
-    std::string line;
-    for (const char character : text) {
-        if (character == '\n') {
-            lines.push_back(line);
-            line.clear();
-        } else {
-            line.push_back(character);
-        }
-    }
-    return lines;
-}
 
 bool contains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;
@@ -1040,7 +1027,7 @@ TEST_IN("driver_peredur", test_peredur_reports_on_request) {
 
     const DriverRun run = run_driver(
         "peredur", {"--input", input, "--output-dir", out.string(), "--config",
-                    config, "--dashboard", "--diagnostics", "--cpu-report"});
+                    config, "--diagnostics", "--cpu-report"});
     expect(run.m_exit_code == 0, "peredur: a run with every report exits zero");
     const std::size_t seed = printed_seed(run.m_output);
     const nlohmann::json manifest =
@@ -1053,19 +1040,6 @@ TEST_IN("driver_peredur", test_peredur_reports_on_request) {
            "peredur: --diagnostics prints the tool and cache reports");
     expect(contains(run.m_output, "CPU attribution (wall "),
            "peredur: --cpu-report prints the CPU attribution");
-
-    expect(contains(run.m_output, "Progress: "),
-           "peredur: --dashboard prints where the progress goes");
-    expect(std::filesystem::exists(out / "index.html"),
-           "peredur: --dashboard writes the page beside the progress file");
-    const std::string progress = read_text(out / "progress.jsonl");
-    std::size_t n_events = 0;
-    for (const std::string& line : tsv_lines(progress)) {
-        expect(nlohmann::json::accept(line),
-               "peredur: each progress line is one JSON object");
-        ++n_events;
-    }
-    expect(n_events >= 2, "peredur: the progress file records the run");
 }
 
 TEST_IN("driver_peredur", test_peredur_tlsf_reports_on_request) {
@@ -1126,6 +1100,29 @@ std::vector<std::filesystem::path> crash_logs_of(pid_t pid) {
     return found;
 }
 
+// Reads @p read_fd until @p marker has appeared, the writer closes it, or the
+// deadline passes, and returns what was read.
+std::string read_until_marker(int read_fd, const std::string& marker) {
+    std::string output;
+    std::array<char, 4096> buffer{};
+    const auto give_up = std::chrono::steady_clock::now() + k_deadline;
+    while (output.find(marker) == std::string::npos &&
+           std::chrono::steady_clock::now() < give_up) {
+        struct pollfd pfd{};
+        pfd.fd = read_fd;
+        pfd.events = POLLIN;
+        if (poll(&pfd, 1, 20) <= 0) {
+            continue;
+        }
+        const ssize_t n_read = read(read_fd, buffer.data(), buffer.size());
+        if (n_read <= 0) {
+            break;
+        }
+        output.append(buffer.data(), static_cast<std::size_t>(n_read));
+    }
+    return output;
+}
+
 TEST_IN("driver_peredur", test_peredur_writes_a_crash_report) {
     const TempDir dir("e2e_peredur_crash");
     const std::string input =
@@ -1135,25 +1132,20 @@ TEST_IN("driver_peredur", test_peredur_writes_a_crash_report) {
     const std::filesystem::path out = dir.path() / "out";
     std::filesystem::create_directories(out);
 
-    const PipedChild child =
-        spawn_piped_child({std::string(PEREDUR_DRIVER_DIR) + "/peredur",
-                           "--input", input, "--output-dir", out.string(),
-                           "--config", config, "--seed", "7", "--dashboard"},
-                          ParentDeathPolicy::KillWithParentThread,
-                          ExecutableLookup::AbsolutePath);
+    const PipedChild child = spawn_piped_child(
+        {std::string(PEREDUR_DRIVER_DIR) + "/peredur", "--input", input,
+         "--output-dir", out.string(), "--config", config, "--seed", "7"},
+        ParentDeathPolicy::KillWithParentThread,
+        ExecutableLookup::AbsolutePath);
     close(child.m_write_fd);
 
-    // The progress file is opened after the handler is installed and the seed
-    // registered, so its existence is the earliest moment a signal is a crash
+    // The seed is printed, and flushed, after the handler is installed and the
+    // seed registered, so seeing it is the earliest moment a signal is a crash
     // rather than a kill. A signal sent before then takes the default action
     // and leaves no report.
-    const std::filesystem::path progress = out / "progress.jsonl";
-    const auto give_up = std::chrono::steady_clock::now() + k_deadline;
-    while (!std::filesystem::exists(progress) &&
-           std::chrono::steady_clock::now() < give_up) {
-        std::this_thread::sleep_for(milliseconds{20});
-    }
-    expect(std::filesystem::exists(progress),
+    const std::string announced =
+        read_until_marker(child.m_read_fd, "Seed: 7\n");
+    expect(contains(announced, "Seed: 7\n"),
            "peredur: the endless run reached its search");
     kill(child.m_pid, SIGSEGV);
 

@@ -199,7 +199,6 @@ ENV PATH=/opt/peredur/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbi
     PEREDUR_GANAK_PATH=/opt/peredur/libexec/peredur/ganak \
     PEREDUR_BLACK_PATH=/opt/peredur/libexec/peredur/black/bin/black \
     PEREDUR_FORMALISER_SCRIPT=/opt/peredur/share/peredur/fretCLI.main.js \
-    PEREDUR_DASHBOARD_PAGE=/opt/peredur/share/peredur/dashboard.html \
     PEREDUR_EXAMPLES=/opt/peredur/share/peredur/examples
 
 # Repairs, run.json and the crash handler's crashes/ directory are all written

@@ -1,6 +1,6 @@
 # Search pipeline
 
-How a `peredur` run proceeds from input to `run.json`, and the design record behind its search budget, output and dashboard.
+How a `peredur` run proceeds from input to `run.json`, and the design record behind its search budget and output.
 
 ## Algorithm flow (`peredur`)
 
@@ -38,15 +38,9 @@ Report "best fitness" as the population maximum, never `population[0]`/`front()`
 
 `peredur` rejects unknown arguments (`find_unknown_arg`), so a new flag must be added to the table in `src/main.cpp`.
 
-## Live dashboard
+## Generation pipeline
 
-Opt-in, via `peredur --dashboard` or `[runtime] dashboard = true`, so campaigns do not pay for it. When on, both drivers stream to `<output-dir>/progress.jsonl` and copy `web/dashboard.html` there as `index.html`; watch with `python3 -m http.server -d <output-dir> 8000`. The page polls once a second, overridden by `?poll=<seconds>` (`?poll=0` loads once).
-
-Each `stage` record carries `distinct`, the number of distinct specifications among the survivors, which measures whether a selection scheme keeps diversity. Computing it hashes the population, so `run_generation_pipeline` does so only when an observer is attached.
-
-Everything above the page script's `boot()` call must be free of DOM access at load time: `boot()` runs only when `document` exists, and otherwise the script exports its functions for `test/web/`. A top-level `document.getElementById` breaks the JS tests.
-
-The page derives its stage list from the latest generation's `stage` records, so new stages need no change to either side. `make_generation_pipeline` (`include/genetic/pipeline.hpp`) returns named `PipelineStage`s, and `run_generation_pipeline` reports each to an optional `StageObserver`. Breeding must stay a single stage, because crossover and mutation interleave per offspring slot and splitting them reorders the RNG draws; the `determinism` suite pins the draw stream.
+`make_generation_pipeline` (`include/genetic/pipeline.hpp`) returns named `PipelineStage`s, and `run_generation_pipeline` reports each to an optional `StageObserver`, through which the `pipeline` suite reads every stage's name and population sizes. Breeding must stay a single stage, because crossover and mutation interleave per offspring slot and splitting them reorders the RNG draws; the `determinism` suite pins the draw stream.
 
 Two calls that both draw from the `RandomSource` must never be arguments of the same call, because gcc and clang evaluate arguments in opposite orders and seeds stop reproducing across compilers. Sequence each draw into its own local (as `rewrite_post_order` does); the CI gcc job catches this, the goldens being pinned under clang.
 

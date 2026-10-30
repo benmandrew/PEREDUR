@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "config.hpp"
-#include "dashboard.hpp"
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
 #include "genetic/output_gate.hpp"
@@ -27,7 +26,7 @@ SearchOutput<Specification> run_monolithic(
     const Specification& original, const Config& cfg,
     const RandomSource& random_source,
     const AggregateWeightedFitnessFunctionT<Specification>& fitness,
-    DashboardWriter& dashboard, const std::string& output_dir,
-    SearchBudget& budget, StreamingMaximalFilter<Specification>* stream);
+    const std::string& output_dir, SearchBudget& budget,
+    StreamingMaximalFilter<Specification>* stream);
 
 }  // namespace tlsf::internal

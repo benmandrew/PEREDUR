@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "config.hpp"
-#include "dashboard.hpp"
 
 // Screens @p original before anything is built from it, printing what it
 // finds on stderr. False, after a `fatal:` line naming @p input_path, when an
@@ -29,10 +28,6 @@ bool screen_original(const Spec& original, const std::string& input_path,
                      const std::function<std::optional<bool>()>& realizability,
                      const Config& cfg);
 
-// Prints the seed where there is one, opens @p dashboard's log with the run's
-// fixed facts, and says where its page is when one was written.
-void announce_run(DashboardWriter& dashboard, const std::string& input_path,
-                  const std::string& output_dir, const Config& cfg,
-                  std::optional<std::size_t> seed,
-                  const std::vector<std::string>& objectives,
-                  const std::vector<std::string>& stages);
+// Prints the seed where there is one, flushed: most runs write to a file, and
+// a run killed part-way must still say which seed reproduces it.
+void announce_seed(std::optional<std::size_t> seed);

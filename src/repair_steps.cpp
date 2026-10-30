@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "config.hpp"
-#include "dashboard.hpp"
 #include "filter/correctness.hpp"
 #include "requirement.hpp"
 #include "runner/atom_names.hpp"
@@ -35,20 +34,9 @@ bool screen_original(const Spec& original, const std::string& input_path,
     return true;
 }
 
-void announce_run(DashboardWriter& dashboard, const std::string& input_path,
-                  const std::string& output_dir, const Config& cfg,
-                  std::optional<std::size_t> seed,
-                  const std::vector<std::string>& objectives,
-                  const std::vector<std::string>& stages) {
+void announce_seed(std::optional<std::size_t> seed) {
     if (seed.has_value()) {
-        std::cout << "Seed: " << *seed << "\n";
-    }
-    dashboard.run_start(input_path, cfg.generations, cfg.population_size,
-                        seed.value_or(0), objectives, stages);
-    if (!dashboard.write_page().empty()) {
-        std::cout << "Progress: " << dashboard.path() << "\n"
-                  << "  view with: python3 -m http.server -d " << output_dir
-                  << " 8000\n";
+        std::cout << "Seed: " << *seed << "\n" << std::flush;
     }
 }
 

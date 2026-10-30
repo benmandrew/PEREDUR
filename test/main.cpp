@@ -66,7 +66,6 @@ const std::vector<Suite>& suites() {
         suite_named("scope"),
         suite_named("serialisation"),
         suite_named("config_io"),
-        suite_named("dashboard"),
         suite_named("driver_support"),
         suite_named("profile"),
         suite_named("tlsf_parser"),

@@ -10,7 +10,7 @@ Detail lives in `docs/dev/`. Read the file covering an area before changing it. 
 
 | File | Sections |
 |---|---|
-| `docs/dev/algorithm.md` | Algorithm flow, Elitism, Termination modes, Run output, Live dashboard, TLSF repair modes, Key types |
+| `docs/dev/algorithm.md` | Algorithm flow, Elitism, Termination modes, Run output, Generation pipeline, TLSF repair modes, Key types |
 | `docs/dev/operators.md` | Crossover, Operator repairs of 2026-08-19, Implication in the TLSF grammar, Monotone rewrites, Cloned assumptions, Assumption construction, Timing donation, Scope-aware timing moves, Removable guarantees |
 | `docs/dev/fretish-scopes.md` | FRETISH scopes |
 | `docs/dev/performance.md` | Cache keys, Scoring dispatch, Implication prefilter, Implication residual query, Tool subprocesses, Profiling |
@@ -29,7 +29,6 @@ cmake --workflow --preset release    # build-release/
 cmake --build build                  # incremental
 
 ctest --preset debug [-R <regex>]
-node --test "test/web/*.test.mjs"    # dashboard page script
 
 cmake --build build --target lint    # cpplint + clang-tidy + cppcheck + gen_configs defaults
 cmake --build build --target format  # format-ci for a dry run
@@ -64,7 +63,6 @@ Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves w
 - Anything that moves the cursor goes through `stdout_is_tty()` (`include/status_line.hpp`). Most runs are redirected to `run.log`.
 - The scoring report's `N individual(s) dropped` line prints unconditionally; `run_experiments.py` parses it.
 - Report best fitness as the population maximum, never `population[0]`.
-- The dashboard page script does no DOM access above its `boot()` call; `test/web/` evaluates it under node.
 
 ### Engine
 

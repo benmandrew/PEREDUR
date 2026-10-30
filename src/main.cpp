@@ -30,8 +30,8 @@ int main(int argc, const char* const argv[]) {
         argc, argv,
         {"--input", "--output-dir", "--config", "--format", "--seed",
          "--write-config-reference", "--check-config-reference"},
-        {"--dashboard", "--cpu-report", "--diagnostics", "--repair-summary",
-         "--version", "-h", "--help"});
+        {"--cpu-report", "--diagnostics", "--repair-summary", "--version", "-h",
+         "--help"});
     if (unknown.has_value()) {
         std::cerr << "Unknown argument: '" << *unknown << "'\n"
                   << "Try '" << argv[0] << " --help' for the accepted flags. "
@@ -59,10 +59,6 @@ int main(int argc, const char* const argv[]) {
             return 1;
         }
     }
-    // Folded into cfg here so everything downstream, both drivers included,
-    // reads one switch. The flag can only enable: a config that already asked
-    // for the dashboard is not turned off by its absence.
-    cfg.dashboard = cfg.dashboard || has_flag(argc, argv, "--dashboard");
     cfg.report_cpu_timing = has_flag(argc, argv, "--cpu-report");
     cfg.report_diagnostics = has_flag(argc, argv, "--diagnostics");
     cfg.report_repair_summary = has_flag(argc, argv, "--repair-summary");

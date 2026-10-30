@@ -1,7 +1,7 @@
 // Tests over the generation pipeline as an observable list of stages: that a
 // consumer sees every stage without knowing which stages exist, that adding a
-// filter adds a stage, and that the reported population sizes and distinct
-// counts track the real ones. The draw stream the pipeline must preserve is
+// filter adds a stage, and that the reported population sizes track the real
+// ones. The draw stream the pipeline must preserve is
 // pinned separately, in determinism_tests.cpp.
 
 #include <algorithm>
@@ -130,30 +130,6 @@ TEST(test_pipeline_sizes_track_the_population) {
            "pipeline: padding should report the target size");
     expect(stage(seen, "select").n_out == k_target_size,
            "pipeline: selection should report exactly target_size survivors");
-}
-
-TEST(test_pipeline_reports_distinct_alongside_size) {
-    const std::vector<StageObservation> seen = observe_generation({});
-    for (const StageObservation& obs : seen) {
-        expect(obs.distinct <= obs.n_out,
-               "pipeline: a stage cannot hold more distinct specifications "
-               "than it holds specifications");
-    }
-    expect(stage(seen, "order-parents").distinct == 4,
-           "pipeline: four distinct parents should be reported as four");
-}
-
-TEST(test_pipeline_distinct_sees_through_a_duplicated_population) {
-    // The real generation 0: original_population seeds the run with
-    // population_size byte-identical copies of the input specification, so
-    // every size the pipeline reports is 4 while the population holds one
-    // specification. distinct is the only field that can tell those apart.
-    const std::vector<StageObservation> seen = observe_generation(
-        {}, std::vector<Specification>(4, distinct_specs().front()));
-    expect(stage(seen, "order-parents").n_out == 4 &&
-               stage(seen, "order-parents").distinct == 1,
-           "pipeline: a population of four copies of one specification should "
-           "report size 4 and one distinct individual");
 }
 
 FilterFunction reject_all(const std::string& name, FilterKind kind) {

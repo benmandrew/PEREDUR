@@ -1,8 +1,8 @@
 #pragma once
 
 // The generation loop both front ends run: breed, filter, score and select
-// once per generation, then report the generation on the status line and the
-// dashboard and offer its gate-passing candidates to the accumulator.
+// once per generation, then report the generation on the status line and offer
+// its gate-passing candidates to the accumulator.
 
 #include <algorithm>
 #include <chrono>
@@ -14,12 +14,10 @@
 #include <vector>
 
 #include "config.hpp"
-#include "dashboard.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
 #include "genetic/filter_report.hpp"
 #include "genetic/generation.hpp"
-#include "genetic/nsga2.hpp"
 #include "genetic/output_gate.hpp"
 #include "genetic/pipeline.hpp"
 #include "genetic/random_source.hpp"
@@ -41,19 +39,6 @@ inline GenerationSizes generation_sizes(const Config& cfg,
     return {std::max(std::size_t{1},
                      static_cast<std::size_t>(size * cfg.selection_rate)),
             static_cast<std::size_t>(size * cfg.elitism_rate)};
-}
-
-// The objective names in registration order, which label the per-objective
-// means the dashboard reports. Read off the fitness function rather than a
-// second hardcoded list, so a new objective needs no change here.
-template <typename Spec>
-std::vector<std::string> objective_names(
-    const AggregateWeightedFitnessFunctionT<Spec>& fitness) {
-    std::vector<std::string> names;
-    for (const WeightedFitnessFunctionT<Spec>& objective : fitness) {
-        names.push_back(objective.name);
-    }
-    return names;
 }
 
 namespace generation_loop_detail {
@@ -80,12 +65,11 @@ SearchResult<Spec> run_generations(
     const Config& cfg, std::vector<Scored<Spec>> population,
     const AggregateWeightedFitnessFunctionT<Spec>& fitness,
     const std::vector<FilterFunctionT<Spec>>& filters,
-    const RandomSource& random_source, DashboardWriter& dashboard,
-    RepairAccumulator<Spec>& accumulator, SearchBudget& budget) {
+    const RandomSource& random_source, RepairAccumulator<Spec>& accumulator,
+    SearchBudget& budget) {
     using generation_loop_detail::format_fixed;
     using generation_loop_detail::seconds_since;
 
-    const std::vector<std::string> names = objective_names(fitness);
     // Each filter records the last generation's in/out sizes in its own
     // counters, which are added here to one running row per filter.
     std::vector<FilterRunStats> filter_stats;
@@ -124,24 +108,9 @@ SearchResult<Spec> run_generations(
             status.set(col_time, format_fixed(seconds_since(start), 2) + "s");
             status.render();
         };
-        // The stage index is assigned here rather than by the pipeline: the
-        // observer sees stages in order, and the dashboard needs their order
-        // without the pipeline having to number them. Left empty with the
-        // dashboard off: the pipeline hashes the whole population after every
-        // stage for an observer, so a no-op one costs a distinct-count per
-        // stage that nothing reads.
-        std::size_t stage_index = 0;
-        StageObserver on_stage;
-        if (dashboard.enabled()) {
-            on_stage = [&dashboard, &stage_index,
-                        gen](const StageObservation& obs) {
-                dashboard.stage(gen, stage_index++, obs);
-            };
-        }
-
         population = evolve_generation(
             cfg, population, sizes.selection, sizes.elitism, fitness, filters,
-            random_source, on_progress, on_stage, &budget);
+            random_source, on_progress, nullptr, &budget);
         budget.count_generation();
         for (std::size_t k = 0; k < filters.size(); ++k) {
             filter_stats[k].total_in += filters[k].n_in();
@@ -154,14 +123,9 @@ SearchResult<Spec> run_generations(
         // number below the mean beside it, and one that fell between
         // generations while the search was still improving.
         double best = 0.0;
-        double sum = 0.0;
         for (const Scored<Spec>& cand : population) {
-            sum += cand.fitness;
             best = std::max(best, cand.fitness);
         }
-        const double mean = population.empty()
-                                ? 0.0
-                                : sum / static_cast<double>(population.size());
         const std::size_t n_real = accumulate_gate_passing(
             population, cfg, gen, accumulator, gate_status);
 
@@ -172,12 +136,6 @@ SearchResult<Spec> run_generations(
         }
         status.set(col_real, std::to_string(n_real));
         status.finish();
-        if (dashboard.enabled()) {
-            dashboard.generation(
-                gen, elapsed, best, mean,
-                mean_objectives(names, objectives_of(population)), n_real,
-                population.size());
-        }
     }
     return {std::move(population), std::move(filter_stats)};
 }

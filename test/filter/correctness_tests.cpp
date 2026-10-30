@@ -109,9 +109,9 @@ TEST(test_every_tlsf_correctness_stage_has_a_gate_check) {
     }
 }
 
-// The two paths' tables must agree on names as well as on content: the
-// dashboard, the filter report and run_experiments.py all key on the stage
-// name, and a repair is screened by whichever table its front end reads.
+// The two paths' tables must agree on names as well as on content: the filter
+// report and run_experiments.py both key on the stage name, and a repair is
+// screened by whichever table its front end reads.
 TEST(test_both_paths_name_the_same_checks_in_the_same_order) {
     const std::vector<CorrectnessCheck> fretish =
         correctness_checks(global_sat_checker(), global_real_checker());

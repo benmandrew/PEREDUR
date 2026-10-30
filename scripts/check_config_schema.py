@@ -26,7 +26,7 @@ from pathlib import Path
 # must not be "corrected" into agreement. The first is a results-CSV key
 # column and the next three are emitted unconditionally, so following the
 # binary would put every new row at odds with the archived ones; the
-# last five are sentinels make_toml reads as "emit nothing", not mirrors of a
+# last four are sentinels make_toml reads as "emit nothing", not mirrors of a
 # C++ value at all.
 GEN_CONFIGS_EXEMPT = {
     "selection_scheme":
@@ -48,9 +48,6 @@ GEN_CONFIGS_EXEMPT = {
     "max_scoring_failure_rate":
         "0.0 is make_toml's 'emit only when positive' sentinel, not a mirror of "
         "the 0.15 default",
-    "dashboard":
-        "False is make_toml's 'emit only when true' sentinel; it coincides with "
-        "the default rather than tracking it",
     "parallel":
         "0 is make_toml's 'emit only when positive' sentinel; the default is "
         "available_parallelism(), a call rather than a constant, so there is "

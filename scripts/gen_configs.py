@@ -81,8 +81,6 @@ METRIC_DIR = "log"
 #     and 0.0 are "do not emit" sentinels read by make_toml, not mirrors of
 #     config.hpp's 10000 ms, 60000 ms and 0.15. A campaign that needs a cap sets
 #     one; everything else inherits the binary's.
-#   * dashboard — False is the same kind of sentinel (emitted only when true).
-#     It coincides with config.hpp today, and must stay False if that moves.
 DEFAULTS: dict = {
     "generations": 10,
     "population_size": 200,
@@ -194,11 +192,6 @@ DEFAULTS: dict = {
     # run_experiments.py's own per-run cap off it -- derive_config there fills in
     # for a config that says nothing and defers to one that does not.
     "parallel": 0,
-    # Progress log + dashboard page, off by default in config.hpp and emitted
-    # only when true. A campaign of many runs should leave it off; the
-    # mechanism-check subset turns it on because progress.jsonl is where the
-    # per-stage distinct-individual counts are recorded.
-    "dashboard": False,
 }
 
 
@@ -274,9 +267,7 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         [f"ltl2tgba_timeout_ms = {d['ltl2tgba_timeout_ms']}"]
         if d.get("ltl2tgba_timeout_ms") else []) + (
         [f"max_scoring_failure_rate = {_fmt(d['max_scoring_failure_rate'])}"]
-        if d.get("max_scoring_failure_rate") else []) + (
-        [f"dashboard = {_fmt(d['dashboard'])}"]
-        if d.get("dashboard") else []) + ([
+        if d.get("max_scoring_failure_rate") else []) + ([
         "",
         "[tlsf.mutation]",
         f"p_assumption = {_fmt(d['p_assumption'])}",
@@ -485,11 +476,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", type=Path, default=CONFIGS_DIR, metavar="PATH",
                         help=f"Directory to write <scheme>/ dirs into (default: "
                              f"{CONFIGS_DIR})")
-    parser.add_argument("--dashboard", action="store_true",
-                        help="Emit runtime.dashboard = true, so each run writes "
-                             "progress.jsonl (per-stage distinct-individual "
-                             "counts). Costs a flushed write per stage; leave "
-                             "off for a full campaign, on for a subset")
     parser.add_argument("--tlsf", action="store_true",
                         help="Emit the TLSF campaign grid: a coarse "
                              "generations x population cross (sweeps A, B) and "
@@ -622,7 +608,6 @@ def main() -> None:
     defaults["ltlsynt_timeout_ms"] = ltlsynt_timeout or 0
     defaults["ltl2tgba_timeout_ms"] = ltl2tgba_timeout or 0
     defaults["max_scoring_failure_rate"] = max_scoring_failure_rate or 0.0
-    defaults["dashboard"] = args.dashboard
     wanted = set(args.sweeps)
     sweeps = [(name, levels) for name, levels in sweep_table if name in wanted]
     # --levels restricts every selected sweep to the named levels (a sweep left

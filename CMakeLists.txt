@@ -131,7 +131,6 @@ target_sources(peredur_fitness PRIVATE
     src/tlsf/repair_modes.cpp
     src/tlsf/repair_output.cpp
     src/config_io.cpp
-    src/dashboard.cpp
     src/driver_support.cpp
     src/repair_steps.cpp
 )
@@ -176,17 +175,6 @@ target_include_directories(peredur_formaliser PRIVATE src)
 target_link_libraries(peredur_formaliser PUBLIC peredur_fitness)
 target_compile_definitions(peredur_formaliser PRIVATE
     FORMALISER_SCRIPT_PATH="${FORMALISER_SCRIPT_PATH}")
-
-# The live dashboard page, copied beside progress.jsonl at run start so that
-# serving the output directory is all a viewer needs. Resolved from the source
-# tree the same way FORMALISER_SCRIPT_PATH is; a run whose page has gone missing
-# still writes the progress log, it just does not drop the viewer next to it.
-if(NOT DEFINED PEREDUR_DASHBOARD_PAGE_PATH)
-    set(PEREDUR_DASHBOARD_PAGE_PATH "${CMAKE_SOURCE_DIR}/web/dashboard.html"
-        CACHE FILEPATH "Path to the live dashboard HTML page")
-endif()
-target_compile_definitions(peredur_fitness PRIVATE
-    PEREDUR_DASHBOARD_PAGE_PATH="${PEREDUR_DASHBOARD_PAGE_PATH}")
 
 add_executable(peredur
     src/main.cpp

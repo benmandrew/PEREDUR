@@ -16,7 +16,6 @@
 #include <nlohmann/json.hpp>
 
 #include "crash/crash_handler.hpp"
-#include "dashboard.hpp"
 #include "evolution.hpp"
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
@@ -175,10 +174,7 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
     std::vector<ScoredSpecification> population = original_population(
         original_spec, fitness_function, cfg.population_size);
 
-    DashboardWriter dashboard(output_dir, cfg.dashboard);
-    announce_run(dashboard, input_path, output_dir, cfg, effective_seed,
-                 objective_names(fitness_function),
-                 generation_stage_names(filter_functions));
+    announce_seed(effective_seed);
 
     // Started here rather than at process start, matching AuRUS: its
     // startRunningTime is set on entry to evolve(count), after the initial
@@ -201,7 +197,7 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
                 budget, stream.get());
         SearchResult<Specification> evolved = run_generations(
             cfg, std::move(population), fitness_function, filter_functions,
-            random_source, dashboard, accumulator, budget);
+            random_source, accumulator, budget);
         const SearchOutput<Specification> output =
             finish_search(cfg, std::move(evolved), accumulator.specifications(),
                           fitness_function, stream.get());
@@ -211,8 +207,6 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
         if (cfg.report_repair_summary) {
             print_repair_changes(original_spec, output.repairs);
         }
-        dashboard.run_end(budget.generations(), output.n_realizable,
-                          output.repairs.size(), budget.elapsed_s());
         end_run(cfg, output.filter_stats, input_path, output_dir,
                 effective_seed, budget, RepairInput::Fretish);
     } catch (const std::exception& exc) {

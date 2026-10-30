@@ -80,7 +80,7 @@ cmake --install build-release --prefix <prefix> --component peredur
 
 `--component peredur` is what keeps the install to this project. FetchContent brings its dependencies in with `add_subdirectory`, which brings their install rules along with them, so an unqualified install writes Eigen's headers and cpptrace's CMake config beside the binaries, a large amount of material belonging to neither.
 
-The tree has three parts: `bin/` for the eight binaries, `libexec/peredur/` for the solvers, and `share/peredur/` for the dashboard page, the vendored formaliser script, the bundled examples and `peredur-env.sh`. The solvers sit under `libexec/` because they are private to PEREDUR, so a host with its own `ltlsynt` or `ganak` on `PATH` keeps getting that one for its own use.
+The tree has three parts: `bin/` for the eight binaries, `libexec/peredur/` for the solvers, and `share/peredur/` for the vendored formaliser script, the bundled examples and `peredur-env.sh`. The solvers sit under `libexec/` because they are private to PEREDUR, so a host with its own `ltlsynt` or `ganak` on `PATH` keeps getting that one for its own use.
 
 ```sh
 . <prefix>/share/peredur/peredur-env.sh
@@ -90,7 +90,7 @@ Sourcing that file points the installed binaries at the solvers installed beside
 
 ### Environment overrides
 
-Five paths are compiled in, and each takes an environment variable that wins over it. `peredur-env.sh` sets all five; setting one by hand overrides that single path and leaves the rest alone.
+Four paths are compiled in, and each takes an environment variable that wins over it. `peredur-env.sh` sets all four; setting one by hand overrides that single path and leaves the rest alone.
 
 | Variable | Overrides |
 |---|---|
@@ -98,11 +98,10 @@ Five paths are compiled in, and each takes an environment variable that wins ove
 | `PEREDUR_GANAK_PATH` | the `ganak` binary |
 | `PEREDUR_BLACK_PATH` | the `black` binary |
 | `PEREDUR_FORMALISER_SCRIPT` | the vendored FRET formaliser script |
-| `PEREDUR_DASHBOARD_PAGE` | the dashboard page `--dashboard` copies into the output directory |
 
 Each is read once, on first use. An unset or empty variable falls back to the compiled-in default, since a shell or container runtime that carries an unset variable around exports it as empty.
 
-The container image is the packaged form of the same install tree, with the five variables baked in as `ENV` because there is no shell to source anything from. [Docker](docker.md) covers building and running it.
+The container image is the packaged form of the same install tree, with the four variables baked in as `ENV` because there is no shell to source anything from. [Docker](docker.md) covers building and running it.
 
 ## Tests, linting and formatting
 

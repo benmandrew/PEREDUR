@@ -35,7 +35,6 @@ add_executable(peredur_tests
     prop_formula/temporal_tests.cpp
     serialisation_tests.cpp
     config_io_tests.cpp
-    dashboard_tests.cpp
     driver_support_tests.cpp
     profile_tests.cpp
     thread_pool_tests.cpp
@@ -121,7 +120,6 @@ set(peredur_test_suites
     scope
     serialisation
     config_io
-    dashboard
     driver_support
     tlsf_parser
     tlsf_writer
@@ -164,20 +162,6 @@ set_tests_properties(peredur_tests.thread_pool_sized PROPERTIES
 # The checked-in schema and template must equal what k_config_keys generates.
 add_test(NAME config_reference
          COMMAND peredur --check-config-reference ${CMAKE_SOURCE_DIR})
-
-# The dashboard page ships as one self-contained HTML file, so its script is
-# tested by extracting it from the page and running it under node -- the same
-# node the FRET formaliser already needs at run time. It is not a build
-# dependency, so a missing one skips these rather than failing configuration.
-find_program(NODE_EXECUTABLE node)
-if(NODE_EXECUTABLE)
-    file(GLOB dashboard_page_tests CONFIGURE_DEPENDS
-         ${CMAKE_CURRENT_SOURCE_DIR}/web/*.test.mjs)
-    add_test(NAME dashboard_page
-             COMMAND ${NODE_EXECUTABLE} --test ${dashboard_page_tests})
-else()
-    message(STATUS "node not found; skipping the dashboard page's tests")
-endif()
 
 add_custom_target(tests
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure

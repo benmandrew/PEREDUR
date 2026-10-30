@@ -90,7 +90,7 @@ WeightedFitnessFunctionT<Spec> status_objective(const Spec& original,
 //   status_walk_cost(spec)               cost hint for the realizability walk
 //   admission_order(original)            conflict_degree_order over its parts
 //
-// Objective order and names are read by the manifest and the dashboard.
+// The output gate finds the status objective by its name, "status".
 template <typename Spec, typename Scorers>
 AggregateWeightedFitnessFunctionT<Spec> make_fitness_function(
     const Spec& original, const Config& cfg) {

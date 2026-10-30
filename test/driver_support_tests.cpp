@@ -66,12 +66,12 @@ TEST(test_parse_seed_rejects_malformed_values) {
 }
 
 TEST(test_has_flag_matches_whole_arguments) {
-    const std::array<const char* const, 4> argv = {"peredur", "--dashboard",
+    const std::array<const char* const, 4> argv = {"peredur", "--diagnostics",
                                                    "--seed", "7"};
     const int argc = static_cast<int>(argv.size());
-    expect(has_flag(argc, argv.data(), "--dashboard"),
-           "expected --dashboard found");
-    expect(!has_flag(argc, argv.data(), "--dash"),
+    expect(has_flag(argc, argv.data(), "--diagnostics"),
+           "expected --diagnostics found");
+    expect(!has_flag(argc, argv.data(), "--diag"),
            "expected a prefix of a flag not to match");
     expect(!has_flag(argc, argv.data(), "peredur"),
            "expected argv[0] to be skipped");

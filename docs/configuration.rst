@@ -17,7 +17,6 @@ Every section and key is optional; absent keys keep their built-in defaults. Sec
 
    [runtime]
    parallel = 16              # override thread pool size
-   dashboard = true           # stream progress.jsonl + the live dashboard page
 
 ``example-config.toml`` in the repository root is an annotated template listing every key with a comment explaining it. Every value in it **is** that key's default, so copying the file whole changes nothing. It and ``schemas/config-schema.json`` are generated from the key table in ``src/config/keys.hpp``.
 
@@ -157,7 +156,7 @@ Every run reports every candidate that passed the output gate in any generation,
 
 Accumulation was made the default on 2026-08-25, on the ``2026-08-19-accumulator`` campaign: over 200 paired TLSF runs it gained ``implies_ideal`` on 6 pairs and lost it on none (exact McNemar p = 0.0312), at a median paired wall ratio of 1.034. The FRETISH replication that campaign's plan names was never run. The accumulator never draws from the ``RandomSource``, so the seed stream is the same as without it and only the emitted set differs. The accumulated members are merged rather than re-checked: they passed the same gate, in the generation they were collected in. The cost is one gate sweep per generation, on both paths, whose realisability query is memoised from scoring; the status line's ``real`` column is read off that sweep.
 
-Each newly accumulated specification is written to ``<output-dir>/accumulated/`` the moment it is accumulated, one file per specification, named ``gen<NN>_<seq>.json`` on the FRETISH path and ``gen<NN>_<seq>.tlsf`` on the TLSF one. Every file is opened, written and closed on the spot, the same intent as the ``progress.jsonl`` the dashboard reads, so a run killed by an external wall-clock cap keeps every repair it had already found. That is the failure the writer exists for: in the aurus-h2h campaign 126 AuRUS runs were killed at the 7200 s cap and lost 3,934 solutions their logs prove had been found, and 19 of 499 PEREDUR runs were killed the same way. The directory is created on the first write and not before, so a run that accumulates nothing leaves the output directory as it was.
+Each newly accumulated specification is written to ``<output-dir>/accumulated/`` the moment it is accumulated, one file per specification, named ``gen<NN>_<seq>.json`` on the FRETISH path and ``gen<NN>_<seq>.tlsf`` on the TLSF one. Every file is opened, written and closed on the spot, so a run killed by an external wall-clock cap keeps every repair it had already found. That is the failure the writer exists for: in the aurus-h2h campaign 126 AuRUS runs were killed at the 7200 s cap and lost 3,934 solutions their logs prove had been found, and 19 of 499 PEREDUR runs were killed the same way. The directory is created on the first write and not before, so a run that accumulates nothing leaves the output directory as it was.
 
 What lands there is the raw set of gate-passing candidates. ``repair_N.json`` and ``repair_N.tlsf`` are unchanged and remain the only filtered output, deduplicated and screened for maximality, with a fitness record beside each. An accumulated file is a specification document alone, written through the serialiser a repair goes through, so a tombstoned guarantee is absent from it rather than flagged.
 
@@ -340,8 +339,6 @@ An undecided ``ltlsynt`` answer is resolved by each caller in its own direction 
 
 Reporting
 ~~~~~~~~~
-
-``runtime.dashboard`` streams per-stage and per-generation progress to ``<output-dir>/progress.jsonl`` and copies the live dashboard page beside it, so ``python3 -m http.server -d <output-dir> 8000`` shows the run as it happens. It defaults to false, because a campaign of many runs pays for the extra file and its flushes with nobody watching; ``peredur --dashboard`` enables it for a single run without editing a config. The flag can only turn the dashboard on — a config that already asked for it is not disabled by omitting the flag.
 
 ``peredur --cpu-report`` prints a CPU-attribution report at the end, separating time spent in PEREDUR's own code from time spent in the external tools (``black``, ``ltlsynt``, ``ganak``), measured per-process via ``getrusage``/``wait4``. It is a flag rather than a config key because it asks about one interactive run rather than about the search, as ``PEREDUR_PROFILE`` does for the scope profiler.
 

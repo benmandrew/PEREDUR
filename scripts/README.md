@@ -15,9 +15,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `merge_experiments.py` | Joins per-host CSVs on `KEY_FIELDS`, keeping one row per key. Vendored likewise. |
 | `check_config_schema.py` | Lint, wired into CI and the pre-commit hook. Holds `gen_configs.DEFAULTS` against the defaults in the generated `example-config.toml`. |
 | `coverage_badge.py` | Measures coverage and writes `docs/coverage.svg`. `--check` fails on drift; CI rewrites and commits the badge when it does. |
-| `check_well_separated.py` | Standalone `ltlsynt` well-separation check that bypasses PEREDUR's cached verdict. Also imported as a library by `aurus_validate.py`. |
-| `aurus_campaign.py` | Drives the AuRUS baseline arm of a head-to-head. |
-| `aurus_validate.py` | Re-checks AuRUS's claimed repairs with `realize` and scores them with `compare`. Run it before any AuRUS analysis. |
+| `check_well_separated.py` | Standalone `ltlsynt` well-separation check that bypasses PEREDUR's cached verdict. |
 | `import_fret.py` | Converts FRET project exports into a FRETISH `spec.json` for `examples/`. Its docstring lists every conversion rule, and its stderr summary names each requirement a lossy rule touched. Comparisons over several variables or arithmetic need z3's Python bindings, which `nix develop` provides. |
 | `test_campaign.py` | Covers `campaign.py`. No pytest; run it directly. CI's `python-tests` job runs every `test_*.py` here. |
 | `test_experiment_paths.py` | Covers the factor-path parsers and the resume-key invariants in `run_experiments.py` and `gen_configs.py`. |

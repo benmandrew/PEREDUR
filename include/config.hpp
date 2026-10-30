@@ -119,11 +119,6 @@ struct Config {
     /// formulae it dropped and the ones it put in their place. Set by
     /// `peredur --repair-summary` alone, like report_cpu_timing.
     bool report_repair_summary = false;
-    /// Stream per-stage and per-generation progress to
-    /// `<output-dir>/progress.jsonl` and copy the dashboard page beside it.
-    /// Off by default, since a campaign pays for the file and its flushes with
-    /// nobody watching. `--dashboard` turns it on for one run.
-    bool dashboard = false;
     SelectionScheme selection_scheme = SelectionScheme::Nsga2Apportion;
     double selection_rate = 0.5;
     /// The top elitism_rate fraction of the population carries over into the

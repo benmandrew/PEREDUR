@@ -28,8 +28,7 @@ struct AccumulatorStats {
 /// its runs were killed at the 7200s cap and lost 3,934 solutions their own
 /// logs prove had been found. Each file here is opened, written and closed on
 /// the spot, so a `SIGKILL` at any moment leaves every file already written
-/// intact -- the same intent as the dashboard's `progress.jsonl`, "one record,
-/// flushed as written".
+/// intact.
 ///
 /// What lands there is the *raw* set of candidates that passed the output gate,
 /// and is deliberately not the run's answer: `repair_N.json` / `repair_N.tlsf`
