@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 
+#include "correctness_filter.hpp"
 #include "filter/bloat.hpp"
 #include "filter/implication.hpp"
 #include "filter/well_separation.hpp"
@@ -251,7 +252,8 @@ TEST(test_vacuity_filter_drops_contradictory_assumptions) {
         "GUARANTEE { G (a -> b); }");
     const tlsf::Specification sound = weaker_spec();
     const FilterFunctionT<tlsf::Specification> filter =
-        tlsf_make_vacuity_filter();
+        correctness_filter<tlsf::Specification>("vacuity", global_sat_checker(),
+                                                global_real_checker());
     const std::vector<tlsf::Specification> survivors =
         filter({contradictory, sound, base_spec()});
     expect(survivors.size() == 2,
@@ -313,7 +315,8 @@ TEST(test_vacuity_filter_drops_trivial_section_literals) {
     const tlsf::Specification true_guarantee = parse_main(
         "INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); true; }");
     const FilterFunctionT<tlsf::Specification> filter =
-        tlsf_make_vacuity_filter();
+        correctness_filter<tlsf::Specification>("vacuity", global_sat_checker(),
+                                                global_real_checker());
     const std::vector<tlsf::Specification> survivors =
         filter({true_guarantee, base_spec()});
     expect(survivors.size() == 1 && survivors[0] == base_spec(),
@@ -446,7 +449,8 @@ tlsf::Specification reactive_output_assumption_spec() {
 TEST(test_well_separation_drops_output_liveness_assumption) {
     RealizabilityChecker checker;
     const FilterFunctionT<tlsf::Specification> filter =
-        make_well_separation_filter<tlsf::Specification>(checker);
+        correctness_filter<tlsf::Specification>("not-well-separated",
+                                                global_sat_checker(), checker);
     const std::vector<tlsf::Specification> kept =
         filter({output_liveness_assumption_spec()});
     expect(kept.empty(),
@@ -457,7 +461,8 @@ TEST(test_well_separation_drops_output_liveness_assumption) {
 TEST(test_well_separation_keeps_reactive_output_assumption) {
     RealizabilityChecker checker;
     const FilterFunctionT<tlsf::Specification> filter =
-        make_well_separation_filter<tlsf::Specification>(checker);
+        correctness_filter<tlsf::Specification>("not-well-separated",
+                                                global_sat_checker(), checker);
     const tlsf::Specification spec = reactive_output_assumption_spec();
     const std::vector<tlsf::Specification> kept = filter({spec});
     expect(kept.size() == 1 && kept.front() == spec,
@@ -468,7 +473,8 @@ TEST(test_well_separation_keeps_reactive_output_assumption) {
 TEST(test_well_separation_keeps_input_only_assumption) {
     RealizabilityChecker checker;
     const FilterFunctionT<tlsf::Specification> filter =
-        make_well_separation_filter<tlsf::Specification>(checker);
+        correctness_filter<tlsf::Specification>("not-well-separated",
+                                                global_sat_checker(), checker);
     // Input-only assumption: well-separated by construction, kept without a
     // realizability query.
     const tlsf::Specification spec = weaker_spec();

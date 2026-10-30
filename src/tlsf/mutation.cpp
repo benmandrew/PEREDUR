@@ -660,3 +660,17 @@ tlsf::Specification tlsf_mutate(const tlsf::Specification& spec,
                                               random_source, cfg);
     return mutated;
 }
+
+tlsf::Specification tlsf_simplify(tlsf::Specification spec) {
+    for (tlsf::Section* section : tlsf::mutable_sections_of(spec)) {
+        for (tlsf::SectionEntry& entry : *section) {
+            // Deleted conjuncts are left as they are. Nothing reads their
+            // content again, so rewriting it buys nothing.
+            if (entry.m_removed) {
+                continue;
+            }
+            entry.m_formula.simplify();
+        }
+    }
+    return spec;
+}

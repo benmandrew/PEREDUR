@@ -21,68 +21,6 @@
 
 namespace prop_formula_internal {
 
-Formula::Kind node_type_to_kind(NodeType type) {
-    switch (type) {
-        case NodeType::Variable:
-            return Formula::Kind::Atom;
-        case NodeType::Not:
-            return Formula::Kind::Not;
-        case NodeType::And:
-            return Formula::Kind::And;
-        case NodeType::Or:
-            return Formula::Kind::Or;
-        case NodeType::Implies:
-            return Formula::Kind::Implies;
-        case NodeType::Iff:
-            return Formula::Kind::Iff;
-        case NodeType::Next:
-            return Formula::Kind::Next;
-        case NodeType::Eventually:
-            return Formula::Kind::Eventually;
-        case NodeType::Globally:
-            return Formula::Kind::Globally;
-        case NodeType::Until:
-            return Formula::Kind::Until;
-        case NodeType::Release:
-            return Formula::Kind::Release;
-        case NodeType::WeakUntil:
-            return Formula::Kind::WeakUntil;
-    }
-    assert(false);
-    __builtin_unreachable();
-}
-
-NodeType kind_to_node_type(Formula::Kind kind) {
-    switch (kind) {
-        case Formula::Kind::Atom:
-            return NodeType::Variable;
-        case Formula::Kind::Not:
-            return NodeType::Not;
-        case Formula::Kind::And:
-            return NodeType::And;
-        case Formula::Kind::Or:
-            return NodeType::Or;
-        case Formula::Kind::Implies:
-            return NodeType::Implies;
-        case Formula::Kind::Iff:
-            return NodeType::Iff;
-        case Formula::Kind::Next:
-            return NodeType::Next;
-        case Formula::Kind::Eventually:
-            return NodeType::Eventually;
-        case Formula::Kind::Globally:
-            return NodeType::Globally;
-        case Formula::Kind::Until:
-            return NodeType::Until;
-        case Formula::Kind::Release:
-            return NodeType::Release;
-        case Formula::Kind::WeakUntil:
-            return NodeType::WeakUntil;
-    }
-    assert(false);
-    __builtin_unreachable();
-}
-
 // Appends a unary node of @p type over @p child's arena, producing a new arena
 // with the root last. Child indices in the source arena are unchanged (the
 // child keeps positions [0, child.size)); the new root points at the old root.
@@ -160,8 +98,8 @@ Formula Formula::make_unary(Kind kind, const Formula& child) {
     // Built on the arena; see the note at the top of this file.
     assert(kind == Kind::Not || kind == Kind::Next ||
            kind == Kind::Eventually || kind == Kind::Globally);
-    return Formula::from_node_arena(prop_formula_internal::build_unary_arena(
-        prop_formula_internal::kind_to_node_type(kind), child.m_impl->m_nodes));
+    return Formula::from_node_arena(
+        prop_formula_internal::build_unary_arena(kind, child.m_impl->m_nodes));
 }
 
 Formula Formula::make_binary(Kind kind, const Formula& left,
@@ -176,8 +114,7 @@ Formula Formula::make_binary(Kind kind, const Formula& left,
         case Kind::WeakUntil:
             return Formula::from_node_arena(
                 prop_formula_internal::build_binary_arena(
-                    prop_formula_internal::kind_to_node_type(kind),
-                    left.m_impl->m_nodes, right.m_impl->m_nodes));
+                    kind, left.m_impl->m_nodes, right.m_impl->m_nodes));
         case Kind::Atom:
         case Kind::Not:
         case Kind::Next:
@@ -191,13 +128,12 @@ Formula Formula::make_binary(Kind kind, const Formula& left,
 
 Formula::Kind Formula::kind() const {
     assert(!m_impl->m_nodes.empty());
-    return prop_formula_internal::node_type_to_kind(
-        m_impl->m_nodes.back().m_type);
+    return m_impl->m_nodes.back().m_type;
 }
 
 std::optional<std::string> Formula::atom_name() const {
     const prop_formula_internal::Node& root = m_impl->m_nodes.back();
-    if (root.m_type != prop_formula_internal::NodeType::Variable) {
+    if (root.m_type != prop_formula_internal::NodeType::Atom) {
         return std::nullopt;
     }
     return root.m_variable;

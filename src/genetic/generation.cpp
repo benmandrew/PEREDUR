@@ -20,73 +20,6 @@
 #include "thread_pool.hpp"
 #include "tlsf/specification.hpp"
 
-namespace {
-
-// A stop timing with its stop simplified. `until false` is Always spelt another
-// way, so it folds into Always rather than splitting the cache keys of one
-// obligation. `until true` and `before true` gut or contradict their
-// requirement and are left to the filters, which see the lowered formula.
-Timing simplify_stop_timing(const Timing& timing) {
-    const Formula* stop = timing_stop(timing);
-    assert(stop != nullptr);
-    Formula simplified = *stop;
-    simplified.simplify();
-    if (std::holds_alternative<timing::Before>(timing)) {
-        return timing::before(std::move(simplified));
-    }
-    if (simplified.atom_name() == std::optional<std::string>("false")) {
-        return timing::always();
-    }
-    return timing::until(std::move(simplified));
-}
-
-}  // namespace
-
-Specification simplify_offspring(Specification offspring) {
-    Specification pre_simplify = offspring;
-    // Removed requirements are left alone alongside locked ones. Their content
-    // is never read again, so simplifying it buys nothing, and rewriting it
-    // could collapse two tombstones onto the same shape and hand the dedup
-    // below a size change that discards the whole offspring.
-    const auto simplify_all = [](std::vector<Requirement>& reqs) {
-        for (auto& req : reqs) {
-            if (!req.m_weakenable || req.m_removed) {
-                continue;
-            }
-            req.m_condition.simplify();
-            req.m_response.simplify();
-            if (timing_stop(req.m_timing) != nullptr) {
-                req.m_timing = simplify_stop_timing(req.m_timing);
-            }
-            req.m_ltl = requirement_to_ltl(req);
-        }
-    };
-    simplify_all(offspring.m_assumptions);
-    simplify_all(offspring.m_guarantees);
-    Specification rededuped(offspring.m_assumptions, offspring.m_guarantees,
-                            offspring.m_in_atoms, offspring.m_out_atoms,
-                            offspring.m_modes);
-    if (rededuped.m_assumptions.size() != pre_simplify.m_assumptions.size() ||
-        rededuped.m_guarantees.size() != pre_simplify.m_guarantees.size()) {
-        return pre_simplify;
-    }
-    return rededuped;
-}
-
-const GeneticOperators<Specification>& fretish_operators() {
-    static const GeneticOperators<Specification> ops{
-        [](const Specification& first, const Specification& second,
-           const RandomSource& random_source, const Config&) {
-            return crossover_specifications(first, second, random_source);
-        },
-        [](const Specification& spec, const RandomSource& random_source,
-           const Config& cfg) {
-            return mutate_specification(spec, random_source, cfg);
-        },
-        [](Specification spec) { return simplify_offspring(std::move(spec)); }};
-    return ops;
-}
-
 template <typename Spec>
 FilterFunctionT<Spec> make_predicate_filter(
     std::string name,
@@ -133,20 +66,6 @@ template FilterFunctionT<tlsf::Specification>
 make_predicate_filter<tlsf::Specification>(
     std::string, std::function<bool(const tlsf::Specification&)>, std::size_t,
     FilterKind);
-
-std::vector<ScoredSpecification> evolve_generation(
-    const Config& cfg, const std::vector<ScoredSpecification>& population,
-    std::size_t target_size, std::size_t elitism_size,
-    const AggregateWeightedFitnessFunction& fitness_functions,
-    const std::vector<FilterFunction>& filter_functions,
-    const RandomSource& random_source,
-    const GenerationProgressCallback& on_progress,
-    const StageObserver& on_stage, SearchBudget* budget) {
-    return evolve_generation_generic<Specification>(
-        cfg, population, target_size, elitism_size, fitness_functions,
-        filter_functions, fretish_operators(), random_source, on_progress,
-        on_stage, budget);
-}
 
 template <typename Spec>
 std::vector<FilterFunctionT<Spec>> get_filter_functions(

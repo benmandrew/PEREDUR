@@ -81,16 +81,6 @@ bool tlsf_is_vacuous(const tlsf::Specification& spec,
            tlsf_has_unsatisfiable_assumptions(spec, checker);
 }
 
-FilterFunctionT<tlsf::Specification> tlsf_make_vacuity_filter(
-    std::size_t max_in_flight) {
-    return make_predicate_filter<tlsf::Specification>(
-        "vacuity",
-        [](const tlsf::Specification& spec) {
-            return !tlsf_is_vacuous(spec, global_sat_checker());
-        },
-        max_in_flight);
-}
-
 namespace {
 
 std::vector<std::string> sorted_live(const tlsf::Section& section) {

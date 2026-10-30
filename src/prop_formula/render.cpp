@@ -19,7 +19,7 @@ std::string unary_operator_symbol(NodeType type) {
             return "F";
         case NodeType::Globally:
             return "G";
-        case NodeType::Variable:
+        case NodeType::Atom:
         case NodeType::And:
         case NodeType::Or:
         case NodeType::Implies:
@@ -49,7 +49,7 @@ std::string binary_operator_symbol(NodeType type) {
             return "R";
         case NodeType::WeakUntil:
             return "W";
-        case NodeType::Variable:
+        case NodeType::Atom:
         case NodeType::Not:
         case NodeType::Next:
         case NodeType::Eventually:
@@ -66,7 +66,7 @@ std::string binary_operator_symbol(NodeType type) {
 // precedence assumptions that the parser would have to agree with.
 std::string node_to_string(const std::vector<Node>& nodes, std::size_t index) {
     const Node& node = nodes[index];
-    if (node.m_type == NodeType::Variable) {
+    if (node.m_type == NodeType::Atom) {
         return node.m_variable;
     }
     if (is_unary_node(node.m_type)) {

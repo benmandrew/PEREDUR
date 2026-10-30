@@ -69,10 +69,10 @@ The overview pages describe the algorithm, the tuning knobs, and the TLSF path. 
    api/genetic/monotone
    api/genetic/mutation
    api/genetic/nsga2
-   api/genetic/operators
    api/genetic/pipeline
    api/genetic/random_source
    api/genetic/scored
+   api/genetic/simplify
 
 .. toctree::
    :maxdepth: 1
@@ -96,6 +96,5 @@ The overview pages describe the algorithm, the tuning knobs, and the TLSF path. 
    api/tlsf/mucs
    api/tlsf/mutation
    api/tlsf/crossover
-   api/tlsf/operators
    api/tlsf/filter
    api/tlsf/pipeline

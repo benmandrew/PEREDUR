@@ -41,7 +41,6 @@ PROFDATA = BUILD / "coverage.profdata"
 BINARIES = (
     "peredur",
     "compare",
-    "keyword-terms",
     "lint-ideals",
     "ltl",
     "maximal",

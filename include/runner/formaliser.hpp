@@ -62,9 +62,6 @@ class PersistentProcess {
     pid_t m_pid = -1;
     int m_write_fd = -1;
     int m_read_fd = -1;
-    /// Kept from the spawn for the destructor's reap, which is the only place
-    /// this child's peak resident set is read. See ProcessResult.
-    std::uint64_t m_rss_floor_kb = 0;
     std::string m_read_buffer;
 };
 

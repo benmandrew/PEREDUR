@@ -159,18 +159,6 @@ TEST(test_sampling_is_a_function_of_its_arguments) {
     expect(any_difference, "a different seed drew the same words");
 }
 
-TEST(test_hex_round_trips_the_bit_order) {
-    expect(fingerprint::to_hex({true, false, false, false}) == "1",
-           "word 0 is the low bit");
-    expect(fingerprint::to_hex({false, false, false, true}) == "8",
-           "word 3 is the high bit of the digit");
-    expect(fingerprint::to_hex({true, true, true, true, true}) == "1f",
-           "a fifth word opens a second digit");
-    expect(fingerprint::to_hex({}).empty(), "no words is no digits");
-    expect(fingerprint::hamming_distance({true, false}, {false, false}) == 1,
-           "one differing position");
-}
-
 /// The differential the rest of this suite rests on: every row is checked
 /// against SPOT rather than against the table above, because a hand-written
 /// expectation and a hand-written evaluator can be wrong in the same way.

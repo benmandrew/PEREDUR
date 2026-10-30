@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "correctness_filter.hpp"
 #include "filter/vacuity.hpp"
 #include "fixtures.hpp"
 #include "genetic/generation.hpp"
@@ -74,7 +75,8 @@ TEST(test_jointly_unsatisfiable_assumptions_are_vacuous) {
 
 TEST(test_filter_drops_only_the_vacuous_spec) {
     SatisfiabilityChecker checker;
-    FilterFunction filter = make_vacuity_filter(checker);
+    FilterFunction filter =
+        correctness_filter("vacuity", checker, global_real_checker());
     const Specification good =
         with_assumptions({continual("req", timing::within_ticks(6))});
     const Specification vacuous =
@@ -164,7 +166,8 @@ TEST(test_true_assumption_response_is_not_vacuous) {
 
 TEST(test_filter_drops_the_vacuous_specs) {
     SatisfiabilityChecker checker;
-    FilterFunction filter = make_vacuity_filter(checker);
+    FilterFunction filter =
+        correctness_filter("vacuity", checker, global_real_checker());
     const Specification good = with_guarantees({conditional("req", "grant")});
     const auto survivors =
         filter({good, with_guarantees({conditional("false", "grant")}),

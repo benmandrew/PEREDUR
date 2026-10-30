@@ -14,8 +14,6 @@ Formula::Formula() : m_impl(std::make_shared<Impl>("true")) {}
 // go but terminate.
 // NOLINTNEXTLINE(bugprone-throwing-static-initialization)
 Formula Formula::true_formula = Formula("true");
-// NOLINTNEXTLINE(bugprone-throwing-static-initialization)
-Formula Formula::false_formula = Formula("false");
 
 Formula::Formula(const std::string& formula)
     : m_impl(std::make_shared<Impl>(formula)) {}
@@ -56,7 +54,7 @@ bool operator==(const Formula& lhs, const Formula& rhs) {
 bool Formula::is_propositional() const {
     for (const prop_formula_internal::Node& node : m_impl->m_nodes) {
         switch (node.m_type) {
-            case prop_formula_internal::NodeType::Variable:
+            case prop_formula_internal::NodeType::Atom:
             case prop_formula_internal::NodeType::Not:
             case prop_formula_internal::NodeType::And:
             case prop_formula_internal::NodeType::Or:

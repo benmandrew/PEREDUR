@@ -32,7 +32,7 @@ Count run_ganak_on_dimacs(const std::string& dimacs_path, unsigned seed = 1,
 /// Counts the models of `formula` over the variables it mentions, memoised on
 /// the canonical renamed key (`formula_key::renamed`) and the seed.
 ///
-/// The renaming is sound here where it is not in `simplify_ltl`, because the
+/// The renaming is sound here where it is not for a cached formula, because the
 /// value is a number rather than a formula: a count is invariant under a
 /// bijection on the atoms, and the free variables of the wider alphabet are
 /// multiplied back in by the caller, outside this cache. Two guards differing
@@ -43,6 +43,6 @@ Count run_ganak_on_dimacs(const std::string& dimacs_path, unsigned seed = 1,
 /// What reaches ganak is `formula_key::canonical`'s rendering rather than the
 /// caller's spelling, which keeps the variable set: the caller multiplies the
 /// count by two per variable of the wider alphabet, so a normalisation that
-/// dropped one would undercount the result by that factor. `simplify_ltl` is
-/// such a normalisation and is deliberately not used here.
+/// dropped one would undercount the result by that factor. `ltlfilt
+/// --simplify` is such a normalisation and is deliberately not used here.
 Count run_ganak_on_formula(const std::string& formula, unsigned seed = 1);

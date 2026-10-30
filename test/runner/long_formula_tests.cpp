@@ -117,8 +117,6 @@ TEST(test_ltlfilt_decides_a_formula_over_the_argv_limit) {
            "long-formula: a conjunction is equivalent to its reversal");
     expect(!ltl_equivalent(formula, reordered + " & q"),
            "long-formula: an extra conjunct breaks equivalence");
-    expect(!simplify_ltl(formula).empty(),
-           "long-formula: simplify_ltl should return a formula");
     const std::optional<std::string> rewritten =
         rewrite_weak_operators("(" + formula + ") W q");
     expect(rewritten.has_value() && !has_weak_operator(*rewritten),

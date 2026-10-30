@@ -12,7 +12,7 @@ namespace {
 
 struct SubformulaKey {
     prop_formula_internal::NodeType m_type =
-        prop_formula_internal::NodeType::Variable;
+        prop_formula_internal::NodeType::Atom;
     std::size_t m_left = 0;
     std::size_t m_right = 0;
     std::string_view m_variable;
@@ -49,7 +49,7 @@ std::unordered_map<std::size_t, std::size_t> collect_subformula_ids(
         SubformulaKey key{};
         key.m_type = node.m_type;
         switch (node.m_type) {
-            case prop_formula_internal::NodeType::Variable:
+            case prop_formula_internal::NodeType::Atom:
                 key.m_variable = node.m_variable;
                 break;
             case prop_formula_internal::NodeType::Not:

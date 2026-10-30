@@ -66,22 +66,6 @@ bool tlsf_has_valid_guarantee(const tlsf::Specification& spec,
 bool tlsf_is_vacuous(const tlsf::Specification& spec,
                      SatisfiabilityChecker& checker);
 
-/// Returns a filter dropping the specifications tlsf_is_vacuous accepts — the
-/// TLSF counterpart of make_vacuity_filter, carrying the same "vacuity" stage
-/// name so filter reports and dashboard labels line up across the two paths. A
-/// spec with no assumption formulae is kept; an uncertain (timed-out)
-/// satisfiability result is treated as satisfiable and the spec is kept.
-///
-/// Runs every generation, as on the FRETISH path, and the final repair screen
-/// applies the predicate again to whatever reaches it.
-///
-/// @param max_in_flight Concurrent checks. Each spec carrying assumptions costs
-///                      a `black` subprocess on a cache miss, and the miss rate
-///                      rises with population diversity, so a serial sweep here
-///                      dominates a diverse run. 1 evaluates serially.
-FilterFunctionT<tlsf::Specification> tlsf_make_vacuity_filter(
-    std::size_t max_in_flight = 1);
-
 /// Whether spec @p from logically implies spec @p dest: true when
 /// `(from.to_ltl()) & !(dest.to_ltl())` is unsatisfiable, false when
 /// satisfiable, nullopt when the black query times out. A complete

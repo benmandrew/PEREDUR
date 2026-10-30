@@ -198,15 +198,6 @@ double semantic_similarity(const Requirement& requirement,
     return semantic_similarity_from_counts(counts, metric);
 }
 
-double semantic_similarity(const Requirement& requirement,
-                           const Requirement& other_requirement,
-                           const Config& cfg) {
-    return semantic_pair_similarity(
-        requirement, other_requirement, cfg.default_model_counting_bound,
-        cfg.similarity_metric, cfg.keyword_similarity,
-        cfg.semantic_trace_weight);
-}
-
 double semantic_pair_similarity(const Requirement& requirement,
                                 const Requirement& other_requirement,
                                 std::size_t step_count, SimilarityMetric metric,

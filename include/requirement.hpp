@@ -1,8 +1,8 @@
 #pragma once
 
 /// @file requirement.hpp
-/// @brief Core domain types: Timing, ConditionType, Requirement, Specification,
-///        and the automaton State used for model counting.
+/// @brief Core domain types: Timing, ConditionType, Requirement and
+///        Specification.
 
 #include <cstddef>
 #include <cstdint>
@@ -144,8 +144,6 @@ struct Scope {
     /// the whole execution.
     [[nodiscard]] bool is_global() const { return m_kind == ScopeKind::Global; }
 };
-
-inline Scope global_scope() { return Scope{}; }
 
 /// True for the three "only" scopes, whose lowering negates the requirement's
 /// obligation and applies it outside the named interval.
@@ -324,18 +322,6 @@ std::size_t count_live(const std::vector<Requirement>& reqs);
 /// order. Callers walking a subset of a requirement list index through this so
 /// that a walk position maps back to the slot it came from.
 std::vector<std::size_t> live_indices(const std::vector<Requirement>& reqs);
-
-/// Vestigial placeholder. Model counting used to build requirement automata
-/// here, and this described a state of one; counting now goes through SPOT and
-/// Ganak instead, and `TransferSystem::m_states` holds only default-constructed
-/// values, so none of these fields carries information. It survives because
-/// `m_states` is typed on it and sized from it. Do not read the fields.
-struct State {
-    bool m_condition_holds = false;
-    bool m_response_holds = false;
-    bool m_countdown_state = false;
-    std::size_t m_countdown_ticks = 0;
-};
 
 /// Returns true if any assumption or guarantee has a condition that is the
 /// literal atom "false" (e.g. after simplifying "!(true)"). Such a

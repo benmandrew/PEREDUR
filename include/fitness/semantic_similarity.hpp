@@ -88,16 +88,6 @@ double semantic_similarity(const Requirement& requirement,
                            std::size_t step_count,
                            SimilarityMetric metric = SimilarityMetric::Direct);
 
-/// Overload of semantic_similarity using the bound, metric and keyword
-/// placement from @p cfg: the pair score of @ref semantic_pair_similarity.
-/// @param requirement       The first requirement to compare
-/// @param other_requirement The second requirement to compare
-/// @param cfg               Configuration providing the model-counting bound
-/// @return                  A semantic similarity score in [0, 1]
-double semantic_similarity(const Requirement& requirement,
-                           const Requirement& other_requirement,
-                           const Config& cfg);
-
 /// The semantic score of one requirement pair as the specification-level score
 /// averages it. Under KeywordSimilarity::Syntactic it is the trace-count score
 /// alone. Under KeywordSimilarity::Semantic it is

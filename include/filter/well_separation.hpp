@@ -68,15 +68,3 @@ struct WellSeparationStats {
 template <typename Spec>
 bool specification_is_not_well_separated(const Spec& specification,
                                          RealizabilityChecker& checker);
-
-/// Returns a filter dropping specifications that are not well-separated: ones
-/// the system can vacuously satisfy by forcing its own assumptions to fail.
-/// @p checker is captured by reference and must outlive the returned filter.
-/// Instantiated for Specification (the default) and tlsf::Specification.
-///
-/// @param checker       Realizability checker for the ltlsynt query; must be
-///                      thread-safe when max_in_flight exceeds 1
-/// @param max_in_flight Concurrent checks. Each is a full ltlsynt query.
-template <typename Spec = Specification>
-FilterFunctionT<Spec> make_well_separation_filter(
-    RealizabilityChecker& checker, std::size_t max_in_flight = 1);

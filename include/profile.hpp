@@ -23,7 +23,6 @@
 #include <cstdint>
 #include <iosfwd>
 #include <string>
-#include <vector>
 
 namespace profile {
 
@@ -62,27 +61,6 @@ Site& site(const char* name);
 /// and outlives the caller's copy, so the Site's name pointer stays valid.
 /// Call it once and keep the reference; it is not cheap enough for a hot loop.
 Site& site_interned(const std::string& name);
-
-/// Adds @p n to a free-standing counter (no timing). For quantities that are
-/// not durations: bytes read, cache entries, retries.
-void add_count(const char* name, std::uint64_t n = 1);
-
-/// Keeps the largest @p value ever recorded under @p name, instead of summing.
-/// For a quantity whose total is meaningless but whose worst case is not — a
-/// child's peak resident set is the case this exists for, where adding the
-/// peaks of a thousand calls would produce a number describing nothing.
-///
-/// Shares the counter namespace with add_count, so a name must be one or the
-/// other for the whole run; mixing them silently gives neither. The convention
-/// is a `_max` suffix. Takes a std::string because these names are built per
-/// tool at run time, and the registry copies the key.
-void record_max(const std::string& name, std::uint64_t value);
-
-/// Every registered site, in registration order.
-const std::vector<Site*>& sites();
-
-/// Free-standing counters, as (name, value) pairs.
-std::vector<std::pair<std::string, std::uint64_t>> counts();
 
 /// Writes the human-readable table to @p out, sorted by total wall descending.
 void report(std::ostream& out);

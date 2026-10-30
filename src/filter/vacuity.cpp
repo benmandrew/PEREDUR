@@ -57,13 +57,3 @@ bool specification_is_vacuous(const Specification& specification,
            specification_has_valid_guarantee(specification, checker) ||
            specification_has_unsatisfiable_assumptions(specification, checker);
 }
-
-FilterFunction make_vacuity_filter(SatisfiabilityChecker& checker,
-                                   std::size_t max_in_flight) {
-    return make_predicate_filter(
-        "vacuity",
-        [&checker](const Specification& spec) {
-            return !specification_is_vacuous(spec, checker);
-        },
-        max_in_flight);
-}

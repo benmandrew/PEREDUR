@@ -8,9 +8,9 @@
 /// canonical shape, so one formula reaches a cache under many spellings and
 /// each spelling buys its own subprocess. Measured over 14 specifications,
 /// replacing the raw string with the key these functions produce removes
-/// 22.1% of the `simplify_ltl` execs a run makes, 13.9% of `ltlsynt`'s and
-/// 11.3% of `count_traces`'s; where the atom renaming also applies, those
-/// become 31.6%, 16.2% and 15.7%.
+/// 22.1% of the `ltlfilt --simplify` execs a run then made, 13.9% of
+/// `ltlsynt`'s and 11.3% of `count_traces`'s; where the atom renaming also
+/// applies, those become 31.6%, 16.2% and 15.7%.
 ///
 /// The keys are computed from the string rather than from the AST because the
 /// caches receive strings, and because the same formula reaches several of

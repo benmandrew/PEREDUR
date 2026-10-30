@@ -144,9 +144,6 @@ Binaries
 ``lint-ideals``
   Checks the ideal repairs under each ``examples/`` subject: that the specification implies each ideal, and the other properties ``--help`` lists.
 
-``keyword-terms``
-  Writes the per-requirement-pair and per-specification keyword-order terms of a set of FRETISH candidates against an original, for offline analysis of the ``"semantic"`` keyword mix.
-
 ``signal_tracer`` is an internal helper rather than a user-facing tool: the crash handler runs it out-of-process to symbolise a stack trace, because unwinding in-process from a signal handler is not safe. Run any of the others with ``--help`` for its options, or with ``--version`` for the commit it was built from.
 
 External tools
@@ -165,7 +162,7 @@ External tools
   Weighted model counter.  Downloaded as a release binary via ``cmake/ganak.cmake``; path passed as ``GANAK_EXECUTABLE_PATH``.  Used to count satisfying valuations for each automaton transition, which is what enables trace-level model counting via the ``TransferSystem`` matrix.
 
 ``node``
-  Runs the vendored FRET formaliser CLI, which lowers FRETISH requirements to LTL.  Looked up on ``PATH`` at run time rather than built or fetched by CMake, so it must be installed separately.  Unlike the others it is a persistent bidirectional child process rather than one exec per query, and it serves the FRETISH path alone.
+  Runs the vendored FRET formaliser CLI, which lowers FRETISH requirements to LTL.  Looked up on ``PATH`` at run time rather than built or fetched by CMake, so it must be installed separately.  Unlike the others it is a persistent bidirectional child process rather than one exec per query.  It is a test oracle for ``requirement_to_ltl``: only the test binary and the fuzzer link ``peredur_formaliser``, and no shipped binary runs it.
 
 Every pipe a runner opens is created with ``O_CLOEXEC``. These runners are called from many scoring-pool threads at once, so a fork on one thread would otherwise inherit the pipes every other in-flight call holds open, and keep them alive past its own exec — leaving the reader waiting on an end-of-file that never arrives.
 

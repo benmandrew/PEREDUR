@@ -15,7 +15,8 @@ static void BenchCountTraces(benchmark::State& state) {
     const std::size_t step_count = static_cast<std::size_t>(state.range(0));
     const Requirement req(Formula("true"), Formula("a & b"),
                           timing::for_ticks(5));
-    const TransferSystem system = build_transfer_system(req);
+    const TransferSystem system = build_transfer_system_from_ltl(
+        requirement_to_ltl(req), count_joint_atoms(req, req));
     for (auto _ : state) {
         benchmark::DoNotOptimize(count_traces(system, step_count));
     }

@@ -13,15 +13,21 @@
 #include <functional>
 #include <iterator>
 #include <string>
+#include <type_traits>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "config.hpp"
+#include "genetic/crossover.hpp"
+#include "genetic/mutation.hpp"
 #include "genetic/nsga2.hpp"
-#include "genetic/operators.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
+#include "genetic/simplify.hpp"
+#include "tlsf/crossover.hpp"
+#include "tlsf/mutation.hpp"
+#include "tlsf/specification.hpp"
 
 /// Which representation of the population is live. A generation begins and ends
 /// scored; between breeding and scoring the individuals have no fitness yet, so
@@ -168,7 +174,8 @@ inline bool probability_check(double rate, const RandomSource& random_source) {
 /// Breeds @p offspring_n new specifications from the fittest parents. Each slot
 /// starts as parent i, is crossed with a random parent drawn from the top
 /// @p top_n with probability crossover_rate, mutated with probability
-/// mutation_rate, then simplified if the operator set provides a simplifier.
+/// mutation_rate, then simplified. The operators are the FRETISH ones or the
+/// TLSF ones, chosen by @p Spec at compile time.
 ///
 /// The per-slot draw sequence is fixed so a seed reproduces the generation, and
 /// this must stay a single unit for that reason: crossover and mutation are
@@ -183,7 +190,6 @@ template <typename Spec>
 std::vector<Spec> breed_offspring(const Config& cfg,
                                   const std::vector<Scored<Spec>>& sorted_pop,
                                   std::size_t offspring_n, std::size_t top_n,
-                                  const GeneticOperators<Spec>& ops,
                                   const RandomSource& random_source,
                                   SearchBudget* budget) {
     std::vector<Spec> offspring_pop;
@@ -204,12 +210,20 @@ std::vector<Spec> breed_offspring(const Config& cfg,
         Spec offspring = sorted_pop[i].specification;
         if (probability_check(cfg.crossover_rate, random_source)) {
             const std::size_t partner = random_source.next_index(top_n);
-            offspring =
-                ops.crossover(offspring, sorted_pop[partner].specification,
-                              random_source, cfg);
+            const Spec& other = sorted_pop[partner].specification;
+            if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
+                offspring = tlsf_crossover(offspring, other, random_source);
+            } else {
+                offspring =
+                    crossover_specifications(offspring, other, random_source);
+            }
         }
         if (probability_check(cfg.mutation_rate, random_source)) {
-            offspring = ops.mutate(offspring, random_source, cfg);
+            if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
+                offspring = tlsf_mutate(offspring, random_source, cfg);
+            } else {
+                offspring = mutate_specification(offspring, random_source, cfg);
+            }
         }
         // Counted before simplification, and only when the slot actually
         // produced something new: AuRUS increments on `!chromosome.equals(
@@ -218,9 +232,11 @@ std::vector<Spec> breed_offspring(const Config& cfg,
         if (budgeted && !(offspring == sorted_pop[i].specification)) {
             budget->count_offspring();
         }
-        offspring_pop.push_back(ops.simplify
-                                    ? ops.simplify(std::move(offspring))
-                                    : std::move(offspring));
+        if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
+            offspring_pop.push_back(tlsf_simplify(std::move(offspring)));
+        } else {
+            offspring_pop.push_back(simplify_offspring(std::move(offspring)));
+        }
     }
     return offspring_pop;
 }
@@ -337,12 +353,10 @@ struct GenerationContext {
     GenerationContext(const Config& cfg,
                       const std::vector<Scored<Spec>>& parents,
                       std::size_t target_size, std::size_t elitism_size,
-                      const GeneticOperators<Spec>& ops,
                       const RandomSource& random_source, ScoreFn score,
                       SearchBudget* budget)
         : m_cfg(cfg),
           m_parents(parents),
-          m_ops(ops),
           m_random_source(random_source),
           m_score(std::move(score)),
           m_budget(budget),
@@ -383,7 +397,6 @@ struct GenerationContext {
     /// The incoming population in its original order, retained for (mu+lambda)
     /// pooling in the selection stage.
     const std::vector<Scored<Spec>>& m_parents;
-    const GeneticOperators<Spec>& m_ops;
     const RandomSource& m_random_source;
     ScoreFn m_score;
     /// The run's budget, or null for a run that has none. Owned by the driver,
@@ -475,7 +488,7 @@ void stage_breed(GenerationContext<Spec>& ctx) {
     ctx.m_scored.clear();
     ctx.m_candidates = generation_detail::breed_offspring(
         ctx.m_cfg, ctx.m_sorted_parents, ctx.m_offspring_n, ctx.m_top_n,
-        ctx.m_ops, ctx.m_random_source, ctx.m_budget);
+        ctx.m_random_source, ctx.m_budget);
     // The filter chain is judged as a whole rather than filter by filter, so
     // the unfiltered offspring have to survive until every filter has run.
     ctx.m_pre_filter = ctx.m_candidates;

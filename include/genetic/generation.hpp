@@ -26,7 +26,6 @@
 #include "genetic/crossover.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/nsga2.hpp"
-#include "genetic/operators.hpp"
 #include "genetic/pipeline.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
@@ -636,46 +635,6 @@ std::vector<std::string> generation_stage_names(
     return names;
 }
 
-/// Generic one-generation evolution loop, templated on the specification
-/// element type @p Spec and any callable fitness type @p Fitness. The three
-/// genetic operators (crossover, mutation, simplification) are injected via
-/// @p ops rather than hardcoded, so different Spec types supply their own.
-///
-/// See evolve_generation() for the algorithm; the behaviour is identical.
-template <typename Spec, typename Fitness>
-std::vector<Scored<Spec>> evolve_generation_generic(
-    const Config& cfg, const std::vector<Scored<Spec>>& population,
-    std::size_t target_size, std::size_t elitism_size,
-    const Fitness& fitness_functions,
-    const std::vector<FilterFunctionT<Spec>>& filter_functions,
-    const GeneticOperators<Spec>& ops, const RandomSource& random_source,
-    const GenerationProgressCallback& on_progress = nullptr,
-    const StageObserver& on_stage = nullptr, SearchBudget* budget = nullptr) {
-    assert(random_source);
-    assert(!fitness_functions.empty());
-    assert(cfg.crossover_rate >= 0.0 && cfg.crossover_rate <= 1.0);
-    assert(cfg.mutation_rate >= 0.0 && cfg.mutation_rate <= 1.0);
-    assert(!population.empty());
-
-    GenerationContext<Spec> ctx(
-        cfg, population, target_size, elitism_size, ops, random_source,
-        [&cfg, &fitness_functions,
-         &on_progress](const std::vector<Spec>& candidates) {
-            return score_population(cfg, candidates, fitness_functions,
-                                    on_progress);
-        },
-        budget);
-    const std::vector<PipelineStage<Spec>> stages =
-        make_generation_pipeline<Spec>(filter_stages(filter_functions),
-                                       correctness_rescue(filter_functions));
-    return run_generation_pipeline(ctx, stages, on_stage);
-}
-
-/// Returns the bundle of FRETISH genetic operators wiring
-/// crossover_specifications, mutate_specification, and simplify_offspring for
-/// use with evolve_generation_generic.
-const GeneticOperators<Specification>& fretish_operators();
-
 /// Evolves a population for one generation:
 ///   1. Order the population best-first under @p cfg's selection scheme —
 ///      descending weighted fitness for WeightedAverage, the NSGA-II
@@ -701,12 +660,16 @@ const GeneticOperators<Specification>& fretish_operators();
 /// If the population is smaller than target_size, all of it is used as
 /// parents. elitism_size is clamped to the number of parents.
 ///
+/// Templated on the specification type @p Spec, which picks the FRETISH or
+/// TLSF operators (see generation_detail::breed_offspring), and on any
+/// callable fitness type @p Fitness.
+///
 /// @param cfg               Algorithm configuration (rates and filter flags)
 /// @param population        Current generation's specifications
 /// @param target_size       Number of offspring to produce
 /// @param elitism_size      Number of top parents carried over verbatim;
 ///                          must be less than target_size
-/// @param fitness_function  Non-empty weighted fitness function for scoring
+/// @param fitness_functions Non-empty fitness function for scoring
 /// @param filter_functions  Filters applied to the offspring after crossover
 ///                          and mutation, before scoring
 /// @param random_source     Random source for crossover and mutation
@@ -719,14 +682,31 @@ const GeneticOperators<Specification>& fretish_operators();
 ///                          through the generation when it runs out, so the
 ///                          result can then be smaller than target_size
 /// @return                  Next generation of target_size specifications
-/// @throws std::invalid_argument if random_source is not callable, if
-///                               fitness_function is empty, if rates are
-///                               outside [0, 1]
-std::vector<ScoredSpecification> evolve_generation(
-    const Config& cfg, const std::vector<ScoredSpecification>& population,
+template <typename Spec, typename Fitness>
+std::vector<Scored<Spec>> evolve_generation(
+    const Config& cfg, const std::vector<Scored<Spec>>& population,
     std::size_t target_size, std::size_t elitism_size,
-    const AggregateWeightedFitnessFunction& fitness_function,
-    const std::vector<FilterFunction>& filter_functions,
+    const Fitness& fitness_functions,
+    const std::vector<FilterFunctionT<Spec>>& filter_functions,
     const RandomSource& random_source,
     const GenerationProgressCallback& on_progress = nullptr,
-    const StageObserver& on_stage = nullptr, SearchBudget* budget = nullptr);
+    const StageObserver& on_stage = nullptr, SearchBudget* budget = nullptr) {
+    assert(random_source);
+    assert(!fitness_functions.empty());
+    assert(cfg.crossover_rate >= 0.0 && cfg.crossover_rate <= 1.0);
+    assert(cfg.mutation_rate >= 0.0 && cfg.mutation_rate <= 1.0);
+    assert(!population.empty());
+
+    GenerationContext<Spec> ctx(
+        cfg, population, target_size, elitism_size, random_source,
+        [&cfg, &fitness_functions,
+         &on_progress](const std::vector<Spec>& candidates) {
+            return score_population(cfg, candidates, fitness_functions,
+                                    on_progress);
+        },
+        budget);
+    const std::vector<PipelineStage<Spec>> stages =
+        make_generation_pipeline<Spec>(filter_stages(filter_functions),
+                                       correctness_rescue(filter_functions));
+    return run_generation_pipeline(ctx, stages, on_stage);
+}

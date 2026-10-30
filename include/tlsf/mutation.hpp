@@ -42,3 +42,12 @@
 tlsf::Specification tlsf_mutate(const tlsf::Specification& spec,
                                 const RandomSource& random_source,
                                 const Config& cfg);
+
+/// Simplifies each section formula's propositional subtrees in place via
+/// Formula::simplify(), which leaves any temporal nodes (and therefore the
+/// temporal skeleton) intact. Returns the simplified specification.
+///
+/// TLSF has no counterpart to the FRETISH Requirement::m_weakenable lock, which
+/// exempts a requirement from mutation, crossover and simplification:
+/// tlsf_simplify and tlsf_mutate touch every formula.
+tlsf::Specification tlsf_simplify(tlsf::Specification spec);

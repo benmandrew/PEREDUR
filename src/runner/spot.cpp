@@ -1293,17 +1293,6 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
     if (reuse.has_value() && !controller.empty()) {
         store_controller(*reuse, controller);
     }
-    // Diagnostic hook (off unless PEREDUR_LTLSYNT_LOG names a file): append one
-    // "elapsed_s timed_out n_atoms" line per ltlsynt exec, for studying the
-    // call-duration distribution and tuning ltlsynt_timeout. Zero cost when the
-    // env var is unset.
-    if (const char* log_path = std::getenv("PEREDUR_LTLSYNT_LOG")) {
-        static std::mutex log_mutex;
-        const std::scoped_lock log_lock(log_mutex);
-        std::ofstream log_file(log_path, std::ios::app);
-        log_file << result.m_wall_s << ' ' << (result.m_timed_out ? 1 : 0)
-                 << ' ' << (inputs.size() + outputs.size()) << '\n';
-    }
     std::scoped_lock lock(m_cache_mutex);
     record_exec<RealizabilityChecker>(result);
     if (!result.m_timed_out && !realizable.has_value()) {

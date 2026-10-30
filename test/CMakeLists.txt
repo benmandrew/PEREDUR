@@ -61,7 +61,7 @@ add_executable(peredur_tests
 target_include_directories(peredur_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(peredur_tests PRIVATE peredur_fitness)
+target_link_libraries(peredur_tests PRIVATE peredur_formaliser)
 
 # A process of its own that spawns a contained child, so process_runner can
 # signal a whole process group the way timeout does without killing itself.
@@ -74,7 +74,7 @@ add_dependencies(peredur_tests contained_child_helper)
 # where they landed. Every driver is built into the same directory, so one
 # generator expression covers all of them.
 add_dependencies(peredur_tests
-    peredur compare keyword-terms lint-ideals ltl maximal mucs realize
+    peredur compare lint-ideals ltl maximal mucs realize
     signal_tracer)
 target_compile_definitions(peredur_tests PRIVATE
     PEREDUR_DRIVER_DIR="$<TARGET_FILE_DIR:peredur>"
@@ -140,7 +140,6 @@ set(peredur_test_suites
     driver_compare
     driver_maximal
     driver_lint_ideals
-    driver_keyword_terms
     driver_signal_tracer
 )
 foreach(suite IN LISTS peredur_test_suites)

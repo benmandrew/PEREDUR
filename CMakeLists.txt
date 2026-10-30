@@ -93,7 +93,6 @@ target_sources(peredur_fitness PRIVATE
     src/fitness/function.cpp
     src/runner/atom_names.cpp
     src/runner/black.cpp
-    src/runner/formaliser.cpp
     src/runner/ganak.cpp
     src/runner/ltlfilt.cpp
     src/runner/process.cpp
@@ -117,10 +116,10 @@ target_sources(peredur_fitness PRIVATE
     src/genetic/monotone.cpp
     src/genetic/mutation.cpp
     src/genetic/nsga2.cpp
+    src/genetic/simplify.cpp
     src/tlsf/fitness.cpp
     src/tlsf/mutation.cpp
     src/tlsf/crossover.cpp
-    src/tlsf/operators.cpp
     src/tlsf/filter.cpp
     src/fingerprint/prefilter.cpp
     src/tlsf/mucs.cpp
@@ -149,10 +148,6 @@ target_compile_definitions(peredur_fitness PRIVATE
     SPOT_BIN_DIR="${SPOT_BIN_DIR}"
     BLACK_EXECUTABLE_PATH="${BLACK_EXECUTABLE}"
 )
-if(DEFINED PEREDUR_DEFAULT_FITNESS_WEIGHT)
-    target_compile_definitions(peredur_fitness PUBLIC
-        PEREDUR_DEFAULT_FITNESS_WEIGHT=${PEREDUR_DEFAULT_FITNESS_WEIGHT})
-endif()
 
 # Defaults to the vendored copy (vendor/fretCLI.main.js, see vendor/README.md
 # for provenance); override with
@@ -172,7 +167,14 @@ if(NOT FORMALISER_SCRIPT_PATH)
         "FORMALISER_SCRIPT_PATH is not set. Configure with "
         "-DFORMALISER_SCRIPT_PATH=/path/to/fretCLI.main.js")
 endif()
-target_compile_definitions(peredur_fitness PRIVATE
+
+# The FRET formaliser is a test oracle: the tests and the fuzzer check the
+# hand-written LTL lowering against it, and no binary calls it. It is a library
+# of its own so that nothing shipped links it.
+add_library(peredur_formaliser STATIC src/runner/formaliser.cpp)
+target_include_directories(peredur_formaliser PRIVATE src)
+target_link_libraries(peredur_formaliser PUBLIC peredur_fitness)
+target_compile_definitions(peredur_formaliser PRIVATE
     FORMALISER_SCRIPT_PATH="${FORMALISER_SCRIPT_PATH}")
 
 # The live dashboard page, copied beside progress.jsonl at run start so that
@@ -208,9 +210,6 @@ target_link_libraries(compare PRIVATE peredur_fitness)
 
 add_executable(lint-ideals src/lint_ideals.cpp)
 target_link_libraries(lint-ideals PRIVATE peredur_fitness)
-
-add_executable(keyword-terms src/keyword_terms.cpp)
-target_link_libraries(keyword-terms PRIVATE peredur_fitness)
 
 add_executable(realize src/realize.cpp)
 target_link_libraries(realize PRIVATE peredur_fitness)

@@ -8,12 +8,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <future>
-#include <memory>
 #include <mutex>
 #include <queue>
 #include <thread>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -37,31 +34,20 @@ class ThreadPool {
     ThreadPool(const ThreadPool&) = delete;
     ThreadPool& operator=(const ThreadPool&) = delete;
 
-    template <typename F>
-    auto submit(F task, TaskPriority priority = TaskPriority::Foreground)
-        -> std::future<std::invoke_result_t<F>> {
-        using T = std::invoke_result_t<F>;
-        auto task_promise = std::make_shared<std::promise<T>>();
-        std::future<T> result = task_promise->get_future();
+    /// Queues @p task and returns at once. Nothing reports its completion
+    /// or carries its result back: the task does that itself, as
+    /// run_bounded_async's tasks do through their completion queue. A task
+    /// must not throw, since an exception escaping a worker calls
+    /// std::terminate.
+    void submit(std::function<void()> task,
+                TaskPriority priority = TaskPriority::Foreground) {
         {
             std::scoped_lock lock(m_mutex);
             std::queue<std::function<void()>>& queue =
                 priority == TaskPriority::Foreground ? m_tasks : m_background;
-            queue.emplace([task = std::move(task), task_promise]() mutable {
-                try {
-                    if constexpr (std::is_void_v<T>) {
-                        task();
-                        task_promise->set_value();
-                    } else {
-                        task_promise->set_value(task());
-                    }
-                } catch (...) {
-                    task_promise->set_exception(std::current_exception());
-                }
-            });
+            queue.push(std::move(task));
         }
         m_cv.notify_one();
-        return result;
     }
 
     /// How many workers this pool runs. Filters use it to size their own

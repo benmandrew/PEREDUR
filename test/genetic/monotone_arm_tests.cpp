@@ -88,7 +88,7 @@ TEST(test_response_arm_moves_the_requirement) {
         for (const ConditionType condition_type :
              {ConditionType::Continual, ConditionType::Trigger}) {
             const Requirement original =
-                subject(timing, condition_type, global_scope());
+                subject(timing, condition_type, Scope{});
             check_direction(original, Direction::Weaken, cfg,
                             "monotone arm: the original requirement must imply "
                             "its weakened rewrite",
@@ -139,7 +139,7 @@ TEST(test_only_scope_flips_the_response) {
 TEST(test_stop_arm_moves_the_requirement) {
     const Config cfg = stop_only();
     std::size_t answered = 0;
-    for (const Scope& scope : {global_scope(), Scope{ScopeKind::OnlyIn, "m"}}) {
+    for (const Scope& scope : {Scope{}, Scope{ScopeKind::OnlyIn, "m"}}) {
         for (const Timing& timing :
              {timing::until(Formula("a")), timing::before(Formula("a"))}) {
             for (const ConditionType condition_type :
@@ -190,8 +190,7 @@ void expect_general_rewrite(const Requirement& original, const Config& cfg,
 
 TEST(test_after_ticks_declines_the_arm) {
     expect_general_rewrite(
-        subject(timing::after_ticks(1), ConditionType::Continual,
-                global_scope()),
+        subject(timing::after_ticks(1), ConditionType::Continual, Scope{}),
         response_only(), &Requirement::m_response,
         "monotone arm: `after n ticks` holds its response at both polarities, "
         "so the arm must decline it and the general rewrite must run in its "
@@ -203,7 +202,7 @@ TEST(test_trigger_condition_declines_the_arm) {
     cfg.p_response = 0.0;
     cfg.p_trigger = 1.0;
     expect_general_rewrite(
-        subject(timing::always(), ConditionType::Trigger, global_scope()), cfg,
+        subject(timing::always(), ConditionType::Trigger, Scope{}), cfg,
         &Requirement::m_condition,
         "monotone arm: a trigger's rising edge holds its condition at both "
         "polarities, so the arm must decline it");

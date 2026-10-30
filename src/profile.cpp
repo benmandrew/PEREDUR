@@ -12,12 +12,10 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <map>
 #include <mutex>
 #include <ostream>
 #include <sstream>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace profile {
@@ -41,19 +39,6 @@ std::vector<Site*>& site_registry() {
 std::mutex& registry_mutex() {
     static std::mutex mutex;
     return mutex;
-}
-
-// Leaked for the same reason as site_registry above, and not optionally so. The
-// report is registered with atexit on the first scope, so a registry
-// constructed after that point is destroyed before the report reads it. Sites
-// would survive that anyway because they are already leaked; these keys are
-// std::strings, and a destroyed map has the report printing their freed buffers
-// -- names short enough for the small-string optimisation come out as the
-// pointers written over their storage, longer ones as a prefix of whatever
-// replaced them. Silent, and only in the JSON's counters block.
-std::map<std::string, std::uint64_t>& counter_registry() {
-    static auto* counters = new std::map<std::string, std::uint64_t>();
-    return *counters;
 }
 
 // PEREDUR_PROFILE's value, or nullptr when unset. Captured once: a run that
@@ -182,30 +167,6 @@ Site& site_interned(const std::string& name) {
     return site(stable);
 }
 
-void add_count(const char* name, std::uint64_t n) {
-    if (!enabled()) {
-        return;
-    }
-    const std::scoped_lock lock(registry_mutex());
-    counter_registry()[name] += n;
-}
-
-void record_max(const std::string& name, std::uint64_t value) {
-    if (!enabled()) {
-        return;
-    }
-    const std::scoped_lock lock(registry_mutex());
-    std::uint64_t& slot = counter_registry()[name];
-    slot = std::max(slot, value);
-}
-
-const std::vector<Site*>& sites() { return site_registry(); }
-
-std::vector<std::pair<std::string, std::uint64_t>> counts() {
-    const std::scoped_lock lock(registry_mutex());
-    return {counter_registry().begin(), counter_registry().end()};
-}
-
 void report(std::ostream& out) {
     std::vector<Site*> ordered;
     {
@@ -250,14 +211,6 @@ void report(std::ostream& out) {
             << format_ns(entry->m_max_wall_ns.load()) << "\n";
     }
 
-    const auto counters = counts();
-    if (!counters.empty()) {
-        out << "\nScope counters:\n";
-        for (const auto& [name, value] : counters) {
-            out << std::left << std::setw(34) << name << std::right
-                << std::setw(14) << value << "\n";
-        }
-    }
     out << std::flush;
 }
 
@@ -292,19 +245,8 @@ void report_json(const std::string& path) {
              << entry->m_max_wall_ns.load() << "}";
     }
     file << "\n"
-            R"(  ],)"
-            "\n"
-            R"(  "counters": {)"
-            "\n";
-    first = true;
-    for (const auto& [name, value] : counts()) {
-        if (!first) {
-            file << ",\n";
-        }
-        first = false;
-        file << R"(    ")" << name << R"(": )" << value;
-    }
-    file << "\n  }\n}\n";
+            R"(  ])"
+            "\n}\n";
 }
 
 void report_if_enabled() {

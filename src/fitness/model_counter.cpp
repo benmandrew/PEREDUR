@@ -101,7 +101,7 @@ CountMatrix matrix_power(const CountMatrix& matrix, std::size_t exponent) {
 
 Count count_traces(const TransferSystem& system, std::size_t step_count) {
     PEREDUR_PROFILE_SCOPE("count/count_traces");
-    const CountMatrix weighted_transition = weighted_transition_matrix(system);
+    const CountMatrix& weighted_transition = system.m_transition_matrix;
     assert(weighted_transition.rows() == weighted_transition.cols());
     assert(weighted_transition.rows() != 0);
     const CountMatrix propagated =

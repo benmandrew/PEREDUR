@@ -10,6 +10,7 @@
 #include "config.hpp"
 #include "fixtures.hpp"
 #include "genetic/generation.hpp"
+#include "genetic/simplify.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
 #include "test_registry.hpp"
@@ -30,8 +31,8 @@ std::string first_condition(const Specification& spec) {
 // key; `before false` keeps its kind, being valid rather than a respelling.
 TEST(test_simplify_folds_until_false_into_always) {
     const auto simplified_timing = [](const Timing& timing) {
-        return fretish_operators()
-            .simplify(Specification({}, {make_req("a", "b", timing)}, {}, {}))
+        return simplify_offspring(
+                   Specification({}, {make_req("a", "b", timing)}, {}, {}))
             .m_guarantees.front()
             .m_timing;
     };

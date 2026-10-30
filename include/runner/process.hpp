@@ -24,40 +24,6 @@ struct ProcessResult {
     double m_cpu_s = 0.0;
     /// Wall seconds from the start of the call to the reap.
     double m_wall_s = 0.0;
-    /// The child's peak resident set in kilobytes, from wait4's ru_maxrss
-    /// (which the runner normalises: that field is kilobytes on Linux and
-    /// bytes on macOS), or
-    /// zero when that figure could not be told apart from this process's own
-    /// footprint — see m_peak_rss_floor_kb, which is the whole subtlety here.
-    ///
-    /// A kernel-maintained high-water mark rather than a sample, so unlike
-    /// polling /proc it cannot miss a spike between reads. It covers this child
-    /// and any descendant it waited for itself, which is what makes it the
-    /// right number for a tool that forks internally.
-    ///
-    /// Also zero when the child was killed before the kernel recorded anything,
-    /// and on a timeout it describes only what the process reached before the
-    /// SIGKILL — a tool stopped on its way up reports less than it was heading
-    /// for.
-    std::uint64_t m_peak_rss_kb = 0;
-    /// This process's own resident set at the moment of the fork, in kilobytes,
-    /// below which the child's peak cannot be measured at all.
-    ///
-    /// A forked child starts as a copy-on-write copy of its parent, so its mm
-    /// begins life with the parent's resident set already charged to it, and
-    /// exec folds that pre-exec high-water into the child's maxrss rather than
-    /// discarding it. What wait4 reports is therefore
-    /// `max(parent RSS at fork, the tool's true peak)`: exact above this floor,
-    /// and pure artefact at or below it. m_peak_rss_kb carries the figure only
-    /// in the first case, so that the parent's own footprint can never be read
-    /// back as a tool's.
-    ///
-    /// Itself the larger of a sample on each side of the fork, since no single
-    /// read lands at the instant the kernel charges the child. Understating it
-    /// would hand a tool this process's whole footprint, so it is deliberately
-    /// rounded the safe way: a tool whose peak falls between the two samples is
-    /// reported as unmeasurable rather than mis-attributed.
-    std::uint64_t m_peak_rss_floor_kb = 0;
     /// True if the deadline expired: the output is partial and the process
     /// group was killed.
     bool m_timed_out = false;
@@ -135,10 +101,6 @@ struct PipedChild {
     int m_write_fd = -1;
     /// The parent's read end of the child's stdout.
     int m_read_fd = -1;
-    /// This process's resident set at the fork, as ProcessResult documents it.
-    /// Carried on the child because only the spawn can observe it, while the
-    /// peak it qualifies is not read until reap_with_grace, arbitrarily later.
-    std::uint64_t m_rss_floor_kb = 0;
 };
 
 /// Forks and execs `arguments` with a pipe onto each of the child's stdin and
@@ -189,16 +151,4 @@ void harden_child_after_fork(ParentDeathPolicy policy, pid_t parent_pid);
 /// Reaps `pid`, giving it `grace` to exit on its own before killing its process
 /// group. Returns the child's user+sys CPU seconds. For a child that is asked
 /// to shut down cleanly first, such as the formaliser on stdin EOF.
-///
-/// `executable` names the binary for the peak-resident-set counters, which this
-/// records itself exactly as execute_and_capture does. It is a parameter rather
-/// than a default because a spawn path that reports no memory is invisible
-/// rather than merely incomplete: the counters would simply be missing, and a
-/// tool spawned this way would look like a tool that never allocates.
-///
-/// `rss_floor_kb` is the spawn's PipedChild::m_rss_floor_kb, without which the
-/// peak recorded here would be this process's own footprint whenever the child
-/// stayed under it.
-double reap_with_grace(pid_t pid, std::chrono::milliseconds grace,
-                       const std::string& executable,
-                       std::uint64_t rss_floor_kb);
+double reap_with_grace(pid_t pid, std::chrono::milliseconds grace);

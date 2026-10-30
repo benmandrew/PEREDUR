@@ -178,7 +178,7 @@ std::optional<Formula> simplify_self_join(const Formula& lhs,
 // did that: simplify() folded them propositionally only, so the `Constant`
 // monotone rewrite's own output left `G(false)`, `X(true)` and
 // `(true) W (false)` standing as distinct spellings of one constant. Measured
-// over 14 specifications, 30.4% of the formulae reaching simplify_ltl and
+// over 14 specifications, 30.4% of the formulae reaching ltlfilt and
 // 43.7% of those reaching ltlsynt mention a constant, and each distinct
 // spelling buys its own exec of both. This is not a wall-time change -- a
 // paired A/B over 33 cases read null, the fold moving the search on the TLSF

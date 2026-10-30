@@ -151,7 +151,7 @@ class Parser {
         if (at_end()) {
             m_failed = true;
             m_nodes.push_back(prop_formula_internal::Node{
-                prop_formula_internal::NodeType::Variable, "", 0, 0});
+                prop_formula_internal::NodeType::Atom, "", 0, 0});
             return m_nodes.size() - 1;
         }
         const char first = m_text[m_position];
@@ -172,7 +172,7 @@ class Parser {
         }
 
         m_nodes.push_back(prop_formula_internal::Node{
-            prop_formula_internal::NodeType::Variable, name, 0, 0});
+            prop_formula_internal::NodeType::Atom, name, 0, 0});
         return m_nodes.size() - 1;
     }
 

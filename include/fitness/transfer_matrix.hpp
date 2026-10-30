@@ -15,7 +15,6 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
-#include <vector>
 
 #include "requirement.hpp"
 
@@ -107,27 +106,14 @@ inline Count parse_count_decimal_or_throw(std::string_view text) {
     return value;
 }
 
-/// An automaton representation for model counting. Encodes a finite-state
-/// automaton that validates a requirement specification, along with valuation
-/// counts for the propositional conditions and a transition matrix for
-/// computing the number of satisfying traces via matrix exponentiation.
+/// An automaton representation for model counting: the weighted transition
+/// matrix of a finite-state automaton for a requirement, from which the number
+/// of satisfying traces follows by matrix exponentiation. The state count is
+/// the matrix's dimension.
 struct TransferSystem {
-    /// The states of the automaton. The SPOT + Ganak path leaves these
-    /// default-constructed and carrying no information -- it needs only the
-    /// state count, which is the vector's size -- so only a
-    /// test-constructed system populates them.
-    std::vector<State> m_states;
-    /// Counts of satisfying valuations for conditions. Always empty on the
-    /// SPOT + Ganak path, which folds the valuation weights straight into
-    /// m_transition_matrix at construction; only a test-constructed system
-    /// supplies them separately.
-    CountVector m_valuation_counts;
-    /// Transition matrix T where T[i][j] is count from state i to j
+    /// Transition matrix T where T[i][j] is the number of valuations taking
+    /// state i to state j.
     CountMatrix m_transition_matrix;
-    /// Whether matrix represents weighted transitions. Always true on the
-    /// SPOT + Ganak path; false only for a test-constructed 0/1 adjacency
-    /// matrix awaiting m_valuation_counts.
-    bool m_transition_matrix_is_weighted = false;
     /// Optional mask of valid final states (1 = valid, 0 = invalid).
     /// Empty means all states are valid final states.
     CountVector m_final_state_mask;
@@ -145,29 +131,3 @@ std::size_t count_joint_atoms(const Requirement& req1, const Requirement& req2);
 /// rather than only on the requirement objects themselves.
 TransferSystem build_transfer_system_from_ltl(const std::string& ltl,
                                               std::size_t n_total_atoms);
-
-/// Constructs a TransferSystem for a requirement using SPOT's ltl2tgba to
-/// generate a deterministic automaton from the requirement's LTL formula.
-/// The canonical_valuation_counts parameter is accepted for API compatibility
-/// but is ignored (weights come from SPOT + Ganak directly).
-TransferSystem build_transfer_system(
-    const Requirement& requirement,
-    const CountVector& canonical_valuation_counts = CountVector());
-
-/// Constructs a TransferSystem for a requirement, explicitly specifying the
-/// total atom universe size used for transition weighting. Use this overload
-/// when comparing trace counts across systems that must share the same universe
-/// (e.g. when computing semantic similarity alongside a conjunction system).
-TransferSystem build_transfer_system(const Requirement& requirement,
-                                     std::size_t n_total_atoms);
-
-/// Constructs a TransferSystem for the conjunction of two requirements.
-/// Runs ltl2tgba on "(ltl1) & (ltl2)" and weights transitions via Ganak.
-TransferSystem build_conjunction_transfer_system(
-    const Requirement& requirement1, const Requirement& requirement2);
-
-/// Returns the weighted transition matrix for a TransferSystem. If
-/// m_transition_matrix_is_weighted is already true the matrix is returned
-/// unchanged. Otherwise each column j is scaled by m_valuation_counts(j),
-/// turning a 0/1 adjacency matrix into a valuation-weighted one.
-CountMatrix weighted_transition_matrix(const TransferSystem& system);

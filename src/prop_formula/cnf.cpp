@@ -43,7 +43,7 @@ class TseitinEncoder {
         const prop_formula_internal::Node& node = m_nodes[index];
         int literal = 0;
         switch (node.m_type) {
-            case prop_formula_internal::NodeType::Variable: {
+            case prop_formula_internal::NodeType::Atom: {
                 literal = get_or_create_symbol(node.m_variable);
                 break;
             }

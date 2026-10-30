@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "correctness_filter.hpp"
 #include "filter/well_separation.hpp"
 #include "fixtures.hpp"
 #include "requirement.hpp"
@@ -131,7 +132,8 @@ TEST(test_request_response_assumption_is_well_separated) {
 
 TEST(test_filter_drops_only_the_non_well_separated_spec) {
     RealizabilityChecker checker;
-    FilterFunction filter = make_well_separation_filter(checker);
+    FilterFunction filter =
+        correctness_filter("not-well-separated", global_sat_checker(), checker);
     const Specification good =
         with_assumptions({continual("req", timing::always())});
     const Specification bad =

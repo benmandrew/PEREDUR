@@ -100,10 +100,37 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set(BLACK_EXECUTABLE "${BLACK_WRAPPER}" CACHE FILEPATH "Path to black executable" FORCE)
 
     else()
-        # Build black from source.  Requires a SAT/SMT solver library; z3 and
-        # cryptominisat5 are checked in that order.
-        include(ExternalProject)
+        set(_black_from_source TRUE)
+    endif()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(_black_from_source TRUE)
+else()
+    message(FATAL_ERROR "No black-sat support for ${CMAKE_SYSTEM_NAME}")
+endif()
 
+if(_black_from_source)
+    # Build black from source: on every Linux host the deb does not cover, and
+    # on macOS. The two differ only in where the solver comes from, in the
+    # compiler flags, and in how the binary finds its libraries.
+    include(ExternalProject)
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        execute_process(
+            COMMAND brew --prefix
+            OUTPUT_VARIABLE HOMEBREW_PREFIX
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(NOT HOMEBREW_PREFIX)
+            set(HOMEBREW_PREFIX "/opt/homebrew")
+        endif()
+        set(_black_prefix_path_extra "|${HOMEBREW_PREFIX}")
+        set(_black_platform_args
+            -DCMAKE_MACOSX_RPATH=ON
+            -DCMAKE_CXX_FLAGS=-Wno-nrvo)
+    else()
+        # Requires a SAT/SMT solver library; z3 and cryptominisat5 are
+        # checked in that order.
         find_library(_z3_lib z3)
         find_library(_cryptominisat5_lib cryptominisat5)
         if(_z3_lib)
@@ -120,131 +147,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 "or:\n"
                 "  sudo apt install libcryptominisat5-dev")
         endif()
-
-        # Propagated into each sub-project's CMAKE_ARGS below so a genuine
-        # cache miss at least compiles fast (e.g. sccache, when CI sets it).
-        set(_black_launcher_args
-            -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
-            -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER})
-
-        # tsl-hopscotch-map: header-only hash map, not reliably packaged
-        set(TSL_INSTALL_DIR "${BLACK_ROOT_DIR}/deps/tsl-hopscotch")
-        set(TSL_PREFIX "${BLACK_ROOT_DIR}/deps/tsl-hopscotch-src")
-        # See the comment above SPOT_STAMP_DIR in cmake/spot.cmake: skip
-        # re-declaring the external project when a prior (possibly
-        # CI-cache-restored) run already completed it, so a cache hit
-        # actually avoids redoing the step.
-        if(EXISTS "${TSL_PREFIX}/src/tsl_hopscotch_project-stamp/tsl_hopscotch_project-done")
-            add_custom_target(tsl_hopscotch_project)
-        else()
-            ExternalProject_Add(tsl_hopscotch_project
-                GIT_REPOSITORY "https://github.com/Tessil/hopscotch-map.git"
-                GIT_TAG "v2.4.0"
-                GIT_SHALLOW TRUE
-                PREFIX "${TSL_PREFIX}"
-                INSTALL_DIR "${TSL_INSTALL_DIR}"
-                CMAKE_ARGS
-                    -DCMAKE_BUILD_TYPE=Release
-                    -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-                    ${_black_launcher_args}
-                BUILD_COMMAND ""
-                INSTALL_COMMAND ${CMAKE_COMMAND} --install <BINARY_DIR>
-                LOG_CONFIGURE TRUE
-                LOG_INSTALL TRUE
-                LOG_OUTPUT_ON_FAILURE TRUE
-            )
-        endif()
-
-        # nlohmann_json: header-only JSON library
-        set(NLOHMANN_INSTALL_DIR "${BLACK_ROOT_DIR}/deps/nlohmann")
-        set(NLOHMANN_PREFIX "${BLACK_ROOT_DIR}/deps/nlohmann-src")
-        if(EXISTS "${NLOHMANN_PREFIX}/src/nlohmann_json_project-stamp/nlohmann_json_project-done")
-            add_custom_target(nlohmann_json_project)
-        else()
-            ExternalProject_Add(nlohmann_json_project
-                GIT_REPOSITORY "https://github.com/nlohmann/json.git"
-                GIT_TAG "v3.12.0"
-                GIT_SHALLOW TRUE
-                PREFIX "${NLOHMANN_PREFIX}"
-                INSTALL_DIR "${NLOHMANN_INSTALL_DIR}"
-                CMAKE_ARGS
-                    -DCMAKE_BUILD_TYPE=Release
-                    -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-                    -DJSON_BuildTests=OFF
-                    -DJSON_Install=ON
-                    ${_black_launcher_args}
-                BUILD_COMMAND ""
-                INSTALL_COMMAND ${CMAKE_COMMAND} --install <BINARY_DIR>
-                LOG_CONFIGURE TRUE
-                LOG_INSTALL TRUE
-                LOG_OUTPUT_ON_FAILURE TRUE
-            )
-        endif()
-
-        set(BLACK_INSTALL_DIR "${BLACK_ROOT_DIR}/install")
-        set(BLACK_LIB_DIR "${BLACK_INSTALL_DIR}/lib")
-        set(BLACK_BIN "${BLACK_INSTALL_DIR}/bin/black")
-        set(BLACK_WRAPPER "${BLACK_ROOT_DIR}/black")
-        set(BLACK_PREFIX "${BLACK_ROOT_DIR}/src")
-
-        if(EXISTS "${BLACK_PREFIX}/src/black_project-stamp/black_project-done")
-            add_custom_target(black_project)
-        else()
-            ExternalProject_Add(black_project
-                URL "https://github.com/black-sat/black/archive/refs/tags/v${BLACK_VERSION}.tar.gz"
-                TLS_VERIFY ON
-                DOWNLOAD_EXTRACT_TIMESTAMP ON
-                PREFIX "${BLACK_PREFIX}"
-                INSTALL_DIR "${BLACK_INSTALL_DIR}"
-                LIST_SEPARATOR |
-                CMAKE_ARGS
-                    -DCMAKE_BUILD_TYPE=Release
-                    -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-                    -DCMAKE_PREFIX_PATH=${TSL_INSTALL_DIR}|${NLOHMANN_INSTALL_DIR}
-                    -DENABLE_TESTS=OFF
-                    -DENABLE_FORMULAS_TESTS=OFF
-                    -DGIT_UPDATE_SUBMODULES=OFF
-                    "-DCMAKE_CXX_FLAGS=-Wno-nrvo -Wno-used-but-marked-unused"
-                    ${_black_solver_flag}
-                    ${_black_launcher_args}
-                BUILD_COMMAND
-                    ${CMAKE_COMMAND} --build <BINARY_DIR> --target frontend --parallel
-                INSTALL_COMMAND
-                    ${CMAKE_COMMAND} --install <BINARY_DIR>
-                DEPENDS
-                    tsl_hopscotch_project
-                    nlohmann_json_project
-                LOG_CONFIGURE TRUE
-                LOG_BUILD TRUE
-                LOG_INSTALL TRUE
-                LOG_OUTPUT_ON_FAILURE TRUE
-            )
-        endif()
-
-        file(WRITE "${BLACK_WRAPPER}"
-            "#!/bin/sh\nexport LD_LIBRARY_PATH=\"${BLACK_LIB_DIR}:\${LD_LIBRARY_PATH}\"\nexec \"${BLACK_BIN}\" \"$@\"\n")
-        file(CHMOD "${BLACK_WRAPPER}"
-            PERMISSIONS
-                OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                GROUP_READ GROUP_EXECUTE
-                WORLD_READ WORLD_EXECUTE
-        )
-
-        set(BLACK_EXECUTABLE "${BLACK_WRAPPER}" CACHE FILEPATH "Path to black executable" FORCE)
-        set(BLACK_EXTERNAL_TARGET "black_project")
-    endif()
-
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    include(ExternalProject)
-
-    execute_process(
-        COMMAND brew --prefix
-        OUTPUT_VARIABLE HOMEBREW_PREFIX
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        ERROR_QUIET
-    )
-    if(NOT HOMEBREW_PREFIX)
-        set(HOMEBREW_PREFIX "/opt/homebrew")
+        set(_black_prefix_path_extra "")
+        set(_black_platform_args
+            "-DCMAKE_CXX_FLAGS=-Wno-nrvo -Wno-used-but-marked-unused"
+            ${_black_solver_flag})
     endif()
 
     # Propagated into each sub-project's CMAKE_ARGS below so a genuine
@@ -253,7 +159,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
         -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER})
 
-    # tsl-hopscotch-map: header-only hash map, not in Homebrew
+    # tsl-hopscotch-map: header-only hash map, not reliably packaged
     set(TSL_INSTALL_DIR "${BLACK_ROOT_DIR}/deps/tsl-hopscotch")
     set(TSL_PREFIX "${BLACK_ROOT_DIR}/deps/tsl-hopscotch-src")
     # See the comment above SPOT_STAMP_DIR in cmake/spot.cmake: skip
@@ -281,7 +187,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         )
     endif()
 
-    # nlohmann_json: header-only JSON library, not in Homebrew
+    # nlohmann_json: header-only JSON library
     set(NLOHMANN_INSTALL_DIR "${BLACK_ROOT_DIR}/deps/nlohmann")
     set(NLOHMANN_PREFIX "${BLACK_ROOT_DIR}/deps/nlohmann-src")
     if(EXISTS "${NLOHMANN_PREFIX}/src/nlohmann_json_project-stamp/nlohmann_json_project-done")
@@ -308,6 +214,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     endif()
 
     set(BLACK_INSTALL_DIR "${BLACK_ROOT_DIR}/install")
+    set(BLACK_LIB_DIR "${BLACK_INSTALL_DIR}/lib")
+    set(BLACK_BIN "${BLACK_INSTALL_DIR}/bin/black")
     set(BLACK_PREFIX "${BLACK_ROOT_DIR}/src")
     if(EXISTS "${BLACK_PREFIX}/src/black_project-stamp/black_project-done")
         add_custom_target(black_project)
@@ -322,26 +230,26 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
             CMAKE_ARGS
                 -DCMAKE_BUILD_TYPE=Release
                 -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-                -DCMAKE_PREFIX_PATH=${TSL_INSTALL_DIR}|${NLOHMANN_INSTALL_DIR}|${HOMEBREW_PREFIX}
+                -DCMAKE_PREFIX_PATH=${TSL_INSTALL_DIR}|${NLOHMANN_INSTALL_DIR}${_black_prefix_path_extra}
                 -DENABLE_TESTS=OFF
                 -DENABLE_FORMULAS_TESTS=OFF
                 -DGIT_UPDATE_SUBMODULES=OFF
-                -DCMAKE_MACOSX_RPATH=ON
-                -DCMAKE_CXX_FLAGS=-Wno-nrvo
+                ${_black_platform_args}
                 ${_black_launcher_args}
             BUILD_COMMAND
                 ${CMAKE_COMMAND} --build <BINARY_DIR> --target frontend --parallel
             INSTALL_COMMAND
                 ${CMAKE_COMMAND} --install <BINARY_DIR>
-            # Unlike the Linux paths, BLACK_EXECUTABLE here is the installed
-            # binary rather than a wrapper script written at configure time, so
-            # nothing has created it by the time the generator runs.
-            # ExternalProject declares only its stamps as outputs, leaving the
-            # `DEPENDS "${BLACK_EXECUTABLE}"` on black_binary with no rule to
-            # produce it -- ninja rejects the whole graph before compiling
-            # anything.  add_dependencies alone does not fix that: it orders
-            # targets, it does not name a producer for the file.
-            BUILD_BYPRODUCTS "${BLACK_INSTALL_DIR}/bin/black"
+            # On macOS BLACK_EXECUTABLE is the installed binary rather than a
+            # wrapper script written at configure time, so nothing has created
+            # it by the time the generator runs. ExternalProject declares only
+            # its stamps as outputs, leaving the `DEPENDS "${BLACK_EXECUTABLE}"`
+            # on black_binary with no rule to produce it -- ninja rejects the
+            # whole graph before compiling anything. add_dependencies alone
+            # does not fix that: it orders targets, it does not name a producer
+            # for the file. On Linux the declaration is true and changes
+            # nothing.
+            BUILD_BYPRODUCTS "${BLACK_BIN}"
             DEPENDS
                 tsl_hopscotch_project
                 nlohmann_json_project
@@ -352,12 +260,22 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         )
     endif()
 
-    set(BLACK_EXECUTABLE "${BLACK_INSTALL_DIR}/bin/black"
-        CACHE FILEPATH "Path to black executable" FORCE)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        set(BLACK_EXECUTABLE "${BLACK_BIN}"
+            CACHE FILEPATH "Path to black executable" FORCE)
+    else()
+        set(BLACK_WRAPPER "${BLACK_ROOT_DIR}/black")
+        file(WRITE "${BLACK_WRAPPER}"
+            "#!/bin/sh\nexport LD_LIBRARY_PATH=\"${BLACK_LIB_DIR}:\${LD_LIBRARY_PATH}\"\nexec \"${BLACK_BIN}\" \"$@\"\n")
+        file(CHMOD "${BLACK_WRAPPER}"
+            PERMISSIONS
+                OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                GROUP_READ GROUP_EXECUTE
+                WORLD_READ WORLD_EXECUTE
+        )
+        set(BLACK_EXECUTABLE "${BLACK_WRAPPER}" CACHE FILEPATH "Path to black executable" FORCE)
+    endif()
     set(BLACK_EXTERNAL_TARGET "black_project")
-
-else()
-    message(FATAL_ERROR "No black-sat support for ${CMAKE_SYSTEM_NAME}")
 endif()
 
 message(STATUS "Using black executable: ${BLACK_EXECUTABLE}")

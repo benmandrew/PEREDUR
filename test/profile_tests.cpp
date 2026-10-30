@@ -110,45 +110,6 @@ TEST(test_wall_and_cpu_are_measured_separately) {
            "a sleeping scope records less CPU time than wall time");
 }
 
-TEST(test_record_max_keeps_the_largest) {
-    // The counter exists for peak resident sets, where summing a thousand
-    // calls' peaks would describe nothing that ever happened. Both orders are
-    // exercised because a naive implementation that assigns rather than
-    // compares passes the ascending one.
-    if (!profile::enabled()) {
-        return;
-    }
-    profile::record_max("test/max-ascending", 10);
-    profile::record_max("test/max-ascending", 250);
-    profile::record_max("test/max-descending", 250);
-    profile::record_max("test/max-descending", 10);
-    std::uint64_t ascending = 0;
-    std::uint64_t descending = 0;
-    for (const auto& [name, value] : profile::counts()) {
-        if (name == "test/max-ascending") {
-            ascending = value;
-        } else if (name == "test/max-descending") {
-            descending = value;
-        }
-    }
-    expect(ascending == 250, "a rising sequence records its largest value");
-    expect(descending == 250,
-           "a falling sequence keeps the largest rather than the last, got " +
-               std::to_string(descending));
-}
-
-TEST(test_record_max_is_silent_when_disabled) {
-    if (profile::enabled()) {
-        return;
-    }
-    profile::record_max("test/max-disabled", 99);
-    const auto counters = profile::counts();
-    const bool present = std::any_of(
-        counters.begin(), counters.end(),
-        [](const auto& entry) { return entry.first == "test/max-disabled"; });
-    expect(!present, "a disabled profiler registers no counter at all");
-}
-
 TEST(test_clocks_advance_monotonically) {
     const std::uint64_t wall_before = profile::wall_ns();
     const std::uint64_t cpu_before = profile::thread_cpu_ns();
@@ -222,11 +183,11 @@ std::string this_executable() {
 
 // Defined last, so it runs last: the scopes above have already latched
 // PEREDUR_PROFILE as unset.
-TEST(test_a_counter_name_survives_the_exit_report) {
-    // Same defect as the interning one above, one registry over: the report is
+TEST(test_an_interned_site_name_survives_the_exit_report) {
+    // Same defect as the interning one above, at exit: the report is
     // registered with atexit on the first scope, so everything it reads has to
-    // outlive static destruction. Sites are leaked for that reason and so is
-    // the counter registry; without that, the report reads its keys' freed
+    // outlive static destruction. Sites and the intern table behind their
+    // names are leaked for that reason; without that, the report reads freed
     // buffers -- names short enough for the small-string optimisation come out
     // as the pointers written over them, longer ones as a prefix of whatever
     // replaced them.
@@ -236,8 +197,9 @@ TEST(test_a_counter_name_survives_the_exit_report) {
     // a second process reading the first's. The child skips the spawn by
     // finding PEREDUR_PROFILE already set, so it recurses exactly once.
     const bool is_the_child = std::getenv("PEREDUR_PROFILE") != nullptr;
-    profile::add_count("test/counter-name-survives");
     if (is_the_child) {
+        const profile::Scope scope(
+            profile::site_interned(std::string("test/site-name-survives")));
         return;
     }
 
@@ -258,9 +220,10 @@ TEST(test_a_counter_name_survives_the_exit_report) {
     const std::string json((std::istreambuf_iterator<char>(file)),
                            std::istreambuf_iterator<char>());
     std::filesystem::remove(report);
-    expect(json.find(R"("test/counter-name-survives": 1)") != std::string::npos,
-           "profile: the exit report should name the counter that was added, "
-           "not the freed bytes of its key");
+    expect(
+        json.find(R"("name": "test/site-name-survives")") != std::string::npos,
+        "profile: the exit report should name the site that was timed, "
+        "not the freed bytes of its interned name");
 }
 
 }  // namespace

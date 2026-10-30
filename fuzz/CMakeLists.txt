@@ -4,7 +4,7 @@
 # the project keeps building with whichever compiler the active preset uses
 # (GCC in the debug preset). Linking a clang+libFuzzer-compiled object
 # against the GCC-compiled, ASAN/UBSAN-instrumented peredur_core/
-# peredur_fitness static libraries works in practice (verified empirically)
+# peredur_fitness/peredur_formaliser static libraries works in practice (verified empirically)
 # without needing a second, fully clang-built copy of the whole dependency
 # tree (which would re-trigger SPOT's from-source ExternalProject build).
 find_program(PEREDUR_FUZZ_CLANGXX NAMES clang++)
@@ -26,10 +26,12 @@ add_custom_command(
             -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=all
             "-I${CMAKE_SOURCE_DIR}/include"
             "${PEREDUR_FUZZ_SOURCE}"
+            "$<TARGET_FILE:peredur_formaliser>"
             "$<TARGET_FILE:peredur_fitness>"
             "$<TARGET_FILE:peredur_core>"
             -o "${PEREDUR_FUZZ_BINARY}"
-    DEPENDS "${PEREDUR_FUZZ_SOURCE}" peredur_fitness peredur_core
+    DEPENDS "${PEREDUR_FUZZ_SOURCE}" peredur_formaliser peredur_fitness
+            peredur_core
     COMMENT "Building ltl_equivalence_fuzzer with ${PEREDUR_FUZZ_CLANGXX} (libFuzzer)"
     VERBATIM
 )

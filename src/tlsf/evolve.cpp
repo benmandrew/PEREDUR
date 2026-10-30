@@ -21,7 +21,6 @@
 #include "genetic/scored.hpp"
 #include "runner/black.hpp"
 #include "status_line.hpp"
-#include "tlsf/operators.hpp"
 #include "tlsf/specification.hpp"
 
 namespace tlsf::internal {
@@ -152,10 +151,9 @@ std::vector<Scored<Specification>> evolve_population(
                                        progress.muc_iter);
             };
         }
-        population = evolve_generation_generic(
+        population = evolve_generation(
             cfg, population, sizes.selection, sizes.elitism, fitness,
-            per_gen_filters, tlsf_operators(), random_source, on_progress,
-            on_stage, &budget);
+            per_gen_filters, random_source, on_progress, on_stage, &budget);
         budget.count_generation();
         fold_filter_stats(per_gen_filters, filter_stats_out);
         const FitnessSummary summary = summarise_fitness(population);

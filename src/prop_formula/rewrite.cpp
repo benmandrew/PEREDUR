@@ -11,7 +11,6 @@ namespace {
 using prop_formula_internal::is_binary_node;
 using prop_formula_internal::is_unary_node;
 using prop_formula_internal::Node;
-using prop_formula_internal::node_type_to_kind;
 using prop_formula_internal::NodeType;
 
 // Each rewritten child is sequenced into a local of its own rather than passed
@@ -22,10 +21,10 @@ using prop_formula_internal::NodeType;
 Formula rewrite_subtree(const std::vector<Node>& nodes, std::size_t index,
                         const Formula::RewriteCallback& rewrite_callback) {
     const Node& node = nodes[index];
-    const Formula::Kind kind = node_type_to_kind(node.m_type);
+    const Formula::Kind kind = node.m_type;
 
     Formula rewritten_subtree;
-    if (node.m_type == NodeType::Variable) {
+    if (node.m_type == NodeType::Atom) {
         rewritten_subtree = Formula::make_atom(node.m_variable);
     } else if (is_unary_node(node.m_type)) {
         const Formula child =

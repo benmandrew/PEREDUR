@@ -19,13 +19,7 @@
 #include "requirement.hpp"
 
 /// Default weight for WeightedFitnessFunction when not explicitly specified.
-/// Override at compile time with -DPEREDUR_DEFAULT_FITNESS_WEIGHT=<value>.
-#ifndef PEREDUR_DEFAULT_FITNESS_WEIGHT
 inline constexpr double k_default_fitness_weight = 1.0;
-#else
-inline constexpr double k_default_fitness_weight =
-    PEREDUR_DEFAULT_FITNESS_WEIGHT;
-#endif
 
 /// A fitness function scores a specification element, returning a value in
 /// [0, 1].

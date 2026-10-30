@@ -11,22 +11,9 @@
 
 namespace prop_formula_internal {
 
-enum class NodeType : std::uint8_t {
-    Variable,
-    Not,
-    And,
-    Or,
-    Implies,
-    Iff,
-    // Temporal operators. Appended so the ordinals of the propositional types
-    // are unchanged (formula hashes and orderings depend on them).
-    Next,
-    Eventually,
-    Globally,
-    Until,
-    Release,
-    WeakUntil,
-};
+/// The arena's node type is the public Formula::Kind itself, so a node's type
+/// needs no conversion to answer Formula::kind().
+using NodeType = Formula::Kind;
 
 /// True for the unary node types (one child in m_left).
 inline bool is_unary_node(NodeType type) {
@@ -43,7 +30,7 @@ inline bool is_binary_node(NodeType type) {
 }
 
 struct Node {
-    NodeType m_type = NodeType::Variable;
+    NodeType m_type = NodeType::Atom;
     std::string m_variable;
     std::size_t m_left = 0;
     std::size_t m_right = 0;
@@ -80,8 +67,6 @@ std::vector<Node> parse_formula(const std::string& formula);
 /// collapse rather than a defect.
 std::optional<std::vector<Node>> try_parse_formula(const std::string& formula);
 DimacsCnf encode_dimacs(const std::vector<Node>& nodes);
-Formula::Kind node_type_to_kind(NodeType type);
-NodeType kind_to_node_type(Formula::Kind kind);
 std::string node_to_string(const std::vector<Node>& nodes, std::size_t index);
 
 /// Builds a new arena wrapping @p child under a unary node of @p type.

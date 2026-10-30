@@ -36,18 +36,6 @@ std::set<std::string> collect_formula_atoms(const Formula& formula) {
     return atoms;
 }
 
-// Returns the number of unique atoms across both formulas.
-std::size_t count_requirement_atoms(const Requirement& req) {
-    std::set<std::string> atoms = collect_formula_atoms(req.m_condition);
-    const std::set<std::string> resp = collect_formula_atoms(req.m_response);
-    atoms.insert(resp.begin(), resp.end());
-    if (const Formula* stop = timing_stop(req.m_timing)) {
-        const std::set<std::string> stop_atoms = collect_formula_atoms(*stop);
-        atoms.insert(stop_atoms.begin(), stop_atoms.end());
-    }
-    return atoms.size();
-}
-
 }  // namespace
 
 std::size_t count_joint_atoms(const Requirement& req1,
@@ -402,8 +390,7 @@ TransferSystem build_transfer_system_from_hoa(const HoaAutomaton& hoa,
         }
     }
 
-    std::vector<State> states(hoa.m_n_states);
-    return {states, CountVector(), matrix, true, final_mask};
+    return {matrix, final_mask};
 }
 
 }  // namespace
@@ -413,46 +400,4 @@ TransferSystem build_transfer_system_from_ltl(const std::string& ltl,
     const std::string hoa_text = run_ltl2tgba_for_counting(ltl);
     const HoaAutomaton hoa = parse_hoa(hoa_text);
     return build_transfer_system_from_hoa(hoa, n_total_atoms);
-}
-
-TransferSystem build_transfer_system(
-    const Requirement& requirement,
-    const CountVector& /*canonical_valuation_counts*/) {
-    const std::size_t n_total_atoms = count_requirement_atoms(requirement);
-    return build_transfer_system_from_ltl(requirement_to_ltl(requirement),
-                                          n_total_atoms);
-}
-
-TransferSystem build_transfer_system(const Requirement& requirement,
-                                     std::size_t n_total_atoms) {
-    return build_transfer_system_from_ltl(requirement_to_ltl(requirement),
-                                          n_total_atoms);
-}
-
-TransferSystem build_conjunction_transfer_system(
-    const Requirement& requirement1, const Requirement& requirement2) {
-    const std::size_t n_total_atoms =
-        count_joint_atoms(requirement1, requirement2);
-    const std::string ltl1 = requirement_to_ltl(requirement1);
-    const std::string ltl2 = requirement_to_ltl(requirement2);
-    const std::string conj = "(" + ltl1 + ") & (" + ltl2 + ")";
-    return build_transfer_system_from_ltl(conj, n_total_atoms);
-}
-
-CountMatrix weighted_transition_matrix(const TransferSystem& system) {
-    if (system.m_transition_matrix_is_weighted) {
-        return system.m_transition_matrix;
-    }
-    CountMatrix weighted = system.m_transition_matrix;
-    for (Eigen::Index column = 0; column < weighted.cols(); ++column) {
-        for (Eigen::Index row = 0; row < weighted.rows(); ++row) {
-            Count updated = 0;
-            [[maybe_unused]] const bool overflow =
-                count_mul_overflow(weighted(row, column),
-                                   system.m_valuation_counts(column), updated);
-            assert(!overflow);
-            weighted(row, column) = updated;
-        }
-    }
-    return weighted;
 }

@@ -89,13 +89,13 @@ std::vector<std::uint64_t> evaluate_arena(const std::vector<Node>& nodes,
         assert(!prop_formula_internal::is_binary_node(node.m_type) ||
                (node.m_left < idx && node.m_right < idx));
         const std::uint64_t left =
-            node.m_type == NodeType::Variable ? 0 : value[node.m_left];
+            node.m_type == NodeType::Atom ? 0 : value[node.m_left];
         const std::uint64_t right =
             prop_formula_internal::is_binary_node(node.m_type)
                 ? value[node.m_right]
                 : 0;
         switch (node.m_type) {
-            case NodeType::Variable:
+            case NodeType::Atom:
                 value[idx] = atom_mask(node.m_variable, word);
                 break;
             case NodeType::Not:
@@ -249,33 +249,6 @@ bool refutes_implication(const PackedFingerprint& lhs,
         }
     }
     return false;
-}
-
-std::string to_hex(const std::vector<bool>& bits) {
-    const std::size_t digits = (bits.size() + 3) / 4;
-    std::vector<unsigned> nibbles(digits, 0);
-    for (std::size_t index = 0; index < bits.size(); ++index) {
-        if (bits[index]) {
-            nibbles[index / 4] |= 1U << (index % 4);
-        }
-    }
-    std::string text(digits, '0');
-    for (std::size_t digit = 0; digit < digits; ++digit) {
-        const unsigned value = nibbles[digits - 1 - digit];
-        text[digit] =
-            static_cast<char>(value < 10 ? '0' + value : 'a' + value - 10);
-    }
-    return text;
-}
-
-std::size_t hamming_distance(const std::vector<bool>& lhs,
-                             const std::vector<bool>& rhs) {
-    assert(lhs.size() == rhs.size());
-    std::size_t total = 0;
-    for (std::size_t index = 0; index < lhs.size(); ++index) {
-        total += static_cast<std::size_t>(lhs[index] != rhs[index]);
-    }
-    return total;
 }
 
 }  // namespace fingerprint

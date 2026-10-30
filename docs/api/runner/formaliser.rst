@@ -5,4 +5,6 @@ Wrapper around the external FRET requirement-formaliser CLI (``fretCLI.main.js f
 
 ``global_formaliser()`` returns the process-lifetime instance shared by all callers, so the memoisation cache and the single child process are shared across the entire run.
 
+The formaliser is a test oracle. It is built into the ``peredur_formaliser`` library, which only the test binary and the fuzzer link: they check ``requirement_to_ltl`` against it, and no shipped binary calls it.
+
 .. doxygenfile:: formaliser.hpp

@@ -169,19 +169,21 @@ TEST(test_every_submitted_task_runs) {
     const std::size_t n_tasks = (pool.size() * 4) + 1;
 
     std::vector<char> ran(n_tasks, 0);
-    std::vector<std::future<void>> results;
-    results.reserve(n_tasks);
+    std::vector<std::promise<void>> done(n_tasks);
     for (std::size_t i = 0; i < n_tasks; ++i) {
-        results.push_back(pool.submit([&ran, i] { ran[i] = 1; }));
+        pool.submit([&ran, &done, i] {
+            ran[i] = 1;
+            done[i].set_value();
+        });
     }
-    for (std::future<void>& result : results) {
-        result.get();
+    for (std::promise<void>& finished : done) {
+        finished.get_future().get();
     }
 
     for (std::size_t i = 0; i < n_tasks; ++i) {
         expect(ran[i] == 1,
                "every task submitted to the pool should have run by the time "
-               "its future is ready");
+               "it reports itself done");
     }
 }
 
@@ -191,25 +193,28 @@ TEST(test_foreground_tasks_run_before_queued_background_ones) {
     ThreadPool pool(1);
     std::promise<void> release;
     std::shared_future<void> gate = release.get_future().share();
-    std::future<void> held = pool.submit([gate] { gate.wait(); });
+    pool.submit([gate] { gate.wait(); });
 
     std::mutex order_mutex;
     std::vector<std::string> order;
-    const auto record = [&order_mutex, &order](std::string name) {
-        return [&order_mutex, &order, name = std::move(name)] {
-            const std::scoped_lock lock(order_mutex);
-            order.push_back(name);
+    std::vector<std::promise<void>> done(4);
+    const auto record = [&order_mutex, &order, &done](std::string name,
+                                                      std::size_t slot) {
+        return [&order_mutex, &order, &done, name = std::move(name), slot] {
+            {
+                const std::scoped_lock lock(order_mutex);
+                order.push_back(name);
+            }
+            done[slot].set_value();
         };
     };
-    std::vector<std::future<void>> results;
-    results.push_back(pool.submit(record("b1"), TaskPriority::Background));
-    results.push_back(pool.submit(record("b2"), TaskPriority::Background));
-    results.push_back(pool.submit(record("f1")));
-    results.push_back(pool.submit(record("f2"), TaskPriority::Foreground));
+    pool.submit(record("b1", 0), TaskPriority::Background);
+    pool.submit(record("b2", 1), TaskPriority::Background);
+    pool.submit(record("f1", 2));
+    pool.submit(record("f2", 3), TaskPriority::Foreground);
     release.set_value();
-    held.get();
-    for (std::future<void>& result : results) {
-        result.get();
+    for (std::promise<void>& finished : done) {
+        finished.get_future().get();
     }
 
     const std::vector<std::string> expected{"f1", "f2", "b1", "b2"};
@@ -239,17 +244,26 @@ TEST(test_idle_workers_counts_waiting_workers_less_queued_tasks) {
            "worker idle");
     std::promise<void> release;
     std::shared_future<void> gate = release.get_future().share();
-    std::future<void> first = pool.submit([gate] { gate.wait(); });
+    std::vector<std::promise<void>> done(2);
+    pool.submit([gate, &done] {
+        gate.wait();
+        done[0].set_value();
+    });
     expect(idle_workers_reach(pool, 1),
            "idle_workers: a worker running a task should not count as idle");
-    std::future<void> second =
-        pool.submit([gate] { gate.wait(); }, TaskPriority::Background);
+    pool.submit(
+        [gate, &done] {
+            gate.wait();
+            done[1].set_value();
+        },
+        TaskPriority::Background);
     expect(idle_workers_reach(pool, 0),
            "idle_workers: a queued or running task should claim the last "
            "idle worker");
     release.set_value();
-    first.get();
-    second.get();
+    for (std::promise<void>& finished : done) {
+        finished.get_future().get();
+    }
     expect(idle_workers_reach(pool, 2),
            "idle_workers: workers should count as idle again once their "
            "tasks finish");

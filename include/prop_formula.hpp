@@ -31,6 +31,9 @@ class Formula {
     /// emits them, so FRETISH formulae stay propositional. New values are
     /// appended so the NodeType/Kind ordinals of the propositional kinds — and
     /// therefore every existing formula hash and ordering — are unchanged.
+    /// Also the type of each node in a formula's arena. The temporal kinds are
+    /// appended after the propositional ones, whose ordinals formula hashes
+    /// and orderings depend on, so a new kind goes at the end.
     enum class Kind : std::uint8_t {
         Atom,
         Not,
@@ -58,9 +61,6 @@ class Formula {
 
     /// Static instance of the logical constant "true" for convenience.
     static Formula true_formula;
-
-    /// Static instance of the logical constant "false" for convenience.
-    static Formula false_formula;
 
     /// Constructs a Formula by parsing a string representation.
     /// Supports operators: ! or ~ (negation), & (and), | (or), -> (implies),
@@ -191,7 +191,7 @@ class Formula {
     /// tree with no canonical shape, so the search hands the solvers one
     /// formula under many spellings and each spelling buys its own
     /// subprocess. Measured over 14 specifications, ordering alone accounts
-    /// for 16.4% of the `simplify_ltl` execs a run makes.
+    /// for 16.4% of the `ltlfilt --simplify` execs a run then made.
     ///
     /// It is deliberately not a simplifier: no constant is folded and no
     /// tautology recognised, both of which belong to `simplify()`. And it is

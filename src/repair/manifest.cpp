@@ -233,7 +233,12 @@ namespace {
 // lookahead queries issued, started and later asked by the walk itself. The
 // lookahead moves no score, but its untaken branches add ltlsynt execs, so
 // tool_calls.ltlsynt.calls reads higher than at 40 at the default depth.
-constexpr int k_schema_version = 41;
+//
+// 42 removed caches.simplify_ltl with the simplify_ltl pass, which no engine
+// path had called for many versions; its row read zero hits and misses.
+// tool_calls.ltlfilt.cache_hits, which counted that pass's hits and so read
+// zero too, now counts the remove_wm memo's hits.
+constexpr int k_schema_version = 42;
 
 // A config key that only one of the two repair paths reads, as a JSON pointer
 // into config_json(). tlsf.repair_mode is absent: the FRETISH path rejects a
@@ -344,9 +349,9 @@ nlohmann::json tool_calls_json() {
         {"ltl2tgba",
          row(Ltl2tgbaStats::n_cache_misses, Ltl2tgbaStats::n_cache_hits,
              Ltl2tgbaStats::n_timeouts, Ltl2tgbaStats::total_time_s)},
-        // Every ltlfilt exec, over all three entry points, which is the
+        // Every ltlfilt exec, over both counted entry points, which is the
         // set total_s is over. Its per-entry-point split is in `caches`.
-        {"ltlfilt", row(LtlfiltStats::n_execs(), LtlfiltStats::n_cache_hits,
+        {"ltlfilt", row(LtlfiltStats::n_execs(), LtlfiltStats::n_remove_wm_hits,
                         LtlfiltStats::n_timeouts, LtlfiltStats::total_time_s)},
         {"ltlsynt", row(RealizabilityChecker::n_cache_misses,
                         RealizabilityChecker::n_cache_hits,
@@ -443,8 +448,6 @@ nlohmann::json caches_json() {
         {"ltl2tgba",
          row(Ltl2tgbaStats::n_cache_hits, Ltl2tgbaStats::n_cache_misses)},
         {"ganak", row(GanakStats::n_cache_hits, GanakStats::n_cache_misses)},
-        {"simplify_ltl",
-         row(LtlfiltStats::n_cache_hits, LtlfiltStats::n_cache_misses)},
         {"remove_wm",
          row(LtlfiltStats::n_remove_wm_hits, LtlfiltStats::n_remove_wm_execs)},
         // Memoised nowhere: check_satisfiability caches the decided answer one

@@ -45,11 +45,13 @@ TEST(test_semantic_similarity_default_overload_matches_explicit_step_count) {
     const Requirement other_requirement{Formula("P"), Formula("P|Q"),
                                         timing::immediately()};
     // Syntactic keeps the keyword measures out of the semantic objective, so
-    // only the trace count is compared.
+    // only the trace count is compared. The Config overload takes
+    // specifications, so each requirement is the one guarantee of its own.
     Config cfg;
     cfg.keyword_similarity = KeywordSimilarity::Syntactic;
-    const double with_default =
-        semantic_similarity(requirement, other_requirement, cfg);
+    const Specification spec({}, {requirement}, {"P"}, {"Q"});
+    const Specification other_spec({}, {other_requirement}, {"P"}, {"Q"});
+    const double with_default = semantic_similarity(spec, other_spec, cfg);
     // Pin both the bound and the metric explicitly: the Config overload carries
     // both, so comparing against a bound-only call (which defaults the metric
     // to Direct) would conflate them now that Config defaults the metric to
@@ -479,10 +481,9 @@ TEST(test_keyword_similarity_trace_weight_half_averages_the_two) {
            "keyword-similarity: the split scoring path must mix the same way");
 }
 
-// The keyword-terms driver prints one row per changed_requirement_pairs entry
-// and an analysis forms every weight from those rows. That holds only if the
-// mean of w * trace + (1 - w) * keyword over the rows, a removed slot scoring 0
-// and no rows scoring 1, is the semantic score a run computes.
+// The semantic objective scores changed_requirement_pairs' rows, so the mean of
+// w * trace + (1 - w) * keyword over them, a removed slot scoring 0 and no rows
+// scoring 1, has to be the semantic score a run computes.
 TEST(test_changed_requirement_pairs_rebuild_the_weighted_score) {
     const Scope in_mode{ScopeKind::In, "m"};
     const Requirement same{Formula("P"), Formula("Q"), timing::immediately()};

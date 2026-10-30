@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "correctness_filter.hpp"
 #include "filter/implication.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/random_source.hpp"
@@ -17,7 +18,6 @@
 #include "tlsf/filter.hpp"
 #include "tlsf/fitness.hpp"
 #include "tlsf/mutation.hpp"
-#include "tlsf/operators.hpp"
 #include "tlsf/specification.hpp"
 #include "tlsf_fixtures.hpp"
 
@@ -644,13 +644,15 @@ TEST(test_end_to_end_evolution) {
         score_population(cfg, seed_pop, fitness);
 
     const std::vector<FilterFunctionT<tlsf::Specification>> filters = {
-        make_dedup_filter<tlsf::Specification>(), tlsf_make_vacuity_filter()};
+        make_dedup_filter<tlsf::Specification>(),
+        correctness_filter<tlsf::Specification>("vacuity", global_sat_checker(),
+                                                global_real_checker())};
 
     for (std::size_t generation = 0; generation < 2; ++generation) {
         const RandomSource rng = make_random_source_from_seed(generation + 1);
-        population = evolve_generation_generic(cfg, population, target_size,
-                                               /*elitism_size=*/0, fitness,
-                                               filters, tlsf_operators(), rng);
+        population =
+            evolve_generation(cfg, population, target_size,
+                              /*elitism_size=*/0, fitness, filters, rng);
         expect(population.size() == target_size,
                "end-to-end: each generation returns target_size offspring");
         for (const Scored<tlsf::Specification>& scored : population) {

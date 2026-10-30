@@ -78,12 +78,4 @@ PackedFingerprint pack(const std::vector<bool>& bits);
 bool refutes_implication(const PackedFingerprint& lhs,
                          const PackedFingerprint& rhs);
 
-/// Lowercase hex, four bits a digit, word 0 in the low bit of the last digit.
-/// Padded to a whole digit so a fingerprint's length names its word count.
-std::string to_hex(const std::vector<bool>& bits);
-
-/// The count of positions where two equal-length fingerprints differ.
-std::size_t hamming_distance(const std::vector<bool>& lhs,
-                             const std::vector<bool>& rhs);
-
 }  // namespace fingerprint
