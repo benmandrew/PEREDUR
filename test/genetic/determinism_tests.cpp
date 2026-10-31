@@ -138,6 +138,10 @@ Config golden_config() {
     // arm returns before the RandomSource at any value. Pinned so a golden that
     // gains one fails here rather than re-recording.
     cfg.p_stop = 0.15;
+    // Off, its default. The golden fitness has no status objective, so the
+    // arm would leave every list alone even on; pinned so that a golden
+    // gaining one fails here rather than re-recording.
+    cfg.blame_targeted_slots = false;
     cfg.parallel = 1;
     return cfg;
 }
@@ -422,6 +426,62 @@ TEST(test_new_arms_cost_no_draw_at_zero) {
     expect(render_draws(monotone_on) != render_draws(response_on),
            "p_monotone: turning the arm on must change the draw stream, or "
            "the zero-cost guard above is passing over a dead arm");
+}
+
+// Slot targeting is a filter on the list the slot draw indexes, so it never
+// adds a draw. Off, a parent context must change nothing at all; on, the same
+// draw must index a shorter list, or the off check passes over a dead arm.
+TEST(test_slot_targeting_costs_no_draw_when_off) {
+    const std::vector<std::string> inputs = {"a", "b", "c"};
+    const std::vector<std::string> outputs = {"x", "y"};
+    const Specification spec({make_req("a", "b", timing::eventually())},
+                             {make_req("a", "x"), make_req("b", "y"),
+                              make_req("c", "x", timing::within_ticks(2))},
+                             inputs, outputs);
+    ParentContext parent;
+    parent.status = 1.0 / 3.0;
+    parent.refused_guarantees = {1};
+
+    struct Outcome {
+        std::string trace;
+        std::size_t slot_bound = 0;
+        Specification mutated;
+    };
+    const auto mutate = [&spec](const Config& cfg,
+                                const ParentContext* context) {
+        auto trace = std::make_shared<DrawTrace>();
+        const RandomSource source = make_recording_source(k_seed, trace);
+        Outcome outcome;
+        outcome.mutated = mutate_specification(spec, source, cfg, context);
+        outcome.trace = render_trace(*trace);
+        // The add-assumption arm's next_real comes first, then the slot.
+        outcome.slot_bound =
+            trace->draws.size() > 1 ? trace->draws[1].first : 0;
+        return outcome;
+    };
+
+    Config off = golden_config();
+    off.p_remove_guarantee = 0.0;
+    const Outcome without = mutate(off, nullptr);
+    const Outcome with = mutate(off, &parent);
+    expect(with.trace == without.trace && with.mutated == without.mutated,
+           "blame_targeted_slots: off, a parent context must change neither "
+           "the draw stream nor the offspring");
+    expect(without.slot_bound == 4,
+           "blame_targeted_slots: off, the slot draw should index all four "
+           "live weakenable slots, got " +
+               std::to_string(without.slot_bound));
+
+    Config targeting_on = off;
+    targeting_on.blame_targeted_slots = true;
+    const std::size_t before = SlotTargetingStats::n_targeted.load();
+    const Outcome targeted = mutate(targeting_on, &parent);
+    expect(targeted.slot_bound == 2,
+           "blame_targeted_slots: on, the slot draw should index the "
+           "assumption and the refused guarantee alone, got " +
+               std::to_string(targeted.slot_bound));
+    expect(SlotTargetingStats::n_targeted.load() == before + 1,
+           "blame_targeted_slots: a narrowed draw should be counted once");
 }
 
 TEST(test_evolved_population_is_pinned) {

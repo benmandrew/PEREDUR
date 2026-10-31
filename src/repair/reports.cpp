@@ -12,6 +12,7 @@
 #include "fitness/status.hpp"
 #include "genetic/accumulator.hpp"
 #include "genetic/generation.hpp"
+#include "genetic/mutation.hpp"
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
 #include "runner/ltlfilt.hpp"
@@ -179,6 +180,8 @@ void print_diagnostics_report() {
               << MrsSpeculationStats::n_killed << " killed once unreachable\n";
     std::cout << "\nRepairs contributed by the cross-generation accumulator: "
               << AccumulatorStats::n_contributed << "\n";
+    std::cout << "Mutations drawn from a blame-targeted slot list: "
+              << SlotTargetingStats::n_targeted << "\n";
     print_cache_report();
     std::cout << "\nFitness cache: " << FitnessCacheStats::n_hits << " hits / "
               << FitnessCacheStats::n_misses << " misses\n";

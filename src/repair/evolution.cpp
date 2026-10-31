@@ -18,13 +18,13 @@ std::vector<ScoredSpecification> original_population(
     std::size_t population_size) {
     std::vector<ScoredSpecification> population;
     population.reserve(population_size);
-    auto [objectives, fitness] =
-        fitness_function.objectives_and_fitness(original_spec);
+    auto [record, fitness] = fitness_function.record_and_fitness(original_spec);
     for (std::size_t i = 0; i < population_size; ++i) {
         ScoredSpecification scored;
         scored.specification = original_spec;
         scored.fitness = fitness;
-        scored.objectives = objectives;
+        scored.objectives = record.values;
+        scored.refused_guarantees = record.refused;
         population.push_back(std::move(scored));
     }
     return population;

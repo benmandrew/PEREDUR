@@ -806,9 +806,53 @@ Specification remove_guarantee(const Specification& specification,
 
 }  // namespace
 
+std::vector<std::size_t> targeted_mutation_slots(
+    const Specification& specification,
+    const std::vector<std::size_t>& weakenable, const ParentContext& parent) {
+    if (!parent.status.has_value() || parent.crossed) {
+        return {};
+    }
+    const std::size_t n_assumptions = specification.m_assumptions.size();
+    std::vector<std::size_t> targeted;
+    if (!parent.realizable) {
+        // An empty refused set on an unrealizable parent means the walk never
+        // graded it, so it says nothing about where the conflict lies.
+        if (parent.refused_guarantees.empty()) {
+            return {};
+        }
+        for (const std::size_t idx : weakenable) {
+            if (idx < n_assumptions ||
+                std::binary_search(parent.refused_guarantees.begin(),
+                                   parent.refused_guarantees.end(),
+                                   idx - n_assumptions)) {
+                targeted.push_back(idx);
+            }
+        }
+        return targeted;
+    }
+    if (parent.original == nullptr) {
+        return {};
+    }
+    const Specification& original = *parent.original;
+    for (const std::size_t idx : weakenable) {
+        const bool is_assumption = idx < n_assumptions;
+        const std::size_t local = is_assumption ? idx : idx - n_assumptions;
+        const std::vector<Requirement>& own = is_assumption
+                                                  ? specification.m_assumptions
+                                                  : specification.m_guarantees;
+        const std::vector<Requirement>& theirs =
+            is_assumption ? original.m_assumptions : original.m_guarantees;
+        if (local >= theirs.size() || !(own[local] == theirs[local])) {
+            targeted.push_back(idx);
+        }
+    }
+    return targeted;
+}
+
 Specification mutate_specification(const Specification& specification,
                                    const RandomSource& random_source,
-                                   const Config& cfg) {
+                                   const Config& cfg,
+                                   const ParentContext* parent) {
     assert(random_source);
     const std::size_t n_assumptions = specification.m_assumptions.size();
     assert(n_assumptions + specification.m_guarantees.size() > 0);
@@ -842,10 +886,20 @@ Specification mutate_specification(const Specification& specification,
     atoms.insert(atoms.end(), specification.m_out_atoms.begin(),
                  specification.m_out_atoms.end());
     const std::vector<Timing> timing_pool = collect_timing_pool(specification);
-    const std::vector<std::size_t> weakenable_indices =
+    std::vector<std::size_t> weakenable_indices =
         collect_weakenable_indices(specification);
     if (weakenable_indices.empty()) {
         return specification;
+    }
+    if (cfg.blame_targeted_slots && parent != nullptr) {
+        std::vector<std::size_t> targeted =
+            targeted_mutation_slots(specification, weakenable_indices, *parent);
+        if (!targeted.empty()) {
+            if (targeted.size() < weakenable_indices.size()) {
+                SlotTargetingStats::n_targeted++;
+            }
+            weakenable_indices = std::move(targeted);
+        }
     }
     const std::size_t idx =
         weakenable_indices[random_source.next_index(weakenable_indices.size())];

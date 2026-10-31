@@ -186,6 +186,15 @@ struct Config {
     /// stronger than `G(c -> F <input>)`, so the unconditional form keeps the
     /// majority of the draw.
     double p_conditional_assumption = 0.25;
+    /// FRETISH only: draw a rewrite's slot from where the parent's status
+    /// points rather than from every live weakenable slot. An unrealizable
+    /// parent draws from the guarantees its MRS walk refused plus every
+    /// assumption, and a realizable one from the slots that differ from the
+    /// original. An empty list, a crossover offspring, or a run without a
+    /// status objective keeps the full list. It filters the list the one draw
+    /// indexes, so it costs no draw; off, the stream is the one before it
+    /// existed.
+    bool blame_targeted_slots = false;
     /// TLSF-mode mutation: probability of mutating an assumption-side section
     /// (INITIALLY/REQUIRE/ASSUME) rather than a guarantee-side one
     /// (PRESET/ASSERT/GUARANTEE). The guarantee side takes the complement.

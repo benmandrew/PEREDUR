@@ -26,6 +26,7 @@
 #include "fitness/semantic_similarity.hpp"
 #include "fitness/status.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/mutation.hpp"
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
 #include "runner/ltlfilt.hpp"
@@ -45,7 +46,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 50;
+constexpr int k_schema_version = 51;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -357,6 +358,9 @@ void write_run_manifest(const std::string& output_dir,
         // population's own collection did not already hold. Zero when every
         // accumulated repair happened to survive to the last generation.
         {"n_accumulated_repairs", AccumulatorStats::n_contributed},
+        // Rewrites whose slot blame_targeted_slots drew from a narrowed list.
+        // Zero whenever the key is off.
+        {"n_targeted_mutations", SlotTargetingStats::n_targeted.load()},
         // ltlsynt calls that reported SPOT's acceptance-set ceiling rather than
         // a verdict, resolved as undecided rather than ending the run.
         {"n_ltlsynt_capability_errors",

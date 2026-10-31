@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 38> k_config_keys{{
+inline constexpr std::array<ConfigKey, 39> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -268,6 +268,18 @@ inline constexpr std::array<ConfigKey, 38> k_config_keys{{
      "Of the appended assumptions, the fraction guarded by a random input atom "
      "rather than by 'true'.",
      ""},
+    {"mutation", "blame_targeted_slots", &Config::blame_targeted_slots,
+     KeyCheck::None, KeyReader::Fretish,
+     "FRETISH only: draw a rewrite's slot from where the parent's status "
+     "points. An unrealizable parent draws from the guarantees its MRS walk "
+     "refused plus every assumption, a realizable one from the slots that "
+     "differ from the original; an empty list or a crossover offspring keeps "
+     "every live weakenable slot. Costs no draw.",
+     "FRETISH only: aim a rewrite at the guarantees the parent's MRS walk "
+     "refused\n"
+     "(and the assumptions) when the parent is unrealizable, or at the slots "
+     "that\n"
+     "differ from the original when it is realizable. Off by default.\n"},
     {"model_counting", "default_bound", &Config::default_model_counting_bound,
      KeyCheck::Positive, KeyReader::Both,
      "Trace-length bound k for bounded model counting.", ""},

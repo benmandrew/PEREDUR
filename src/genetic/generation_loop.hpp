@@ -59,14 +59,14 @@ inline double seconds_since(std::chrono::steady_clock::time_point start) {
 
 // Runs up to cfg.generations generations from @p population, stopping early
 // once @p budget is spent. Every generation's gate-passing candidates go to
-// @p accumulator.
+// @p accumulator. @p original, where given, is lent to breeding.
 template <typename Spec>
 SearchResult<Spec> run_generations(
     const Config& cfg, std::vector<Scored<Spec>> population,
     const AggregateWeightedFitnessFunctionT<Spec>& fitness,
     const std::vector<FilterFunctionT<Spec>>& filters,
     const RandomSource& random_source, RepairAccumulator<Spec>& accumulator,
-    SearchBudget& budget) {
+    SearchBudget& budget, const Spec* original = nullptr) {
     using generation_loop_detail::format_fixed;
     using generation_loop_detail::seconds_since;
 
@@ -110,7 +110,7 @@ SearchResult<Spec> run_generations(
         };
         population = evolve_generation(
             cfg, population, sizes.selection, sizes.elitism, fitness, filters,
-            random_source, on_progress, nullptr, &budget);
+            random_source, on_progress, nullptr, &budget, original);
         budget.count_generation();
         for (std::size_t k = 0; k < filters.size(); ++k) {
             filter_stats[k].total_in += filters[k].n_in();

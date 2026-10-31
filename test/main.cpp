@@ -45,6 +45,7 @@ const std::vector<Suite>& suites() {
         suite_named("termination"),
         suite_named("nsga2"),
         suite_named("mutation"),
+        suite_named("blame_targeting"),
         suite_named("fretish_monotone"),
         suite_named("order_moves"),
         suite_named("prop_formula_ast"),

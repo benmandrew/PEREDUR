@@ -6,6 +6,7 @@
 ///        get_fitness_function.
 
 #include <cassert>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -61,6 +62,28 @@ struct FitnessPart {
 struct ObjectiveWork {
     std::vector<FitnessPart> parts;
     std::function<double(const std::vector<double>&)> combine;
+    /// Optional. Given the same part values as `combine`, the guarantee slots
+    /// the objective blames; see ObjectiveRecord::refused. Only the status
+    /// objective sets it.
+    std::function<std::vector<std::size_t>(const std::vector<double>&)>
+        refused = nullptr;
+};
+
+/// What the fitness cache holds for one candidate: its objective vector, and
+/// the guarantee slots its status walk refused.
+///
+/// The refused set is carried with the objectives rather than recomputed,
+/// so that a cache hit hands breeding exactly what the walk that scored the
+/// candidate found, without asking a single query again.
+struct ObjectiveRecord {
+    /// Per-objective scores, in registration order.
+    std::vector<double> values;
+    /// Indices into `m_guarantees` of the guarantees the MRS walk refused,
+    /// ascending. Empty when the walk did not grade the candidate: a run
+    /// without a status objective, StatusGrading::Aurus, a candidate the
+    /// component or whole-specification screen scored 0, and the TLSF path,
+    /// whose walk runs over conjuncts that no slot names.
+    std::vector<std::size_t> refused;
 };
 
 /// Splits an objective's work for one candidate into parts. An objective
@@ -84,10 +107,26 @@ struct WeightedFitnessFunctionT {
     /// three-field brace initialisations of this aggregate keep compiling under
     /// -Wmissing-field-initializers.
     FitnessDecompositionT<Spec> decompose = nullptr;
+    /// Optional. `function` that also reports the guarantee slots it blames
+    /// (see ObjectiveRecord::refused). Read in its place by the serial path
+    /// where set.
+    std::function<double(const Spec&, std::vector<std::size_t>&)>
+        function_with_refused = nullptr;
 
     /// Scores @p spec on the calling thread: `function` where there is one,
     /// otherwise every part of `decompose` in order, folded by its `combine`.
     double operator()(const Spec& spec) const {
+        std::vector<std::size_t> refused;
+        return evaluate(spec, refused);
+    }
+
+    /// As operator(), filling @p refused with the slots the objective blames,
+    /// which is empty for every objective but status.
+    double evaluate(const Spec& spec, std::vector<std::size_t>& refused) const {
+        refused.clear();
+        if (function_with_refused) {
+            return function_with_refused(spec, refused);
+        }
         if (function) {
             return function(spec);
         }
@@ -97,6 +136,9 @@ struct WeightedFitnessFunctionT {
         values.reserve(work.parts.size());
         for (const FitnessPart& part : work.parts) {
             values.push_back(part.run());
+        }
+        if (work.refused) {
+            refused = work.refused(values);
         }
         return work.combine(values);
     }
@@ -132,7 +174,7 @@ template <typename Spec>
 class AggregateWeightedFitnessFunctionT {
    private:
     std::vector<WeightedFitnessFunctionT<Spec>> m_fitness_functions;
-    mutable std::unordered_map<Spec, std::vector<double>> m_cache;
+    mutable std::unordered_map<Spec, ObjectiveRecord> m_cache;
     mutable std::unique_ptr<std::mutex> m_cache_mutex =
         std::make_unique<std::mutex>();
     /// One profiler site per objective, resolved once at construction: the
@@ -148,7 +190,7 @@ class AggregateWeightedFitnessFunctionT {
     /// the winner's entry, which is the same value. The duplicated work is the
     /// price of not holding the mutex across an objective that shells out to
     /// black or ltlsynt, which would serialise the whole scoring pool.
-    std::vector<double> objectives_cached(const Spec& spec) const {
+    ObjectiveRecord objectives_cached(const Spec& spec) const {
         {
             std::scoped_lock lock(*m_cache_mutex);
             const auto cache_iter = m_cache.find(spec);
@@ -158,14 +200,20 @@ class AggregateWeightedFitnessFunctionT {
             }
             FitnessCacheStats::n_misses++;
         }
-        std::vector<double> values;
-        values.reserve(m_fitness_functions.size());
+        ObjectiveRecord record;
+        record.values.reserve(m_fitness_functions.size());
+        std::vector<std::size_t> refused;
         for (std::size_t i = 0; i < m_fitness_functions.size(); ++i) {
             const profile::Scope scope(*m_profile_sites[i]);
-            values.push_back(m_fitness_functions[i](spec));
+            record.values.push_back(
+                m_fitness_functions[i].evaluate(spec, refused));
+            if (!refused.empty()) {
+                record.refused = std::move(refused);
+                refused.clear();
+            }
         }
         std::scoped_lock lock(*m_cache_mutex);
-        return m_cache.emplace(spec, std::move(values)).first->second;
+        return m_cache.emplace(spec, std::move(record)).first->second;
     }
 
     double weighted_average(const std::vector<double>& objectives) const {
@@ -200,13 +248,21 @@ class AggregateWeightedFitnessFunctionT {
     /// @return The weighted average fitness score, or 0.0 if total weight is
     /// not positive.
     double operator()(const Spec& spec) const {
-        return weighted_average(objectives_cached(spec));
+        return weighted_average(objectives_cached(spec).values);
     }
 
     /// Returns the individual per-objective scores for @p spec, in the
     /// registration order of the aggregated fitness functions.
     std::vector<double> objectives(const Spec& spec) const {
-        return objectives_cached(spec);
+        return objectives_cached(spec).values;
+    }
+
+    /// As objectives_and_fitness, with the refused guarantees alongside.
+    std::pair<ObjectiveRecord, double> record_and_fitness(
+        const Spec& spec) const {
+        ObjectiveRecord record = objectives_cached(spec);
+        const double scalar = weighted_average(record.values);
+        return {std::move(record), scalar};
     }
 
     /// Scores @p spec once, returning both the raw per-objective vector and
@@ -214,7 +270,7 @@ class AggregateWeightedFitnessFunctionT {
     /// lookup. Used by score_population so a scored element carries both.
     std::pair<std::vector<double>, double> objectives_and_fitness(
         const Spec& spec) const {
-        std::vector<double> values = objectives_cached(spec);
+        std::vector<double> values = objectives_cached(spec).values;
         const double scalar = weighted_average(values);
         return {std::move(values), scalar};
     }
@@ -224,6 +280,15 @@ class AggregateWeightedFitnessFunctionT {
     /// path reports, so a split scoring run's cache rate stays comparable.
     std::optional<std::vector<double>> cached_objectives(
         const Spec& spec) const {
+        std::optional<ObjectiveRecord> record = cached_record(spec);
+        if (!record.has_value()) {
+            return std::nullopt;
+        }
+        return std::move(record->values);
+    }
+
+    /// As cached_objectives, with the refused guarantees alongside.
+    std::optional<ObjectiveRecord> cached_record(const Spec& spec) const {
         const std::scoped_lock lock(*m_cache_mutex);
         const auto cache_iter = m_cache.find(spec);
         if (cache_iter != m_cache.end()) {
@@ -286,10 +351,30 @@ class AggregateWeightedFitnessFunctionT {
     /// mutex across a subprocess.
     std::pair<std::vector<double>, double> store(
         const Spec& spec, std::vector<double> values) const {
+        auto [record, scalar] =
+            store(spec, ObjectiveRecord{std::move(values), {}});
+        return {std::move(record.values), scalar};
+    }
+
+    /// As store, for a whole record.
+    std::pair<ObjectiveRecord, double> store(const Spec& spec,
+                                             ObjectiveRecord record) const {
         const std::scoped_lock lock(*m_cache_mutex);
-        const std::vector<double>& stored =
-            m_cache.emplace(spec, std::move(values)).first->second;
-        return {stored, weighted_average(stored)};
+        const ObjectiveRecord& stored =
+            m_cache.emplace(spec, std::move(record)).first->second;
+        return {stored, weighted_average(stored.values)};
+    }
+
+    /// The position of the objective named @p name in an objective vector, or
+    /// nothing when the run does not score it (its weight was 0).
+    [[nodiscard]] std::optional<std::size_t> objective_index(
+        const std::string& name) const {
+        for (std::size_t i = 0; i < m_fitness_functions.size(); ++i) {
+            if (m_fitness_functions[i].name == name) {
+                return i;
+            }
+        }
+        return std::nullopt;
     }
 
     /// Number of aggregated objectives (per-element vector length).

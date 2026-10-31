@@ -266,11 +266,12 @@ SearchOutput<Spec> finish_search(
     // inside solver dispatch for nothing.
     output.repairs.reserve(repairs.size());
     for (Spec& spec : repairs) {
-        auto [objectives, scalar] = fitness.objectives_and_fitness(spec);
+        auto [record, scalar] = fitness.record_and_fitness(spec);
         Scored<Spec> scored;
         scored.specification = std::move(spec);
         scored.fitness = scalar;
-        scored.objectives = std::move(objectives);
+        scored.objectives = std::move(record.values);
+        scored.refused_guarantees = std::move(record.refused);
         output.repairs.push_back(std::move(scored));
     }
     order_population(cfg, output.repairs);

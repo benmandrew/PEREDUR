@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <unordered_set>
@@ -19,6 +20,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "fitness/status.hpp"
 #include "genetic/crossover.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/nsga2.hpp"
@@ -154,6 +156,23 @@ namespace generation_detail {
 
 constexpr std::size_t k_rate_granularity = 1'000'000;
 
+/// What mutation is told about the FRETISH parent @p parent.
+inline ParentContext parent_context(
+    const Scored<Specification>& parent, bool crossed,
+    const Specification* original,
+    std::optional<std::size_t> status_objective) {
+    ParentContext context;
+    if (status_objective.has_value() &&
+        *status_objective < parent.objectives.size()) {
+        context.status = parent.objectives[*status_objective];
+        context.realizable = *context.status >= k_status_realizable;
+    }
+    context.refused_guarantees = parent.refused_guarantees;
+    context.crossed = crossed;
+    context.original = original;
+    return context;
+}
+
 inline bool probability_check(double rate, const RandomSource& random_source) {
     if (rate <= 0.0) {
         return false;
@@ -181,12 +200,17 @@ inline bool probability_check(double rate, const RandomSource& random_source) {
 /// Returns fewer than @p offspring_n specifications when @p budget runs out
 /// part-way through, which is the only way it returns short. A null or inactive
 /// budget cannot, so the default configuration always fills every slot.
+///
+/// FRETISH mutation is handed a ParentContext built from the parent's Scored
+/// entry, @p status_objective naming the status in its objective vector and
+/// @p original lent to it unchanged. Building it draws nothing.
 template <typename Spec>
-std::vector<Spec> breed_offspring(const Config& cfg,
-                                  const std::vector<Scored<Spec>>& sorted_pop,
-                                  std::size_t offspring_n, std::size_t top_n,
-                                  const RandomSource& random_source,
-                                  SearchBudget* budget) {
+std::vector<Spec> breed_offspring(
+    const Config& cfg, const std::vector<Scored<Spec>>& sorted_pop,
+    std::size_t offspring_n, std::size_t top_n,
+    const RandomSource& random_source, SearchBudget* budget,
+    const Spec* original = nullptr,
+    std::optional<std::size_t> status_objective = std::nullopt) {
     std::vector<Spec> offspring_pop;
     offspring_pop.reserve(offspring_n);
     // Read once: an inactive budget must not reach the loop body at all, or an
@@ -203,7 +227,9 @@ std::vector<Spec> breed_offspring(const Config& cfg,
             break;
         }
         Spec offspring = sorted_pop[i].specification;
+        bool crossed = false;
         if (probability_check(cfg.crossover_rate, random_source)) {
+            crossed = true;
             const std::size_t partner = random_source.next_index(top_n);
             const Spec& other = sorted_pop[partner].specification;
             if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
@@ -217,7 +243,10 @@ std::vector<Spec> breed_offspring(const Config& cfg,
             if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
                 offspring = tlsf_mutate(offspring, random_source, cfg);
             } else {
-                offspring = mutate_specification(offspring, random_source, cfg);
+                const ParentContext parent = parent_context(
+                    sorted_pop[i], crossed, original, status_objective);
+                offspring = mutate_specification(offspring, random_source, cfg,
+                                                 &parent);
             }
         }
         // Counted before simplification, and only when the slot actually
@@ -377,6 +406,12 @@ struct GenerationContext {
     /// not by the generation, so it accumulates across generations and across
     /// the cores of a MUC-mode run.
     SearchBudget* m_budget;
+    /// The specification the run repairs, lent to breeding; null when the
+    /// caller gave none.
+    const Spec* m_original = nullptr;
+    /// Where the status sits in each candidate's objective vector, or nothing
+    /// when the run scores none. Read by breeding to build a ParentContext.
+    std::optional<std::size_t> m_status_objective;
 
     std::size_t m_target_size;
     std::size_t m_top_n;
@@ -467,7 +502,8 @@ void stage_breed(GenerationContext<Spec>& ctx) {
     ctx.m_scored.clear();
     ctx.m_candidates = generation_detail::breed_offspring(
         ctx.m_cfg, ctx.m_sorted_parents, ctx.m_offspring_n, ctx.m_top_n,
-        ctx.m_random_source, ctx.m_budget);
+        ctx.m_random_source, ctx.m_budget, ctx.m_original,
+        ctx.m_status_objective);
     // The filter chain is judged as a whole rather than filter by filter, so
     // the unfiltered offspring have to survive until every filter has run.
     ctx.m_pre_filter = ctx.m_candidates;

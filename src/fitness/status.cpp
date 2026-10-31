@@ -357,8 +357,11 @@ double status_score_mrs(const std::vector<std::string>& components,
                         std::size_t n_parts, SatisfiabilityChecker& sat,
                         const SubsetRealizability& subset_realizable,
                         const std::vector<std::size_t>& admission_order,
-                        const std::string& whole,
-                        std::size_t speculation_depth) {
+                        const std::string& whole, std::size_t speculation_depth,
+                        std::vector<std::size_t>* refused) {
+    if (refused != nullptr) {
+        refused->clear();
+    }
     if (!all_components_satisfiable(components, sat)) {
         return k_status_component_unsatisfiable;
     }
@@ -408,7 +411,13 @@ double status_score_mrs(const std::vector<std::string>& components,
         }
         if (!subset_realizable(kept)) {
             kept.erase(inserted);
+            if (refused != nullptr) {
+                refused->push_back(part);
+            }
         }
+    }
+    if (refused != nullptr) {
+        std::sort(refused->begin(), refused->end());
     }
     return static_cast<double>(kept.size()) / static_cast<double>(n_parts);
 }
@@ -602,7 +611,11 @@ double specification_status(const Specification& specification,
                             RealizabilityChecker& real, StatusGrading grading,
                             const std::vector<std::size_t>& slot_order,
                             ComponentCheck component_check,
-                            std::size_t speculation_depth) {
+                            std::size_t speculation_depth,
+                            std::vector<std::size_t>* refused_slots) {
+    if (refused_slots != nullptr) {
+        refused_slots->clear();
+    }
     if (grading == StatusGrading::Aurus) {
         // Sides rather than requirements, and no component tier: the ladder is
         // AuRUS's whole scale, not a refinement of PEREDUR's. See
@@ -628,7 +641,8 @@ double specification_status(const Specification& specification,
 
     const std::vector<std::size_t> slots =
         live_indices(specification.m_guarantees);
-    return status_score_mrs(
+    std::vector<std::size_t> refused_positions;
+    const double score = status_score_mrs(
         components, slots.size(), sat,
         [&specification, &slots,
          &real](const std::vector<std::size_t>& indices) {
@@ -642,5 +656,14 @@ double specification_status(const Specification& specification,
         position_order_from_slots(slot_order, slots),
         "(" + side_conjunction(specification.m_assumptions) + ") & (" +
             side_conjunction(specification.m_guarantees) + ")",
-        speculation_depth);
+        speculation_depth,
+        refused_slots != nullptr ? &refused_positions : nullptr);
+    if (refused_slots != nullptr) {
+        // Positions ascend, and live_indices is ascending, so the slots do too.
+        refused_slots->reserve(refused_positions.size());
+        for (const std::size_t position : refused_positions) {
+            refused_slots->push_back(slots[position]);
+        }
+    }
+    return score;
 }

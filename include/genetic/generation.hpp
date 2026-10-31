@@ -216,17 +216,21 @@ void commit_candidate(const PlannedCandidate<Spec>& candidate,
                       const Fitness& fitness_function,
                       std::vector<Scored<Spec>>& scored,
                       std::vector<bool>& succeeded) {
-    std::vector<double> objectives;
-    objectives.reserve(candidate.work.size());
+    ObjectiveRecord record;
+    record.values.reserve(candidate.work.size());
     for (std::size_t obj = 0; obj < candidate.work.size(); ++obj) {
-        objectives.push_back(
-            candidate.work[obj].combine(candidate.values[obj]));
+        const ObjectiveWork& work = candidate.work[obj];
+        record.values.push_back(work.combine(candidate.values[obj]));
+        if (work.refused) {
+            record.refused = work.refused(candidate.values[obj]);
+        }
     }
     auto [stored, fitness] = fitness_function.store(
-        population[candidate.indices.front()], std::move(objectives));
+        population[candidate.indices.front()], std::move(record));
     for (const std::size_t idx : candidate.indices) {
         scored[idx].specification = population[idx];
-        scored[idx].objectives = stored;
+        scored[idx].objectives = stored.values;
+        scored[idx].refused_guarantees = stored.refused;
         scored[idx].fitness = fitness;
         succeeded[idx] = true;
     }
@@ -235,11 +239,12 @@ void commit_candidate(const PlannedCandidate<Spec>& candidate,
 /// Records an already-cached score against the population slot it belongs to.
 template <typename Spec>
 void commit_cached(std::size_t idx, const std::vector<Spec>& population,
-                   std::pair<std::vector<double>, double> cached,
+                   std::pair<ObjectiveRecord, double> cached,
                    std::vector<Scored<Spec>>& scored,
                    std::vector<bool>& succeeded) {
     scored[idx].specification = population[idx];
-    scored[idx].objectives = std::move(cached.first);
+    scored[idx].objectives = std::move(cached.first.values);
+    scored[idx].refused_guarantees = std::move(cached.first.refused);
     scored[idx].fitness = cached.second;
     succeeded[idx] = true;
 }
@@ -265,13 +270,13 @@ std::vector<PlannedCandidate<Spec>> plan_population(
     std::unordered_map<Spec, std::size_t> planned_by_spec;
     planned_by_spec.reserve(population.size());
     for (std::size_t idx = 0; idx < population.size(); ++idx) {
-        std::optional<std::vector<double>> cached =
-            fitness_function.cached_objectives(population[idx]);
+        std::optional<ObjectiveRecord> cached =
+            fitness_function.cached_record(population[idx]);
         if (cached.has_value()) {
             // Paired with its scalar directly rather than handed back through
             // store(), which would hash and compare the whole specification a
             // second time to re-emplace a key it just answered from.
-            const double fitness = fitness_function.scalar(*cached);
+            const double fitness = fitness_function.scalar(cached->values);
             commit_cached(idx, population, {std::move(*cached), fitness},
                           scored, succeeded);
             report();
@@ -639,6 +644,8 @@ PopulationRescue<Spec> correctness_rescue(
 /// @param budget            Optional run-level budget; breeding stops part-way
 ///                          through the generation when it runs out, so the
 ///                          result can then be smaller than target_size
+/// @param original          Optional specification the run repairs, lent to
+///                          mutation through its ParentContext
 /// @return                  Next generation of target_size specifications
 template <typename Spec, typename Fitness>
 std::vector<Scored<Spec>> evolve_generation(
@@ -648,7 +655,8 @@ std::vector<Scored<Spec>> evolve_generation(
     const std::vector<FilterFunctionT<Spec>>& filter_functions,
     const RandomSource& random_source,
     const GenerationProgressCallback& on_progress = nullptr,
-    const StageObserver& on_stage = nullptr, SearchBudget* budget = nullptr) {
+    const StageObserver& on_stage = nullptr, SearchBudget* budget = nullptr,
+    const Spec* original = nullptr) {
     assert(random_source);
     assert(!fitness_functions.empty());
     assert(cfg.crossover_rate >= 0.0 && cfg.crossover_rate <= 1.0);
@@ -663,6 +671,8 @@ std::vector<Scored<Spec>> evolve_generation(
                                     on_progress);
         },
         budget);
+    ctx.m_original = original;
+    ctx.m_status_objective = fitness_functions.objective_index("status");
     const std::vector<PipelineStage<Spec>> stages =
         make_generation_pipeline<Spec>(filter_stages(filter_functions),
                                        correctness_rescue(filter_functions));

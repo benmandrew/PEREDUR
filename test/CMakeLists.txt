@@ -17,6 +17,7 @@ add_executable(peredur_tests
     genetic/pipeline_tests.cpp
     genetic/termination_tests.cpp
     genetic/mutation_tests.cpp
+    genetic/blame_targeting_tests.cpp
     genetic/monotone_arm_tests.cpp
     genetic/nsga2_tests.cpp
     genetic/order_moves_tests.cpp
@@ -100,6 +101,7 @@ set(peredur_test_suites
     termination
     nsga2
     mutation
+    blame_targeting
     fretish_monotone
     order_moves
     prop_formula_ast

@@ -229,9 +229,12 @@ struct TlsfScorers {
         return tlsf_semantic_similarity_terms(spec, original, cfg);
     }
 
+    // The walk's parts are conjuncts split out of whole sections, which no
+    // section slot names, so nothing is reported as refused.
     static double status(const tlsf::Specification& spec, const Config& cfg,
                          const std::vector<std::size_t>& order,
-                         ComponentCheck component_check) {
+                         ComponentCheck component_check,
+                         std::vector<std::size_t>* /*refused*/) {
         return tlsf_status(spec, cfg, order, component_check);
     }
 

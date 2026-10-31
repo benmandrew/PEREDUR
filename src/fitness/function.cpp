@@ -32,11 +32,12 @@ struct FretishScorers {
 
     static double status(const Specification& spec, const Config& cfg,
                          const std::vector<std::size_t>& slot_order,
-                         ComponentCheck component_check) {
+                         ComponentCheck component_check,
+                         std::vector<std::size_t>* refused) {
         return specification_status(spec, global_sat_checker(),
                                     global_real_checker(), cfg.status_grading,
                                     slot_order, component_check,
-                                    cfg.mrs_speculation_depth);
+                                    cfg.mrs_speculation_depth, refused);
     }
 
     static std::vector<std::string> status_components(

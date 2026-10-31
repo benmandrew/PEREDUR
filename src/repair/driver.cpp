@@ -197,7 +197,7 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
                 budget, stream.get());
         SearchResult<Specification> evolved = run_generations(
             cfg, std::move(population), fitness_function, filter_functions,
-            random_source, accumulator, budget);
+            random_source, accumulator, budget, &original_spec);
         const SearchOutput<Specification> output =
             finish_search(cfg, std::move(evolved), accumulator.specifications(),
                           fitness_function, stream.get());

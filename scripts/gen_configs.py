@@ -117,6 +117,10 @@ DEFAULTS: dict = {
     # a sweep overrides it (see make_toml), like p_add_assumption. At 0 it costs
     # no draw, so a run reproduces one from before the operator existed.
     "p_remove_guarantee": 0.05,
+    # FRETISH only: aim mutation's slot draw by the parent's status. Emitted
+    # into [mutation] only when a sweep overrides it (see make_toml), so
+    # existing grids stay byte-identical.
+    "blame_targeted_slots": False,
     "default_bound": 20,
     "run_implication": True,
     # Keys in VINTAGE_KEYS must follow the binary rather than be pinned, because
@@ -250,7 +254,9 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         [f"p_add_assumption = {_fmt(d['p_add_assumption'])}"]
         if "p_add_assumption" in overrides else []) + (
         [f"p_remove_guarantee = {_fmt(d['p_remove_guarantee'])}"]
-        if "p_remove_guarantee" in overrides else []) + [
+        if "p_remove_guarantee" in overrides else []) + (
+        [f"blame_targeted_slots = {_fmt(d['blame_targeted_slots'])}"]
+        if "blame_targeted_slots" in overrides else []) + [
         "",
         "[model_counting]",
         f"default_bound = {d['default_bound']}",

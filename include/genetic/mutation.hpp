@@ -4,7 +4,10 @@
 /// @brief Mutation operators for formulae, timing constraints, requirements,
 ///        and full specifications used in the genetic algorithm.
 
+#include <atomic>
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -108,16 +111,77 @@ Requirement mutate_requirement(const Requirement& requirement,
                                const RandomSource& random_source,
                                const Config& cfg);
 
+/// What breeding knows about the parent an offspring descends from, handed to
+/// mutate_specification so that it can aim its move. Built per offspring by
+/// breed_offspring from the parent's Scored entry, on the FRETISH path only.
+///
+/// After a crossover the offspring is no longer the parent it was copied from,
+/// so every field but @c original describes the first parent and is only an
+/// estimate of the offspring.
+struct ParentContext {
+    /// The parent's status objective, or nothing when the run scores none.
+    std::optional<double> status;
+    /// The status reached k_status_realizable: realizable and, under MRS
+    /// grading, well-separated.
+    bool realizable = false;
+    /// The guarantee slots the parent's MRS walk refused (see
+    /// ObjectiveRecord::refused). Empty when the walk did not grade it.
+    std::vector<std::size_t> refused_guarantees;
+    /// Crossover fired on this offspring before mutation.
+    bool crossed = false;
+    /// The specification the run repairs, which every slot descends from.
+    /// Borrowed for the generation, never copied; null when the caller has
+    /// none to give.
+    const Specification* original = nullptr;
+};
+
+/// How often mutate_specification drew its slot from a targeted list under
+/// Config::blame_targeted_slots, over a run. Reported under `--diagnostics`
+/// and in run.json.
+struct SlotTargetingStats {
+    /// Rewrites whose slot was drawn from a list narrower than every live
+    /// weakenable slot.
+    inline static std::atomic<std::size_t> n_targeted{0};
+};
+
+/// The slots Config::blame_targeted_slots narrows a rewrite to, as global
+/// indices (assumptions first, then guarantees) drawn from @p weakenable, in
+/// its order. Empty means no narrowing: no context, no status, a crossover
+/// offspring, or a list that would be empty.
+///
+/// An unrealizable parent keeps the refused guarantees and every assumption,
+/// since a guarantee outside every unrealizable core cannot make the
+/// specification realizable by weakening, while any assumption can. A
+/// realizable parent keeps the slots that differ from @p parent's original,
+/// counting an appended assumption as differing, since only those can step
+/// back towards it.
+///
+/// @param specification The specification about to be mutated
+/// @param weakenable    Its live weakenable slots, as mutate_specification
+///                      collects them
+/// @param parent        What breeding knows about the parent
+std::vector<std::size_t> targeted_mutation_slots(
+    const Specification& specification,
+    const std::vector<std::size_t>& weakenable, const ParentContext& parent);
+
 /// Mutates a specification by picking one requirement at random and replacing
 /// it with a mutated version. The pool of atom names is taken from the
 /// specification's in_atoms and out_atoms, on both sides.
 ///
+/// Under Config::blame_targeted_slots the requirement is drawn from
+/// targeted_mutation_slots where that is not empty. The draw is the same single
+/// `next_index` over a shorter list, so the arm adds no draw, though it changes
+/// which slot the draw lands on.
+///
 /// @param specification The specification to mutate (must be non-empty)
 /// @param random_source Random source for index and mutation choices
 /// @param cfg           Configuration providing mutation probabilities
+/// @param parent        What breeding knows about the parent; null aims
+///                      nothing
 /// @return              A specification with one requirement mutated
 /// @throws std::invalid_argument if specification is empty or random_source is
 ///         not callable
 Specification mutate_specification(const Specification& specification,
                                    const RandomSource& random_source,
-                                   const Config& cfg);
+                                   const Config& cfg,
+                                   const ParentContext* parent = nullptr);

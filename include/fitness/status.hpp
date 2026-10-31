@@ -238,6 +238,11 @@ void set_mrs_lookahead_kill_grace(std::chrono::milliseconds grace);
 ///                          once the components pass; empty skips the query
 /// @param speculation_depth How many steps ahead to query; 0 is the serial
 ///                          walk. See Config::mrs_speculation_depth
+/// @param refused           When not null, cleared and then filled with the
+///                          parts the walk refused, ascending. It stays empty
+///                          when the walk does not run: a failed component, an
+///                          unsatisfiable whole specification, or no parts.
+///                          Asking for it changes no query and no score
 /// @return                  k_status_component_unsatisfiable, or |kept|/n_parts
 ///                          in [0, 1]; 1.0 exactly when every part is kept
 double status_score_mrs(const std::vector<std::string>& components,
@@ -245,7 +250,8 @@ double status_score_mrs(const std::vector<std::string>& components,
                         const SubsetRealizability& subset_realizable,
                         const std::vector<std::size_t>& admission_order = {},
                         const std::string& whole = {},
-                        std::size_t speculation_depth = 0);
+                        std::size_t speculation_depth = 0,
+                        std::vector<std::size_t>* refused = nullptr);
 
 /// @p reference restricted to a walk over @p n_parts parts: entries addressing
 /// a part that no longer exists are dropped, and parts the reference does not
@@ -335,12 +341,18 @@ std::vector<std::size_t> conflict_degree_order(
 /// @param speculation_depth The MRS walk's lookahead; see
 ///                      @ref status_score_mrs. Read only under
 ///                      StatusGrading::Mrs
+/// @param refused_slots When not null, cleared and then filled with the
+///                      guarantees the MRS walk refused, as ascending slots of
+///                      `m_guarantees` rather than walk positions. Empty
+///                      under StatusGrading::Aurus and wherever the walk does
+///                      not run (see @ref status_score_mrs)
 double specification_status(
     const Specification& specification, SatisfiabilityChecker& sat,
     RealizabilityChecker& real, StatusGrading grading = StatusGrading::Mrs,
     const std::vector<std::size_t>& slot_order = {},
     ComponentCheck component_check = ComponentCheck::Included,
-    std::size_t speculation_depth = 0);
+    std::size_t speculation_depth = 0,
+    std::vector<std::size_t>* refused_slots = nullptr);
 
 /// The components @ref specification_status tests individually: the condition
 /// and the response of each live requirement as two formulae, assumptions

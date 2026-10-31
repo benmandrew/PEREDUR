@@ -40,7 +40,7 @@ Report "best fitness" as the population maximum, never `population[0]`/`front()`
 
 ## Generation pipeline
 
-`make_generation_pipeline` (`include/genetic/pipeline.hpp`) returns named `PipelineStage`s, and `run_generation_pipeline` reports each to an optional `StageObserver`, through which the `pipeline` suite reads every stage's name and population sizes. Breeding must stay a single stage, because crossover and mutation interleave per offspring slot and splitting them reorders the RNG draws; the `determinism` suite pins the draw stream.
+`make_generation_pipeline` (`include/genetic/pipeline.hpp`) returns named `PipelineStage`s, and `run_generation_pipeline` reports each to an optional `StageObserver`, through which the `pipeline` suite reads every stage's name and population sizes. Breeding must stay a single stage, because crossover and mutation interleave per offspring slot and splitting them reorders the RNG draws; the `determinism` suite pins the draw stream. FRETISH mutation receives a `ParentContext` per offspring, built from the parent's `Scored` entry without a draw, and the original specification by pointer through `GenerationContext::m_original` (see "Blame-targeted slot choice" in `docs/dev/operators.md`).
 
 Two calls that both draw from the `RandomSource` must never be arguments of the same call, because gcc and clang evaluate arguments in opposite orders and seeds stop reproducing across compilers. Sequence each draw into its own local (as `rewrite_post_order` does); the CI gcc job catches this, the goldens being pinned under clang.
 

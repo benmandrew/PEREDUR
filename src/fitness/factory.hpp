@@ -34,7 +34,12 @@ WeightedFitnessFunctionT<Spec> status_objective(const Spec& original,
         StatusContext{cfg, std::move(order)});
     auto status = [status_ctx](const Spec& spec) -> double {
         return Scorers::status(spec, status_ctx->cfg, status_ctx->order,
-                               ComponentCheck::Included);
+                               ComponentCheck::Included, nullptr);
+    };
+    auto status_with_refused = [status_ctx](const Spec& spec,
+                                            std::vector<std::size_t>& refused) {
+        return Scorers::status(spec, status_ctx->cfg, status_ctx->order,
+                               ComponentCheck::Included, &refused);
     };
     // One part per component satisfiability query, plus the realizability
     // walk. The walk is handed ComponentCheck::Skipped and the fold applies
@@ -61,23 +66,42 @@ WeightedFitnessFunctionT<Spec> status_objective(const Spec& original,
                  },
                  k_part_cost_satisfiability});
         }
-        work.parts.push_back({[status_ctx, &spec] {
+        // Written by the walk on its worker and read by the fold on the
+        // dispatcher, which collects the part's result before folding.
+        auto refused = std::make_shared<std::vector<std::size_t>>();
+        work.parts.push_back({[status_ctx, &spec, refused] {
                                   return Scorers::status(
                                       spec, status_ctx->cfg, status_ctx->order,
-                                      ComponentCheck::Skipped);
+                                      ComponentCheck::Skipped, refused.get());
                               },
                               Scorers::status_walk_cost(spec)});
-        work.combine = [n_components](const std::vector<double>& values) {
-            for (std::size_t i = 0; i < n_components; ++i) {
-                if (values[i] == k_status_component_unsatisfiable) {
-                    return k_status_component_unsatisfiable;
+        const auto component_failed =
+            [n_components](const std::vector<double>& values) {
+                for (std::size_t i = 0; i < n_components; ++i) {
+                    if (values[i] == k_status_component_unsatisfiable) {
+                        return true;
+                    }
                 }
-            }
-            return values.back();
+                return false;
+            };
+        work.combine = [component_failed](const std::vector<double>& values) {
+            return component_failed(values) ? k_status_component_unsatisfiable
+                                            : values.back();
+        };
+        // The serial walk never starts behind a failed component, so its
+        // refused set is empty there; this one did run, and its set is
+        // discarded to match.
+        work.refused = [component_failed,
+                        refused](const std::vector<double>& values) {
+            return component_failed(values) ? std::vector<std::size_t>{}
+                                            : *refused;
         };
         return work;
     };
-    return {status, cfg.fitness_weight_status, "status", split};
+    WeightedFitnessFunctionT<Spec> objective{status, cfg.fitness_weight_status,
+                                             "status", split};
+    objective.function_with_refused = std::move(status_with_refused);
+    return objective;
 }
 
 // The fitness factory both front ends build from. What differs between them is
@@ -85,7 +109,10 @@ WeightedFitnessFunctionT<Spec> status_objective(const Spec& original,
 //
 //   syntactic(spec, original, cfg)
 //   semantic_terms(spec, original, cfg)  one term per changed slot
-//   status(spec, cfg, order, ComponentCheck)
+//   status(spec, cfg, order, ComponentCheck, refused)
+//                                        refused may be null, and a front end
+//                                        whose parts name no slot leaves it
+//                                        empty
 //   status_components(spec)              the component satisfiability queries
 //   status_walk_cost(spec)               cost hint for the realizability walk
 //   admission_order(original)            conflict_degree_order over its parts

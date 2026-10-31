@@ -91,6 +91,7 @@ Archived *results* still join. `scheme_of()` in `run_experiments.py` reads the s
 - **48** removed `runtime.dashboard` with the live dashboard and its `progress.jsonl` stream.
 - **49** added `mrs_speculation.killed`: lookahead queries stopped once the walk could no longer read them, their exec killed rather than run to the ltlsynt timeout. `tool_calls.ltlsynt` counts no killed exec, so its calls and timeouts read lower than at 48.
 - **50** added `runtime.mrs_lookahead_kill_grace_ms`: how long an abandoned lookahead query may run before it is killed. At the default of 2000, `mrs_speculation.killed` counts only queries past the grace, so it reads lower than at 49.
+- **51** added `mutation.blame_targeted_slots` and `n_targeted_mutations`, the count of rewrites whose slot that key drew from a narrowed list. The count reads 0 with the key off, which is the default.
 
 ## Where the campaign records are
 
