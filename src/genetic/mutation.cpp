@@ -12,6 +12,7 @@
 
 #include "genetic/binary_kind.hpp"
 #include "genetic/monotone.hpp"
+#include "genetic/order_moves.hpp"
 #include "prop_formula.hpp"
 
 namespace {
@@ -537,14 +538,19 @@ Timing with_stop(const Timing& timing, Formula stop) {
 
 // The monotone arm, offered ahead of the general rewrite. cfg.p_monotone is
 // read before the RandomSource is touched, so at 0 the arm costs no draw and
-// the breeding stream is what it was before it existed.
+// the breeding stream is what it was before it existed. @p free_rewrite, where
+// given, is set when the rewrite is the general one, which has no direction.
 Formula rewrite_field(const Formula& field,
                       const std::vector<std::string>& atoms,
                       std::optional<MonotoneDirection> direction,
-                      const Config& cfg, const RandomSource& random_source) {
+                      const Config& cfg, const RandomSource& random_source,
+                      bool* free_rewrite) {
     if (cfg.p_monotone > 0.0 && direction.has_value() && !atoms.empty() &&
         random_source.next_real() < cfg.p_monotone) {
         return monotone_rewrite(field, *direction, atoms, random_source);
+    }
+    if (free_rewrite != nullptr) {
+        *free_rewrite = true;
     }
     return mutate_formula(field, atoms, random_source);
 }
@@ -593,14 +599,16 @@ Timing mutate_timing(const Timing& timing, Direction direction, ScopeKind scope,
     return sound ? moved : timing;
 }
 
-Requirement mutate_requirement(const Requirement& requirement,
-                               const std::vector<std::string>& atoms,
-                               const std::vector<std::string>& condition_atoms,
-                               Direction direction,
-                               const std::vector<Timing>& timing_pool,
-                               const std::vector<std::string>& mode_pool,
-                               const RandomSource& random_source,
-                               const Config& cfg) {
+namespace {
+
+// mutate_requirement, reporting through @p free_rewrite whether any field took
+// the general rewrite rather than a move along its order.
+Requirement mutate_requirement_tracked(
+    const Requirement& requirement, const std::vector<std::string>& atoms,
+    const std::vector<std::string>& condition_atoms, Direction direction,
+    const std::vector<Timing>& timing_pool,
+    const std::vector<std::string>& mode_pool,
+    const RandomSource& random_source, const Config& cfg, bool* free_rewrite) {
     Requirement mutated = requirement;
     // Under cfg.p_monotone these two rewrites move along the implication order
     // and are direction-agnostic otherwise, rewriting the propositional
@@ -608,14 +616,16 @@ Requirement mutate_requirement(const Requirement& requirement,
     // candidates that moved the wrong way. The key defaults to 0, so that is
     // still what a run does unless it is turned on.
     if (random_source.next_real() < cfg.p_response) {
-        mutated.m_response = rewrite_field(
-            requirement.m_response, atoms,
-            response_direction(requirement, direction), cfg, random_source);
+        mutated.m_response =
+            rewrite_field(requirement.m_response, atoms,
+                          response_direction(requirement, direction), cfg,
+                          random_source, free_rewrite);
     }
     if (random_source.next_real() < cfg.p_trigger) {
-        mutated.m_condition = rewrite_field(
-            requirement.m_condition, condition_atoms,
-            condition_direction(requirement, direction), cfg, random_source);
+        mutated.m_condition =
+            rewrite_field(requirement.m_condition, condition_atoms,
+                          condition_direction(requirement, direction), cfg,
+                          random_source, free_rewrite);
     }
     if (random_source.next_real() < cfg.p_timing) {
         mutated.m_timing = mutate_timing(requirement.m_timing, direction,
@@ -631,7 +641,7 @@ Requirement mutate_requirement(const Requirement& requirement,
         mutated.m_timing = with_stop(
             mutated.m_timing, rewrite_field(*stop, condition_atoms,
                                             stop_direction(mutated, direction),
-                                            cfg, random_source));
+                                            cfg, random_source, free_rewrite));
     }
     // Both arms test their probability before touching the RandomSource, so at
     // the default of 0 neither costs a draw and the breeding stream is what it
@@ -651,6 +661,21 @@ Requirement mutate_requirement(const Requirement& requirement,
     }
     mutated.m_ltl = requirement_to_ltl(mutated);
     return mutated;
+}
+
+}  // namespace
+
+Requirement mutate_requirement(const Requirement& requirement,
+                               const std::vector<std::string>& atoms,
+                               const std::vector<std::string>& condition_atoms,
+                               Direction direction,
+                               const std::vector<Timing>& timing_pool,
+                               const std::vector<std::string>& mode_pool,
+                               const RandomSource& random_source,
+                               const Config& cfg) {
+    return mutate_requirement_tracked(requirement, atoms, condition_atoms,
+                                      direction, timing_pool, mode_pool,
+                                      random_source, cfg, nullptr);
 }
 
 namespace {
@@ -804,6 +829,105 @@ Specification remove_guarantee(const Specification& specification,
                          specification.m_modes);
 }
 
+// The structural actions, tried before any rewrite: the specification with an
+// assumption added or a guarantee removed, or nothing where neither fired.
+std::optional<Specification> structural_action(
+    const Specification& specification, const RandomSource& random_source,
+    const Config& cfg) {
+    // Low-probability structural action: add a new environment assumption. The
+    // Specification constructor deduplicates, so re-adding an existing
+    // assumption is a harmless no-op. Available only when the specification
+    // has an input, since the response of an added assumption must be one; a
+    // spec without inputs spends no draw here and goes on to the rewrites.
+    if (!specification.m_in_atoms.empty() &&
+        random_source.next_real() < cfg.p_add_assumption) {
+        return add_assumption(specification, random_source, cfg);
+    }
+    // The mirror action: delete a guarantee. Never the last live one, since a
+    // specification with nothing left to guarantee is realizable by doing
+    // nothing and is no repair at all. The probability is read before the draw
+    // so that a zero costs no draw at all, which is what lets a config set it
+    // to 0 and reproduce a run from before the operator existed.
+    if (cfg.p_remove_guarantee > 0.0) {
+        const std::vector<std::size_t> removable =
+            removable_guarantee_indices(specification);
+        // The floor is on live guarantees, not removable ones: removing the
+        // only weakenable guarantee is fine while locked ones remain.
+        if (!removable.empty() && count_live(specification.m_guarantees) > 1 &&
+            random_source.next_real() < cfg.p_remove_guarantee) {
+            return remove_guarantee(specification, removable, random_source);
+        }
+    }
+    return std::nullopt;
+}
+
+// Which way Config::direction_gated_mutation lets a mutation move the whole
+// specification, read from what breeding knows about the parent.
+enum class Gate : std::uint8_t {
+    // No gate: the key is off, there is no context or status, or crossover
+    // fired and the first parent's status says little about the offspring.
+    None,
+    // An unrealizable parent: weaker, equal or sideways.
+    Weaken,
+    // A realizable parent: stronger, equal or sideways.
+    Strengthen,
+};
+
+Gate gate_of(const Config& cfg, const ParentContext* parent) {
+    if (!cfg.direction_gated_mutation || parent == nullptr || parent->crossed ||
+        !parent->status.has_value()) {
+        return Gate::None;
+    }
+    return parent->realizable ? Gate::Strengthen : Gate::Weaken;
+}
+
+// True when @p child, a free rewrite of @p parent, may stand under @p gate.
+// A result proved to move the forbidden way is refused. One the rules cannot
+// order either way is kept with probability cfg.p_sideways, which is read
+// before the RandomSource is touched, so at 0 or 1 it costs no draw.
+bool admitted_by_gate(Gate gate, const Specification& parent,
+                      const Specification& child, const Config& cfg,
+                      const RandomSource& random_source) {
+    const MoveOrder order = classify_move(parent, child);
+    const MoveOrder forbidden =
+        gate == Gate::Weaken ? MoveOrder::Stronger : MoveOrder::Weaker;
+    if (order == forbidden) {
+        DirectionGateStats::n_forbidden++;
+        return false;
+    }
+    if (order != MoveOrder::Incomparable || cfg.p_sideways >= 1.0) {
+        return true;
+    }
+    if (cfg.p_sideways <= 0.0 || random_source.next_real() >= cfg.p_sideways) {
+        DirectionGateStats::n_sideways_refused++;
+        return false;
+    }
+    return true;
+}
+
+// The steps a realizable parent may take back towards its original, or none
+// where it lent no original.
+std::vector<Step> steps_back(const Specification& specification,
+                             const ParentContext* parent) {
+    if (parent == nullptr || parent->original == nullptr) {
+        return {};
+    }
+    return steps_towards(specification, *parent->original);
+}
+
+// The rates a realizable parent's rewrite runs at: every arm that moves along
+// an order is off, since its strengthenings come from steps_towards instead,
+// and only the free rewrites remain. An arm at 0 that still draws its
+// next_real draws it, so the rewrite keeps the shape of its stream.
+Config free_rewrite_rates(const Config& cfg) {
+    Config free = cfg;
+    free.p_timing = 0.0;
+    free.p_condition_type = 0.0;
+    free.p_scope = 0.0;
+    free.p_monotone = 0.0;
+    return free;
+}
+
 }  // namespace
 
 std::vector<std::size_t> targeted_mutation_slots(
@@ -856,29 +980,15 @@ Specification mutate_specification(const Specification& specification,
     assert(random_source);
     const std::size_t n_assumptions = specification.m_assumptions.size();
     assert(n_assumptions + specification.m_guarantees.size() > 0);
-    // Low-probability structural action: add a new environment assumption. The
-    // Specification constructor deduplicates, so re-adding an existing
-    // assumption is a harmless no-op. Available only when the specification
-    // has an input, since the response of an added assumption must be one; a
-    // spec without inputs spends no draw here and goes on to the rewrites.
-    if (!specification.m_in_atoms.empty() &&
-        random_source.next_real() < cfg.p_add_assumption) {
-        return add_assumption(specification, random_source, cfg);
-    }
-    // The mirror action: delete a guarantee. Never the last live one, since a
-    // specification with nothing left to guarantee is realizable by doing
-    // nothing and is no repair at all. The probability is read before the draw
-    // so that a zero costs no draw at all, which is what lets a config set it
-    // to 0 and reproduce a run from before the operator existed.
-    if (cfg.p_remove_guarantee > 0.0) {
-        const std::vector<std::size_t> removable =
-            removable_guarantee_indices(specification);
-        // The floor is on live guarantees, not removable ones: removing the
-        // only weakenable guarantee is fine while locked ones remain.
-        if (!removable.empty() && count_live(specification.m_guarantees) > 1 &&
-            random_source.next_real() < cfg.p_remove_guarantee) {
-            return remove_guarantee(specification, removable, random_source);
-        }
+    const Gate gate = gate_of(cfg, parent);
+    // Both structural actions weaken the specification, so a realizable parent
+    // under the gate skips them before their draws.
+    const bool strengthening = gate == Gate::Strengthen;
+    std::optional<Specification> acted =
+        strengthening ? std::nullopt
+                      : structural_action(specification, random_source, cfg);
+    if (acted.has_value()) {
+        return std::move(*acted);
     }
     std::vector<std::string> atoms;
     atoms.insert(atoms.end(), specification.m_in_atoms.begin(),
@@ -888,7 +998,12 @@ Specification mutate_specification(const Specification& specification,
     const std::vector<Timing> timing_pool = collect_timing_pool(specification);
     std::vector<std::size_t> weakenable_indices =
         collect_weakenable_indices(specification);
-    if (weakenable_indices.empty()) {
+    // A realizable parent's strengthenings, each proved by classify_move and
+    // moving one field, tombstone or appended assumption back towards the
+    // original. Empty without the gate.
+    std::vector<Step> steps =
+        strengthening ? steps_back(specification, parent) : std::vector<Step>{};
+    if (weakenable_indices.empty() && steps.empty()) {
         return specification;
     }
     if (cfg.blame_targeted_slots && parent != nullptr) {
@@ -901,8 +1016,17 @@ Specification mutate_specification(const Specification& specification,
             weakenable_indices = std::move(targeted);
         }
     }
-    const std::size_t idx =
-        weakenable_indices[random_source.next_index(weakenable_indices.size())];
+    // Under the gate a realizable parent draws once over its steps and its
+    // rewritable slots together, each counted once, so a parent far from the
+    // original mostly steps back and one at it mostly rewrites sideways.
+    // Without the gate `steps` is empty and this is the slot draw alone.
+    const std::size_t choice =
+        random_source.next_index(steps.size() + weakenable_indices.size());
+    if (choice < steps.size()) {
+        DirectionGateStats::n_steps++;
+        return std::move(steps[choice].m_result);
+    }
+    const std::size_t idx = weakenable_indices[choice - steps.size()];
     std::vector<Requirement> assumptions = specification.m_assumptions;
     std::vector<Requirement> guarantees = specification.m_guarantees;
     // Weakening the assume-guarantee specification means weakening a guarantee
@@ -911,8 +1035,9 @@ Specification mutate_specification(const Specification& specification,
     // be crossed as an experiment factor; no sweep ever crossed them and
     // gen_configs.py could not emit the key.
     const bool is_assumption = idx < n_assumptions;
-    const Direction direction =
-        is_assumption ? Direction::Strengthen : Direction::Weaken;
+    const Direction direction = is_assumption != strengthening
+                                    ? Direction::Strengthen
+                                    : Direction::Weaken;
     // An existing assumption draws from the same pool as a freshly added one,
     // inputs plus outputs, as guarantees do.
     const std::vector<std::string>& mutation_atoms = atoms;
@@ -939,13 +1064,23 @@ Specification mutate_specification(const Specification& specification,
     // form.
     std::vector<Requirement>& target = is_assumption ? assumptions : guarantees;
     const std::size_t local_idx = is_assumption ? idx : idx - n_assumptions;
-    target[local_idx] = mutate_requirement(
+    bool free_rewrite = false;
+    target[local_idx] = mutate_requirement_tracked(
         target[local_idx], mutation_atoms, condition_atoms, direction,
-        timing_pool, specification.m_modes, random_source, cfg);
+        timing_pool, specification.m_modes, random_source,
+        strengthening ? free_rewrite_rates(cfg) : cfg, &free_rewrite);
     if (creates_duplicate(target, local_idx)) {
         return specification;
     }
-    return Specification(std::move(assumptions), std::move(guarantees),
-                         specification.m_in_atoms, specification.m_out_atoms,
-                         specification.m_modes);
+    Specification mutated(std::move(assumptions), std::move(guarantees),
+                          specification.m_in_atoms, specification.m_out_atoms,
+                          specification.m_modes);
+    // The directed arms move the way the gate allows by construction, so only
+    // a free rewrite needs sorting. Returning the parent leaves an offspring
+    // equal to it, which deduplication removes.
+    if (gate != Gate::None && free_rewrite &&
+        !admitted_by_gate(gate, specification, mutated, cfg, random_source)) {
+        return specification;
+    }
+    return mutated;
 }

@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 44> k_config_keys{{
+inline constexpr std::array<ConfigKey, 46> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -301,6 +301,26 @@ inline constexpr std::array<ConfigKey, 44> k_config_keys{{
      "(and the assumptions) when the parent is unrealizable, or at the slots "
      "that\n"
      "differ from the original when it is realizable. Off by default.\n"},
+    {"mutation", "direction_gated", &Config::direction_gated_mutation,
+     KeyCheck::None, KeyReader::Fretish,
+     "FRETISH only: aim a mutation's direction by the parent's status where "
+     "crossover did not fire. An unrealizable parent keeps the weakening "
+     "moves; a realizable one skips the added assumption and the removed "
+     "guarantee and takes its directed moves from the steps back towards the "
+     "original. A free rewrite moving the forbidden way returns the parent.",
+     "FRETISH only: weaken an unrealizable parent and strengthen a realizable "
+     "one\n"
+     "towards the original, and return the parent when a free rewrite moves "
+     "the\n"
+     "forbidden way. p_sideways is the share of incomparable rewrites kept. "
+     "Off by\n"
+     "default.\n"},
+    {"mutation", "p_sideways", &Config::p_sideways, KeyCheck::Probability,
+     KeyReader::Fretish,
+     "FRETISH only, under direction_gated: probability that a free rewrite "
+     "incomparable with its parent is kept rather than returning the parent. "
+     "Draws nothing at 0 or 1.",
+     ""},
     {"model_counting", "default_bound", &Config::default_model_counting_bound,
      KeyCheck::Positive, KeyReader::Both,
      "Trace-length bound k for bounded model counting.", ""},

@@ -206,6 +206,10 @@ void print_diagnostics_report() {
                   << " accepted, " << ClimbStats::n_queries << " queries, "
                   << ClimbStats::n_ltlsynt_execs << " ltlsynt execs\n";
     }
+    std::cout << "Direction gate: " << DirectionGateStats::n_forbidden
+              << " forbidden and " << DirectionGateStats::n_sideways_refused
+              << " sideways rewrites returned to the parent, "
+              << DirectionGateStats::n_steps << " steps towards the original\n";
     print_cache_report();
     std::cout << "\nFitness cache: " << FitnessCacheStats::n_hits << " hits / "
               << FitnessCacheStats::n_misses << " misses\n";

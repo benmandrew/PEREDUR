@@ -95,6 +95,7 @@ Archived *results* still join. `scheme_of()` in `run_experiments.py` reads the s
 - **52** added `config.genetic.maximality_demotion` and `n_maximality_demotions`: the candidates moved one front down at survivor selection as proved weaker than another realizable one (see "Maximality demotion" in `docs/dev/algorithm.md`). It is 0 wherever the key is off, and the key reads null on a TLSF run.
 - **53** added `genetic.p_order_crossover` and the `order_crossover` object, which holds `attempted`, `proved` and `realizable` counts under `join`, `meet` and `relink`. The key defaults to 0, under which every count is 0, and a TLSF run records the key as null.
 - **54** added `config.filters.climb_output`, `climb_order` and `climb_orders`, and the `climb` block (`climbed`, `steps_tried`, `steps_accepted`, `queries`, `ltlsynt_execs`), which is all zero with the climb off. FRETISH only, so a TLSF run records the three keys as null.
+- **55** added `mutation.direction_gated`, `mutation.p_sideways` and the `direction_gate` object: `forbidden` and `sideways_refused` count the free rewrites returned to the parent, and `steps` the realizable parents' steps back towards the original. All three read 0 with the gate off, which is the default.
 
 ## Where the campaign records are
 

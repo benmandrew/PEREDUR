@@ -223,6 +223,19 @@ struct Config {
     /// indexes, so it costs no draw; off, the stream is the one before it
     /// existed.
     bool blame_targeted_slots = false;
+    /// FRETISH only: aim a mutation's direction by the parent's status where
+    /// crossover did not fire. An unrealizable parent keeps the weakening
+    /// moves; a realizable one skips add_assumption and remove_guarantee,
+    /// draws its directed moves from steps_towards the original, and rewrites
+    /// freely otherwise. A free rewrite moving the forbidden way (stronger for
+    /// an unrealizable parent, weaker for a realizable one) returns the
+    /// parent. Off, the stream is the one before it existed.
+    bool direction_gated_mutation = false;
+    /// Under direction_gated_mutation, the probability that a free rewrite
+    /// whose result is incomparable with the parent is kept rather than
+    /// returning the parent. Drawn only with the gate on and only for an
+    /// incomparable result, and not at all at 0 or 1.
+    double p_sideways = 1.0;
     /// TLSF-mode mutation: probability of mutating an assumption-side section
     /// (INITIALLY/REQUIRE/ASSUME) rather than a guarantee-side one
     /// (PRESET/ASSERT/GUARANTEE). The guarantee side takes the complement.

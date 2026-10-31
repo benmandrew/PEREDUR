@@ -103,6 +103,12 @@ p_conditional_assumption = 0.25
 # (and the assumptions) when the parent is unrealizable, or at the slots that
 # differ from the original when it is realizable. Off by default.
 blame_targeted_slots = false
+# FRETISH only: weaken an unrealizable parent and strengthen a realizable one
+# towards the original, and return the parent when a free rewrite moves the
+# forbidden way. p_sideways is the share of incomparable rewrites kept. Off by
+# default.
+direction_gated = false
+p_sideways = 1.0
 
 [model_counting]
 default_bound = 20

@@ -144,6 +144,20 @@ struct SlotTargetingStats {
     inline static std::atomic<std::size_t> n_targeted{0};
 };
 
+/// What Config::direction_gated_mutation did over a run. Reported under
+/// `--diagnostics` and in run.json.
+struct DirectionGateStats {
+    /// Free rewrites proved to move the forbidden way, each returned as the
+    /// parent: stronger than an unrealizable parent, or weaker than a
+    /// realizable one.
+    inline static std::atomic<std::size_t> n_forbidden{0};
+    /// Free rewrites incomparable with the parent that the Config::p_sideways
+    /// draw refused, each returned as the parent.
+    inline static std::atomic<std::size_t> n_sideways_refused{0};
+    /// Mutations of a realizable parent that took a step from steps_towards.
+    inline static std::atomic<std::size_t> n_steps{0};
+};
+
 /// The slots Config::blame_targeted_slots narrows a rewrite to, as global
 /// indices (assumptions first, then guarantees) drawn from @p weakenable, in
 /// its order. Empty means no narrowing: no context, no status, a crossover
@@ -172,6 +186,18 @@ std::vector<std::size_t> targeted_mutation_slots(
 /// targeted_mutation_slots where that is not empty. The draw is the same single
 /// `next_index` over a shorter list, so the arm adds no draw, though it changes
 /// which slot the draw lands on.
+///
+/// Under Config::direction_gated_mutation, and only where @p parent carries a
+/// status and crossover did not fire, the move follows the parent's status. An
+/// unrealizable parent moves as without the gate. A realizable one skips the
+/// two structural actions without drawing for them and computes
+/// steps_towards its original; one `next_index` then picks among those steps
+/// and the slots to rewrite, each counted once, and a rewrite runs with every
+/// directed arm at 0, so it is free. A free rewrite is sorted by
+/// classify_move: proved stronger than an unrealizable parent or weaker than a
+/// realizable one, the parent is returned; incomparable, it is kept with
+/// probability Config::p_sideways. Off, or without a status, the draw stream
+/// is the one before the gate existed.
 ///
 /// @param specification The specification to mutate (must be non-empty)
 /// @param random_source Random source for index and mutation choices

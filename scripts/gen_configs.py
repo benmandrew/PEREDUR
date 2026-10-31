@@ -121,6 +121,11 @@ DEFAULTS: dict = {
     # into [mutation] only when a sweep overrides it (see make_toml), so
     # existing grids stay byte-identical.
     "blame_targeted_slots": False,
+    # FRETISH only: gate mutation's direction on the parent's status, and the
+    # share of incomparable free rewrites kept under the gate. Emitted into
+    # [mutation] only when a sweep overrides them (see make_toml).
+    "direction_gated": False,
+    "p_sideways": 1.0,
     "default_bound": 20,
     "run_implication": True,
     # Keys in VINTAGE_KEYS must follow the binary rather than be pinned, because
@@ -256,7 +261,11 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         [f"p_remove_guarantee = {_fmt(d['p_remove_guarantee'])}"]
         if "p_remove_guarantee" in overrides else []) + (
         [f"blame_targeted_slots = {_fmt(d['blame_targeted_slots'])}"]
-        if "blame_targeted_slots" in overrides else []) + [
+        if "blame_targeted_slots" in overrides else []) + (
+        [f"direction_gated = {_fmt(d['direction_gated'])}"]
+        if "direction_gated" in overrides else []) + (
+        [f"p_sideways = {_fmt(d['p_sideways'])}"]
+        if "p_sideways" in overrides else []) + [
         "",
         "[model_counting]",
         f"default_bound = {d['default_bound']}",

@@ -150,6 +150,12 @@ Config golden_config() {
     // or drawing. The golden fitness has no status objective, so no parent
     // here reads realizable at any value; pinned so that stays a decision.
     cfg.p_order_crossover = 0.0;
+    // Off, its default, with the sideways share at its default of 1, where it
+    // draws nothing even with the gate on. The golden fitness has no status
+    // objective, so the gate would stay shut even on; both are pinned so that
+    // a golden gaining one fails here rather than re-recording.
+    cfg.direction_gated_mutation = false;
+    cfg.p_sideways = 1.0;
     cfg.parallel = 1;
     return cfg;
 }
@@ -522,6 +528,82 @@ TEST(test_slot_targeting_costs_no_draw_when_off) {
                std::to_string(targeted.slot_bound));
     expect(SlotTargetingStats::n_targeted.load() == before + 1,
            "blame_targeted_slots: a narrowed draw should be counted once");
+}
+
+// The direction gate reads its key before anything else, so off, a parent
+// context in either state must change neither the stream nor the offspring.
+// On, a realizable parent must skip the add-assumption draw, or the off check
+// passes over a dead arm.
+TEST(test_direction_gate_costs_no_draw_when_off) {
+    const std::vector<std::string> inputs = {"a", "b", "c"};
+    const std::vector<std::string> outputs = {"x", "y"};
+    const Specification original({make_req("a", "b", timing::eventually())},
+                                 {make_req("a", "x"), make_req("b", "y"),
+                                  make_req("c", "x", timing::within_ticks(2))},
+                                 inputs, outputs);
+    const Specification spec({make_req("a", "b", timing::eventually())},
+                             {make_req("a", "x"), make_req("b", "y"),
+                              make_req("c", "x", timing::within_ticks(4))},
+                             inputs, outputs);
+    ParentContext unrealizable;
+    unrealizable.status = 1.0 / 3.0;
+    unrealizable.original = &original;
+    ParentContext realizable = unrealizable;
+    realizable.status = 1.0;
+    realizable.realizable = true;
+
+    const auto mutate = [&spec](const Config& cfg,
+                                const ParentContext* context) {
+        auto trace = std::make_shared<DrawTrace>();
+        const RandomSource source = make_recording_source(k_seed, trace);
+        Specification mutated =
+            mutate_specification(spec, source, cfg, context);
+        return std::make_pair(*trace, std::move(mutated));
+    };
+
+    const Config off = golden_config();
+    const auto without = mutate(off, nullptr);
+    for (const ParentContext* context : {&unrealizable, &realizable}) {
+        const auto with = mutate(off, context);
+        expect(render_trace(with.first) == render_trace(without.first) &&
+                   with.second == without.second,
+               "direction_gated: off, a parent context must change neither "
+               "the draw stream nor the offspring");
+    }
+
+    Config gate_on = off;
+    gate_on.direction_gated_mutation = true;
+    const DrawTrace strengthened = mutate(gate_on, &realizable).first;
+    // Without the gate the add-assumption arm's next_real opens the stream;
+    // with it a realizable parent opens on the draw over steps and slots.
+    constexpr std::size_t k_real_bound = 1000000;
+    expect(!without.first.draws.empty() &&
+               without.first.draws[0].first == k_real_bound &&
+               !strengthened.draws.empty() &&
+               strengthened.draws[0].first != k_real_bound,
+           "direction_gated: on, a realizable parent should skip the "
+           "add-assumption draw");
+
+    // The sideways share draws only strictly between 0 and 1.
+    constexpr std::size_t k_seeds = 64;
+    for (std::size_t seed = 0; seed < k_seeds; ++seed) {
+        const auto stream = [&](double p_sideways,
+                                const ParentContext& context) {
+            Config cfg = gate_on;
+            cfg.p_sideways = p_sideways;
+            auto trace = std::make_shared<DrawTrace>();
+            const RandomSource source = make_recording_source(seed, trace);
+            static_cast<void>(
+                mutate_specification(spec, source, cfg, &context));
+            return render_trace(*trace);
+        };
+        for (const ParentContext* context : {&unrealizable, &realizable}) {
+            expect(stream(0.0, *context) == stream(1.0, *context),
+                   "p_sideways: at 0 and at 1 the share must cost no draw, "
+                   "seed " +
+                       std::to_string(seed));
+        }
+    }
 }
 
 TEST(test_evolved_population_is_pinned) {

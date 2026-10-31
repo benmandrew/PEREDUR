@@ -49,7 +49,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 54;
+constexpr int k_schema_version = 55;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -390,6 +390,14 @@ void write_run_manifest(const std::string& output_dir,
           {"steps_accepted", ClimbStats::n_steps_accepted.load()},
           {"queries", ClimbStats::n_queries.load()},
           {"ltlsynt_execs", ClimbStats::n_ltlsynt_execs.load()}}},
+        // What direction_gated did: free rewrites returned as the parent for
+        // moving the forbidden way or for a refused sideways draw, and steps
+        // a realizable parent took back towards the original. Zero whenever
+        // the key is off.
+        {"direction_gate",
+         {{"forbidden", DirectionGateStats::n_forbidden.load()},
+          {"sideways_refused", DirectionGateStats::n_sideways_refused.load()},
+          {"steps", DirectionGateStats::n_steps.load()}}},
         // ltlsynt calls that reported SPOT's acceptance-set ceiling rather than
         // a verdict, resolved as undecided rather than ending the run.
         {"n_ltlsynt_capability_errors",

@@ -46,6 +46,7 @@ const std::vector<Suite>& suites() {
         suite_named("nsga2"),
         suite_named("mutation"),
         suite_named("blame_targeting"),
+        suite_named("direction_gate"),
         suite_named("fretish_monotone"),
         suite_named("order_crossover"),
         suite_named("climb"),

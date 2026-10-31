@@ -18,6 +18,7 @@ add_executable(peredur_tests
     genetic/termination_tests.cpp
     genetic/mutation_tests.cpp
     genetic/blame_targeting_tests.cpp
+    genetic/direction_gate_tests.cpp
     genetic/monotone_arm_tests.cpp
     genetic/nsga2_tests.cpp
     genetic/order_crossover_tests.cpp
@@ -104,6 +105,7 @@ set(peredur_test_suites
     nsga2
     mutation
     blame_targeting
+    direction_gate
     fretish_monotone
     order_crossover
     climb
