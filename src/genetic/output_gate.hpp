@@ -5,6 +5,7 @@
 // Instantiated for Specification and tlsf::Specification.
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -90,8 +91,15 @@ struct SearchOutput {
     std::vector<FilterRunStats> filter_stats;
 };
 
+// What the final filters screen in place of the gated repairs, made from them.
+// The FRETISH output climb (genetic/climb.hpp) is the one there is.
+template <typename Spec>
+using RepairTransform =
+    std::function<std::vector<Spec>(const std::vector<Spec>&)>;
+
 // The post-search tail both front ends run: gates the population @p searched
-// ended on, merges the @p accumulated repairs, applies the final filters,
+// ended on, merges the @p accumulated repairs, replaces them with what
+// @p climb makes of them where it is non-empty, applies the final filters,
 // deduplication alone or the implication filter streamed through @p stream
 // where that is non-null, and scores and orders what is left.
 template <typename Spec>
@@ -99,7 +107,8 @@ SearchOutput<Spec> finish_search(
     const Config& cfg, SearchResult<Spec> searched,
     const std::vector<Spec>& accumulated,
     const AggregateWeightedFitnessFunctionT<Spec>& fitness,
-    StreamingMaximalFilter<Spec>* stream);
+    StreamingMaximalFilter<Spec>* stream,
+    const RepairTransform<Spec>& climb = {});
 
 // The closing line: how many realizable specifications the run found, how
 // many of them were maximal and how many equivalent pairs collapsed when the

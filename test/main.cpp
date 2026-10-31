@@ -48,6 +48,7 @@ const std::vector<Suite>& suites() {
         suite_named("blame_targeting"),
         suite_named("fretish_monotone"),
         suite_named("order_crossover"),
+        suite_named("climb"),
         suite_named("order_moves"),
         suite_named("prop_formula_ast"),
         suite_named("prop_formula_canonical"),

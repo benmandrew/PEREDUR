@@ -20,6 +20,7 @@
 #include "filter/streaming_maximal.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/climb.hpp"
 #include "genetic/filter_report.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/generation_loop.hpp"
@@ -198,9 +199,18 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
         SearchResult<Specification> evolved = run_generations(
             cfg, std::move(population), fitness_function, filter_functions,
             random_source, accumulator, budget, &original_spec);
+        RepairTransform<Specification> climb;
+        if (cfg.climb_output) {
+            climb = [&cfg, &original_spec,
+                     accepts = climb_gate(
+                         cfg, status_objective_of(fitness_function))](
+                        const std::vector<Specification>& repairs) {
+                return climb_repairs(repairs, original_spec, cfg, accepts);
+            };
+        }
         const SearchOutput<Specification> output =
             finish_search(cfg, std::move(evolved), accumulator.specifications(),
-                          fitness_function, stream.get());
+                          fitness_function, stream.get(), climb);
         write_specifications(output.repairs, fitness_function, output_dir);
         print_repair_summary(output.n_realizable, output.repairs.size(),
                              cfg.run_implication_filter, output_dir);

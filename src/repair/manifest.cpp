@@ -26,6 +26,7 @@
 #include "fitness/semantic_similarity.hpp"
 #include "fitness/status.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/climb.hpp"
 #include "genetic/demotion.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/order_crossover.hpp"
@@ -48,7 +49,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 53;
+constexpr int k_schema_version = 54;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -382,6 +383,13 @@ void write_run_manifest(const std::string& output_dir,
         // Candidates maximality demotion moved one front down at survivor
         // selection, over every generation. Zero wherever the key is off.
         {"n_maximality_demotions", DemotionStats::n_demoted},
+        // The output climb, all zero unless filters.climb_output is on.
+        {"climb",
+         {{"climbed", ClimbStats::n_climbed.load()},
+          {"steps_tried", ClimbStats::n_steps_tried.load()},
+          {"steps_accepted", ClimbStats::n_steps_accepted.load()},
+          {"queries", ClimbStats::n_queries.load()},
+          {"ltlsynt_execs", ClimbStats::n_ltlsynt_execs.load()}}},
         // ltlsynt calls that reported SPOT's acceptance-set ceiling rather than
         // a verdict, resolved as undecided rather than ending the run.
         {"n_ltlsynt_capability_errors",

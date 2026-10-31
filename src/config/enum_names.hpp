@@ -43,6 +43,12 @@ struct EnumNames<TerminationMode> {
                  {TerminationMode::Individuals, "individuals"}}};
 };
 
+template <>
+struct EnumNames<ClimbOrder> {
+    static constexpr std::array<std::pair<ClimbOrder, const char*>, 2> k_names{
+        {{ClimbOrder::Slot, "slot"}, {ClimbOrder::Similarity, "similarity"}}};
+};
+
 template <typename Enum>
 const char* enum_name(Enum value) {
     for (const auto& [candidate, name] : EnumNames<Enum>::k_names) {

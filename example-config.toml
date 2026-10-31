@@ -109,6 +109,11 @@ default_bound = 20
 
 [filters]
 run_implication = true
+# The lattice climb at the output: each gated repair is strengthened towards
+# the original one proved step at a time, while it stays a repair.
+climb_output = false
+climb_order = "slot"
+climb_orders = 1
 
 [runtime]
 # Per-call wall-clock budgets in ms; 0 disables one. Ganak takes none:

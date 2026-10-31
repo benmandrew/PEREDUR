@@ -50,6 +50,13 @@ enum class MrsAdmissionOrder : std::uint8_t { Spec, Degree };
 /// for AuRUS, and @ref Config::max_wall_s is independent of the choice.
 enum class TerminationMode : std::uint8_t { Generations, Individuals };
 
+/// The order the output climb tries its steps in (see @ref Config::climb_output
+/// and `genetic/climb.hpp`). Slot is the order steps_towards lists them in:
+/// assumption slots, then guarantee slots, then the appended assumptions.
+/// Similarity tries the step with the largest gain in syntactic similarity to
+/// the original first. Neither draws a random number.
+enum class ClimbOrder : std::uint8_t { Slot, Similarity };
+
 struct Config {
     std::size_t generations = 10;
     /// Offspring budget for the whole run under
@@ -86,6 +93,16 @@ struct Config {
     MrsAdmissionOrder mrs_admission_order = MrsAdmissionOrder::Degree;
     std::size_t default_model_counting_bound = 20;
     bool run_implication_filter = true;
+    /// Strengthen each gated FRETISH repair towards the original before the
+    /// final filters, one proved step at a time, keeping a step only where the
+    /// result still passes the output gate.
+    bool climb_output = false;
+    /// The step order of the first climb (see ClimbOrder).
+    ClimbOrder climb_order = ClimbOrder::Slot;
+    /// Climbs per repair. Each one after the first tries the steps under a
+    /// fixed pseudo-random priority of its own, and every distinct result goes
+    /// on to the final filters.
+    std::size_t climb_orders = 1;
     std::chrono::milliseconds black_timeout{1000};
     /// Per-call wall-clock budget for ltlsynt realizability checks; 0 disables
     /// it. ltlsynt has no internal timeout, and the search occasionally builds

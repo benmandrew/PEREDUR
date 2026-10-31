@@ -12,6 +12,7 @@
 #include "fitness/semantic_similarity.hpp"
 #include "fitness/status.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/climb.hpp"
 #include "genetic/demotion.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
@@ -198,6 +199,13 @@ void print_diagnostics_report() {
     std::cout << "Candidates demoted as proved weaker than another realizable "
                  "one: "
               << DemotionStats::n_demoted << "\n";
+    if (ClimbStats::n_climbed > 0) {
+        std::cout << "Output climb: " << ClimbStats::n_climbed
+                  << " repairs climbed, " << ClimbStats::n_steps_tried
+                  << " steps tried, " << ClimbStats::n_steps_accepted
+                  << " accepted, " << ClimbStats::n_queries << " queries, "
+                  << ClimbStats::n_ltlsynt_execs << " ltlsynt execs\n";
+    }
     print_cache_report();
     std::cout << "\nFitness cache: " << FitnessCacheStats::n_hits << " hits / "
               << FitnessCacheStats::n_misses << " misses\n";

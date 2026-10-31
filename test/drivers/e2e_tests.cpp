@@ -261,6 +261,12 @@ nlohmann::json expect_run_manifest(const std::filesystem::path& dir,
             implication.contains(name),
             label + ": the manifest reports implication." + std::string(name));
     }
+    const nlohmann::json& climb = manifest.at("climb");
+    for (const char* name : {"climbed", "steps_tried", "steps_accepted",
+                             "queries", "ltlsynt_execs"}) {
+        expect(climb.contains(name),
+               label + ": the manifest reports climb." + std::string(name));
+    }
     const nlohmann::json& speculation = manifest.at("mrs_speculation");
     for (const char* name : {"issued", "started", "consumed", "killed"}) {
         expect(speculation.contains(name),
@@ -867,6 +873,19 @@ run_implication = false
 parallel = 1
 )";
 
+// k_config_small with the output climb on, in the similarity order.
+const char* const k_config_climb = R"([genetic]
+generations = 2
+population_size = 8
+
+[filters]
+climb_output = true
+climb_order = "similarity"
+
+[runtime]
+parallel = 1
+)";
+
 // Long enough that the run is still searching whenever the signal lands.
 const char* const k_config_endless = R"([genetic]
 generations = 1000000
@@ -1080,6 +1099,52 @@ TEST_IN("driver_peredur", test_peredur_filters_without_implication) {
                !contains(run.m_output, "final/implication"),
            "peredur: the final screen reports deduplication alone");
     expect_run_manifest(out, input, 4, "peredur/dedup");
+}
+
+// Off, the climb counts nothing. On, it climbs every gated repair and a fixed
+// seed still writes the same repairs.
+TEST_IN("driver_peredur", test_peredur_climbs_its_output) {
+    const TempDir dir("e2e_peredur_climb");
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish_unrealizable).string();
+    const std::string off_config =
+        write_text(dir.path() / "off.toml", k_config_small).string();
+    const std::string on_config =
+        write_text(dir.path() / "on.toml", k_config_climb).string();
+    const auto run_into = [&input](const std::string& config,
+                                   const std::filesystem::path& out) {
+        std::filesystem::create_directories(out);
+        const DriverRun run = run_driver(
+            "peredur", {"--input", input, "--output-dir", out.string(),
+                        "--config", config, "--seed", "4", "--diagnostics"});
+        expect(run.m_exit_code == 0, "peredur: a climb run exits zero");
+        return expect_run_manifest(out, input, 4, "peredur/climb");
+    };
+    const nlohmann::json off = run_into(off_config, dir.path() / "off");
+    expect(off.at("climb").at("climbed").get<std::size_t>() == 0,
+           "peredur: with the climb off, nothing is climbed");
+    expect(!off.at("config").at("filters").at("climb_output").get<bool>(),
+           "peredur: the manifest records the climb as off");
+
+    const nlohmann::json first = run_into(on_config, dir.path() / "first");
+    run_into(on_config, dir.path() / "second");
+    expect(
+        first.at("config").at("filters").at("climb_order").get<std::string>() ==
+            "similarity",
+        "peredur: the manifest records the climb order");
+    const std::vector<std::filesystem::path> repairs =
+        repair_files(dir.path() / "first");
+    expect(repairs.empty() ||
+               first.at("climb").at("climbed").get<std::size_t>() > 0,
+           "peredur: a run that wrote repairs climbed them");
+    expect(repairs.size() == repair_files(dir.path() / "second").size(),
+           "peredur: a fixed seed climbs to the same number of repairs");
+    for (const std::filesystem::path& repair : repairs) {
+        expect(read_text(repair) ==
+                   read_text(dir.path() / "second" / repair.filename()),
+               "peredur: a fixed seed climbs to the same " +
+                   repair.filename().string());
+    }
 }
 
 // The crash log lands in a `crashes/` directory under the working directory,

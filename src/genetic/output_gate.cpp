@@ -184,34 +184,39 @@ void print_implication_summary(double elapsed) {
               << ImplicationFilterStats::n_model_refuted << " by model)\n";
 }
 
-// The maximal members of @p realizable in its own order, from @p stream, with
-// a filter-report row each for deduplication and implication. Every
-// accumulated specification is already in the stream, and the stream
-// deduplicates, so pushing @p realizable adds only what the final population
-// found that no generation had accumulated.
+// The maximal members of @p pushed and @p also, in @p pushed's order and then
+// @p also's, from @p stream, with a filter-report row each for deduplication
+// and implication. Every accumulated specification is already in the stream,
+// and the stream deduplicates, so pushing @p pushed adds only what the final
+// population found that no generation had accumulated. @p also names what is
+// in the stream without being pushed: the gated repairs a climb replaced,
+// which stay maximal only where no climbed repair was proved to imply them.
 template <typename Spec>
 std::vector<Spec> drain_maximal_stream(StreamingMaximalFilter<Spec>& stream,
-                                       const std::vector<Spec>& realizable,
+                                       const std::vector<Spec>& pushed,
+                                       const std::vector<Spec>& also,
                                        std::vector<FilterRunStats>& stats) {
     const auto drain_start = std::chrono::steady_clock::now();
-    for (const Spec& spec : realizable) {
+    for (const Spec& spec : pushed) {
         stream.push(spec, {});
     }
     const std::vector<Spec> streamed = stream.finish();
     // The stream returns push order, accumulated specifications first.
     // repair_N is numbered after a stable sort, so the order of fitness ties
-    // is @p realizable's.
+    // is @p pushed's.
     const std::unordered_set<Spec> kept(streamed.begin(), streamed.end());
     std::unordered_set<Spec> emitted;
     std::vector<Spec> maximal;
     maximal.reserve(streamed.size());
-    for (const Spec& spec : realizable) {
-        if (kept.count(spec) != 0 && emitted.insert(spec).second) {
-            maximal.push_back(spec);
+    for (const std::vector<Spec>* list : {&pushed, &also}) {
+        for (const Spec& spec : *list) {
+            if (kept.count(spec) != 0 && emitted.insert(spec).second) {
+                maximal.push_back(spec);
+            }
         }
     }
     const MaximalStreamCounts& counts = stream.counts();
-    stats.push_back({"final/dedup", realizable.size(), counts.n_distinct});
+    stats.push_back({"final/dedup", pushed.size(), counts.n_distinct});
     stats.push_back({"final/implication", counts.n_distinct, maximal.size()});
     print_implication_summary(
         std::chrono::duration<double>(std::chrono::steady_clock::now() -
@@ -227,7 +232,7 @@ SearchOutput<Spec> finish_search(
     const Config& cfg, SearchResult<Spec> searched,
     const std::vector<Spec>& accumulated,
     const AggregateWeightedFitnessFunctionT<Spec>& fitness,
-    StreamingMaximalFilter<Spec>* stream) {
+    StreamingMaximalFilter<Spec>* stream, const RepairTransform<Spec>& climb) {
     // The per-generation filters screen only offspring, and elites bypass
     // them, so the final population is gated here whatever the search did.
     const std::vector<Scored<Spec>>& population = searched.population;
@@ -247,15 +252,23 @@ SearchOutput<Spec> finish_search(
 
     SearchOutput<Spec> output;
     output.filter_stats = std::move(searched.filter_stats);
+    std::vector<Spec> climbed;
+    if (climb) {
+        climbed = climb(realizable);
+        output.filter_stats.push_back(
+            {"final/climb", realizable.size(), climbed.size()});
+    }
+    const std::vector<Spec>& screened = climb ? climbed : realizable;
+    const std::vector<Spec> none;
     std::vector<Spec> repairs;
     if (stream != nullptr) {
-        repairs =
-            drain_maximal_stream(*stream, realizable, output.filter_stats);
+        repairs = drain_maximal_stream(
+            *stream, screened, climb ? realizable : none, output.filter_stats);
         output.n_realizable = stream->counts().n_distinct;
     } else {
         const std::vector<FilterFunctionT<Spec>> filters{
             make_dedup_filter<Spec>()};
-        repairs = filter_population(realizable, filters);
+        repairs = filter_population(screened, filters);
         output.filter_stats.push_back({"final/" + filters[0].name(),
                                        filters[0].n_in(), filters[0].n_out()});
         output.n_realizable = repairs.size();
@@ -329,9 +342,11 @@ template SearchOutput<Specification> finish_search(
     const Config&, SearchResult<Specification>,
     const std::vector<Specification>&,
     const AggregateWeightedFitnessFunctionT<Specification>&,
-    StreamingMaximalFilter<Specification>*);
+    StreamingMaximalFilter<Specification>*,
+    const RepairTransform<Specification>&);
 template SearchOutput<tlsf::Specification> finish_search(
     const Config&, SearchResult<tlsf::Specification>,
     const std::vector<tlsf::Specification>&,
     const AggregateWeightedFitnessFunctionT<tlsf::Specification>&,
-    StreamingMaximalFilter<tlsf::Specification>*);
+    StreamingMaximalFilter<tlsf::Specification>*,
+    const RepairTransform<tlsf::Specification>&);

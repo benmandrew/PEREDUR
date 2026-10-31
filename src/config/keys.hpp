@@ -26,7 +26,7 @@ using ConfigMember =
     std::variant<double Config::*, std::size_t Config::*, bool Config::*,
                  std::chrono::milliseconds Config::*, SelectionScheme Config::*,
                  TerminationMode Config::*, StatusGrading Config::*,
-                 MrsAdmissionOrder Config::*>;
+                 MrsAdmissionOrder Config::*, ClimbOrder Config::*>;
 
 struct ConfigKey {
     const char* section;  // dotted, as in "tlsf.mutation"
@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 41> k_config_keys{{
+inline constexpr std::array<ConfigKey, 44> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -307,6 +307,30 @@ inline constexpr std::array<ConfigKey, 41> k_config_keys{{
     {"filters", "run_implication", &Config::run_implication_filter,
      KeyCheck::None, KeyReader::Both,
      "Enable final implication maximality filter.", ""},
+    {"filters", "climb_output", &Config::climb_output, KeyCheck::None,
+     KeyReader::Fretish,
+     "Strengthen each repair that passes the output gate towards the "
+     "original before deduplication and the implication filter. A step is a "
+     "one-field move towards the original that is proved a strengthening by "
+     "rule, a restored guarantee or a dropped appended assumption, and it is "
+     "kept only where the result passes the output gate again. The climb "
+     "stops when no step is kept, and draws no random number.",
+     "The lattice climb at the output: each gated repair is strengthened "
+     "towards\n"
+     "the original one proved step at a time, while it stays a repair.\n"},
+    {"filters", "climb_order", &Config::climb_order, KeyCheck::None,
+     KeyReader::Fretish,
+     "Order in which the output climb tries its steps: 'slot' is slot order, "
+     "assumptions first; 'similarity' tries the largest gain in syntactic "
+     "similarity to the original first. The order decides which maximal "
+     "repair the climb reaches. Read only when climb_output is true.",
+     ""},
+    {"filters", "climb_orders", &Config::climb_orders, KeyCheck::Positive,
+     KeyReader::Fretish,
+     "Climbs per repair. The first uses climb_order and each later one a "
+     "fixed pseudo-random step priority of its own; every distinct result "
+     "goes on to the final filters. Read only when climb_output is true.",
+     ""},
     {"runtime", "black_timeout_ms", &Config::black_timeout,
      KeyCheck::NonNegative, KeyReader::Both,
      "Timeout per black SAT query in milliseconds.",

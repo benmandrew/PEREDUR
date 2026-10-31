@@ -223,6 +223,14 @@ TEST(test_config_io_enum_keys) {
                                          {"degree", MrsAdmissionOrder::Degree}},
                                         "rotate",
                                         false});
+    expect_enum_key<ClimbOrder>(
+        {"filters",
+         "climb_order",
+         &Config::climb_order,
+         ClimbOrder::Slot,
+         {{"slot", ClimbOrder::Slot}, {"similarity", ClimbOrder::Similarity}},
+         "random",
+         false});
 }
 
 // Pinned because every archived config omits these keys and inherits whatever

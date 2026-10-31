@@ -21,6 +21,7 @@ add_executable(peredur_tests
     genetic/monotone_arm_tests.cpp
     genetic/nsga2_tests.cpp
     genetic/order_crossover_tests.cpp
+    genetic/climb_tests.cpp
     genetic/order_moves_tests.cpp
     main.cpp
     fitness/function_tests.cpp
@@ -105,6 +106,7 @@ set(peredur_test_suites
     blame_targeting
     fretish_monotone
     order_crossover
+    climb
     order_moves
     prop_formula_ast
     prop_formula_canonical
