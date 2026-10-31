@@ -46,6 +46,7 @@ const std::vector<Suite>& suites() {
         suite_named("nsga2"),
         suite_named("mutation"),
         suite_named("fretish_monotone"),
+        suite_named("order_moves"),
         suite_named("prop_formula_ast"),
         suite_named("prop_formula_canonical"),
         suite_named("prop_formula_cnf"),
