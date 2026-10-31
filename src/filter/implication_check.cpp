@@ -28,19 +28,6 @@ std::unordered_set<std::string> live_lowerings(
     return lowerings;
 }
 
-// Whether `stronger -> weaker` is propositionally valid, by enumerating the
-// assignments of `stronger & !weaker`. A formula the enumeration declines, by
-// its width or a temporal operator, reads as unproven. `true` and `false` may
-// parse as atoms, which only adds assignments, so a zero count still proves.
-bool valid_implication(const Formula& stronger, const Formula& weaker) {
-    if (stronger == weaker) {
-        return true;
-    }
-    const std::optional<Count> models = count_models_exhaustively(
-        "(" + stronger.to_string() + ") & !(" + weaker.to_string() + ")");
-    return models.has_value() && *models == Count{0};
-}
-
 enum Field : std::uint8_t {
     k_condition,
     k_response,
@@ -179,7 +166,7 @@ class RuleSearch {
     static bool onward(Answers& answers, const Formula& stronger,
                        const Formula& weaker) {
         if (!answers[0].has_value()) {
-            answers[0] = valid_implication(stronger, weaker);
+            answers[0] = formula_implies(stronger, weaker);
         }
         return answers[0].value_or(false);
     }
@@ -187,7 +174,7 @@ class RuleSearch {
     static bool back(Answers& answers, const Formula& stronger,
                      const Formula& weaker) {
         if (!answers[1].has_value()) {
-            answers[1] = valid_implication(stronger, weaker);
+            answers[1] = formula_implies(stronger, weaker);
         }
         return answers[1].value_or(false);
     }
@@ -225,6 +212,18 @@ bool covered(const Requirement& req, std::size_t slot,
 }
 
 }  // namespace
+
+// A formula the enumeration declines, by its width or a temporal operator,
+// reads as unproven. `true` and `false` may parse as atoms, which only adds
+// assignments, so a zero count still proves.
+bool formula_implies(const Formula& stronger, const Formula& weaker) {
+    if (stronger == weaker) {
+        return true;
+    }
+    const std::optional<Count> models = count_models_exhaustively(
+        "(" + stronger.to_string() + ") & !(" + weaker.to_string() + ")");
+    return models.has_value() && *models == Count{0};
+}
 
 bool requirement_implies(const Requirement& stronger,
                          const Requirement& weaker) {

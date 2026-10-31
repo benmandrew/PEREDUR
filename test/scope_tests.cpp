@@ -1,10 +1,8 @@
 #include <algorithm>
-#include <chrono>
 #include <cstddef>
 #include <functional>
 #include <optional>
 #include <set>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -13,10 +11,10 @@
 #include "filter/implication_check.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/random_source.hpp"
+#include "ltl_oracle.hpp"
 #include "requirement.hpp"
 #include "runner/formaliser.hpp"
 #include "runner/ltlfilt.hpp"
-#include "runner/process.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
 
@@ -82,47 +80,6 @@ Scope make_scope(ScopeKind kind) {
 // to a.
 bool ltl_implies(const std::string& lhs, const std::string& rhs) {
     return ltl_equivalent("(" + lhs + ") & (" + rhs + ")", "(" + lhs + ")");
-}
-
-struct Implication {
-    std::string m_lhs;
-    std::string m_rhs;
-};
-
-// Decides every `lhs -> rhs` in one ltlfilt run. ltl_implies pays one exec per
-// query, 9.6 ms each on the debug build, and the order table alone asks 1,232.
-// An implication holds exactly when lhs & !rhs is unsatisfiable, and %L prints
-// the input line of each satisfiable one. Where ltl_equivalent passes an
-// inconclusive answer, this fails the test.
-std::vector<bool> ltl_implications(const std::vector<Implication>& queries) {
-    std::string input;
-    for (const Implication& query : queries) {
-        input += "(" + query.m_lhs + ") & !(" + query.m_rhs + ")\n";
-    }
-    const ProcessResult result = execute_and_capture_with_input(
-        {ltlfilt_path(), "--satisfiable", "--format=%L", "-F", "-"}, input,
-        std::chrono::milliseconds{60'000});
-    // ltlfilt exits 0 when some line matched and 1 when none did.
-    expect(result.m_exit_code == 0 || result.m_exit_code == 1,
-           "scope: ltlfilt could not decide the implication batch (exit " +
-               std::to_string(result.m_exit_code) + "): " + result.m_output);
-    std::vector<bool> holds(queries.size(), true);
-    std::istringstream lines(result.m_output);
-    std::string line;
-    while (std::getline(lines, line)) {
-        const bool numeric =
-            !line.empty() &&
-            std::all_of(line.begin(), line.end(), [](char character) {
-                return character >= '0' && character <= '9';
-            });
-        expect(numeric, "scope: stray ltlfilt output `" + line + "`");
-        const std::size_t number = std::stoul(line);
-        expect(number >= 1 && number <= queries.size(),
-               "scope: ltlfilt named line " + line + " of " +
-                   std::to_string(queries.size()));
-        holds[number - 1] = false;
-    }
-    return holds;
 }
 
 // --- The lowering against the vendored FRET formaliser --------------------

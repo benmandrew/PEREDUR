@@ -57,6 +57,12 @@ std::optional<bool> spec_implies(const Specification& from,
 std::optional<Specification> residual_destination(const Specification& from,
                                                   const Specification& dest);
 
+/// Whether `stronger -> weaker` is propositionally valid, decided by
+/// enumerating the assignments of `stronger & !weaker`. True only where it is
+/// proven: a formula wider than `k_exhaustive_count_max_atoms` atoms, or one
+/// carrying a temporal operator, reads as unproven.
+bool formula_implies(const Formula& stronger, const Formula& weaker);
+
 /// Whether requirement @p stronger implies @p weaker by rule, without asking a
 /// solver. True only where it is proven, so false means unproven.
 ///
