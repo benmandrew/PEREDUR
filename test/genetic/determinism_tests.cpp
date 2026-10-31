@@ -142,6 +142,9 @@ Config golden_config() {
     // arm would leave every list alone even on; pinned so that a golden
     // gaining one fails here rather than re-recording.
     cfg.blame_targeted_slots = false;
+    // Off, its default: selection then runs no proof, so the goldens hold what
+    // they held before the rule existed.
+    cfg.maximality_demotion = false;
     cfg.parallel = 1;
     return cfg;
 }

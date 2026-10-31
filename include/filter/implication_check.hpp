@@ -4,7 +4,13 @@
 /// @brief Pairwise implication check between two whole specifications, used
 ///        by the implication filter.
 
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <optional>
+#include <string>
+#include <unordered_set>
+#include <vector>
 
 #include "requirement.hpp"
 #include "runner/black.hpp"
@@ -76,3 +82,51 @@ bool formula_implies(const Formula& stronger, const Formula& weaker);
 /// of the steps is tried, since a step can hold only after another one.
 bool requirement_implies(const Requirement& stronger,
                          const Requirement& weaker);
+
+/// A proof of one requirement implying another, in the shape of
+/// requirement_implies. Callers pass a memoised one where they ask the same
+/// pairs repeatedly.
+using RequirementImplication =
+    std::function<bool(const Requirement&, const Requirement&)>;
+
+/// The lowerings of the live entries of @p reqs: the pool rule_cover reads.
+std::unordered_set<std::string> live_lowerings(
+    const std::vector<Requirement>& reqs);
+
+/// How rule_cover proved a requirement implied, if it did.
+enum class RuleCover : std::uint8_t { None, Lowering, Rule };
+
+/// Whether @p req is implied by a live entry of @p pool without asking a
+/// solver: one with the same lowering, or by @p implies the entry in @p req's
+/// own slot. Slots pair by index, tombstones included, so the entry there is
+/// the one the two specifications inherited from one original.
+///
+/// @param req             The requirement to cover.
+/// @param slot            Its index in its own specification.
+/// @param pool            The other specification's requirements on the
+///                        same side.
+/// @param pool_lowerings  live_lowerings of @p pool.
+/// @param implies         The proof asked of the entry in @p slot.
+RuleCover rule_cover(const Requirement& req, std::size_t slot,
+                     const std::vector<Requirement>& pool,
+                     const std::unordered_set<std::string>& pool_lowerings,
+                     const RequirementImplication& implies);
+
+/// Whether spec `from` implies spec `dest` by rule alone: every live
+/// assumption of `from` is covered by `dest`'s assumptions and every live
+/// guarantee of `dest` by `from`'s, in the sense of rule_cover. A tombstone is
+/// a `true` requirement, so it needs no cover and covers nothing.
+///
+/// Sound and incomplete, and never launches a process: false means unproven.
+///
+/// @param from              The candidate stronger specification.
+/// @param dest              The candidate weaker specification.
+/// @param from_guarantees   live_lowerings of `from.m_guarantees`.
+/// @param dest_assumptions  live_lowerings of `dest.m_assumptions`.
+/// @param implies           The proof asked of each pair of slots, such as
+///                          requirement_implies.
+bool spec_implies_by_rule(
+    const Specification& from, const Specification& dest,
+    const std::unordered_set<std::string>& from_guarantees,
+    const std::unordered_set<std::string>& dest_assumptions,
+    const RequirementImplication& implies);

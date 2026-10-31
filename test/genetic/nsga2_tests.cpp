@@ -5,8 +5,12 @@
 #include <utility>
 #include <vector>
 
+#include "fitness/status.hpp"
+#include "fixtures.hpp"
+#include "genetic/demotion.hpp"
 #include "genetic/nsga2.hpp"
 #include "genetic/scored.hpp"
+#include "requirement.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
 
@@ -192,6 +196,131 @@ TEST(test_nsga2_sort_is_deterministic) {
         expect(first[i].specification == second[i].specification,
                "nsga2_sort: identical input yields identical order (stable)");
     }
+}
+
+// --- maximality demotion ---
+
+// Two guarantees over input a and outputs x, y; the first under `first`.
+Specification two_guarantees(const Timing& first,
+                             std::vector<Requirement> assumptions = {}) {
+    return Specification(std::move(assumptions),
+                         {make_req("a", "x", first), make_req("a", "y")}, {"a"},
+                         {"x", "y"});
+}
+
+Specification tight_spec() { return two_guarantees(timing::within_ticks(2)); }
+
+// Status first, then a similarity score that leaves the pair on one front.
+Scored<Specification> scored_with_status(Specification spec, double status) {
+    Scored<Specification> scored;
+    scored.specification = std::move(spec);
+    scored.objectives = {status, 0.5};
+    return scored;
+}
+
+std::vector<bool> flags_of(const Specification& first,
+                           const Specification& second, double first_status,
+                           double second_status) {
+    return proved_weaker_realizable({scored_with_status(first, first_status),
+                                     scored_with_status(second, second_status)},
+                                    0);
+}
+
+TEST(test_demotion_flags_a_weaker_timing) {
+    const std::vector<bool> flags =
+        flags_of(tight_spec(), two_guarantees(timing::within_ticks(3)),
+                 k_status_realizable, k_status_realizable);
+    expect(!flags[0] && flags[1],
+           "demotion: within 3 is proved weaker than within 2, so only the "
+           "looser candidate is demoted");
+}
+
+TEST(test_demotion_flags_a_tombstoned_guarantee) {
+    Specification gutted = tight_spec();
+    gutted.m_guarantees[1].m_removed = true;
+    const std::vector<bool> flags = flags_of(
+        gutted, tight_spec(), k_status_realizable, k_status_realizable);
+    expect(flags[0] && !flags[1],
+           "demotion: a tombstone reads as true, so the candidate missing a "
+           "guarantee is the weaker one");
+}
+
+TEST(test_demotion_flags_a_stronger_assumption) {
+    const Specification assuming = two_guarantees(
+        timing::within_ticks(2), {continual("a", timing::always())});
+    const std::vector<bool> flags = flags_of(
+        tight_spec(), assuming, k_status_realizable, k_status_realizable);
+    expect(!flags[0] && flags[1],
+           "demotion: an added assumption weakens the specification, so the "
+           "candidate carrying it is demoted");
+}
+
+TEST(test_demotion_spares_unrealizable_candidates) {
+    const Specification loose = two_guarantees(timing::within_ticks(3));
+    const std::vector<bool> weaker_unrealizable = flags_of(
+        tight_spec(), loose, k_status_realizable, k_status_unrealizable);
+    expect(!weaker_unrealizable[0] && !weaker_unrealizable[1],
+           "demotion: an unrealizable candidate is never demoted");
+    const std::vector<bool> stronger_unrealizable = flags_of(
+        tight_spec(), loose, k_status_unrealizable, k_status_realizable);
+    expect(!stronger_unrealizable[0] && !stronger_unrealizable[1],
+           "demotion: an unrealizable candidate demotes nothing, however "
+           "strong it is");
+    const std::vector<bool> walk_partial =
+        flags_of(tight_spec(), loose, 0.9, k_status_realizable);
+    expect(!walk_partial[1],
+           "demotion: a status below the top tier is not read as realizable");
+}
+
+TEST(test_demotion_spares_incomparable_and_equivalent_candidates) {
+    const Specification other_response(
+        {}, {make_req("a", "y", timing::within_ticks(2)), make_req("a", "y")},
+        {"a"}, {"x", "y"});
+    const std::vector<bool> incomparable = flags_of(
+        tight_spec(), other_response, k_status_realizable, k_status_realizable);
+    expect(!incomparable[0] && !incomparable[1],
+           "demotion: neither of two incomparable candidates is demoted");
+    const std::vector<bool> equal = flags_of(
+        tight_spec(), tight_spec(), k_status_realizable, k_status_realizable);
+    expect(!equal[0] && !equal[1],
+           "demotion: two equivalent candidates are each proved stronger than "
+           "the other, so neither is strictly weaker");
+}
+
+TEST(test_demotion_flags_do_not_depend_on_order) {
+    const std::vector<Specification> specs = {
+        two_guarantees(timing::within_ticks(4)),
+        two_guarantees(timing::within_ticks(3)), tight_spec()};
+    std::vector<Scored<Specification>> forward;
+    std::vector<Scored<Specification>> backward;
+    for (std::size_t i = 0; i < specs.size(); ++i) {
+        forward.push_back(scored_with_status(specs[i], k_status_realizable));
+        backward.push_back(scored_with_status(specs[specs.size() - 1 - i],
+                                              k_status_realizable));
+    }
+    const std::vector<bool> forward_flags =
+        proved_weaker_realizable(forward, 0);
+    const std::vector<bool> backward_flags =
+        proved_weaker_realizable(backward, 0);
+    expect(forward_flags == std::vector<bool>{true, true, false},
+           "demotion: every candidate below the strongest of a chain is "
+           "demoted, and by one front only");
+    expect(backward_flags == std::vector<bool>{false, true, true},
+           "demotion: reversing the pool reverses the flags");
+}
+
+TEST(test_nsga2_sort_demotes_a_flagged_member_one_front) {
+    std::vector<Scored<int>> population;
+    population.push_back(make_scored(0, {0.9, 0.1}));    // front 0
+    population.push_back(make_scored(1, {0.1, 0.9}));    // front 0
+    population.push_back(make_scored(2, {0.05, 0.05}));  // front 1
+    nsga2_sort(population, {true, false, false});
+    expect(
+        population.front().specification == 1 && population.front().rank == 0,
+        "nsga2_sort: the unflagged front-0 member leads");
+    expect(population[1].rank == 1 && population[2].rank == 1,
+           "nsga2_sort: the demoted member joins front 1 beside the member "
+           "that was already there");
 }
 
 }  // namespace

@@ -120,6 +120,10 @@ struct Config {
     /// `peredur --repair-summary` alone, like report_cpu_timing.
     bool report_repair_summary = false;
     SelectionScheme selection_scheme = SelectionScheme::Nsga2Apportion;
+    /// Under NSGA-II on the FRETISH path, move a realizable candidate one front
+    /// down when a rule proves another realizable candidate in the pool
+    /// strictly stronger (see "Maximality demotion" in docs/dev/algorithm.md).
+    bool maximality_demotion = false;
     double selection_rate = 0.5;
     /// The top elitism_rate fraction of the population carries over into the
     /// next generation verbatim, bypassing crossover, mutation and the

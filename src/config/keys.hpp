@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 39> k_config_keys{{
+inline constexpr std::array<ConfigKey, 40> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -142,6 +142,17 @@ inline constexpr std::array<ConfigKey, 39> k_config_keys{{
      "stays at 0.1.\n"
      "\"nsga2-truncate\", the default until 2026-08-14, was removed on "
      "2026-10-30.\n"},
+    {"genetic", "maximality_demotion", &Config::maximality_demotion,
+     KeyCheck::None, KeyReader::Fretish,
+     "Under nsga2-apportion, move a realizable candidate of the (mu + lambda) "
+     "pool one front down when another realizable candidate is proved "
+     "strictly stronger than it, slot by slot and by rule alone. A weaker "
+     "timing or a removed guarantee costs nothing on similarity, so without "
+     "this a gutted repair can sit on the first front beside the one it "
+     "weakens. FRETISH only; the TLSF path has no rule to prove the order.",
+     "FRETISH only, under nsga2-apportion: demote a realizable candidate one "
+     "front\n"
+     "when another realizable one is proved strictly stronger.\n"},
     {"fitness", "weight_syntactic", &Config::fitness_weight_syntactic,
      KeyCheck::NonNegative, KeyReader::Both,
      "Syntactic similarity component weight. The defaults match AuRUS's "

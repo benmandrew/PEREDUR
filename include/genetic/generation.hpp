@@ -599,6 +599,20 @@ PopulationRescue<Spec> correctness_rescue(
         };
 }
 
+/// Where the objective named "status" sits in each objective vector
+/// @p fitness produces, or nothing where the run registers none.
+template <typename Fitness>
+std::optional<std::size_t> status_objective_index(const Fitness& fitness) {
+    std::size_t index = 0;
+    for (const auto& objective : fitness) {
+        if (objective.name == "status") {
+            return index;
+        }
+        ++index;
+    }
+    return std::nullopt;
+}
+
 /// Evolves a population for one generation:
 ///   1. Order the population best-first under @p cfg's selection scheme —
 ///      descending weighted fitness for WeightedAverage, the NSGA-II
@@ -616,7 +630,10 @@ PopulationRescue<Spec> correctness_rescue(
 ///   7. Choose the survivors: under Nsga2Apportion the parents are pooled
 ///      with the scored offspring, deduplicated and ranked under the
 ///      crowded-comparison order ((mu+lambda) elitism), and the target_size
-///      slots are apportioned over the distinct survivors; under
+///      slots are apportioned over the distinct survivors. With
+///      maximality_demotion on a FRETISH run, a realizable candidate proved
+///      strictly weaker than another realizable one ranks one front lower
+///      (see demotion.hpp), in this step and in step 1. Under
 ///      WeightedAverage the scored population is re-sorted by the weighted
 ///      scalar
 ///
@@ -673,6 +690,9 @@ std::vector<Scored<Spec>> evolve_generation(
         budget);
     ctx.m_original = original;
     ctx.m_status_objective = fitness_functions.objective_index("status");
+    if (cfg.maximality_demotion) {
+        ctx.m_status_index = status_objective_index(fitness_functions);
+    }
     const std::vector<PipelineStage<Spec>> stages =
         make_generation_pipeline<Spec>(filter_stages(filter_functions),
                                        correctness_rescue(filter_functions));

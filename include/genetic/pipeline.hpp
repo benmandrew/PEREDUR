@@ -22,6 +22,7 @@
 #include "config.hpp"
 #include "fitness/status.hpp"
 #include "genetic/crossover.hpp"
+#include "genetic/demotion.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/nsga2.hpp"
 #include "genetic/random_source.hpp"
@@ -417,6 +418,9 @@ struct GenerationContext {
     std::size_t m_top_n;
     std::size_t m_elite_n;
     std::size_t m_offspring_n;
+    /// Where the status objective sits in each objective vector, set only
+    /// where maximality demotion is on and the run registers that objective.
+    std::optional<std::size_t> m_status_index;
 
     /// Parents ordered best-first, kept past breeding so the elites can be
     /// restored from it.
@@ -489,10 +493,31 @@ using PopulationRescue =
 
 namespace pipeline_detail {
 
+/// The maximality-demotion flags over @p population (see
+/// proved_weaker_realizable), or none where demotion is off or @p Spec is not
+/// FRETISH: TLSF has no rule to prove one candidate stronger than another.
+template <typename Spec>
+std::vector<bool> demotion_flags(
+    [[maybe_unused]] const GenerationContext<Spec>& ctx,
+    [[maybe_unused]] const std::vector<Scored<Spec>>& population) {
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        if (ctx.m_cfg.maximality_demotion && ctx.m_status_index.has_value()) {
+            return proved_weaker_realizable(population, *ctx.m_status_index);
+        }
+    }
+    return {};
+}
+
 template <typename Spec>
 void stage_order_parents(GenerationContext<Spec>& ctx) {
     // Parents are selected from the whole population, unfiltered: the filters
     // screen only the offspring bred below.
+    if (uses_nsga2_ranking(ctx.m_cfg)) {
+        // The rule is applied again here, or a candidate demoted at the last
+        // selection would breed and stand as an elite from its old front.
+        nsga2_sort(ctx.m_scored, demotion_flags(ctx, ctx.m_scored));
+        return;
+    }
     order_population(ctx.m_cfg, ctx.m_scored);
 }
 
@@ -592,7 +617,10 @@ void stage_select(GenerationContext<Spec>& ctx) {
     // holding them stops the truncation below from cutting arbitrarily through
     // the rank-0 front.
     pool = generation_detail::dedup_by_specification(std::move(pool));
-    nsga2_sort(pool);
+    const std::vector<bool> demoted = demotion_flags(ctx, pool);
+    DemotionStats::n_demoted += static_cast<std::size_t>(
+        std::count(demoted.begin(), demoted.end(), true));
+    nsga2_sort(pool, demoted);
 
     if (pool.size() > ctx.m_target_size) {
         pool.resize(ctx.m_target_size);

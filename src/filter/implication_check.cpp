@@ -15,8 +15,6 @@
 #include "fitness/exhaustive_count.hpp"
 #include "requirement.hpp"
 
-namespace {
-
 std::unordered_set<std::string> live_lowerings(
     const std::vector<Requirement>& reqs) {
     std::unordered_set<std::string> lowerings;
@@ -27,6 +25,8 @@ std::unordered_set<std::string> live_lowerings(
     }
     return lowerings;
 }
+
+namespace {
 
 enum Field : std::uint8_t {
     k_condition,
@@ -192,23 +192,22 @@ class RuleSearch {
     Answers m_stop;
 };
 
-// Whether @p req is implied by a live entry of @p pool: one with the same
-// lowering, or by rule the entry in @p req's own slot. Slots pair by index,
-// tombstones included, so the entry there is the one the two specifications
-// inherited from one original.
+// rule_cover, counting the covers only the rule proved.
 bool covered(const Requirement& req, std::size_t slot,
              const std::vector<Requirement>& pool,
              const std::unordered_set<std::string>& pool_lowerings) {
-    if (pool_lowerings.count(req.m_ltl) != 0) {
-        return true;
+    switch (rule_cover(req, slot, pool, pool_lowerings, requirement_implies)) {
+        case RuleCover::None:
+            return false;
+        case RuleCover::Lowering:
+            return true;
+        case RuleCover::Rule:
+            ImplicationFilterStats::n_rule_covered.fetch_add(
+                1, std::memory_order_relaxed);
+            return true;
     }
-    if (slot >= pool.size() || pool[slot].m_removed ||
-        !requirement_implies(pool[slot], req)) {
-        return false;
-    }
-    ImplicationFilterStats::n_rule_covered.fetch_add(1,
-                                                     std::memory_order_relaxed);
-    return true;
+    assert(false);
+    __builtin_unreachable();
 }
 
 }  // namespace
@@ -231,6 +230,48 @@ bool requirement_implies(const Requirement& stronger,
         return true;
     }
     return RuleSearch(stronger, weaker).reaches_dest();
+}
+
+RuleCover rule_cover(const Requirement& req, std::size_t slot,
+                     const std::vector<Requirement>& pool,
+                     const std::unordered_set<std::string>& pool_lowerings,
+                     const RequirementImplication& implies) {
+    // The slot's own entry first: candidates that share an original are
+    // mostly equal slot for slot, and a string comparison is cheaper than a
+    // hash.
+    const bool slot_live = slot < pool.size() && !pool[slot].m_removed;
+    if ((slot_live && pool[slot].m_ltl == req.m_ltl) ||
+        pool_lowerings.count(req.m_ltl) != 0) {
+        return RuleCover::Lowering;
+    }
+    if (slot_live && implies(pool[slot], req)) {
+        return RuleCover::Rule;
+    }
+    return RuleCover::None;
+}
+
+bool spec_implies_by_rule(
+    const Specification& from, const Specification& dest,
+    const std::unordered_set<std::string>& from_guarantees,
+    const std::unordered_set<std::string>& dest_assumptions,
+    const RequirementImplication& implies) {
+    for (std::size_t slot = 0; slot < from.m_assumptions.size(); ++slot) {
+        const Requirement& req = from.m_assumptions[slot];
+        if (!req.m_removed &&
+            rule_cover(req, slot, dest.m_assumptions, dest_assumptions,
+                       implies) == RuleCover::None) {
+            return false;
+        }
+    }
+    for (std::size_t slot = 0; slot < dest.m_guarantees.size(); ++slot) {
+        const Requirement& req = dest.m_guarantees[slot];
+        if (!req.m_removed &&
+            rule_cover(req, slot, from.m_guarantees, from_guarantees,
+                       implies) == RuleCover::None) {
+            return false;
+        }
+    }
+    return true;
 }
 
 std::optional<Specification> residual_destination(const Specification& from,

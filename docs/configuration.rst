@@ -133,6 +133,8 @@ Two consequences are worth knowing. Under either NSGA-II scheme the ``[fitness]`
 
 All three schemes still emit the weighted-average scalar in each repair's fitness record, so outputs stay comparable across runs.
 
+``genetic.maximality_demotion`` (``false``) adds one rule to ``nsga2-apportion`` on FRETISH runs. A realizable candidate moves one front down when another realizable candidate in the pool is proved strictly stronger, slot by slot and by rule alone. A weaker timing or a removed guarantee costs nothing on similarity, so without the rule such a candidate can share the first front with the repair it weakens. It has not yet been campaigned; ``docs/dev/algorithm.md`` records the design.
+
 Search size and operators
 -------------------------
 

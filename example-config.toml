@@ -45,6 +45,9 @@ termination = "generations"
 # stays at 0.1.
 # "nsga2-truncate", the default until 2026-08-14, was removed on 2026-10-30.
 selection_scheme = "nsga2-apportion"
+# FRETISH only, under nsga2-apportion: demote a realizable candidate one front
+# when another realizable one is proved strictly stronger.
+maximality_demotion = false
 
 [fitness]
 # AuRUS's weights (Settings.java): its lost- and won-model terms, 0.1 each, are

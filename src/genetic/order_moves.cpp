@@ -27,17 +27,6 @@ Bound flipped(Bound bound) {
     return bound == Bound::Upper ? Bound::Lower : Bound::Upper;
 }
 
-std::unordered_set<std::string> live_lowerings(
-    const std::vector<Requirement>& reqs) {
-    std::unordered_set<std::string> lowerings;
-    for (const Requirement& req : reqs) {
-        if (!req.m_removed) {
-            lowerings.insert(req.m_ltl);
-        }
-    }
-    return lowerings;
-}
-
 // Whether @p req is implied by a live entry of @p pool: one with the same
 // lowering anywhere, or by rule the entry in @p req's own slot.
 bool covered(const Requirement& req, std::size_t slot,

@@ -81,7 +81,7 @@ Always also takes a second list, `donated_to_always`: `until s` for every stop `
 
 No invented constant: a hard-coded `for 10 ticks` weakening of Always produced a degenerate `fsm` repair, and freezing Always (`f4968ab`) left the timing of every Always guarantee immobile, 7 of the 9 across the three FRETISH input specs.
 
-A weaker guarantee timing helps realizability and costs nothing on similarity, so under NSGA-II a gutted timing sits on the front; that wants a campaign.
+A weaker guarantee timing helps realizability and costs nothing on similarity, so under NSGA-II a gutted timing sits on the front; that wants a campaign. `maximality_demotion` moves such a candidate down a front where a stronger realizable one is in the pool (see "Maximality demotion" in `docs/dev/algorithm.md`).
 
 `move_off_extreme` reads the pool before touching the `RandomSource`, so an empty pool costs no draw, and no golden specification has an Always guarantee.
 
@@ -105,7 +105,7 @@ The flag is in `operator<`, `operator==` and `hash`, so a deleted guarantee cann
 
 The probability is tested before the RNG is drawn, so at 0 it costs no draw. Archived configs predate the key, so reproduce them with `p_remove_guarantee = 0.0` (see "Config vintage"). `golden_config()` pins the key.
 
-Deletion helps realizability and costs nothing on similarity, so under NSGA-II a gutted candidate sits on the front. A sweep measuring that needs a `p_remove_guarantee = 0` arm as its control.
+Deletion helps realizability and costs nothing on similarity, so under NSGA-II a gutted candidate sits on the front. A sweep measuring that needs a `p_remove_guarantee = 0` arm as its control. `maximality_demotion` reads a tombstone as a `true` guarantee, so it demotes the gutted candidate wherever the intact one is realizable and in the pool.
 
 ## Order moves
 

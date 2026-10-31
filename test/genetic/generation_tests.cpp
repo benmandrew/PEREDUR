@@ -8,7 +8,9 @@
 #include <vector>
 
 #include "config.hpp"
+#include "fitness/status.hpp"
 #include "fixtures.hpp"
+#include "genetic/demotion.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/simplify.hpp"
 #include "prop_formula.hpp"
@@ -634,6 +636,78 @@ TEST(test_evolve_generation_nsga2_apportion_is_deterministic) {
            "evolve_generation/nsga2-apportion: apportionment draws no random "
            "numbers, so identical inputs and RNG produce an identical "
            "generation");
+}
+
+// --- maximality demotion ---
+
+// A realizable `a -> x within 2` and the same guarantee loosened to within 3,
+// each scored realizable and level on similarity, so plain NSGA-II puts both
+// on front 0.
+struct DemotionCase {
+    Specification tight = Specification(
+        {}, {make_req("a", "x", timing::within_ticks(2))}, {"a"}, {"x"});
+    Specification loose = Specification(
+        {}, {make_req("a", "x", timing::within_ticks(3))}, {"a"}, {"x"});
+    AggregateWeightedFitnessFunction fns = AggregateWeightedFitnessFunction(
+        {{[](const Specification&) { return k_status_realizable; }, 1.0,
+          "status"},
+         {[](const Specification&) { return 0.5; }, 1.0, "similarity"}});
+
+    [[nodiscard]] std::vector<ScoredSpecification> next(
+        const Config& cfg) const {
+        return evolve_generation(cfg,
+                                 score_population(cfg, {tight, loose}, fns), 2,
+                                 0, fns, {}, make_source({}, 0));
+    }
+
+    [[nodiscard]] static std::size_t rank_of(
+        const std::vector<ScoredSpecification>& population,
+        const Specification& spec) {
+        for (const ScoredSpecification& scored : population) {
+            if (scored.specification == spec) {
+                return scored.rank;
+            }
+        }
+        expect(false, "maximality demotion: the candidate should survive");
+        return 0;
+    }
+};
+
+Config demotion_config(bool demote) {
+    Config cfg = nsga2_apportion_config();
+    cfg.crossover_rate = 0.0;
+    cfg.mutation_rate = 0.0;
+    cfg.maximality_demotion = demote;
+    return cfg;
+}
+
+TEST(test_maximality_demotion_is_off_by_default) {
+    expect(!Config{}.maximality_demotion,
+           "maximality demotion: the key defaults to off");
+    const DemotionCase demotion;
+    const std::size_t before = DemotionStats::n_demoted;
+    const std::vector<ScoredSpecification> next =
+        demotion.next(demotion_config(Config{}.maximality_demotion));
+    expect(DemotionCase::rank_of(next, demotion.loose) == 0,
+           "maximality demotion: off, the looser candidate stays on front 0");
+    expect(DemotionStats::n_demoted == before,
+           "maximality demotion: off, nothing is counted");
+}
+
+TEST(test_maximality_demotion_moves_the_weaker_candidate_down) {
+    const DemotionCase demotion;
+    const std::size_t before = DemotionStats::n_demoted;
+    const std::vector<ScoredSpecification> next =
+        demotion.next(demotion_config(true));
+    expect(DemotionCase::rank_of(next, demotion.tight) == 0 &&
+               DemotionCase::rank_of(next, demotion.loose) == 1,
+           "maximality demotion: on, the proved-weaker realizable candidate "
+           "drops one front");
+    expect(next.front().specification == demotion.tight,
+           "maximality demotion: the stronger candidate leads the order");
+    expect(DemotionStats::n_demoted == before + 1,
+           "maximality demotion: one demotion at survivor selection is "
+           "counted once");
 }
 
 }  // namespace

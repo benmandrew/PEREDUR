@@ -11,6 +11,7 @@
 /// population by reading each element's per-objective vector.
 
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <vector>
 
@@ -62,14 +63,26 @@ std::vector<std::vector<double>> objectives_of(
 /// the crowded-comparison operator: front rank ascending, then crowding
 /// distance descending. The sort is stable so a fixed RNG seed yields a
 /// deterministic order.
+///
+/// Each element flagged in @p demoted moves one front down before crowding is
+/// measured, so it competes for crowding distance within the front it lands
+/// in, and a 1 / (1 + rank) apportionment reads its demoted rank. An empty
+/// @p demoted demotes nothing; otherwise it is one flag per element.
 template <typename Spec>
-void nsga2_sort(std::vector<Scored<Spec>>& population) {
+void nsga2_sort(std::vector<Scored<Spec>>& population,
+                const std::vector<bool>& demoted = {}) {
     if (population.empty()) {
         return;
     }
+    assert(demoted.empty() || demoted.size() == population.size());
     const std::vector<std::vector<double>> objectives =
         objectives_of(population);
-    const std::vector<std::size_t> ranks = non_domination_ranks(objectives);
+    std::vector<std::size_t> ranks = non_domination_ranks(objectives);
+    for (std::size_t i = 0; i < demoted.size(); ++i) {
+        if (demoted[i]) {
+            ++ranks[i];
+        }
+    }
     const std::vector<double> distances = crowding_distances(objectives, ranks);
     for (std::size_t i = 0; i < population.size(); ++i) {
         population[i].rank = ranks[i];

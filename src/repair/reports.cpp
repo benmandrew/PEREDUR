@@ -11,6 +11,7 @@
 #include "fitness/semantic_similarity.hpp"
 #include "fitness/status.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/demotion.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
 #include "runner/black.hpp"
@@ -182,6 +183,9 @@ void print_diagnostics_report() {
               << AccumulatorStats::n_contributed << "\n";
     std::cout << "Mutations drawn from a blame-targeted slot list: "
               << SlotTargetingStats::n_targeted << "\n";
+    std::cout << "Candidates demoted as proved weaker than another realizable "
+                 "one: "
+              << DemotionStats::n_demoted << "\n";
     print_cache_report();
     std::cout << "\nFitness cache: " << FitnessCacheStats::n_hits << " hits / "
               << FitnessCacheStats::n_misses << " misses\n";
