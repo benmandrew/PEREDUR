@@ -185,3 +185,17 @@ std::vector<Step> steps_towards(const Specification& current,
 /// comparable under timing_implies.
 std::vector<Timing> timing_chain(const Timing& from, const Timing& dest,
                                  ScopeKind scope);
+
+/// @p current with the timing of slot @p slot on side @p side replaced by
+/// @p timing, or nothing where the Specification constructor would merge the
+/// edited entry into another or the result is not proved Stronger by
+/// classify_move.
+std::optional<Specification> with_slot_timing(const Specification& current,
+                                              StepSide side, std::size_t slot,
+                                              const Timing& timing);
+
+/// The timing_chain a Field step on the Timing field crosses from @p current,
+/// its destination last, or nothing for any other step or where the two
+/// timings are equal or not comparable.
+std::vector<Timing> timing_step_chain(const Specification& current,
+                                      const Step& step);

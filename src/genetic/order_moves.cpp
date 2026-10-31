@@ -657,3 +657,44 @@ std::vector<Timing> timing_chain(const Timing& from, const Timing& dest,
     chain.push_back(dest);
     return chain;
 }
+
+std::optional<Specification> with_slot_timing(const Specification& current,
+                                              StepSide side, std::size_t slot,
+                                              const Timing& timing) {
+    std::vector<Requirement> assumptions = current.m_assumptions;
+    std::vector<Requirement> guarantees = current.m_guarantees;
+    std::vector<Requirement>& edited =
+        side == StepSide::Assumption ? assumptions : guarantees;
+    assert(slot < edited.size());
+    const Requirement& base = edited[slot];
+    edited[slot] = Requirement(base.m_condition, base.m_response, timing,
+                               base.m_condition_type, base.m_weakenable,
+                               base.m_removed, base.m_scope);
+    const std::size_t n_assumptions = assumptions.size();
+    const std::size_t n_guarantees = guarantees.size();
+    Specification result(std::move(assumptions), std::move(guarantees),
+                         current.m_in_atoms, current.m_out_atoms,
+                         current.m_modes);
+    if (result.m_assumptions.size() != n_assumptions ||
+        result.m_guarantees.size() != n_guarantees ||
+        classify_move(current, result) != MoveOrder::Stronger) {
+        return std::nullopt;
+    }
+    return result;
+}
+
+std::vector<Timing> timing_step_chain(const Specification& current,
+                                      const Step& step) {
+    if (step.m_kind != StepKind::Field ||
+        step.m_field != RequirementField::Timing) {
+        return {};
+    }
+    const auto side_of =
+        [&step](const Specification& spec) -> const std::vector<Requirement>& {
+        return step.m_side == StepSide::Assumption ? spec.m_assumptions
+                                                   : spec.m_guarantees;
+    };
+    const Requirement& from = side_of(current)[step.m_slot];
+    const Requirement& dest = side_of(step.m_result)[step.m_slot];
+    return timing_chain(from.m_timing, dest.m_timing, from.m_scope.m_kind);
+}

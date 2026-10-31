@@ -109,6 +109,10 @@ blame_targeted_slots = false
 # default.
 direction_gated = false
 p_sideways = 1.0
+# FRETISH only: take more large moves from a parent far from realizable and
+# fewer from one near it, scaled by the parent's status. Off (0) by default.
+step_scaling = 0.0
+bisect_steps = false
 
 [model_counting]
 default_bound = 20

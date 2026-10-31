@@ -126,6 +126,11 @@ DEFAULTS: dict = {
     # [mutation] only when a sweep overrides them (see make_toml).
     "direction_gated": False,
     "p_sideways": 1.0,
+    # FRETISH only: scale the share of large moves by the parent's status, and
+    # bisect a realizable parent's timing steps under direction_gated. Emitted
+    # into [mutation] only when a sweep overrides them (see make_toml).
+    "step_scaling": 0.0,
+    "bisect_steps": False,
     "default_bound": 20,
     "run_implication": True,
     # FRETISH only: drop proved strengthenings of parents the realizability
@@ -269,7 +274,11 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         [f"direction_gated = {_fmt(d['direction_gated'])}"]
         if "direction_gated" in overrides else []) + (
         [f"p_sideways = {_fmt(d['p_sideways'])}"]
-        if "p_sideways" in overrides else []) + [
+        if "p_sideways" in overrides else []) + (
+        [f"step_scaling = {_fmt(d['step_scaling'])}"]
+        if "step_scaling" in overrides else []) + (
+        [f"bisect_steps = {_fmt(d['bisect_steps'])}"]
+        if "bisect_steps" in overrides else []) + [
         "",
         "[model_counting]",
         f"default_bound = {d['default_bound']}",

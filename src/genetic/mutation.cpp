@@ -190,18 +190,60 @@ Formula mutate_formula(const Formula& formula,
 
 namespace {
 
+// The factor Config::step_scaling multiplies each large move's probability by,
+// or nothing where the key is off or the parent gave no status. Nothing keeps
+// every arm on the draws it took before the key existed.
+using StepScale = std::optional<double>;
+
+// The share of a scaled draw that a large move takes: its unscaled share
+// @p base times @p scale, capped at 1.
+double scaled_share(double base, double scale) {
+    return std::min(1.0, base * scale);
+}
+
+// Under a step scale, whether a tick-count step takes one of its large
+// options, which hold the share @p base of the unscaled draw, rather than its
+// single edge. One next_real, so at a scale of 1 the two choices keep the
+// shares they have unscaled.
+bool draws_large(double base, double scale, const RandomSource& random_source) {
+    const bool large = random_source.next_real() < scaled_share(base, scale);
+    if (large) {
+        StepScalingStats::n_large++;
+    } else {
+        StepScalingStats::n_small++;
+    }
+    return large;
+}
+
+constexpr double k_half = 0.5;
+constexpr double k_two_thirds = 2.0 / 3.0;
+
 Timing weaken_for_timing(const timing::ForTicks& for_ticks,
-                         const RandomSource& random_source) {
+                         const RandomSource& random_source, StepScale scale) {
     if (for_ticks.m_ticks == 1) {
         return random_source.next_bool() ? timing::next_timepoint()
                                          : timing::immediately();
+    }
+    if (scale.has_value()) {
+        return draws_large(k_half, *scale, random_source)
+                   ? timing::for_ticks(for_ticks.m_ticks / 2)
+                   : timing::for_ticks(for_ticks.m_ticks - 1);
     }
     return random_source.next_bool() ? timing::for_ticks(for_ticks.m_ticks - 1)
                                      : timing::for_ticks(for_ticks.m_ticks / 2);
 }
 
 Timing weaken_within_timing(const timing::WithinTicks& within_ticks,
-                            const RandomSource& random_source) {
+                            const RandomSource& random_source,
+                            StepScale scale) {
+    if (scale.has_value()) {
+        if (!draws_large(k_two_thirds, *scale, random_source)) {
+            return timing::within_ticks(within_ticks.m_ticks + 1);
+        }
+        return random_source.next_bool()
+                   ? timing::within_ticks(within_ticks.m_ticks * 2)
+                   : timing::eventually();
+    }
     std::size_t index = random_source.next_index(3);
     switch (index) {
         case 0:
@@ -217,7 +259,16 @@ Timing weaken_within_timing(const timing::WithinTicks& within_ticks,
 }
 
 Timing strengthen_for_timing(const timing::ForTicks& for_ticks,
-                             const RandomSource& random_source) {
+                             const RandomSource& random_source,
+                             StepScale scale) {
+    if (scale.has_value()) {
+        if (!draws_large(k_two_thirds, *scale, random_source)) {
+            return timing::for_ticks(for_ticks.m_ticks + 1);
+        }
+        return random_source.next_bool()
+                   ? timing::for_ticks(for_ticks.m_ticks * 2)
+                   : timing::always();
+    }
     std::size_t index = random_source.next_index(3);
     switch (index) {
         case 0:
@@ -233,10 +284,21 @@ Timing strengthen_for_timing(const timing::ForTicks& for_ticks,
 }
 
 Timing strengthen_within_timing(const timing::WithinTicks& within_ticks,
-                                const RandomSource& random_source) {
+                                const RandomSource& random_source,
+                                StepScale scale) {
     if (within_ticks.m_ticks == 1) {
         return random_source.next_bool() ? timing::next_timepoint()
                                          : timing::immediately();
+    }
+    // `after n-1` pins the response to one tick rather than stepping along the
+    // `within` chain, so it counts with the halving as a large move.
+    if (scale.has_value()) {
+        if (!draws_large(k_two_thirds, *scale, random_source)) {
+            return timing::within_ticks(within_ticks.m_ticks - 1);
+        }
+        return random_source.next_bool()
+                   ? timing::within_ticks((within_ticks.m_ticks + 1) / 2)
+                   : timing::after_ticks(within_ticks.m_ticks - 1);
     }
     std::size_t index = random_source.next_index(3);
     switch (index) {
@@ -341,7 +403,7 @@ Timing move_off_extreme(const Timing& extreme,
 
 Timing strengthen_timing(const Timing& timing,
                          const std::vector<Timing>& timing_pool,
-                         const RandomSource& random_source) {
+                         const RandomSource& random_source, StepScale scale) {
     const auto mutation_function = [&](const auto& value) -> Timing {
         using T = std::decay_t<decltype(value)>;
         // Always is the top of the order and has no strengthening. It is also
@@ -355,7 +417,7 @@ Timing strengthen_timing(const Timing& timing,
         } else if constexpr (strengthens_to_always) {
             return timing::always();
         } else if constexpr (std::is_same_v<T, timing::ForTicks>) {
-            return strengthen_for_timing(value, random_source);
+            return strengthen_for_timing(value, random_source, scale);
         } else if constexpr (std::is_same_v<T, timing::AfterTicks>) {
             // `after n` expands to ¬R at ticks 0..n ∧ R at tick n+1, pinning
             // the response to a single tick. Nothing in the timing order lies
@@ -364,7 +426,7 @@ Timing strengthen_timing(const Timing& timing,
             // strengthen it. AfterTicks therefore has no strengthening.
             return timing::after_ticks(value.m_ticks);
         } else if constexpr (std::is_same_v<T, timing::WithinTicks>) {
-            return strengthen_within_timing(value, random_source);
+            return strengthen_within_timing(value, random_source, scale);
         } else if constexpr (std::is_same_v<T, timing::Eventually>) {
             return move_off_extreme(timing::eventually(),
                                     donated_candidates(timing_pool),
@@ -381,7 +443,7 @@ Timing strengthen_timing(const Timing& timing,
 
 Timing weaken_timing(const Timing& timing,
                      const std::vector<Timing>& timing_pool,
-                     const RandomSource& random_source) {
+                     const RandomSource& random_source, StepScale scale) {
     const auto mutation_function = [&](const auto& value) -> Timing {
         using T = std::decay_t<decltype(value)>;
         if constexpr (std::is_same_v<T, timing::Immediately> ||
@@ -392,11 +454,11 @@ Timing weaken_timing(const Timing& timing,
                                     donated_to_always(timing_pool),
                                     random_source);
         } else if constexpr (std::is_same_v<T, timing::ForTicks>) {
-            return weaken_for_timing(value, random_source);
+            return weaken_for_timing(value, random_source, scale);
         } else if constexpr (std::is_same_v<T, timing::AfterTicks>) {
             return timing::within_ticks(value.m_ticks + 1);
         } else if constexpr (std::is_same_v<T, timing::WithinTicks>) {
-            return weaken_within_timing(value, random_source);
+            return weaken_within_timing(value, random_source, scale);
         } else if constexpr (std::is_same_v<T, timing::Eventually>) {
             return timing::eventually();
         } else if constexpr (timing::k_carries_stop<T>) {
@@ -578,17 +640,27 @@ std::vector<Timing> collect_timing_pool(const Specification& specification) {
     return pool;
 }
 
-Timing mutate_timing(const Timing& timing, Direction direction, ScopeKind scope,
-                     const std::vector<Timing>& timing_pool,
-                     const RandomSource& random_source) {
+namespace {
+
+// True when the operator moving @p direction under @p scope goes through the
+// Global order's strengthenings: the only scopes reverse the order, so there
+// the opposite operator is the one moving in direction.
+bool global_strengthen(Direction direction, ScopeKind scope) {
+    return (direction == Direction::Strengthen) != is_only_scope(scope);
+}
+
+// mutate_timing under a step scale, which the tick-count steps read.
+Timing mutate_timing_scaled(const Timing& timing, Direction direction,
+                            ScopeKind scope,
+                            const std::vector<Timing>& timing_pool,
+                            const RandomSource& random_source,
+                            StepScale scale) {
     assert(random_source);
-    // Both operators step through the Global order, which the only scopes
-    // reverse, so there the opposite operator is the one moving in direction.
-    const bool strengthen =
-        (direction == Direction::Strengthen) != is_only_scope(scope);
-    Timing moved = strengthen
-                       ? strengthen_timing(timing, timing_pool, random_source)
-                       : weaken_timing(timing, timing_pool, random_source);
+    const bool strengthen = global_strengthen(direction, scope);
+    Timing moved =
+        strengthen
+            ? strengthen_timing(timing, timing_pool, random_source, scale)
+            : weaken_timing(timing, timing_pool, random_source, scale);
     // The other scopes drop edges from the Global order, and a step along a
     // dropped edge is refused. Every step is an edge under Global and After,
     // so their moves, and the draws that pick them, are unchanged.
@@ -599,16 +671,39 @@ Timing mutate_timing(const Timing& timing, Direction direction, ScopeKind scope,
     return sound ? moved : timing;
 }
 
+}  // namespace
+
+Timing mutate_timing(const Timing& timing, Direction direction, ScopeKind scope,
+                     const std::vector<Timing>& timing_pool,
+                     const RandomSource& random_source) {
+    return mutate_timing_scaled(timing, direction, scope, timing_pool,
+                                random_source, std::nullopt);
+}
+
 namespace {
 
+// True when the timing arm moving @p requirement in @p direction moves it off
+// Always or Eventually. Such a move has no single edge to take instead, since
+// each extreme moves only into a donated timing, so under a step scale the
+// arm's rate is what scales. Every other timing keeps cfg.p_timing and scales
+// inside its tick-count step.
+bool moves_off_extreme(const Requirement& requirement, Direction direction) {
+    return global_strengthen(direction, requirement.m_scope.m_kind)
+               ? std::holds_alternative<timing::Eventually>(
+                     requirement.m_timing)
+               : std::holds_alternative<timing::Always>(requirement.m_timing);
+}
+
 // mutate_requirement, reporting through @p free_rewrite whether any field took
-// the general rewrite rather than a move along its order.
+// the general rewrite rather than a move along its order, under the step scale
+// @p scale.
 Requirement mutate_requirement_tracked(
     const Requirement& requirement, const std::vector<std::string>& atoms,
     const std::vector<std::string>& condition_atoms, Direction direction,
     const std::vector<Timing>& timing_pool,
     const std::vector<std::string>& mode_pool,
-    const RandomSource& random_source, const Config& cfg, bool* free_rewrite) {
+    const RandomSource& random_source, const Config& cfg, bool* free_rewrite,
+    StepScale scale) {
     Requirement mutated = requirement;
     // Under cfg.p_monotone these two rewrites move along the implication order
     // and are direction-agnostic otherwise, rewriting the propositional
@@ -627,10 +722,18 @@ Requirement mutate_requirement_tracked(
                           condition_direction(requirement, direction), cfg,
                           random_source, free_rewrite);
     }
-    if (random_source.next_real() < cfg.p_timing) {
-        mutated.m_timing = mutate_timing(requirement.m_timing, direction,
-                                         requirement.m_scope.m_kind,
-                                         timing_pool, random_source);
+    // The draw against the rate is the same one, scaled or not.
+    const bool scaled_extreme =
+        scale.has_value() && moves_off_extreme(requirement, direction);
+    const double timing_rate =
+        scaled_extreme ? scaled_share(cfg.p_timing, *scale) : cfg.p_timing;
+    if (random_source.next_real() < timing_rate) {
+        if (scaled_extreme) {
+            StepScalingStats::n_large++;
+        }
+        mutated.m_timing = mutate_timing_scaled(
+            requirement.m_timing, direction, requirement.m_scope.m_kind,
+            timing_pool, random_source, scale);
     }
     // Read off the mutated timing, which the arm above may have just moved onto
     // or off a stop. A requirement without one returns before the draw, so no
@@ -673,9 +776,9 @@ Requirement mutate_requirement(const Requirement& requirement,
                                const std::vector<std::string>& mode_pool,
                                const RandomSource& random_source,
                                const Config& cfg) {
-    return mutate_requirement_tracked(requirement, atoms, condition_atoms,
-                                      direction, timing_pool, mode_pool,
-                                      random_source, cfg, nullptr);
+    return mutate_requirement_tracked(
+        requirement, atoms, condition_atoms, direction, timing_pool, mode_pool,
+        random_source, cfg, nullptr, std::nullopt);
 }
 
 namespace {
@@ -833,7 +936,7 @@ Specification remove_guarantee(const Specification& specification,
 // assumption added or a guarantee removed, or nothing where neither fired.
 std::optional<Specification> structural_action(
     const Specification& specification, const RandomSource& random_source,
-    const Config& cfg) {
+    const Config& cfg, StepScale scale) {
     // Low-probability structural action: add a new environment assumption. The
     // Specification constructor deduplicates, so re-adding an existing
     // assumption is a harmless no-op. Available only when the specification
@@ -853,8 +956,16 @@ std::optional<Specification> structural_action(
             removable_guarantee_indices(specification);
         // The floor is on live guarantees, not removable ones: removing the
         // only weakenable guarantee is fine while locked ones remain.
+        // Removal is a large move, so a step scale scales its rate. The draw
+        // against it is the same one either way.
+        const double rate = scale.has_value()
+                                ? scaled_share(cfg.p_remove_guarantee, *scale)
+                                : cfg.p_remove_guarantee;
         if (!removable.empty() && count_live(specification.m_guarantees) > 1 &&
-            random_source.next_real() < cfg.p_remove_guarantee) {
+            random_source.next_real() < rate) {
+            if (scale.has_value()) {
+                StepScalingStats::n_large++;
+            }
             return remove_guarantee(specification, removable, random_source);
         }
     }
@@ -905,14 +1016,72 @@ bool admitted_by_gate(Gate gate, const Specification& parent,
     return true;
 }
 
-// The steps a realizable parent may take back towards its original, or none
-// where it lent no original.
-std::vector<Step> steps_back(const Specification& specification,
-                             const ParentContext* parent) {
-    if (parent == nullptr || parent->original == nullptr) {
-        return {};
+// The step scale Config::step_scaling sets from @p parent's status:
+// `1 + k * (1 - 2 * status)`, above 1 for a parent more than half way from
+// realizable and below it nearer. The key is read first, so at 0 nothing else
+// is, and a crossover offspring, whose first parent's status is only an
+// estimate of it, is unscaled like a parent without a status.
+StepScale step_scale(const Config& cfg, const ParentContext* parent) {
+    if (cfg.step_scaling <= 0.0 || parent == nullptr || parent->crossed ||
+        !parent->status.has_value()) {
+        return std::nullopt;
     }
-    return steps_towards(specification, *parent->original);
+    StepScalingStats::n_scaled++;
+    const double status = std::clamp(*parent->status, 0.0, 1.0);
+    return 1.0 + (cfg.step_scaling * (1.0 - (2.0 * status)));
+}
+
+// A realizable parent's steps back towards its original, each marked where
+// Config::bisect_steps moved it to the midpoint of its timing chain.
+struct BackSteps {
+    std::vector<Step> m_steps;
+    std::vector<bool> m_bisected;
+};
+
+// Moves a timing step from @p current to the midpoint of the `within n` or
+// `for n` chain it crosses, rounding towards the destination, and returns
+// whether it moved. A chain with no intermediate entry, or a midpoint that
+// would merge two entries, leaves the step going all the way.
+bool bisect_step(const Specification& current, Step& step) {
+    const std::vector<Timing> chain = timing_step_chain(current, step);
+    if (chain.size() < 2) {
+        return false;
+    }
+    std::optional<Specification> midpoint = with_slot_timing(
+        current, step.m_side, step.m_slot, chain[(chain.size() - 1) / 2]);
+    if (!midpoint.has_value()) {
+        return false;
+    }
+    step.m_result = std::move(*midpoint);
+    return true;
+}
+
+// The steps a realizable parent may take back towards its original, or none
+// where it lent no original. Bisection replaces a step's result and draws
+// nothing, so the list keeps its length.
+BackSteps steps_back(const Specification& specification,
+                     const ParentContext* parent, const Config& cfg) {
+    BackSteps back;
+    if (parent == nullptr || parent->original == nullptr) {
+        return back;
+    }
+    back.m_steps = steps_towards(specification, *parent->original);
+    back.m_bisected.assign(back.m_steps.size(), false);
+    if (cfg.bisect_steps) {
+        for (std::size_t i = 0; i < back.m_steps.size(); ++i) {
+            back.m_bisected[i] = bisect_step(specification, back.m_steps[i]);
+        }
+    }
+    return back;
+}
+
+// Takes step @p choice of @p back, counting it.
+Specification take_step(BackSteps& back, std::size_t choice) {
+    DirectionGateStats::n_steps++;
+    if (back.m_bisected[choice]) {
+        DirectionGateStats::n_bisected++;
+    }
+    return std::move(back.m_steps[choice].m_result);
 }
 
 // The rates a realizable parent's rewrite runs at: every arm that moves along
@@ -981,12 +1150,14 @@ Specification mutate_specification(const Specification& specification,
     const std::size_t n_assumptions = specification.m_assumptions.size();
     assert(n_assumptions + specification.m_guarantees.size() > 0);
     const Gate gate = gate_of(cfg, parent);
+    const StepScale scale = step_scale(cfg, parent);
     // Both structural actions weaken the specification, so a realizable parent
     // under the gate skips them before their draws.
     const bool strengthening = gate == Gate::Strengthen;
     std::optional<Specification> acted =
-        strengthening ? std::nullopt
-                      : structural_action(specification, random_source, cfg);
+        strengthening
+            ? std::nullopt
+            : structural_action(specification, random_source, cfg, scale);
     if (acted.has_value()) {
         return std::move(*acted);
     }
@@ -1001,8 +1172,9 @@ Specification mutate_specification(const Specification& specification,
     // A realizable parent's strengthenings, each proved by classify_move and
     // moving one field, tombstone or appended assumption back towards the
     // original. Empty without the gate.
-    std::vector<Step> steps =
-        strengthening ? steps_back(specification, parent) : std::vector<Step>{};
+    BackSteps back =
+        strengthening ? steps_back(specification, parent, cfg) : BackSteps{};
+    const std::vector<Step>& steps = back.m_steps;
     if (weakenable_indices.empty() && steps.empty()) {
         return specification;
     }
@@ -1023,8 +1195,7 @@ Specification mutate_specification(const Specification& specification,
     const std::size_t choice =
         random_source.next_index(steps.size() + weakenable_indices.size());
     if (choice < steps.size()) {
-        DirectionGateStats::n_steps++;
-        return std::move(steps[choice].m_result);
+        return take_step(back, choice);
     }
     const std::size_t idx = weakenable_indices[choice - steps.size()];
     std::vector<Requirement> assumptions = specification.m_assumptions;
@@ -1068,7 +1239,7 @@ Specification mutate_specification(const Specification& specification,
     target[local_idx] = mutate_requirement_tracked(
         target[local_idx], mutation_atoms, condition_atoms, direction,
         timing_pool, specification.m_modes, random_source,
-        strengthening ? free_rewrite_rates(cfg) : cfg, &free_rewrite);
+        strengthening ? free_rewrite_rates(cfg) : cfg, &free_rewrite, scale);
     if (creates_duplicate(target, local_idx)) {
         return specification;
     }

@@ -99,15 +99,15 @@ struct Config {
     bool climb_output = false;
     /// The step order of the first climb (see ClimbOrder).
     ClimbOrder climb_order = ClimbOrder::Slot;
-    /// Climbs per repair. Each one after the first tries the steps under a
-    /// fixed pseudo-random priority of its own, and every distinct result goes
-    /// on to the final filters.
-    std::size_t climb_orders = 1;
     /// FRETISH only: after deduplication, drop each offspring proved stronger
     /// than a parent that an unrealizable query already asked proves
     /// unrealizable (RealizabilityChecker::proved_unrealizable). Off, nothing
     /// is recorded and no stage runs.
     bool parent_verdict_filter = false;
+    /// Climbs per repair. Each one after the first tries the steps under a
+    /// fixed pseudo-random priority of its own, and every distinct result goes
+    /// on to the final filters.
+    std::size_t climb_orders = 1;
     std::chrono::milliseconds black_timeout{1000};
     /// Per-call wall-clock budget for ltlsynt realizability checks; 0 disables
     /// it. ltlsynt has no internal timeout, and the search occasionally builds
@@ -236,11 +236,24 @@ struct Config {
     /// an unrealizable parent, weaker for a realizable one) returns the
     /// parent. Off, the stream is the one before it existed.
     bool direction_gated_mutation = false;
+    /// FRETISH only, under direction_gated_mutation: a realizable parent's
+    /// timing step on a `within n` or `for n` chain moves to the chain's
+    /// midpoint rather than to the original's value. Costs no draw.
+    bool bisect_steps = false;
     /// Under direction_gated_mutation, the probability that a free rewrite
     /// whose result is incomparable with the parent is kept rather than
     /// returning the parent. Drawn only with the gate on and only for an
     /// incomparable result, and not at all at 0 or 1.
     double p_sideways = 1.0;
+    /// FRETISH only: how far the parent's status scales the choice between a
+    /// large move and a single edge, in [0, 1]. Each large move's probability
+    /// (removing a guarantee, moving a timing off Always or Eventually, and
+    /// the jumps of a tick-count step) is multiplied by
+    /// `1 + step_scaling * (1 - 2 * status)`, so a parent far from realizable
+    /// takes more of them and one near it fewer. A crossover offspring or a
+    /// parent without a status is unscaled. At 0 nothing is read and the
+    /// stream is the one before it existed.
+    double step_scaling = 0.0;
     /// TLSF-mode mutation: probability of mutating an assumption-side section
     /// (INITIALLY/REQUIRE/ASSUME) rather than a guarantee-side one
     /// (PRESET/ASSERT/GUARANTEE). The guarantee side takes the complement.

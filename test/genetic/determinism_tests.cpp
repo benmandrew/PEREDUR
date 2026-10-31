@@ -156,6 +156,12 @@ Config golden_config() {
     // a golden gaining one fails here rather than re-recording.
     cfg.direction_gated_mutation = false;
     cfg.p_sideways = 1.0;
+    // Off, their defaults. At 0 the scale reads no status and the tick-count
+    // steps draw as they did before it existed; bisection draws nothing even
+    // on and acts only under the gate. Pinned so that a golden gaining a
+    // status objective fails here rather than re-recording.
+    cfg.step_scaling = 0.0;
+    cfg.bisect_steps = false;
     // Off, its default. The stage draws nothing even on, and the golden
     // fitness has no status objective to record origins against; pinned so
     // that a golden gaining one fails here rather than re-recording.
@@ -608,6 +614,76 @@ TEST(test_direction_gate_costs_no_draw_when_off) {
                        std::to_string(seed));
         }
     }
+}
+
+// The step scale reads its key before the parent's status, so at 0 a context in
+// either state must change neither the stream nor the offspring. On, the
+// tick-count steps must draw differently, or the off check passes over a dead
+// arm. Bisection replaces a step's result and draws nothing, so with the gate
+// on its stream must match the gate's alone.
+TEST(test_step_scaling_costs_no_draw_when_off) {
+    const std::vector<std::string> inputs = {"a", "b", "c"};
+    const std::vector<std::string> outputs = {"x", "y"};
+    const Specification original({make_req("a", "b", timing::eventually())},
+                                 {make_req("a", "x"), make_req("b", "y"),
+                                  make_req("c", "x", timing::within_ticks(2))},
+                                 inputs, outputs);
+    const Specification spec(
+        {make_req("a", "b", timing::eventually())},
+        {make_req("a", "x", timing::for_ticks(4)), make_req("b", "y"),
+         make_req("c", "x", timing::within_ticks(8))},
+        inputs, outputs);
+    ParentContext unrealizable;
+    unrealizable.status = 0.0;
+    unrealizable.original = &original;
+    ParentContext realizable = unrealizable;
+    realizable.status = 1.0;
+    realizable.realizable = true;
+
+    const auto mutate = [&spec](const Config& cfg, const ParentContext* context,
+                                std::size_t seed) {
+        auto trace = std::make_shared<DrawTrace>();
+        const RandomSource source = make_recording_source(seed, trace);
+        Specification mutated =
+            mutate_specification(spec, source, cfg, context);
+        return std::make_pair(render_trace(*trace), std::move(mutated));
+    };
+
+    Config off = golden_config();
+    off.p_timing = 1.0;
+    off.bisect_steps = true;
+    Config gate_on = off;
+    gate_on.direction_gated_mutation = true;
+    Config gate_unbisected = gate_on;
+    gate_unbisected.bisect_steps = false;
+    Config scaled = off;
+    scaled.step_scaling = 1.0;
+    constexpr std::size_t k_seeds = 64;
+    const std::size_t scaled_before = StepScalingStats::n_scaled.load();
+    bool scaled_moved = false;
+    for (std::size_t seed = 0; seed < k_seeds; ++seed) {
+        const auto without = mutate(off, nullptr, seed);
+        for (const ParentContext* context : {&unrealizable, &realizable}) {
+            const auto with = mutate(off, context, seed);
+            expect(with.first == without.first && with.second == without.second,
+                   "step_scaling: at 0, a parent context must change neither "
+                   "the draw stream nor the offspring, seed " +
+                       std::to_string(seed));
+            expect(mutate(gate_on, context, seed).first ==
+                       mutate(gate_unbisected, context, seed).first,
+                   "bisect_steps: under the gate bisection must cost no draw, "
+                   "seed " +
+                       std::to_string(seed));
+        }
+        const bool differs =
+            mutate(scaled, &unrealizable, seed).first != without.first;
+        scaled_moved = scaled_moved || differs;
+    }
+    expect(StepScalingStats::n_scaled.load() == scaled_before + k_seeds,
+           "step_scaling: on, each mutation with a status should be scaled "
+           "once, and none at 0");
+    expect(scaled_moved,
+           "step_scaling: on, some tick-count step should draw differently");
 }
 
 TEST(test_evolved_population_is_pinned) {

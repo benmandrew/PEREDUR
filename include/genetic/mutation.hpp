@@ -156,6 +156,22 @@ struct DirectionGateStats {
     inline static std::atomic<std::size_t> n_sideways_refused{0};
     /// Mutations of a realizable parent that took a step from steps_towards.
     inline static std::atomic<std::size_t> n_steps{0};
+    /// Of those steps, the timing steps Config::bisect_steps moved to the
+    /// midpoint of their chain.
+    inline static std::atomic<std::size_t> n_bisected{0};
+};
+
+/// What Config::step_scaling did over a run. Reported under `--diagnostics`
+/// and in run.json.
+struct StepScalingStats {
+    /// Mutations run under a step scale: the key on and the parent carrying a
+    /// status, crossover not having fired.
+    inline static std::atomic<std::size_t> n_scaled{0};
+    /// Large moves taken under a scale: a removed guarantee, a timing moved off
+    /// Always or Eventually, or a tick-count step's jump.
+    inline static std::atomic<std::size_t> n_large{0};
+    /// Tick-count steps under a scale that took their single edge.
+    inline static std::atomic<std::size_t> n_small{0};
 };
 
 /// The slots Config::blame_targeted_slots narrows a rewrite to, as global
@@ -197,7 +213,19 @@ std::vector<std::size_t> targeted_mutation_slots(
 /// classify_move: proved stronger than an unrealizable parent or weaker than a
 /// realizable one, the parent is returned; incomparable, it is kept with
 /// probability Config::p_sideways. Off, or without a status, the draw stream
-/// is the one before the gate existed.
+/// is the one before the gate existed. Under Config::bisect_steps a timing
+/// step on a `within n` or `for n` chain moves to the chain's midpoint instead
+/// of the original's value, at no cost in draws.
+///
+/// Under Config::step_scaling, where @p parent carries a status and crossover
+/// did not fire, each large move's probability is multiplied by
+/// `1 + step_scaling * (1 - 2 * status)`, capped at 1: removing a guarantee,
+/// moving a timing off Always or Eventually (the timing arm's rate scales,
+/// since neither has a single edge to take instead), and the jumps of a
+/// tick-count step (halving or doubling a count, or leaving the chain), which
+/// then share one `next_real` with the single edge. At a factor of 1 every
+/// share is the unscaled one, though the tick-count steps draw differently.
+/// At 0 the key costs no draw.
 ///
 /// @param specification The specification to mutate (must be non-empty)
 /// @param random_source Random source for index and mutation choices

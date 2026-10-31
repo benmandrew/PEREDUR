@@ -40,51 +40,11 @@ std::uint64_t step_priority(const Step& step, std::size_t permutation) {
     return mix(mix(static_cast<std::uint64_t>(permutation)) ^ identity);
 }
 
-const std::vector<Requirement>& side_of(const Specification& spec,
-                                        StepSide side) {
-    return side == StepSide::Assumption ? spec.m_assumptions
-                                        : spec.m_guarantees;
-}
-
-// @p current with the timing of one slot replaced, or nothing where the
-// Specification constructor would merge it into another entry or the result
-// is not proved a strengthening.
-std::optional<Specification> with_timing(const Specification& current,
-                                         StepSide side, std::size_t slot,
-                                         const Timing& timing) {
-    std::vector<Requirement> assumptions = current.m_assumptions;
-    std::vector<Requirement> guarantees = current.m_guarantees;
-    std::vector<Requirement>& edited =
-        side == StepSide::Assumption ? assumptions : guarantees;
-    const Requirement& base = edited[slot];
-    edited[slot] = Requirement(base.m_condition, base.m_response, timing,
-                               base.m_condition_type, base.m_weakenable,
-                               base.m_removed, base.m_scope);
-    const std::size_t n_assumptions = assumptions.size();
-    const std::size_t n_guarantees = guarantees.size();
-    Specification result(std::move(assumptions), std::move(guarantees),
-                         current.m_in_atoms, current.m_out_atoms,
-                         current.m_modes);
-    if (result.m_assumptions.size() != n_assumptions ||
-        result.m_guarantees.size() != n_guarantees ||
-        classify_move(current, result) != MoveOrder::Stronger) {
-        return std::nullopt;
-    }
-    return result;
-}
-
 // The timing chain a timing step crosses, without its destination, or empty
 // where the step has no intermediate entries.
 std::vector<Timing> chain_before_destination(const Specification& current,
                                              const Step& step) {
-    if (step.m_kind != StepKind::Field ||
-        step.m_field != RequirementField::Timing) {
-        return {};
-    }
-    const Requirement& from = side_of(current, step.m_side)[step.m_slot];
-    const Requirement& dest = side_of(step.m_result, step.m_side)[step.m_slot];
-    std::vector<Timing> chain =
-        timing_chain(from.m_timing, dest.m_timing, from.m_scope.m_kind);
+    std::vector<Timing> chain = timing_step_chain(current, step);
     if (!chain.empty()) {
         chain.pop_back();
     }
@@ -145,8 +105,8 @@ std::optional<Specification> furthest_accepted(const Specification& current,
     while (high - low > 1) {
         const std::ptrdiff_t mid = low + ((high - low) / 2);
         std::optional<Specification> candidate =
-            with_timing(current, step.m_side, step.m_slot,
-                        chain[static_cast<std::size_t>(mid)]);
+            with_slot_timing(current, step.m_side, step.m_slot,
+                             chain[static_cast<std::size_t>(mid)]);
         if (candidate.has_value() && accepts(*candidate)) {
             low = mid;
             best = std::move(candidate);

@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 47> k_config_keys{{
+inline constexpr std::array<ConfigKey, 49> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -320,6 +320,23 @@ inline constexpr std::array<ConfigKey, 47> k_config_keys{{
      "FRETISH only, under direction_gated: probability that a free rewrite "
      "incomparable with its parent is kept rather than returning the parent. "
      "Draws nothing at 0 or 1.",
+     ""},
+    {"mutation", "step_scaling", &Config::step_scaling, KeyCheck::Probability,
+     KeyReader::Fretish,
+     "FRETISH only: how far the parent's status scales the choice between a "
+     "large move and a single edge. Each large move's probability (removing a "
+     "guarantee, moving a timing off Always or Eventually, a tick-count jump) "
+     "is multiplied by 1 + step_scaling * (1 - 2 * status). A crossover "
+     "offspring is unscaled. Draws nothing at 0.",
+     "FRETISH only: take more large moves from a parent far from realizable "
+     "and\n"
+     "fewer from one near it, scaled by the parent's status. Off (0) by "
+     "default.\n"},
+    {"mutation", "bisect_steps", &Config::bisect_steps, KeyCheck::None,
+     KeyReader::Fretish,
+     "FRETISH only, under direction_gated: a realizable parent's timing step "
+     "on a within or for chain moves to the chain's midpoint rather than to "
+     "the original's value. Costs no draw.",
      ""},
     {"model_counting", "default_bound", &Config::default_model_counting_bound,
      KeyCheck::Positive, KeyReader::Both,

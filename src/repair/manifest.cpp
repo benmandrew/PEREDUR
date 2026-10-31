@@ -50,7 +50,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 56;
+constexpr int k_schema_version = 57;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -398,7 +398,15 @@ void write_run_manifest(const std::string& output_dir,
         {"direction_gate",
          {{"forbidden", DirectionGateStats::n_forbidden.load()},
           {"sideways_refused", DirectionGateStats::n_sideways_refused.load()},
-          {"steps", DirectionGateStats::n_steps.load()}}},
+          {"steps", DirectionGateStats::n_steps.load()},
+          {"bisected", DirectionGateStats::n_bisected.load()}}},
+        // What step_scaling did: mutations run under a scale, and the large
+        // moves and single tick-count edges they took. Zero whenever the key
+        // is off.
+        {"step_scaling",
+         {{"scaled", StepScalingStats::n_scaled.load()},
+          {"large", StepScalingStats::n_large.load()},
+          {"small", StepScalingStats::n_small.load()}}},
         // What the parent-verdict stage did: offspring dropped as proved
         // strengthenings of a parent the realizability memo showed
         // unrealizable, and proved strengthenings kept because the parent's

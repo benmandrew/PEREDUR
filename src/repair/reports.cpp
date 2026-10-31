@@ -210,7 +210,12 @@ void print_diagnostics_report() {
     std::cout << "Direction gate: " << DirectionGateStats::n_forbidden
               << " forbidden and " << DirectionGateStats::n_sideways_refused
               << " sideways rewrites returned to the parent, "
-              << DirectionGateStats::n_steps << " steps towards the original\n";
+              << DirectionGateStats::n_steps << " steps towards the original ("
+              << DirectionGateStats::n_bisected << " bisected)\n";
+    std::cout << "Step scaling: " << StepScalingStats::n_scaled
+              << " mutations scaled, " << StepScalingStats::n_large
+              << " large moves and " << StepScalingStats::n_small
+              << " single edges taken\n";
     std::cout << "Parent-verdict stage: " << ParentVerdictStats::n_dropped
               << " proved strengthenings of an unrealizable parent dropped, "
               << ParentVerdictStats::n_unproved
