@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "fitness/status.hpp"
 #include "fixtures.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
@@ -145,6 +146,10 @@ Config golden_config() {
     // Off, its default: selection then runs no proof, so the goldens hold what
     // they held before the rule existed.
     cfg.maximality_demotion = false;
+    // At its default of 0 the order crossover returns before reading a verdict
+    // or drawing. The golden fitness has no status objective, so no parent
+    // here reads realizable at any value; pinned so that stays a decision.
+    cfg.p_order_crossover = 0.0;
     cfg.parallel = 1;
     return cfg;
 }
@@ -429,6 +434,38 @@ TEST(test_new_arms_cost_no_draw_at_zero) {
     expect(render_draws(monotone_on) != render_draws(response_on),
            "p_monotone: turning the arm on must change the draw stream, or "
            "the zero-cost guard above is passing over a dead arm");
+
+    // The order crossover sits inside breeding, after the partner draw, and
+    // replaces the graft rather than adding to it, so it too is compared on
+    // the rendered stream. Every parent scores a full status, so every pair
+    // has verdicts and the arm can fire whenever its probability allows.
+    const auto render_breeding = [&](const Config& cfg, double status) {
+        std::vector<ScoredSpecification> parents;
+        for (Specification& specification : golden_population()) {
+            ScoredSpecification entry;
+            entry.specification = std::move(specification);
+            entry.objectives = {0.5, 0.5, status};
+            parents.push_back(std::move(entry));
+        }
+        auto trace = std::make_shared<DrawTrace>();
+        const RandomSource source = make_recording_source(k_seed, trace);
+        (void)generation_detail::breed_offspring(
+            cfg, parents, parents.size(), parents.size(), source, nullptr);
+        return render_trace(*trace);
+    };
+    Config breeding = golden_config();
+    breeding.crossover_rate = 1.0;
+    breeding.mutation_rate = 0.0;
+    Config order_on = breeding;
+    order_on.p_order_crossover = 1.0;
+    expect(render_breeding(breeding, k_status_realizable) ==
+               render_breeding(order_on, k_status_unrealizable),
+           "p_order_crossover: at 0, or on parents with no verdict, the arm "
+           "must draw nothing");
+    expect(render_breeding(order_on, k_status_realizable) !=
+               render_breeding(breeding, k_status_realizable),
+           "p_order_crossover: turning the arm on must change the draw "
+           "stream, or the zero-cost guard above is passing over a dead arm");
 }
 
 // Slot targeting is a filter on the list the slot draw indexes, so it never

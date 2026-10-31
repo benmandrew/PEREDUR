@@ -2,6 +2,7 @@
 
 #include <sys/resource.h>
 
+#include <array>
 #include <cstddef>
 #include <iomanip>
 #include <iostream>
@@ -14,6 +15,7 @@
 #include "genetic/demotion.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
+#include "genetic/order_crossover.hpp"
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
 #include "runner/ltlfilt.hpp"
@@ -179,6 +181,16 @@ void print_diagnostics_report() {
               << " issued, " << MrsSpeculationStats::n_started << " started, "
               << MrsSpeculationStats::n_consumed << " consumed by the walk, "
               << MrsSpeculationStats::n_killed << " killed once unreachable\n";
+    constexpr std::array<const char*, k_order_crossover_kinds> k_kind_names = {
+        "join", "meet", "relink"};
+    std::cout << "Order crossover (attempted / proved / scored realizable):";
+    for (std::size_t kind = 0; kind < k_order_crossover_kinds; ++kind) {
+        std::cout << (kind == 0 ? " " : ", ") << k_kind_names[kind] << " "
+                  << OrderCrossoverStats::n_attempted[kind] << " / "
+                  << OrderCrossoverStats::n_proved[kind] << " / "
+                  << OrderCrossoverStats::n_realizable[kind];
+    }
+    std::cout << "\n";
     std::cout << "\nRepairs contributed by the cross-generation accumulator: "
               << AccumulatorStats::n_contributed << "\n";
     std::cout << "Mutations drawn from a blame-targeted slot list: "

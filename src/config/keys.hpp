@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 40> k_config_keys{{
+inline constexpr std::array<ConfigKey, 41> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -66,6 +66,16 @@ inline constexpr std::array<ConfigKey, 40> k_config_keys{{
     {"genetic", "crossover_rate", &Config::crossover_rate,
      KeyCheck::Probability, KeyReader::Both,
      "Probability of crossover between parents.", ""},
+    {"genetic", "p_order_crossover", &Config::p_order_crossover,
+     KeyCheck::Probability, KeyReader::Fretish,
+     "FRETISH only: of the crossovers whose parents both carry a "
+     "realizability verdict, the fraction that take the order crossover: a "
+     "join of two realizable parents, a meet of two unrealizable ones, or path "
+     "relinking between one of each. 0 draws nothing.",
+     "FRETISH only: the share of crossovers between parents with known\n"
+     "realizability that join, meet or relink them along the implication "
+     "order\n"
+     "instead of grafting subformulae. 0 draws nothing.\n"},
     {"genetic", "mutation_rate", &Config::mutation_rate, KeyCheck::Probability,
      KeyReader::Both, "Probability of mutating an offspring.",
      "per offspring, unlike the per-requirement rates in [mutation]\n"},

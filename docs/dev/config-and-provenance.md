@@ -93,6 +93,7 @@ Archived *results* still join. `scheme_of()` in `run_experiments.py` reads the s
 - **50** added `runtime.mrs_lookahead_kill_grace_ms`: how long an abandoned lookahead query may run before it is killed. At the default of 2000, `mrs_speculation.killed` counts only queries past the grace, so it reads lower than at 49.
 - **51** added `mutation.blame_targeted_slots` and `n_targeted_mutations`, the count of rewrites whose slot that key drew from a narrowed list. The count reads 0 with the key off, which is the default.
 - **52** added `config.genetic.maximality_demotion` and `n_maximality_demotions`: the candidates moved one front down at survivor selection as proved weaker than another realizable one (see "Maximality demotion" in `docs/dev/algorithm.md`). It is 0 wherever the key is off, and the key reads null on a TLSF run.
+- **53** added `genetic.p_order_crossover` and the `order_crossover` object, which holds `attempted`, `proved` and `realizable` counts under `join`, `meet` and `relink`. The key defaults to 0, under which every count is 0, and a TLSF run records the key as null.
 
 ## Where the campaign records are
 
@@ -144,6 +145,7 @@ The campaign archives under `experiments/` and the narrative log `EXPERIMENTS.md
 | 2026-10-30 | `[model_counting] metric` | removed | Trace counts always combine as logarithms. `gen_configs.py` wrote `metric = "direct"` into every flat config until that day, and the `direct` arm of the 2026-07-16 `metric` profile set it too; such a config now warns, ignores the key and scores its semantic objective on logarithms. |
 | 2026-10-30 | `genetic.selection_scheme` | `nsga2-truncate` (and `nsga2`) removed | A config that sets either spelling is rejected with an error naming `weighted` and `nsga2-apportion`. Every NSGA-II campaign archived before 2026-08-14 pins one of the two, as do the truncate arms of `2026-08-11-selection-default` and the 2026-08-07 elitism campaign. The determinism goldens were re-recorded under `nsga2-apportion` in the same commit. |
 | 2026-10-30 | `runtime.dashboard` | removed | Removed with the live dashboard and `peredur --dashboard`. It only wrote `progress.jsonl` and the page beside it, and drew nothing from the `RandomSource`, so a config that sets it warns, ignores the key and searches exactly as before. |
+| 2026-10-31 | `genetic.p_order_crossover` | added at `0` | Exposes nothing. At 0 the arm returns before reading a verdict or drawing, so every archive reproduces seed for seed with the key omitted; exact at 0. |
 
 The archived *results* of the selection renames stay readable. Their `selection` column still says `nsga2`, and `canonical_scheme()` in `run_experiments.py` and `merge_experiments.py` maps that onto `nsga2-truncate` wherever the column is read, so all 224,861 archived `nsga2` rows keep their resume key and still join new ones for resume, merge and cross-campaign comparison. Nothing under `experiments/` was rewritten to match the new names, because the column records the name the campaign ran under.
 

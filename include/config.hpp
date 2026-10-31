@@ -132,6 +132,13 @@ struct Config {
     /// screens what elites carry in.
     double elitism_rate = 0.1;
     double crossover_rate = 0.1;
+    /// FRETISH only: of the crossovers whose two parents both carry a
+    /// realizability verdict, the fraction that take the order crossover
+    /// (include/genetic/order_crossover.hpp) in place of the subformula graft:
+    /// a join of two realizable parents, a meet of two unrealizable ones, and
+    /// path relinking between one of each. Read before the RandomSource is
+    /// drawn, so at 0 the search draws as it did before the arm existed.
+    double p_order_crossover = 0.0;
     double mutation_rate = 1.0;
     double p_trigger = 0.5;
     double p_response = 0.5;

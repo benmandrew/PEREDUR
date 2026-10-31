@@ -25,6 +25,7 @@
 #include "genetic/demotion.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/nsga2.hpp"
+#include "genetic/order_crossover.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "genetic/simplify.hpp"
@@ -186,6 +187,70 @@ inline bool probability_check(double rate, const RandomSource& random_source) {
                                     static_cast<double>(k_rate_granularity));
 }
 
+/// The FRETISH order crossover of parents @p first and @p partner of @p
+/// sorted_pop into @p offspring, returning the kind that ran, or nothing where
+/// the arm did not fire or produced no child, leaving @p offspring alone.
+///
+/// The verdicts are read before the probability, and neither draws, so the
+/// arm costs no draw at `p_order_crossover = 0` or on a pair whose verdicts
+/// leave the operator unknown. The original's assumption count is not known
+/// here, so it is taken as the fewest any parent carries: every candidate
+/// keeps the original's slots, and pairing an appended assumption by index as
+/// well is still sound, since each slot's bound is proved.
+inline std::optional<OrderCrossoverKind> order_crossover_arm(
+    const Config& cfg, const std::vector<Scored<Specification>>& sorted_pop,
+    std::size_t first, std::size_t partner, const RandomSource& random_source,
+    Specification& offspring) {
+    if (cfg.p_order_crossover <= 0.0) {
+        return std::nullopt;
+    }
+    const std::optional<std::size_t> status_index = status_objective_index(cfg);
+    const ParentVerdict first_verdict =
+        parent_verdict(sorted_pop[first], status_index, global_real_checker());
+    if (first_verdict == ParentVerdict::Unknown) {
+        return std::nullopt;
+    }
+    const std::optional<OrderCrossoverKind> kind = order_crossover_kind(
+        first_verdict, parent_verdict(sorted_pop[partner], status_index,
+                                      global_real_checker()));
+    if (!kind.has_value() ||
+        !probability_check(cfg.p_order_crossover, random_source)) {
+        return std::nullopt;
+    }
+    std::size_t n_original_assumptions =
+        sorted_pop[first].specification.m_assumptions.size();
+    for (const Scored<Specification>& parent : sorted_pop) {
+        n_original_assumptions = std::min(
+            n_original_assumptions, parent.specification.m_assumptions.size());
+    }
+    OrderCrossoverOutcome outcome =
+        order_crossover(*kind, sorted_pop[first].specification,
+                        sorted_pop[partner].specification,
+                        first_verdict == ParentVerdict::Realizable,
+                        n_original_assumptions, random_source);
+    if (!outcome.m_child.has_value()) {
+        return std::nullopt;
+    }
+    offspring = std::move(*outcome.m_child);
+    return kind;
+}
+
+/// The FRETISH crossover of @p offspring, parent @p first of @p sorted_pop,
+/// with parent @p partner: the order crossover where it yields a child, else
+/// the subformula graft. Returns the order crossover's kind where it ran.
+inline std::optional<OrderCrossoverKind> fretish_crossover(
+    const Config& cfg, const std::vector<Scored<Specification>>& sorted_pop,
+    std::size_t first, std::size_t partner, const RandomSource& random_source,
+    Specification& offspring) {
+    std::optional<OrderCrossoverKind> kind = order_crossover_arm(
+        cfg, sorted_pop, first, partner, random_source, offspring);
+    if (!kind.has_value()) {
+        offspring = crossover_specifications(
+            offspring, sorted_pop[partner].specification, random_source);
+    }
+    return kind;
+}
+
 /// Breeds @p offspring_n new specifications from the fittest parents. Each slot
 /// starts as parent i, is crossed with a random parent drawn from the top
 /// @p top_n with probability crossover_rate, mutated with probability
@@ -229,6 +294,7 @@ std::vector<Spec> breed_offspring(
         }
         Spec offspring = sorted_pop[i].specification;
         bool crossed = false;
+        [[maybe_unused]] std::optional<OrderCrossoverKind> order_kind;
         if (probability_check(cfg.crossover_rate, random_source)) {
             crossed = true;
             const std::size_t partner = random_source.next_index(top_n);
@@ -236,8 +302,8 @@ std::vector<Spec> breed_offspring(
             if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
                 offspring = tlsf_crossover(offspring, other, random_source);
             } else {
-                offspring =
-                    crossover_specifications(offspring, other, random_source);
+                order_kind = fretish_crossover(cfg, sorted_pop, i, partner,
+                                               random_source, offspring);
             }
         }
         if (probability_check(cfg.mutation_rate, random_source)) {
@@ -261,6 +327,8 @@ std::vector<Spec> breed_offspring(
             offspring_pop.push_back(tlsf_simplify(std::move(offspring)));
         } else {
             offspring_pop.push_back(simplify_offspring(std::move(offspring)));
+            OrderCrossoverStats::note_offspring(order_kind,
+                                                offspring_pop.back());
         }
     }
     return offspring_pop;
@@ -592,6 +660,10 @@ void stage_score(GenerationContext<Spec>& ctx) {
     ctx.m_scored = ctx.m_score(ctx.m_candidates);
     ctx.m_candidates.clear();
     ctx.m_view = PopulationView::Scored;
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        OrderCrossoverStats::settle(ctx.m_scored,
+                                    status_objective_index(ctx.m_cfg));
+    }
 }
 
 template <typename Spec>

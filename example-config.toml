@@ -21,6 +21,10 @@ selection_rate = 0.5
 # time and level on yield and quality -- see docs/configuration.rst.
 elitism_rate = 0.1
 crossover_rate = 0.1
+# FRETISH only: the share of crossovers between parents with known
+# realizability that join, meet or relink them along the implication order
+# instead of grafting subformulae. 0 draws nothing.
+p_order_crossover = 0.0
 # per offspring, unlike the per-requirement rates in [mutation]
 mutation_rate = 1.0
 # Offspring budget under termination = "individuals"; ignored otherwise, and

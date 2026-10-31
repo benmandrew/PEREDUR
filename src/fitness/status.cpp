@@ -255,6 +255,7 @@ class WalkLookahead {
                         node->m_kill, &node->m_abandon,
                         std::chrono::milliseconds{
                             g_lookahead_kill_grace_ms.load()});
+                    const SpeculativeQueryScope speculative;
                     (void)(*oracle)(node->m_set);
                     answered = true;
                 } catch (const ExecCancelled&) {

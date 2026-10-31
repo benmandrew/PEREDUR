@@ -371,7 +371,131 @@ std::optional<bool> decide_without_environment(
     }
 }
 
+// Canonically, so that a re-spelling of a conjunct is still the same conjunct
+// -- which is the whole reason two candidates differing in one slot are
+// comparable at all. A tag before the unit separator is carried through
+// verbatim: it says which section the formula sits in, and the same formula in
+// two sections is two conjuncts.
+std::string conjunct_key(const std::string& conjunct) {
+    const std::size_t separator = conjunct.find('\x1f');
+    return separator == std::string::npos
+               ? formula_key::canonical(conjunct)
+               : conjunct.substr(0, separator + 1) +
+                     formula_key::canonical(conjunct.substr(separator + 1));
+}
+
+// The sides check_realizability passes for @p specification. The pointers
+// borrow from it.
+SpecificationSides fretish_sides_of(const Specification& specification) {
+    SpecificationSides sides;
+    for (const Requirement& requirement : specification.m_assumptions) {
+        if (!requirement.m_removed) {
+            sides.m_assumptions.push_back(requirement.m_ltl);
+            sides.m_assumption_requirements.push_back(&requirement);
+        }
+    }
+    for (const Requirement& requirement : specification.m_guarantees) {
+        if (!requirement.m_removed) {
+            sides.m_guarantees.push_back(requirement.m_ltl);
+            sides.m_guarantee_requirements.push_back(&requirement);
+        }
+    }
+    return sides;
+}
+
+std::string query_scope(const SpecificationSides& sides,
+                        const std::vector<std::string>& inputs,
+                        const std::vector<std::string>& outputs) {
+    return sides.m_scope + "\x1f" + join_comma(inputs) + "\x1f" +
+           join_comma(outputs);
+}
+
+thread_local bool t_speculative = false;
+
 }  // namespace
+
+SpeculativeQueryScope::SpeculativeQueryScope() : m_previous(t_speculative) {
+    t_speculative = true;
+}
+
+SpeculativeQueryScope::~SpeculativeQueryScope() { t_speculative = m_previous; }
+
+bool SpeculativeQueryScope::active() { return t_speculative; }
+
+void RealizabilityChecker::record_witness(const std::string& cache_key,
+                                          const std::string& scope,
+                                          const SpecificationSides& sides) {
+    std::scoped_lock lock(m_cache_mutex);
+    if (!m_witness_keys.insert(cache_key).second) {
+        return;
+    }
+    std::vector<int> assumptions =
+        intern_side(sides.m_assumptions, sides.m_assumption_requirements);
+    std::vector<int> guarantees =
+        intern_side(sides.m_guarantees, sides.m_guarantee_requirements);
+    const std::uint64_t assumption_signature = signature_of(assumptions);
+    const std::uint64_t guarantee_signature = signature_of(guarantees);
+    m_witnesses[scope].push_back(
+        Decided{std::move(assumptions), std::move(guarantees),
+                assumption_signature, guarantee_signature, false});
+}
+
+bool RealizabilityChecker::proved_unrealizable(
+    const Specification& specification) const {
+    const SpecificationSides sides = fretish_sides_of(specification);
+    const std::string scope = query_scope(
+        sides, environment_signals(specification), specification.m_out_atoms);
+    std::vector<std::string> assumption_keys;
+    assumption_keys.reserve(sides.m_assumptions.size());
+    for (const std::string& conjunct : sides.m_assumptions) {
+        assumption_keys.push_back(conjunct_key(conjunct));
+    }
+    std::vector<std::string> guarantee_keys;
+    guarantee_keys.reserve(sides.m_guarantees.size());
+    for (const std::string& conjunct : sides.m_guarantees) {
+        guarantee_keys.push_back(conjunct_key(conjunct));
+    }
+
+    std::scoped_lock lock(m_cache_mutex);
+    const auto bucket = m_witnesses.find(scope);
+    if (bucket == m_witnesses.end()) {
+        return false;
+    }
+    // A conjunct never interned is in no witness. On the guarantee side that
+    // only shrinks the set a witness must fall inside; on the assumption side
+    // it leaves nothing that could include it.
+    std::vector<int> assumptions;
+    for (const std::string& key : assumption_keys) {
+        const auto found = m_conjunct_ids.find(key);
+        if (found == m_conjunct_ids.end()) {
+            return false;
+        }
+        assumptions.push_back(found->second);
+    }
+    std::vector<int> guarantees;
+    for (const std::string& key : guarantee_keys) {
+        const auto found = m_conjunct_ids.find(key);
+        if (found != m_conjunct_ids.end()) {
+            guarantees.push_back(found->second);
+        }
+    }
+    for (std::vector<int>* side : {&assumptions, &guarantees}) {
+        std::sort(side->begin(), side->end());
+        side->erase(std::unique(side->begin(), side->end()), side->end());
+    }
+    const std::uint64_t assumption_signature = signature_of(assumptions);
+    const std::uint64_t guarantee_signature = signature_of(guarantees);
+    return std::any_of(
+        bucket->second.begin(), bucket->second.end(),
+        [&](const Decided& witness) {
+            return (assumption_signature & ~witness.m_assumption_signature) ==
+                       0 &&
+                   (witness.m_guarantee_signature & ~guarantee_signature) ==
+                       0 &&
+                   includes_sorted(witness.m_assumptions, assumptions) &&
+                   includes_sorted(guarantees, witness.m_guarantees);
+        });
+}
 
 void RealizabilityChecker::remember_verdict(
     const std::string& cache_key, const std::string& scope, bool have_sides,
@@ -398,18 +522,7 @@ std::vector<int> RealizabilityChecker::intern_side(
         const std::string& conjunct = conjuncts[position];
         const Requirement* requirement =
             requirements.empty() ? nullptr : requirements[position];
-        // Canonically, so that a re-spelling of a conjunct is still the same
-        // conjunct -- which is the whole reason two candidates differing in
-        // one slot are comparable at all.
-        // A tag before the unit separator is carried through verbatim: it
-        // says which section the formula sits in, and the same formula in two
-        // sections is two conjuncts.
-        const std::size_t separator = conjunct.find('\x1f');
-        const std::string key =
-            separator == std::string::npos
-                ? formula_key::canonical(conjunct)
-                : conjunct.substr(0, separator + 1) +
-                      formula_key::canonical(conjunct.substr(separator + 1));
+        const std::string key = conjunct_key(conjunct);
         const auto found = m_conjunct_ids.find(key);
         const int conjunct_id = found != m_conjunct_ids.end()
                                     ? found->second
@@ -1160,21 +1273,9 @@ RealizabilityChecker::ReuseQuery RealizabilityChecker::reuse_query(
 std::optional<bool> RealizabilityChecker::check_realizability(
     const Specification& specification) {
     const std::string conj_ltl = specification.to_ltl();
-    SpecificationSides sides;
-    for (const Requirement& requirement : specification.m_assumptions) {
-        if (!requirement.m_removed) {
-            sides.m_assumptions.push_back(requirement.m_ltl);
-            sides.m_assumption_requirements.push_back(&requirement);
-        }
-    }
-    for (const Requirement& requirement : specification.m_guarantees) {
-        if (!requirement.m_removed) {
-            sides.m_guarantees.push_back(requirement.m_ltl);
-            sides.m_guarantee_requirements.push_back(&requirement);
-        }
-    }
     return check_realizability_ltl(conj_ltl, environment_signals(specification),
-                                   specification.m_out_atoms, sides);
+                                   specification.m_out_atoms,
+                                   fretish_sides_of(specification));
 }
 
 std::optional<bool> RealizabilityChecker::check_realizability_ltl(
@@ -1186,6 +1287,22 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
 }
 
 std::optional<bool> RealizabilityChecker::check_realizability_ltl(
+    const std::string& ltl_formula, const std::vector<std::string>& inputs,
+    const std::vector<std::string>& outputs, const SpecificationSides& sides) {
+    const std::optional<bool> verdict =
+        decide_realizability_ltl(ltl_formula, inputs, outputs, sides);
+    // Every route to the verdict counts, a cache hit included, since a query
+    // first asked speculatively is still one the walk went on to ask. Only the
+    // FRETISH sides are recorded: proved_unrealizable is FRETISH-only.
+    if (verdict == false && !sides.m_guarantee_requirements.empty() &&
+        !SpeculativeQueryScope::active()) {
+        const std::string scope = query_scope(sides, inputs, outputs);
+        record_witness(scope + "\x1e" + ltl_formula, scope, sides);
+    }
+    return verdict;
+}
+
+std::optional<bool> RealizabilityChecker::decide_realizability_ltl(
     const std::string& ltl_formula, const std::vector<std::string>& inputs,
     const std::vector<std::string>& outputs, const SpecificationSides& sides) {
     // No `ltlfilt --simplify` pre-pass, matching run_ltl2tgba_for_counting:
@@ -1208,8 +1325,7 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
         !sides.m_assumptions.empty() || !sides.m_guarantees.empty();
     // Everything that has to match for a comparison to mean anything: the
     // caller's own discriminator and the alphabet the synthesiser plays over.
-    const std::string scope = sides.m_scope + "\x1f" + join_comma(inputs) +
-                              "\x1f" + join_comma(outputs);
+    const std::string scope = query_scope(sides, inputs, outputs);
     std::vector<int> assumption_ids;
     std::vector<int> guarantee_ids;
     // Only the FRETISH lowering is `(&A) -> (&G)` conjunct by conjunct, which

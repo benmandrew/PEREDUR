@@ -28,6 +28,7 @@
 #include "genetic/accumulator.hpp"
 #include "genetic/demotion.hpp"
 #include "genetic/mutation.hpp"
+#include "genetic/order_crossover.hpp"
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
 #include "runner/ltlfilt.hpp"
@@ -47,7 +48,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 52;
+constexpr int k_schema_version = 53;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -261,6 +262,19 @@ nlohmann::json fitness_cache_json() {
             {"misses", FitnessCacheStats::n_misses}};
 }
 
+nlohmann::json order_crossover_json() {
+    constexpr std::array<const char*, k_order_crossover_kinds> k_names = {
+        "join", "meet", "relink"};
+    nlohmann::json counts = nlohmann::json::object();
+    for (std::size_t kind = 0; kind < k_order_crossover_kinds; ++kind) {
+        counts[k_names[kind]] = {
+            {"attempted", OrderCrossoverStats::n_attempted[kind].load()},
+            {"proved", OrderCrossoverStats::n_proved[kind].load()},
+            {"realizable", OrderCrossoverStats::n_realizable[kind].load()}};
+    }
+    return counts;
+}
+
 }  // namespace
 
 std::vector<std::string> ignored_non_default_keys(const Config& cfg,
@@ -355,6 +369,9 @@ void write_run_manifest(const std::string& output_dir,
           {"started", MrsSpeculationStats::n_started.load()},
           {"consumed", MrsSpeculationStats::n_consumed.load()},
           {"killed", MrsSpeculationStats::n_killed.load()}}},
+        // Zero on every count unless genetic.p_order_crossover is above 0;
+        // TLSF runs never take the arm.
+        {"order_crossover", order_crossover_json()},
         // Repairs the cross-generation accumulator added that the final
         // population's own collection did not already hold. Zero when every
         // accumulated repair happened to survive to the last generation.

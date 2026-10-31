@@ -13,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "requirement.hpp"
@@ -123,6 +124,28 @@ struct ControllerReuseStats {
     inline static double total_cpu_s = 0.0;
 };
 
+/// Marks the realizability queries the current thread asks, while it lives, as
+/// speculative: asked ahead of a caller that may never read them, and finished
+/// or killed depending on timing. The MRS walk's lookahead holds one around
+/// each query it runs. A speculative verdict is memoised like any other, but
+/// RealizabilityChecker::proved_unrealizable never reads it, so what that
+/// answers does not depend on which lookahead queries happened to finish.
+class SpeculativeQueryScope {
+   public:
+    SpeculativeQueryScope();
+    ~SpeculativeQueryScope();
+    SpeculativeQueryScope(const SpeculativeQueryScope&) = delete;
+    SpeculativeQueryScope& operator=(const SpeculativeQueryScope&) = delete;
+    SpeculativeQueryScope(SpeculativeQueryScope&&) = delete;
+    SpeculativeQueryScope& operator=(SpeculativeQueryScope&&) = delete;
+
+    /// True while some scope is alive on the calling thread.
+    static bool active();
+
+   private:
+    bool m_previous;
+};
+
 class RealizabilityChecker {
    public:
     inline static std::size_t n_cache_misses = 0;
@@ -160,6 +183,19 @@ class RealizabilityChecker {
     /// repeated calls with identical inputs incur no additional tool
     /// invocations.
     std::optional<bool> check_realizability(const Specification& specification);
+
+    /// Whether a query some non-speculative caller was told is unrealizable
+    /// proves @p specification unrealizable by inclusion: its assumptions
+    /// include the specification's live assumptions, and its guarantees are
+    /// among the live guarantees, compared canonically. Asks no tool and
+    /// memoises nothing. False means unproven, not realizable.
+    ///
+    /// The queries it reads are those the MRS walk, the AuRUS ladder and the
+    /// output gate ask, which a fixed seed fixes, so the answer does too, up
+    /// to a query that timed out in one run and not in another. A part the
+    /// walk refused for being unrealizable, rather than ill-separated or
+    /// undecided, leaves such a query behind.
+    bool proved_unrealizable(const Specification& specification) const;
 
     /// Realizability of a raw LTL formula with the given input/output atom
     /// partition (mode-agnostic core shared by the FRETISH and TLSF front
@@ -258,6 +294,15 @@ class RealizabilityChecker {
         bool m_realizable = false;
     };
 
+    std::optional<bool> decide_realizability_ltl(
+        const std::string& ltl_formula, const std::vector<std::string>& inputs,
+        const std::vector<std::string>& outputs,
+        const SpecificationSides& sides);
+    /// Records an unrealizable verdict a non-speculative caller was given, for
+    /// proved_unrealizable.
+    void record_witness(const std::string& cache_key, const std::string& scope,
+                        const SpecificationSides& sides);
+
     std::optional<bool> subsumed_verdict(
         const std::string& scope, const std::vector<int>& assumptions,
         const std::vector<int>& guarantees, std::uint64_t assumption_signature,
@@ -332,6 +377,11 @@ class RealizabilityChecker {
 
     /// The canonical formula behind each conjunct id, under m_cache_mutex.
     std::vector<std::string> m_conjunct_formulas;
+
+    /// The unrealizable queries proved_unrealizable reads, by scope, and the
+    /// cache keys already among them. Both under m_cache_mutex.
+    std::unordered_map<std::string, std::vector<Decided>> m_witnesses;
+    std::unordered_set<std::string> m_witness_keys;
 
     /// The controller store. When ltlsynt decides a large FRETISH query
     /// realizable it is asked for the winning Mealy machine too, at no extra
