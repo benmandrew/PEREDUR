@@ -5,6 +5,7 @@
 ///        PipelineStage, and the stage list a generation runs through.
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -26,6 +27,7 @@
 #include "genetic/mutation.hpp"
 #include "genetic/nsga2.hpp"
 #include "genetic/order_crossover.hpp"
+#include "genetic/order_moves.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "genetic/simplify.hpp"
@@ -154,9 +156,62 @@ void order_population(const Config& cfg,
                      });
 }
 
+/// Where a bred offspring came from: the index of its parent in the sorted
+/// population breed_offspring read, and how the offspring relates to that
+/// parent under classify_move. Recorded only for the parent-verdict stage.
+struct OffspringOrigin {
+    std::size_t parent = 0;
+    /// Nothing where the parent's status already proves it realizable, since
+    /// the stage then has no use for the order and classify_move is skipped.
+    std::optional<MoveOrder> order;
+};
+
+/// What the parent-verdict stage did over a run
+/// (Config::parent_verdict_filter). Reported under `--diagnostics` and in
+/// run.json.
+struct ParentVerdictStats {
+    /// Offspring dropped as proved strengthenings of a parent the memo shows
+    /// to be unrealizable.
+    inline static std::atomic<std::size_t> n_dropped{0};
+    /// Offspring proved stronger than their parent whose parent had a status
+    /// below realizable but no decided verdict, and so were kept.
+    inline static std::atomic<std::size_t> n_unproved{0};
+};
+
+/// The name the parent-verdict stage reports under, in the stage list and in
+/// the filter report.
+inline constexpr const char* k_parent_verdict_stage = "parent-verdict";
+
 namespace generation_detail {
 
 constexpr std::size_t k_rate_granularity = 1'000'000;
+
+/// True when @p parent's status proves it realizable.
+template <typename Spec>
+bool status_proves_realizable(const Scored<Spec>& parent,
+                              std::optional<std::size_t> status_objective) {
+    return status_objective.has_value() &&
+           *status_objective < parent.objectives.size() &&
+           parent.objectives[*status_objective] >= k_status_realizable;
+}
+
+/// Appends to @p origins, where set, where the offspring @p offspring of the
+/// parent at @p index came from. A parent whose status proves it realizable
+/// is not classified, since the parent-verdict stage acts only on an
+/// unrealizable one.
+inline void record_origin(std::vector<OffspringOrigin>* origins,
+                          const Scored<Specification>& parent,
+                          std::size_t index, const Specification& offspring,
+                          std::optional<std::size_t> status_objective) {
+    if (origins == nullptr) {
+        return;
+    }
+    OffspringOrigin origin{index, std::nullopt};
+    if (!status_proves_realizable(parent, status_objective)) {
+        origin.order = classify_move(parent.specification, offspring);
+    }
+    origins->push_back(origin);
+}
 
 /// What mutation is told about the FRETISH parent @p parent.
 inline ParentContext parent_context(
@@ -270,13 +325,18 @@ inline std::optional<OrderCrossoverKind> fretish_crossover(
 /// FRETISH mutation is handed a ParentContext built from the parent's Scored
 /// entry, @p status_objective naming the status in its objective vector and
 /// @p original lent to it unchanged. Building it draws nothing.
+///
+/// Where @p origins is given, each FRETISH offspring's OffspringOrigin is
+/// appended to it, in the order of the returned offspring. Classifying draws
+/// nothing either.
 template <typename Spec>
 std::vector<Spec> breed_offspring(
     const Config& cfg, const std::vector<Scored<Spec>>& sorted_pop,
     std::size_t offspring_n, std::size_t top_n,
     const RandomSource& random_source, SearchBudget* budget,
     const Spec* original = nullptr,
-    std::optional<std::size_t> status_objective = std::nullopt) {
+    std::optional<std::size_t> status_objective = std::nullopt,
+    std::vector<OffspringOrigin>* origins = nullptr) {
     std::vector<Spec> offspring_pop;
     offspring_pop.reserve(offspring_n);
     // Read once: an inactive budget must not reach the loop body at all, or an
@@ -329,6 +389,8 @@ std::vector<Spec> breed_offspring(
             offspring_pop.push_back(simplify_offspring(std::move(offspring)));
             OrderCrossoverStats::note_offspring(order_kind,
                                                 offspring_pop.back());
+            record_origin(origins, sorted_pop[i], i, offspring_pop.back(),
+                          status_objective);
         }
     }
     return offspring_pop;
@@ -497,6 +559,9 @@ struct GenerationContext {
     std::vector<Spec> m_candidates;
     /// Breeding's output, before any filter ran. See stage_filter_fallback.
     std::vector<Spec> m_pre_filter;
+    /// Where each entry of m_pre_filter came from, recorded only for the
+    /// parent-verdict stage and empty otherwise.
+    std::vector<OffspringOrigin> m_origins;
     /// The scored population, live at the start of a generation and from
     /// scoring onwards.
     std::vector<Scored<Spec>> m_scored;
@@ -552,6 +617,11 @@ struct StageObservation {
 /// Invoked after each stage completes, in stage order.
 using StageObserver = std::function<void(const StageObservation&)>;
 
+/// A realizability verdict for a parent, settled without launching a process,
+/// or nothing where none is known. See stage_parent_verdict.
+template <typename Spec>
+using ParentVerdictLookup = std::function<std::optional<bool>(const Spec&)>;
+
 /// Screens a rescued population, returning the part of it fit to breed from.
 /// Built by correctness_rescue() and read only by stage_filter_fallback; a null
 /// one rescues nothing, so the fallback restores the offspring unscreened.
@@ -593,14 +663,67 @@ template <typename Spec>
 void stage_breed(GenerationContext<Spec>& ctx) {
     ctx.m_sorted_parents = std::move(ctx.m_scored);
     ctx.m_scored.clear();
+    ctx.m_origins.clear();
+    bool record_origins = false;
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        record_origins = ctx.m_cfg.parent_verdict_filter;
+    }
     ctx.m_candidates = generation_detail::breed_offspring(
         ctx.m_cfg, ctx.m_sorted_parents, ctx.m_offspring_n, ctx.m_top_n,
         ctx.m_random_source, ctx.m_budget, ctx.m_original,
-        ctx.m_status_objective);
+        ctx.m_status_objective, record_origins ? &ctx.m_origins : nullptr);
     // The filter chain is judged as a whole rather than filter by filter, so
     // the unfiltered offspring have to survive until every filter has run.
     ctx.m_pre_filter = ctx.m_candidates;
     ctx.m_view = PopulationView::Unscored;
+}
+
+/// Drops each offspring proved Stronger than its parent where @p verdict shows
+/// that parent unrealizable. Realizability is closed under weakening, so a
+/// strengthening of an unrealizable specification is unrealizable too, and
+/// scoring one spends a population slot on a candidate the output gate would
+/// refuse anyway. Breeding recorded each offspring's origin in m_origins,
+/// aligned with m_pre_filter; the candidates have since been deduplicated, so
+/// they are matched to it by value.
+///
+/// A status below 1 is no proof, since an ill-separated realizable candidate
+/// scores below 1 too, and neither is an undecided query. @p verdict must
+/// therefore be a decided answer, and is asked once per parent with a proved
+/// strengthening among its offspring. The stage draws nothing.
+template <typename Spec>
+void stage_parent_verdict(GenerationContext<Spec>& ctx,
+                          const ParentVerdictLookup<Spec>& verdict) {
+    assert(ctx.m_origins.size() == ctx.m_pre_filter.size());
+    std::unordered_set<Spec> doomed;
+    std::vector<std::optional<bool>> unrealizable(ctx.m_sorted_parents.size());
+    for (std::size_t k = 0; k < ctx.m_origins.size(); ++k) {
+        const OffspringOrigin& origin = ctx.m_origins[k];
+        if (origin.order != MoveOrder::Stronger) {
+            continue;
+        }
+        std::optional<bool>& known = unrealizable[origin.parent];
+        if (!known.has_value()) {
+            known =
+                verdict(ctx.m_sorted_parents[origin.parent].specification) ==
+                std::optional<bool>(false);
+        }
+        if (*known) {
+            doomed.insert(ctx.m_pre_filter[k]);
+        } else {
+            ParentVerdictStats::n_unproved++;
+        }
+    }
+    if (doomed.empty()) {
+        return;
+    }
+    const std::size_t before = ctx.m_candidates.size();
+    ctx.m_candidates.erase(
+        std::remove_if(ctx.m_candidates.begin(), ctx.m_candidates.end(),
+                       [&doomed](const Spec& candidate) {
+                           return doomed.count(candidate) != 0;
+                       }),
+        ctx.m_candidates.end());
+    ParentVerdictStats::n_dropped += before - ctx.m_candidates.size();
 }
 
 /// Rescues the generation when the filters between breeding and here rejected

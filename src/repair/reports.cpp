@@ -17,6 +17,7 @@
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/order_crossover.hpp"
+#include "genetic/pipeline.hpp"
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
 #include "runner/ltlfilt.hpp"
@@ -210,6 +211,10 @@ void print_diagnostics_report() {
               << " forbidden and " << DirectionGateStats::n_sideways_refused
               << " sideways rewrites returned to the parent, "
               << DirectionGateStats::n_steps << " steps towards the original\n";
+    std::cout << "Parent-verdict stage: " << ParentVerdictStats::n_dropped
+              << " proved strengthenings of an unrealizable parent dropped, "
+              << ParentVerdictStats::n_unproved
+              << " kept with the parent's verdict undecided\n";
     print_cache_report();
     std::cout << "\nFitness cache: " << FitnessCacheStats::n_hits << " hits / "
               << FitnessCacheStats::n_misses << " misses\n";

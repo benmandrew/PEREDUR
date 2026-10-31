@@ -30,6 +30,7 @@
 #include "genetic/demotion.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/order_crossover.hpp"
+#include "genetic/pipeline.hpp"
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
 #include "runner/ltlfilt.hpp"
@@ -49,7 +50,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 55;
+constexpr int k_schema_version = 56;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -398,6 +399,13 @@ void write_run_manifest(const std::string& output_dir,
          {{"forbidden", DirectionGateStats::n_forbidden.load()},
           {"sideways_refused", DirectionGateStats::n_sideways_refused.load()},
           {"steps", DirectionGateStats::n_steps.load()}}},
+        // What the parent-verdict stage did: offspring dropped as proved
+        // strengthenings of a parent the realizability memo showed
+        // unrealizable, and proved strengthenings kept because the parent's
+        // verdict was undecided. Zero whenever the key is off.
+        {"parent_verdict",
+         {{"dropped", ParentVerdictStats::n_dropped.load()},
+          {"unproved", ParentVerdictStats::n_unproved.load()}}},
         // ltlsynt calls that reported SPOT's acceptance-set ceiling rather than
         // a verdict, resolved as undecided rather than ending the run.
         {"n_ltlsynt_capability_errors",

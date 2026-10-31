@@ -103,6 +103,11 @@ struct Config {
     /// fixed pseudo-random priority of its own, and every distinct result goes
     /// on to the final filters.
     std::size_t climb_orders = 1;
+    /// FRETISH only: after deduplication, drop each offspring proved stronger
+    /// than a parent that an unrealizable query already asked proves
+    /// unrealizable (RealizabilityChecker::proved_unrealizable). Off, nothing
+    /// is recorded and no stage runs.
+    bool parent_verdict_filter = false;
     std::chrono::milliseconds black_timeout{1000};
     /// Per-call wall-clock budget for ltlsynt realizability checks; 0 disables
     /// it. ltlsynt has no internal timeout, and the search occasionally builds

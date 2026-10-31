@@ -156,6 +156,10 @@ Config golden_config() {
     // a golden gaining one fails here rather than re-recording.
     cfg.direction_gated_mutation = false;
     cfg.p_sideways = 1.0;
+    // Off, its default. The stage draws nothing even on, and the golden
+    // fitness has no status objective to record origins against; pinned so
+    // that a golden gaining one fails here rather than re-recording.
+    cfg.parent_verdict_filter = false;
     cfg.parallel = 1;
     return cfg;
 }

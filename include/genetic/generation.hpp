@@ -612,6 +612,13 @@ std::optional<std::size_t> status_objective_index(const Fitness& fitness) {
     }
     return std::nullopt;
 }
+/// Splices the parent-verdict stage into @p filters directly after
+/// deduplication, or at the front where there is none, so that it runs before
+/// the correctness filters and spares them its drops. Its verdicts come from
+/// global_real_checker's proved_unrealizable, which reads the unrealizable
+/// queries the run's scoring asked and never launches one.
+void insert_parent_verdict_stage(
+    std::vector<PipelineStage<Specification>>& filters);
 
 /// Evolves a population for one generation:
 ///   1. Order the population best-first under @p cfg's selection scheme —
@@ -693,8 +700,14 @@ std::vector<Scored<Spec>> evolve_generation(
     if (cfg.maximality_demotion) {
         ctx.m_status_index = status_objective_index(fitness_functions);
     }
+    std::vector<PipelineStage<Spec>> filters = filter_stages(filter_functions);
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        if (cfg.parent_verdict_filter) {
+            insert_parent_verdict_stage(filters);
+        }
+    }
     const std::vector<PipelineStage<Spec>> stages =
-        make_generation_pipeline<Spec>(filter_stages(filter_functions),
+        make_generation_pipeline<Spec>(std::move(filters),
                                        correctness_rescue(filter_functions));
     return run_generation_pipeline(ctx, stages, on_stage);
 }

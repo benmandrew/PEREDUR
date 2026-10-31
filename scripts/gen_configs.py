@@ -128,6 +128,10 @@ DEFAULTS: dict = {
     "p_sideways": 1.0,
     "default_bound": 20,
     "run_implication": True,
+    # FRETISH only: drop proved strengthenings of parents the realizability
+    # memo shows unrealizable. Emitted into [filters] only when a sweep
+    # overrides it (see make_toml).
+    "parent_verdict": False,
     # Keys in VINTAGE_KEYS must follow the binary rather than be pinned, because
     # VINTAGE_KEYS sources its written-out values from this table -- a stale
     # entry here is a wrong value written into every config generated with
@@ -272,6 +276,8 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         "",
         "[filters]",
         f"run_implication = {_fmt(d['run_implication'])}",
+    ] + ([f"parent_verdict = {_fmt(d['parent_verdict'])}"]
+         if "parent_verdict" in overrides else []) + [
         "",
         "[runtime]",
         f"black_timeout_ms = {d['black_timeout_ms']}",

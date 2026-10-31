@@ -120,6 +120,9 @@ run_implication = true
 climb_output = false
 climb_order = "slot"
 climb_orders = 1
+# FRETISH only: drop, before scoring, each offspring proved stronger than a parent
+# an unrealizable query already asked proves unrealizable. Off by default.
+parent_verdict = false
 
 [runtime]
 # Per-call wall-clock budgets in ms; 0 disables one. Ganak takes none:

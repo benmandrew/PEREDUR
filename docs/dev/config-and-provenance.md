@@ -96,6 +96,7 @@ Archived *results* still join. `scheme_of()` in `run_experiments.py` reads the s
 - **53** added `genetic.p_order_crossover` and the `order_crossover` object, which holds `attempted`, `proved` and `realizable` counts under `join`, `meet` and `relink`. The key defaults to 0, under which every count is 0, and a TLSF run records the key as null.
 - **54** added `config.filters.climb_output`, `climb_order` and `climb_orders`, and the `climb` block (`climbed`, `steps_tried`, `steps_accepted`, `queries`, `ltlsynt_execs`), which is all zero with the climb off. FRETISH only, so a TLSF run records the three keys as null.
 - **55** added `mutation.direction_gated`, `mutation.p_sideways` and the `direction_gate` object: `forbidden` and `sideways_refused` count the free rewrites returned to the parent, and `steps` the realizable parents' steps back towards the original. All three read 0 with the gate off, which is the default.
+- **56** added `filters.parent_verdict` and the `parent_verdict` object: `dropped` counts the offspring the parent-verdict stage removed as proved strengthenings of an unrealizable parent, and `unproved` the proved strengthenings it kept because the parent's verdict was undecided. Both read 0 with the key off, which is the default.
 
 ## Where the campaign records are
 

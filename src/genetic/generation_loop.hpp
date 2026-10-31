@@ -73,10 +73,21 @@ SearchResult<Spec> run_generations(
     // Each filter records the last generation's in/out sizes in its own
     // counters, which are added here to one running row per filter.
     std::vector<FilterRunStats> filter_stats;
-    filter_stats.reserve(filters.size());
+    filter_stats.reserve(filters.size() + 1);
     for (const FilterFunctionT<Spec>& filter : filters) {
         filter_stats.push_back({filter.name(), 0, 0});
     }
+    // The parent-verdict stage is a pipeline stage rather than a filter, since
+    // it reads where each offspring came from, so its row is gathered from the
+    // stage observer.
+    FilterRunStats parent_verdict{k_parent_verdict_stage, 0, 0};
+    const StageObserver observe =
+        [&parent_verdict](const StageObservation& stage) {
+            if (stage.name == k_parent_verdict_stage) {
+                parent_verdict.total_in += stage.n_in;
+                parent_verdict.total_out += stage.n_out;
+            }
+        };
 
     StatusLine status;
     const std::size_t col_gen = status.add("gen");
@@ -110,7 +121,7 @@ SearchResult<Spec> run_generations(
         };
         population = evolve_generation(
             cfg, population, sizes.selection, sizes.elitism, fitness, filters,
-            random_source, on_progress, nullptr, &budget, original);
+            random_source, on_progress, observe, &budget, original);
         budget.count_generation();
         for (std::size_t k = 0; k < filters.size(); ++k) {
             filter_stats[k].total_in += filters[k].n_in();
@@ -136,6 +147,15 @@ SearchResult<Spec> run_generations(
         }
         status.set(col_real, std::to_string(n_real));
         status.finish();
+    }
+    if (parent_verdict.total_in > 0) {
+        // Beside deduplication's row, where the stage runs.
+        const auto dedup = std::find_if(
+            filter_stats.begin(), filter_stats.end(),
+            [](const FilterRunStats& row) { return row.name == "dedup"; });
+        filter_stats.insert(
+            dedup == filter_stats.end() ? filter_stats.begin() : dedup + 1,
+            std::move(parent_verdict));
     }
     return {std::move(population), std::move(filter_stats)};
 }

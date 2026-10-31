@@ -1,5 +1,6 @@
 #include "genetic/generation.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <functional>
@@ -89,6 +90,30 @@ std::vector<FilterFunctionT<Spec>> get_filter_functions(
         }
     }
     return filters;
+}
+
+void insert_parent_verdict_stage(
+    std::vector<PipelineStage<Specification>>& filters) {
+    // make_dedup_filter's name.
+    const auto dedup =
+        std::find_if(filters.begin(), filters.end(),
+                     [](const PipelineStage<Specification>& stage) {
+                         return stage.name() == "dedup";
+                     });
+    const auto position = dedup == filters.end() ? filters.begin() : dedup + 1;
+    filters.insert(
+        position,
+        PipelineStage<Specification>(
+            k_parent_verdict_stage, [](GenerationContext<Specification>& ctx) {
+                pipeline_detail::stage_parent_verdict<Specification>(
+                    ctx,
+                    [](const Specification& parent) -> std::optional<bool> {
+                        if (global_real_checker().proved_unrealizable(parent)) {
+                            return false;
+                        }
+                        return std::nullopt;
+                    });
+            }));
 }
 
 template std::vector<FilterFunctionT<Specification>> get_filter_functions(
