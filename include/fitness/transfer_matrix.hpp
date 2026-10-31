@@ -36,8 +36,10 @@ static_assert(std::is_floating_point_v<Count>, "Count must be floating-point");
 // ~3 significant digits, so only atom-rich deep-horizon specs are affected.
 // Warn rather than block. #pragma message is a note (not a warning), so it
 // survives -Werror on exactly those targets, where #warning would wrongly fail
-// the build.
-#if LDBL_MANT_DIG < 64 || LDBL_MAX_EXP < 16384
+// the build. clang-tidy, which defines __clang_analyzer__, would promote the
+// note to an error under WarningsAsErrors, and cpplint rejects a NOLINT naming
+// clang-diagnostic-#pragma-messages, so the note is skipped there.
+#if (LDBL_MANT_DIG < 64 || LDBL_MAX_EXP < 16384) && !defined(__clang_analyzer__)
 #pragma message(                                                      \
     "peredur: long double is narrower than x87 here; model-counting " \
     "range is ~16x shallower and scores lose ~3 digits. Supported, "  \
