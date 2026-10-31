@@ -27,31 +27,6 @@ Bound flipped(Bound bound) {
     return bound == Bound::Upper ? Bound::Lower : Bound::Upper;
 }
 
-// Whether @p req is implied by a live entry of @p pool: one with the same
-// lowering anywhere, or by rule the entry in @p req's own slot.
-bool covered(const Requirement& req, std::size_t slot,
-             const std::vector<Requirement>& pool,
-             const std::unordered_set<std::string>& pool_lowerings) {
-    if (pool_lowerings.count(req.m_ltl) != 0) {
-        return true;
-    }
-    return slot < pool.size() && !pool[slot].m_removed &&
-           requirement_implies(pool[slot], req);
-}
-
-// Every live entry of @p reqs is covered by @p pool.
-bool all_covered(const std::vector<Requirement>& reqs,
-                 const std::vector<Requirement>& pool) {
-    const std::unordered_set<std::string> lowerings = live_lowerings(pool);
-    for (std::size_t slot = 0; slot < reqs.size(); ++slot) {
-        if (!reqs[slot].m_removed &&
-            !covered(reqs[slot], slot, pool, lowerings)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 std::optional<std::size_t> tick_count(const Timing& timing) {
     return std::visit(
         [](const auto& value) -> std::optional<std::size_t> {
@@ -542,8 +517,9 @@ class StepCollector {
 
 bool specification_implies_by_rule(const Specification& stronger,
                                    const Specification& weaker) {
-    return all_covered(stronger.m_assumptions, weaker.m_assumptions) &&
-           all_covered(weaker.m_guarantees, stronger.m_guarantees);
+    return spec_implies_by_rule(
+        stronger, weaker, live_lowerings(stronger.m_guarantees),
+        live_lowerings(weaker.m_assumptions), requirement_implies);
 }
 
 MoveOrder classify_move(const Specification& parent,
