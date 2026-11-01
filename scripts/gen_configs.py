@@ -93,6 +93,13 @@ DEFAULTS: dict = {
     # because carrying elites over re-injects exact duplicates, which is the
     # mechanism the replicate scheme exists to undo.
     "elitism_rate": 0.1,
+    # FRETISH only: the probability crossover picks join, meet or relink from
+    # the pair's verdicts, and whether selection demotes a realizable candidate
+    # proved strictly weaker than another. Emitted into [genetic] only when a
+    # sweep overrides them (see make_toml), so existing grids stay
+    # byte-identical.
+    "p_order_crossover": 0.0,
+    "maximality_demotion": False,
     "weight_syntactic": 0.33,
     "weight_semantic": 0.33,
     "weight_status": 0.33,
@@ -137,6 +144,12 @@ DEFAULTS: dict = {
     # memo shows unrealizable. Emitted into [filters] only when a sweep
     # overrides it (see make_toml).
     "parent_verdict": False,
+    # FRETISH only: climb each gated repair towards the original, the order its
+    # steps are tried in, and how many orders. Emitted into [filters] only when
+    # a sweep overrides them (see make_toml).
+    "climb_output": False,
+    "climb_order": "slot",
+    "climb_orders": 1,
     # Keys in VINTAGE_KEYS must follow the binary rather than be pinned, because
     # VINTAGE_KEYS sources its written-out values from this table -- a stale
     # entry here is a wrong value written into every config generated with
@@ -236,6 +249,10 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         f"mutation_rate   = {_fmt(d['mutation_rate'])}",
     ] + ([f"elitism_rate    = {_fmt(d['elitism_rate'])}"]
          if "elitism_rate" in overrides else []) + (
+        [f"p_order_crossover = {_fmt(d['p_order_crossover'])}"]
+        if "p_order_crossover" in overrides else []) + (
+        [f"maximality_demotion = {_fmt(d['maximality_demotion'])}"]
+        if "maximality_demotion" in overrides else []) + (
         [f"max_wall_s      = {d['max_wall_s']}"]
         if d.get("max_wall_s") else []) + (
         [f'termination     = "{d["termination"]}"']
@@ -286,7 +303,13 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         "[filters]",
         f"run_implication = {_fmt(d['run_implication'])}",
     ] + ([f"parent_verdict = {_fmt(d['parent_verdict'])}"]
-         if "parent_verdict" in overrides else []) + [
+         if "parent_verdict" in overrides else []) + (
+        [f"climb_output = {_fmt(d['climb_output'])}"]
+        if "climb_output" in overrides else []) + (
+        [f'climb_order = "{d["climb_order"]}"']
+        if "climb_order" in overrides else []) + (
+        [f"climb_orders = {d['climb_orders']}"]
+        if "climb_orders" in overrides else []) + [
         "",
         "[runtime]",
         f"black_timeout_ms = {d['black_timeout_ms']}",
