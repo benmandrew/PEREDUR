@@ -27,10 +27,21 @@ struct ClimbStats {
     inline static std::atomic<std::size_t> n_steps_accepted{0};
     /// Candidates put to the gate predicate.
     inline static std::atomic<std::size_t> n_queries{0};
-    /// ltlsynt execs while the climb ran, the rest of its queries having been
-    /// settled by the realizability memo, its subsumption rules or a stored
-    /// controller.
+    /// ltlsynt execs while the climb ran. With the five counts below, it
+    /// splits every realizability query the climb's gate asked by what
+    /// answered it; each query lands in exactly one.
     inline static std::atomic<std::size_t> n_ltlsynt_execs{0};
+    /// Queries answered by the memo's entry for the same formula.
+    inline static std::atomic<std::size_t> n_memo_hits{0};
+    /// Queries settled by conjunct-set inclusion in a decided entry.
+    inline static std::atomic<std::size_t> n_subsumed{0};
+    /// Queries settled by `requirement_implies` replacements of a decided
+    /// entry.
+    inline static std::atomic<std::size_t> n_rule_subsumed{0};
+    /// Queries over no environment inputs, decided by satisfiability.
+    inline static std::atomic<std::size_t> n_satisfiability_routed{0};
+    /// Queries a stored controller was shown to realize.
+    inline static std::atomic<std::size_t> n_controller_hits{0};
 };
 
 /// Whether a candidate the climb reached is still a repair.

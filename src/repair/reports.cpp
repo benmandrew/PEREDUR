@@ -205,7 +205,14 @@ void print_diagnostics_report() {
                   << " repairs climbed, " << ClimbStats::n_steps_tried
                   << " steps tried, " << ClimbStats::n_steps_accepted
                   << " accepted, " << ClimbStats::n_queries << " queries, "
-                  << ClimbStats::n_ltlsynt_execs << " ltlsynt execs\n";
+                  << ClimbStats::n_ltlsynt_execs << " ltlsynt execs\n"
+                  << "Output climb answers: " << ClimbStats::n_memo_hits
+                  << " memo, " << ClimbStats::n_subsumed << " subsumed, "
+                  << ClimbStats::n_rule_subsumed << " rule-subsumed, "
+                  << ClimbStats::n_satisfiability_routed
+                  << " satisfiability-routed, " << ClimbStats::n_controller_hits
+                  << " stored controller, " << ClimbStats::n_ltlsynt_execs
+                  << " ltlsynt\n";
     }
     std::cout << "Direction gate: " << DirectionGateStats::n_forbidden
               << " forbidden and " << DirectionGateStats::n_sideways_refused

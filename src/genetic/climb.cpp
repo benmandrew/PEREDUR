@@ -1,6 +1,7 @@
 #include "genetic/climb.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -174,7 +175,18 @@ std::vector<Specification> climb_repairs(
         }
     }
     ClimbStats::n_climbed += starts.size();
-    const std::size_t execs_before = RealizabilityChecker::n_cache_misses;
+    // Read without the checker's lock, as nothing else queries it while the
+    // climb runs and the workers have joined by the second read.
+    const auto checker_counts = [] {
+        return std::array<std::size_t, 6>{
+            RealizabilityChecker::n_cache_misses,
+            RealizabilityChecker::n_cache_hits,
+            RealizabilityChecker::n_subsumed,
+            RealizabilityChecker::n_rule_subsumed,
+            RealizabilityChecker::n_satisfiability_routed,
+            ControllerReuseStats::n_hits};
+    };
+    const std::array<std::size_t, 6> before = checker_counts();
 
     const std::size_t n_orders = std::max<std::size_t>(cfg.climb_orders, 1);
     const auto climb_one = [&starts, &original, &cfg, &accepts,
@@ -211,8 +223,13 @@ std::vector<Specification> climb_repairs(
             });
     }
 
-    ClimbStats::n_ltlsynt_execs +=
-        RealizabilityChecker::n_cache_misses - execs_before;
+    const std::array<std::size_t, 6> after = checker_counts();
+    ClimbStats::n_ltlsynt_execs += after[0] - before[0];
+    ClimbStats::n_memo_hits += after[1] - before[1];
+    ClimbStats::n_subsumed += after[2] - before[2];
+    ClimbStats::n_rule_subsumed += after[3] - before[3];
+    ClimbStats::n_satisfiability_routed += after[4] - before[4];
+    ClimbStats::n_controller_hits += after[5] - before[5];
     std::vector<Specification> distinct;
     std::unordered_set<Specification> emitted;
     for (std::vector<Specification>& climbed : results) {

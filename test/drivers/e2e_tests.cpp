@@ -262,8 +262,10 @@ nlohmann::json expect_run_manifest(const std::filesystem::path& dir,
             label + ": the manifest reports implication." + std::string(name));
     }
     const nlohmann::json& climb = manifest.at("climb");
-    for (const char* name : {"climbed", "steps_tried", "steps_accepted",
-                             "queries", "ltlsynt_execs"}) {
+    for (const char* name :
+         {"climbed", "steps_tried", "steps_accepted", "queries",
+          "ltlsynt_execs", "memo_hits", "subsumed", "rule_subsumed",
+          "satisfiability_routed", "controller_hits"}) {
         expect(climb.contains(name),
                label + ": the manifest reports climb." + std::string(name));
     }
