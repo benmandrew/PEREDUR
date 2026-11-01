@@ -292,6 +292,12 @@ struct Config {
     /// settled one. Each deeper level doubles the queries for one more step,
     /// and only one query per level is ever used. Values above 8 read as 8.
     std::size_t mrs_speculation_depth = 2;
+    /// The fewest guarantees a FRETISH realizability query needs before the
+    /// stored controllers are tried on it ahead of ltlsynt; 0 turns the store
+    /// off. Only a controller's pass is believed, so the store never makes a
+    /// verdict wrong; it changes a verdict only where ltlsynt's own is wrong,
+    /// as SPOT 2.15.1's decomposition is on some queries.
+    std::size_t controller_reuse_min_guarantees = 10;
     /// How long a lookahead query may keep running once the walk has settled
     /// its branch the other way, before its exec is killed; 0 kills at once.
     /// A query that finishes inside the grace still fills the caches for later

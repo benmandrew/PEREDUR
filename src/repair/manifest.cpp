@@ -50,7 +50,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 58;
+constexpr int k_schema_version = 59;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -245,7 +245,20 @@ nlohmann::json caches_json() {
                {"guarantees_checked",
                 ControllerReuseStats::n_guarantees_checked},
                {"verdicts_recalled", ControllerReuseStats::n_verdict_hits},
-               {"stored", ControllerReuseStats::n_stored}}}}},
+               {"stored", ControllerReuseStats::n_stored}}},
+             // The execs (misses) split by outcome, with the speculative
+             // ones and the slow decided ones counted again within them.
+             {"execs",
+              {{"realizable", RealizabilityChecker::n_exec_realizable},
+               {"unrealizable", RealizabilityChecker::n_exec_unrealizable},
+               {"timed_out", RealizabilityChecker::n_timeouts},
+               {"capability_errors", RealizabilityChecker::n_capability_errors},
+               {"speculative", RealizabilityChecker::n_speculative_execs},
+               {"decided_over_1s", RealizabilityChecker::n_decided_over_1s},
+               {"decided_over_2s", RealizabilityChecker::n_decided_over_2s},
+               {"decided_over_5s", RealizabilityChecker::n_decided_over_5s},
+               {"slowest_decided_s",
+                RealizabilityChecker::slowest_decided_s}}}}},
         {"count_traces",
          row(CountTracesStats::n_hits, CountTracesStats::n_misses)},
         {"ltl2tgba",

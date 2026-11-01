@@ -412,6 +412,28 @@ std::string query_scope(const SpecificationSides& sides,
 
 thread_local bool t_speculative = false;
 
+// Folds one ltlsynt exec's outcome into the checker's counts. The caller holds
+// m_cache_mutex.
+void count_exec_outcome(const ProcessResult& result,
+                        const std::optional<bool>& realizable) {
+    using Checker = RealizabilityChecker;
+    if (!result.m_timed_out && !realizable.has_value()) {
+        Checker::n_capability_errors++;
+    }
+    if (t_speculative) {
+        Checker::n_speculative_execs++;
+    }
+    if (realizable.has_value()) {
+        ++(*realizable ? Checker::n_exec_realizable
+                       : Checker::n_exec_unrealizable);
+        const double wall = result.m_wall_s;
+        Checker::n_decided_over_1s += static_cast<std::size_t>(wall > 1.0);
+        Checker::n_decided_over_2s += static_cast<std::size_t>(wall > 2.0);
+        Checker::n_decided_over_5s += static_cast<std::size_t>(wall > 5.0);
+        Checker::slowest_decided_s = std::max(Checker::slowest_decided_s, wall);
+    }
+}
+
 }  // namespace
 
 SpeculativeQueryScope::SpeculativeQueryScope() : m_previous(t_speculative) {
@@ -1380,7 +1402,8 @@ std::optional<bool> RealizabilityChecker::decide_realizability_ltl(
     }
     {
         std::scoped_lock lock(m_cache_mutex);
-        if (fretish_sides && guarantee_ids.size() >= m_reuse_min_guarantees &&
+        if (fretish_sides && m_reuse_min_guarantees > 0 &&
+            guarantee_ids.size() >= m_reuse_min_guarantees &&
             controller_reuse_available()) {
             reuse = reuse_query(scope, assumption_ids, guarantee_ids);
         } else {
@@ -1411,9 +1434,7 @@ std::optional<bool> RealizabilityChecker::decide_realizability_ltl(
     }
     std::scoped_lock lock(m_cache_mutex);
     record_exec<RealizabilityChecker>(result);
-    if (!result.m_timed_out && !realizable.has_value()) {
-        n_capability_errors++;
-    }
+    count_exec_outcome(result, realizable);
     // Undecided is memoised like any other outcome, for the reason the ltlfilt
     // cache gives: a formula that blew the budget once will blow it every
     // time, and re-paying that wait per occurrence is the stall the timeout

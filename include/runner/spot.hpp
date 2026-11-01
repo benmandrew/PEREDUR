@@ -176,6 +176,19 @@ class RealizabilityChecker {
     /// separately because the two say different things: a timeout is a budget
     /// this run chose, and this is a ceiling the tool was built with.
     inline static std::size_t n_capability_errors = 0;
+    /// ltlsynt execs that came back realizable and unrealizable. With
+    /// n_timeouts and n_capability_errors they split the execs by outcome.
+    inline static std::size_t n_exec_realizable = 0;
+    inline static std::size_t n_exec_unrealizable = 0;
+    /// Execs that returned while a SpeculativeQueryScope was alive on the
+    /// asking thread. A killed one raises before it is counted.
+    inline static std::size_t n_speculative_execs = 0;
+    /// Decided execs slower than 1, 2 and 5 s, and the slowest: what a lower
+    /// ltlsynt_timeout_ms would have turned undecided.
+    inline static std::size_t n_decided_over_1s = 0;
+    inline static std::size_t n_decided_over_2s = 0;
+    inline static std::size_t n_decided_over_5s = 0;
+    inline static double slowest_decided_s = 0.0;
 
     /// Checks whether the specification is realizable using ltlsynt. Returns
     /// true (realizable), false (unrealizable), or nullopt (timed out, so
@@ -391,9 +404,11 @@ class RealizabilityChecker {
     /// realizes `(&A) -> (&G)` when no word it produces satisfies every
     /// assumption and violates a guarantee, which is one product emptiness
     /// check per guarantee. Only a pass is believed: a failure, a timeout or a
-    /// tool error falls through to ltlsynt, so the store changes how a verdict
-    /// is reached and never which one. Everything here lives under
-    /// m_reuse_mutex, which is never held together with m_cache_mutex.
+    /// tool error falls through to ltlsynt, so the store never makes a verdict
+    /// wrong. It changes one only where ltlsynt's own is wrong, as SPOT
+    /// 2.15.1's decomposition is on some realizable queries. Everything here
+    /// lives under m_reuse_mutex, which is never held together with
+    /// m_cache_mutex.
     std::mutex m_reuse_mutex;
     std::size_t m_reuse_min_guarantees = 10;
     std::unordered_map<std::string,

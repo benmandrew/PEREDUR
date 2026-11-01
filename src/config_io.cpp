@@ -354,4 +354,6 @@ void apply_tool_timeouts(const Config& cfg) {
     set_ltl2tgba_timeout(cfg.ltl2tgba_timeout);
     set_ltlfilt_timeout(cfg.ltlfilt_timeout);
     set_mrs_lookahead_kill_grace(cfg.mrs_lookahead_kill_grace);
+    global_real_checker().set_controller_reuse_min_guarantees(
+        cfg.controller_reuse_min_guarantees);
 }

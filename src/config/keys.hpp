@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 49> k_config_keys{{
+inline constexpr std::array<ConfigKey, 50> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -433,6 +433,17 @@ inline constexpr std::array<ConfigKey, 49> k_config_keys{{
      "How many steps ahead the MRS walk queries both outcomes into idle "
      "workers.\n"
      "Scores are unchanged at any value; 0 turns it off.\n"},
+    {"runtime", "controller_reuse_min_guarantees",
+     &Config::controller_reuse_min_guarantees, KeyCheck::NonNegative,
+     KeyReader::Both,
+     "The fewest guarantees a FRETISH realizability query needs before the "
+     "controllers ltlsynt emitted for earlier queries are tried on it ahead of "
+     "a new exec; 0 turns the store off. Only a controller's pass is "
+     "believed, so the store never makes a verdict wrong; it changes one only "
+     "where ltlsynt's own is wrong, as SPOT 2.15.1's decomposition is on "
+     "some queries.",
+     "Guarantees a query needs before stored controllers are tried on it.\n"
+     "0 turns the store off.\n"},
     {"runtime", "mrs_lookahead_kill_grace_ms",
      &Config::mrs_lookahead_kill_grace, KeyCheck::NonNegative, KeyReader::Both,
      "How long, in milliseconds, a lookahead query of the MRS walk may keep "
