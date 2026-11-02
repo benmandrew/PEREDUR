@@ -217,9 +217,11 @@ TEST(test_spot_satisfiable_decides_both_ways) {
 // is that the deadline is honoured -- execute_and_capture kills the process
 // group, so nothing survives the call -- and that the result reads as no
 // answer rather than as UNSAT, which would drop a candidate over a budget.
+// SPOT 2.16.1 settles a 12-term chain in 30ms and a 24-term one in 2s, and runs
+// past 5s from 26 terms, so the chain runs to 30.
 TEST(test_spot_blowup_is_bounded_not_answered) {
     std::string formula = "G(F(p0))";
-    for (int term = 1; term < 12; ++term) {
+    for (int term = 1; term < 30; ++term) {
         formula.append(" <-> G(F(p").append(std::to_string(term)).append("))");
     }
     const auto start = std::chrono::steady_clock::now();
@@ -333,6 +335,18 @@ TEST(test_model_probe_refutes_but_never_establishes) {
            "model probe: black's UNSAT does not establish an implication");
     expect(SatisfiabilityChecker::n_model_probe_sat == probes_before + 1,
            "model probe: an unsatisfiable query is not counted as refuted");
+}
+
+// SPOT 2.16.1's `ltlfilt --satisfiable` calls this satisfiable, though `G b`
+// forces d from step 2 and so contradicts `F G !d`. SPOT's first look on the
+// implication route answers it, so the answer read must be black's.
+TEST(test_spot_sat_is_taken_only_with_a_model) {
+    SatisfiabilityChecker checker;
+    checker.set_timeout(k_test_black_timeout);
+    expect(checker.check_satisfiability("G(b -> X(X(d))) & G(b) & F(G(!d))",
+                                        QueryPolarity::ExpectUnsat) ==
+               std::optional<bool>(false),
+           "spot SAT: an unsatisfiable formula should read UNSAT");
 }
 
 }  // namespace

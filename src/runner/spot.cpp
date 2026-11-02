@@ -128,6 +128,13 @@ std::optional<bool> parse_realizability_output(const ProcessResult& result) {
 // controller is asked for only where it may be stored. ltlsynt prints the
 // verdict line first either way, and on the measured queries the strategy
 // cost nothing beyond the verdict.
+// SPOT 2.15.1's ltlsynt, with its default --decompose=yes, answered
+// UNREALIZABLE for some realizable specifications with a `G F` assumption (5%
+// of the distinct UNREALIZABLE answers on liquid-mixer), which Spot issue #651
+// fixed in 2.16. The minimal case, realized by v := e, guards a downgrade:
+//
+//     echo 'GF l -> (X(l | !l) & (v <-> e))' |
+//         ltlsynt --realizability -F - --ins=e,l
 std::vector<std::string> ltlsynt_command(
     const std::string& ltlsynt, const std::vector<std::string>& inputs,
     const std::vector<std::string>& outputs, bool wants_controller) {

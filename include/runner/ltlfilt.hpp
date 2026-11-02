@@ -36,6 +36,15 @@ struct LtlfiltStats {
     inline static std::size_t n_timeouts = 0;
 };
 
+/// spot_satisfiable_by_emptiness's ltl2tgba and autfilt execs, kept apart from
+/// ltlfilt's so that each row's seconds stay over its own tool.
+struct EmptinessStats {
+    inline static std::size_t n_execs = 0;
+    inline static double total_time_s = 0.0;
+    inline static double total_cpu_s = 0.0;
+    inline static std::size_t n_timeouts = 0;
+};
+
 /// Returns the full filesystem path to the ltlfilt binary.
 std::string ltlfilt_path();
 
@@ -96,6 +105,16 @@ std::optional<std::string> rewrite_weak_operators(const std::string& formula);
 /// one -- SPOT emits `W` and `M` itself and reads back what it writes.
 std::optional<bool> spot_satisfiable(const std::string& formula,
                                      std::chrono::milliseconds timeout);
+
+/// Satisfiability by `ltl2tgba --low --any` and `autfilt --is-empty`, each
+/// exec within @p timeout. SPOT 2.16.1's `ltlfilt --satisfiable` calls some
+/// unsatisfiable formulae satisfiable, and this path does not: it agreed with
+/// black on every one of 1,238 replayed queries both decided, and with 2.15.1.
+/// Two execs and a translation, so it costs 34ms at the median on liquid-mixer
+/// queries where `--satisfiable` takes 6ms. Returns nullopt on a timeout or
+/// any other failure.
+std::optional<bool> spot_satisfiable_by_emptiness(
+    const std::string& formula, std::chrono::milliseconds timeout);
 
 /// Returns true if `lhs` and `rhs` are logically equivalent LTL formulae,
 /// checked via `ltlfilt --equivalent-to`. This is a best-effort

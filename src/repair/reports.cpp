@@ -162,9 +162,13 @@ void print_diagnostics_report() {
     }
     std::cout << "\nConstant-folded (decided by ltlfilt, no black call): "
               << SatisfiabilityChecker::n_constant_folded << "\n";
-    std::cout << "Decided by SPOT (ltlfilt --satisfiable, no black call): "
+    std::cout << "Decided by SPOT (its UNSAT, or its SAT with a black model): "
               << SatisfiabilityChecker::n_spot_decided << "\n";
-    std::cout << "black calls (escalations and implication model probes): "
+    std::cout << "SPOT SAT overruled by black's UNSAT: "
+              << SatisfiabilityChecker::n_spot_sat_refuted << "\n";
+    std::cout << "SPOT SAT black could not confirm (undecided): "
+              << SatisfiabilityChecker::n_spot_sat_unconfirmed << "\n";
+    std::cout << "black calls (confirmations, escalations, model probes): "
               << SatisfiabilityChecker::n_black_calls << "\n";
     std::cout << "Implications refuted by a black model (SPOT undecided "
                  "at its first look): "

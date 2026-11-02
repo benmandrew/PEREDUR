@@ -162,6 +162,42 @@ std::optional<bool> spot_satisfiable(const std::string& formula,
     return std::nullopt;
 }
 
+std::optional<bool> spot_satisfiable_by_emptiness(
+    const std::string& formula, std::chrono::milliseconds timeout) {
+    PEREDUR_PROFILE_SCOPE("ltlfilt/spot_satisfiable_by_emptiness");
+    const ProcessResult automaton = execute_and_capture_with_input(
+        {ltl2tgba_path(), "--low", "--any", "-H", "-F", "-"},
+        spot_formula_line(formula), timeout);
+    {
+        std::scoped_lock lock(g_ltlfilt_mutex);
+        EmptinessStats::n_execs++;
+        record_exec<EmptinessStats>(automaton);
+    }
+    if (automaton.m_timed_out || automaton.m_exit_code != 0 ||
+        automaton.m_output.rfind("HOA:", 0) != 0) {
+        return std::nullopt;
+    }
+    // -c prints how many automata passed the filter, so "1" is an empty
+    // automaton and "0" one that accepts a word.
+    const ProcessResult empty = execute_and_capture_with_input(
+        {autfilt_path(), "--is-empty", "-c", "-"}, automaton.m_output, timeout);
+    {
+        std::scoped_lock lock(g_ltlfilt_mutex);
+        EmptinessStats::n_execs++;
+        record_exec<EmptinessStats>(empty);
+    }
+    if (empty.m_timed_out) {
+        return std::nullopt;
+    }
+    if (empty.m_output == "1\n") {
+        return false;
+    }
+    if (empty.m_output == "0\n") {
+        return true;
+    }
+    return std::nullopt;
+}
+
 bool ltl_equivalent(const std::string& lhs, const std::string& rhs) {
     const std::string binary = ltlfilt_path();
     if (access(binary.c_str(), F_OK) != 0) {

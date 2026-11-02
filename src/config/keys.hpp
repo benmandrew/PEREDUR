@@ -440,7 +440,7 @@ inline constexpr std::array<ConfigKey, 50> k_config_keys{{
      "controllers ltlsynt emitted for earlier queries are tried on it ahead of "
      "a new exec; 0 turns the store off. Only a controller's pass is "
      "believed, so the store never makes a verdict wrong; it changes one only "
-     "where ltlsynt's own is wrong, as SPOT 2.15.1's decomposition is on "
+     "where ltlsynt's own was wrong, as SPOT 2.15.1's decomposition was on "
      "some queries.",
      "Guarantees a query needs before stored controllers are tried on it.\n"
      "0 turns the store off.\n"},

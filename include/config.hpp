@@ -295,8 +295,8 @@ struct Config {
     /// The fewest guarantees a FRETISH realizability query needs before the
     /// stored controllers are tried on it ahead of ltlsynt; 0 turns the store
     /// off. Only a controller's pass is believed, so the store never makes a
-    /// verdict wrong; it changes a verdict only where ltlsynt's own is wrong,
-    /// as SPOT 2.15.1's decomposition is on some queries.
+    /// verdict wrong; it changes a verdict only where ltlsynt's own was wrong,
+    /// as SPOT 2.15.1's decomposition was on some queries.
     std::size_t controller_reuse_min_guarantees = 10;
     /// How long a lookahead query may keep running once the walk has settled
     /// its branch the other way, before its exec is killed; 0 kills at once.

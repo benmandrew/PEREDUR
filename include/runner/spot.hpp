@@ -405,8 +405,8 @@ class RealizabilityChecker {
     /// assumption and violates a guarantee, which is one product emptiness
     /// check per guarantee. Only a pass is believed: a failure, a timeout or a
     /// tool error falls through to ltlsynt, so the store never makes a verdict
-    /// wrong. It changes one only where ltlsynt's own is wrong, as SPOT
-    /// 2.15.1's decomposition is on some realizable queries. Everything here
+    /// wrong. It changes one only where ltlsynt's own was wrong, as SPOT
+    /// 2.15.1's decomposition was on some realizable queries. Everything here
     /// lives under m_reuse_mutex, which is never held together with
     /// m_cache_mutex.
     std::mutex m_reuse_mutex;

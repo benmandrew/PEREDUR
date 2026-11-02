@@ -197,19 +197,12 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
         return decided;
     }
     n_cache_misses++;
-    // SPOT first, on every query. It decides by automaton emptiness, so its
-    // cost tracks the automaton's size rather than the verdict, and it settles
-    // in tens of milliseconds the deep nested-X implications that black cannot
-    // finish at all: measured over the search's own queries it answered 5,579
-    // of 5,579 with a 10ms median, against black's 27ms, and at an X-chain
-    // depth of 640 it answers in 30ms where black exceeds 60s.
-    //
     // Bounded by the caller's own budget as well as by m_spot_budget, so a
-    // configured timeout still bounds the whole query rather than the black
-    // stage alone -- otherwise a 1000ms setting would admit a 1500ms query. A
-    // zero budget disables black's timeout by convention; SPOT keeps its own
-    // either way, since the unbounded automaton construction is the case
-    // m_spot_budget exists to stop.
+    // configured timeout still bounds SPOT's stage too -- otherwise a 1000ms
+    // setting would admit a 1500ms query. A zero budget disables black's
+    // timeout by convention; SPOT keeps its own either way, since the
+    // unbounded automaton construction is the case m_spot_budget exists to
+    // stop.
     const std::chrono::milliseconds spot_budget =
         m_timeout.count() == 0 ? m_spot_budget
                                : std::min(m_timeout, m_spot_budget);
@@ -220,14 +213,22 @@ std::optional<bool> SatisfiabilityChecker::check_satisfiability(
         m_cache.emplace(cache_key, answer);
         return answer;
     }
-    if (const std::optional<bool> decided =
-            spot_satisfiable(ltl_formula, spot_budget)) {
+    // SPOT first, on every query. It decides by automaton emptiness, so its
+    // cost tracks the automaton's size rather than the verdict, and it settles
+    // in tens of milliseconds the unsatisfiable queries black cannot finish:
+    // at an X-chain depth of 640 it answers in 30ms where black exceeds 60s,
+    // and asking black first timed out on 189 of 518 lift queries and 51 of
+    // 385 pcar-v2-888 ones, all of which SPOT then proved UNSAT. SPOT 2.16.1's
+    // `ltlfilt --satisfiable` calls some unsatisfiable formulae satisfiable,
+    // so only its UNSAT is final and its SAT goes to confirm_spot_sat.
+    std::optional<bool> answer = spot_satisfiable(ltl_formula, spot_budget);
+    if (answer == std::optional<bool>{false}) {
         n_spot_decided++;
-        std::scoped_lock lock(m_cache_mutex);
-        m_cache.emplace(cache_key, decided);
-        return decided;
+    } else if (answer.has_value()) {
+        answer = confirm_spot_sat(ltl_formula, spot_budget);
+    } else {
+        answer = black_answer(ltl_formula, m_timeout);
     }
-    const std::optional<bool> answer = black_answer(ltl_formula, m_timeout);
     std::scoped_lock lock(m_cache_mutex);
     m_cache.emplace(cache_key, answer);
     return answer;
@@ -271,12 +272,12 @@ std::optional<bool> SatisfiabilityChecker::implication_answer(
     // in 50-60ms.
     //
     // So SPOT gets a first look, which settles every query on the small
-    // specifications, and then black is asked for a model. Only its SAT
-    // answer is taken. A model is a proof, and SAT is the answer SPOT would
-    // have given had it finished, so the verdicts a run reads are the ones it
-    // read before this probe existed. black's UNSAT is discarded, and the
-    // query goes back to SPOT with its full budget, so an implication is
-    // still only ever established by SPOT.
+    // specifications, and then black is asked for a model. Only the probe's
+    // SAT answer is taken: on a valid implication black runs out its bound,
+    // so the probe's UNSAT is discarded and the query goes back to SPOT with
+    // its full budget. SPOT's own SAT goes to black for a model, as on the
+    // `ExpectSat` route, so an implication is established by SPOT's UNSAT or
+    // by black overruling a SAT SPOT got wrong.
     //
     // A formula as long as a whole large specification skips the first look:
     // SPOT's automaton there takes longer than any first look, and the time
@@ -286,10 +287,14 @@ std::optional<bool> SatisfiabilityChecker::implication_answer(
             ? std::chrono::milliseconds{0}
             : std::min(spot_budget, k_implication_first_look);
     if (first_look.count() > 0) {
-        if (const std::optional<bool> decided =
-                spot_satisfiable(ltl_formula, first_look)) {
+        const std::optional<bool> decided =
+            spot_satisfiable(ltl_formula, first_look);
+        if (decided == std::optional<bool>{false}) {
             n_spot_decided++;
             return decided;
+        }
+        if (decided.has_value()) {
+            return confirm_spot_sat(ltl_formula, spot_budget);
         }
     }
     const std::chrono::milliseconds probe_budget =
@@ -300,10 +305,14 @@ std::optional<bool> SatisfiabilityChecker::implication_answer(
         return true;
     }
     if (spot_budget > first_look) {
-        if (const std::optional<bool> decided =
-                spot_satisfiable(ltl_formula, spot_budget)) {
+        const std::optional<bool> decided =
+            spot_satisfiable(ltl_formula, spot_budget);
+        if (decided == std::optional<bool>{false}) {
             n_spot_decided++;
             return decided;
+        }
+        if (decided.has_value()) {
+            return confirm_spot_sat(ltl_formula, spot_budget);
         }
     }
     // An unsatisfiable query is one black proves only by exhausting a
@@ -311,6 +320,29 @@ std::optional<bool> SatisfiabilityChecker::implication_answer(
     // second subprocess and the same non-answer.
     n_escalations_declined++;
     return std::nullopt;
+}
+
+std::optional<bool> SatisfiabilityChecker::confirm_spot_sat(
+    const std::string& ltl_formula, std::chrono::milliseconds spot_budget) {
+    std::optional<bool> answer = black_answer(ltl_formula, m_timeout);
+    // black cannot prove a valid implication in time, which is exactly the
+    // case where SPOT's SAT is wrong, so emptiness gets the last word.
+    if (!answer.has_value()) {
+        answer = spot_satisfiable_by_emptiness(ltl_formula, spot_budget);
+    }
+    return count_spot_sat_check(answer);
+}
+
+std::optional<bool> SatisfiabilityChecker::count_spot_sat_check(
+    std::optional<bool> answer) {
+    if (answer == std::optional<bool>{true}) {
+        n_spot_decided++;
+    } else if (answer.has_value()) {
+        n_spot_sat_refuted++;
+    } else {
+        n_spot_sat_unconfirmed++;
+    }
+    return answer;
 }
 
 std::optional<bool> SatisfiabilityChecker::black_answer(

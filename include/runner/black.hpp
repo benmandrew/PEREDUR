@@ -63,14 +63,20 @@ class SatisfiabilityChecker {
     /// unsound on those. Reported as indeterminate, like a timeout. Non-zero
     /// means queries are going unanswered -- check that ltlfilt is reachable.
     inline static std::atomic<std::size_t> n_weak_operator_unresolved{0};
-    /// Queries settled by SPOT without reaching black. Expected to be nearly
-    /// every cache miss; a low figure means ltlfilt is unreachable or the
-    /// population has drifted into automaton-hostile formulae.
+    /// Queries settled by SPOT: its UNSAT, or its SAT once confirmed.
     inline static std::atomic<std::size_t> n_spot_decided{0};
-    /// black subprocesses actually launched, which is no longer the same as
-    /// the cache-miss count: only an `ExpectSat` query SPOT left undecided
-    /// gets one. black_model's probes count here too, as they do in the
-    /// time and timeout totals below.
+    /// SPOT SAT answers black or automaton emptiness proved UNSAT. Each is
+    /// SPOT calling an
+    /// unsatisfiable formula satisfiable, as SPOT 2.16.1's
+    /// `ltlfilt --satisfiable` does on `G(b -> XXd) & Gb & FG!d`.
+    inline static std::atomic<std::size_t> n_spot_sat_refuted{0};
+    /// SPOT SAT answers neither black nor automaton emptiness settled in
+    /// budget, which are reported undecided.
+    inline static std::atomic<std::size_t> n_spot_sat_unconfirmed{0};
+    /// black subprocesses actually launched: one per SPOT SAT it confirms,
+    /// per `ExpectSat` query SPOT left undecided, and per model probe.
+    /// black_model's probes count here too, as they do in the time and
+    /// timeout totals below.
     inline static std::atomic<std::size_t> n_black_calls{0};
     /// Queries SPOT left undecided that were not escalated, because their
     /// polarity says black would exhaust its bound and answer nothing.
@@ -86,11 +92,12 @@ class SatisfiabilityChecker {
 
     /// Returns true (SAT), false (UNSAT), or nullopt (timed out / unknown).
     ///
-    /// SPOT is asked first and settles almost everything; `polarity` decides
-    /// whether a query it could not settle is escalated to black. Callers that
-    /// omit it get `ExpectSat`, which escalates -- the conservative default,
-    /// since a spurious escalation costs one subprocess and a missing one
-    /// costs an answer.
+    /// SPOT is asked first, and only its UNSAT is final: its SAT is believed
+    /// once black finds a model or, failing that, automaton emptiness agrees.
+    /// `polarity` decides whether a query SPOT could not settle is escalated
+    /// to black. Callers that omit it get `ExpectSat`, which escalates -- the
+    /// conservative default, since a spurious escalation costs one subprocess
+    /// and a missing one costs an answer.
     std::optional<bool> check_satisfiability(
         const std::string& ltl_formula,
         QueryPolarity polarity = QueryPolarity::ExpectSat);
@@ -143,6 +150,14 @@ class SatisfiabilityChecker {
     /// at @p spot_budget. Leaves the cache to the caller.
     std::optional<bool> implication_answer(
         const std::string& ltl_formula, std::chrono::milliseconds spot_budget);
+    /// SPOT's SAT on @p ltl_formula, checked by black within `m_timeout`
+    /// and, if black leaves it undecided, by automaton emptiness within
+    /// @p spot_budget. Either check's answer stands; neither leaves the query
+    /// undecided. Leaves the cache to the caller.
+    std::optional<bool> confirm_spot_sat(const std::string& ltl_formula,
+                                         std::chrono::milliseconds spot_budget);
+    /// Counts the outcome of checking a SPOT SAT and passes @p answer on.
+    static std::optional<bool> count_spot_sat_check(std::optional<bool> answer);
     /// One black solve within @p budget, weak operators rewritten away first.
     /// Leaves the cache to the caller.
     static std::optional<bool> black_answer(const std::string& ltl_formula,

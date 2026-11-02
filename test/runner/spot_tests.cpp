@@ -586,6 +586,17 @@ TEST(test_unrealizable_immediately) {
            "spot-runner: G(true -> false) should be unrealisable");
 }
 
+// SPOT 2.15.1's ltlsynt answered this UNREALIZABLE under its default
+// decomposition (Spot issue #651, fixed in 2.16); v := e realizes it.
+TEST(test_decomposition_keeps_realizable_verdict) {
+    RealizabilityChecker checker;
+    expect(checker.check_realizability_ltl("GF l -> (X(l | !l) & (v <-> e))",
+                                           {"e", "l"},
+                                           {"v"}) == std::optional<bool>{true},
+           "spot-runner: GF l -> (X(l | !l) & (v <-> e)) should be "
+           "realisable");
+}
+
 TEST(test_realizable_next_timepoint) {
     RealizabilityChecker checker;
     Requirement req =

@@ -1,12 +1,15 @@
 include(ExternalProject)
 
-set(SPOT_VERSION "2.15.1")
+set(SPOT_VERSION "2.16.1")
 set(SPOT_DOWNLOAD_URL
     "https://www.lre.epita.fr/dload/spot/spot-${SPOT_VERSION}.tar.gz")
 set(SPOT_PREFIX "${PEREDUR_THIRD_PARTY_DIR}/spot_src")
 set(SPOT_INSTALL_DIR "${PEREDUR_THIRD_PARTY_DIR}/spot")
 set(SPOT_BIN_DIR "${SPOT_INSTALL_DIR}/bin")
 set(SPOT_STAMP_DIR "${SPOT_PREFIX}/src/spot_project-stamp")
+# Written by the install step. The done stamp alone would keep an install of
+# an older SPOT_VERSION after a bump.
+set(SPOT_VERSION_MARKER "${SPOT_INSTALL_DIR}/.spot-${SPOT_VERSION}")
 
 # ExternalProject_Add regenerates its per-step driver scripts on every
 # configure, which get a newer mtime than a CI-cache-restored "-done" stamp.
@@ -14,7 +17,7 @@ set(SPOT_STAMP_DIR "${SPOT_PREFIX}/src/spot_project-stamp")
 # though the installed output is already present and valid. Skip
 # re-declaring the external project entirely when a prior run already
 # completed it, so a cache hit actually saves the rebuild.
-if(EXISTS "${SPOT_STAMP_DIR}/spot_project-done")
+if(EXISTS "${SPOT_STAMP_DIR}/spot_project-done" AND EXISTS "${SPOT_VERSION_MARKER}")
     add_custom_target(spot_project)
     message(STATUS "Spot ${SPOT_VERSION} already installed at ${SPOT_INSTALL_DIR}")
 else()
@@ -51,6 +54,8 @@ else()
             ${SPOT_MAKE_PROGRAM} -j ${CMAKE_BUILD_PARALLEL_LEVEL}
         INSTALL_COMMAND
             ${SPOT_MAKE_PROGRAM} install
+        COMMAND
+            ${CMAKE_COMMAND} -E touch ${SPOT_VERSION_MARKER}
         LOG_CONFIGURE TRUE
         LOG_BUILD TRUE
         LOG_INSTALL TRUE

@@ -50,7 +50,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 59;
+constexpr int k_schema_version = 60;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -166,14 +166,17 @@ nlohmann::json tool_calls_json() {
                                  ControllerReuseStats::n_verdict_hits,
                                  ControllerReuseStats::n_timeouts,
                                  ControllerReuseStats::total_time_s)},
-        // "calls" is black's own exec count, which parted company with the
-        // cache-miss count when SPOT took the first stage: a miss now
-        // reaches black only if SPOT left it undecided and its polarity
-        // says black could still answer.
+        // "calls" is black's own exec count: one per SPOT SAT it confirms,
+        // per `ExpectSat` query SPOT left undecided, and per model probe.
         {"black", row(SatisfiabilityChecker::n_black_calls,
                       SatisfiabilityChecker::n_cache_hits,
                       SatisfiabilityChecker::n_timeouts,
                       SatisfiabilityChecker::total_time_s)},
+        // The ltl2tgba and autfilt execs that confirm a SPOT SAT black left
+        // undecided; cache_hits is always 0, as nothing memoises them here.
+        {"spot_emptiness",
+         row(EmptinessStats::n_execs, 0, EmptinessStats::n_timeouts,
+             EmptinessStats::total_time_s)},
         // No timeouts field: ganak runs untimed, so it could only ever read 0.
         {"ganak",
          {{"calls", GanakStats::n_cache_misses},
@@ -372,6 +375,10 @@ void write_run_manifest(const std::string& output_dir,
         {"n_escalations_declined",
          SatisfiabilityChecker::n_escalations_declined.load()},
         {"n_model_probe_sat", SatisfiabilityChecker::n_model_probe_sat.load()},
+        {"n_spot_sat_refuted",
+         SatisfiabilityChecker::n_spot_sat_refuted.load()},
+        {"n_spot_sat_unconfirmed",
+         SatisfiabilityChecker::n_spot_sat_unconfirmed.load()},
         {"n_weak_operator_unresolved",
          SatisfiabilityChecker::n_weak_operator_unresolved.load()},
         {"n_tautology_substitutions", Ltl2tgbaStats::n_tautology_substitutions},
