@@ -21,6 +21,15 @@ if(EXISTS "${SPOT_STAMP_DIR}/spot_project-done" AND EXISTS "${SPOT_VERSION_MARKE
     add_custom_target(spot_project)
     message(STATUS "Spot ${SPOT_VERSION} already installed at ${SPOT_INSTALL_DIR}")
 else()
+    # An install without this version's marker is an older SPOT, for instance
+    # one a CI restore-key brought back after a bump. Its libbddx.so sits on
+    # the new build's link path, and libspot then links against the old BuDDy
+    # and misses the symbols the new one added.
+    if(EXISTS "${SPOT_INSTALL_DIR}")
+        message(STATUS "Removing the stale Spot install at ${SPOT_INSTALL_DIR}")
+        file(REMOVE_RECURSE "${SPOT_INSTALL_DIR}")
+    endif()
+
     # Autotools' ./configure doesn't know about CMAKE_CXX_COMPILER_LAUNCHER;
     # thread it through manually (e.g. sccache, when CI sets it) so a genuine
     # cache miss at least compiles fast on a subsequent run. This project only
