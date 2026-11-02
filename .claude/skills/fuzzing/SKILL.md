@@ -5,15 +5,21 @@ description: Build and run the ltl_equivalence_fuzzer, which differentially test
 
 # Fuzzing
 
-`fuzz/ltl_equivalence_fuzzer` differentially tests the hand-rolled `requirement_to_ltl()` translator against the real FRET formaliser CLI: it generates random `Requirement`s, checks that the two LTL formulae are logically equivalent (via `ltlfilt --equivalent-to`), and aborts on a mismatch so libFuzzer captures a repro. It also aborts when the CLI rejects the generated FRETish or `ltlfilt` cannot decide the equivalence, because a skipped case is a case never checked: a mode named `mode`, a FRET keyword, once made every scoped sentence a parse error and hid all of them. Nothing is skipped. A zero-tick bounded timing under a non-Global scope makes FRET print the empty range `F[0,-1] φ`, which SPOT cannot parse, so the fuzzer folds it to `false` (and `G[0,-1] φ` to `true`) before comparing. It does not replace `requirement_to_ltl()` at runtime — the hand-rolled translator stays the source of truth used by fitness scoring, model counting, and `black`/`ltlsynt` (which don't all accept the CLI's bounded-interval LTL syntax); the CLI is cross-validation only.
+`fuzz/ltl_equivalence_fuzzer` generates random `Requirement`s, lowers each with `requirement_to_ltl()` and with the vendored FRET formaliser, and checks the two formulae are equivalent with `ltlfilt --equivalent-to`. It aborts on a mismatch, on a sentence the CLI rejects, and on an equivalence `ltlfilt` cannot decide, so libFuzzer captures a repro for each. The formaliser is a test oracle only; `requirement_to_ltl()` stays the translator every binary uses. The design, including why `F[0,-1] φ` folds to `false`, is in "FRETISH scopes" in `docs/dev/fretish-scopes.md`.
 
-Requires a clang++ with libFuzzer support on `PATH` (declared in `flake.nix`'s devShell) — GCC has no `-fsanitize=fuzzer` equivalent, so this target is built via a raw `clang++` invocation in `fuzz/CMakeLists.txt`, linked against the same `peredur_core`/`peredur_fitness` static libraries the active preset already built (verified safe to mix with GCC+ASAN/UBSAN in practice).
+## Build and run
+
+The target needs a `clang++` with libFuzzer on `PATH`; the `nix develop` shell provides one. `fuzz/CMakeLists.txt` builds it with a raw `clang++` call and links the `peredur_core`, `peredur_fitness` and `peredur_formaliser` libraries the active preset built. On Linux those libraries are GCC-built, and mixing them with the clang object works. On macOS the shell's compiler is already clang 22.
 
 ```sh
 cmake --preset debug -DPEREDUR_FUZZ=ON
 cmake --build build --target fuzz_ltl_equivalence
-./build/fuzz/ltl_equivalence_fuzzer -max_total_time=60 corpus_dir/   # fuzz for 60s
+./build/fuzz/ltl_equivalence_fuzzer -max_total_time=60 corpus_dir/   # fuzz for 60 s
 ./build/fuzz/ltl_equivalence_fuzzer crash-<hash>                    # replay a repro
 ```
 
-Each input spawns an `ltlfilt` subprocess (the formaliser CLI's own process is persistent and reused across inputs), so this runs orders of magnitude slower than a typical libFuzzer target — expected for differential testing against external tools, not a bug.
+Each input spawns one `ltlfilt` process, while the formaliser's `node` process is reused across inputs. This runs orders of magnitude slower than a typical libFuzzer target, which is expected for differential testing against external tools.
+
+## After a crash
+
+Replay the `crash-<hash>` file: stderr shows the verdict, the requirement's parts, the FRETish sentence and both formulae. A mismatch is a bug in `requirement_to_ltl()` or in the fuzzer's folding of FRET's output; fix it, then pin the case in `test/scope_tests.cpp` so it outlives the corpus.

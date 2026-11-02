@@ -5,49 +5,50 @@ description: Diagnose a PEREDUR crash log from crashes/. Use when investigating 
 
 # Debugging crashes from `crashes/`
 
-`crash_handler.cpp` installs a SIGSEGV/SIGABRT/SIGFPE handler that forks
-`signal_tracer` (cpptrace) and writes `crashes/crash_<pid>_<timestamp>.log`,
-including the `--seed` and full `Config` values needed to reproduce. Both the
-`release` and `relwithdebinfo` presets build with `-DNDEBUG` (CMake's default
-for those build types), so:
+Only `peredur` installs the crash handler (`src/crash/crash_handler.cpp`); the other binaries write no log. On SIGSEGV, SIGABRT or SIGFPE it forks the `signal_tracer` that sits beside the executable, which writes `crashes/crash_<pid>_<timestamp>.log` under the working directory of the run. `cpptrace::register_terminate_handler()` also traces an uncaught exception.
 
-- `assert()` is a no-op in these binaries — a failure path guarded only by
-  `assert` (e.g. a non-zero subprocess exit code, a parse precondition) does
-  *not* abort; it silently continues with whatever garbage/default value
-  resulted. When chasing a crash, treat every `assert` between the crash site
-  and the actual root cause as a place where bad data could have been let
-  through instead of being caught loudly.
-- `build-release/` has no debug info, so its crash logs only show raw
-  addresses (`at .../peredur`, no function/line). Don't try to reverse the
-  PIE load offset by hand — rebuild `relwithdebinfo` instead (it keeps
-  `-DNDEBUG`, so timing/behavior stays close to release, but adds `-g`):
+## What the log holds
 
-  ```sh
-  cmake --workflow --preset relwithdebinfo
-  ```
+`format_crash_metadata` (`src/repair/driver.cpp`) records the input path, the seed and ten config values: generations, population, crossover and mutation rates, `p_trigger`, `p_response`, `p_timing` and the three fitness weights. Every other key is missing. To reproduce, find the config file the run used (for a campaign run, under `experiments/<name>/`). A repro with the seed alone and default config runs a different search.
 
-- Reproduce with the exact seed from the crash log's `Config:` block:
+## Symbols and asserts
 
-  ```sh
-  ./build-relwithdebinfo/peredur --seed <seed from log>
-  ```
+Both `release` and `relwithdebinfo` build with `-DNDEBUG`, so `assert()` does nothing in them. A failure path guarded only by an `assert` lets bad data through instead of stopping. Treat every `assert` between the crash site and the root cause as a place the bad value could have entered.
 
-  This is usually deterministic even though the crash often surfaces inside a
-  worker thread (`score_population`'s `std::async` pool) — the RNG seed
-  drives which specifications get generated, and the bug is typically a data
-  bug (an unhandled edge case), not a true data race.
-- If it reproduces, the new `crashes/` log from the `relwithdebinfo` binary is
-  now fully symbolized (function + file:line per frame, including inlined
-  frames) — read that first.
-- To inspect the actual values at the fault (not just the stack shape), run
-  under `gdb -batch`, since the program crashes itself before you'd get a
-  chance to attach:
+`build-release/` has no debug info, so its frames show raw addresses only. Do not reverse the PIE load offset by hand. Rebuild with debug info, which keeps `-DNDEBUG` and so stays close to release behaviour:
 
-  ```sh
-  gdb -q -batch -ex "run --seed <seed>" -ex "print <expr>" -ex bt \
-      --args ./build-relwithdebinfo/peredur --seed <seed>
-  ```
+```sh
+cmake --workflow --preset relwithdebinfo
+```
 
-  Inspecting the live locals (e.g. an empty `std::vector` where the code
-  assumed at least one element) pinpoints the precondition that was violated,
-  which is usually faster than reasoning from the call chain alone.
+## Reproduce
+
+`peredur` exits 1 without `--input` and `--output-dir`, and the output directory must exist:
+
+```sh
+mkdir -p /tmp/repro
+./build-relwithdebinfo/peredur --input <Input: from log> --output-dir /tmp/repro \
+    --seed <Seed: from log> [--config <original config.toml>]
+```
+
+The repro is usually deterministic, even when the crash surfaces on a `ThreadPool` worker (`src/thread_pool.cpp`) during scoring. The seed fixes which candidates are bred, and the bug is usually an unhandled edge case in the data. A crash that does not reproduce under the same seed and config points to a data race: try the `tsan` preset.
+
+If it reproduces, the new log from the `relwithdebinfo` binary is symbolised, with function and file:line per frame, including inlined frames. Read that first.
+
+## Inspect the values at the fault
+
+The program traces itself and exits, so attaching later is too late. Launch it under a debugger, which stops on the signal before the handler runs. An empty `std::vector` where the code assumed one element pinpoints the violated precondition faster than reasoning from the call chain.
+
+On macOS use `lldb`, since Homebrew `gdb` cannot run programs on arm64:
+
+```sh
+lldb --batch -o run -o bt -o "frame variable" -- \
+    ./build-relwithdebinfo/peredur --input <spec> --output-dir /tmp/repro --seed <seed>
+```
+
+On the Linux campaign hosts use `gdb`:
+
+```sh
+gdb -q -batch -ex run -ex bt -ex "info locals" \
+    --args ./build-relwithdebinfo/peredur --input <spec> --output-dir /tmp/repro --seed <seed>
+```
