@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 50> k_config_keys{{
+inline constexpr std::array<ConfigKey, 51> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -400,6 +400,18 @@ inline constexpr std::array<ConfigKey, 50> k_config_keys{{
      "gate. The startup budget screen warns when the input specification is in "
      "that position.",
      ""},
+    {"runtime", "ltlsynt_decompose_budget_ms",
+     &Config::ltlsynt_decompose_budget, KeyCheck::NonNegative, KeyReader::Both,
+     "How long, in milliseconds, a realizability query's first ltlsynt "
+     "attempt, with SPOT's default decomposition, may run before it is killed "
+     "and the query is asked again with --decompose=no in what is left of "
+     "ltlsynt_timeout_ms. Default 1000; 0, or a value at or above "
+     "ltlsynt_timeout_ms, asks once for the whole budget. Without "
+     "decomposition lift's slow queries finish in a fraction of the time, "
+     "while some of liquid-mixer's 5 ms queries time out, so neither setting "
+     "wins alone.",
+     "Milliseconds before a query is re-asked without decomposition.\n"
+     "0 asks once.\n"},
     {"runtime", "ltl2tgba_timeout_ms", &Config::ltl2tgba_timeout,
      KeyCheck::NonNegative, KeyReader::Both,
      "Per-call ltl2tgba automaton-construction timeout in milliseconds. "

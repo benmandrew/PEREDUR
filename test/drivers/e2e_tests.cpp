@@ -272,8 +272,9 @@ nlohmann::json expect_run_manifest(const std::filesystem::path& dir,
     const nlohmann::json& execs = caches.at("realizability").at("execs");
     for (const char* name :
          {"realizable", "unrealizable", "timed_out", "capability_errors",
-          "speculative", "decided_over_1s", "decided_over_2s",
-          "decided_over_5s", "slowest_decided_s"}) {
+          "speculative", "decompose_reasks", "reasks_decided",
+          "decided_over_1s", "decided_over_2s", "decided_over_5s",
+          "slowest_decided_s"}) {
         expect(execs.contains(name), label +
                                          ": the manifest reports "
                                          "caches.realizability.execs." +

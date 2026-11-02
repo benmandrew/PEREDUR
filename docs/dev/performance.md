@@ -152,6 +152,14 @@ Against 2.15.1 on the old route, both on release builds at `runtime.parallel = 4
 
 The `ExpectUnsat` route keeps its first look, probe and second look (see Implication model probe), and a SAT at either look goes to `confirm_spot_sat` as on the `ExpectSat` route.
 
+## Decomposition re-ask
+
+ltlsynt splits a specification into independent parts by default (*decomposition*), and on SPOT 2.16.1 neither setting wins alone. Lift's queries were logged from one seed-1 run (1,279 execs) and replayed one at a time under the 10 s timeout. With decomposition, 5 of 80 sampled slow queries (over 1 s, or killed in the run) timed out, and without it all 5 decided in 0.06-0.25 s, the sample taking 113 s against 211 s. On 200 fast lift queries the two settings cost the same 7.8 s. Without decomposition, though, 21 of `liquid-mixer`'s 1,561 queries time out, where with it none take over 50 ms, so `--decompose=no` everywhere costs 268 s against 8.3 s. Both settings gave the same verdict wherever both decided.
+
+So `run_ltlsynt` gives the decomposed attempt `runtime.ltlsynt_decompose_budget_ms` (default 1000) and asks a query that overruns it again with `--decompose=no` in the rest of the timeout. In the replay that cut the slow sample's time to 0.81x with no timeouts, and no `liquid-mixer` query or fast lift query runs long enough to be re-asked. `caches.realizability.execs` counts `decompose_reasks` and `reasks_decided`. A re-asked query is two execs, counted once by the second's outcome, with both attempts' time.
+
+Measured at `runtime.parallel = 4` on one release build, the budget at 0 against 1000 ms and interleaved per case, lift's wall time was 0.86x and 0.94x on seeds 1 and 2, its timeouts falling from 11 to 2 and from 22 to 13. `humanoid-742` ran 1.03x with 4 timeouts down to 3, and `pcar-v2-888` 1.00x. Three `liquid-mixer` seeds ran 1.18x, 0.94x and 1.20x with 0, 0 and 2 re-asks, which is the spread the same runs show with no change at all. Repairs were identical everywhere but lift seed 1, which wrote 15 against 16, since decided timeouts change what selection sees.
+
 ## Tool subprocesses
 
 Every pipe a runner opens must be created with `pipe2(..., O_CLOEXEC)`, as `execute_and_capture` (`src/runner/process.cpp`) and the formaliser (`src/runner/formaliser.cpp`) do. Runners are called from many threads, so a fork on one thread would inherit other calls' pipes past its exec, and their readers would never see end of file. `pipe` followed by `fcntl` races a concurrent fork. `dup2` clears the flag on the child's standard descriptors.

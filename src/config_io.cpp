@@ -351,6 +351,7 @@ Config config_from_toml_string(const std::string& content) {
 void apply_tool_timeouts(const Config& cfg) {
     global_sat_checker().set_timeout(cfg.black_timeout);
     RealizabilityChecker::set_timeout(cfg.ltlsynt_timeout);
+    RealizabilityChecker::set_decompose_budget(cfg.ltlsynt_decompose_budget);
     set_ltl2tgba_timeout(cfg.ltl2tgba_timeout);
     set_ltlfilt_timeout(cfg.ltlfilt_timeout);
     set_mrs_lookahead_kill_grace(cfg.mrs_lookahead_kill_grace);

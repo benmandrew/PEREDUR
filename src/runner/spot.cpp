@@ -46,6 +46,11 @@ namespace {
 // no upper bound, so an unbounded run stalls on the tail.
 std::atomic<std::int64_t> g_ltlsynt_timeout_ms{0};
 
+// How long the decomposed attempt may run before the query is re-asked without
+// decomposition, in milliseconds; 0 makes one attempt. Set once at startup
+// from Config::ltlsynt_decompose_budget.
+std::atomic<std::int64_t> g_ltlsynt_decompose_budget_ms{0};
+
 // Per-call wall-clock budget for the ltl2tgba counting exec, in milliseconds; 0
 // disables the timeout. Set once at startup from Config::ltl2tgba_timeout, read
 // by every scoring worker, hence atomic. Mirrors g_ltlsynt_timeout_ms: ltl2tgba
@@ -168,6 +173,38 @@ std::optional<bool> read_ltlsynt_output(const ProcessResult& result,
     return parse_realizability_output(verdict_only);
 }
 
+// Runs @p command on @p formula_line under the per-call timeout, setting
+// @p reasked when the decomposed attempt overran the decompose budget and a
+// second exec without decomposition gave the result. A re-asked result's wall
+// and CPU time are both attempts'.
+//
+// Neither decomposition setting wins alone on SPOT 2.16.1. With it, 5 of 80
+// slow lift queries time out at 10 s, and without it all 5 decide in under
+// 0.25 s; without it, 21 of liquid-mixer's 1,561 queries time out, and with it
+// none take over 50 ms. So the decomposed attempt gets the budget, and only one
+// that overruns it pays a second exec.
+ProcessResult run_ltlsynt(std::vector<std::string> command,
+                          const std::string& formula_line, bool& reasked) {
+    const auto timeout = std::chrono::milliseconds(g_ltlsynt_timeout_ms.load());
+    const auto budget =
+        std::chrono::milliseconds(g_ltlsynt_decompose_budget_ms.load());
+    const bool two_attempts =
+        budget.count() > 0 && (timeout.count() == 0 || budget < timeout);
+    ProcessResult first = execute_and_capture_with_input(
+        command, formula_line, two_attempts ? budget : timeout);
+    reasked = two_attempts && first.m_timed_out;
+    if (!reasked) {
+        return first;
+    }
+    command.emplace_back("--decompose=no");
+    ProcessResult second = execute_and_capture_with_input(
+        command, formula_line,
+        timeout.count() == 0 ? timeout : timeout - budget);
+    second.m_wall_s += first.m_wall_s;
+    second.m_cpu_s += first.m_cpu_s;
+    return second;
+}
+
 }  // namespace
 
 RealizabilityChecker& global_real_checker() {
@@ -192,6 +229,11 @@ std::string autfilt_path() { return spot_bin_dir() + "/autfilt"; }
 
 void RealizabilityChecker::set_timeout(std::chrono::milliseconds timeout) {
     g_ltlsynt_timeout_ms.store(timeout.count());
+}
+
+void RealizabilityChecker::set_decompose_budget(
+    std::chrono::milliseconds budget) {
+    g_ltlsynt_decompose_budget_ms.store(budget.count());
 }
 
 void set_ltl2tgba_timeout(std::chrono::milliseconds timeout) {
@@ -1422,11 +1464,10 @@ std::optional<bool> RealizabilityChecker::decide_realizability_ltl(
     }
     const std::string ltlsynt = ltlsynt_path();
     assert(access(ltlsynt.c_str(), F_OK) == 0);
-    const std::vector<std::string> command =
-        ltlsynt_command(ltlsynt, inputs, outputs, reuse.has_value());
-    const auto timeout = std::chrono::milliseconds(g_ltlsynt_timeout_ms.load());
-    const ProcessResult result = execute_and_capture_with_input(
-        command, spot_formula_line(conj_ltl), timeout);
+    bool reasked = false;
+    const ProcessResult result = run_ltlsynt(
+        ltlsynt_command(ltlsynt, inputs, outputs, reuse.has_value()),
+        spot_formula_line(conj_ltl), reasked);
     // A timed-out query is undecided, not unrealizable. Which of the two is
     // the safe reading depends on the question being asked -- admitting a
     // repair wants "unrealizable", the well-separation check wants
@@ -1442,6 +1483,10 @@ std::optional<bool> RealizabilityChecker::decide_realizability_ltl(
     std::scoped_lock lock(m_cache_mutex);
     record_exec<RealizabilityChecker>(result);
     count_exec_outcome(result, realizable);
+    if (reasked) {
+        n_decompose_reasks++;
+        n_reasks_decided += static_cast<std::size_t>(realizable.has_value());
+    }
     // Undecided is memoised like any other outcome, for the reason the ltlfilt
     // cache gives: a formula that blew the budget once will blow it every
     // time, and re-paying that wait per occurrence is the stall the timeout

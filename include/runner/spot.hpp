@@ -183,8 +183,15 @@ class RealizabilityChecker {
     /// Execs that returned while a SpeculativeQueryScope was alive on the
     /// asking thread. A killed one raises before it is counted.
     inline static std::size_t n_speculative_execs = 0;
+    /// Queries whose decomposed attempt hit the decompose budget and were
+    /// asked again with `--decompose=no`, and those of them the second exec
+    /// decided. Each such query is two execs and is counted once above, by
+    /// the outcome of the second.
+    inline static std::size_t n_decompose_reasks = 0;
+    inline static std::size_t n_reasks_decided = 0;
     /// Decided execs slower than 1, 2 and 5 s, and the slowest: what a lower
-    /// ltlsynt_timeout_ms would have turned undecided.
+    /// ltlsynt_timeout_ms would have turned undecided. A re-asked query's time
+    /// is both attempts'.
     inline static std::size_t n_decided_over_1s = 0;
     inline static std::size_t n_decided_over_2s = 0;
     inline static std::size_t n_decided_over_5s = 0;
@@ -275,6 +282,13 @@ class RealizabilityChecker {
     /// Zero (the default) disables the timeout. Set once at startup from
     /// Config::ltlsynt_timeout.
     static void set_timeout(std::chrono::milliseconds timeout);
+
+    /// How long the first, decomposed ltlsynt attempt may run before the
+    /// query is asked again with `--decompose=no` in the rest of the per-call
+    /// timeout (process-global, like set_timeout). Zero (the default), or a
+    /// budget at or above a non-zero timeout, makes one attempt. Set once at
+    /// startup from Config::ltlsynt_decompose_budget.
+    static void set_decompose_budget(std::chrono::milliseconds budget);
 
     /// Whether a query with no environment inputs goes to the global
     /// SatisfiabilityChecker before ltlsynt. With no inputs the environment

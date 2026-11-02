@@ -597,6 +597,39 @@ TEST(test_decomposition_keeps_realizable_verdict) {
            "realisable");
 }
 
+// A 1 ms decompose budget cuts every first attempt, so each query below is
+// decided by the re-ask without decomposition, and must agree with ltlsynt's
+// usual answer.
+TEST(test_decompose_reask_keeps_verdicts) {
+    struct ScopedBudget {
+        ScopedBudget() {
+            RealizabilityChecker::set_decompose_budget(
+                std::chrono::milliseconds(1));
+        }
+        ScopedBudget(const ScopedBudget&) = delete;
+        ScopedBudget& operator=(const ScopedBudget&) = delete;
+        ScopedBudget(ScopedBudget&&) = delete;
+        ScopedBudget& operator=(ScopedBudget&&) = delete;
+        ~ScopedBudget() {
+            RealizabilityChecker::set_decompose_budget(
+                std::chrono::milliseconds(0));
+        }
+    };
+    const ScopedLtlsyntTimeout timeout(std::chrono::milliseconds(10'000));
+    const ScopedBudget budget;
+    const std::size_t before = RealizabilityChecker::n_decompose_reasks;
+    RealizabilityChecker checker;
+    expect(checker.check_realizability_ltl("GF l -> (X(l | !l) & (v <-> e))",
+                                           {"e", "l"},
+                                           {"v"}) == std::optional<bool>{true},
+           "spot-runner: the re-ask should find v := e");
+    expect(checker.check_realizability_ltl("G(v <-> X e)", {"e"}, {"v"}) ==
+               std::optional<bool>{false},
+           "spot-runner: the re-ask should find G(v <-> X e) unrealisable");
+    expect(RealizabilityChecker::n_decompose_reasks == before + 2,
+           "spot-runner: a 1 ms budget should re-ask both queries");
+}
+
 TEST(test_realizable_next_timepoint) {
     RealizabilityChecker checker;
     Requirement req =

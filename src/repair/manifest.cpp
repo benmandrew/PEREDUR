@@ -50,7 +50,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 60;
+constexpr int k_schema_version = 61;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -257,6 +257,10 @@ nlohmann::json caches_json() {
                {"timed_out", RealizabilityChecker::n_timeouts},
                {"capability_errors", RealizabilityChecker::n_capability_errors},
                {"speculative", RealizabilityChecker::n_speculative_execs},
+               // Queries asked again without decomposition, a second exec
+               // each, and those the second exec decided.
+               {"decompose_reasks", RealizabilityChecker::n_decompose_reasks},
+               {"reasks_decided", RealizabilityChecker::n_reasks_decided},
                {"decided_over_1s", RealizabilityChecker::n_decided_over_1s},
                {"decided_over_2s", RealizabilityChecker::n_decided_over_2s},
                {"decided_over_5s", RealizabilityChecker::n_decided_over_5s},

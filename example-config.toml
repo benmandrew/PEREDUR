@@ -135,6 +135,9 @@ parent_verdict = false
 # unbounded call can stall a whole run.
 black_timeout_ms = 1000
 ltlsynt_timeout_ms = 10000
+# Milliseconds before a query is re-asked without decomposition.
+# 0 asks once.
+ltlsynt_decompose_budget_ms = 1000
 ltl2tgba_timeout_ms = 60000
 ltlfilt_timeout_ms = 10000
 # Thread pool size; the default is the hardware concurrency narrowed by

@@ -117,6 +117,14 @@ struct Config {
     /// (see RealizabilityChecker), so a formula abandoned once stays undecided
     /// for the rest of the run.
     std::chrono::milliseconds ltlsynt_timeout{10'000};
+    /// How long a query's first ltlsynt attempt, with SPOT's default
+    /// decomposition, may run before it is killed and the query is asked again
+    /// with `--decompose=no` in what is left of ltlsynt_timeout; 0, or a value
+    /// at or above that timeout, asks once for the whole budget. Neither
+    /// setting wins alone: on SPOT 2.16.1, lift's slow queries finish without
+    /// decomposition in a fraction of the time, while 21 of liquid-mixer's
+    /// 5 ms queries time out.
+    std::chrono::milliseconds ltlsynt_decompose_budget{1'000};
     /// Per-call wall-clock budget for the ltl2tgba model-counting exec; 0
     /// disables it. The deterministic (-D) construction can blow up
     /// super-exponentially on deeply nested formulae (multi-GB, minutes to
