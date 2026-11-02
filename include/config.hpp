@@ -306,6 +306,14 @@ struct Config {
     /// verdict wrong; it changes a verdict only where ltlsynt's own was wrong,
     /// as SPOT 2.15.1's decomposition was on some queries.
     std::size_t controller_reuse_min_guarantees = 10;
+    /// How long, in milliseconds, the input specification's own realizability
+    /// query must take at the startup budget screen for the stored controllers
+    /// to be tried; 0 tries them whatever it took. A try costs about 20 ms of
+    /// controller checks and saves an exec on 30-70% of tries, so it pays only
+    /// where execs are slow. The screen took 8-10 ms on liquid-mixer,
+    /// valu3s-uc6 and fsm-lmcps, where the store cost a quarter of the wall
+    /// time, and 441-452 ms on lift, where it halved it.
+    std::chrono::milliseconds controller_reuse_min_screen{40};
     /// How long a lookahead query may keep running once the walk has settled
     /// its branch the other way, before its exec is killed; 0 kills at once.
     /// A query that finishes inside the grace still fills the caches for later

@@ -116,6 +116,9 @@ struct ControllerReuseStats {
     inline static std::size_t n_verdict_hits = 0;
     /// Controllers ltlsynt emitted that joined the store.
     inline static std::size_t n_stored = 0;
+    /// Queries the store would have taken but for the screen-time gate (see
+    /// RealizabilityChecker::set_controller_reuse_min_screen).
+    inline static std::size_t n_gated = 0;
     /// Every ltl2tgba and autfilt exec the checks made, the emptiness checks
     /// among them.
     inline static std::size_t n_execs = 0;
@@ -308,6 +311,14 @@ class RealizabilityChecker {
         m_reuse_min_guarantees = count;
     }
 
+    /// How long the input specification's own realizability query must have
+    /// taken at the startup budget screen (BudgetScreen::observed_ms) for this
+    /// checker to store controllers and try them. Zero, the default, or a run
+    /// with no screen tries them whatever that query cost.
+    void set_controller_reuse_min_screen(std::chrono::milliseconds mean) {
+        m_reuse_min_screen = mean;
+    }
+
    private:
     /// One decided query, with its two sides interned to integer ids so that
     /// the inclusion tests are over small sorted vectors rather than over
@@ -425,6 +436,10 @@ class RealizabilityChecker {
     /// m_cache_mutex.
     std::mutex m_reuse_mutex;
     std::size_t m_reuse_min_guarantees = 10;
+    std::chrono::milliseconds m_reuse_min_screen{0};
+    /// Whether the screened input query was slow enough for the store to pay;
+    /// see set_controller_reuse_min_screen. Called with m_cache_mutex held.
+    [[nodiscard]] bool reuse_pays() const;
     std::unordered_map<std::string,
                        std::deque<std::shared_ptr<StoredController>>>
         m_controllers;

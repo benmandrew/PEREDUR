@@ -1373,6 +1373,20 @@ std::optional<bool> RealizabilityChecker::check_realizability_ltl(
     return verdict;
 }
 
+bool RealizabilityChecker::reuse_pays() const {
+    // A run whose input was not screened (the budget is unlimited, or the
+    // caller is not a repair driver) keeps the store, as it had before the
+    // gate. A running mean of exec time cannot stand in for the screen: lift's
+    // first 800 execs averaged 13 ms, the small specifications' level, and its
+    // cost sits in a slow tail later in the run.
+    if (m_reuse_min_screen.count() <= 0 || BudgetScreen::observed_ms < 0) {
+        return true;
+    }
+    const bool pays = BudgetScreen::observed_ms >= m_reuse_min_screen.count();
+    ControllerReuseStats::n_gated += static_cast<std::size_t>(!pays);
+    return pays;
+}
+
 std::optional<bool> RealizabilityChecker::decide_realizability_ltl(
     const std::string& ltl_formula, const std::vector<std::string>& inputs,
     const std::vector<std::string>& outputs, const SpecificationSides& sides) {
@@ -1453,7 +1467,7 @@ std::optional<bool> RealizabilityChecker::decide_realizability_ltl(
         std::scoped_lock lock(m_cache_mutex);
         if (fretish_sides && m_reuse_min_guarantees > 0 &&
             guarantee_ids.size() >= m_reuse_min_guarantees &&
-            controller_reuse_available()) {
+            controller_reuse_available() && reuse_pays()) {
             reuse = reuse_query(scope, assumption_ids, guarantee_ids);
         } else {
             n_cache_misses++;

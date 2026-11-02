@@ -160,6 +160,14 @@ So `run_ltlsynt` gives the decomposed attempt `runtime.ltlsynt_decompose_budget_
 
 Measured at `runtime.parallel = 4` on one release build, the budget at 0 against 1000 ms and interleaved per case, lift's wall time was 0.86x and 0.94x on seeds 1 and 2, its timeouts falling from 11 to 2 and from 22 to 13. `humanoid-742` ran 1.03x with 4 timeouts down to 3, and `pcar-v2-888` 1.00x. Three `liquid-mixer` seeds ran 1.18x, 0.94x and 1.20x with 0, 0 and 2 re-asks, which is the spread the same runs show with no change at all. Repairs were identical everywhere but lift seed 1, which wrote 15 against 16, since decided timeouts change what selection sees.
 
+## Controller-store gate
+
+A FRETISH query with at least `controller_reuse_min_guarantees` guarantees is first checked against the controllers ltlsynt emitted for earlier queries. A try costs about 20 ms of controller checks (7.5-9.7 ms per check, 1.1-2.7 checks per try) and saves an exec on 30-70% of tries, so it pays only where execs are slow. With the store off at 4 threads, `fsm-lmcps`, `valu3s-uc6` and `liquid-mixer` ran at 0.71x, 0.74x and 0.78x the wall time (median of 3 seeds), with the same repairs, while `lift-plus-cruise-full` ran 2.19x slower. A mean ltlsynt exec costs 8 ms on the first three and 390 ms on lift.
+
+So `reuse_pays` opens the store only where the startup budget screen timed the input specification's own query at `runtime.controller_reuse_min_screen_ms` (default 40) or more. The screen took 8-10 ms on every small-specification run and 436-452 ms on lift. A running mean of exec time was tried first and lost. Lift's first 800 execs averaged 13 ms, its cost sitting in a slow tail later in the run, so a 40 ms mean gate turned 210 of lift's queries away and ran 1.13x slower. A run with no screen, as under an unlimited `ltlsynt_timeout_ms`, keeps the store. `caches.realizability.controller_reuse.gated` counts the queries turned away.
+
+Against the gate at 0 on one release build, interleaved per case, `fsm-lmcps` ran 0.65x and 0.74x, `valu3s-uc6` 0.74x and 0.70x and `liquid-mixer` 0.79x and 0.77x on seeds 1 and 2, and lift seed 1 0.99x with its gate open. Every repair was identical.
+
 ## Tool subprocesses
 
 Every pipe a runner opens must be created with `pipe2(..., O_CLOEXEC)`, as `execute_and_capture` (`src/runner/process.cpp`) and the formaliser (`src/runner/formaliser.cpp`) do. Runners are called from many threads, so a fork on one thread would inherit other calls' pipes past its exec, and their readers would never see end of file. `pipe` followed by `fcntl` races a concurrent fork. `dup2` clears the flag on the child's standard descriptors.

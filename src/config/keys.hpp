@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 51> k_config_keys{{
+inline constexpr std::array<ConfigKey, 52> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -456,6 +456,20 @@ inline constexpr std::array<ConfigKey, 51> k_config_keys{{
      "some queries.",
      "Guarantees a query needs before stored controllers are tried on it.\n"
      "0 turns the store off.\n"},
+    {"runtime", "controller_reuse_min_screen_ms",
+     &Config::controller_reuse_min_screen, KeyCheck::NonNegative,
+     KeyReader::Both,
+     "How long, in milliseconds, the input specification's own realizability "
+     "query must take at the startup budget screen for the stored controllers "
+     "to be tried; 0 tries them whatever it took. Default 40. A try costs "
+     "about 20 ms of controller checks and saves an exec on 30-70% of tries, "
+     "so it pays only where execs are slow. The screen took 8-10 ms on the "
+     "small FRETISH specifications, where the store cost a quarter of the wall "
+     "time, and 441-452 ms on lift, where it halved it. A run with no screen, "
+     "as under an unlimited ltlsynt_timeout_ms, keeps the store.",
+     "Screened input-query milliseconds below which stored controllers are "
+     "not tried.\n"
+     "0 always tries them.\n"},
     {"runtime", "mrs_lookahead_kill_grace_ms",
      &Config::mrs_lookahead_kill_grace, KeyCheck::NonNegative, KeyReader::Both,
      "How long, in milliseconds, a lookahead query of the MRS walk may keep "

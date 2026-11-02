@@ -490,6 +490,47 @@ TEST(test_controller_reuse_agrees_with_ltlsynt) {
            "no controller answered, and nowhere else");
 }
 
+// A screened input query of 5 ms is below a 1 h gate, so the store stays
+// shut: nothing is stored, the child that the parent's controller would answer
+// goes to ltlsynt, and each turned-away query is counted.
+TEST(test_controller_reuse_gated_on_screen_time) {
+    using controller_reuse::expect_agrees;
+    using controller_reuse::spec;
+    const controller_reuse::Requirements req;
+    RealizabilityChecker storing;
+    storing.set_controller_reuse_min_guarantees(1);
+    storing.set_controller_reuse_min_screen(std::chrono::hours(1));
+    struct ScopedScreen {
+        std::int64_t m_previous = BudgetScreen::observed_ms;
+        ScopedScreen() { BudgetScreen::observed_ms = 5; }
+        ScopedScreen(const ScopedScreen&) = delete;
+        ScopedScreen& operator=(const ScopedScreen&) = delete;
+        ScopedScreen(ScopedScreen&&) = delete;
+        ScopedScreen& operator=(ScopedScreen&&) = delete;
+        ~ScopedScreen() { BudgetScreen::observed_ms = m_previous; }
+    };
+    const ScopedScreen screen;
+    const std::size_t stored = ControllerReuseStats::n_stored;
+    const std::size_t hits = ControllerReuseStats::n_hits;
+    const std::size_t gated = ControllerReuseStats::n_gated;
+    std::size_t execs = 0;
+    execs += expect_agrees(
+        storing, spec({req.m_asks_eventually}, {req.m_answers, req.m_idle}),
+        "the parent, gated");
+    execs += expect_agrees(
+        storing,
+        spec({req.m_asks_eventually},
+             {req.m_answers, req.m_idle, req.m_answers_eventually}),
+        "the child, gated");
+    expect(ControllerReuseStats::n_stored == stored &&
+               ControllerReuseStats::n_hits == hits,
+           "spot-runner: a shut gate should neither store nor try a "
+           "controller");
+    expect(ControllerReuseStats::n_gated == gated + 2,
+           "spot-runner: both queries should be counted as gated");
+    expect(execs == 2, "spot-runner: ltlsynt should decide both queries");
+}
+
 // A controller that relies on its assumption: never asked, it never grants.
 // Without the assumption the query is unrealizable, and the check, which
 // cannot lean on the assumption either, must fail rather than answer it.
