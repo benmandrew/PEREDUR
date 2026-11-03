@@ -349,4 +349,26 @@ TEST(test_spot_sat_is_taken_only_with_a_model) {
            "spot SAT: an unsatisfiable formula should read UNSAT");
 }
 
+// black groups `->` differently from SPOT, for which every formula here is
+// written: it reads `a -> b & c` as `(a -> b) & c`, and a chain `a -> b -> c`
+// with its first arrow binding. Each case is satisfiable under SPOT's grouping
+// and unsatisfiable under black's, and both are shapes scope_wrap emits: an
+// unbounded trigger obligation after `m ->` (only before), and the
+// true-condition trigger after `m ->` (in, not in, only in).
+TEST(test_black_reads_implication_as_spot_does) {
+    constexpr std::array<std::string_view, 3> k_cases{
+        "!a & (a -> b & c) & !c",
+        "!m & (m -> G(p) & q) & !q",
+        "!m & !r & (m -> (true) -> (r))",
+    };
+    for (const std::string_view formula : k_cases) {
+        SatisfiabilityChecker checker;
+        checker.set_timeout(k_test_black_timeout);
+        expect(checker.check_satisfiability_by_black(std::string(formula)) ==
+                   std::optional<bool>(true),
+               "black-runner: " + std::string(formula) +
+                   " is satisfiable as SPOT groups it");
+    }
+}
+
 }  // namespace
