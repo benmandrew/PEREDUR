@@ -74,6 +74,37 @@ TEST(test_timing_for_ticks) {
            "from_json(Timing): ForTicks round-trip should match");
 }
 
+// `within 0` and `for 0` mean `immediately`, and are read as it, because
+// timing_implies would otherwise claim `for 0 => next` and
+// `next => within 0`, both false. `after 0` is a timing of its own.
+TEST(test_zero_tick_bounds_load_as_immediately) {
+    for (const char* type : {"WithinTicks", "ForTicks"}) {
+        const nlohmann::json jobj = {{"type", type}, {"ticks", 0}};
+        expect(jobj.get<Timing>() == timing::immediately(),
+               std::string("from_json(Timing): ") + type +
+                   " at 0 ticks should load as Immediately");
+    }
+    const nlohmann::json after = {{"type", "AfterTicks"}, {"ticks", 0}};
+    expect(after.get<Timing>() == timing::after_ticks(0),
+           "from_json(Timing): AfterTicks at 0 ticks should load unchanged");
+    for (const ScopeKind scope : {ScopeKind::Global, ScopeKind::In,
+                                  ScopeKind::OnlyIn, ScopeKind::OnlyBefore}) {
+        const Timing for0 =
+            nlohmann::json{{"type", "ForTicks"}, {"ticks", 0}}.get<Timing>();
+        const Timing within0 =
+            nlohmann::json{{"type", "WithinTicks"}, {"ticks", 0}}.get<Timing>();
+        const bool only = is_only_scope(scope);
+        expect(!timing_implies(only ? timing::next_timepoint() : for0,
+                               only ? for0 : timing::next_timepoint(), scope),
+               "timing_implies: a loaded `for 0` and `next` are incomparable");
+        expect(
+            !timing_implies(only ? within0 : timing::next_timepoint(),
+                            only ? timing::next_timepoint() : within0, scope),
+            "timing_implies: a loaded `within 0` and `next` are "
+            "incomparable");
+    }
+}
+
 TEST(test_timing_after_ticks) {
     const Timing tim = timing::after_ticks(2);
     nlohmann::json jobj;
