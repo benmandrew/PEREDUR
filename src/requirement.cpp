@@ -407,6 +407,22 @@ bool is_only_scope(ScopeKind kind) {
 
 namespace {
 
+// `within 0` or `for 0`, which the loader reads as `immediately`. The tick
+// conditions below hold only from one tick up, so neither may reach them.
+[[maybe_unused]] bool is_zero_tick_bound(const Timing& timing) {
+    return std::visit(
+        [](const auto& value) -> bool {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, timing::WithinTicks> ||
+                          std::is_same_v<T, timing::ForTicks>) {
+                return value.m_ticks == 0;
+            } else {
+                return false;
+            }
+        },
+        timing);
+}
+
 // The Global-scope order behind timing_implies, reflexive.
 bool global_timing_implies(const Timing& upper, const Timing& lower) {
     if (upper == lower) {
@@ -460,6 +476,7 @@ bool global_timing_implies(const Timing& upper, const Timing& lower) {
 
 bool timing_implies(const Timing& stronger, const Timing& weaker,
                     ScopeKind scope) {
+    assert(!is_zero_tick_bound(stronger) && !is_zero_tick_bound(weaker));
     switch (scope) {
         case ScopeKind::Global:
         case ScopeKind::After:

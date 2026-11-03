@@ -60,10 +60,22 @@ inline void from_json(const nlohmann::json& jobj, Timing& tim) {
         tim = immediately();
     } else if (type == "NextTimepoint") {
         tim = next_timepoint();
-    } else if (type == "WithinTicks") {
-        tim = within_ticks(jobj.at("ticks").get<std::size_t>());
-    } else if (type == "ForTicks") {
-        tim = for_ticks(jobj.at("ticks").get<std::size_t>());
+    } else if (type == "WithinTicks" || type == "ForTicks") {
+        // `within 0` and `for 0` both bound the response to the present
+        // timepoint, so each means `immediately` in every scope and condition
+        // type, which SPOT confirms on the lowerings. They are read as that,
+        // because timing_implies takes a bounded timing to span at least one
+        // tick: it claims `for n => next` and `next => within n` with no
+        // `n >= 1`, and both fail at 0. `after 0`, "not now, but next", is its
+        // own timing.
+        const auto ticks = jobj.at("ticks").get<std::size_t>();
+        if (ticks == 0) {
+            tim = immediately();
+        } else if (type == "WithinTicks") {
+            tim = within_ticks(ticks);
+        } else {
+            tim = for_ticks(ticks);
+        }
     } else if (type == "AfterTicks") {
         tim = after_ticks(jobj.at("ticks").get<std::size_t>());
     } else if (type == "Eventually") {
