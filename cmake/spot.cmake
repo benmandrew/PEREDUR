@@ -7,6 +7,7 @@ set(SPOT_PREFIX "${PEREDUR_THIRD_PARTY_DIR}/spot_src")
 set(SPOT_INSTALL_DIR "${PEREDUR_THIRD_PARTY_DIR}/spot")
 set(SPOT_BIN_DIR "${SPOT_INSTALL_DIR}/bin")
 set(SPOT_STAMP_DIR "${SPOT_PREFIX}/src/spot_project-stamp")
+set(SPOT_BUILD_DIR "${SPOT_PREFIX}/src/spot_project-build")
 # Written by the install step. The done stamp alone would keep an install of
 # an older SPOT_VERSION after a bump.
 set(SPOT_VERSION_MARKER "${SPOT_INSTALL_DIR}/.spot-${SPOT_VERSION}")
@@ -22,12 +23,28 @@ if(EXISTS "${SPOT_STAMP_DIR}/spot_project-done" AND EXISTS "${SPOT_VERSION_MARKE
     message(STATUS "Spot ${SPOT_VERSION} already installed at ${SPOT_INSTALL_DIR}")
 else()
     # An install without this version's marker is an older SPOT, for instance
-    # one a CI restore-key brought back after a bump. Its libbddx.so sits on
-    # the new build's link path, and libspot then links against the old BuDDy
-    # and misses the symbols the new one added.
+    # one a CI restore-key brought back after a bump.
     if(EXISTS "${SPOT_INSTALL_DIR}")
         message(STATUS "Removing the stale Spot install at ${SPOT_INSTALL_DIR}")
         file(REMOVE_RECURSE "${SPOT_INSTALL_DIR}")
+    endif()
+
+    # So is a build tree configured for another version. The CI cache restores
+    # one: actions/cache globs with implicitDescendants off, so its `!` excludes
+    # never reach inside the `third-party` directory it archives. The new
+    # source extracts with the tarball's mtimes, older than the cached objects,
+    # so make keeps most of the old BuDDy and libspot links against it, missing
+    # bdd_splitcube, bdd_have_dependent_var and bdd_mt_sccs. The stamps go too,
+    # so every step reruns into the empty tree.
+    set(_spot_config_h "${SPOT_BUILD_DIR}/config.h")
+    if(EXISTS "${_spot_config_h}")
+        file(STRINGS "${_spot_config_h}" _spot_built_version
+             REGEX "^#define PACKAGE_VERSION ")
+        if(NOT _spot_built_version STREQUAL
+           "#define PACKAGE_VERSION \"${SPOT_VERSION}\"")
+            message(STATUS "Removing the stale Spot build tree at ${SPOT_BUILD_DIR}")
+            file(REMOVE_RECURSE "${SPOT_BUILD_DIR}" "${SPOT_STAMP_DIR}")
+        endif()
     endif()
 
     # Autotools' ./configure doesn't know about CMAKE_CXX_COMPILER_LAUNCHER;
@@ -52,6 +69,7 @@ else()
         TLS_VERIFY ON
         DOWNLOAD_EXTRACT_TIMESTAMP ON
         PREFIX "${SPOT_PREFIX}"
+        BINARY_DIR "${SPOT_BUILD_DIR}"
         INSTALL_DIR "${SPOT_INSTALL_DIR}"
         CONFIGURE_COMMAND
             <SOURCE_DIR>/configure
