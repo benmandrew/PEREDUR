@@ -22,6 +22,7 @@
 
 #include "formula_key.hpp"
 #include "profile.hpp"
+#include "prop_formula.hpp"
 #include "prop_formula/identifier.hpp"
 #include "runner/ltlfilt.hpp"
 #include "runner/process.hpp"
@@ -109,6 +110,24 @@ struct BlackQuery {
     bool m_unresolved = false;
 };
 
+// black groups `->` differently from SPOT, whose grammar every formula here is
+// written in: it reads `a -> b & c` as `(a -> b) & c`, and `a -> b -> c` as
+// `(a -> b) -> c`. scope_wrap emits both shapes unparenthesised (`m -> inner`
+// over an unbounded trigger obligation, or over the true-condition one), so
+// black was answering for a different formula on 85 of the 576 lowerings over
+// every scope, condition type and timing up to three ticks. Formula renders
+// every operand in parentheses, so its text leaves black nothing to group.
+//
+// It runs last, after to_black_constants: this parser has no numeric literal,
+// so SPOT's "1" in a string ltlfilt has printed reads only once respelled.
+std::string fully_parenthesised(const std::string& formula) {
+    const std::optional<Formula> parsed = Formula::try_parse(formula);
+    // Every query is built by requirement_to_ltl or the implication checks,
+    // which this parser reads. Should one not be, black sees it as before.
+    assert(parsed.has_value());
+    return parsed.has_value() ? parsed->to_string() : formula;
+}
+
 BlackQuery prepare_black_query(const std::string& formula) {
     BlackQuery prepared;
     std::string query = formula;
@@ -125,7 +144,7 @@ BlackQuery prepare_black_query(const std::string& formula) {
             return prepared;
         }
     }
-    prepared.m_text = to_black_constants(query);
+    prepared.m_text = fully_parenthesised(to_black_constants(query));
     return prepared;
 }
 
