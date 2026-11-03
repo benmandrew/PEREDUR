@@ -132,5 +132,14 @@
             pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux
               "${pkgs.fmt_9}/lib";
         };
+
+        # `nix develop '.#proofs'` (quoted: zsh's extendedglob reads `#`), for
+        # the Lean proofs in proofs/. A shell of its own because lean4 is a
+        # 650 MB download that no build, test or CI job needs, and on
+        # aarch64-darwin there is no binary cache entry, so it builds from
+        # source.
+        devShells.proofs = pkgs.mkShell {
+          packages = [ pkgs.lean4 ];
+        };
       });
 }
