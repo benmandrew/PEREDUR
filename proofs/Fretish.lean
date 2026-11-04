@@ -5,3 +5,4 @@ import Fretish.Scope
 import Fretish.Syntax
 import Fretish.Exact
 import Fretish.ExactOnly
+import Fretish.Cpp

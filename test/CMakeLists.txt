@@ -80,6 +80,11 @@ add_dependencies(peredur_tests contained_child_helper)
 add_executable(implication_oracle implication_oracle.cpp)
 target_link_libraries(implication_oracle PRIVATE peredur_fitness)
 
+# Not a test: scripts/check_lean_timing_order.py runs it to compare
+# timing_implies with its Lean transcription in proofs/Fretish/Cpp.lean.
+add_executable(timing_order_table timing_order_table.cpp)
+target_link_libraries(timing_order_table PRIVATE peredur_fitness)
+
 # The end-to-end suites spawn the drivers rather than calling into the library,
 # so the binaries have to exist before ctest runs and the suite has to know
 # where they landed. Every driver is built into the same directory, so one
