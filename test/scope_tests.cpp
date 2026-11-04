@@ -494,14 +494,21 @@ TEST(test_stop_timing_order_is_pinned) {
 // predicate generalises them. One stop throughout: across different stops the
 // predicate claims no edge, and some hold.
 TEST(test_timing_order_is_pinned) {
-    const std::vector<Timing> timings = {
-        timing::immediately(),       timing::next_timepoint(),
-        timing::within_ticks(1),     timing::within_ticks(2),
-        timing::within_ticks(4),     timing::for_ticks(1),
-        timing::for_ticks(2),        timing::for_ticks(4),
-        timing::after_ticks(1),      timing::after_ticks(3),
-        timing::eventually(),        timing::always(),
-        timing::until(Formula("s")), timing::before(Formula("s"))};
+    const std::vector<Timing> timings = {timing::immediately(),
+                                         timing::next_timepoint(),
+                                         timing::within_ticks(1),
+                                         timing::within_ticks(2),
+                                         timing::within_ticks(4),
+                                         timing::for_ticks(1),
+                                         timing::for_ticks(2),
+                                         timing::for_ticks(4),
+                                         timing::after_ticks(0),
+                                         timing::after_ticks(1),
+                                         timing::after_ticks(3),
+                                         timing::eventually(),
+                                         timing::always(),
+                                         timing::until(Formula("s")),
+                                         timing::before(Formula("s"))};
     std::vector<OrderQuery> queries;
     for (const ScopeCase& scope_case : scope_cases()) {
         const Scope scope = make_scope(scope_case.m_kind);

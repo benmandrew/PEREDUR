@@ -31,6 +31,7 @@ def globalTimingImplies (upper lower : Kind) : Bool :=
   | .basic .imm, w | .basic .next, w => (w matches .basic (.within _))
   | .basic (.within n), .basic (.within m) | .basic (.after n), .basic (.within m) =>
     decide (m > n)
+  | .basic (.after n), .basic .next => decide (n = 0)
   | .basic (.within _), _ | .basic (.after _), _ => false
   | .basic .ev, _ | .untilK, _ | .beforeK, _ => false
 
@@ -67,23 +68,17 @@ def Kind.cppValid : Kind → Prop
   | .basic (.within n) | .basic (.forT n) => 0 < n
   | _ => True
 
-/-- The edges `timing_implies` misses: `after 0 ⇒ next`, reversed under the
-only scopes. -/
-def missedEdge (k : ScopeKind) (K K' : Kind) : Prop :=
-  if isOnly k then K = .basic .next ∧ K' = .basic (.after 0)
-  else K = .basic (.after 0) ∧ K' = .basic .next
-
 variable {K K' : Kind}
 
 theorem table0 (hK : K.cppValid) (hK' : K'.cppValid) :
-    le0K K K' ↔ globalTimingImplies K K' = true ∨ (K = .basic (.after 0) ∧ K' = .basic .next) := by
+    le0K K K' ↔ globalTimingImplies K K' = true := by
   rcases K with ⟨A⟩ | _ | _ <;> rcases K' with ⟨B⟩ | _ | _ <;>
     (try cases A) <;> (try cases B) <;>
     simp_all [le0K, le0, globalTimingImplies, Kind.cppValid, Kind.carriesStop] <;> omega
 
 theorem tableB {k : ScopeKind} (hk : k = .inMode ∨ k = .notInMode ∨ k = .beforeMode)
     (hK : K.cppValid) (hK' : K'.cppValid) :
-    leBK K K' ↔ timingImplies K K' k = true ∨ (K = .basic (.after 0) ∧ K' = .basic .next) := by
+    leBK K K' ↔ timingImplies K K' k = true := by
   rcases hk with rfl | rfl | rfl <;>
   rcases K with ⟨A⟩ | _ | _ <;> rcases K' with ⟨B⟩ | _ | _ <;>
     (try cases A) <;> (try cases B) <;>
@@ -93,7 +88,7 @@ theorem tableB {k : ScopeKind} (hk : k = .inMode ∨ k = .notInMode ∨ k = .bef
 theorem tableO {k : ScopeKind} {base : Kind → Kind → Prop}
     (hk : (k = .onlyIn ∨ k = .onlyAfter) ∧ base = leBK ∨ k = .onlyBefore ∧ base = le0K)
     (hK : K.cppValid) (hK' : K'.cppValid) :
-    leO base K K' ↔ timingImplies K K' k = true ∨ (K = .basic .next ∧ K' = .basic (.after 0)) := by
+    leO base K K' ↔ timingImplies K K' k = true := by
   rcases hk with ⟨rfl | rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
   rcases K with ⟨A⟩ | _ | _ <;> rcases K' with ⟨B⟩ | _ | _ <;>
     (try cases A) <;> (try cases B) <;>
@@ -101,10 +96,10 @@ theorem tableO {k : ScopeKind} {base : Kind → Kind → Prop}
       timingImplies, globalTimingImplies, Kind.cppValid, Kind.carriesStop] <;> omega
 
 /-- Under every scope, for timings `timing_implies` accepts, a timing implies
-another exactly when `timing_implies` says so or the pair is a missed edge. -/
+another exactly when `timing_implies` says so. -/
 theorem timing_implies_exact (k : ScopeKind) (hK : K.cppValid) (hK' : K'.cppValid) :
-    timingOrder k K K' ↔ timingImplies K K' k = true ∨ missedEdge k K K' := by
-  cases k <;> simp only [timingOrder, missedEdge, isOnly, if_true, if_false, Bool.false_eq_true]
+    timingOrder k K K' ↔ timingImplies K K' k = true := by
+  cases k <;> simp only [timingOrder]
   · exact (exact0K K K').trans (table0 hK hK')
   · exact (exactBK K K').trans (tableB (.inl rfl) hK hK')
   · exact (exactBK K K').trans (tableB (.inr (.inl rfl)) hK hK')
@@ -117,16 +112,6 @@ theorem timing_implies_exact (k : ScopeKind) (hK : K.cppValid) (hK' : K'.cppVali
 /-- Every edge `timing_implies` claims holds. -/
 theorem timing_implies_sound (k : ScopeKind) (hK : K.cppValid) (hK' : K'.cppValid)
     (h : timingImplies K K' k = true) : timingOrder k K K' :=
-  (timing_implies_exact k hK hK').mpr (.inl h)
-
-/-- The missed edges hold, and `timing_implies` rejects them. -/
-theorem missedEdge_missed (k : ScopeKind) (h : missedEdge k K K') :
-    timingOrder k K K' ∧ timingImplies K K' k = false := by
-  have hv : K.cppValid ∧ K'.cppValid := by
-    cases k <;> simp only [missedEdge, isOnly] at h <;> simp at h <;>
-      obtain ⟨rfl, rfl⟩ := h <;> exact ⟨trivial, trivial⟩
-  refine ⟨(timing_implies_exact k hv.1 hv.2).mpr (.inr h), ?_⟩
-  cases k <;> simp only [missedEdge, isOnly] at h <;> simp at h <;>
-    obtain ⟨rfl, rfl⟩ := h <;> rfl
+  (timing_implies_exact k hK hK').mpr h
 
 end Fretish
