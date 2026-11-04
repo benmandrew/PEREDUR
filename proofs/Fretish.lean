@@ -6,3 +6,6 @@ import Fretish.Syntax
 import Fretish.Exact
 import Fretish.ExactOnly
 import Fretish.Cpp
+import Fretish.Witness
+import Fretish.ScopeOrder
+import Fretish.CondOrder

@@ -25,10 +25,12 @@ inductive ScopeKind where
   | onlyIn
   | onlyBefore
   | onlyAfter
+  deriving DecidableEq
 
 inductive CondType where
   | continual
   | trigger
+  deriving DecidableEq
 
 /-- `start_of_mode`: the point before the mode rises. -/
 abbrev som (m : Pred) : Pred := fun t => ¬ m t ∧ m (t + 1)
