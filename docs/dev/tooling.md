@@ -40,6 +40,10 @@ cmake --build build --target format-ci     # dry-run (fails if unformatted)
 
 clang-tidy results are cached through ctcache whenever it is on PATH, as the dev shell puts it. The cache lives in `<build-dir>/ctcache`, gitignored and per preset; `CTCACHE_DIR` overrides it, which CI sets so `actions/cache` can restore it.
 
+ctcache's hash leaves out the clang-tidy binary, so CI's cache key and its restore prefix both carry the clang-tidy version, read from the dev shell. Without it a toolchain bump would replay the old version's clean results for every unchanged translation unit. The cached path is all of `.ctcache`, so it still matches when results are filed under a per-version subdirectory.
+
+CI runs on Linux. `.github/workflows/macos.yml` runs `cmake --workflow --preset debug` under `nix develop` on `macos-latest` once a week and on manual dispatch, and is the only CI coverage of the Darwin branches. CI's third-party cache entries hold only the installed tools: `scripts/prune_third_party.sh` deletes `downloads/`, any leftover `spot_src` or `work/` directory, and `*.a` and `*.la` files as each job's last step, keeping the install prefixes and their markers. `actions/cache` cannot do this with `!` patterns, because it hands `tar` the directories it matched and `tar` recurses into them. Their keys hash `flake.lock` and `flake.nix` as well as the three tool modules and `cmake/third_party.cmake`.
+
 The same checks run from the tracked `.githooks/pre-commit`. Its format check runs clang-format on the staged contents of each staged C++ file (`git show :<file>`), so a partly staged file is checked as it will be committed; cpplint and cppcheck still read the working tree. Git does not clone hooks, so `cmake/githooks.cmake` sets `core.hooksPath` at configure time, the hooks needing build targets anyway. Edit hooks in `.githooks/`, never `.git/hooks/`. `git commit --no-verify` bypasses one; CI is the real enforcement.
 
 ## Docs

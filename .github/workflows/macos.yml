@@ -1,0 +1,83 @@
+name: macOS
+
+# The one CI run of the macOS branches: the Darwin half of cmake/black.cmake,
+# the darwin dev shell and its LLVM, and posix_spawn in src/runner/process.cpp.
+# ci.yml runs on Linux alone, so without this a break there is found by
+# whoever next builds on a Mac.
+#
+# Weekly and on demand, never per push. A cold run builds Spot and black from
+# source, and macOS runners are the scarcest kind, so a leg on every pull
+# request would cost more than the signal is worth.
+on:
+  schedule:
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+
+env:
+  SCCACHE_GHA_ENABLED: "true"
+
+jobs:
+  debug:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      # Same gate as benchmark.yml: a scheduled run over a tree that has not
+      # moved since the last one re-derives the same answer. Eight days of
+      # slack over the weekly cron so a late trigger still runs.
+      - name: Decide whether this run has anything to do
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          age=$(( $(date +%s) - $(git log -1 --format=%ct) ))
+          if [ "$age" -lt 691200 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "HEAD committed ${age}s ago; running the weekly macOS build."
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No commits in the last 8 days; skipping the macOS build."
+          fi
+
+      - name: Install Nix
+        if: steps.gate.outputs.run == 'true'
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up sccache
+        if: steps.gate.outputs.run == 'true'
+        uses: mozilla-actions/sccache-action@v0.0.10
+
+      # The pattern of the third-party step in ci.yml, which explains the
+      # flake hash, the version segment and the pruning. The key names the OS
+      # and the architecture, so this entry can never restore into a Linux
+      # leg or the other way round. The path is the debug preset's default
+      # third-party directory, since a workflow preset takes no -D.
+      - name: Cache third-party tools
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache@v5
+        with:
+          path: build/third_party
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.event.repository.name }}-third-party-ninja-v4-${{ hashFiles('flake.lock', 'flake.nix', 'cmake/third_party.cmake', 'cmake/spot.cmake', 'cmake/ganak.cmake', 'cmake/black.cmake') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-${{ github.event.repository.name }}-third-party-ninja-v4-
+
+      # The runner image ships Homebrew, as a developer's Mac usually does.
+      # cmake/black.cmake keeps Homebrew's z3 out of black's build inside the
+      # Nix shell, so this leg sees the same build a developer does.
+      - name: Configure, build, test
+        if: steps.gate.outputs.run == 'true'
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: sccache
+          CMAKE_CXX_COMPILER_LAUNCHER: sccache
+        run: nix develop --command cmake --workflow --preset debug
+
+      # Last, so the cache's post step saves the pruned tree.
+      - name: Prune the third-party tree before the cache saves it
+        if: steps.gate.outputs.run == 'true'
+        run: scripts/prune_third_party.sh build/third_party
