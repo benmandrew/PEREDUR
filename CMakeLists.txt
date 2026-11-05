@@ -1,5 +1,17 @@
 cmake_minimum_required(VERSION 3.21)
 
+# The release and bench presets once set CMAKE_CXX_FLAGS to exactly this. It
+# reached cpptrace's feature probes, which fail under -Werror, and the failed
+# results are cached; a preset cannot remove a cache entry, so an older tree is
+# cleared here once. -Werror on our own targets comes from cmake/warnings.cmake.
+if("$CACHE{CMAKE_CXX_FLAGS}" STREQUAL "-Wall -Werror")
+    message(STATUS "Clearing the CMAKE_CXX_FLAGS an older preset set, and the "
+                   "cpptrace probes it failed")
+    set(CMAKE_CXX_FLAGS "" CACHE STRING "" FORCE)
+    unset(HAS_CXX_EXCEPTION_TYPE CACHE)
+    unset(HAS_UNWIND CACHE)
+endif()
+
 project(peredur VERSION 0.1.0 LANGUAGES CXX)
 
 enable_testing()
@@ -41,6 +53,10 @@ if(PEREDUR_TSAN)
     else()
         message(STATUS "TSan: no setarch on ${CMAKE_SYSTEM_NAME}; tests run with ASLR enabled")
     endif()
+else()
+    # Cached with FORCE above, so without this a tree that once had TSan on
+    # keeps wrapping every test in setarch after it is turned off.
+    unset(CMAKE_CROSSCOMPILING_EMULATOR CACHE)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

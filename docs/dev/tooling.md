@@ -21,6 +21,8 @@ cmake --build build
 cmake --build build-release
 ```
 
+The release and bench presets set no `CMAKE_CXX_FLAGS`. Their former `-Wall -Werror` reached cpptrace's feature probes, `HAS_UNWIND` and `HAS_CXX_EXCEPTION_TYPE`, which failed under it, and CMake cached the failed results. `-Werror` on in-tree targets comes from `cmake/warnings.cmake` instead. On an older tree the root `CMakeLists.txt` clears that exact cached value and both probe results once.
+
 Non-Nix: requires CMake ≥ 3.25, Ninja, a C++17 compiler, `libunwind` and Node.js; CMake fetches the rest.
 
 ## Lint & Format

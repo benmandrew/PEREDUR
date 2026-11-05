@@ -31,8 +31,7 @@
       "inherits": "base",
       "binaryDir": "${sourceDir}/build-release",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_CXX_FLAGS": "-Wall -Werror"
+        "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
@@ -74,7 +73,6 @@
       "binaryDir": "${sourceDir}/build-bench",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_CXX_FLAGS": "-Wall -Werror",
         "PEREDUR_BENCH": "ON"
       }
     }
