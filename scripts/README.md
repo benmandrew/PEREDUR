@@ -128,6 +128,8 @@ read it from there.
 | `h2h-tlsf` | nsga2-truncate, `log` metric | C/default | `H2H_TLSF_SPECS_2026_07` | 0–19 | `results-ablate-tlsf.csv` |
 | `aurus-h2h` | nsga2-apportion, `log` metric | C/default | `H2H_TLSF_READY` | 0–19 | `results-aurus-h2h.csv` |
 | `arbiter-probe` | nsga2-truncate, nsga2-apportion | R/elit0.1 | `ARBITER_PROBE_SPECS` | 0–39 | `results-arbiter-probe.csv` |
+| `fretish-order` | nsga2-apportion, random, `log` metric | O (random: base, only-climb) | `FRETISH_ORDER_SMALL` | 0–29 | `results-fretish-order.csv` |
+| `fretish-order-large` | nsga2-apportion, random, `log` metric | O/base, O/full | `FRETISH_ORDER_LARGE` | 0–29 | `results-fretish-order-large.csv` |
 
 `tlsf` runs the six basic-TLSF examples (arbiter, gyro-var1, humanoid-531,
 lift, lily02, minepump) rather than the four FRETISH specs, swept over
