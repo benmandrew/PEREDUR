@@ -41,7 +41,7 @@ max_wall_s = 0
 # that differs from its parent and checked between offspring rather than at a
 # generation boundary. generations still bounds the run under either.
 termination = "generations"
-# "nsga2-apportion" | "weighted". Under NSGA-II
+# "nsga2-apportion" | "weighted" | "random". Under NSGA-II
 # the [fitness] weights only select which components are active (weight > 0);
 # they no longer bias selection, and the (mu+lambda) survivor pooling is already
 # elitist, so elitism_rate = 0 is the natural companion on paper -- though it

@@ -141,7 +141,9 @@ class SearchBudget {
 /// Orders a scored population best-first according to @p cfg's selection
 /// scheme: descending weighted fitness for WeightedAverage, or the NSGA-II
 /// crowded-comparison order (front rank ascending, crowding descending) for
-/// Nsga2Apportion. The sort is stable in both cases so a
+/// Nsga2Apportion. Random sorts by the weighted scalar too, since this order
+/// numbers the written repairs; its search never reads it, as the parent and
+/// survivor stages shuffle instead. The sort is stable in every case so a
 /// fixed RNG seed is reproducible.
 template <typename Spec>
 void order_population(const Config& cfg,
@@ -408,6 +410,17 @@ void pad_to_size(std::vector<Spec>& survivors, std::size_t target_size) {
     }
 }
 
+/// Puts @p population in a uniformly random order (Fisher-Yates), for
+/// SelectionScheme::Random. Each draw is sequenced into its own local.
+template <typename T>
+void shuffle_population(std::vector<T>& population,
+                        const RandomSource& random_source) {
+    for (std::size_t i = population.size(); i > 1; --i) {
+        const std::size_t j = random_source.next_index(i);
+        std::swap(population[i - 1], population[j]);
+    }
+}
+
 /// Drops every repeat of a specification already present earlier in
 /// @p population, preserving the order of the first occurrences.
 template <typename Spec>
@@ -650,6 +663,13 @@ template <typename Spec>
 void stage_order_parents(GenerationContext<Spec>& ctx) {
     // Parents are selected from the whole population, unfiltered: the filters
     // screen only the offspring bred below.
+    if (ctx.m_cfg.selection_scheme == SelectionScheme::Random) {
+        // Breeding reads the parents in order and the elites off the front,
+        // so a shuffle makes both a uniform draw over the population.
+        generation_detail::shuffle_population(ctx.m_scored,
+                                              ctx.m_random_source);
+        return;
+    }
     if (uses_nsga2_ranking(ctx.m_cfg)) {
         // The rule is applied again here, or a candidate demoted at the last
         // selection would breed and stand as an elite from its old front.
@@ -791,6 +811,23 @@ void stage_score(GenerationContext<Spec>& ctx) {
 
 template <typename Spec>
 void stage_select(GenerationContext<Spec>& ctx) {
+    if (ctx.m_cfg.selection_scheme == SelectionScheme::Random) {
+        // The same (mu + lambda) pool as below, cut by a uniform shuffle in
+        // place of the crowded-comparison order, so no objective decides who
+        // survives. A short pool is padded by cycling, which favours nobody.
+        std::vector<Scored<Spec>> pool = ctx.m_parents;
+        pool.insert(pool.end(), std::make_move_iterator(ctx.m_scored.begin()),
+                    std::make_move_iterator(ctx.m_scored.end()));
+        pool = generation_detail::dedup_by_specification(std::move(pool));
+        generation_detail::shuffle_population(pool, ctx.m_random_source);
+        if (pool.size() > ctx.m_target_size) {
+            pool.resize(ctx.m_target_size);
+        } else if (!pool.empty()) {
+            generation_detail::pad_to_size(pool, ctx.m_target_size);
+        }
+        ctx.m_scored = std::move(pool);
+        return;
+    }
     if (!uses_nsga2_ranking(ctx.m_cfg)) {
         order_population(ctx.m_cfg, ctx.m_scored);
         return;

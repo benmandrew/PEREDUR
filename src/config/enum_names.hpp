@@ -18,9 +18,10 @@ struct EnumNames;
 
 template <>
 struct EnumNames<SelectionScheme> {
-    static constexpr std::array<std::pair<SelectionScheme, const char*>, 2>
+    static constexpr std::array<std::pair<SelectionScheme, const char*>, 3>
         k_names{{{SelectionScheme::WeightedAverage, "weighted"},
-                 {SelectionScheme::Nsga2Apportion, "nsga2-apportion"}}};
+                 {SelectionScheme::Nsga2Apportion, "nsga2-apportion"},
+                 {SelectionScheme::Random, "random"}}};
 };
 
 template <>
