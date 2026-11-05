@@ -143,6 +143,61 @@ TEST(test_tool_path_unset_env_falls_back) {
            "its source");
 }
 
+// The run manifest's version lines. A probe that fails must say why and return,
+// since a run must not end because its provenance could not be read.
+TEST(test_tool_version_probe_keeps_the_marked_line) {
+    const ToolVersion found = probe_tool_version(
+        {"/bin/sh", "-c",
+         R"(printf 'BANNER\n  tool version 1.2 \r\nlicence\n')"},
+        "version");
+    expect(found.m_version == std::optional<std::string>("version 1.2"),
+           "tool-version: the probe should keep the marked line from the "
+           "marker on, trimmed at its end");
+    expect(found.m_error.empty(),
+           "tool-version: a probe that found its line should report no error");
+
+    const ToolVersion unmarked =
+        probe_tool_version({"/bin/sh", "-c", "echo 1.2"}, "version");
+    expect(!unmarked.m_version && !unmarked.m_error.empty(),
+           "tool-version: output without the marker should give no version "
+           "and a reason");
+
+    const ToolVersion failed = probe_tool_version(
+        {"/bin/sh", "-c", "echo version 1.2; exit 3"}, "version");
+    expect(!failed.m_version && failed.m_error == "exit status 3",
+           "tool-version: a non-zero exit should give no version and name the "
+           "status");
+
+    const ToolVersion missing =
+        probe_tool_version({"/nonexistent/peredur-tool", "--version"}, "v");
+    expect(!missing.m_version && !missing.m_error.empty(),
+           "tool-version: a missing binary should give no version and a "
+           "reason, not throw");
+}
+
+TEST(test_tool_versions_read_the_built_tools) {
+    const auto starts_with = [](const ToolVersion& probed,
+                                std::string_view prefix) {
+        return probed.m_version && probed.m_version->rfind(prefix, 0) == 0;
+    };
+    expect(starts_with(spot_version(), "(spot) "),
+           "tool-version: ltlsynt should report its Spot release, got \"" +
+               spot_version().m_version.value_or(spot_version().m_error) +
+               "\"");
+    expect(starts_with(ganak_version(), "Ganak SHA1: "),
+           "tool-version: ganak should report its commit, got \"" +
+               ganak_version().m_version.value_or(ganak_version().m_error) +
+               "\"");
+    expect(starts_with(black_version(), "version "),
+           "tool-version: black should report its one version line, got \"" +
+               black_version().m_version.value_or(black_version().m_error) +
+               "\"");
+    expect(
+        black_version().m_version.value_or("").find('\n') == std::string::npos,
+        "tool-version: black's version should be one line, not its "
+        "licence text");
+}
+
 // A mode's side reaches ltlsynt. `always m` is out of the system's hands when
 // m is a pure mode or an input, and the system's to hold when m is declared an
 // output. The scoped guarantee makes m a scope mode as well as a response atom.

@@ -212,15 +212,24 @@ RealizabilityChecker& global_real_checker() {
     return instance;
 }
 
-std::string spot_bin_dir() {
+const ToolPath& spot_bin_dir_source() {
 #ifdef SPOT_BIN_DIR
     static const ToolPath k_dir =
         tool_path_from_env("PEREDUR_SPOT_BIN_DIR", SPOT_BIN_DIR);
-    return k_dir.m_path;
 #else
+    static const ToolPath k_dir;
     assert(false);
-    return "";
 #endif
+    return k_dir;
+}
+
+std::string spot_bin_dir() { return spot_bin_dir_source().m_path; }
+
+const ToolVersion& spot_version() {
+    // The first line reads `<path> (spot) 2.16.1`; the path is recorded apart.
+    static const ToolVersion k_version =
+        probe_tool_version({ltlsynt_path(), "--version"}, "(spot)");
+    return k_version;
 }
 
 std::string ltlsynt_path() { return spot_bin_dir() + "/ltlsynt"; }
