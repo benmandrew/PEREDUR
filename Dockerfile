@@ -65,7 +65,7 @@ WORKDIR /src
 FROM toolchain AS spot
 ARG BUILD_DIR
 ARG BUILD_JOBS
-COPY cmake/spot.cmake cmake/
+COPY cmake/spot.cmake cmake/third_party.cmake cmake/
 RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DPEREDUR_TOOL_MODULE=spot.cmake \
         ${BUILD_JOBS:+-DCMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS}} \
@@ -74,7 +74,7 @@ RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
 FROM toolchain AS black
 ARG BUILD_DIR
 ARG BUILD_JOBS
-COPY cmake/black.cmake cmake/
+COPY cmake/black.cmake cmake/third_party.cmake cmake/
 RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DPEREDUR_TOOL_MODULE=black.cmake \
         ${BUILD_JOBS:+-DCMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS}} \
@@ -83,7 +83,7 @@ RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
 FROM toolchain AS ganak
 ARG BUILD_DIR
 ARG BUILD_JOBS
-COPY cmake/ganak.cmake cmake/
+COPY cmake/ganak.cmake cmake/third_party.cmake cmake/
 RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DPEREDUR_TOOL_MODULE=ganak.cmake \
         ${BUILD_JOBS:+-DCMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS}} \
@@ -91,8 +91,8 @@ RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
 
 # Eigen, cpptrace, nlohmann_json and tomlplusplus. FetchContent populates at
 # configure time into ${CMAKE_BINARY_DIR}/_deps, and re-reads the stamps it
-# leaves there, so staging them here keeps four git clones out of the loop that
-# every source edit re-enters.
+# leaves there, so staging them here keeps five archive downloads out of the
+# loop that every source edit re-enters.
 FROM toolchain AS deps
 ARG BUILD_DIR
 COPY cmake/dependencies.cmake cmake/
@@ -107,13 +107,10 @@ RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
 FROM toolchain AS tools
 ARG BUILD_DIR
 
-# The install tree and the stamp, not the unpacked source tree beside them,
-# which is the larger of the two by far: cmake/spot.cmake reads the stamp to
-# decide whether to declare the external project at all, and nothing downstream
-# of that reads the sources.
+# The install trees only. Each carries the marker (cmake/third_party.cmake)
+# that the real configure reads before running the tool, and Spot's build tree
+# is deleted once it installs.
 COPY --from=spot ${BUILD_DIR}/third_party/spot ${BUILD_DIR}/third_party/spot
-COPY --from=spot ${BUILD_DIR}/third_party/spot_src/src/spot_project-stamp/spot_project-done \
-                 ${BUILD_DIR}/third_party/spot_src/src/spot_project-stamp/
 COPY --from=black ${BUILD_DIR}/third_party/black ${BUILD_DIR}/third_party/black
 COPY --from=ganak ${BUILD_DIR}/third_party/ganak ${BUILD_DIR}/third_party/ganak
 COPY --from=deps ${BUILD_DIR}/_deps ${BUILD_DIR}/_deps
