@@ -4,6 +4,10 @@ project(peredur VERSION 0.1.0 LANGUAGES CXX)
 
 enable_testing()
 
+# Before PEREDUR_THIRD_PARTY_DIR is first set: it tells a tree configured
+# before this file existed from a fresh one.
+include(cmake/find_tool.cmake)
+
 # Spot, black and ganak are spawned as subprocesses and nothing links against
 # them, so their trees carry none of a preset's flags -- every preset builds a
 # byte-equivalent copy. Hoisting the location behind a variable lets a caller

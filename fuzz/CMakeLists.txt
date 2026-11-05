@@ -7,7 +7,7 @@
 # peredur_fitness/peredur_formaliser static libraries works in practice (verified empirically)
 # without needing a second, fully clang-built copy of the whole dependency
 # tree (which would re-trigger SPOT's from-source ExternalProject build).
-find_program(PEREDUR_FUZZ_CLANGXX NAMES clang++)
+peredur_find_program(PEREDUR_FUZZ_CLANGXX NAMES clang++)
 if(NOT PEREDUR_FUZZ_CLANGXX)
     message(FATAL_ERROR
         "PEREDUR_FUZZ requires a clang++ with libFuzzer support on PATH; "

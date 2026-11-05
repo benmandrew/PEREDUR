@@ -30,6 +30,15 @@ endfunction()
 
 set(_resolved_from_git FALSE)
 
+# A git that configure found and that has since disappeared (a garbage-collected
+# /nix/store path) used to fall through to commit=unknown, which a run.json then
+# carried without complaint. Fail instead; reconfiguring finds git again.
+if(GIT_EXECUTABLE AND NOT EXISTS "${GIT_EXECUTABLE}")
+    message(FATAL_ERROR
+        "git at ${GIT_EXECUTABLE} no longer exists. Re-run configure "
+        "(cmake --preset <preset>) to find it again.")
+endif()
+
 if(GIT_EXECUTABLE AND EXISTS "${GIT_EXECUTABLE}")
     # A source tree exported from a tarball, or vendored into another
     # checkout, is not a work tree; fall back rather than fail the build.
