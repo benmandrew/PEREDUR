@@ -40,7 +40,7 @@ cmake --build build --target format-ci     # dry-run (fails if unformatted)
 
 clang-tidy results are cached through ctcache whenever it is on PATH, as the dev shell puts it. The cache lives in `<build-dir>/ctcache`, gitignored and per preset; `CTCACHE_DIR` overrides it, which CI sets so `actions/cache` can restore it.
 
-The same checks run from the tracked `.githooks/pre-commit`. Git does not clone hooks, so `cmake/githooks.cmake` sets `core.hooksPath` at configure time, the hooks needing build targets anyway. Edit hooks in `.githooks/`, never `.git/hooks/`. `git commit --no-verify` bypasses one; CI is the real enforcement.
+The same checks run from the tracked `.githooks/pre-commit`. Its format check runs clang-format on the staged contents of each staged C++ file (`git show :<file>`), so a partly staged file is checked as it will be committed; cpplint and cppcheck still read the working tree. Git does not clone hooks, so `cmake/githooks.cmake` sets `core.hooksPath` at configure time, the hooks needing build targets anyway. Edit hooks in `.githooks/`, never `.git/hooks/`. `git commit --no-verify` bypasses one; CI is the real enforcement.
 
 ## Docs
 
