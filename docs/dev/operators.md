@@ -103,7 +103,7 @@ A weaker guarantee timing helps realizability and costs nothing on similarity, s
 
 ## Scope-aware timing moves
 
-Every timing step above is an edge of the Global order, and a scope changes which edges hold. `timing_implies` (`src/requirement.cpp`) states the order for each scope, measured with SPOT over 14 timings, 8 scopes and both condition types (2,912 ordered pairs, condition type moving none). `test_timing_order_is_pinned` re-derives every edge and non-edge with tick counts up to 4.
+Every timing step above is an edge of the Global order, and a scope changes which edges hold. `timing_implies` (`src/requirement.cpp`) states the order for each scope, measured with SPOT over 14 timings, 8 scopes and both condition types (2,912 ordered pairs, condition type moving none). `test_timing_order_is_pinned` re-derives every edge and non-edge over 15 timings with tick counts 0 to 4, and `timing_implies_exact` in `proofs/Fretish/Cpp.lean` proves the order exact at every tick count. That proof found `after 0 ⇒ next`, which the 14 measured timings left out because none was `after 0`. Under the only scopes it reverses to `next ⇒ after 0`.
 
 The After scope keeps the Global order. In, NotIn and Before drop the edges from `next`, `within n` and `after n` into Eventually, because the bounded lowering discharges those three when the interval closes (`boundary | X r`), while a bounded Eventually (`!boundary U r`) is not discharged. The only scopes negate the obligation through `dual_timing`, so their order is the Global one reversed, with `eventually` also above `before s`. In that reversed order `until s` is not below Always, and under OnlyIn and OnlyAfter neither `for n` nor `next` is.
 

@@ -462,6 +462,11 @@ bool global_timing_implies(const Timing& upper, const Timing& lower) {
                 if constexpr (into_within) {
                     return weak.m_ticks > strong.m_ticks;
                 }
+                // `after 0` is `!r & X r`, which holds `r` at the next tick.
+                if constexpr (std::is_same_v<S, timing::AfterTicks> &&
+                              std::is_same_v<W, timing::NextTimepoint>) {
+                    return strong.m_ticks == 0;
+                }
                 return false;
             } else if constexpr (from_bottom_or_stop) {
                 return false;

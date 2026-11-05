@@ -153,18 +153,20 @@ bool is_only_scope(ScopeKind kind);
 /// timing @p weaker under a @p scope of that kind, all other fields equal.
 /// Reflexive. The condition type moves no edge.
 ///
-/// Measured with SPOT for all 14 timings, 8 scopes and both condition types,
-/// and pinned by test_timing_order_is_pinned. An edge holds for any condition,
-/// response, mode and stop, since the measurement takes each as a free atom
-/// and an implication stays valid under uniform substitution. A missing edge
-/// is only a non-implication for some field values, and where the order
-/// generalises a tick count the test samples further counts.
+/// Measured with SPOT for 14 timings, 8 scopes and both condition types, and
+/// pinned by test_timing_order_is_pinned over 15. An edge holds for any
+/// condition, response, mode and stop, since the measurement takes each as a
+/// free atom and an implication stays valid under uniform substitution. A
+/// missing edge is only a non-implication for some field values, and where the
+/// order generalises a tick count the test samples further counts.
+/// `timing_implies_exact` in `proofs/Fretish/Cpp.lean` proves the order exact
+/// for every tick count, against a transcription of this function.
 ///
 /// - Global and After: `always` is above everything but `after n` and
 ///   `before s`; `for n` is above `for m` (m < n), `immediately`, `next` and
 ///   every `within`; `immediately` and `next` are above every `within`;
-///   `within n` and `after n` are above `within m` (m > n); everything without
-///   a stop is above `eventually`.
+///   `within n` and `after n` are above `within m` (m > n); `after 0` is above
+///   `next`; everything without a stop is above `eventually`.
 /// - In, NotIn and Before: the same, without the edges from `next`, `within`
 ///   and `after` into `eventually`. A bounded `next` or `within` is discharged
 ///   when the interval closes, and a bounded `eventually` is not.
