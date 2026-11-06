@@ -153,6 +153,10 @@ function(peredur_run_step log)
     if(NOT ARG_WORKING_DIRECTORY)
         set(ARG_WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
     endif()
+    # execute_process cannot open a log in a missing directory, and then runs
+    # nothing at all.
+    get_filename_component(log_dir "${log}" DIRECTORY)
+    file(MAKE_DIRECTORY "${log_dir}")
     execute_process(
         COMMAND ${ARG_COMMAND}
         WORKING_DIRECTORY "${ARG_WORKING_DIRECTORY}"
