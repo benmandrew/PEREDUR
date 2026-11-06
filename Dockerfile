@@ -167,6 +167,8 @@ RUN find /opt/peredur/libexec -type f -exec sh -c \
 FROM ${BASE_IMAGE} AS runtime
 
 # libfmt9 is black's and libunwind8 is cpptrace's, and both paths need them.
+# libz3-4 is the solver a source-built black links (arm64, or any base other
+# than noble); without it black cannot load, and only the smoke test notices.
 #
 # nodejs is off by default because nothing the image runs calls it. It runs the
 # vendored FRET formaliser, and the only callers of that are
@@ -179,6 +181,7 @@ ARG WITH_NODE=0
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         libfmt9 \
         libunwind8 \
+        libz3-4 \
     && if [ "${WITH_NODE}" = "1" ]; then \
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs; \
     fi \
