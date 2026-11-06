@@ -19,10 +19,22 @@ if(DOXYGEN_FOUND AND SPHINX_BUILD_EXE AND KATEX_DIST_DIR)
     # staging under a katex/ subdirectory lands the stylesheet next to its
     # fonts/ directory -- the relative paths katex.min.css resolves against.
     set(KATEX_STATIC_DIR "${CMAKE_BINARY_DIR}/docs/_static")
+    # The Nix store is read-only, and file(COPY) keeps source permissions by
+    # default, which leaves a staging copy that rm -rf cannot delete. Copy with
+    # default permissions, and make writable any copy an older configure left.
+    if(EXISTS "${KATEX_STATIC_DIR}/katex")
+        file(CHMOD_RECURSE "${KATEX_STATIC_DIR}/katex"
+             FILE_PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+             DIRECTORY_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                                   GROUP_READ GROUP_EXECUTE
+                                   WORLD_READ WORLD_EXECUTE)
+    endif()
     file(COPY "${KATEX_DIST_DIR}/katex.min.css"
-         DESTINATION "${KATEX_STATIC_DIR}/katex")
+         DESTINATION "${KATEX_STATIC_DIR}/katex"
+         NO_SOURCE_PERMISSIONS)
     file(COPY "${KATEX_DIST_DIR}/fonts"
-         DESTINATION "${KATEX_STATIC_DIR}/katex")
+         DESTINATION "${KATEX_STATIC_DIR}/katex"
+         NO_SOURCE_PERMISSIONS)
 
     configure_file(
         "${CMAKE_SOURCE_DIR}/docs/Doxyfile.in"
