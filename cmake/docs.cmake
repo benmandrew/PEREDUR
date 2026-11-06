@@ -1,5 +1,11 @@
+# See cmake/find_tool.cmake: re-resolved when the dev shell's store paths move.
+peredur_refresh_found(DOXYGEN_EXECUTABLE)
+peredur_refresh_found(DOXYGEN_DOT_EXECUTABLE)
 find_package(Doxygen)
-find_program(SPHINX_BUILD_EXE sphinx-build)
+peredur_record_found(DOXYGEN_EXECUTABLE)
+peredur_record_found(DOXYGEN_DOT_EXECUTABLE)
+peredur_find_program(SPHINX_BUILD_EXE sphinx-build)
+peredur_refresh_found(KATEX_DIST_DIR)
 
 # sphinxcontrib-katex bundles katex.min.js but not katex.min.css, and defaults
 # that stylesheet to a jsdelivr URL. Staging the stylesheet and its fonts out of
@@ -9,6 +15,7 @@ find_path(KATEX_DIST_DIR
     PATH_SUFFIXES lib/node_modules/katex/dist share/katex/dist dist
     DOC "Directory containing katex.min.css and its fonts/ subdirectory"
 )
+peredur_record_found(KATEX_DIST_DIR)
 
 if(DOXYGEN_FOUND AND SPHINX_BUILD_EXE AND KATEX_DIST_DIR)
     set(DOXYGEN_OUTPUT_DIR "${CMAKE_BINARY_DIR}/docs/doxygen")

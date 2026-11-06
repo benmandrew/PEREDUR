@@ -1,18 +1,24 @@
 cmake_minimum_required(VERSION 3.21)
 
+# The release and bench presets once set CMAKE_CXX_FLAGS to exactly this. It
+# reached cpptrace's feature probes, which fail under -Werror, and the failed
+# results are cached; a preset cannot remove a cache entry, so an older tree is
+# cleared here once. -Werror on our own targets comes from cmake/warnings.cmake.
+if("$CACHE{CMAKE_CXX_FLAGS}" STREQUAL "-Wall -Werror")
+    message(STATUS "Clearing the CMAKE_CXX_FLAGS an older preset set, and the "
+                   "cpptrace probes it failed")
+    set(CMAKE_CXX_FLAGS "" CACHE STRING "" FORCE)
+    unset(HAS_CXX_EXCEPTION_TYPE CACHE)
+    unset(HAS_UNWIND CACHE)
+endif()
+
 project(peredur VERSION 0.1.0 LANGUAGES CXX)
 
 enable_testing()
 
-if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
-  include(ProcessorCount)
-  ProcessorCount(NPROC)
-  if(NPROC GREATER 1)
-    set(CMAKE_BUILD_PARALLEL_LEVEL ${NPROC})
-  else()
-    set(CMAKE_BUILD_PARALLEL_LEVEL 1)
-  endif()
-endif()
+# Before PEREDUR_THIRD_PARTY_DIR is first set: it tells a tree configured
+# before this file existed from a fresh one.
+include(cmake/find_tool.cmake)
 
 # Spot, black and ganak are spawned as subprocesses and nothing links against
 # them, so their trees carry none of a preset's flags -- every preset builds a
@@ -47,6 +53,10 @@ if(PEREDUR_TSAN)
     else()
         message(STATUS "TSan: no setarch on ${CMAKE_SYSTEM_NAME}; tests run with ASLR enabled")
     endif()
+else()
+    # Cached with FORCE above, so without this a tree that once had TSan on
+    # keeps wrapping every test in setarch after it is turned off.
+    unset(CMAKE_CROSSCOMPILING_EMULATOR CACHE)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -143,7 +153,6 @@ target_include_directories(peredur_fitness PUBLIC include)
 # "fingerprint/lasso.hpp", which lives under src/ because it is not published.
 target_include_directories(peredur_fitness PRIVATE src)
 target_link_libraries(peredur_fitness PUBLIC peredur_core tomlplusplus::tomlplusplus)
-add_dependencies(peredur_fitness spot_project)
 # Include Eigen as a system directory so clang-tidy skips warnings inside it.
 target_include_directories(peredur_fitness SYSTEM PUBLIC ${eigen_SOURCE_DIR})
 target_compile_definitions(peredur_fitness PRIVATE
@@ -228,11 +237,22 @@ target_link_libraries(maximal PRIVATE peredur_fitness)
 # does. include/ stays the published surface.
 target_include_directories(maximal PRIVATE src)
 
-add_custom_target(ganak_binary ALL DEPENDS "${GANAK_EXECUTABLE}")
-add_custom_target(black_binary ALL DEPENDS "${BLACK_EXECUTABLE}")
-if(DEFINED BLACK_EXTERNAL_TARGET)
-    add_dependencies(black_binary ${BLACK_EXTERNAL_TARGET})
+# Configure installs the solvers and checks that they run; this checks again
+# on every build. See cmake/check_tools.cmake.
+set(PEREDUR_TOOLS_STALE_FILE "${CMAKE_BINARY_DIR}/tools-stale.stamp")
+if(NOT EXISTS "${PEREDUR_TOOLS_STALE_FILE}")
+    file(TOUCH "${PEREDUR_TOOLS_STALE_FILE}")
 endif()
+set_property(DIRECTORY APPEND PROPERTY
+    CMAKE_CONFIGURE_DEPENDS "${PEREDUR_TOOLS_STALE_FILE}")
+add_custom_target(tool_health ALL
+    COMMAND ${CMAKE_COMMAND}
+        "-DSTALE_FILE=${PEREDUR_TOOLS_STALE_FILE}"
+        "-DTOOLS=ltlsynt=${SPOT_BIN_DIR}/ltlsynt|black=${BLACK_EXECUTABLE}|ganak=${GANAK_EXECUTABLE}"
+        -P "${CMAKE_SOURCE_DIR}/cmake/check_tools.cmake"
+    COMMENT "Checking that Spot, black and Ganak run"
+    VERBATIM
+)
 
 add_subdirectory(test)
 

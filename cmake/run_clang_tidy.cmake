@@ -33,6 +33,20 @@ if(CLANG_TIDY_EXE AND CLANG_TIDY_CACHE_EXE)
     else()
         set(CTCACHE_DIR "${BUILD_DIR}/ctcache")
     endif()
+    # ctcache's key covers the preprocessed source and the config, never the
+    # clang-tidy binary, so after an LLVM upgrade it would replay the old
+    # version's verdicts. One subdirectory per clang-tidy version keeps them
+    # apart, CI's directory included.
+    execute_process(
+        COMMAND "${CLANG_TIDY_EXE}" --version
+        OUTPUT_VARIABLE _clang_tidy_version_out
+        ERROR_QUIET
+    )
+    if(_clang_tidy_version_out MATCHES "version ([0-9][0-9.]*)")
+        set(CTCACHE_DIR "${CTCACHE_DIR}/clang-tidy-${CMAKE_MATCH_1}")
+    else()
+        message(FATAL_ERROR "Could not read a version from ${CLANG_TIDY_EXE} --version")
+    endif()
     set(CLANG_TIDY_INVOKED_BINARY "${CMAKE_CURRENT_LIST_DIR}/clang_tidy_cache_wrapper.sh")
     set(RUN_CLANG_TIDY_LAUNCHER ${CMAKE_COMMAND} -E env
         "CTCACHE_DIR=${CTCACHE_DIR}"

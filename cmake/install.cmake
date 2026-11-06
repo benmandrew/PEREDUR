@@ -93,6 +93,8 @@ if(PEREDUR_INSTALL_TOOLS)
         FILES_MATCHING
             PATTERN "libspot.so*"
             PATTERN "libbddx.so*"
+            PATTERN "libspot*.dylib"
+            PATTERN "libbddx*.dylib"
             PATTERN "pkgconfig" EXCLUDE)
 
     # Statically linked, so it needs no wrapper.
@@ -110,10 +112,31 @@ if(PEREDUR_INSTALL_TOOLS)
         install(DIRECTORY "${BLACK_LIB_DIR}/"
             DESTINATION "${PEREDUR_TOOL_DIR}/black/lib"
             COMPONENT peredur
-            FILES_MATCHING PATTERN "*.so*")
+            FILES_MATCHING
+                PATTERN "*.so*"
+                PATTERN "*.dylib"
+                PATTERN "cmake" EXCLUDE)
     else()
         message(STATUS
             "black came from PATH; the install tree will not carry a copy")
+    endif()
+
+    # dyld ignores the wrapper's LD_LIBRARY_PATH and follows the absolute
+    # install names baked in at build time; see cmake/relocate_macho.cmake.
+    if(APPLE)
+        foreach(_peredur_relocated spot black)
+            install(CODE "
+                execute_process(
+                    COMMAND \"${CMAKE_COMMAND}\"
+                        \"-DDIR=\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${PEREDUR_TOOL_DIR}/${_peredur_relocated}\"
+                        \"-DOLD_PREFIX=${PEREDUR_THIRD_PARTY_DIR}\"
+                        -P \"${CMAKE_CURRENT_LIST_DIR}/relocate_macho.cmake\"
+                    RESULT_VARIABLE _peredur_relocate_rc)
+                if(NOT _peredur_relocate_rc EQUAL 0)
+                    message(FATAL_ERROR \"Relocating ${_peredur_relocated} failed\")
+                endif()"
+                COMPONENT peredur)
+        endforeach()
     endif()
 endif()
 

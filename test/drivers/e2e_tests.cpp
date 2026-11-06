@@ -228,6 +228,22 @@ nlohmann::json expect_run_manifest(const std::filesystem::path& dir,
            label + ": the manifest names its input");
     expect(manifest.contains("schema_version"),
            label + ": the manifest is versioned");
+    // Which solvers gave the verdicts. The test tree builds all three, so each
+    // has to answer its version probe.
+    for (const char* name : {"spot", "ganak", "black"}) {
+        const nlohmann::json& tool = manifest.at("external_tools").at(name);
+        const std::string where = label + ": external_tools." + name;
+        expect(tool.at("path").is_string() &&
+                   !tool.at("path").get<std::string>().empty(),
+               where + " records its resolved path");
+        expect(tool.at("from_env").is_boolean(),
+               where + " records whether the environment supplied it");
+        expect(tool.at("version").is_string() &&
+                   !tool.at("version").get<std::string>().empty(),
+               where + " records its version");
+        expect(tool.at("version_error").is_null(),
+               where + " records no version error");
+    }
     expect(
         manifest.at("config").at("genetic").at("generations").get<int>() == 2,
         label + ": the manifest echoes the config it ran under");

@@ -1,7 +1,7 @@
-find_program(CPPLINT_EXE NAMES cpplint cpplint.py)
-find_program(CLANG_TIDY_EXE NAMES clang-tidy)
-find_program(RUN_CLANG_TIDY_EXE NAMES run-clang-tidy run-clang-tidy-14)
-find_program(CPPCHECK_EXE NAMES cppcheck)
+peredur_find_program(CPPLINT_EXE NAMES cpplint cpplint.py)
+peredur_find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+peredur_find_program(RUN_CLANG_TIDY_EXE NAMES run-clang-tidy run-clang-tidy-14)
+peredur_find_program(CPPCHECK_EXE NAMES cppcheck)
 
 set(PEREDUR_LINT_GLOBS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
@@ -37,8 +37,12 @@ set(PEREDUR_LINT_CPP_GLOBS
 # yields an empty CPP subset, which the clang-tidy target below treats as a
 # no-op rather than letting run-clang-tidy fall back to linting the whole
 # compile database.
-set(PEREDUR_LINT_FILES_OVERRIDE "" CACHE STRING
-    "Absolute paths of files to lint; empty means lint all sources")
+#
+# Read once and dropped from the cache: a cache entry outlived the configure it
+# was passed to, so one local configure copying CI's command restricted every
+# later `lint` in that tree to those files.
+set(PEREDUR_LINT_FILES_OVERRIDE "${PEREDUR_LINT_FILES_OVERRIDE}")
+unset(PEREDUR_LINT_FILES_OVERRIDE CACHE)
 
 if(PEREDUR_LINT_FILES_OVERRIDE)
     # The override is every changed C++ file in the branch, so it is cut back
@@ -78,7 +82,8 @@ elseif(CPPLINT_EXE)
     )
 else()
     add_custom_target(lint-cpplint
-        COMMAND ${CMAKE_COMMAND} -E echo "WARNING: cpplint was not found on PATH, skipping"
+        COMMAND ${CMAKE_COMMAND} -E echo "cpplint was not found on PATH; lint runs inside nix develop"
+        COMMAND ${CMAKE_COMMAND} -E false
         COMMENT "cpplint not available"
         VERBATIM
     )
@@ -132,7 +137,8 @@ elseif(CLANG_TIDY_EXE)
     )
 else()
     add_custom_target(lint-clang-tidy
-        COMMAND ${CMAKE_COMMAND} -E echo "WARNING: clang-tidy was not found on PATH, skipping"
+        COMMAND ${CMAKE_COMMAND} -E echo "clang-tidy was not found on PATH; lint runs inside nix develop"
+        COMMAND ${CMAKE_COMMAND} -E false
         COMMENT "clang-tidy not available"
         VERBATIM
     )
@@ -160,7 +166,8 @@ elseif(CPPCHECK_EXE)
     )
 else()
     add_custom_target(lint-cppcheck
-        COMMAND ${CMAKE_COMMAND} -E echo "WARNING: cppcheck was not found on PATH, skipping"
+        COMMAND ${CMAKE_COMMAND} -E echo "cppcheck was not found on PATH; lint runs inside nix develop"
+        COMMAND ${CMAKE_COMMAND} -E false
         COMMENT "cppcheck not available"
         VERBATIM
     )
@@ -171,7 +178,7 @@ endif()
 # Checks gen_configs.DEFAULTS against the defaults in example-config.toml.
 # Unlike the linters above this ignores PEREDUR_LINT_FILES_OVERRIDE: it is a
 # whole-tree check costing milliseconds.
-find_program(PYTHON3_EXE NAMES python3 python)
+peredur_find_program(PYTHON3_EXE NAMES python3 python)
 
 if(PYTHON3_EXE)
     add_custom_target(lint-config-schema
@@ -183,7 +190,8 @@ if(PYTHON3_EXE)
     )
 else()
     add_custom_target(lint-config-schema
-        COMMAND ${CMAKE_COMMAND} -E echo "WARNING: python3 was not found on PATH, skipping"
+        COMMAND ${CMAKE_COMMAND} -E echo "python3 was not found on PATH; lint runs inside nix develop"
+        COMMAND ${CMAKE_COMMAND} -E false
         COMMENT "python3 not available"
         VERBATIM
     )

@@ -41,10 +41,11 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       # Publishing is for a push to main or a v* tag and nothing else. A pull
-      # request and a manual dispatch both build and stop, which still catches a
-      # Dockerfile that no longer works. Gated on the event rather than on
-      # whether secrets happen to be readable: a pull request from a branch in
-      # this repository does get them, and only a fork's does not.
+      # request and a manual dispatch both build, smoke-test and stop, which
+      # still catches a Dockerfile or an image that no longer works. Gated on
+      # the event rather than on whether secrets happen to be readable: a pull
+      # request from a branch in this repository does get them, and only a
+      # fork's does not.
       PUSH: ${{ github.event_name == 'push' }}
     steps:
       - name: Check out repository
@@ -64,6 +65,33 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # The image is built into the local daemon first and smoke-tested there,
+      # and only then pushed. A push-by-digest build leaves nothing local to
+      # run, and running the pushed digest instead would test nothing on a pull
+      # request, which never pushes. The push step below rebuilds from this
+      # builder's own layer cache, so it costs the export alone. Its context
+      # and build arguments must stay the same as these, or it pushes an image
+      # other than the one tested.
+      - name: Build for the smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            PEREDUR_GIT_COMMIT=${{ github.sha }}
+            PEREDUR_GIT_DIRTY=false
+          cache-from: type=gha,scope=${{ steps.platform.outputs.pair }}
+          provenance: false
+          load: true
+          tags: peredur:smoke
+
+      # One short call per solver through the path the image's ENV gives it,
+      # a realize on a bundled example and a one-generation repair, plus a
+      # check that --version names this commit as a clean build. Before the
+      # push, so an image that cannot run never gets a digest to merge.
+      - name: Smoke-test the image
+        run: scripts/docker_smoke.sh peredur:smoke "$GITHUB_SHA"
+
       # BUILD_JOBS is deliberately unset: a hosted runner is small enough that
       # one job per core is right, and the value would otherwise join the cache
       # key of every stage that reads it (see the Dockerfile).
@@ -74,9 +102,10 @@ jobs:
       # its stage copies cmake/spot.cmake and nothing else, so a change anywhere
       # else in the tree reuses it.
       #
-      # Only a push writes that cache; a pull request reads it and exports
-      # nothing. `mode=max` exports every layer of every stage, and this
-      # Dockerfile is one stage per fetched dependency, so each export is a
+      # Only a push writes that cache, which is why cache-to sits on the push
+      # step alone; a pull request reads it and exports nothing. `mode=max`
+      # exports every layer of every stage, and this Dockerfile is one stage
+      # per fetched dependency, so each export is a
       # ~2.8GB generation per architecture -- which is what took the store past
       # its limit when the arm64 matrix landed, and the eviction that followed
       # fell on the CI third-party caches rather than here. Writing on pushes
@@ -85,7 +114,8 @@ jobs:
       # are split at all. A pull request still hits main's cache; only a branch
       # that changes cmake/spot.cmake pays for Spot, which is the case that
       # would miss either way.
-      - name: Build and push by digest
+      - name: Push by digest
+        if: env.PUSH == 'true'
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -95,11 +125,9 @@ jobs:
             PEREDUR_GIT_COMMIT=${{ github.sha }}
             PEREDUR_GIT_DIRTY=false
           cache-from: type=gha,scope=${{ steps.platform.outputs.pair }}
-          cache-to: ${{ env.PUSH == 'true'
-            && format('type=gha,mode=max,scope={0}', steps.platform.outputs.pair)
-            || '' }}
+          cache-to: type=gha,mode=max,scope=${{ steps.platform.outputs.pair }}
           provenance: false
-          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=${{ env.PUSH }}
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export the digest
         if: env.PUSH == 'true'

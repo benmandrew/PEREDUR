@@ -96,7 +96,7 @@ target_link_libraries(scope_order_table PRIVATE peredur_fitness)
 # generator expression covers all of them.
 add_dependencies(peredur_tests
     peredur compare lint-ideals ltl maximal mucs realize
-    signal_tracer)
+    signal_tracer tool_health)
 target_compile_definitions(peredur_tests PRIVATE
     PEREDUR_DRIVER_DIR="$<TARGET_FILE_DIR:peredur>"
     PEREDUR_CONTAINED_CHILD_HELPER="$<TARGET_FILE:contained_child_helper>")
@@ -192,6 +192,19 @@ set_tests_properties(peredur_tests.thread_pool_sized PROPERTIES
 # The checked-in schema and template must equal what k_config_keys generates.
 add_test(NAME config_reference
          COMMAND peredur --check-config-reference ${CMAKE_SOURCE_DIR})
+
+# The suite tests the solvers this build installed. A shell that has sourced an
+# install's peredur-env.sh, or exported an override for a campaign, would point
+# every test at other binaries without a word, so the overrides are cleared for
+# each test. An empty value reads as unset (src/runner/tool_paths.cpp).
+get_property(_peredur_registered_tests DIRECTORY PROPERTY TESTS)
+foreach(_peredur_test IN LISTS _peredur_registered_tests)
+    set_property(TEST ${_peredur_test} APPEND PROPERTY ENVIRONMENT
+        "PEREDUR_SPOT_BIN_DIR="
+        "PEREDUR_GANAK_PATH="
+        "PEREDUR_BLACK_PATH="
+        "PEREDUR_FORMALISER_SCRIPT=")
+endforeach()
 
 add_custom_target(tests
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure

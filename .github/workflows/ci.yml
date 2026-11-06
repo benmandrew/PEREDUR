@@ -160,9 +160,12 @@ jobs:
             # part of the lint target, so a campaign archive, a harness edit or
             # a new ideal rebuilds nothing. coverage_badge.py is the one script
             # a build job runs, and it needs the instrumented build under it, so
-            # it counts as a build input.
+            # it counts as a build input. fuzz/ is here because the debug leg
+            # compiles the fuzzer and nothing else does, so a fuzz-only break
+            # would otherwise merge unseen; bench/ because the root
+            # CMakeLists reads it.
             build=false
-            if changed src include test cmake vendor .github \
+            if changed src include test cmake vendor fuzz bench .github \
                        CMakeLists.txt CMakePresets.json flake.nix flake.lock \
                        schemas example-config.toml \
                        scripts/coverage_badge.py | grep -q .; then
@@ -296,13 +299,33 @@ jobs:
       # overwritten) with a rolling restore-keys prefix restores the previous
       # run's results; only changed TUs are re-analysed. This is what keeps the
       # nightly full-tree sweep (and large PRs) cheap.
+      #
+      # The clang-tidy version is in the key and in the restore prefix because
+      # ctcache's own hash leaves the binary out: it covers the preprocessed TU,
+      # the --dump-config output and the arguments after the executable. Without
+      # it, a toolchain bump replays the old clang-tidy's clean verdicts for
+      # every unchanged TU. The path is the whole of .ctcache, so it still
+      # matches if cmake/lint.cmake files results under a per-version
+      # subdirectory of CTCACHE_DIR.
+      - name: Read the clang-tidy version
+        id: clang-tidy
+        run: |
+          version=$(nix develop --command clang-tidy --version \
+            | sed -n 's/.*LLVM version \([^ ]*\).*/\1/p' | head -n 1)
+          if [ -z "$version" ]; then
+            echo "::error::could not read the clang-tidy version"
+            exit 1
+          fi
+          echo "clang-tidy $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Cache clang-tidy results
         uses: actions/cache@v5
         with:
           path: .ctcache
-          key: ${{ runner.os }}-ctcache-${{ github.sha }}
+          key: ${{ runner.os }}-ctcache-clang-tidy-${{ steps.clang-tidy.outputs.version }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-ctcache-
+            ${{ runner.os }}-ctcache-clang-tidy-${{ steps.clang-tidy.outputs.version }}-
 
       # A single dev shell for configure + format + lint + docs, so the Nix
       # flake is evaluated and the shell instantiated once rather than once per
@@ -407,40 +430,49 @@ jobs:
       # all of it the ~181s each leg spent downloading, configuring and building
       # Spot.
       #
-      # Only the *installed* halves are cached, never the source and object
-      # trees ExternalProject leaves beside them. Each module guards its whole
-      # ExternalProject_Add behind an `if(EXISTS <name>-stamp/<name>-done)`, so
-      # a restored tree that carries the stamp and the install prefix is never
-      # rebuilt and never reads the objects that produced it -- 3.2GB of build
-      # tree for 530MB of output, in a repository whose 10GB Actions cache the
-      # arm64 Docker matrix already shares. Storing both halves put the store
-      # 25% over that limit, and the eviction that followed cost these entries
-      # and nothing else: they are the largest objects in it and, being written
-      # at the end of a job and read at the start of the next, always the
-      # coldest. The downloaded archives stay: ganak.cmake and black.cmake guard
-      # their downloads on the archive file rather than on a stamp, so dropping
-      # those buys 230MB and re-fetches them every run.
+      # Only the *installed* halves are meant to be cached. Each module installs
+      # its tool at configure time and finishes with a marker
+      # (cmake/third_party.cmake); a restored tree whose markers match and
+      # whose binaries run is never rebuilt and never reads the sources, the
+      # objects or the downloads that produced it. Spot's build tree was 3.2GB
+      # for 530MB of output, in a repository whose 10GB Actions cache the arm64
+      # Docker matrix already shares. Storing both halves put the store 25%
+      # over that limit, and the eviction that followed cost these entries and
+      # nothing else: they are the largest objects in it and, being written at
+      # the end of a job and read at the start of the next, always the
+      # coldest. The modules now delete their build trees once installed, and
+      # the prune step below drops the downloads and the static archives:
+      # nothing links libspot.a, and cmake/install.cmake keeps it out of the
+      # image for the same reason.
       #
-      # The static archives go too. Nothing links libspot.a -- cmake/install.cmake
-      # excludes it from the image for the same reason -- and it dwarfs the
-      # shared library beside it: 212MB to 137MB compressed over spot and ganak.
+      # The pruning is done by scripts/prune_third_party.sh as this job's last
+      # step, not by `!` patterns here. Up to v3 this step listed `!` excludes
+      # for all of the above, and they removed nothing. actions/cache resolves
+      # its paths with @actions/glob under implicitDescendants: false, so the
+      # pattern `third-party` yields that one directory, the excludes only ever
+      # filter what the globber yields, and tar then archives the directory
+      # recursively. Checked against @actions/glob on a mock tree: the yield is
+      # `third-party` alone and tar takes every object file under it. A
+      # `third-party/**` include fails the same way, since it also yields the
+      # parent directories and tar recurses into each. The entries agree: the
+      # last v3 gcc entry was 713.7MiB, where the installed halves of Spot and
+      # Ganak had been measured at 137MB compressed.
       #
-      # `-v3` is in the key because the path list and the payload both moved,
-      # and a restore has to miss rather than pull back a per-preset entry.
+      # flake.lock and flake.nix are in the hash because Spot is built against
+      # the dev shell's compiler and libraries: after a nixpkgs bump the cached
+      # binaries name store paths a fresh runner does not have. The restore
+      # prefix leaves them out, so an older entry still comes back on a miss;
+      # configure runs the restored tools and rebuilds any that fail.
+      #
+      # `-v4` is in the key because the payload shrank: a restore has to miss
+      # rather than pull back a v3 entry that carries the whole build tree.
       - name: Cache third-party tools
         uses: actions/cache@v5
         with:
-          path: |
-            third-party
-            !third-party/**/*_project
-            !third-party/**/*_project/**
-            !third-party/**/*_project-build
-            !third-party/**/*_project-build/**
-            !third-party/**/*.a
-            !third-party/**/*.la
-          key: ${{ runner.os }}-${{ github.event.repository.name }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v3-${{ hashFiles('cmake/spot.cmake', 'cmake/ganak.cmake', 'cmake/black.cmake') }}
+          path: third-party
+          key: ${{ runner.os }}-${{ github.event.repository.name }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v4-${{ hashFiles('flake.lock', 'flake.nix', 'cmake/third_party.cmake', 'cmake/spot.cmake', 'cmake/ganak.cmake', 'cmake/black.cmake') }}
           restore-keys: |
-            ${{ runner.os }}-${{ github.event.repository.name }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v3-
+            ${{ runner.os }}-${{ github.event.repository.name }}-${{ matrix.compiler || 'clang' }}-third-party-ninja-v4-
 
       # FetchContent's trees are compiled with the preset's own flags -- Eigen
       # and cpptrace go into the binaries -- so unlike the tools above these
@@ -498,6 +530,12 @@ jobs:
           name: coverage-badge
           path: docs/coverage.svg
           retention-days: 1
+
+      # Last, because actions/cache saves in its post step, after every step
+      # here, and only when the job succeeded -- the same condition this step
+      # runs under. See the cache step for why the pruning is not done there.
+      - name: Prune the third-party tree before the cache saves it
+        run: scripts/prune_third_party.sh "$GITHUB_WORKSPACE/third-party"
 
   # Commits the badge the coverage leg drew, when it differs from the one on
   # main. A job of its own so that write access to the repository is held by

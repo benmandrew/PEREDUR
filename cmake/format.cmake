@@ -1,4 +1,4 @@
-find_program(CLANG_FORMAT_EXE NAMES clang-format)
+peredur_find_program(CLANG_FORMAT_EXE NAMES clang-format)
 
 set(PEREDUR_FORMAT_GLOBS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
