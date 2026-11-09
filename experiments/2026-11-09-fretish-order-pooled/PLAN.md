@@ -4,18 +4,19 @@ The pooled strength-and-diversity pass of 2026-10-08-fretish-rerun-analysis, run
 
 ## Order of work
 
-Each host holds only its own seeds of every results directory (av2 0-14, av3 15-29), so the pool is built locally and committed before anything is enqueued.
+The small specs and lift-plus-cruise-full ran split by seed (av2 0-14, av3 15-29), so no host holds all of their runs. Their pool was built locally from both hosts' collected runs and committed as `members/` (with `git add -f`, since `/experiments/*/*` ignores it, as it ignores `design.toml` and the subject lists). The cores are split by core (`2026-11-09-fretish-order-cores/PLAN.md`), so each host holds every seed of its own cores and pools them itself.
 
-1. Collect the run phases of both source campaigns, so that `experiments/results-fretish-order`, `-large` and `-cores` hold all 30 seeds locally.
-2. Pool, then commit `members/` with `git add -f`, since `/experiments/*/*` ignores it (as it ignores `design.toml` and the subject lists, which are force-added too, as 2026-10-08 did): `python3 scripts/pool_members.py experiments/2026-11-09-fretish-order-pooled/design.toml experiments/2026-11-09-fretish-order-pooled/members`. Check `members/index.csv` for `runs_missing` (must be 0) and `runs_empty`.
-3. Enqueue `2026-11-09-fretish-order-pooled-calib` (fsm-timing on av2) and read its directions, undecided share and call-seconds before the main pass. Rebalance `subjects-av2.txt` and `subjects-av3.txt` on what it shows.
-4. Enqueue this campaign. When it is done, run `campaign.py collect --outputs fretish-order-pooled`.
-5. Reduce: `python3 scripts/pooled_reduce.py experiments/2026-11-09-fretish-order-pooled/design.toml experiments/2026-11-09-fretish-order-pooled/members experiments/fretish-order-pooled experiments/2026-11-09-fretish-order-pooled/reduced`.
+1. Done: collect `experiments/results-fretish-order` and `-large`, pool the ten non-core subjects with `python3 scripts/pool_members.py experiments/2026-11-09-fretish-order-pooled/design.toml experiments/2026-11-09-fretish-order-pooled/members --subjects ...`, check `members/index.csv` for `runs_missing` (0) and `runs_empty`, and commit.
+2. Enqueue this campaign on each host behind `2026-11-09-fretish-order-cores`. On each host, the `pool` phase writes `experiments/fretish-order-pooled-members` (ignored): it copies the committed pool of each small subject in `subjects-<host>.txt` byte for byte, and pools each of the host's cores from its 30 seeds. A missing or unfinished core run fails the phase. The `fingerprint` and `subsumption` phases follow on the same host.
+3. When both hosts are done, run `campaign.py collect --outputs fretish-order-pooled`. Collect the cores' runs with `campaign.py collect 2026-11-09-fretish-order-cores` too, then pool the cores locally into `members/` and commit them. The gzip output is byte-stable, so each core's `sha256_jsonl` must equal the one in that host's `experiments/fretish-order-pooled-members/done-subjects-<host>.csv`.
+4. Reduce: `python3 scripts/pooled_reduce.py experiments/2026-11-09-fretish-order-pooled/design.toml experiments/2026-11-09-fretish-order-pooled/members experiments/fretish-order-pooled experiments/2026-11-09-fretish-order-pooled/reduced`.
+
+The subject lists hold each host's cores. The small subjects keep their first split until the balance between hosts is decided.
 
 ## Pool sizes
 
-Nodes in the 9 design arms, from `maximal.tsv`: fsm 2837, fsm-combined 5976, fsm-lmcps 8, fsm-timing 7457, lift-plus-cruise-mini 8977, liquid-mixer 12856, mode-arbiter 2312, takeoff 3319, valu3s-uc6 31777, lift-plus-cruise-full 2463 (base and full). On fsm-lmcps, only full (1 member) and only-blame (7) hold any member, and base holds none, so its contrasts carry almost no information. The cores are not yet collected.
+Nodes in the 9 design arms, from `maximal.tsv`: fsm 2837, fsm-combined 5976, fsm-lmcps 8, fsm-timing 7457, lift-plus-cruise-mini 8977, liquid-mixer 12856, mode-arbiter 2312, takeoff 3319, valu3s-uc6 31777, lift-plus-cruise-full 2463 (base and full). On fsm-lmcps, only full (1 member) and only-blame (7) hold any member, and base holds none, so its contrasts carry almost no information. The cores are pooled on their hosts.
 
-## Calibration estimate
+## Cost estimate
 
-A local fingerprint of fsm-timing at 32768 words (seed 3, 253 s at 8 workers) plans 335,899 pairs, or 337,999 directions (2,100 both ways). At the 2026-10-08 pass's 0.51 call-seconds a direction, that is about 48 CPU-h, about 2 h of wall time at 24 jobs. The calibration campaign measures the real figure.
+A local fingerprint of fsm-timing at 32768 words (seed 3, 253 s at 8 workers) plans 335,899 pairs, or 337,999 directions (2,100 both ways). At the 2026-10-08 pass's 0.51 call-seconds a direction, that is about 48 CPU-h, about 2 h of wall time at 24 jobs. No calibration campaign measures it first; the main pass's first fsm-timing rows give the real figure.

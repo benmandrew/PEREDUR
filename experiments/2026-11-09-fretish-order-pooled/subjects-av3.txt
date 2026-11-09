@@ -3,8 +3,9 @@ fsm-combined
 fsm-timing
 lift-plus-cruise-mini
 lift-plus-cruise-full
+rad-core-10
+rad-core-12-18
 rad-core-45
 rad-core-55
 rad-core-61
-rad-core-65
 rad-core-68

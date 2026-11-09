@@ -1,15 +1,26 @@
 name = "2026-11-09-fretish-order-pooled"
 branch = "feat/fretish-order-pooled"
-description = "Pooled strength and diversity of the FRETISH order arms: each only-<feature> arm and full against base under nsga2-apportion, over the 9 small specs, lift-plus-cruise-full and rad's 10 cores. Per host, a fingerprint phase draws black lasso words over the committed pooled members and plans the pairs design.toml needs; a compare phase decides them. Pooling and the reduction run locally (PLAN.md)."
+description = "Pooled strength and diversity of the FRETISH order arms: each only-<feature> arm and full against base under nsga2-apportion, over the 9 small specs, lift-plus-cruise-full and rad's 10 cores. Per host: a pool phase copies the committed pools of its subjects and pools its own cores from all 30 seeds, a fingerprint phase draws black lasso words over the members and plans the pairs design.toml needs, and a compare phase decides them. The reduction runs locally (PLAN.md)."
 
-# Not seed-split: each host takes whole subjects (subjects-<host>.txt). The
-# members are pooled locally over both hosts' seeds and committed before this
-# is enqueued, since av2 holds seeds 0-14 of every results directory and av3
-# 15-29.
+# Not seed-split: each host takes whole subjects (subjects-<host>.txt). Enqueued
+# behind 2026-11-09-fretish-order-cores, so on each host it starts once that
+# host's cores, every seed of them, are done.
 hosts = { av2 = "", av3 = "" }
 
 # fpdraw is EXCLUDE_FROM_ALL, so the build names it.
 build = "sh -c 'cmake --build build-release && cmake --build build-release --target fpdraw'"
+
+# A subject already in the committed pool (members/, built locally from both
+# hosts' seeds) is copied byte for byte; a core is pooled from this host's
+# results directory, and a missing or unfinished seed fails the phase. The
+# output is under an ignored directory, so the checkout stays clean.
+[[phases]]
+name = "pool"
+kind = "pool"
+design = "experiments/2026-11-09-fretish-order-pooled/design.toml"
+subjects = "experiments/2026-11-09-fretish-order-pooled/subjects-{host}.txt"
+copy_from = "experiments/2026-11-09-fretish-order-pooled/members"
+out = "experiments/fretish-order-pooled-members"
 
 # Draw 32768 words a subject over the members (black, 30 s a draw, 8 at a
 # time), evaluate every node on them, and plan the pairs the design's
@@ -20,7 +31,7 @@ build = "sh -c 'cmake --build build-release && cmake --build build-release --tar
 name = "fingerprint"
 kind = "fingerprint"
 subjects = "experiments/2026-11-09-fretish-order-pooled/subjects-{host}.txt"
-members = "experiments/2026-11-09-fretish-order-pooled/members"
+members = "experiments/fretish-order-pooled-members"
 design = "experiments/2026-11-09-fretish-order-pooled/design.toml"
 work = "experiments/fretish-order-pooled-work"
 out = "experiments/fretish-order-pooled/fp"

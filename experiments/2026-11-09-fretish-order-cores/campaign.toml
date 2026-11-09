@@ -1,11 +1,14 @@
 name = "2026-11-09-fretish-order-cores"
-branch = "feat/fretish-order-eval"
+branch = "feat/fretish-order-pooled"
 profile = "fretish-order-cores"
 description = "rad's ten unrealisable cores, each as its own spec, under every arm of 2026-11-05-fretish-order at the same budget. Whole rad found no repair under any arm. PLAN.md gives the design and the analysis."
 
-# Every arm of a seed runs on one host, so a host difference cancels inside
-# each (spec, seed) cell, as in 2026-11-05-fretish-order.
-hosts = { av2 = "0-14", av3 = "15-29" }
+# Split by core, not by seed: each host runs all 30 seeds of its own cores, so
+# the pooled pass after this can pool them on that host. Every arm of a
+# (core, seed) cell still runs on one host. Both hosts take every seed, which
+# a campaign-level table refuses as an overlap, so the level gives each host
+# no seeds and every phase names its own.
+hosts = { av2 = "", av3 = "" }
 
 build = "sh -c 'cmake --build build-release'"
 
@@ -13,15 +16,39 @@ build = "sh -c 'cmake --build build-release'"
 # tree already exists on both hosts, and a tick runs this only if it is missing.
 configs = "python3 scripts/gen_configs.py --sweeps O --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order --pin-vintage && python3 scripts/gen_configs.py --sweeps O --levels base,only-climb --schemes random --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order --pin-vintage"
 
-# 10 cores x 18 arms x 30 seeds = 5,400 runs. The 2026-10 rerun put the cores
-# at 9-65 s a run at parallel 1; this campaign's small set ran at 6.85 s of
-# host wall a run at jobs 15, which puts the phase at about 3 h.
+# 10 cores x 18 arms x 30 seeds = 5,400 runs, 2,160 on av2 and 3,240 on av3.
+# Resume keeps each host's finished rows of its own cores from the first
+# launch (seeds 0-14 on av2, 15-29 on av3).
 [[phases]]
-name = "cores"
+name = "cores-av2"
 profile = "fretish-order-cores"
+specs = ["rad-core-1-18", "rad-core-17-18", "rad-core-33", "rad-core-65"]
+hosts = { av2 = "0-29" }
 jobs = 15
 
 [[phases]]
-name = "score-cores"
+name = "cores-av3"
+profile = "fretish-order-cores"
+specs = ["rad-core-10", "rad-core-12-18", "rad-core-45", "rad-core-55",
+         "rad-core-61", "rad-core-68"]
+hosts = { av3 = "0-29" }
+jobs = 15
+
+# Each host scores its own cores alone. The results directory also holds the
+# other host's cores from the first launch, at the seeds this host ran then;
+# scored here too, they would reach collect --curves from both hosts with
+# different wall-time columns, and the merge refuses the pair.
+[[phases]]
+name = "score-cores-av2"
 kind = "score"
 profile = "fretish-order-cores"
+specs = ["rad-core-1-18", "rad-core-17-18", "rad-core-33", "rad-core-65"]
+hosts = { av2 = "0-29" }
+
+[[phases]]
+name = "score-cores-av3"
+kind = "score"
+profile = "fretish-order-cores"
+specs = ["rad-core-10", "rad-core-12-18", "rad-core-45", "rad-core-55",
+         "rad-core-61", "rad-core-68"]
+hosts = { av3 = "0-29" }

@@ -4,7 +4,6 @@ mode-arbiter
 liquid-mixer
 valu3s-uc6
 rad-core-1-18
-rad-core-10
-rad-core-12-18
 rad-core-17-18
 rad-core-33
+rad-core-65
