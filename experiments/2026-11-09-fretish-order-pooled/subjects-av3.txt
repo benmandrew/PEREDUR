@@ -1,6 +1,8 @@
-takeoff
 fsm-combined
-fsm-timing
+fsm
+takeoff
+mode-arbiter
+liquid-mixer
 lift-plus-cruise-mini
 lift-plus-cruise-full
 rad-core-10

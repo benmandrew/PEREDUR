@@ -11,7 +11,7 @@ The small specs and lift-plus-cruise-full ran split by seed (av2 0-14, av3 15-29
 3. When both hosts are done, run `campaign.py collect --outputs fretish-order-pooled`. Collect the cores' runs with `campaign.py collect 2026-11-09-fretish-order-cores` too, then pool the cores locally into `members/` and commit them. The gzip output is byte-stable, so each core's `sha256_jsonl` must equal the one in that host's `experiments/fretish-order-pooled-members/done-subjects-<host>.csv`.
 4. Reduce: `python3 scripts/pooled_reduce.py experiments/2026-11-09-fretish-order-pooled/design.toml experiments/2026-11-09-fretish-order-pooled/members experiments/fretish-order-pooled experiments/2026-11-09-fretish-order-pooled/reduced`.
 
-The subject lists hold each host's cores. The small subjects keep their first split until the balance between hosts is decided.
+Each host's subject list holds its own cores and about half the planned pairs of the other subjects, from a local plan at 32768 words and seed 3 on 2026-11-09. av2 takes fsm-timing (335,899 pairs), valu3s-uc6 (1,563) and fsm-lmcps (0). av3 takes fsm-combined (116,336), fsm (68,720), takeoff (57,411), mode-arbiter (36,649), liquid-mixer (13,825), lift-plus-cruise-mini and lift-plus-cruise-full, which is 292,941 pairs before the two sampled subjects. The two subjects slowest to fingerprint, valu3s-uc6 (21 min locally) and lift-plus-cruise-mini (over 25 min), are on different hosts. The cores' pair counts are unknown until their hosts pool them.
 
 ## Pool sizes
 

@@ -1,8 +1,6 @@
-fsm-lmcps
-fsm
-mode-arbiter
-liquid-mixer
+fsm-timing
 valu3s-uc6
+fsm-lmcps
 rad-core-1-18
 rad-core-17-18
 rad-core-33
