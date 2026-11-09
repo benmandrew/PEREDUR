@@ -1,0 +1,42 @@
+name = "2026-11-09-fretish-order-pooled"
+branch = "feat/fretish-order-pooled"
+description = "Pooled strength and diversity of the FRETISH order arms: each only-<feature> arm and full against base under nsga2-apportion, over the 9 small specs, lift-plus-cruise-full and rad's 10 cores. Per host, a fingerprint phase draws black lasso words over the committed pooled members and plans the pairs design.toml needs; a compare phase decides them. Pooling and the reduction run locally (PLAN.md)."
+
+# Not seed-split: each host takes whole subjects (subjects-<host>.txt). The
+# members are pooled locally over both hosts' seeds and committed before this
+# is enqueued, since av2 holds seeds 0-14 of every results directory and av3
+# 15-29.
+hosts = { av2 = "", av3 = "" }
+
+# fpdraw is EXCLUDE_FROM_ALL, so the build names it.
+build = "sh -c 'cmake --build build-release && cmake --build build-release --target fpdraw'"
+
+# Draw 32768 words a subject over the members (black, 30 s a draw, 8 at a
+# time), evaluate every node on them, and plan the pairs the design's
+# contrasts need with a direction no word refutes: every such pair for an
+# exhaustive subject, and 100 draws an arm for valu3s-uc6,
+# lift-plus-cruise-mini and lift-plus-cruise-full. Resumes per subject.
+[[phases]]
+name = "fingerprint"
+kind = "fingerprint"
+subjects = "experiments/2026-11-09-fretish-order-pooled/subjects-{host}.txt"
+members = "experiments/2026-11-09-fretish-order-pooled/members"
+design = "experiments/2026-11-09-fretish-order-pooled/design.toml"
+work = "experiments/fretish-order-pooled-work"
+out = "experiments/fretish-order-pooled/fp"
+pairs = "experiments/fretish-order-pooled-work/pairs-{host}.csv"
+words = 32768
+seed = 3
+workers = 8
+black_timeout = 30
+
+# Every planned pair, each unrefuted direction at the archive's 20 s.
+[[phases]]
+name = "subsumption"
+kind = "compare"
+pairs = "experiments/fretish-order-pooled-work/pairs-{host}.csv"
+out = "experiments/fretish-order-pooled/subsumption-{host}.csv"
+jobs = 24
+black_timeout = 20
+wall_timeout = 180
+vmem_kb = 8388608
