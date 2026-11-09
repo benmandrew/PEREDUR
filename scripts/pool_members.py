@@ -2,12 +2,16 @@
 """Pool each subject's members over its seeds and arms into nodes.
 
     python3 scripts/pool_members.py DESIGN.toml OUT_DIR [--root .] \\
-        [--subjects SUBJECT...] [--allow-missing]
+        [--subjects SUBJECT... | --subjects-file FILE] [--copy-from DIR] \\
+        [--allow-missing] [--manifest experiments/compare-manifests/NAME.json]
 
-Run locally after `campaign.py collect`, since each lab host holds only its
-own seeds of a results directory and a pool needs all of them. The output is
-committed beside the campaign, so every host's fingerprint phase reads the
-same nodes.
+A pool needs every seed of a subject. Where the hosts split a subject's seeds,
+run this locally after `campaign.py collect` and commit the output. Where one
+host runs every seed of a subject, a `kind = "pool"` campaign phase runs it
+there, with --copy-from naming the committed pool: a subject already in
+that directory is copied byte for byte with its index rows, and only the
+others are pooled from results. The phase writes under an ignored directory,
+so the checkout stays clean for the next stage.
 
 DESIGN.toml is read by scripts/pooled_design.py. For each subject, every arm
 its contrasts name is read at every declared seed, from
@@ -20,9 +24,10 @@ walking arms in design order, seeds in ascending order, and each run's members
 in their own order.
 
 A missing run directory fails the subject unless --allow-missing is given,
-since a pool built from half the seeds reads as a complete one. A run
-directory with no members (no maximal.tsv, or no repair) contributes nothing
-and is counted.
+since a pool built from half the seeds reads as a complete one. So does one
+without run.json, which the search writes last: a killed run leaves its
+directory behind without it. A finished run directory with no members (no
+maximal.tsv, or no repair) contributes nothing and is counted.
 
 Writes OUT_DIR/<subject>.jsonl.gz, one node a line:
 
@@ -33,7 +38,10 @@ Writes OUT_DIR/<subject>.jsonl.gz, one node a line:
 `members` lists every (arm, seed, file) holding the node, the file relative
 to its run directory. The gzip header carries no name or mtime, so the same
 inputs give the same bytes. Also writes OUT_DIR/index.csv with one row per
-subject and arm.
+subject and arm, rewritten after each subject, and one progress row per
+finished subject to OUT_DIR/done-<subjects file stem>.csv (done.csv with
+--subjects), which a --manifest names for `campaign.py status`. Exits 0 only
+when every subject is pooled or copied.
 """
 
 import argparse
@@ -43,7 +51,11 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import socket
+import subprocess
 import sys
+import time
 
 import pooled_design as D
 
@@ -85,7 +97,7 @@ def pool(root: str, subject: dict, allow_missing: bool) -> tuple:
         for seed in subject["seeds"]:
             run = os.path.join(root, subject["results"],
                                D.run_dir_name(subject, arm, seed))
-            if not os.path.isdir(run):
+            if not os.path.isfile(os.path.join(run, "run.json")):
                 stats[arm]["missing"] += 1
                 missing.append(run)
                 continue
@@ -107,9 +119,9 @@ def pool(root: str, subject: dict, allow_missing: bool) -> tuple:
                 stats[arm]["members"] += 1
     if missing and not allow_missing:
         raise D.DesignError(
-            f"{subject['name']}: {len(missing)} run director(ies) missing, "
-            f"first {missing[0]}. Collect every host first, or pass "
-            f"--allow-missing to pool what is there.")
+            f"{subject['name']}: {len(missing)} run director(ies) missing or "
+            f"unfinished (no run.json), first {missing[0]}. Finish or collect "
+            f"every seed first, or pass --allow-missing to pool what is there.")
     return list(nodes.values()), stats
 
 
@@ -127,6 +139,106 @@ INDEX_HEADER = ["subject", "arm", "runs", "runs_missing", "runs_empty",
                 "members", "nodes", "nodes_total", "sha256_jsonl"]
 
 
+def read_index(path: str) -> list:
+    if not os.path.exists(path):
+        return []
+    with open(path, newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def write_index(path: str, rows: list) -> None:
+    rows = sorted(rows, key=lambda r: (r["subject"], r["arm"]))
+    tmp = path + ".part"
+    with open(tmp, "w", newline="") as handle:
+        w = csv.DictWriter(handle, INDEX_HEADER, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(rows)
+    os.replace(tmp, path)
+
+
+def copy_pool(subject: dict, src_dir: str, out: str) -> tuple:
+    """A committed pool, copied byte for byte, and its index rows.
+
+    Refused unless the source index has one row for each of the subject's
+    design arms and no other, and its checksum matches the copied body, so a
+    pool built under another design, or a truncated file, never passes as
+    this one.
+    """
+    name = subject["name"]
+    src = os.path.join(src_dir, f"{name}.jsonl.gz")
+    rows = [r for r in read_index(os.path.join(src_dir, "index.csv"))
+            if r["subject"] == name]
+    if sorted(r["arm"] for r in rows) != sorted(subject["arms"]):
+        raise D.DesignError(
+            f"{name}: {src_dir}/index.csv lists arms "
+            f"{sorted(r['arm'] for r in rows)}, the design "
+            f"{sorted(subject['arms'])}")
+    with gzip.open(src, "rb") as handle:
+        sha = hashlib.sha256(handle.read()).hexdigest()
+    if any(r["sha256_jsonl"] != sha for r in rows):
+        raise D.DesignError(f"{name}: {src} does not match the checksum "
+                            f"{src_dir}/index.csv records")
+    dest = os.path.join(out, f"{name}.jsonl.gz")
+    shutil.copyfile(src, dest + ".part")
+    os.replace(dest + ".part", dest)
+    return rows, int(rows[0]["nodes_total"]), sha
+
+
+def write_manifest(path: str, manifest: dict) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as handle:
+        handle.write(json.dumps(manifest, indent=2) + "\n")
+    os.replace(tmp, path)
+
+
+def checkout_head() -> dict:
+    """The checkout's branch and commit, for status's provenance columns."""
+    out = {}
+    for key, argv in (("branch", ["rev-parse", "--abbrev-ref", "HEAD"]),
+                      ("head", ["rev-parse", "HEAD"])):
+        try:
+            proc = subprocess.run(["git", *argv], capture_output=True,
+                                  text=True, timeout=30)
+            out[key] = proc.stdout.strip() or "?"
+        except (OSError, subprocess.SubprocessError):
+            out[key] = "?"
+    return out
+
+
+def subject_names(args, design: dict) -> tuple:
+    """The subjects to pool, and the progress file's stem."""
+    if args.subjects_file:
+        with open(args.subjects_file) as handle:
+            names = [ln.strip() for ln in handle
+                     if ln.strip() and not ln.startswith("#")]
+        stem = os.path.splitext(os.path.basename(args.subjects_file))[0]
+        return names, f"done-{stem}"
+    return args.subjects or list(design["subjects"]), "done"
+
+
+def pool_one(args, subject: dict) -> tuple:
+    """(index rows, nodes, members, sha, source) for one subject."""
+    name = subject["name"]
+    source = (args.copy_from if args.copy_from and os.path.exists(
+        os.path.join(args.copy_from, f"{name}.jsonl.gz")) else None)
+    if source:
+        rows, n_nodes, sha = copy_pool(subject, source, args.out)
+        return rows, n_nodes, sum(int(r["members"]) for r in rows), sha, source
+    nodes, stats = pool(args.root, subject, args.allow_missing)
+    sha = write_jsonl_gz(os.path.join(args.out, f"{name}.jsonl.gz"), nodes)
+    rows = []
+    for arm in subject["arms"]:
+        s = stats[arm]
+        rows.append({"subject": name, "arm": arm, "runs": s["runs"],
+                     "runs_missing": s["missing"], "runs_empty": s["empty"],
+                     "members": s["members"],
+                     "nodes": sum(arm in n["arms"] for n in nodes),
+                     "nodes_total": len(nodes), "sha256_jsonl": sha})
+    return (rows, len(nodes), sum(s["members"] for s in stats.values()), sha,
+            None)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -134,51 +246,81 @@ def main(argv=None) -> int:
     ap.add_argument("out")
     ap.add_argument("--root", default=".",
                     help="directory the design's results paths are under")
-    ap.add_argument("--subjects", nargs="*", default=None)
+    pick = ap.add_mutually_exclusive_group()
+    pick.add_argument("--subjects", nargs="*", default=None)
+    pick.add_argument("--subjects-file", default=None,
+                      help="text file, one subject a line")
+    ap.add_argument("--copy-from", default=None,
+                    help="committed pool directory; a subject found there is "
+                         "copied rather than pooled")
     ap.add_argument("--allow-missing", action="store_true")
+    ap.add_argument("--manifest", default=None)
     args = ap.parse_args(argv)
     try:
         design = D.load_design(args.design)
-    except D.DesignError as exc:
+        names, stem = subject_names(args, design)
+    except (OSError, D.DesignError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    names = args.subjects or list(design["subjects"])
     unknown = [s for s in names if s not in design["subjects"]]
     if unknown:
         print(f"error: the design has no subject {', '.join(unknown)}",
               file=sys.stderr)
         return 2
+    if args.copy_from and (os.path.abspath(args.copy_from)
+                           == os.path.abspath(args.out)):
+        print("error: --copy-from and OUT_DIR are one directory",
+              file=sys.stderr)
+        return 2
     os.makedirs(args.out, exist_ok=True)
     index_path = os.path.join(args.out, "index.csv")
-    rows = []
-    if os.path.exists(index_path):
-        with open(index_path, newline="") as handle:
-            rows = [r for r in csv.DictReader(handle) if r["subject"] not in names]
-    failed = False
+    progress = os.path.join(args.out, f"{stem}.csv")
+    rows = [r for r in read_index(index_path) if r["subject"] not in names]
+    manifest = None
+    if args.manifest:
+        manifest = {
+            "kind": "pool", "hostname": socket.gethostname(),
+            "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "finished": None,
+            "design": args.design, "subjects": args.subjects_file,
+            "subject_list": names, "copy_from": args.copy_from,
+            "out_dir": args.out,
+            # status counts this file's rows against `planned`.
+            "out": progress, "planned": len(names), "git": checkout_head()}
+        write_manifest(args.manifest, manifest)
+    # Pooling is cheap and deterministic, so a rerun redoes every subject
+    # rather than trusting what a killed pass left.
+    if os.path.exists(progress):
+        os.remove(progress)
+    failed = []
     for name in names:
-        subject = design["subjects"][name]
         try:
-            nodes, stats = pool(args.root, subject, args.allow_missing)
-        except D.DesignError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            failed = True
+            new_rows, n_nodes, n_members, sha, source = pool_one(
+                args, design["subjects"][name])
+        except (OSError, ValueError, D.DesignError) as exc:
+            print(f"error: {exc}", file=sys.stderr, flush=True)
+            failed.append(name)
             continue
-        sha = write_jsonl_gz(os.path.join(args.out, f"{name}.jsonl.gz"), nodes)
-        for arm in subject["arms"]:
-            s = stats[arm]
-            rows.append({"subject": name, "arm": arm, "runs": s["runs"],
-                         "runs_missing": s["missing"], "runs_empty": s["empty"],
-                         "members": s["members"],
-                         "nodes": sum(arm in n["arms"] for n in nodes),
-                         "nodes_total": len(nodes), "sha256_jsonl": sha})
-        print(f"{name}: {len(nodes)} nodes from "
-              f"{sum(s['members'] for s in stats.values())} members", flush=True)
-    rows.sort(key=lambda r: (r["subject"], r["arm"]))
-    with open(index_path, "w", newline="") as handle:
-        w = csv.DictWriter(handle, INDEX_HEADER)
-        w.writeheader()
-        w.writerows(rows)
-    return 1 if failed else 0
+        rows += new_rows
+        write_index(index_path, rows)
+        new = not os.path.exists(progress)
+        with open(progress, "a", newline="") as handle:
+            w = csv.writer(handle)
+            if new:
+                w.writerow(["subject", "source", "nodes", "members",
+                            "sha256_jsonl"])
+            w.writerow([name, "copied" if source else "pooled", n_nodes,
+                        n_members, sha])
+        print(f"{name}: {n_nodes} nodes from {n_members} members"
+              + (f" (copied from {source})" if source else ""), flush=True)
+    write_index(index_path, rows)
+    if manifest is not None:
+        manifest["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        manifest["missing"] = len(failed)
+        write_manifest(args.manifest, manifest)
+    if failed:
+        print(f"incomplete: {', '.join(failed)}", file=sys.stderr, flush=True)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

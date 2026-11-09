@@ -451,7 +451,8 @@ python3 scripts/score_campaign.py ... --dry-run   # the queue and the command
 ```
 
 `score_campaign.py` queues the run directories under `--results` whose name
-ends `_seed<N>` with N in `--seeds`, smallest first by the line count of
+ends `_seed<N>` with N in `--seeds` (and, with `--specs`, `_<spec>_seed<N>`
+for one of those specs), smallest first by the line count of
 `accumulated/index.tsv`, and runs one `score_curves.py --maximality` per
 directory from `--workers` threads, each pinned with `taskset` to a block of
 `--cores` cores and each invocation under coreutils `timeout --wall-cap-s`.
@@ -534,7 +535,13 @@ open direction is planned.
 ```sh
 # Locally, after collecting every host's runs: one node file per subject
 python3 scripts/pool_members.py experiments/x/design.toml experiments/x/members \
-    [--root .] [--subjects fsm ...] [--allow-missing]
+    [--root .] [--subjects fsm ... | --subjects-file FILE] [--allow-missing]
+
+# What a pool phase runs on av2: copy the committed pools, pool the rest
+python3 scripts/pool_members.py experiments/x/design.toml experiments/x-members \
+    --subjects-file experiments/x/subjects-av2.txt \
+    --copy-from experiments/x/members \
+    --manifest experiments/compare-manifests/<campaign>.pool.json
 
 # Locally, after `collect --outputs x-out`
 python3 scripts/pooled_reduce.py experiments/x/design.toml experiments/x/members \
@@ -546,9 +553,15 @@ python3 scripts/pooled_reduce.py experiments/x/design.toml experiments/x/members
 design declares, from `<root>/<results>/<run_dir>`. A member is a file named in
 `accumulated/maximal.tsv` (`members = "maximal"`) or a `repair_N.json` with its
 fitness dropped (`members = "output"`). Identical sorted JSON is one node. A
-missing run directory fails the subject unless `--allow-missing` is given; a
-run with no members is counted in `index.csv` as empty. The gzip output is
-byte-stable.
+missing run directory, or one without `run.json`, fails the subject unless
+`--allow-missing` is given; a run with no members is counted in `index.csv` as
+empty. The gzip output is byte-stable. With `--copy-from DIR`, a subject whose
+`DIR/<subject>.jsonl.gz` exists is copied byte for byte and its `DIR/index.csv`
+rows carried over, once their arms and checksum match; `DIR` must differ from
+the output. Each finished subject appends a row to
+`<out>/done-<subjects-file stem>.csv` (`done.csv` without a file), and the
+exit is 1 if any subject failed. `PEREDUR_POOL_CMD` overrides the command, for
+a test; the `kind = "pool"` declaration is in `docs/dev/campaigns.md`.
 
 `pooled_reduce.py` refuses a subject whose verdict rows differ from the plan it
 re-derives from the design and the fingerprints. It writes

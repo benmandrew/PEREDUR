@@ -653,6 +653,27 @@ check_true(any(kind == "busy" for kind, _ in C.stage_refusals(
                 processes=cprocs), "b")),
            "and a live comparer blocks a stage")
 
+# A pool pass reports as the other unseeded kinds do: subjects finished, from
+# its progress CSV, against the subject list's length in its manifest.
+pprocs = C.live_processes([
+    "python3 python3 scripts/pool_members.py d.toml experiments/pm "
+    "--subjects-file s-av2.txt --manifest experiments/compare-manifests/"
+    "pooled.pool.json"])
+check((pprocs[0].get("kind"), pprocs[0].get("manifest")),
+      ("pool", "experiments/compare-manifests/pooled.pool.json"),
+      "pool_members.py is read as a pool pass naming its manifest")
+prec = C.campaigns_from_compare_manifests([{
+    "kind": "pool", "file": "experiments/compare-manifests/pooled.pool.json",
+    "hostname": "av2", "started": "2026-11-09T10:00:00+0000",
+    "out": "experiments/pm/done-s-av2.csv", "planned": 9,
+    "git": {"branch": "b", "head": "abc1234def"}}])[0]
+check((prec["kind"], prec["label"], prec["out"], prec["rows_planned"]),
+      ("pool", "pool:pooled.pool", "experiments/pm/done-s-av2.csv", 9),
+      "a pool manifest is one record, planned from its subject count")
+pann = dict(prec, rows_done=4, log_mtime=1786459940)
+C.annotate(pann, {"epoch": 1786460000, "processes": pprocs})
+check(pann["state"], "running", "and the pool pass naming it claims it")
+
 
 # ── collect: merge and verification against local fixtures ────────────────────
 
@@ -1331,6 +1352,131 @@ phases = [ { kind = "fingerprint", subjects = "s-{host}.txt", members = "m", wor
     dargs = C.phase_args(dph, [], "av1")
     check(dargs[dargs.index("--design") + 1], "d/design.toml",
           "a declared design is handed to fingerprint_members.py")
+    write_declaration(decl_root, "pooling", """
+    name = "pooling"
+    branch = "b"
+    hosts = { av1 = "", av2 = "" }
+
+    [[phases]]
+    kind = "pool"
+    design = "x/design.toml"
+    subjects = "x/subjects-{host}.txt"
+    copy_from = "x/members"
+    out = "pm"
+
+    [[phases]]
+    kind = "pool"
+    name = "fresh"
+    design = "x/design.toml"
+    subjects = "x/s.txt"
+    out = "pm2"
+    hosts = ["av2"]
+    """)
+    pooling = C.load_campaign("pooling", decl_root)
+    pool_ph, fresh = pooling["phases"]
+    check((pool_ph["kind"], pool_ph["name"], pool_ph["hosts"],
+           fresh["copy_from"], fresh["hosts"]),
+          ("pool", "pool", None, None, ["av2"]),
+          "a pool phase parses, copy_from is optional and hosts narrows it")
+    check(C.phase_args(pool_ph, [], "av1"),
+          ["x/design.toml", "pm", "--subjects-file", "x/subjects-av1.txt",
+           "--copy-from", "x/members",
+           "--manifest", "experiments/compare-manifests/pooling.pool.json"],
+          "its arguments expand {host}, and no --allow-missing is ever passed")
+    check_true(C.phase_command(pool_ph, [], "av1").startswith(C.POOL_CMD + " "),
+               "and its command is pool_members.py's")
+    check((C.phase_seeds(pool_ph, "av1", [0]), C.phase_runs_on(fresh, "av1", [])),
+          ([], False), "it takes no seeds, and runs only where hosts says")
+    for body, expect_in, why in (
+        ('design = "d", subjects = "s", out = "m", copy_from = "m/"',
+         "copy_from and out name one directory", "writing into the committed pool"),
+        ('design = "d", out = "m"', "needs subjects", "a missing subject list"),
+        ('design = "d", subjects = "s", out = "m", words = 3',
+         "unknown key(s) words", "a fingerprint budget"),
+    ):
+        write_declaration(decl_root, "poolbad", f"""
+    name = "poolbad"
+    branch = "b"
+    hosts = {{ av1 = "" }}
+    phases = [ {{ kind = "pool", {body} }} ]
+    """)
+        try:
+            C.load_campaign("poolbad", decl_root)
+            got = "accepted"
+        except C.CampaignError as exc:
+            got = str(exc)
+        check_true(expect_in in got, f"{why} must be refused ({got!r})")
+    pool_root = Path(tempfile.mkdtemp(prefix="pool-inputs-"))
+    try:
+        (pool_root / "x").mkdir()
+        check_true("no design at" in (C.pool_inputs_missing(
+            pool_root, pool_ph, "av1") or ""),
+                   "a pool phase without its design is refused before an attempt")
+        (pool_root / "x" / "design.toml").write_text("draws = 1\n")
+        check_true("no subject list at" in (C.pool_inputs_missing(
+            pool_root, pool_ph, "av1") or "")
+                   and "subjects-av1.txt" in C.pool_inputs_missing(
+                       pool_root, pool_ph, "av1"),
+                   "as is one without the host's subject list")
+        (pool_root / "x" / "subjects-av1.txt").write_text("fsm\n")
+        check_true("no committed pool at" in (C.pool_inputs_missing(
+            pool_root, pool_ph, "av1") or ""),
+                   "and one whose committed pool is missing")
+        (pool_root / "x" / "members").mkdir()
+        check((C.pool_inputs_missing(pool_root, pool_ph, "av1"),
+               C.phase_inputs_missing(pool_root, pool_ph, "av1")), (None, None),
+              "which its inputs in place satisfy")
+    finally:
+        shutil.rmtree(pool_root, ignore_errors=True)
+
+    write_declaration(decl_root, "scorespecs", """
+    name = "scorespecs"
+    branch = "b"
+    profile = "tlsf"
+    hosts = { av1 = "", av2 = "" }
+    phases = [
+      { kind = "score", specs = ["arbiter"], hosts = { av1 = "0-2" } },
+      { kind = "score", name = "all", hosts = { av2 = "0-2" } },
+    ]
+    """)
+    narrowed, whole = C.load_campaign("scorespecs", decl_root)["phases"]
+    nargs = C.phase_args(narrowed, [0, 1, 2], "av1")
+    check((nargs[nargs.index("--specs") + 1], "--specs" in C.phase_args(
+        whole, [0], "av2")), ("arbiter", False),
+          "a score phase's specs reach the scorer, and only when declared")
+    write_declaration(decl_root, "scorespecsbad", """
+    name = "scorespecsbad"
+    branch = "b"
+    profile = "tlsf"
+    hosts = { av1 = "0-2" }
+    phases = [ { kind = "score", specs = [] } ]
+    """)
+    try:
+        C.load_campaign("scorespecsbad", decl_root)
+        got = "accepted"
+    except C.CampaignError as exc:
+        got = str(exc)
+    check_true("specs must be a non-empty array" in got,
+               f"an empty score specs list is refused ({got!r})")
+    import score_campaign as SC  # noqa: E402
+    sc_root = Path(tempfile.mkdtemp(prefix="score-specs-"))
+    try:
+        for name in ("sweep_O_base_x_wkoff_log_rad-core-1-18_seed00",
+                     "sweep_O_base_x_wkoff_log_rad-core-17-18_seed00",
+                     "sweep_O_base_x_wkoff_log_rad-core-1-18_seed01",
+                     "sweep_O_base_x_wkoff_log_rad-core-10_seed00"):
+            (sc_root / name).mkdir()
+        check(sorted(r.name for r in SC.queue_runs(sc_root, [0, 1],
+                                                   ["rad-core-1-18"])),
+              ["sweep_O_base_x_wkoff_log_rad-core-1-18_seed00",
+               "sweep_O_base_x_wkoff_log_rad-core-1-18_seed01"],
+              "score_campaign.py --specs keeps only that spec's run directories, "
+              "and rad-core-1-18 does not match rad-core-17-18")
+        check(len(SC.queue_runs(sc_root, [0])), 3,
+              "and without it every spec at the host's seeds is queued")
+    finally:
+        shutil.rmtree(sc_root, ignore_errors=True)
+
     design_root = Path(tempfile.mkdtemp(prefix="fpdesign-"))
     try:
         (design_root / "s-av1.txt").write_text("fsm\n")
@@ -1540,8 +1686,9 @@ phases = [ { kind = "score", results = "experiments/results-rematch" } ]
          "unknown key(s) jobs on a score phase", "jobs on a score phase"),
         ('phases = [ { kind = "score", results = "x", sweeps = ["R"] } ]',
          "unknown key(s) sweeps on a score phase", "sweeps on a score phase"),
-        ('phases = [ { kind = "score", results = "x", specs = ["a"] } ]',
-         "unknown key(s) specs on a score phase", "specs on a score phase"),
+        ('phases = [ { kind = "score", results = "x", specs = "a" } ]',
+         "specs must be a non-empty array", "a bare string of specs on a "
+         "score phase"),
         ('phases = [ { profile = "arbiter-probe", workers = 2 } ]',
          "unknown key(s) workers on a run phase", "a budget on a run phase"),
         ('phases = [ { kind = "grade", profile = "arbiter-probe" } ]',
@@ -2908,6 +3055,54 @@ out = "experiments/fpo/sub-{host}.csv"
                in cmp_calls.read_text(),
                "with the pair list the fingerprint phase names")
 
+    pool_dir = queue_root / "pooler"
+    pool_dir.mkdir()
+    stub_pool = pool_dir / "stub_pool_members.py"
+    stub_pool.write_text(STUB_RUNNER)
+    pool_calls = pool_dir / "calls.txt"
+    C.POOL_CMD = f"{sys.executable} {stub_pool}"
+    entry = last_entry()
+    entry.update({"state": "done"})
+    C.write_entry(entry["path"], entry)
+    git(repo, "checkout", "-q", "-b", "feat/pooled")
+    write_declaration(repo, "pooled", """
+name = "pooled"
+branch = "feat/pooled"
+build = "true"
+hosts = { local = "" }
+
+[[phases]]
+kind = "pool"
+design = "experiments/pooled/design.toml"
+subjects = "experiments/pooled/subjects-{host}.txt"
+copy_from = "experiments/pooled/members"
+out = "experiments/pooled-members"
+""")
+    git(repo, "add", "experiments/pooled/campaign.toml")
+    git(repo, "commit", "-q", "--no-verify", "-m", "pooled campaign")
+    enqueued = io.StringIO()
+    with contextlib.redirect_stdout(enqueued):
+        code = C.cmd_enqueue(argparse.Namespace(
+            campaign="pooled", host=["local"], max_attempts=3, again=False,
+            dry_run=False))
+    check(code, 0, f"a pool campaign is enqueued: {enqueued.getvalue()}")
+    code, printed = tick()
+    check((code, "no design at" in last_entry()["last_error"],
+           pool_calls.exists()), (1, True, False),
+          "a pool phase without its design fails fast, the driver unreached")
+    (repo / "experiments" / "pooled" / "members").mkdir(parents=True)
+    (repo / "experiments" / "pooled" / "design.toml").write_text("draws = 1\n")
+    (repo / "experiments" / "pooled" / "subjects-local.txt").write_text("fsm\n")
+    code, printed = tick()
+    check((code, last_entry()["state"]), (0, "done"),
+          f"with its inputs in place the pool phase runs: {printed}")
+    check(pool_calls.read_text().strip(),
+          "experiments/pooled/design.toml experiments/pooled-members "
+          "--subjects-file experiments/pooled/subjects-local.txt "
+          "--copy-from experiments/pooled/members "
+          "--manifest experiments/compare-manifests/pooled.pool.json",
+          "the driver got the host's paths and the manifest")
+
     check_true("tick --host av1" in C.cron_line("av1", "/x"),
                "av1 gets a crontab line like the others")
 
@@ -3859,6 +4054,7 @@ contrasts = [
         scheme, level = arm.split("/")
         run = pd_root / "res" / f"{level}_{scheme}_{subject}_seed{seed:02d}"
         (run / "accumulated").mkdir(parents=True)
+        (run / "run.json").write_text("{}")
         if specs is None:
             return
         names = []
@@ -3886,7 +4082,8 @@ contrasts = [
             capture_output=True, text=True)
 
     proc = run_pool()
-    check((proc.returncode, "fsm: 3 run director(ies) missing" in proc.stderr,
+    check((proc.returncode,
+           "fsm: 3 run director(ies) missing or unfinished" in proc.stderr,
            (pmembers / "fsm.jsonl.gz").exists()), (1, True, False),
           f"a pool missing a seed's runs is refused: {proc.stderr}")
     for subject in ("fsm", "big"):
@@ -3927,6 +4124,71 @@ contrasts = [
           "members = \"output\" pools repair files without their fitness")
     write_design("0-1")
     run_pool()
+
+    # A host's pool phase: fsm is in the committed pool and copied, big is
+    # pooled from results.
+    committed, host_out = pd_root / "committed", pd_root / "host-members"
+    committed.mkdir()
+    shutil.copy(pmembers / "fsm.jsonl.gz", committed / "fsm.jsonl.gz")
+    with open(pmembers / "index.csv", newline="") as handle:
+        crow = [r for r in csv.DictReader(handle) if r["subject"] == "fsm"]
+    with open(committed / "index.csv", "w", newline="") as handle:
+        w = csv.DictWriter(handle, list(crow[0]))
+        w.writeheader()
+        w.writerows(crow)
+    host_subjects = pd_root / "subjects-h.txt"
+    host_subjects.write_text("fsm\nbig\n")
+    # The committed copy has a seed the results lack, so a copy is visible.
+    shutil.rmtree(pd_root / "res" / "full_x_fsm_seed01")
+    host_manifest = pd_root / "pool.json"
+
+    def run_host_pool() -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(POOL_MEMBERS_PY), str(design), str(host_out),
+             "--root", str(pd_root), "--subjects-file", str(host_subjects),
+             "--copy-from", str(committed), "--manifest", str(host_manifest)],
+            capture_output=True, text=True)
+
+    proc = run_host_pool()
+    check(proc.returncode, 0, f"a host pool copies and pools: {proc.stderr}")
+    check(((host_out / "fsm.jsonl.gz").read_bytes()
+           == (committed / "fsm.jsonl.gz").read_bytes(),
+           (host_out / "big.jsonl.gz").read_bytes()
+           == (pmembers / "big.jsonl.gz").read_bytes()), (True, True),
+          "the committed subject is copied byte for byte, the other pooled")
+    hrows = list(csv.DictReader(open(host_out / "index.csv", newline="")))
+    check(([r for r in hrows if r["subject"] == "fsm"] == crow,
+           len([r for r in hrows if r["subject"] == "big"])), (True, 3),
+          "and the copied subject's index rows are carried over unchanged")
+    done = list(csv.DictReader(open(host_out / "done-subjects-h.csv")))
+    hman = json.loads(host_manifest.read_text())
+    check(([(r["subject"], r["source"]) for r in done], hman["kind"],
+           hman["planned"], hman["out"], hman["missing"]),
+          ([("fsm", "copied"), ("big", "pooled")], "pool", 2,
+           str(host_out / "done-subjects-h.csv"), 0),
+          "one progress row per subject, which the manifest names for status")
+    (pd_root / "res" / "only_x_big_seed01" / "run.json").unlink()
+    proc = run_host_pool()
+    check((proc.returncode, "big: 1 run director(ies) missing or unfinished"
+           in proc.stderr), (1, True),
+          f"a run without run.json fails its subject: {proc.stderr}")
+    check([r["subject"] for r in csv.DictReader(
+        open(host_out / "done-subjects-h.csv"))], ["fsm"],
+          "and the progress file holds only what this pass finished")
+    (pd_root / "res" / "only_x_big_seed01" / "run.json").write_text("{}")
+    with _gzip.open(committed / "fsm.jsonl.gz", "wt") as handle:
+        handle.write("{}\n")
+    proc = run_host_pool()
+    check((proc.returncode, "does not match the checksum" in proc.stderr),
+          (1, True), "a committed pool its index does not describe is refused")
+    shutil.copy(pmembers / "fsm.jsonl.gz", committed / "fsm.jsonl.gz")
+    proc = subprocess.run(
+        [sys.executable, str(POOL_MEMBERS_PY), str(design), str(committed),
+         "--subjects-file", str(host_subjects), "--copy-from", str(committed)],
+        capture_output=True, text=True)
+    check((proc.returncode, "one directory" in proc.stderr), (2, True),
+          "and so is a pool written over the committed one")
+    put_run("fsm", "x/full", 1, None)
 
     pwork, pout = pd_root / "work", pd_root / "out"
     psubjects = pd_root / "subjects.txt"

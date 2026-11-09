@@ -113,6 +113,11 @@ COMPARE_PAIRS_CMD = os.environ.get("PEREDUR_COMPARE_PAIRS_CMD",
 # pair list a later compare phase decides (scripts/fingerprint_members.py).
 FINGERPRINT_CMD = os.environ.get("PEREDUR_FINGERPRINT_CMD",
                                  f"{REMOTE_PYTHON} scripts/fingerprint_members.py")
+# The pooling twin, for a `kind = "pool"` phase: pools a host's subjects into
+# the nodes a fingerprint phase reads, copying any subject already committed
+# (scripts/pool_members.py).
+POOL_CMD = os.environ.get("PEREDUR_POOL_CMD",
+                          f"{REMOTE_PYTHON} scripts/pool_members.py")
 # Where a compare phase's manifest goes on the host. A fixed directory rather
 # than beside the output CSV, which may sit at any depth: status finds the
 # manifests with one shallow `find` instead of a walk of experiments/.
@@ -519,6 +524,10 @@ def live_processes(ps_lines: list[str]) -> list[dict]:
                           "args": args})
         elif comm.startswith("python") and "fingerprint_members.py" in args:
             found.append({"comm": comm, "profile": None, "kind": "fingerprint",
+                          "manifest": option_of_args(args, "--manifest"),
+                          "args": args})
+        elif comm.startswith("python") and "pool_members.py" in args:
+            found.append({"comm": comm, "profile": None, "kind": "pool",
                           "manifest": option_of_args(args, "--manifest"),
                           "args": args})
     return found
@@ -1683,13 +1692,18 @@ CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
 # repairs, fingerprints every node on them and plans the word-pruned pair list
 # for a compare phase after it (scripts/fingerprint_members.py). It is not
 # seed-split either: its paths expand `{host}` and its `hosts` is an array.
-PHASE_KINDS = ("run", "score", "compare", "fingerprint")
-UNSEEDED_KINDS = ("compare", "fingerprint")
+#
+# A fifth, `kind = "pool"`, pools a host's subjects into the nodes a
+# fingerprint phase reads (scripts/pool_members.py), for subjects whose every
+# seed that host ran. With `copy_from`, a subject already in that committed
+# pool is copied instead. Unseeded, as the two above.
+PHASE_KINDS = ("run", "score", "compare", "fingerprint", "pool")
+UNSEEDED_KINDS = ("compare", "fingerprint", "pool")
 RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts"}
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s")
 SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
-                    *SCORE_BUDGET_KEYS}
+                    "specs", *SCORE_BUDGET_KEYS}
 COMPARE_BUDGET_KEYS = ("jobs", "black_timeout", "wall_timeout", "vmem_kb")
 COMPARE_PHASE_KEYS = {"name", "kind", "pairs", "out", "hosts",
                       *COMPARE_BUDGET_KEYS}
@@ -1697,9 +1711,12 @@ FINGERPRINT_BUDGET_KEYS = ("words", "seed", "workers", "black_timeout")
 FINGERPRINT_PATH_KEYS = ("subjects", "members", "work", "out")
 FINGERPRINT_PHASE_KEYS = {"name", "kind", "pairs", "hosts", "design",
                           *FINGERPRINT_PATH_KEYS, *FINGERPRINT_BUDGET_KEYS}
+POOL_PATH_KEYS = ("design", "subjects", "out")
+POOL_PHASE_KEYS = {"name", "kind", "hosts", "copy_from", *POOL_PATH_KEYS}
 KIND_PHASE_KEYS = {"run": RUN_PHASE_KEYS, "score": SCORE_PHASE_KEYS,
                    "compare": COMPARE_PHASE_KEYS,
-                   "fingerprint": FINGERPRINT_PHASE_KEYS}
+                   "fingerprint": FINGERPRINT_PHASE_KEYS,
+                   "pool": POOL_PHASE_KEYS}
 
 
 def parse_seed_range(text: str, where: str) -> list:
@@ -1893,6 +1910,10 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
             normalised.append(normalise_fingerprint_phase(phase, where, name,
                                                           seeds_by_host))
             continue
+        if kind == "pool":
+            normalised.append(normalise_pool_phase(phase, where, name,
+                                                   seeds_by_host))
+            continue
         profile = phase.get("profile", raw.get("profile"))
         if kind == "score":
             results = phase.get("results")
@@ -2004,8 +2025,14 @@ def normalise_score_phase(phase: dict, where: str, profile,
         import score_campaign  # noqa: PLC0415
         budgets["wall_cap_s"] = score_campaign.wall_cap_default(
             budgets["deadline_s"])
+    specs = phase.get("specs")
+    if specs is not None and not (
+            isinstance(specs, list) and specs
+            and all(isinstance(v, str) and v for v in specs)):
+        raise CampaignError(f"{where}: specs must be a non-empty array of "
+                            f"strings")
     return {"name": phase.get("name", Path(out).name), "kind": "score",
-            "profile": profile, "jobs": None, "sweeps": None, "specs": None,
+            "profile": profile, "jobs": None, "sweeps": None, "specs": specs,
             "hosts": phase_hosts, "results": results, "out": out, **budgets}
 
 
@@ -2142,6 +2169,30 @@ def normalise_fingerprint_phase(phase: dict, where: str, campaign: str,
     return record
 
 
+def normalise_pool_phase(phase: dict, where: str, campaign: str,
+                         seeds_by_host: dict) -> dict:
+    """A pool phase's record: the design, the host's subject list and the
+    output directory, and optionally the committed pool to copy from. It
+    takes no budget, and never --allow-missing, so a missing seed fails it."""
+    record: dict = {"name": phase.get("name") or "pool", "kind": "pool",
+                    "campaign": campaign, "profile": None, "jobs": None,
+                    "sweeps": None, "specs": None}
+    record.update(normalise_unseeded_paths(phase, where, "pool",
+                                           POOL_PATH_KEYS, ("copy_from",)))
+    if not isinstance(record["name"], str) or any(
+            c in record["name"] for c in "/{} "):
+        raise CampaignError(f"{where}: name must be a non-empty string "
+                            f"without '/', spaces or braces")
+    if record["copy_from"] is not None and (
+            record["copy_from"].rstrip("/") == record["out"].rstrip("/")):
+        raise CampaignError(f"{where}: copy_from and out name one directory; "
+                            f"out must not be the committed pool, or the "
+                            f"pass leaves the checkout dirty")
+    record["hosts"] = normalise_unseeded_hosts(phase, where, "pool",
+                                               seeds_by_host)
+    return record
+
+
 def expand_host(path: str, host: str) -> str:
     """A compare phase's path with ``{host}`` replaced. format() rather than
     replace() so a stray brace or another placeholder fails at load time."""
@@ -2246,6 +2297,8 @@ def phase_args(phase: dict, seeds: list, host: str | None = None) -> list:
         return compare_phase_args(phase, host or "")
     if phase_kind(phase) == "fingerprint":
         return fingerprint_phase_args(phase, host or "")
+    if phase_kind(phase) == "pool":
+        return pool_phase_args(phase, host or "")
     if phase_kind(phase) == "score":
         return score_phase_args(phase, seeds)
     args = ["--profile", phase["profile"]]
@@ -2266,6 +2319,8 @@ def score_phase_args(phase: dict, seeds: list) -> list:
     args = ["--results", phase["results"], "--out", phase["out"]]
     for key in SCORE_BUDGET_KEYS:
         args += [f"--{key.replace('_', '-')}", str(phase[key])]
+    if phase.get("specs"):
+        args += ["--specs", *phase["specs"]]
     return args + ["--seeds", *[str(s) for s in seeds]]
 
 
@@ -2291,6 +2346,17 @@ def fingerprint_phase_args(phase: dict, host: str) -> list:
     return args + ["--manifest", compare_manifest_path(phase)]
 
 
+def pool_phase_args(phase: dict, host: str) -> list:
+    """pool_members.py's arguments on one host: the design and output
+    directory, the host's subject list, the committed pool if declared, and
+    the manifest."""
+    args = [expand_host(phase["design"], host), expand_host(phase["out"], host),
+            "--subjects-file", expand_host(phase["subjects"], host)]
+    if phase.get("copy_from"):
+        args += ["--copy-from", expand_host(phase["copy_from"], host)]
+    return args + ["--manifest", compare_manifest_path(phase)]
+
+
 def phase_launcher(phase: dict) -> str:
     """The command a phase's arguments follow: runner, scorer or comparer."""
     kind = phase_kind(phase)
@@ -2298,6 +2364,8 @@ def phase_launcher(phase: dict) -> str:
         return COMPARE_PAIRS_CMD
     if kind == "fingerprint":
         return FINGERPRINT_CMD
+    if kind == "pool":
+        return POOL_CMD
     return SCORER_CMD if kind == "score" else RUNNER_CMD
 
 
@@ -2978,6 +3046,32 @@ def fingerprint_inputs_missing(root: Path, phase: dict, host: str):
     return None
 
 
+def pool_inputs_missing(root: Path, phase: dict, host: str):
+    """Why a pool phase cannot run here, or None: its design, subject list
+    and committed pool are inputs the checkout must hold."""
+    for key, what in (("design", "design"), ("subjects", "subject list")):
+        path = root / expand_host(phase[key], host)
+        if not path.is_file():
+            return (f"no {what} at {path} for pool phase {phase['name']} — "
+                    f"fix {key} = ... in campaign.toml")
+    if phase.get("copy_from"):
+        path = root / expand_host(phase["copy_from"], host)
+        if not path.is_dir():
+            return (f"no committed pool at {path} for pool phase "
+                    f"{phase['name']} — fix copy_from = ... in campaign.toml")
+    return None
+
+
+def phase_inputs_missing(root: Path, phase: dict, host: str):
+    """Why an unseeded phase cannot run here, or None."""
+    kind = phase_kind(phase)
+    if kind == "compare":
+        return pairs_file_missing(root, phase, host)
+    if kind == "pool":
+        return pool_inputs_missing(root, phase, host)
+    return fingerprint_inputs_missing(root, phase, host)
+
+
 def results_dir_missing(root: Path, phase: dict):
     """Why a score phase cannot run here, or None.
 
@@ -3388,9 +3482,7 @@ def tick_compare_phase(entry: dict, campaign: dict, phase: dict, index: int,
         write_entry(entry["path"], entry)
         print(f"tick: {entry['file']} phase {index} ({phase['name']}) skipped")
         return 0
-    blocked = (pairs_file_missing(root, phase, host)
-               if phase_kind(phase) == "compare"
-               else fingerprint_inputs_missing(root, phase, host))
+    blocked = phase_inputs_missing(root, phase, host)
     if blocked is not None and not args.dry_run:
         fail_or_requeue(entry, blocked)
         write_entry(entry["path"], entry)
@@ -3747,8 +3839,8 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--outputs", metavar="NAME",
                          help="Pull each host's experiments/NAME/ into "
                               "experiments/NAME/<host>/ and join nothing, for "
-                              "fingerprint and compare passes whose outputs "
-                              "are a tree. --profile, --csv and --results-dir "
+                              "pool, fingerprint and compare passes whose "
+                              "outputs are a tree. --profile, --csv and --results-dir "
                               "are not read.")
     add_colour_flag(collect)
     collect.set_defaults(func=cmd_collect)
