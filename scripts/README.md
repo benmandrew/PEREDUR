@@ -484,7 +484,8 @@ python3 scripts/compare_pairs.py experiments/rq2/pairs-av1.csv \
     --manifest experiments/compare-manifests/<campaign>.subsumption.json
 ```
 
-One `compare --repairs <a> --ideals <b> --timeout <black>` call per pair, each
+One `compare --repairs <a> --ideals <b> --timeout <black>` call per pair
+(`--timeout` is seconds per solver direction, default 20), each
 through two temporary directories of one symlink, under `ulimit -v` and
 `timeout <wall>`. It appends `id,relation,rc,secs` per pair, where `relation`
 is `a` relative to `b` (`weaker` means `b` strictly implies `a`), `undecided`
@@ -495,6 +496,69 @@ list has a row, so a killed or partial pass is retried rather than marked done.
 `build-release`, which is the build the tick has just verified. A tick refuses
 the phase by name where the host's pair list is missing.
 `PEREDUR_COMPARE_PAIRS_CMD` overrides the command, for a test.
+
+A fourth pair-list column, `dirs` (`fwd`, `rev` or `both`), is passed to
+`compare` as `COMPARE_DIRECTIONS` and adds `a_implies_b,b_implies_a` to the
+output: `1` or `0` from compare's `DIR` line, `?` for a queried direction
+with no answer, `0` for one not queried.
+
+### Fingerprinting pooled members
+
+```sh
+# What a fingerprint phase runs on av2
+python3 scripts/fingerprint_members.py experiments/x/subjects-av2.txt \
+    experiments/x/members experiments/x-work experiments/x-out/fp \
+    --pairs experiments/x-work/pairs-av2.csv --words 32768 --seed 3 \
+    --workers 8 --black-timeout 30 --design experiments/x/design.toml \
+    --manifest experiments/compare-manifests/<campaign>.fingerprint.json
+```
+
+Per subject: node files and the members' LTL go under the work directory,
+black's lasso words (`scripts/draw_black.py`, through `build-release/fpdraw ltl`) and
+every node's fingerprint (`fpdraw eval`) under the output directory, and the
+word-pruned pair list `<work>/<subject>/pairs.csv` with a `dirs` column for
+the compare phase after it. Progress is one row per finished subject in
+`<out>/done-<subjects stem>.csv`, and a rerun resumes from it. It exits 0 only
+when every subject is done. `PEREDUR_FINGERPRINT_CMD` overrides the command,
+for a test. The `kind = "fingerprint"` declaration is in
+`docs/dev/campaigns.md`.
+
+`--design` reads a pooled design (`scripts/pooled_design.py` documents the
+TOML) and narrows each subject's plan to the pairs its contrasts need. A
+sampled subject's draw orders are written to
+`<out>/<subject>/order-<scheme>__<level>.txt`. Without it, every pair with an
+open direction is planned.
+
+### Pooling members and reducing a pooled pass
+
+```sh
+# Locally, after collecting every host's runs: one node file per subject
+python3 scripts/pool_members.py experiments/x/design.toml experiments/x/members \
+    [--root .] [--subjects fsm ...] [--allow-missing]
+
+# Locally, after `collect --outputs x-out`
+python3 scripts/pooled_reduce.py experiments/x/design.toml experiments/x/members \
+    experiments/x-out experiments/x/reduced [--subjects ...] \
+    [--ball-k 1 3 5] [--no-balls] [--match 0|none]
+```
+
+`pool_members.py` reads every arm a subject's contrasts name at every seed the
+design declares, from `<root>/<results>/<run_dir>`. A member is a file named in
+`accumulated/maximal.tsv` (`members = "maximal"`) or a `repair_N.json` with its
+fitness dropped (`members = "output"`). Identical sorted JSON is one node. A
+missing run directory fails the subject unless `--allow-missing` is given; a
+run with no members is counted in `index.csv` as empty. The gzip output is
+byte-stable.
+
+`pooled_reduce.py` refuses a subject whose verdict rows differ from the plan it
+re-derives from the design and the fingerprints. It writes
+`strength/contrasts.csv` (frontier sizes and net subsumption under the
+`decided`, `imp` and `non` readings of an undecided direction, or ratio
+estimates with 95% half-widths for a sampled subject), `strength/relations.csv`,
+`strength/summary.txt` (an exact signed-rank test per contrast over subjects,
+Holm-corrected within each `family`) and, unless `--no-balls`,
+`ball-radii/prc-k<K>.csv` and `report-k<K>.txt`. `--match` seeds the
+subsampling of a ball unit's groups to its smallest one.
 
 ### The queue
 
@@ -684,6 +748,11 @@ one below over run names rather than keys: a run on both hosts is written
 once where the two copies are byte-identical and reported as MISMATCH where
 they differ, a curve whose header comes from another `score_curves.py`
 vintage is refused, and a host that answers nothing is INCOMPLETE.
+
+`collect --outputs NAME` pulls each host's `experiments/NAME/` into
+`experiments/NAME/<host>/` the same way and joins nothing, for fingerprint
+and compare passes whose outputs are a tree. A host with no files is
+INCOMPLETE.
 
 `collect` rsyncs each host's per-run tree and results CSV back and merges them
 on the natural key through `merge_experiments.py`, then verifies the outcome

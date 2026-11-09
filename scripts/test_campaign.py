@@ -927,6 +927,36 @@ try:
     check(C.cmd_collect(collect_args(curves="curves-fixture")), 0,
           "and the recovered host collects clean afterwards")
     check(C.count_csv_rows(merged_curves), 10, "restoring every row")
+
+    # ── collect --outputs ─────────────────────────────────────────────────────
+    #
+    # A fingerprint pass and the compare pass after it leave a tree, not one
+    # CSV per run: each host's directory comes across whole and nothing is
+    # joined. A host with nothing there is INCOMPLETE.
+    for h in ("h1", "h2"):
+        tree = hosts[h] / "experiments" / "analysis-fixture" / "fp" / f"s-{h}"
+        tree.mkdir(parents=True)
+        (tree / "fp.tsv").write_text("x\t0f\n")
+        (hosts[h] / "experiments" / "analysis-fixture"
+         / f"subsumption-{h}.csv").write_text("id,relation\n")
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        code = C.cmd_collect(collect_args(outputs="analysis-fixture"))
+    check(code, 0, f"an outputs collect from two hosts exits 0: "
+                   f"{buffer.getvalue()}")
+    got_out = dest / "experiments" / "analysis-fixture"
+    check_true((got_out / "h1" / "fp" / "s-h1" / "fp.tsv").is_file()
+               and (got_out / "h2" / "subsumption-h2.csv").is_file(),
+               "each host's tree lands under <out>/<host>/")
+    check_true(not (dest / "experiments" / "analysis-fixture.csv").exists(),
+               "and nothing is joined")
+    shutil.rmtree(hosts["h2"] / "experiments" / "analysis-fixture")
+    shutil.rmtree(got_out / "h2")
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        code = C.cmd_collect(collect_args(outputs="analysis-fixture"))
+    check((code, "INCOMPLETE" in buffer.getvalue() and "h2" in buffer.getvalue()),
+          (1, True), "a host with no outputs makes the collect INCOMPLETE")
 finally:
     merge.REPO_ROOT = real_merge_root
     shutil.rmtree(tmp, ignore_errors=True)
@@ -1224,6 +1254,120 @@ name = "badpairs"
 branch = "b"
 hosts = {{ av1 = "", av2 = "" }}
 phases = [ {{ kind = "compare", {body} }} ]
+""")
+        check_true(expect_in in got, f"{why} must be refused ({got!r})")
+
+    # ── a fingerprint phase ───────────────────────────────────────────────────
+    #
+    # Not seed-split either: four paths and an optional joined pair list, all
+    # expanding {host}, and budgets defaulting to fingerprint_members.py's.
+    write_declaration(decl_root, "fprint", """
+name = "fprint"
+branch = "campaign/fp"
+hosts = { av1 = "", av2 = "", av3 = "" }
+
+[[phases]]
+name = "draw"
+kind = "fingerprint"
+subjects = "experiments/fprint/subjects-{host}.txt"
+members = "experiments/fprint/members"
+work = "experiments/fp-work"
+out = "experiments/fp-out/fp"
+pairs = "experiments/fp-work/pairs-{host}.csv"
+workers = 4
+
+[[phases]]
+name = "subsumption"
+kind = "compare"
+pairs = "experiments/fp-work/pairs-{host}.csv"
+out = "experiments/fp-out/subsumption-{host}.csv"
+""")
+    fprint = C.load_campaign("fprint", decl_root)
+    fp_phase = fprint["phases"][0]
+    check((fp_phase["kind"], fp_phase["name"], fp_phase["words"],
+           fp_phase["seed"], fp_phase["workers"], fp_phase["black_timeout"],
+           fp_phase["hosts"]),
+          ("fingerprint", "draw", 32768, 3, 4, 30, None),
+          "a fingerprint phase parses, its budgets defaulting to "
+          "fingerprint_members.py's")
+    check((fprint["config_dirs"], fprint["results_dirs"]["av1"]), ([], []),
+          "and reads no configs or results directory")
+    check(C.phase_args(fp_phase, [], "av2"),
+          ["experiments/fprint/subjects-av2.txt", "experiments/fprint/members",
+           "experiments/fp-work", "experiments/fp-out/fp",
+           "--pairs", "experiments/fp-work/pairs-av2.csv",
+           "--words", "32768", "--seed", "3", "--workers", "4",
+           "--black-timeout", "30",
+           "--manifest", "experiments/compare-manifests/fprint.draw.json"],
+          "{host} is expanded per host, and every budget is stated")
+    check_true(C.phase_command(fp_phase, [], "av1").startswith(
+        C.FINGERPRINT_CMD + " experiments/fprint/subjects-av1.txt "),
+               "and its command is fingerprint_members.py's")
+    check((C.phase_seeds(fp_phase, "av1", [0]),
+           all(C.phase_runs_on(fp_phase, h, []) for h in C.HOSTS)),
+          ([], True), "it takes no seeds and runs on every declared host")
+    check(C.new_entry(fprint, "av3", 4, "b" * 40)["phase_seeds"], ["", ""],
+          "an entry for the chain freezes no seeds for either phase")
+
+    write_declaration(decl_root, "fpnopairs", """
+name = "fpnopairs"
+branch = "b"
+hosts = { av1 = "", av2 = "" }
+phases = [ { kind = "fingerprint", subjects = "s.txt", members = "m", work = "w", out = "o", hosts = ["av2"], seed = 0 } ]
+""")
+    nop = C.load_campaign("fpnopairs", decl_root)["phases"][0]
+    check((nop["pairs"], nop["seed"], C.phase_runs_on(nop, "av1", []),
+           "--pairs" in C.phase_args(nop, [], "av2")),
+          (None, 0, False, False),
+          "pairs is optional, seed may be 0, and hosts narrows the list")
+
+    write_declaration(decl_root, "fpdesign", """
+name = "fpdesign"
+branch = "b"
+hosts = { av1 = "", av2 = "" }
+phases = [ { kind = "fingerprint", subjects = "s-{host}.txt", members = "m", work = "w", out = "o", design = "d/design.toml" } ]
+""")
+    dph = C.load_campaign("fpdesign", decl_root)["phases"][0]
+    dargs = C.phase_args(dph, [], "av1")
+    check(dargs[dargs.index("--design") + 1], "d/design.toml",
+          "a declared design is handed to fingerprint_members.py")
+    design_root = Path(tempfile.mkdtemp(prefix="fpdesign-"))
+    try:
+        (design_root / "s-av1.txt").write_text("fsm\n")
+        (design_root / "m").mkdir()
+        check_true("no design at" in (C.fingerprint_inputs_missing(
+            design_root, dph, "av1") or ""),
+                   "and a missing design file is refused before an attempt")
+        (design_root / "d").mkdir()
+        (design_root / "d" / "design.toml").write_text("draws = 1\n")
+        check(C.fingerprint_inputs_missing(design_root, dph, "av1"), None,
+              "which a present one satisfies")
+    finally:
+        shutil.rmtree(design_root, ignore_errors=True)
+
+    for body, expect_in, why in (
+        ('members = "m", work = "w", out = "o"', "needs subjects",
+         "a missing subject list"),
+        ('subjects = "s", members = "m", out = "o"', "needs work",
+         "a missing work directory"),
+        ('subjects = "s", members = "m", work = "w", out = "o", jobs = 2',
+         "unknown key(s) jobs", "a compare budget"),
+        ('subjects = "s", members = "m", work = "w", out = "o", profile = "x"',
+         "unknown key(s) profile", "a profile"),
+        ('subjects = "s-{seed}", members = "m", work = "w", out = "o"',
+         "only {host}", "a placeholder other than {host}"),
+        ('subjects = "s", members = "m", work = "w", out = "o", words = 0',
+         "at least 1", "zero words"),
+        ('subjects = "s", members = "m", work = "w", out = "o", seed = -1',
+         "at least 0", "a negative seed"),
+        ('subjects = "s", members = "m", work = "w", out = "o", '
+         'hosts = { av1 = "0" }', "array of host names", "a seed table"),
+    ):
+        got = declaration_error(decl_root, "badfp", f"""
+name = "badfp"
+branch = "b"
+hosts = {{ av1 = "", av2 = "" }}
+phases = [ {{ kind = "fingerprint", {body} }} ]
 """)
         check_true(expect_in in got, f"{why} must be refused ({got!r})")
 
@@ -2681,6 +2825,89 @@ wall_timeout = 9
           "a pass that exits non-zero, as a partial one does, is not done")
     (cmp_dir / "exit-code").unlink()
 
+    # ── a fingerprint phase, then the compare phase it plans ─────────────────
+    #
+    # The fingerprint phase is refused by name where its committed inputs are
+    # missing, and its pair list is what unblocks the compare phase after it.
+    fp_dir = queue_root / "fingerprinter"
+    fp_dir.mkdir()
+    stub_fp = fp_dir / "stub_fingerprint_members.py"
+    stub_fp.write_text(STUB_RUNNER)
+    fp_calls = fp_dir / "calls.txt"
+    C.FINGERPRINT_CMD = f"{sys.executable} {stub_fp}"
+    cmp_calls.unlink()
+    entry = last_entry()
+    entry.update({"state": "done"})
+    C.write_entry(entry["path"], entry)
+    git(repo, "checkout", "-q", "-b", "feat/fingerprinted")
+    write_declaration(repo, "fingerprinted", """
+name = "fingerprinted"
+branch = "feat/fingerprinted"
+build = "true"
+hosts = { local = "" }
+
+[[phases]]
+kind = "fingerprint"
+name = "draw"
+subjects = "experiments/fingerprinted/subjects-{host}.txt"
+members = "experiments/fingerprinted/members"
+work = "experiments/fpw"
+out = "experiments/fpo"
+pairs = "experiments/fpw/pairs-{host}.csv"
+words = 64
+
+[[phases]]
+kind = "compare"
+name = "sub"
+pairs = "experiments/fpw/pairs-{host}.csv"
+out = "experiments/fpo/sub-{host}.csv"
+""")
+    git(repo, "add", "experiments/fingerprinted/campaign.toml")
+    git(repo, "commit", "-q", "--no-verify", "-m", "fingerprinted campaign")
+    enqueued = io.StringIO()
+    with contextlib.redirect_stdout(enqueued):
+        code = C.cmd_enqueue(argparse.Namespace(
+            campaign="fingerprinted", host=["local"], max_attempts=3,
+            again=False, dry_run=False))
+    check(code, 0, f"a fingerprint-then-compare chain is enqueued: "
+                   f"{enqueued.getvalue()}")
+    code, printed = tick()
+    check(code, 1, "a fingerprint phase with no subject list fails fast")
+    entry = last_entry()
+    check_true("no subject list" in entry["last_error"]
+               and "subjects-local.txt" in entry["last_error"],
+               f"naming the expanded path: {entry['last_error']!r}")
+    check((entry["attempts"], entry["phase"]), (1, 0), "costing an attempt")
+    check_true(not fp_calls.exists(), "with the driver never reached")
+
+    (repo / "experiments" / "fingerprinted" / "members").mkdir(parents=True)
+    (repo / "experiments" / "fingerprinted" / "subjects-local.txt").write_text(
+        "fsm\n")
+    code, printed = tick()
+    check(code, 0, f"with its inputs in place the fingerprint phase runs: "
+                   f"{printed}")
+    check((last_entry()["state"], last_entry()["phase"]), ("queued", 1),
+          "and the entry moves on to the compare phase")
+    check(fp_calls.read_text().strip(),
+          "experiments/fingerprinted/subjects-local.txt "
+          "experiments/fingerprinted/members experiments/fpw experiments/fpo "
+          "--pairs experiments/fpw/pairs-local.csv --words 64 --seed 3 "
+          "--workers 8 --black-timeout 30 "
+          "--manifest experiments/compare-manifests/fingerprinted.draw.json",
+          "the driver got the host's paths and every budget")
+    code, printed = tick()
+    check((code, "no pair list" in last_entry()["last_error"]), (1, True),
+          "the compare phase waits on the pair list the stub never wrote")
+    (repo / "experiments" / "fpw").mkdir(parents=True)
+    (repo / "experiments" / "fpw" / "pairs-local.csv").write_text(
+        "id,a_path,b_path,dirs\n")
+    code, printed = tick()
+    check((code, last_entry()["state"]), (0, "done"),
+          f"and runs once it is there, finishing the chain: {printed}")
+    check_true("experiments/fpw/pairs-local.csv experiments/fpo/sub-local.csv"
+               in cmp_calls.read_text(),
+               "with the pair list the fingerprint phase names")
+
     check_true("tick --host av1" in C.cron_line("av1", "/x"),
                "av1 gets a crontab line like the others")
 
@@ -3378,8 +3605,453 @@ try:
               f"a pass with an id still missing exits non-zero: {proc.stderr}")
         check_true("incomplete: 1 of 9" in proc.stderr, "and says how many")
     (cp_root / "ro").chmod(0o700)
+
+    # A dirs column: COMPARE_DIRECTIONS reaches compare, the DIR line becomes
+    # two columns, and a pair the outer timeout killed reads ? where it was
+    # asked and 0 where the planner had already refuted the direction.
+    dir_bin = cp_root / "compare-dirs"
+    dir_bin.write_text("""#!/bin/sh
+name=$(ls "$2")
+case "$name" in
+  hang*) sleep 10 ;;
+esac
+case "$COMPARE_DIRECTIONS" in
+  fwd) echo "DIR\t$name\tideal.json\t1\t0" >&2; echo "$name : strictly stronger than ideal" ;;
+  rev) echo "DIR\t$name\tideal.json\t0\t?" >&2; echo "$name : timeout" ;;
+  *) echo "DIR\t$name\tideal.json\t1\t1" >&2; echo "$name : equivalent to ideal" ;;
+esac
+""")
+    dir_bin.chmod(0o755)
+    dpairs = cp_root / "dpairs.csv"
+    dpairs.write_text("id,a_path,b_path,dirs\n"
+                      f"d0,{cp_root / 'eq.json'},{cp_root / 'ideal.json'},both\n"
+                      f"d1,{cp_root / 'eq.json'},{cp_root / 'ideal.json'},fwd\n"
+                      f"d2,{cp_root / 'eq.json'},{cp_root / 'ideal.json'},rev\n"
+                      f"d3,{cp_root / 'hang.json'},{cp_root / 'ideal.json'},fwd\n")
+    dout = cp_root / "dout.csv"
+    proc = subprocess.run(
+        [sys.executable, str(COMPARE_PAIRS_PY), str(dpairs), str(dout),
+         "--compare", str(dir_bin), "--wall-timeout", "1", "--jobs", "2"],
+        capture_output=True, text=True,
+        env=dict(os.environ, COMPARE_PAIRS_TMP=str(cp_root / "tmp")))
+    check(proc.returncode, 0, f"a pass over a dirs column exits 0: {proc.stderr}")
+    lines = dout.read_text().splitlines()
+    check(lines[0], "id,relation,rc,secs,a_implies_b,b_implies_a",
+          "the output gains the two direction columns")
+    got = {r["id"]: (r["relation"], r["a_implies_b"], r["b_implies_a"])
+           for r in csv.DictReader(io.StringIO(dout.read_text()))}
+    check(got, {"d0": ("equivalent", "1", "1"), "d1": ("stronger", "1", "0"),
+                "d2": ("undecided", "0", "?"), "d3": ("undecided", "?", "0")},
+          "each direction is read off the DIR line, or ? where none came")
+    dpairs.write_text("id,a_path,b_path,dirs\n"
+                      f"x,{cp_root / 'eq.json'},{cp_root / 'ideal.json'},up\n")
+    proc = subprocess.run(
+        [sys.executable, str(COMPARE_PAIRS_PY), str(dpairs),
+         str(cp_root / "x.csv"), "--compare", str(dir_bin)],
+        capture_output=True, text=True)
+    check((proc.returncode, "dirs must be one of" in proc.stderr), (2, True),
+          "an unknown direction is refused before any call")
 finally:
     shutil.rmtree(cp_root, ignore_errors=True)
+
+# ── fingerprint_members.py ────────────────────────────────────────────────────
+#
+# The driver against a stub fpdraw and a stub draw script: what is checked is
+# the bookkeeping (resume, progress, join) and the planner, whose pruning
+# decides which pairs compare ever sees.
+
+FINGERPRINT_MEMBERS_PY = Path(__file__).resolve().parent / "fingerprint_members.py"
+STUB_FPDRAW = """#!/usr/bin/env python3
+import json, os, sys
+here = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(here, "fpdraw-calls.txt"), "a") as h:
+    h.write(sys.argv[1] + " " + os.environ.get("FPDRAW_UNGLUE", "-") + "\\n")
+if sys.argv[1] == "ltl":
+    print("signals\\ta ")
+    for p in open(sys.argv[3]).read().split():
+        print(p + "\\tA\\tG\\tG")
+else:
+    for p in open(sys.argv[3]).read().split():
+        print(p + "\\t" + json.load(open(p))["fp"])
+"""
+STUB_DRAW = """#!/usr/bin/env python3
+import os, sys
+ltl, n, seed, out = sys.argv[1:5]
+rows = open(ltl).read().splitlines()[1:]
+open(out, "w").write("0 1 a=1\\n" * int(n))
+open(out + ".meta", "w").write("".join(
+    f"{i}\\t{rows[i % len(rows)].split()[0]}\\t0\\t"
+    + os.environ.get("STUB_RESULT", "SAT") + "\\t1\\tNone\\n"
+    for i in range(int(n))))
+"""
+
+fm_root = Path(tempfile.mkdtemp(prefix="fingerprint-members-"))
+try:
+    import gzip as _gzip
+    fpdraw = fm_root / "fpdraw"
+    fpdraw.write_text(STUB_FPDRAW)
+    fpdraw.chmod(0o755)
+    draw = fm_root / "draw.py"
+    draw.write_text(STUB_DRAW)
+    members = fm_root / "members"
+    members.mkdir()
+    # fsm: 0 holds {0,1}, 1 holds {0}, 2 holds {0,1}, 3 holds {2}. Open
+    # directions: 1 => 0, 0 <=> 2, 1 => 2; node 3 meets nobody.
+    nodes = [("03", [["directed", 0, "a.json"], ["uniform", 1, "b.json"]]),
+             ("01", [["directed", 2, "c.json"]]),
+             ("03", [["uniform", 3, "d.json"]]),
+             ("04", [["uniform", 4, "e.json"]])]
+    with _gzip.open(members / "fsm.jsonl.gz", "wt") as handle:
+        for i, (fp, mem) in enumerate(nodes):
+            handle.write(json.dumps({"node": i, "members": mem,
+                                     "spec": {"fp": fp, "i": i}}) + "\n")
+    with _gzip.open(members / "rad-core-1.jsonl.gz", "wt") as handle:
+        handle.write(json.dumps({"node": 0, "members": [["directed", 0, "x"]],
+                                 "spec": {"fp": "01"}}) + "\n")
+    subjects = fm_root / "subjects-h.txt"
+    subjects.write_text("fsm\nrad-core-1\n")
+    work, out = fm_root / "work", fm_root / "out"
+    joined = fm_root / "pairs-h.csv"
+    manifest = fm_root / "m.json"
+
+    def run_fm(**env) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(FINGERPRINT_MEMBERS_PY), str(subjects),
+             str(members), str(work), str(out), "--pairs", str(joined),
+             "--words", "5", "--workers", "1", "--fpdraw", str(fpdraw),
+             "--draw-script", str(draw), "--manifest", str(manifest)],
+            capture_output=True, text=True, env=dict(os.environ, **env))
+
+    proc = run_fm(STUB_RESULT="ERROR")
+    check(proc.returncode, 1, f"a draw black answered ERROR on fails: "
+                              f"{proc.stdout}")
+    check_true("ERROR on 5 of 5" in proc.stdout and not joined.exists(),
+               "naming the count, and joining nothing")
+    check_true(not (out / "fsm" / "words").exists(),
+               "and leaving no words behind to resume from")
+
+    proc = run_fm()
+    check(proc.returncode, 0, f"a clean pass exits 0: {proc.stdout} {proc.stderr}")
+    plan = list(csv.DictReader(open(work / "fsm" / "pairs.csv", newline="")))
+    check([(r["id"], r["dirs"]) for r in plan],
+          [("fsm:0:1", "rev"), ("fsm:0:2", "both"), ("fsm:1:2", "fwd")],
+          "a pair is planned in each direction no word refutes, none else")
+    check(plan[0]["a_path"], str(work / "fsm" / "nodes" / "00000.json"),
+          "with the node files written under the work directory")
+    check(len((work / "fsm" / "members.list").read_text().split()), 5,
+          "a node is drawn once per member that holds it")
+    check(json.loads((work / "fsm" / "nodes" / "00002.json").read_text()),
+          {"fp": "03", "i": 2}, "the node file is the pooled spec")
+    calls = (fm_root / "fpdraw-calls.txt").read_text().split("\n")
+    check([c for c in calls if c.startswith("eval")], ["eval 0", "eval 1"],
+          "FPDRAW_UNGLUE is set on rad-core-* alone")
+    check(len(joined.read_text().splitlines()), 4,
+          "the joined pair list holds every subject's rows under one header")
+    done_rows = list(csv.DictReader(open(out / "done-subjects-h.csv")))
+    check([(r["subject"], r["pairs"]) for r in done_rows],
+          [("fsm", "3"), ("rad-core-1", "0")],
+          "each finished subject appends one progress row")
+    meta = json.loads(manifest.read_text())
+    check((meta["kind"], meta["planned"], meta["missing"], meta["out"]),
+          ("fingerprint", 2, 0, str(out / "done-subjects-h.csv")),
+          "the manifest names the progress file status counts")
+
+    (fm_root / "fpdraw-calls.txt").unlink()
+    proc = run_fm()
+    check((proc.returncode, (fm_root / "fpdraw-calls.txt").exists()),
+          (0, False), "a rerun skips every finished subject")
+    check(len(list(csv.DictReader(open(out / "done-subjects-h.csv")))), 2,
+          "and appends no progress row")
+    (work / "fsm" / "pairs.csv").unlink()
+    proc = run_fm()
+    check((proc.returncode, (fm_root / "fpdraw-calls.txt").exists(),
+           (work / "fsm" / "pairs.csv").exists()),
+          (0, False, True), "a subject missing only its plan is re-planned "
+                            "without re-drawing or re-evaluating")
+finally:
+    shutil.rmtree(fm_root, ignore_errors=True)
+
+# ── pooled design: pool_members.py, planning, pooled_reduce.py ────────────────
+#
+# One design read three ways. Arms x/full, x/base and x/only, contrasts full
+# and only against base. Each subject's runs hold, at seed 0:
+#   full: n0 = {fp 01, i 0}
+#   base: n1 = {fp 03, i 1}
+#   only: n1 again (one node, two arms), n2 = {fp 01, i 3}, n3 = {fp 07, i 4}
+# Open directions: 0 => 1, 2 => 1, 1 => 3, 0 => 3 and 2 => 3, 0 <=> 2. The
+# design drops 0-2 and 0-3, since full and only share no node and no contrast.
+
+SCRIPTS = Path(__file__).resolve().parent
+POOL_MEMBERS_PY = SCRIPTS / "pool_members.py"
+POOLED_REDUCE_PY = SCRIPTS / "pooled_reduce.py"
+sys.path.insert(0, str(SCRIPTS))
+import pooled_design as PD  # noqa: E402
+import pooled_reduce as PR  # noqa: E402
+
+pd_root = Path(tempfile.mkdtemp(prefix="pooled-design-"))
+try:
+    import gzip as _gzip
+    design = pd_root / "design.toml"
+
+    def write_design(seeds: str, extra: str = "") -> None:
+        design.write_text(f"""
+draws = 7
+[[groups]]
+results = "res"
+run_dir = "{{level}}_{{scheme}}_{{subject}}_seed{{seed:02d}}"
+seeds = "{seeds}"
+subjects = ["fsm", "big"]
+sampled = ["big"]
+draws = 10
+contrasts = [
+  {{ name = "full", a = "x/full", b = "x/base" }},
+  {{ name = "only-a", a = "x/only", b = "x/base", family = "only" }},
+]
+{extra}""")
+
+    write_design("0-1")
+    rec = PD.load_design(str(design))["subjects"]
+    check((rec["fsm"]["arms"], rec["fsm"]["sampled"], rec["big"]["sampled"],
+           rec["big"]["draws"], rec["fsm"]["seeds"],
+           [c["family"] for c in rec["fsm"]["contrasts"]]),
+          (["x/full", "x/base", "x/only"], False, True, 10, [0, 1],
+           ["full", "only"]),
+          "a design gives each subject its arms in contrast order, its "
+          "estimator, draws and seeds, and a contrast its own family by default")
+    check((PD.partners(rec["fsm"], "x/base"), PD.partners(rec["fsm"], "x/only")),
+          (["x/full", "x/only"], ["x/base"]),
+          "an arm's partners are the arms a contrast pairs it with")
+    check(PD.parse_seeds("0-2,15-16", "s"), [0, 1, 2, 15, 16],
+          "seeds take ranges and lists")
+    for body, expect_in, why in (
+        ({"groups": [{"results": "r", "run_dir": "{x}", "seeds": "0",
+                      "subjects": ["s"], "contrasts": [
+                          {"name": "c", "a": "s/a", "b": "s/b"}]}]},
+         "run_dir may use only", "a run_dir naming an unknown field"),
+        ({"groups": [{"results": "r", "run_dir": "d", "seeds": "0",
+                      "subjects": ["s"], "sampled": ["t"], "contrasts": [
+                          {"name": "c", "a": "s/a", "b": "s/b"}]}]},
+         "sampled names t", "a sampled subject outside subjects"),
+        ({"groups": [{"results": "r", "run_dir": "d", "seeds": "0",
+                      "subjects": ["s"], "contrasts": [
+                          {"name": "c", "a": "base", "b": "s/b"}]}]},
+         "is not <scheme>/<level>", "an arm without its scheme"),
+        ({"groups": [{"results": "r", "run_dir": "d", "seeds": "0-1,1",
+                      "subjects": ["s"], "contrasts": [
+                          {"name": "c", "a": "s/a", "b": "s/b"}]}]},
+         "repeats a seed", "a repeated seed"),
+        ({"groups": [{"results": "r", "run_dir": "d", "seeds": "0",
+                      "subjects": ["s"], "contrasts": [
+                          {"name": "c", "a": "s/a", "b": "s/a"}]}]},
+         "the same arm", "a contrast of an arm with itself"),
+    ):
+        try:
+            PD.parse_design(body)
+            got = "accepted"
+        except PD.DesignError as exc:
+            got = str(exc)
+        check_true(expect_in in got, f"{why} must be refused ({got!r})")
+    check(PD.draw_order("s", "x/a", 3, [5, 1, 9, 2]),
+          PD.draw_order("s", "x/a", 3, [2, 9, 1, 5]),
+          "a draw order depends on the node set, not the order it is given in")
+
+    def put_run(subject: str, arm: str, seed: int, specs) -> None:
+        scheme, level = arm.split("/")
+        run = pd_root / "res" / f"{level}_{scheme}_{subject}_seed{seed:02d}"
+        (run / "accumulated").mkdir(parents=True)
+        if specs is None:
+            return
+        names = []
+        for k, spec in enumerate(specs):
+            names.append(f"gen01_{k:04d}.json")
+            # Key order differs from run to run; identity is on sorted JSON.
+            body = dict(reversed(list(spec.items()))) if k % 2 else spec
+            (run / "accumulated" / names[-1]).write_text(json.dumps(body))
+        (run / "accumulated" / "maximal.tsv").write_text(
+            "file\n" + "".join(f"{n}\n" for n in names))
+        (run / "repair_0.json").write_text(json.dumps(dict(specs[0], fitness=1)))
+
+    for subject in ("fsm", "big"):
+        put_run(subject, "x/full", 0, [{"fp": "01", "i": 0}])
+        put_run(subject, "x/base", 0, [{"fp": "03", "i": 1}])
+        put_run(subject, "x/only", 0, [{"i": 1, "fp": "03"},
+                                       {"fp": "01", "i": 3},
+                                       {"fp": "07", "i": 4}])
+    pmembers = pd_root / "members"
+
+    def run_pool(*extra) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(POOL_MEMBERS_PY), str(design), str(pmembers),
+             "--root", str(pd_root), *extra],
+            capture_output=True, text=True)
+
+    proc = run_pool()
+    check((proc.returncode, "fsm: 3 run director(ies) missing" in proc.stderr,
+           (pmembers / "fsm.jsonl.gz").exists()), (1, True, False),
+          f"a pool missing a seed's runs is refused: {proc.stderr}")
+    for subject in ("fsm", "big"):
+        for arm in ("x/full", "x/base", "x/only"):
+            put_run(subject, arm, 1, None)
+    proc = run_pool()
+    check(proc.returncode, 0, f"a complete pool exits 0: {proc.stderr}")
+    with _gzip.open(pmembers / "fsm.jsonl.gz", "rt") as handle:
+        pooled = [json.loads(line) for line in handle]
+    check([(n["node"], n["arms"], n["spec"]["i"]) for n in pooled],
+          [(0, ["x/full"], 0), (1, ["x/base", "x/only"], 1),
+           (2, ["x/only"], 3), (3, ["x/only"], 4)],
+          "identical sorted JSON is one node, numbered in design-arm order")
+    check(pooled[1]["members"],
+          [["x/base", 0, "accumulated/gen01_0000.json"],
+           ["x/only", 0, "accumulated/gen01_0000.json"]],
+          "and a node lists every member holding it")
+    index = list(csv.DictReader(open(pmembers / "index.csv", newline="")))
+    check([(r["subject"], r["arm"], r["runs"], r["runs_empty"], r["nodes"])
+           for r in index if r["subject"] == "fsm"],
+          [("fsm", "x/base", "2", "1", "1"), ("fsm", "x/full", "2", "1", "1"),
+           ("fsm", "x/only", "2", "1", "3")],
+          "the index counts runs, empty runs and nodes per arm")
+    first = (pmembers / "fsm.jsonl.gz").read_bytes()
+    run_pool("--subjects", "fsm")
+    check(((pmembers / "fsm.jsonl.gz").read_bytes() == first,
+           len(list(csv.DictReader(open(pmembers / "index.csv"))))),
+          (True, 6), "a re-pool gives the same bytes and keeps other "
+                     "subjects' index rows")
+    write_design("0-1", "members = \"output\"")
+    # members = "output" is a group key; the extra line lands in the group.
+    run_pool("--subjects", "fsm")
+    with _gzip.open(pmembers / "fsm.jsonl.gz", "rt") as handle:
+        outs = [json.loads(line) for line in handle]
+    check([(n["spec"], n["members"][0][2]) for n in outs],
+          [({"fp": "01", "i": 0}, "repair_0.json"),
+           ({"fp": "03", "i": 1}, "repair_0.json")],
+          "members = \"output\" pools repair files without their fitness")
+    write_design("0-1")
+    run_pool()
+
+    pwork, pout = pd_root / "work", pd_root / "out"
+    psubjects = pd_root / "subjects.txt"
+    psubjects.write_text("fsm\nbig\n")
+    fpdraw = pd_root / "fpdraw"
+    fpdraw.write_text(STUB_FPDRAW)
+    fpdraw.chmod(0o755)
+    draw = pd_root / "draw.py"
+    draw.write_text(STUB_DRAW)
+
+    def run_planner(*extra) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(FINGERPRINT_MEMBERS_PY), str(psubjects),
+             str(pmembers), str(pwork), str(pout), "--words", "5",
+             "--workers", "1", "--fpdraw", str(fpdraw), "--draw-script",
+             str(draw), *extra], capture_output=True, text=True)
+
+    def planned(subject: str) -> list:
+        return sorted((r["id"], r["dirs"]) for r in csv.DictReader(
+            open(pwork / subject / "pairs.csv", newline="")))
+
+    proc = run_planner()
+    check(proc.returncode, 0, f"the planner runs on a pool: {proc.stderr}")
+    check(len(planned("fsm")), 6,
+          "without a design every pair with an open direction is planned")
+    shutil.rmtree(pwork)
+    shutil.rmtree(pout)
+    proc = run_planner("--design", str(design))
+    check(proc.returncode, 0, f"a design narrows the plan: {proc.stderr}")
+    want = [("fsm:0:1", "fwd"), ("fsm:1:2", "rev"), ("fsm:1:3", "fwd"),
+            ("fsm:2:3", "fwd")]
+    check(planned("fsm"), want,
+          "an exhaustive subject keeps pairs sharing an arm or a contrast")
+    check(planned("big"), [(i.replace("fsm", "big"), d) for i, d in want],
+          "a sampled subject drawing every node keeps the pairs that can "
+          "decide a draw")
+    orders = {arm: [int(x) for x in (pout / "big" / f"order-x__{arm}.txt")
+                    .read_text().split()] for arm in ("full", "base", "only")}
+    check({arm: sorted(v) for arm, v in orders.items()},
+          {"full": [0], "base": [1], "only": [1, 2, 3]},
+          "the draw order of each arm is written in full")
+    check_true(not (pout / "fsm" / "order-x__only.txt").exists(),
+               "and an exhaustive subject writes none")
+    big = PD.load_design(str(design))["subjects"]["big"]
+    one_draw = dict(big, draws=1)
+    bits = [0x01, 0x03, 0x01, 0x07]
+    narrow = {(x, y) for x, y, _ in PD.sampled_plan(
+        one_draw, pooled, bits, {"x/full": [0], "x/base": [1],
+                                 "x/only": [2, 3, 1]})}
+    check(narrow, {(0, 1), (1, 2)},
+          "one draw an arm keeps only the drawn nodes' pairs")
+
+    # Verdicts: each planned direction holds, except 1 => 3 is undecided.
+    collected = pd_root / "collected"
+    hfp = collected / "h" / "fp"
+    hfp.mkdir(parents=True)
+    for subject in ("fsm", "big"):
+        shutil.copytree(pout / subject, hfp / subject)
+
+    def write_verdicts(skip=None) -> None:
+        with open(collected / "h" / "subsumption-h.csv", "w", newline="") as h:
+            w = csv.writer(h)
+            w.writerow(["id", "relation", "rc", "secs", "a_implies_b",
+                        "b_implies_a"])
+            for subject in ("fsm", "big"):
+                for pid, dirs in want:
+                    pid = pid.replace("fsm", subject)
+                    if pid == skip:
+                        continue
+                    fwd = "?" if pid.endswith(":1:3") else (
+                        "1" if dirs in ("fwd", "both") else "0")
+                    rev = "1" if dirs in ("rev", "both") else "0"
+                    w.writerow([pid, "x", 0, 2, fwd, rev])
+
+    rout = pd_root / "reduced"
+
+    def run_reduce() -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(POOLED_REDUCE_PY), str(design), str(pmembers),
+             str(collected), str(rout)], capture_output=True, text=True)
+
+    write_verdicts(skip="fsm:2:3")
+    proc = run_reduce()
+    check_true(proc.returncode != 0 and "1 planned pair(s) have no row"
+               in proc.stderr,
+               f"a reduction missing a planned row is refused: {proc.stderr}")
+    write_verdicts()
+    proc = run_reduce()
+    check(proc.returncode, 0, f"a complete reduction exits 0: {proc.stderr}")
+    rows = {(r["subject"], r["contrast"]): r for r in csv.DictReader(
+        open(rout / "strength" / "contrasts.csv", newline=""))}
+    fsm_full, fsm_only = rows[("fsm", "full")], rows[("fsm", "only-a")]
+    check((fsm_full["a_front"], fsm_full["b_front"], fsm_full["net"],
+           fsm_full["net_imp"], fsm_full["net_non"]),
+          ("1", "1", "1.0", "1.0", "1.0"),
+          "full's lone node implies base's: a is the stronger, net +1")
+    check((fsm_only["a_front"], fsm_only["net"], fsm_only["queries"],
+           fsm_only["call_s_sum"]),
+          ("1", "1.0", "4", "8"),
+          "only's frontier is n2 alone, which implies base's n1")
+    big_full, big_only = rows[("big", "full")], rows[("big", "only-a")]
+    check((big_full["plan"], big_full["net_non"], big_only["net_non"],
+           big_only["frontier_draws_a"], big_only["undecided"],
+           big_full["undecided"]),
+          ("sampled", "1.0", "1.0", "1", "2", "0"),
+          "the sampled estimator agrees when every node is drawn, and counts "
+          "the undecided direction a draw met")
+    summary_text = (rout / "strength" / "summary.txt").read_text()
+    check_true("Holm (only)" in summary_text and "Holm (full)" in summary_text,
+               "the summary corrects within each contrast family")
+    check_true((rout / "ball-radii" / "report-k1.txt").exists(),
+               "and the ball-radii report is written")
+
+    check(PR.wilcoxon_p([1, 2, 3, 4, 5]), 0.0625,
+          "the exact signed-rank p of five positive differences is 2/32")
+    check(round(PR.wilcoxon_p([1, -1, 2, 2]), 4), round(2 * 3 / 16, 4),
+          "and ties take their average rank")
+    check({k: round(v, 6) for k, v in
+           PR.holm({"a": 0.01, "b": 0.04, "c": 0.03}).items()},
+          {"a": 0.03, "c": 0.06, "b": 0.06},
+          "Holm's adjustment is monotone in the sorted p")
+    check(round(PR.jaccard(0b0110, 0b0011), 4), round(2 / 3, 4),
+          "Jaccard distance is the symmetric difference over the union")
+finally:
+    shutil.rmtree(pd_root, ignore_errors=True)
 
 if FAILURES:
     print(f"\n{len(FAILURES)} campaign.py test(s) failed.")
