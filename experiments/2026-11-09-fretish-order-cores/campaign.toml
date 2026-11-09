@@ -1,0 +1,27 @@
+name = "2026-11-09-fretish-order-cores"
+branch = "feat/fretish-order-eval"
+profile = "fretish-order-cores"
+description = "rad's ten unrealisable cores, each as its own spec, under every arm of 2026-11-05-fretish-order at the same budget. Whole rad found no repair under any arm. PLAN.md gives the design and the analysis."
+
+# Every arm of a seed runs on one host, so a host difference cancels inside
+# each (spec, seed) cell, as in 2026-11-05-fretish-order.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# 2026-11-05-fretish-order's line, verbatim, so the arms are its arms. The
+# tree already exists on both hosts, and a tick runs this only if it is missing.
+configs = "python3 scripts/gen_configs.py --sweeps O --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order --pin-vintage && python3 scripts/gen_configs.py --sweeps O --levels base,only-climb --schemes random --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order --pin-vintage"
+
+# 10 cores x 18 arms x 30 seeds = 5,400 runs. The 2026-10 rerun put the cores
+# at 9-65 s a run at parallel 1; this campaign's small set ran at 6.85 s of
+# host wall a run at jobs 15, which puts the phase at about 3 h.
+[[phases]]
+name = "cores"
+profile = "fretish-order-cores"
+jobs = 15
+
+[[phases]]
+name = "score-cores"
+kind = "score"
+profile = "fretish-order-cores"

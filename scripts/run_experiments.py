@@ -83,6 +83,13 @@ FRETISH_SPECS: dict[str, dict[str, Path]] = {
     "lift-plus-cruise-full": _spec("lift-plus-cruise-full", "json"),
     "rad": _spec("rad", "json"),
     "ventilator-controller": _spec("ventilator-controller", "json"),
+    # The ten unrealisable cores of rad, each as its own spec; written by
+    # scripts/make_core_specs.py. No fixes/, so no ideals.
+    **{name: _spec(name, "json") for name in (
+        "rad-core-1-18", "rad-core-10", "rad-core-12-18", "rad-core-17-18",
+        "rad-core-33", "rad-core-45", "rad-core-55", "rad-core-61",
+        "rad-core-65", "rad-core-68",
+    )},
 }
 
 # The FRETISH order-search evaluation (experiments/2026-11-05-fretish-order).
@@ -96,6 +103,10 @@ FRETISH_ORDER_SMALL: tuple[str, ...] = (
 FRETISH_ORDER_LARGE: tuple[str, ...] = (
     "lift-plus-cruise-full", "rad", "ventilator-controller",
 )
+# rad's cores, run under every arm of the small set
+# (experiments/2026-11-09-fretish-order-cores, profile fretish-order-cores).
+FRETISH_ORDER_CORES: tuple[str, ...] = tuple(
+    s for s in FRETISH_SPECS if s.startswith("rad-core-"))
 
 # Basic-TLSF specs with ideal fixes. PEREDUR infers the TLSF format from the
 # .tlsf extension, and compare reads the .tlsf ideals the same way. The first
@@ -593,6 +604,25 @@ PROFILES: dict[str, dict] = {
         "results_dir": EXPERIMENTS_DIR / "results-fretish-order-large",
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order-large.csv",
         "default_jobs": 4,
+    },
+    # rad's ten cores under every arm of fretish-order, since whole rad finds
+    # nothing at the budget. Same config tree, its own results.
+    "fretish-order-cores": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {},
+        "specs": list(FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order-cores",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order-cores.csv",
+        "default_jobs": 16,
     },
 }
 
