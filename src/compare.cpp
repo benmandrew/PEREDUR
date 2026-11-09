@@ -3,10 +3,12 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <type_traits>
@@ -30,11 +32,13 @@ namespace {
 struct Args {
     std::string repairs_dir;
     std::string ideals_dir;
+    std::int64_t timeout_s{20};
 };
 
 void print_usage(const char* prog) {
     std::cerr
-        << "Usage: " << prog << " --repairs <dir> --ideals <dir>\n"
+        << "Usage: " << prog
+        << " --repairs <dir> --ideals <dir> [--timeout S]\n"
         << "\n"
         << "Compares each repair in the repairs directory against every\n"
         << "ideal in the ideals directory and reports whether the found\n"
@@ -43,7 +47,13 @@ void print_usage(const char* prog) {
         << "assume-guarantee implication order. Both directories must hold\n"
         << "the same format: FRETISH JSON (.json) or basic-TLSF (.tlsf).\n"
         << "\n"
-        << "  --version  Print the git commit this binary was built from.\n";
+        << "Each pair's per-direction verdicts go to stderr as\n"
+        << "DIR<TAB>repair<TAB>ideal<TAB>fwd<TAB>rev, with ? for undecided.\n"
+        << "COMPARE_DIRECTIONS=fwd|rev asks one direction only; the other\n"
+        << "reports 0.\n"
+        << "\n"
+        << "  --timeout S  Per-black-call budget in seconds (default: 20).\n"
+        << "  --version    Print the git commit this binary was built from.\n";
 }
 
 std::optional<Args> parse_args(int argc, const char* const* argv) {
@@ -58,6 +68,17 @@ std::optional<Args> parse_args(int argc, const char* const* argv) {
         } else if (arg == "--ideals" && i + 1 < argc &&
                    argv[i + 1] != nullptr) {
             args.ideals_dir = argv[++i];
+        } else if (arg == "--timeout") {
+            if (i + 1 >= argc || argv[i + 1] == nullptr) {
+                std::cerr << arg << " expects a value\n";
+                return std::nullopt;
+            }
+            const std::optional<std::size_t> value = parse_seed(argv[++i]);
+            if (!value.has_value() || *value == 0) {
+                std::cerr << arg << " expects a positive integer\n";
+                return std::nullopt;
+            }
+            args.timeout_s = static_cast<std::int64_t>(*value);
         } else {
             std::cerr << "Unknown argument: " << arg << "\n";
             return std::nullopt;
@@ -230,17 +251,44 @@ void run_and_report(const std::vector<Entry<Spec>>& repairs,
     };
     std::vector<BestResult> best_per_repair(n_repairs);
 
+    // COMPARE_DIRECTIONS=fwd|rev skips the other direction, which the caller
+    // (scripts/compare_pairs.py's dirs column) has already refuted on a
+    // sampled word; a skipped direction reports 0. Every pair's per-direction
+    // verdicts go to stderr as DIR lines, since the relation alone cannot say
+    // which direction an undecided pair lacks.
+    const char* dirs_env = std::getenv("COMPARE_DIRECTIONS");
+    const std::string dirs = dirs_env != nullptr ? dirs_env : "both";
+    const bool do_fwd = dirs != "rev";
+    const bool do_rev = dirs != "fwd";
+    std::mutex dir_mutex;
+    const auto tri = [](std::optional<bool> verdict) {
+        if (!verdict.has_value()) {
+            return "?";
+        }
+        return *verdict ? "1" : "0";
+    };
+
     run_bounded_async(
         n_tasks, max_in_flight,
         [&](std::size_t task_idx) {
             const std::size_t rep = task_idx / n_ideals;
             const std::size_t ide = task_idx % n_ideals;
             return [&, rep, ide] {
-                return classify(
-                    SpecFormat<Spec>::implies(repairs[rep].spec,
-                                              ideals[ide].spec, checker),
-                    SpecFormat<Spec>::implies(ideals[ide].spec,
-                                              repairs[rep].spec, checker));
+                const std::optional<bool> fwd =
+                    do_fwd ? SpecFormat<Spec>::implies(
+                                 repairs[rep].spec, ideals[ide].spec, checker)
+                           : std::optional<bool>(false);
+                const std::optional<bool> rev =
+                    do_rev ? SpecFormat<Spec>::implies(
+                                 ideals[ide].spec, repairs[rep].spec, checker)
+                           : std::optional<bool>(false);
+                {
+                    const std::scoped_lock lock(dir_mutex);
+                    std::cerr << "DIR\t" << repairs[rep].name << "\t"
+                              << ideals[ide].name << "\t" << tri(fwd) << "\t"
+                              << tri(rev) << "\n";
+                }
+                return classify(fwd, rev);
             };
         },
         [&](std::size_t task_idx, Relation rel) {
@@ -315,8 +363,8 @@ int main(int argc, const char* const argv[]) {
     }
     const Args& args = *maybe_args;
 
-    SatisfiabilityChecker& checker =
-        configure_offline_checkers(std::chrono::milliseconds{20'000}, true);
+    SatisfiabilityChecker& checker = configure_offline_checkers(
+        std::chrono::milliseconds{args.timeout_s * 1000}, true);
 
     return selects_tlsf({args.repairs_dir, args.ideals_dir})
                ? run<tlsf::Specification>(args, checker)
