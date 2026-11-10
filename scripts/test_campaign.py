@@ -31,6 +31,7 @@ import importlib
 import io
 import json
 import os
+import random
 import re
 import shutil
 import signal
@@ -4312,6 +4313,51 @@ contrasts = [
           "Holm's adjustment is monotone in the sorted p")
     check(round(PR.jaccard(0b0110, 0b0011), 4), round(2 / 3, 4),
           "Jaccard distance is the symmetric difference over the union")
+
+    # a's two members sit 0.5 apart, b's 1.0 apart. b's 0b0111 is within
+    # a's radius of 0b0011 (1/3), b's 0b1000 is 1.0 from both; b's radius
+    # of 1.0 holds all of a.
+    hand = [0b0011, 0b0001, 0b0111, 0b1000]
+    got = PR.pooled_draw(PR.Dist([0, 1, 2, 3], hand), [0, 1], [2, 3], [1])
+    check(got, {1: (0.5, 1.0)},
+          "pooled containment: half of b in a's region, all of a in b's")
+    rng = random.Random(7)
+    same = True
+    for _ in range(50):
+        prints = [rng.getrandbits(48) | 1 for _ in range(20)]
+        ga = rng.sample(range(20), 6)
+        gb = rng.sample(range(20), 6)
+        dist = PR.Dist(sorted(set(ga) | set(gb)), prints)
+        for k in (1, 3):
+            x, y = PR.pooled_draw(dist, ga, gb, [k])[k]
+            unit = PR.unit_row({"d": ga, "u": gb}, prints, k, None)
+            same &= (round(x, 4) == unit[3 + PR.PAIRS.index("du")]
+                     and round(y, 4) == unit[3 + PR.PAIRS.index("ud")])
+    check_true(same, "pooled containment agrees with the per-run unit_row")
+    # Arm b repeats arm a run for run (one RNG stream, a feature that never
+    # fires): with seed-disjoint halves the contrast reads as the control,
+    # not as full overlap.
+    twin_bits = [rng.getrandbits(48) | 1 for _ in range(16)]
+    twin = [{"node": i, "arms": ["x/a", "x/b"],
+             "members": [["x/a", i % 8, "f"], ["x/b", i % 8, "f"]]}
+            for i in range(16)]
+    trows = PR.pooled_task(("s", {"name": "c", "a": "x/a", "b": "x/b"},
+                            twin, twin_bits, [1], 1, "0"))
+    check((trows[0]["b_in_a"], trows[0]["a_in_b"]),
+          (trows[0]["ctrl_a"], trows[0]["ctrl_b"]),
+          "an arm identical to base run for run reads as base's own control")
+    check_true(trows[0]["b_in_a"] < 1.0,
+               "and the shared seeds do not count as overlap")
+    proc = subprocess.run(
+        [sys.executable, str(POOLED_REDUCE_PY), str(design), str(pmembers),
+         str(collected), str(rout), "--pooled-only", "--pooled-draws", "2"],
+        capture_output=True, text=True)
+    check(proc.returncode, 0, f"a pooled-only reduction exits 0: {proc.stderr}")
+    prow = list(csv.DictReader(open(rout / "ball-radii-pooled" / "pooled.csv",
+                                    newline="")))
+    check_true(prow and all(r["b_in_a"] == "" for r in prow)
+               and (rout / "ball-radii-pooled" / "report-k1.txt").exists(),
+               "a pool no larger than K leaves its pooled cells blank")
 finally:
     shutil.rmtree(pd_root, ignore_errors=True)
 

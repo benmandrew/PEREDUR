@@ -546,7 +546,9 @@ python3 scripts/pool_members.py experiments/x/design.toml experiments/x-members 
 # Locally, after `collect --outputs x-out`
 python3 scripts/pooled_reduce.py experiments/x/design.toml experiments/x/members \
     experiments/x-out experiments/x/reduced [--subjects ...] \
-    [--ball-k 1 3 5] [--no-balls] [--match 0|none]
+    [--ball-k 1 3 5] [--no-balls] [--match 0|none] \
+    [--pooled-balls | --pooled-only] [--pooled-draws 20] [--pooled-seed 0] \
+    [--jobs N]
 ```
 
 `pool_members.py` reads every arm a subject's contrasts name at every seed the
@@ -572,6 +574,21 @@ estimates with 95% half-widths for a sampled subject), `strength/relations.csv`,
 Holm-corrected within each `family`) and, unless `--no-balls`,
 `ball-radii/prc-k<K>.csv` and `report-k<K>.txt`. `--match` seeds the
 subsampling of a ball unit's groups to its smallest one.
+
+The per-run ball radii read one run's members as a group, and a group with K
+or fewer members has no radius, so an arm whose runs return few members loses
+most of its units. `--pooled-balls` adds `ball-radii-pooled/`, which pools
+each arm's distinct nodes over its odd seeds and over its even seeds. A
+contrast pairs a's odd half with b's even half and the reverse, so no pair
+shares a seed's RNG stream: an arm whose feature never fires repeats base run
+for run, and a shared seed would read that as overlap. Each arm's control
+pairs its own two halves. All four half-pools are subsampled to the smallest
+one's size, `--pooled-draws` times, with the contrast and controls on the same
+samples in each draw. `pooled.csv` holds the mean and SD over draws of `b_in_a` (the share of
+b inside a's region), `a_in_b` and both controls, per subject, contrast and K;
+`report-k<K>.txt` tests each over subjects, Holm-corrected within a family.
+`--pooled-only` writes that directory alone and skips strength and the
+per-run radii. `--jobs` runs the (subject, contrast) tasks in parallel.
 
 ### The queue
 

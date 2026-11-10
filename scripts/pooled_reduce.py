@@ -3,7 +3,8 @@
 ball-radii tables, one row per subject and contrast.
 
     python3 scripts/pooled_reduce.py DESIGN.toml MEMBERS_DIR COLLECTED_DIR OUT_DIR \\
-        [--subjects SUBJECT...] [--ball-k 1 3 5] [--no-balls] [--match SEED]
+        [--subjects SUBJECT...] [--ball-k 1 3 5] [--no-balls] [--match SEED] \\
+        [--pooled-balls | --pooled-only] [--pooled-draws N] [--jobs N]
 
 Run locally after `campaign.py collect --outputs NAME`. MEMBERS_DIR is the
 committed output of scripts/pool_members.py. COLLECTED_DIR is
@@ -43,6 +44,15 @@ prefix. `null` units hold three seeds of one arm, the same-arm control. A
 group's region is the union of balls around its members of radius the Jaccard
 distance to the K-th nearest other member, as in the 2026-10-08 fp_prc.py.
 
+Pooled ball radii (--pooled-balls, or --pooled-only alone). A run with K or
+fewer members has no radius, so an arm whose runs are small loses most of its
+per-run units. Here each arm's seeds split by parity into two half-pools
+of distinct nodes, all four half-pools of a contrast are subsampled to the
+smallest one's size, and a's odd half meets b's even half and the reverse, so
+no pair shares a seed's RNG stream. An arm's control pairs its own two halves
+at the same size. Shares are averaged over --pooled-draws draws. Writes
+OUT_DIR/ball-radii-pooled/pooled.csv and report-k<K>.txt.
+
 Writes OUT_DIR/strength/{contrasts,relations}.csv and summary.txt, and, unless
 --no-balls, OUT_DIR/ball-radii/prc-k<K>.csv and report-k<K>.txt. The summary
 gives, per contrast, the exact Wilcoxon signed-rank test over subjects, with a
@@ -52,12 +62,14 @@ Stdlib only.
 """
 
 import argparse
+import array
 import collections
 import csv
 import glob
 import gzip
 import json
 import math
+import multiprocessing
 import os
 import random
 import statistics
@@ -489,6 +501,188 @@ def ball_report(rows: list, design: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+# ── pooled ball radii ───────────────────────────────────────────────────────
+
+class Dist:
+    """Jaccard distances among a fixed node set, each pair computed once."""
+
+    def __init__(self, ids: list, bits: list):
+        self.pos = {v: i for i, v in enumerate(ids)}
+        pb = [bits[v] for v in ids]
+        pc = [b.bit_count() for b in pb]
+        self.rows = []
+        for i, (x, cx) in enumerate(zip(pb, pc)):
+            row = array.array("f", bytes(4 * len(ids)))
+            for j in range(i):
+                inter = (x & pb[j]).bit_count()
+                union = cx + pc[j] - inter
+                row[j] = (union - inter) / union if union else 0.0
+            self.rows.append(row)
+        for i in range(len(ids)):              # mirror the lower triangle
+            ri = self.rows[i]
+            for j in range(i + 1, len(ids)):
+                ri[j] = self.rows[j][i]
+
+    def radii(self, xs: list, ks: list) -> dict:
+        """Per K, each member's distance to its K-th nearest other in xs."""
+        cols = [self.pos[x] for x in xs]
+        out = {k: [] for k in ks}
+        for x in xs:
+            row = self.rows[self.pos[x]]
+            ds = sorted(row[c] for c in cols)  # ds[0] is the member itself
+            for k in ks:
+                out[k].append(ds[k])
+        return out
+
+
+def pooled_draw(dist: Dist, a: list, b: list, ks: list) -> dict:
+    """One draw: a's and b's equal-size samples, each a union of balls of
+    radius the distance to its K-th nearest other member; per K, the share of
+    b inside a's region (b_in_a) and of a inside b's (a_in_b)."""
+    ra, rb = dist.radii(a, ks), dist.radii(b, ks)
+    cols_b = [dist.pos[y] for y in b]
+    out = {}
+    for k in ks:
+        rad_a, rad_b = ra[k], rb[k]
+        in_a = [False] * len(b)
+        in_b = [False] * len(a)
+        for i, x in enumerate(a):
+            row, r = dist.rows[dist.pos[x]], rad_a[i]
+            for j, c in enumerate(cols_b):
+                d = row[c]
+                if d <= r:
+                    in_a[j] = True
+                if d <= rad_b[j]:
+                    in_b[i] = True
+        out[k] = (sum(in_a) / len(b), sum(in_b) / len(a))
+    return out
+
+
+def half_nodes(nodes: list, arm: str, parity: int) -> list:
+    return [n["node"] for n in nodes
+            if any(m[0] == arm and m[1] % 2 == parity for m in n["members"])]
+
+
+def pooled_task(task: tuple) -> list:
+    """Rows for one (subject, contrast). Each arm's seeds split by parity
+    into two half-pools of distinct nodes, and all four are subsampled to
+    the smallest one's size, `draws` times. The contrast pairs a's odd half
+    with b's even half and a's even with b's odd; an arm's control pairs its
+    own odd and even halves. No pair shares a seed, so an arm that matches
+    base run for run (one RNG stream, a feature that never fires) cannot
+    look closer to base than base is to itself. Within a draw the contrast
+    and both controls use the same samples."""
+    subject, contrast, nodes, bits, ks, draws, seed = task
+    a_arm, b_arm = contrast["a"], contrast["b"]
+    A = [n["node"] for n in nodes if a_arm in n["arms"]]
+    B = [n["node"] for n in nodes if b_arm in n["arms"]]
+    (a0, a1), (b0, b1) = ((half_nodes(nodes, arm, 0), half_nodes(nodes, arm, 1))
+                          for arm in (a_arm, b_arm))
+    n = min(len(a0), len(a1), len(b0), len(b1))
+    base = {"subject": subject, "contrast": contrast["name"],
+            "n_a": len(A), "n_b": len(B), "n": n}
+    cols = [c + sfx for c in ("b_in_a", "a_in_b", "ctrl_a", "ctrl_b")
+            for sfx in ("", "_sd")]
+    if n <= max(ks):
+        return [dict(base, k=k, draws=0, **dict.fromkeys(cols, "")) for k in ks]
+    dist = Dist(sorted(set(A) | set(B)), bits)
+    acc = {k: collections.defaultdict(list) for k in ks}
+
+    def take(rng, xs):
+        return xs if len(xs) == n else sorted(rng.sample(xs, n))
+
+    for r in range(draws):
+        rng = random.Random(f"{seed}|{subject}|{contrast['name']}|{r}")
+        sa0, sa1, sb0, sb1 = (take(rng, h) for h in (a0, a1, b0, b1))
+        x1 = pooled_draw(dist, sa1, sb0, ks)
+        x2 = pooled_draw(dist, sa0, sb1, ks)
+        ca = pooled_draw(dist, sa0, sa1, ks)
+        cb = pooled_draw(dist, sb0, sb1, ks)
+        for k in ks:
+            acc[k]["b_in_a"].append((x1[k][0] + x2[k][0]) / 2)
+            acc[k]["a_in_b"].append((x1[k][1] + x2[k][1]) / 2)
+            acc[k]["ctrl_a"].append(sum(ca[k]) / 2)
+            acc[k]["ctrl_b"].append(sum(cb[k]) / 2)
+    rows = []
+    for k in ks:
+        row = dict(base, k=k, draws=draws)
+        for col in ("b_in_a", "a_in_b", "ctrl_a", "ctrl_b"):
+            v = acc[k][col]
+            row[col] = round(statistics.mean(v), 4) if v else ""
+            row[f"{col}_sd"] = round(statistics.stdev(v), 4) if len(v) > 1 else ""
+        rows.append(row)
+    return rows
+
+
+def pooled_report(rows: list, design: dict, k: int) -> str:
+    """Per contrast, over subjects: each containment against its arm's
+    half-pool control, and the two directions against each other."""
+    families = collections.OrderedDict()
+    for rec in design["subjects"].values():
+        for c in rec["contrasts"]:
+            families.setdefault(c["family"], [])
+            if c["name"] not in families[c["family"]]:
+                families[c["family"]].append(c["name"])
+    tests = (("b in a vs control a", "b_in_a", "ctrl_a"),
+             ("a in b vs control b", "a_in_b", "ctrl_b"),
+             ("b in a vs a in b", "b_in_a", "a_in_b"))
+    lines = [f"Pooled ball radii, K={k}: each arm's distinct nodes over its "
+             "odd and over its even seeds, all four half-pools subsampled to "
+             "the smallest; a contrast pairs halves of opposite parity, a "
+             "control an arm's own two halves. Paired over subjects; p is the "
+             "exact Wilcoxon signed-rank, Holm within a family and test."]
+    for fam, names in families.items():
+        for label, x, y in tests:
+            pairs = {}
+            for name in names:
+                pairs[name] = [(float(r[x]), float(r[y])) for r in rows
+                               if r["contrast"] == name and r["k"] == k
+                               and r[x] != "" and r[y] != ""]
+            ps = {nm: wilcoxon_p([u - v for u, v in p]) for nm, p in pairs.items() if p}
+            adj = holm(ps)
+            lines.append(f"== {fam}: {label}")
+            for name in names:
+                p = pairs[name]
+                if not p:
+                    lines.append(f"  {name:14} n= 0")
+                    continue
+                d = [u - v for u, v in p]
+                lines.append(
+                    f"  {name:14} n={len(p):2d}  "
+                    f"{statistics.mean(u for u, _ in p):.3f} vs "
+                    f"{statistics.mean(v for _, v in p):.3f}  "
+                    f"median diff {statistics.median(d):+.3f}  "
+                    f"below {sum(v < 0 for v in d)}/{sum(v != 0 for v in d)}  "
+                    f"p {ps[name]:.3g}  Holm {adj[name]:.3g}")
+    return "\n".join(lines) + "\n"
+
+
+def pooled_balls(args, design: dict, names: list) -> None:
+    tasks = []
+    for name in names:
+        rec = design["subjects"][name]
+        nodes = load_nodes(args.members, name)
+        bits = load_bits(subject_dir(args.collected, name), len(nodes))
+        for c in rec["contrasts"]:
+            tasks.append((name, c, nodes, bits, args.ball_k,
+                          args.pooled_draws, args.pooled_seed))
+    tasks.sort(key=lambda t: -sum(1 for n in t[2]
+                                  if t[1]["a"] in n["arms"] or t[1]["b"] in n["arms"]))
+    rows = []
+    with multiprocessing.Pool(args.jobs) as pool:
+        for got in pool.imap_unordered(pooled_task, tasks):
+            rows += got
+            print(f"pooled {got[0]['subject']} {got[0]['contrast']}: "
+                  f"n={got[0]['n']}", flush=True)
+    rows.sort(key=lambda r: (names.index(r["subject"]), r["contrast"], r["k"]))
+    pdir = os.path.join(args.out, "ball-radii-pooled")
+    os.makedirs(pdir, exist_ok=True)
+    write_csv(os.path.join(pdir, "pooled.csv"), rows)
+    for k in args.ball_k:
+        with open(os.path.join(pdir, f"report-k{k}.txt"), "w") as h:
+            h.write(pooled_report(rows, design, k))
+
+
 # ── driver ──────────────────────────────────────────────────────────────────
 
 def summary(rows: list, design: dict) -> str:
@@ -546,6 +740,15 @@ def main(argv=None) -> int:
     ap.add_argument("--subjects", nargs="*", default=None)
     ap.add_argument("--ball-k", nargs="*", type=int, default=[1, 3, 5])
     ap.add_argument("--no-balls", action="store_true")
+    ap.add_argument("--pooled-balls", action="store_true",
+                    help="also write ball-radii-pooled/: each arm's nodes over "
+                         "all seeds, subsampled to the smaller pool")
+    ap.add_argument("--pooled-only", action="store_true",
+                    help="write ball-radii-pooled/ alone; skip strength and "
+                         "the per-run ball radii")
+    ap.add_argument("--pooled-draws", type=int, default=20)
+    ap.add_argument("--pooled-seed", default="0")
+    ap.add_argument("--jobs", type=int, default=1)
     ap.add_argument("--match", default="0",
                     help="seed for subsampling a unit's groups to its smallest "
                          "group; 'none' keeps every member")
@@ -553,6 +756,9 @@ def main(argv=None) -> int:
     design = D.load_design(args.design)
     match = None if args.match == "none" else args.match
     names = args.subjects or list(design["subjects"])
+    if args.pooled_only:
+        pooled_balls(args, design, names)
+        return 0
     by = load_rows(args.collected)
     rows, rel_rows = [], []
     balls = collections.defaultdict(list)
@@ -602,6 +808,8 @@ def main(argv=None) -> int:
                 report = ball_report(list(csv.DictReader(h)), design)
             with open(os.path.join(bdir, f"report-k{k}.txt"), "w") as h:
                 h.write(report)
+    if args.pooled_balls:
+        pooled_balls(args, design, names)
     return 0
 
 
