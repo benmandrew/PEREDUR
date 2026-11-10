@@ -1,0 +1,32 @@
+only-climb: a = nsga2-apportion/only-climb, b = nsga2-apportion/base (xtriple)
+  b in a vs control a    n=15  0.499 vs 0.666  below 10/14  p 0.00525
+  a in b vs control b    n=17  0.543 vs 0.426  below 6/17  p 0.0797
+  b in a vs a in b       n=17  0.490 vs 0.543  below 9/17  p 0.611
+only-gate: a = nsga2-apportion/only-gate, b = nsga2-apportion/base (xtriple)
+  b in a vs control a    n=17  0.467 vs 0.454  below 5/16  p 0.252
+  a in b vs control b    n=17  0.421 vs 0.426  below 10/17  p 0.548
+  b in a vs a in b       n=18  0.496 vs 0.435  below 5/18  p 0.0304
+only-scale: a = nsga2-apportion/only-scale, b = nsga2-apportion/base (xtriple)
+  b in a vs control a    n=17  0.416 vs 0.417  below 6/17  p 0.963
+  a in b vs control b    n=17  0.421 vs 0.426  below 9/17  p 0.487
+  b in a vs a in b       n=18  0.407 vs 0.453  below 10/18  p 0.495
+only-xover: a = nsga2-apportion/only-xover, b = nsga2-apportion/base (xtriple)
+  b in a vs control a    n=17  0.420 vs 0.416  below 6/17  p 0.207
+  a in b vs control b    n=17  0.423 vs 0.426  below 9/17  p 0.89
+  b in a vs a in b       n=18  0.445 vs 0.413  below 9/18  p 0.865
+only-verdict: a = nsga2-apportion/only-verdict, b = nsga2-apportion/base (xtriple)
+  b in a vs control a    n=17  0.411 vs 0.419  below 11/17  p 0.159
+  a in b vs control b    n=17  0.417 vs 0.426  below 9/17  p 0.207
+  b in a vs a in b       n=18  0.388 vs 0.450  below 10/18  p 0.58
+only-blame: a = nsga2-apportion/only-blame, b = nsga2-apportion/base (xtriple)
+  b in a vs control a    n=17  0.404 vs 0.429  below 12/17  p 0.0569
+  a in b vs control b    n=17  0.431 vs 0.426  below 6/17  p 0.353
+  b in a vs a in b       n=18  0.409 vs 0.463  below 10/18  p 0.212
+only-demote: a = nsga2-apportion/only-demote, b = nsga2-apportion/base (xtriple)
+  b in a vs control a    n=17  0.423 vs 0.408  below 5/17  p 0.0348
+  a in b vs control b    n=17  0.420 vs 0.426  below 8/17  p 0.678
+  b in a vs a in b       n=18  0.406 vs 0.446  below 10/18  p 0.865
+full: a = nsga2-apportion/full, b = nsga2-apportion/base (xtriple)
+  b in a vs control a    n=18  0.465 vs 0.582  below 12/18  p 0.0385
+  a in b vs control b    n=18  0.533 vs 0.455  below 7/18  p 0.154
+  b in a vs a in b       n=18  0.465 vs 0.533  below 9/17  p 0.353

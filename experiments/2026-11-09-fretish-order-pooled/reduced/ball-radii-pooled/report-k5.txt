@@ -1,0 +1,31 @@
+Pooled ball radii, K=5: each arm's distinct nodes over its odd and over its even seeds, all four half-pools subsampled to the smallest; a contrast pairs halves of opposite parity, a control an arm's own two halves. Paired over subjects; p is the exact Wilcoxon signed-rank, Holm within a family and test.
+== only: b in a vs control a
+  only-climb     n=16  0.679 vs 0.830  median diff -0.097  below 12/14  p 0.00305  Holm 0.0214
+  only-gate      n=18  0.744 vs 0.743  median diff +0.000  below 8/16  p 0.744  Holm 1
+  only-scale     n=18  0.710 vs 0.702  median diff +0.007  below 6/17  p 0.123  Holm 0.739
+  only-xover     n=18  0.738 vs 0.740  median diff +0.000  below 8/16  p 0.597  Holm 1
+  only-verdict   n=18  0.722 vs 0.725  median diff -0.000  below 10/16  p 0.659  Holm 1
+  only-blame     n=18  0.697 vs 0.719  median diff +0.000  below 8/17  p 0.973  Holm 1
+  only-demote    n=18  0.717 vs 0.707  median diff +0.002  below 7/17  p 0.306  Holm 1
+== only: a in b vs control b
+  only-climb     n=16  0.806 vs 0.768  median diff -0.006  below 9/15  p 0.679  Holm 1
+  only-gate      n=18  0.699 vs 0.721  median diff -0.005  below 9/16  p 0.144  Holm 0.719
+  only-scale     n=18  0.713 vs 0.722  median diff -0.006  below 12/16  p 0.0429  Holm 0.3
+  only-xover     n=18  0.707 vs 0.723  median diff +0.000  below 8/17  p 1  Holm 1
+  only-verdict   n=18  0.722 vs 0.722  median diff +0.000  below 6/16  p 0.744  Holm 1
+  only-blame     n=18  0.720 vs 0.724  median diff +0.000  below 8/17  p 0.738  Holm 1
+  only-demote    n=18  0.715 vs 0.722  median diff -0.003  below 10/16  p 0.0934  Holm 0.561
+== only: b in a vs a in b
+  only-climb     n=16  0.679 vs 0.806  median diff -0.081  below 11/15  p 0.0353  Holm 0.247
+  only-gate      n=18  0.744 vs 0.699  median diff +0.007  below 6/16  p 0.0761  Holm 0.457
+  only-scale     n=18  0.710 vs 0.713  median diff -0.003  below 9/17  p 0.548  Holm 1
+  only-xover     n=18  0.738 vs 0.707  median diff -0.004  below 11/17  p 0.678  Holm 1
+  only-verdict   n=18  0.722 vs 0.722  median diff +0.000  below 8/17  p 0.927  Holm 1
+  only-blame     n=18  0.697 vs 0.720  median diff -0.003  below 10/17  p 0.243  Holm 1
+  only-demote    n=18  0.717 vs 0.715  median diff +0.001  below 8/17  p 0.818  Holm 1
+== full: b in a vs control a
+  full           n=18  0.671 vs 0.805  median diff -0.087  below 12/16  p 0.0155  Holm 0.0155
+== full: a in b vs control b
+  full           n=18  0.786 vs 0.720  median diff +0.044  below 6/17  p 0.174  Holm 0.174
+== full: b in a vs a in b
+  full           n=18  0.671 vs 0.786  median diff -0.076  below 10/17  p 0.0569  Holm 0.0569
