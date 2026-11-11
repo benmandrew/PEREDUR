@@ -200,17 +200,27 @@ void print_diagnostics_report() {
     std::cout << "\n";
     std::cout << "\nRepairs contributed by the cross-generation accumulator: "
               << AccumulatorStats::n_contributed << "\n";
-    std::cout << "Mutations drawn from a blame-targeted slot list: "
-              << SlotTargetingStats::n_targeted << "\n";
+    std::cout << "Mutations: " << MutationStats::n_mutations << ", "
+              << MutationStats::n_slot_draws << " reaching the slot draw, "
+              << SlotTargetingStats::n_targeted
+              << " drawn from a blame-targeted slot list\n";
     std::cout << "Candidates demoted as proved weaker than another realizable "
                  "one: "
               << DemotionStats::n_demoted << "\n";
+    if (DemotionStats::final_front.has_value()) {
+        std::cout << "Final first front: "
+                  << DemotionStats::final_front->n_members << " members, "
+                  << DemotionStats::final_front->n_realizable << " realizable, "
+                  << DemotionStats::final_front->n_gutted
+                  << " proved weaker than another realizable member\n";
+    }
     if (ClimbStats::n_climbed > 0) {
         std::cout << "Output climb: " << ClimbStats::n_climbed
                   << " repairs climbed, " << ClimbStats::n_steps_tried
                   << " steps tried, " << ClimbStats::n_steps_accepted
                   << " accepted, " << ClimbStats::n_queries << " queries, "
-                  << ClimbStats::n_ltlsynt_execs << " ltlsynt execs\n"
+                  << ClimbStats::n_ltlsynt_execs << " ltlsynt execs, "
+                  << ClimbStats::wall_s << " s\n"
                   << "Output climb answers: " << ClimbStats::n_memo_hits
                   << " memo, " << ClimbStats::n_subsumed << " subsumed, "
                   << ClimbStats::n_rule_subsumed << " rule-subsumed, "
@@ -223,11 +233,16 @@ void print_diagnostics_report() {
               << " forbidden and " << DirectionGateStats::n_sideways_refused
               << " sideways rewrites returned to the parent, "
               << DirectionGateStats::n_steps << " steps towards the original ("
-              << DirectionGateStats::n_bisected << " bisected)\n";
+              << DirectionGateStats::n_bisected << " bisected, "
+              << DirectionGateStats::n_steps_realizable
+              << " scored realizable)\n";
     std::cout << "Step scaling: " << StepScalingStats::n_scaled
               << " mutations scaled, " << StepScalingStats::n_large
               << " large moves and " << StepScalingStats::n_small
-              << " single edges taken\n";
+              << " single edges taken; " << StepScalingStats::n_unscaled
+              << " unscaled, with " << StepScalingStats::n_unscaled_large
+              << " large moves and " << StepScalingStats::n_unscaled_small
+              << " single edges\n";
     std::cout << "Parent-verdict stage: " << ParentVerdictStats::n_dropped
               << " proved strengthenings of an unrealizable parent dropped, "
               << ParentVerdictStats::n_unproved

@@ -30,6 +30,7 @@
 #include "genetic/demotion.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/order_crossover.hpp"
+#include "genetic/output_gate.hpp"
 #include "genetic/pipeline.hpp"
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
@@ -52,7 +53,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 64;
+constexpr int k_schema_version = 65;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -371,6 +372,10 @@ void write_run_manifest(const std::string& output_dir,
         {"external_tools", external_tools_json()},
         {"finished_utc", utc_timestamp()},
         {"wall_s", wall_s},
+        // Of wall_s, the seconds the post-search tail took: the output gate on
+        // the final population, the climb, the final filters and the rescore.
+        // Machine-dependent, as wall_s is.
+        {"finish_wall_s", OutputTailStats::wall_s},
         // Which budget ended the run, the generations it completed, and the
         // offspring it bred getting there. individuals_bred is null under the
         // default configuration: counting an offspring means comparing it
@@ -451,9 +456,24 @@ void write_run_manifest(const std::string& output_dir,
         // Rewrites whose slot blame_targeted_slots drew from a narrowed list.
         // Zero whenever the key is off.
         {"n_targeted_mutations", SlotTargetingStats::n_targeted.load()},
+        // Every FRETISH mutation, and those that reached the slot draw, which
+        // n_targeted_mutations is a subset of. Zero on the TLSF path.
+        {"n_mutations", MutationStats::n_mutations.load()},
+        {"n_slot_draws", MutationStats::n_slot_draws.load()},
         // Candidates maximality demotion moved one front down at survivor
         // selection, over every generation. Zero wherever the key is off.
         {"n_maximality_demotions", DemotionStats::n_demoted},
+        // The final population's first front by objectives alone, and its
+        // realizable members another realizable member is proved strictly
+        // stronger than. Measured whether or not demotion is on; null without
+        // a status objective and on the TLSF path.
+        {"final_front",
+         DemotionStats::final_front.has_value()
+             ? nlohmann::json(
+                   {{"members", DemotionStats::final_front->n_members},
+                    {"realizable", DemotionStats::final_front->n_realizable},
+                    {"gutted", DemotionStats::final_front->n_gutted}})
+             : nlohmann::json(nullptr)},
         // The output climb, all zero unless filters.climb_output is on.
         {"climb",
          {{"climbed", ClimbStats::n_climbed.load()},
@@ -465,7 +485,8 @@ void write_run_manifest(const std::string& output_dir,
           {"subsumed", ClimbStats::n_subsumed.load()},
           {"rule_subsumed", ClimbStats::n_rule_subsumed.load()},
           {"satisfiability_routed", ClimbStats::n_satisfiability_routed.load()},
-          {"controller_hits", ClimbStats::n_controller_hits.load()}}},
+          {"controller_hits", ClimbStats::n_controller_hits.load()},
+          {"wall_s", ClimbStats::wall_s}}},
         // What direction_gated did: free rewrites returned as the parent for
         // moving the forbidden way or for a refused sideways draw, and steps
         // a realizable parent took back towards the original. Zero whenever
@@ -474,14 +495,20 @@ void write_run_manifest(const std::string& output_dir,
          {{"forbidden", DirectionGateStats::n_forbidden.load()},
           {"sideways_refused", DirectionGateStats::n_sideways_refused.load()},
           {"steps", DirectionGateStats::n_steps.load()},
-          {"bisected", DirectionGateStats::n_bisected.load()}}},
+          {"bisected", DirectionGateStats::n_bisected.load()},
+          {"steps_realizable", DirectionGateStats::n_steps_realizable.load()}}},
         // What step_scaling did: mutations run under a scale, and the large
-        // moves and single tick-count edges they took. Zero whenever the key
-        // is off.
+        // moves and single tick-count edges they took, zero whenever the key
+        // is off. The unscaled counts are the same three for the mutations a
+        // scale would have applied to with the key at 0, zero whenever it is
+        // on.
         {"step_scaling",
          {{"scaled", StepScalingStats::n_scaled.load()},
           {"large", StepScalingStats::n_large.load()},
-          {"small", StepScalingStats::n_small.load()}}},
+          {"small", StepScalingStats::n_small.load()},
+          {"unscaled", StepScalingStats::n_unscaled.load()},
+          {"unscaled_large", StepScalingStats::n_unscaled_large.load()},
+          {"unscaled_small", StepScalingStats::n_unscaled_small.load()}}},
         // What the parent-verdict stage did: offspring dropped as proved
         // strengthenings of a parent the realizability memo showed
         // unrealizable, and proved strengthenings kept because the parent's
