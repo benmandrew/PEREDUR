@@ -188,7 +188,10 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/peredur /opt/peredur
-COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/peredur-entrypoint
+# COPY --chmod needs BuildKit, which a Docker without the buildx plugin lacks,
+# so the mode is set in a step of its own.
+COPY docker/entrypoint.sh /usr/local/bin/peredur-entrypoint
+RUN chmod 755 /usr/local/bin/peredur-entrypoint
 
 # The same values cmake writes into share/peredur/peredur-env.sh, set as ENV
 # because there is no shell to source that file from. Each overrides a path
