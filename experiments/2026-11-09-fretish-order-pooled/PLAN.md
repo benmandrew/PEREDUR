@@ -40,7 +40,30 @@ The audit also checked, and found sound: the arm configs (each differs from base
 
 A sensitivity check on the first pass, restricted to the 11 subjects with under 1% crashed rows, left every non-climb contrast where it was: only-gate's median net is +0.188 there, stronger on 10 of 11, against +0.187 over all subjects. Eight of those 11 are rad cores. The climb and full rows have no such check, since their pools are wrong on every subject.
 
-## Results
+## Re-run of 2026-11-11
+
+Queue entries 068 (av2) and 069 (av3) ran at `f559846`, and both finished by 16:12. All 2,132,728 compare rows returned 0 and decided both directions, so the `imp` and `non` readings agree on every share. fsm-lmcps planned no pair. The reduction ran locally in 58 minutes and wrote `reduced-v2/`.
+
+### Strength
+
+| Contrast | Subjects | Median net | Arm / base stronger | Holm p |
+|---|---|---|---|---|
+| only-climb | 18 | +0.920 | 18 / 0 | 5.3e-05 |
+| full | 18 | +0.371 | 18 / 0 | 7.6e-06 |
+| only-gate | 18 | +0.188 | 18 / 0 | 5.3e-05 |
+| only-demote | 18 | +0.012 | 13 / 5 | 0.038 |
+| only-xover | 18 | +0.020 | 13 / 5 | 0.43 |
+| only-scale | 18 | +0.009 | 10 / 7 | 0.79 |
+| only-blame | 18 | +0.001 | 9 / 7 | 1 |
+| only-verdict | 18 | 0.000 | 7 / 8 | 1 |
+
+Only-climb's `sub_a` is 0 on every subject: no frontier class of only-climb is strictly implied by one of base's. Its search is base's run for run, so this is the climb strengthening base's own outputs, and the large net follows from the design. Its smallest net is rad-core-33's 0.269. Gate, demote and the non-climb arms match the first pass's figures to the second decimal, since their pools are unchanged.
+
+### Pooled diversity
+
+The only-climb and full arms' nodes fall inside base's region less often than base's own other half does, at every K: only-climb 0.487 against 0.629 at K = 3, below on 17 of 18 subjects (Holm 0.0005); full 0.490 against 0.633, 16 of 18 (Holm 7.6e-05). In the other direction, base's nodes fall inside only-climb's region as often as in its control at every K (smallest Holm 0.30), and inside full's less often at K = 1 and 3 (Holm 0.008 and 0.024) and as often at K = 5. The climb therefore reaches points outside base's region while still covering base's. No other only-arm differs from its control at any K (smallest Holm 0.49).
+
+## Results of the first pass
 
 The tables below are the first pass's, voided by "Audit of 2026-11-11".
 
