@@ -1,0 +1,47 @@
+# The pooled design of the FRETISH order evaluation (scripts/pooled_design.py).
+# pool_members.py, fingerprint_members.py --design and pooled_reduce.py all
+# read this file, so the arms pooled, the pairs planned and the contrasts
+# reported agree. Arms are <scheme>/<level>; a contrast's net is positive when
+# `a` is the stronger.
+
+draws = 100
+
+# 2026-11-05-fretish-order, phase small: 9 specs x 18 arms x 30 seeds.
+[[groups]]
+results = "experiments/results-fretish-order"
+run_dir = "sweep_O_{level}_{scheme}_wkoff_log_{subject}_seed{seed:02d}"
+seeds = "0-29"
+members = "output"
+subjects = ["fsm", "fsm-timing", "fsm-combined", "mode-arbiter", "takeoff",
+            "liquid-mixer", "valu3s-uc6", "fsm-lmcps", "lift-plus-cruise-mini"]
+sampled = ["valu3s-uc6", "lift-plus-cruise-mini"]
+contrasts = [
+  { name = "only-climb", a = "nsga2-apportion/only-climb", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-gate", a = "nsga2-apportion/only-gate", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-scale", a = "nsga2-apportion/only-scale", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-xover", a = "nsga2-apportion/only-xover", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-verdict", a = "nsga2-apportion/only-verdict", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-blame", a = "nsga2-apportion/only-blame", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-demote", a = "nsga2-apportion/only-demote", b = "nsga2-apportion/base", family = "only" },
+  { name = "full", a = "nsga2-apportion/full", b = "nsga2-apportion/base", family = "full" },
+]
+
+# 2026-11-09-fretish-order-cores: rad's ten cores x 18 arms x 30 seeds.
+[[groups]]
+results = "experiments/results-fretish-order-cores"
+run_dir = "sweep_O_{level}_{scheme}_wkoff_log_{subject}_seed{seed:02d}"
+seeds = "0-29"
+members = "output"
+subjects = ["rad-core-1-18", "rad-core-10", "rad-core-12-18", "rad-core-17-18",
+            "rad-core-33", "rad-core-45", "rad-core-55", "rad-core-61",
+            "rad-core-65", "rad-core-68"]
+contrasts = [
+  { name = "only-climb", a = "nsga2-apportion/only-climb", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-gate", a = "nsga2-apportion/only-gate", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-scale", a = "nsga2-apportion/only-scale", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-xover", a = "nsga2-apportion/only-xover", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-verdict", a = "nsga2-apportion/only-verdict", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-blame", a = "nsga2-apportion/only-blame", b = "nsga2-apportion/base", family = "only" },
+  { name = "only-demote", a = "nsga2-apportion/only-demote", b = "nsga2-apportion/base", family = "only" },
+  { name = "full", a = "nsga2-apportion/full", b = "nsga2-apportion/base", family = "full" },
+]

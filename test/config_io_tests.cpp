@@ -200,7 +200,8 @@ TEST(test_config_io_enum_keys) {
          &Config::selection_scheme,
          SelectionScheme::Nsga2Apportion,
          {{"weighted", SelectionScheme::WeightedAverage},
-          {"nsga2-apportion", SelectionScheme::Nsga2Apportion}},
+          {"nsga2-apportion", SelectionScheme::Nsga2Apportion},
+          {"random", SelectionScheme::Random}},
          "pareto",
          true});
     // Pinned because the default is what every archived config inherits: the

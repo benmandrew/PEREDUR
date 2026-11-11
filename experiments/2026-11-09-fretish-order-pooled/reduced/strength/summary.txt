@@ -1,0 +1,27 @@
+== net_decided (a stronger when positive)
+  only-climb     n=15 median=-0.0323 mean=-0.0524 a>b 0, b>a 12, tie 3, Wilcoxon p=0.0004883, Holm (only) p=0.00293
+  only-gate      n=16 median=+0.1883 mean=+0.2063 a>b 16, b>a 0, tie 0, Wilcoxon p=3.052e-05, Holm (only) p=0.0002136
+  only-scale     n=16 median=+0.0139 mean=+0.0245 a>b 10, b>a 5, tie 1, Wilcoxon p=0.1205, Holm (only) p=0.3616
+  only-xover     n=16 median=+0.0219 mean=+0.0611 a>b 12, b>a 4, tie 0, Wilcoxon p=0.03864, Holm (only) p=0.1545
+  only-verdict   n=16 median=+0.0000 mean=+0.0104 a>b 6, b>a 7, tie 3, Wilcoxon p=0.7224, Holm (only) p=1
+  only-blame     n=16 median=+0.0007 mean=+0.0083 a>b 8, b>a 6, tie 2, Wilcoxon p=0.6257, Holm (only) p=1
+  only-demote    n=16 median=+0.0092 mean=+0.0469 a>b 13, b>a 3, tie 0, Wilcoxon p=0.001312, Holm (only) p=0.006561
+  full           n=16 median=+0.0476 mean=+0.0680 a>b 11, b>a 4, tie 1, Wilcoxon p=0.01807, Holm (full) p=0.01807
+== net_imp (a stronger when positive)
+  only-climb     n=17 median=-0.0718 mean=-0.0654 a>b 1, b>a 14, tie 2, Wilcoxon p=0.0008545, Holm (only) p=0.005127
+  only-gate      n=18 median=+0.1900 mean=+0.1934 a>b 16, b>a 2, tie 0, Wilcoxon p=5.341e-05, Holm (only) p=0.0003738
+  only-scale     n=18 median=+0.0200 mean=+0.0400 a>b 11, b>a 5, tie 2, Wilcoxon p=0.05768, Holm (only) p=0.173
+  only-xover     n=18 median=+0.0252 mean=+0.0782 a>b 14, b>a 4, tie 0, Wilcoxon p=0.01593, Holm (only) p=0.07965
+  only-verdict   n=18 median=+0.0000 mean=+0.0024 a>b 8, b>a 6, tie 4, Wilcoxon p=0.8077, Holm (only) p=0.8077
+  only-blame     n=18 median=+0.0032 mean=+0.0082 a>b 10, b>a 6, tie 2, Wilcoxon p=0.3225, Holm (only) p=0.645
+  only-demote    n=18 median=+0.0179 mean=+0.0509 a>b 12, b>a 6, tie 0, Wilcoxon p=0.02081, Holm (only) p=0.08325
+  full           n=19 median=+0.0957 mean=+0.0938 a>b 13, b>a 5, tie 1, Wilcoxon p=0.01823, Holm (full) p=0.01823
+== net_non (a stronger when positive)
+  only-climb     n=17 median=-0.0323 mean=-0.0522 a>b 0, b>a 14, tie 3, Wilcoxon p=0.0001221, Holm (only) p=0.0007324
+  only-gate      n=18 median=+0.1872 mean=+0.1845 a>b 17, b>a 1, tie 0, Wilcoxon p=1.526e-05, Holm (only) p=0.0001068
+  only-scale     n=18 median=+0.0078 mean=+0.0212 a>b 10, b>a 6, tie 2, Wilcoxon p=0.1591, Holm (only) p=0.4772
+  only-xover     n=18 median=+0.0203 mean=+0.0551 a>b 13, b>a 5, tie 0, Wilcoxon p=0.03849, Holm (only) p=0.154
+  only-verdict   n=18 median=+0.0000 mean=+0.0078 a>b 6, b>a 8, tie 4, Wilcoxon p=0.8433, Holm (only) p=0.9774
+  only-blame     n=18 median=+0.0007 mean=+0.0079 a>b 9, b>a 6, tie 3, Wilcoxon p=0.4887, Holm (only) p=0.9774
+  only-demote    n=18 median=+0.0092 mean=+0.0417 a>b 14, b>a 4, tie 0, Wilcoxon p=0.002808, Holm (only) p=0.01404
+  full           n=19 median=+0.0392 mean=+0.0621 a>b 14, b>a 4, tie 1, Wilcoxon p=0.0056, Holm (full) p=0.0056

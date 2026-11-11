@@ -39,6 +39,12 @@ CONFIGS_DIR = Path(__file__).parent.parent / "experiments" / "configs"
 # "nsga2-replicate" of the two NSGA-II schemes.
 SCHEMES: list[str] = ["nsga2-apportion", "weighted"]
 
+# Schemes --schemes accepts beyond the default pair. random is the undirected
+# baseline of the FRETISH order-search evaluation: it shuffles parents and
+# survivors and reads no objective. It is offered but never emitted by
+# default, so a grid generated without --schemes stays byte-identical.
+EXTRA_SCHEMES: list[str] = ["random"]
+
 # The weakening directory names a state and sets none: the binary never weakens
 # and no config states a key. The directory stays because `weakening` is one of
 # merge_experiments.KEY_FIELDS: weakening_of() in run_experiments.py reads it
@@ -385,6 +391,40 @@ SWEEP_R: list[tuple[str, dict]] = [
     ("elit0.1", {"elitism_rate": 0.1}),   # config.hpp default
 ]
 
+# Sweep O: the FRETISH order-directed search of 2026-10-31, one feature per
+# arm. "base" has every feature off and "full" every feature on; "no-<f>" is
+# full without feature f and "only-<f>" is base with f alone, so the sweep
+# ablates in both directions. The gate arm carries bisect_steps, which acts
+# only under direction_gated. The "on" values are the ones the 3-seed
+# measurements in docs/dev/operators.md used. FRETISH only.
+ORDER_FEATURES: list[tuple[str, dict]] = [
+    ("xover",   {"p_order_crossover": 0.3}),
+    ("climb",   {"climb_output": True}),
+    ("demote",  {"maximality_demotion": True}),
+    ("blame",   {"blame_targeted_slots": True}),
+    ("gate",    {"direction_gated": True, "bisect_steps": True}),
+    ("scale",   {"step_scaling": 1.0}),
+    ("verdict", {"parent_verdict": True}),
+]
+
+
+def _order_sweep() -> list[tuple[str, dict]]:
+    full: dict = {}
+    for _, on in ORDER_FEATURES:
+        full.update(on)
+    # Every key is written in every arm, off as well as on, so no arm inherits
+    # a default that a later commit may move.
+    base = {k: DEFAULTS[k] for k in full}
+    levels: list[tuple[str, dict]] = [("base", dict(base)), ("full", dict(full))]
+    for name, on in ORDER_FEATURES:
+        levels.append((f"no-{name}", {**full, **{k: base[k] for k in on}}))
+    for name, on in ORDER_FEATURES:
+        levels.append((f"only-{name}", {**base, **on}))
+    return levels
+
+
+SWEEP_O: list[tuple[str, dict]] = _order_sweep()
+
 # Keys whose built-in default has changed at least once since campaigns began
 # being archived. A generated config states a key only where a sweep overrides
 # it, so everything else is inherited from the binary at run time — which means
@@ -405,7 +445,12 @@ SWEEPS: list[tuple[str, list]] = [
     ("B", SWEEP_B),
     ("C", SWEEP_C),
     ("R", SWEEP_R),
+    ("O", SWEEP_O),
 ]
+
+# Sweeps emitted when --sweeps is omitted. O is held back, so a grid generated
+# without --sweeps stays byte-identical to the one before it existed.
+DEFAULT_SWEEPS: list[str] = ["A", "B", "C", "R"]
 
 # ── TLSF campaign grid ───────────────────────────────────────────────────────
 
@@ -498,7 +543,8 @@ def parse_args() -> argparse.Namespace:
                              f"override --generations and --population-size. "
                              f"Omit to keep the pinned 0.33 triple every past "
                              f"grid was generated under")
-    parser.add_argument("--schemes", nargs="+", choices=SCHEMES, default=SCHEMES,
+    parser.add_argument("--schemes", nargs="+",
+                        choices=SCHEMES + EXTRA_SCHEMES, default=SCHEMES,
                         metavar="SCHEME",
                         help=f"Selection schemes to emit (default: "
                              f"{' '.join(SCHEMES)})")
@@ -506,9 +552,11 @@ def parse_args() -> argparse.Namespace:
     # letters are the whole choice list.
     parser.add_argument("--sweeps", nargs="+",
                         choices=[n for n, _ in SWEEPS],
-                        default=[n for n, _ in SWEEPS], metavar="SWEEP",
-                        help="Sweeps to emit (default: every sweep of the "
-                             "selected table)")
+                        default=DEFAULT_SWEEPS, metavar="SWEEP",
+                        help="Sweeps to emit (default: "
+                             f"{' '.join(DEFAULT_SWEEPS)}, the selected table's "
+                             "sweeps among them; the FRETISH order sweep O is "
+                             "emitted only when named)")
     parser.add_argument("--levels", default=None, metavar="NAMES",
                         help="Comma-separated level names; each selected sweep "
                              "emits only its matching levels (e.g. --levels "

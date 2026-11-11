@@ -1,0 +1,50 @@
+name = "2026-11-05-fretish-order"
+branch = "feat/fretish-order-eval"
+profile = "fretish-order"
+description = "The FRETISH order-directed search of 2026-10-31 against an all-off baseline and random selection, with a two-way ablation of its seven keys. PLAN.md gives the design and the analysis."
+
+# Every arm of a seed runs on one host, so a host difference cancels inside
+# each (spec, seed) cell. Seeds 0 and 15 are the pilot's, which resume here.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# Two calls into one tree: every sweep O arm under nsga2-apportion, and the two
+# random arms (base, only-climb) under random/. The budget is the TLSF paper's:
+# 1000 bred individuals at population 100, with generations high enough never
+# to bind. No --parallel: run_experiments.py sets it from jobs.
+configs = "python3 scripts/gen_configs.py --sweeps O --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order --pin-vintage && python3 scripts/gen_configs.py --sweeps O --levels base,only-climb --schemes random --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order --pin-vintage"
+
+# 9 small specs x 18 arms x 30 seeds = 4,860 runs. About 10 s a run at the
+# defaults and up to 2.2x that with the climb on; estimate 1-2 h on two hosts.
+[[phases]]
+name = "small"
+profile = "fretish-order"
+jobs = 15
+
+# lift-plus-cruise-full at 3 arms x 30 seeds = 90 runs, about 15 min each at
+# parallel 8; estimate 3 h.
+[[phases]]
+name = "lift-full"
+profile = "fretish-order-large"
+specs = ["lift-plus-cruise-full"]
+jobs = 3
+
+# rad and ventilator-controller at 3 arms x 10 seeds = 60 runs. Most are
+# expected to reach the 7200 s cap; estimate 8 h.
+[[phases]]
+name = "rad-vent"
+profile = "fretish-order-large"
+specs = ["rad", "ventilator-controller"]
+jobs = 7
+hosts = { av2 = "0-4", av3 = "15-19" }
+
+[[phases]]
+name = "score-small"
+kind = "score"
+profile = "fretish-order"
+
+[[phases]]
+name = "score-large"
+kind = "score"
+profile = "fretish-order-large"

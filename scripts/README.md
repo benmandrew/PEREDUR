@@ -128,6 +128,8 @@ read it from there.
 | `h2h-tlsf` | nsga2-truncate, `log` metric | C/default | `H2H_TLSF_SPECS_2026_07` | 0–19 | `results-ablate-tlsf.csv` |
 | `aurus-h2h` | nsga2-apportion, `log` metric | C/default | `H2H_TLSF_READY` | 0–19 | `results-aurus-h2h.csv` |
 | `arbiter-probe` | nsga2-truncate, nsga2-apportion | R/elit0.1 | `ARBITER_PROBE_SPECS` | 0–39 | `results-arbiter-probe.csv` |
+| `fretish-order` | nsga2-apportion, random, `log` metric | O (random: base, only-climb) | `FRETISH_ORDER_SMALL` | 0–29 | `results-fretish-order.csv` |
+| `fretish-order-large` | nsga2-apportion, random, `log` metric | O/base, O/full | `FRETISH_ORDER_LARGE` | 0–29 | `results-fretish-order-large.csv` |
 
 `tlsf` runs the six basic-TLSF examples (arbiter, gyro-var1, humanoid-531,
 lift, lily02, minepump) rather than the four FRETISH specs, swept over
@@ -355,6 +357,32 @@ the scorer's command line whatever the declaration said, so the manifest the
 host writes records the declaration's values. `hosts` narrows a score phase
 as it narrows a run phase, and each host scores its own seeds alone.
 
+A `compare` phase runs `compare` over a pair list planned in advance, through
+`compare_pairs.py`. It is not seed-split: each host runs the pair file its own
+`pairs` path names, so it refuses `profile`, `sweeps`, `specs` and every other
+key not shown here. `{host}` in `pairs` or `out` becomes the host's name, and
+either path may be absolute or relative to the checkout:
+
+```toml
+hosts = { av1 = "", av2 = "", av3 = "" }   # "" = no seeds on that host
+
+[[phases]]
+name = "subsumption"                      # default: compare
+kind = "compare"
+pairs = "experiments/rq2/pairs-{host}.csv"   # id,a_path,b_path
+out = "experiments/rq2/subsumption-{host}.csv"
+jobs = 28              # pairs in flight
+black_timeout = 300    # compare --timeout, per solver call
+wall_timeout = 700     # outer timeout per pair
+vmem_kb = 8000000      # ulimit -v per pair
+hosts = ["av1", "av3"] # optional; an array of host names, not a seed table
+```
+
+The empty string is accepted only at the campaign level, and only where every
+seeded phase gives that host its own range; a run or score phase that would
+fall back on `""` is refused. The budgets default to `compare_pairs.DEFAULTS`
+and are stated on the command line, as a score phase's are.
+
 A phase's own `hosts` table overrides the campaign-level split for that phase
 alone, and may only narrow it — every host it names must already be declared at
 the top level, since `stage` staged no other one. A host the table omits runs
@@ -408,8 +436,9 @@ stage also refuses a checkout ahead of the pushed commit.
 A campaign is launched by `enqueue`, described under the queue below.
 `enqueue` accepts no seed range: it reads the split from `campaign.toml`, which
 is the only place it is written down. A score phase runs like any other phase,
-as a `score_campaign.py` command over the same seeds, and `tick --dry-run`
-prints it.
+as a `score_campaign.py` command over the same seeds, and a compare phase as a
+`compare_pairs.py` command over that host's pair list; `tick --dry-run` prints
+both.
 
 ### Scoring a finished search
 
@@ -422,7 +451,8 @@ python3 scripts/score_campaign.py ... --dry-run   # the queue and the command
 ```
 
 `score_campaign.py` queues the run directories under `--results` whose name
-ends `_seed<N>` with N in `--seeds`, smallest first by the line count of
+ends `_seed<N>` with N in `--seeds` (and, with `--specs`, `_<spec>_seed<N>`
+for one of those specs), smallest first by the line count of
 `accumulated/index.tsv`, and runs one `score_curves.py --maximality` per
 directory from `--workers` threads, each pinned with `taskset` to a block of
 `--cores` cores and each invocation under coreutils `timeout --wall-cap-s`.
@@ -444,6 +474,121 @@ budgets and the wall cap are the two campaigns' values: 900 s per `maximal`
 call, 600 s for `compare`, a 4500 s deadline and a cap 900 s past it.
 `PEREDUR_SCORE_CURVES_CMD`, `PEREDUR_BIN_DIR`, `MAXIMAL_BIN` and
 `COMPARE_BIN` override what it runs, for a worktree or a test.
+
+### Comparing planned pairs
+
+```sh
+# What a compare phase runs on av1
+python3 scripts/compare_pairs.py experiments/rq2/pairs-av1.csv \
+    experiments/rq2/subsumption-av1.csv --jobs 28 --black-timeout 300 \
+    --wall-timeout 700 --vmem-kb 8000000 \
+    --manifest experiments/compare-manifests/<campaign>.subsumption.json
+```
+
+One `compare --repairs <a> --ideals <b> --timeout <black>` call per pair
+(`--timeout` is seconds per solver direction, default 20), each
+through two temporary directories of one symlink, under `ulimit -v` and
+`timeout <wall>`. It appends `id,relation,rc,secs` per pair, where `relation`
+is `a` relative to `b` (`weaker` means `b` strictly implies `a`), `undecided`
+for a solver or wall timeout, and `error` where no relation was printed. An id
+already in the output is skipped. It exits 0 only when every id in the pair
+list has a row, so a killed or partial pass is retried rather than marked done.
+`compare` and the black and Spot paths default to this checkout's
+`build-release`, which is the build the tick has just verified. A tick refuses
+the phase by name where the host's pair list is missing.
+`PEREDUR_COMPARE_PAIRS_CMD` overrides the command, for a test.
+
+A fourth pair-list column, `dirs` (`fwd`, `rev` or `both`), is passed to
+`compare` as `COMPARE_DIRECTIONS` and adds `a_implies_b,b_implies_a` to the
+output: `1` or `0` from compare's `DIR` line, `?` for a queried direction
+with no answer, `0` for one not queried.
+
+### Fingerprinting pooled members
+
+```sh
+# What a fingerprint phase runs on av2
+python3 scripts/fingerprint_members.py experiments/x/subjects-av2.txt \
+    experiments/x/members experiments/x-work experiments/x-out/fp \
+    --pairs experiments/x-work/pairs-av2.csv --words 32768 --seed 3 \
+    --workers 8 --black-timeout 30 --design experiments/x/design.toml \
+    --manifest experiments/compare-manifests/<campaign>.fingerprint.json
+```
+
+Per subject: node files and the members' LTL go under the work directory,
+black's lasso words (`scripts/draw_black.py`, through `build-release/fpdraw ltl`) and
+every node's fingerprint (`fpdraw eval`) under the output directory, and the
+word-pruned pair list `<work>/<subject>/pairs.csv` with a `dirs` column for
+the compare phase after it. Progress is one row per finished subject in
+`<out>/done-<subjects stem>.csv`, and a rerun resumes from it. It exits 0 only
+when every subject is done. `PEREDUR_FINGERPRINT_CMD` overrides the command,
+for a test. The `kind = "fingerprint"` declaration is in
+`docs/dev/campaigns.md`.
+
+`--design` reads a pooled design (`scripts/pooled_design.py` documents the
+TOML) and narrows each subject's plan to the pairs its contrasts need. A
+sampled subject's draw orders are written to
+`<out>/<subject>/order-<scheme>__<level>.txt`. Without it, every pair with an
+open direction is planned.
+
+### Pooling members and reducing a pooled pass
+
+```sh
+# Locally, after collecting every host's runs: one node file per subject
+python3 scripts/pool_members.py experiments/x/design.toml experiments/x/members \
+    [--root .] [--subjects fsm ... | --subjects-file FILE] [--allow-missing]
+
+# What a pool phase runs on av2: copy the committed pools, pool the rest
+python3 scripts/pool_members.py experiments/x/design.toml experiments/x-members \
+    --subjects-file experiments/x/subjects-av2.txt \
+    --copy-from experiments/x/members \
+    --manifest experiments/compare-manifests/<campaign>.pool.json
+
+# Locally, after `collect --outputs x-out`
+python3 scripts/pooled_reduce.py experiments/x/design.toml experiments/x/members \
+    experiments/x-out experiments/x/reduced [--subjects ...] \
+    [--ball-k 1 3 5] [--no-balls] [--match 0|none] \
+    [--pooled-balls | --pooled-only] [--pooled-draws 20] [--pooled-seed 0] \
+    [--jobs N]
+```
+
+`pool_members.py` reads every arm a subject's contrasts name at every seed the
+design declares, from `<root>/<results>/<run_dir>`. A member is a file named in
+`accumulated/maximal.tsv` (`members = "maximal"`) or a `repair_N.json` with its
+fitness dropped (`members = "output"`). Identical sorted JSON is one node. A
+missing run directory, or one without `run.json`, fails the subject unless
+`--allow-missing` is given; a run with no members is counted in `index.csv` as
+empty. The gzip output is byte-stable. With `--copy-from DIR`, a subject whose
+`DIR/<subject>.jsonl.gz` exists is copied byte for byte and its `DIR/index.csv`
+rows carried over, once their arms and checksum match; `DIR` must differ from
+the output. Each finished subject appends a row to
+`<out>/done-<subjects-file stem>.csv` (`done.csv` without a file), and the
+exit is 1 if any subject failed. `PEREDUR_POOL_CMD` overrides the command, for
+a test; the `kind = "pool"` declaration is in `docs/dev/campaigns.md`.
+
+`pooled_reduce.py` refuses a subject whose verdict rows differ from the plan it
+re-derives from the design and the fingerprints. It writes
+`strength/contrasts.csv` (frontier sizes and net subsumption under the
+`decided`, `imp` and `non` readings of an undecided direction, or ratio
+estimates with 95% half-widths for a sampled subject), `strength/relations.csv`,
+`strength/summary.txt` (an exact signed-rank test per contrast over subjects,
+Holm-corrected within each `family`) and, unless `--no-balls`,
+`ball-radii/prc-k<K>.csv` and `report-k<K>.txt`. `--match` seeds the
+subsampling of a ball unit's groups to its smallest one.
+
+The per-run ball radii read one run's members as a group, and a group with K
+or fewer members has no radius, so an arm whose runs return few members loses
+most of its units. `--pooled-balls` adds `ball-radii-pooled/`, which pools
+each arm's distinct nodes over its odd seeds and over its even seeds. A
+contrast pairs a's odd half with b's even half and the reverse, so no pair
+shares a seed's RNG stream: an arm whose feature never fires repeats base run
+for run, and a shared seed would read that as overlap. Each arm's control
+pairs its own two halves. All four half-pools are subsampled to the smallest
+one's size, `--pooled-draws` times, with the contrast and controls on the same
+samples in each draw. `pooled.csv` holds the mean and SD over draws of `b_in_a` (the share of
+b inside a's region), `a_in_b` and both controls, per subject, contrast and K;
+`report-k<K>.txt` tests each over subjects, Holm-corrected within a family.
+`--pooled-only` writes that directory alone and skips strength and the
+per-run radii. `--jobs` runs the (subject, contrast) tasks in parallel.
 
 ### The queue
 
@@ -590,6 +735,11 @@ gate was overridden), and STATE follows the same three-hour rule with a
 `score_campaign.py` naming that directory in place of a runner naming a
 profile. `--campaign <out>` selects it.
 
+A compare phase is a `compare:<campaign>.<phase>` row, read from its manifest
+under `experiments/compare-manifests/`. ROWS is the output CSV's rows against
+the pair list's length, STALE is the output's age, BINARY is `compare`'s commit,
+and a `compare_pairs.py` naming that manifest counts as running.
+
 An unreachable host prints a row saying so rather than aborting the poll, and
 sets a non-zero exit status, so a wrapper can tell a full poll from a partial
 one.
@@ -628,6 +778,11 @@ one below over run names rather than keys: a run on both hosts is written
 once where the two copies are byte-identical and reported as MISMATCH where
 they differ, a curve whose header comes from another `score_curves.py`
 vintage is refused, and a host that answers nothing is INCOMPLETE.
+
+`collect --outputs NAME` pulls each host's `experiments/NAME/` into
+`experiments/NAME/<host>/` the same way and joins nothing, for fingerprint
+and compare passes whose outputs are a tree. A host with no files is
+INCOMPLETE.
 
 `collect` rsyncs each host's per-run tree and results CSV back and merges them
 on the natural key through `merge_experiments.py`, then verifies the outcome

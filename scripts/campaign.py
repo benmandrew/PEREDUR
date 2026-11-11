@@ -104,6 +104,24 @@ RUNNER_CMD = os.environ.get("PEREDUR_RUNNER_CMD",
 # The scoring twin, for a `kind = "score"` phase, with the same override.
 SCORER_CMD = os.environ.get("PEREDUR_SCORER_CMD",
                             f"{REMOTE_PYTHON} scripts/score_campaign.py")
+# The pairwise twin, for a `kind = "compare"` phase: one `compare` call per
+# planned pair, driven by scripts/compare_pairs.py. Overridden the same way.
+COMPARE_PAIRS_CMD = os.environ.get("PEREDUR_COMPARE_PAIRS_CMD",
+                                   f"{REMOTE_PYTHON} scripts/compare_pairs.py")
+# The fingerprint twin, for a `kind = "fingerprint"` phase: draws lasso words
+# over pooled FRETISH repairs, fingerprints every node on them, and plans the
+# pair list a later compare phase decides (scripts/fingerprint_members.py).
+FINGERPRINT_CMD = os.environ.get("PEREDUR_FINGERPRINT_CMD",
+                                 f"{REMOTE_PYTHON} scripts/fingerprint_members.py")
+# The pooling twin, for a `kind = "pool"` phase: pools a host's subjects into
+# the nodes a fingerprint phase reads, copying any subject already committed
+# (scripts/pool_members.py).
+POOL_CMD = os.environ.get("PEREDUR_POOL_CMD",
+                          f"{REMOTE_PYTHON} scripts/pool_members.py")
+# Where a compare phase's manifest goes on the host. A fixed directory rather
+# than beside the output CSV, which may sit at any depth: status finds the
+# manifests with one shallow `find` instead of a walk of experiments/.
+COMPARE_MANIFEST_DIR = "experiments/compare-manifests"
 
 # Rebuilt by stage. The lab machines have no Nix, so this is the incremental
 # build; a campaign overrides it with `build` in campaign.toml.
@@ -181,18 +199,27 @@ while IFS= read -r m; do
   cat "$m"
   echo "@M@ENDSFILE"
 done
+echo "@M@COMPAREMANIFESTS"
+find @CMPDIR@ -maxdepth 1 -type f -name '*.json' 2>/dev/null |
+while IFS= read -r m; do
+  echo "@M@CFILE $m"
+  cat "$m"
+  echo "@M@ENDCFILE"
+done
 """ + QUEUE_BLOCK
 # A score phase's manifest sits one level down, inside its output directory,
 # so it gets a sweep of its own: widening the first to depth two would pull in
 # the per-host manifests archived campaigns keep under their own directories.
-# The sweeps go through `find`, not a glob, because the lab login shell is
-# zsh: its default NOMATCH aborts the whole script where a glob matches
-# nothing.
+# Compare manifests sit in one fixed directory, COMPARE_MANIFEST_DIR, for the
+# same reason. The sweeps go through `find`, not a glob, because the lab login
+# shell is zsh: its default NOMATCH aborts the whole script where a glob
+# matches nothing.
 
 
 def inventory_script(root: str) -> str:
     return render_script(INVENTORY_SCRIPT,
                          ROOT=shlex.quote(root),
+                         CMPDIR=shlex.quote(COMPARE_MANIFEST_DIR),
                          QUEUE=shlex.quote(QUEUE_DIR))
 
 
@@ -217,6 +244,19 @@ def detail_script(root: str, campaigns: list[dict]) -> str:
     """
     lines = [f"cd {shlex.quote(root)} 2>/dev/null || exit 3"]
     for c in campaigns:
+        if c.get("kind") in UNSEEDED_KINDS:
+            # Rows in the output CSV, header excluded by parse_detail, and
+            # its mtime for staleness. The planned count is the manifest's.
+            # A fingerprint pass's `out` is its per-subject progress CSV.
+            q_out = shlex.quote(c["out"])
+            lines += [
+                f'echo "{MARK}CAMPAIGN {c["profile"]}"',
+                f"if [ -f {q_out} ]; then",
+                f'  echo "{MARK}CSVROWS $(wc -l < {q_out})"',
+                f'  echo "{MARK}OUTMTIME $(stat -c %Y {q_out})"',
+                "fi",
+            ]
+            continue
         if c.get("kind") == "score":
             # A score phase's progress is a directory listing: one CSV per
             # scored run, and the newest file for staleness.
@@ -323,6 +363,7 @@ def parse_toml_blocks(text: str, tag: str) -> list:
 def parse_inventory(text: str) -> dict:
     """Split the inventory script's marker-delimited output into fields."""
     out: dict = {"ps": [], "manifests": [], "score_manifests": [],
+                 "compare_manifests": [],
                  "queue": parse_toml_blocks(text, "QFILE"), "hostname": "?",
                  "epoch": None, "branch": "?", "head": "?", "dirty": None,
                  "error": None}
@@ -331,13 +372,15 @@ def parse_inventory(text: str) -> dict:
             out["manifests"].append(json.loads(body))
         except json.JSONDecodeError:
             pass
-    for name, body in marker_blocks(text, "SFILE"):
-        try:
-            manifest = json.loads(body)
-            manifest["file"] = name
-            out["score_manifests"].append(manifest)
-        except (json.JSONDecodeError, TypeError):
-            pass
+    for key, marker in (("score_manifests", "SFILE"),
+                        ("compare_manifests", "CFILE")):
+        for name, body in marker_blocks(text, marker):
+            try:
+                manifest = json.loads(body)
+                manifest["file"] = name
+                out[key].append(manifest)
+            except (json.JSONDecodeError, TypeError):
+                pass
     section = None
     buf: list[str] = []
 
@@ -405,7 +448,12 @@ def parse_detail(text: str) -> dict:
         tag, _, rest = line[len(MARK):].partition(" ")
         rest = rest.strip()
         if tag == "CAMPAIGN":
-            current = per.setdefault(rest, {})
+            entry: dict = per.setdefault(rest, {})
+            if rest.split(":", 1)[0] in UNSEEDED_KINDS:
+                # A compare output CSV is this pass's alone, so its length
+                # is the done count rather than a fallback for one.
+                entry["compare_rows"] = True
+            current = entry
         elif current is None:
             continue
         elif tag == "CSVROWS" and rest.isdigit():
@@ -428,7 +476,9 @@ def parse_detail(text: str) -> dict:
             current["plan"] = rest
             current.update(parse_plan_line(rest))
     for entry in per.values():
-        if "rows_done_plan" in entry:
+        if entry.get("compare_rows"):
+            entry["rows_done"] = entry.get("csv_rows", 0)
+        elif "rows_done_plan" in entry:
             entry["rows_done"] = entry["rows_done_plan"]
         elif "csvs" in entry:
             entry["rows_done"] = entry["csvs"]
@@ -468,6 +518,18 @@ def live_processes(ps_lines: list[str]) -> list[dict]:
                 continue
             found.append({"comm": comm, "profile": None, "kind": "score",
                           "out": option_of_args(args, "--out"), "args": args})
+        elif comm.startswith("python") and "compare_pairs.py" in args:
+            found.append({"comm": comm, "profile": None, "kind": "compare",
+                          "manifest": option_of_args(args, "--manifest"),
+                          "args": args})
+        elif comm.startswith("python") and "fingerprint_members.py" in args:
+            found.append({"comm": comm, "profile": None, "kind": "fingerprint",
+                          "manifest": option_of_args(args, "--manifest"),
+                          "args": args})
+        elif comm.startswith("python") and "pool_members.py" in args:
+            found.append({"comm": comm, "profile": None, "kind": "pool",
+                          "manifest": option_of_args(args, "--manifest"),
+                          "args": args})
     return found
 
 
@@ -557,6 +619,42 @@ def campaigns_from_score_manifests(manifests: list[dict]) -> list[dict]:
     return out
 
 
+def campaigns_from_compare_manifests(manifests: list[dict]) -> list[dict]:
+    """One record per compare manifest, in the shape the run records take.
+
+    ``profile`` is the manifest's stem prefixed with its kind, ``compare:``
+    or ``fingerprint:``, which keys the detail probe and doubles as the label.
+    Planned is the pair list's length (subjects, for a fingerprint pass) as
+    the pass read it; done is the output CSV's live row count.
+    """
+    out = []
+    for m in manifests:
+        git = m.get("git") or {}
+        kind = m.get("kind") if m.get("kind") in UNSEEDED_KINDS else "compare"
+        binaries = m.get("binaries") or {}
+        binary = binaries.get("compare") or binaries.get("peredur") or {}
+        label = f"{kind}:{Path(m.get('file', '?')).stem}"
+        out.append({
+            "kind": kind,
+            "profile": label,
+            "label": label,
+            "manifest": m.get("file", ""),
+            "out": str(m.get("out") or ""),
+            "pairs": m.get("pairs", ""),
+            "manifest_host": m.get("hostname", "?"),
+            "started": m.get("started"),
+            "finished": m.get("finished"),
+            "branch": git.get("branch", "?"),
+            "head": (git.get("head") or "?")[:7],
+            "binary_commit": binary.get("commit_short", "?"),
+            "dirty_binary": binary.get("dirty") == "1",
+            "rows_planned": m.get("pairs_total", m.get("planned")),
+            "seeds": [],
+        })
+    out.sort(key=lambda c: (c.get("started") or "", c["profile"]))
+    return out
+
+
 def gather_host(host: str, root: str, only: str | None, want_plan: bool,
                 show_all: bool) -> dict:
     """Everything status reports for one host. Never raises."""
@@ -586,7 +684,8 @@ def gather_host(host: str, root: str, only: str | None, want_plan: bool,
         "queue": inv["queue"],
     })
     campaigns = (campaigns_from_manifests(inv["manifests"])
-                 + campaigns_from_score_manifests(inv["score_manifests"]))
+                 + campaigns_from_score_manifests(inv["score_manifests"])
+                 + campaigns_from_compare_manifests(inv["compare_manifests"]))
     if only:
         campaigns = [c for c in campaigns if c["profile"] == only]
     elif not show_all:
@@ -661,6 +760,10 @@ def claims_campaign(proc: dict, c: dict) -> bool:
     if c.get("kind") == "score":
         return (proc.get("kind") == "score" and bool(proc.get("out"))
                 and Path(proc["out"]).name == Path(c.get("out", "")).name)
+    if c.get("kind") in UNSEEDED_KINDS:
+        return (proc.get("kind") == c["kind"] and bool(proc.get("manifest"))
+                and Path(proc["manifest"]).name
+                == Path(c.get("manifest", "")).name)
     return bool(proc.get("profile")) and proc["profile"] == c["profile"]
 
 
@@ -877,6 +980,9 @@ def status_notes(reports: list[dict]) -> list[str]:
             elif p.get("kind") == "score":
                 notes.append(f"{r['host']}: scorer live on "
                              f"--out {p.get('out') or '?'}")
+            elif p.get("kind") in UNSEEDED_KINDS:
+                notes.append(f"{r['host']}: {p['kind']} pass live on "
+                             f"--manifest {p.get('manifest') or '?'}")
         for c in r["campaigns"]:
             if c["state"] == "stuck" and c.get("kind") == "score":
                 notes.append(
@@ -885,6 +991,11 @@ def status_notes(reports: list[dict]) -> list[str]:
                     f"has been touched for {human_duration(c['stale_s'])} — "
                     f"longer than one run's scoring may take, so it is "
                     f"producing nothing")
+            elif c["state"] == "stuck" and c.get("kind") in UNSEEDED_KINDS:
+                notes.append(
+                    f"{r['host']}/{c['label']}: a {c['kind']} pass is alive on this "
+                    f"pass but its output has not grown for "
+                    f"{human_duration(c['stale_s'])}")
             elif c["state"] == "stuck":
                 notes.append(
                     f"{r['host']}/{c['profile']}: a runner is alive on this "
@@ -897,9 +1008,11 @@ def status_notes(reports: list[dict]) -> list[str]:
             if c.get("dirty_binary"):
                 notes.append(f"{r['host']}/{c['profile']}: launched off a "
                              f"binary built dirty (* on BINARY)")
-            if c.get("rows_planned") is None and c.get("kind") == "score":
-                notes.append(f"{r['host']}/{c.get('label')}: the score "
-                             f"manifest records no queued count")
+            if c.get("rows_planned") is None and c.get("kind") in ("score",
+                                                                   *UNSEEDED_KINDS):
+                notes.append(f"{r['host']}/{c.get('label')}: the "
+                             f"{c.get('kind')} manifest records no planned "
+                             f"count")
             elif c.get("rows_planned") is None:
                 notes.append(f"{r['host']}/{c['profile']}: no plan — that "
                              f"checkout may no longer define the profile")
@@ -971,7 +1084,10 @@ def print_status(reports: list[dict]) -> None:
           "A score: row is a scoring pass: ROWS is curves written against "
           "runs queued,\nfrom its score-manifest, STALE is the newest file "
           "under its output directory, and\nrunning means a scorer names "
-          "that directory.")
+          "that directory. A compare: row is a\npairwise compare pass: ROWS is "
+          "output rows against the pair list's length, from\nits manifest "
+          "under experiments/compare-manifests, and STALE is the output's "
+          "age.")
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -1426,10 +1542,50 @@ def collect_curves(hosts: list, out_name: str, dry_run: bool) -> int:
                               problems, missing, host_dirs) else 1
 
 
+def collect_outputs(hosts: list, out_name: str, dry_run: bool) -> int:
+    """Copy each host's ``experiments/<out>/`` into
+    ``experiments/<out>/<host>/`` and join nothing.
+
+    For passes whose outputs are a directory tree rather than one CSV per run,
+    such as a fingerprint phase and the compare phase after it: the
+    reduction reads each host's copy where it lands. A host that fails or
+    answers with no files is INCOMPLETE, and the exit status says so.
+    """
+    print(f"Collecting outputs: experiments/{out_name}/ from each host into "
+          f"experiments/{out_name}/<host>/")
+    print(f"Hosts:              {', '.join(hosts)}\n")
+    rows, missing = [], []
+    for host in hosts:
+        pulled = pull_curves(host, out_name, dry_run)
+        if not pulled["ok"]:
+            missing.append(host)
+            rows.append([host, f"failed: {pulled.get('error')}", "-"])
+            continue
+        if dry_run:
+            rows.append([host, f"experiments/{out_name}/{host}/",
+                         f"{pulled.get('files', 0)} files / "
+                         f"{human_bytes(pulled.get('bytes'))}"])
+            continue
+        files = [f for f in pulled["dest"].rglob("*") if f.is_file()]
+        if not files:
+            missing.append(host)
+        rows.append([host, f"experiments/{out_name}/{host}/",
+                     f"{len(files)} files"])
+    print(render_table(rows, ["HOST", "INTO", "FILES"]))
+    if dry_run:
+        print("\nDry run — nothing transferred, nothing written.")
+    if missing:
+        print(f"\nINCOMPLETE: nothing usable from {', '.join(missing)}")
+        return 1
+    return 0
+
+
 def cmd_collect(args: argparse.Namespace) -> int:
     hosts = [args.host] if args.host else list(HOSTS)
     if getattr(args, "curves", None):
         return collect_curves(hosts, args.curves, args.dry_run)
+    if getattr(args, "outputs", None):
+        return collect_outputs(hosts, args.outputs, args.dry_run)
     csv_name, result_dir = resolve_profile(args)
     results_csv = REPO_ROOT / "experiments" / csv_name
     # Named for what chose the file: --csv bypasses --profile entirely.
@@ -1525,12 +1681,42 @@ CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
 # A phase is a search run (`kind = "run"`, the default) or an offline scoring
 # pass over a results directory (`kind = "score"`). Each kind reads its own
 # keys, and a key from the other kind is refused by name.
-PHASE_KINDS = ("run", "score")
+#
+# A third kind, `kind = "compare"`, runs `compare` over a pre-planned list of
+# repair pairs (scripts/compare_pairs.py). It is not seed-split: each host runs
+# the pair file its own `pairs` path names, with `{host}` expanded to the host,
+# so it takes neither a profile nor any selection key, and its `hosts` is an
+# array of host names rather than a table of seed ranges.
+#
+# A fourth, `kind = "fingerprint"`, draws lasso words over pooled FRETISH
+# repairs, fingerprints every node on them and plans the word-pruned pair list
+# for a compare phase after it (scripts/fingerprint_members.py). It is not
+# seed-split either: its paths expand `{host}` and its `hosts` is an array.
+#
+# A fifth, `kind = "pool"`, pools a host's subjects into the nodes a
+# fingerprint phase reads (scripts/pool_members.py), for subjects whose every
+# seed that host ran. With `copy_from`, a subject already in that committed
+# pool is copied instead. Unseeded, as the two above.
+PHASE_KINDS = ("run", "score", "compare", "fingerprint", "pool")
+UNSEEDED_KINDS = ("compare", "fingerprint", "pool")
 RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts"}
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s")
 SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
-                    *SCORE_BUDGET_KEYS}
+                    "specs", *SCORE_BUDGET_KEYS}
+COMPARE_BUDGET_KEYS = ("jobs", "black_timeout", "wall_timeout", "vmem_kb")
+COMPARE_PHASE_KEYS = {"name", "kind", "pairs", "out", "hosts",
+                      *COMPARE_BUDGET_KEYS}
+FINGERPRINT_BUDGET_KEYS = ("words", "seed", "workers", "black_timeout")
+FINGERPRINT_PATH_KEYS = ("subjects", "members", "work", "out")
+FINGERPRINT_PHASE_KEYS = {"name", "kind", "pairs", "hosts", "design",
+                          *FINGERPRINT_PATH_KEYS, *FINGERPRINT_BUDGET_KEYS}
+POOL_PATH_KEYS = ("design", "subjects", "out")
+POOL_PHASE_KEYS = {"name", "kind", "hosts", "copy_from", *POOL_PATH_KEYS}
+KIND_PHASE_KEYS = {"run": RUN_PHASE_KEYS, "score": SCORE_PHASE_KEYS,
+                   "compare": COMPARE_PHASE_KEYS,
+                   "fingerprint": FINGERPRINT_PHASE_KEYS,
+                   "pool": POOL_PHASE_KEYS}
 
 
 def parse_seed_range(text: str, where: str) -> list:
@@ -1558,11 +1744,16 @@ def parse_seed_range(text: str, where: str) -> list:
     return sorted(seeds)
 
 
-def parse_host_split(hosts, where: str) -> dict:
+def parse_host_split(hosts, where: str, allow_empty: bool = False) -> dict:
     """A ``hosts`` table to a host -> seed list map, checked for overlap.
 
     Shared by the campaign-level table and a phase's override, so the overlap
     check runs at both levels.
+
+    ``allow_empty`` lets the campaign-level table give a host ``""``: a host
+    that takes part only in phases that are not seed-split, such as a compare
+    phase. load_campaign then refuses any seeded phase that would fall back
+    on that empty range, so the empty string cannot silently skip a run.
     """
     if not isinstance(hosts, dict) or not hosts:
         raise CampaignError(f"{where} must be a non-empty table, "
@@ -1572,6 +1763,9 @@ def parse_host_split(hosts, where: str) -> dict:
         if host not in HOSTS and host != LOCAL:
             raise CampaignError(f"{where}: unknown host {host!r}; "
                                 f"known: {', '.join([*HOSTS, LOCAL])}")
+        if allow_empty and text == "":
+            seeds_by_host[host] = []
+            continue
         seeds_by_host[host] = parse_seed_range(text, f"{where}.{host}")
     pairs = list(seeds_by_host.items())
     for i, (h1, s1) in enumerate(pairs):
@@ -1684,7 +1878,8 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
     if not isinstance(branch, str) or not branch:
         raise CampaignError(f"{path}: branch must be a non-empty string")
 
-    seeds_by_host = parse_host_split(raw.get("hosts"), f"{path}: hosts")
+    seeds_by_host = parse_host_split(raw.get("hosts"), f"{path}: hosts",
+                                     allow_empty=True)
 
     phases = raw.get("phases")
     if not isinstance(phases, list) or not phases:
@@ -1701,12 +1896,24 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
         if kind not in PHASE_KINDS:
             raise CampaignError(f"{where}: kind must be one of "
                                 f"{', '.join(PHASE_KINDS)}, not {kind!r}")
-        allowed = SCORE_PHASE_KEYS if kind == "score" else RUN_PHASE_KEYS
+        allowed = KIND_PHASE_KEYS[kind]
         unknown = sorted(set(phase) - allowed)
         if unknown:
             raise CampaignError(f"{where}: unknown key(s) {', '.join(unknown)} "
                                 f"on a {kind} phase; known: "
                                 f"{', '.join(sorted(allowed))}")
+        if kind == "compare":
+            normalised.append(normalise_compare_phase(phase, where, name,
+                                                      seeds_by_host))
+            continue
+        if kind == "fingerprint":
+            normalised.append(normalise_fingerprint_phase(phase, where, name,
+                                                          seeds_by_host))
+            continue
+        if kind == "pool":
+            normalised.append(normalise_pool_phase(phase, where, name,
+                                                   seeds_by_host))
+            continue
         profile = phase.get("profile", raw.get("profile"))
         if kind == "score":
             results = phase.get("results")
@@ -1743,6 +1950,14 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
                     f"the campaign level. A phase narrows the split; it "
                     f"cannot add a host, which stage never staged and the "
                     f"other phases would never run on.")
+        else:
+            empty = [h for h, s in seeds_by_host.items() if not s]
+            if empty:
+                raise CampaignError(
+                    f"{where}: hosts {', '.join(empty)} declare no seeds "
+                    f"(\"\") at the campaign level, and this {kind} phase "
+                    f"would fall back on that empty range and run nothing "
+                    f"there. Give the phase its own hosts table.")
         if kind == "score":
             normalised.append(normalise_score_phase(phase, where, profile,
                                                     phase_hosts))
@@ -1810,9 +2025,196 @@ def normalise_score_phase(phase: dict, where: str, profile,
         import score_campaign  # noqa: PLC0415
         budgets["wall_cap_s"] = score_campaign.wall_cap_default(
             budgets["deadline_s"])
+    specs = phase.get("specs")
+    if specs is not None and not (
+            isinstance(specs, list) and specs
+            and all(isinstance(v, str) and v for v in specs)):
+        raise CampaignError(f"{where}: specs must be a non-empty array of "
+                            f"strings")
     return {"name": phase.get("name", Path(out).name), "kind": "score",
-            "profile": profile, "jobs": None, "sweeps": None, "specs": None,
+            "profile": profile, "jobs": None, "sweeps": None, "specs": specs,
             "hosts": phase_hosts, "results": results, "out": out, **budgets}
+
+
+def normalise_compare_phase(phase: dict, where: str, campaign: str,
+                            seeds_by_host: dict) -> dict:
+    """A compare phase's record: its pair list, its output, its budgets.
+
+    ``pairs`` and ``out`` are kept as written, ``{host}`` and all, and
+    expanded per host by expand_host when the command is built. Each budget
+    defaults to compare_pairs.py's own value and is carried explicitly to the
+    command line, as a score phase's are. ``hosts`` narrows the campaign's
+    host list; omitted, the phase runs on every declared host.
+    """
+    import compare_pairs  # noqa: PLC0415
+    record: dict = {"name": phase.get("name"), "kind": "compare",
+                    "campaign": campaign, "profile": None, "jobs": None,
+                    "sweeps": None, "specs": None}
+    for key in ("pairs", "out"):
+        value = phase.get(key)
+        if not isinstance(value, str) or not value:
+            raise CampaignError(
+                f"{where}: a compare phase needs {key} = \"...\", a path on "
+                f"the host (absolute, or relative to the checkout; {{host}} "
+                f"is replaced by the host's name)")
+        try:
+            expand_host(value, "x")
+        except (KeyError, IndexError, ValueError):
+            raise CampaignError(f"{where}: {key} = {value!r} may use only "
+                                f"{{host}} as a placeholder") from None
+        record[key] = value
+    if record["name"] is None:
+        record["name"] = "compare"
+    if not isinstance(record["name"], str) or not record["name"] or any(
+            c in record["name"] for c in "/{} "):
+        raise CampaignError(f"{where}: name must be a non-empty string "
+                            f"without '/', spaces or braces")
+    for key in COMPARE_BUDGET_KEYS:
+        value = phase.get(key, compare_pairs.DEFAULTS[key])
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise CampaignError(f"{where}: {key} must be a positive integer")
+        record[key] = value
+    hosts = phase.get("hosts")
+    if hosts is not None:
+        if (not isinstance(hosts, list) or not hosts
+                or not all(isinstance(h, str) for h in hosts)):
+            raise CampaignError(
+                f"{where}: a compare phase's hosts is an array of host names, "
+                f"e.g. hosts = [\"av1\", \"av2\"]; it is not seed-split")
+        extra = sorted(set(hosts) - set(seeds_by_host))
+        if extra:
+            raise CampaignError(
+                f"{where}: hosts {', '.join(extra)} are not declared at the "
+                f"campaign level. A phase narrows the host list; it cannot "
+                f"add a host, which stage never staged.")
+        hosts = list(dict.fromkeys(hosts))
+    record["hosts"] = hosts
+    return record
+
+
+def normalise_unseeded_paths(phase: dict, where: str, kind: str,
+                              required: tuple, optional: tuple = ()) -> dict:
+    """The path keys of a compare or fingerprint phase, kept as written with
+    `{host}` unexpanded, after checking that each is a non-empty string using
+    no other placeholder."""
+    out: dict = {}
+    for key in (*required, *optional):
+        value = phase.get(key)
+        if value is None and key in optional:
+            out[key] = None
+            continue
+        if not isinstance(value, str) or not value:
+            raise CampaignError(
+                f"{where}: a {kind} phase needs {key} = \"...\", a path on "
+                f"the host (absolute, or relative to the checkout; {{host}} "
+                f"is replaced by the host's name)")
+        try:
+            expand_host(value, "x")
+        except (KeyError, IndexError, ValueError):
+            raise CampaignError(f"{where}: {key} = {value!r} may use only "
+                                f"{{host}} as a placeholder") from None
+        out[key] = value
+    return out
+
+
+def normalise_unseeded_hosts(phase: dict, where: str, kind: str,
+                             seeds_by_host: dict):
+    """A compare or fingerprint phase's `hosts` array, narrowing the
+    campaign's host list; None runs it on every declared host."""
+    hosts = phase.get("hosts")
+    if hosts is None:
+        return None
+    if (not isinstance(hosts, list) or not hosts
+            or not all(isinstance(h, str) for h in hosts)):
+        raise CampaignError(
+            f"{where}: a {kind} phase's hosts is an array of host names, "
+            f"e.g. hosts = [\"av1\", \"av2\"]; it is not seed-split")
+    extra = sorted(set(hosts) - set(seeds_by_host))
+    if extra:
+        raise CampaignError(
+            f"{where}: hosts {', '.join(extra)} are not declared at the "
+            f"campaign level. A phase narrows the host list; it cannot "
+            f"add a host, which stage never staged.")
+    return list(dict.fromkeys(hosts))
+
+
+def normalise_fingerprint_phase(phase: dict, where: str, campaign: str,
+                                seeds_by_host: dict) -> dict:
+    """A fingerprint phase's record: its four paths, an optional joined pair
+    list and pooled design, and its budgets, each defaulting to
+    fingerprint_members.py's own value and carried explicitly to the command
+    line."""
+    import fingerprint_members  # noqa: PLC0415
+    record: dict = {"name": phase.get("name") or "fingerprint",
+                    "kind": "fingerprint", "campaign": campaign,
+                    "profile": None, "jobs": None, "sweeps": None,
+                    "specs": None}
+    record.update(normalise_unseeded_paths(phase, where, "fingerprint",
+                                           FINGERPRINT_PATH_KEYS,
+                                           ("pairs", "design")))
+    if not isinstance(record["name"], str) or any(
+            c in record["name"] for c in "/{} "):
+        raise CampaignError(f"{where}: name must be a non-empty string "
+                            f"without '/', spaces or braces")
+    for key in FINGERPRINT_BUDGET_KEYS:
+        value = phase.get(key, fingerprint_members.DEFAULTS[key])
+        lowest = 0 if key == "seed" else 1
+        if (isinstance(value, bool) or not isinstance(value, int)
+                or value < lowest):
+            raise CampaignError(f"{where}: {key} must be an integer of at "
+                                f"least {lowest}")
+        record[key] = value
+    record["hosts"] = normalise_unseeded_hosts(phase, where, "fingerprint",
+                                               seeds_by_host)
+    return record
+
+
+def normalise_pool_phase(phase: dict, where: str, campaign: str,
+                         seeds_by_host: dict) -> dict:
+    """A pool phase's record: the design, the host's subject list and the
+    output directory, and optionally the committed pool to copy from. It
+    takes no budget, and never --allow-missing, so a missing seed fails it."""
+    record: dict = {"name": phase.get("name") or "pool", "kind": "pool",
+                    "campaign": campaign, "profile": None, "jobs": None,
+                    "sweeps": None, "specs": None}
+    record.update(normalise_unseeded_paths(phase, where, "pool",
+                                           POOL_PATH_KEYS, ("copy_from",)))
+    if not isinstance(record["name"], str) or any(
+            c in record["name"] for c in "/{} "):
+        raise CampaignError(f"{where}: name must be a non-empty string "
+                            f"without '/', spaces or braces")
+    if record["copy_from"] is not None and (
+            record["copy_from"].rstrip("/") == record["out"].rstrip("/")):
+        raise CampaignError(f"{where}: copy_from and out name one directory; "
+                            f"out must not be the committed pool, or the "
+                            f"pass leaves the checkout dirty")
+    record["hosts"] = normalise_unseeded_hosts(phase, where, "pool",
+                                               seeds_by_host)
+    return record
+
+
+def expand_host(path: str, host: str) -> str:
+    """A compare phase's path with ``{host}`` replaced. format() rather than
+    replace() so a stray brace or another placeholder fails at load time."""
+    return path.format(host=host)
+
+
+def compare_manifest_path(phase: dict) -> str:
+    """Where the host's compare_pairs.py or fingerprint_members.py writes
+    this phase's manifest."""
+    return f"{COMPARE_MANIFEST_DIR}/{phase['campaign']}.{phase['name']}.json"
+
+
+def phase_runs_on(phase: dict, host: str, default: list) -> bool:
+    """Whether a phase has anything to do on a host.
+
+    A seeded phase runs where it has seeds. A compare or fingerprint phase
+    runs on every host its `hosts` array names, or every declared host when it
+    names none.
+    """
+    if phase_kind(phase) in UNSEEDED_KINDS:
+        return phase.get("hosts") is None or host in phase["hosts"]
+    return bool(phase_seeds(phase, host, default))
 
 
 def phase_kind(phase: dict) -> str:
@@ -1864,6 +2266,9 @@ def phase_seeds(phase: dict, host: str, default: list) -> list:
     absent host is a deliberate narrowing, with no fallback to the campaign
     range.
     """
+    if phase_kind(phase) in UNSEEDED_KINDS:
+        # Not seed-split: phase_runs_on says whether it runs on the host.
+        return []
     if phase.get("hosts") is None:
         return default
     return phase["hosts"].get(host, [])
@@ -1881,12 +2286,19 @@ def entry_phase_seeds(entry: dict, index: int) -> str:
     return entry.get("seeds", "")
 
 
-def phase_args(phase: dict, seeds: list) -> list:
+def phase_args(phase: dict, seeds: list, host: str | None = None) -> list:
     """The runner arguments for one phase over one host's seeds.
 
     The seeds come from the declaration, never from an argument typed at
-    launch time.
+    launch time. A compare phase takes no seeds, only the host its paths are
+    expanded for.
     """
+    if phase_kind(phase) == "compare":
+        return compare_phase_args(phase, host or "")
+    if phase_kind(phase) == "fingerprint":
+        return fingerprint_phase_args(phase, host or "")
+    if phase_kind(phase) == "pool":
+        return pool_phase_args(phase, host or "")
     if phase_kind(phase) == "score":
         return score_phase_args(phase, seeds)
     args = ["--profile", phase["profile"]]
@@ -1907,17 +2319,59 @@ def score_phase_args(phase: dict, seeds: list) -> list:
     args = ["--results", phase["results"], "--out", phase["out"]]
     for key in SCORE_BUDGET_KEYS:
         args += [f"--{key.replace('_', '-')}", str(phase[key])]
+    if phase.get("specs"):
+        args += ["--specs", *phase["specs"]]
     return args + ["--seeds", *[str(s) for s in seeds]]
 
 
+def compare_phase_args(phase: dict, host: str) -> list:
+    """compare_pairs.py's arguments on one host: its two paths, every budget
+    stated, and the manifest status reads."""
+    args = [expand_host(phase["pairs"], host), expand_host(phase["out"], host)]
+    for key in COMPARE_BUDGET_KEYS:
+        args += [f"--{key.replace('_', '-')}", str(phase[key])]
+    return args + ["--manifest", compare_manifest_path(phase)]
+
+
+def fingerprint_phase_args(phase: dict, host: str) -> list:
+    """fingerprint_members.py's arguments on one host: its four paths, the
+    joined pair list and the design if declared, every budget stated, and the
+    manifest."""
+    args = [expand_host(phase[key], host) for key in FINGERPRINT_PATH_KEYS]
+    for key in ("pairs", "design"):
+        if phase.get(key):
+            args += [f"--{key}", expand_host(phase[key], host)]
+    for key in FINGERPRINT_BUDGET_KEYS:
+        args += [f"--{key.replace('_', '-')}", str(phase[key])]
+    return args + ["--manifest", compare_manifest_path(phase)]
+
+
+def pool_phase_args(phase: dict, host: str) -> list:
+    """pool_members.py's arguments on one host: the design and output
+    directory, the host's subject list, the committed pool if declared, and
+    the manifest."""
+    args = [expand_host(phase["design"], host), expand_host(phase["out"], host),
+            "--subjects-file", expand_host(phase["subjects"], host)]
+    if phase.get("copy_from"):
+        args += ["--copy-from", expand_host(phase["copy_from"], host)]
+    return args + ["--manifest", compare_manifest_path(phase)]
+
+
 def phase_launcher(phase: dict) -> str:
-    """The command a phase's arguments follow: the runner, or the scorer."""
-    return SCORER_CMD if phase_kind(phase) == "score" else RUNNER_CMD
+    """The command a phase's arguments follow: runner, scorer or comparer."""
+    kind = phase_kind(phase)
+    if kind == "compare":
+        return COMPARE_PAIRS_CMD
+    if kind == "fingerprint":
+        return FINGERPRINT_CMD
+    if kind == "pool":
+        return POOL_CMD
+    return SCORER_CMD if kind == "score" else RUNNER_CMD
 
 
-def phase_command(phase: dict, seeds: list) -> str:
+def phase_command(phase: dict, seeds: list, host: str | None = None) -> str:
     return " ".join([phase_launcher(phase)]
-                    + [shlex.quote(a) for a in phase_args(phase, seeds)])
+                    + [shlex.quote(a) for a in phase_args(phase, seeds, host)])
 
 
 # -- stage --------------------------------------------------------------------
@@ -2460,7 +2914,7 @@ def cmd_enqueue(args: argparse.Namespace) -> int:
             why = " ".join(sections.get("err", [])) or err or "no answer"
             rows.append([host, name, f"failed: {why}"])
             continue
-        rows.append([host, name, f"queued, {entry['seeds']}"])
+        rows.append([host, name, f"queued, {entry['seeds'] or 'no seeds'}"])
     print(render_table(rows, ["HOST", "ENTRY", "RESULT"]))
     if ok and not args.dry_run:
         print(f"\nThe cron tick will pick these up, staging {branch} at "
@@ -2552,9 +3006,70 @@ def run_step(root: Path, command, log_path: Path, shell: bool = False) -> int:
     return proc.returncode
 
 
-def run_phase(root: Path, phase: dict, seeds: list, log_path: Path) -> int:
+def run_phase(root: Path, phase: dict, seeds: list, log_path: Path,
+              host: str | None = None) -> int:
     return run_step(root, shlex.split(phase_launcher(phase))
-                    + phase_args(phase, seeds), log_path)
+                    + phase_args(phase, seeds, host), log_path)
+
+
+def pairs_file_missing(root: Path, phase: dict, host: str):
+    """Why a compare phase cannot run here, or None.
+
+    The pair list is planned elsewhere and copied to each host by hand, so a
+    host can be staged and still lack it. Asked before the attempt is spent,
+    like results_dir_missing, so the entry names the file.
+    """
+    pairs = root / expand_host(phase["pairs"], host)
+    if pairs.is_file():
+        return None
+    return (f"no pair list at {pairs} for compare phase {phase['name']} — "
+            f"copy it to this host, or fix pairs = ... in campaign.toml")
+
+
+def fingerprint_inputs_missing(root: Path, phase: dict, host: str):
+    """Why a fingerprint phase cannot run here, or None: its subject list,
+    members directory and design are committed inputs, so their absence means
+    a declaration naming the wrong path, said before an attempt is spent."""
+    subjects = root / expand_host(phase["subjects"], host)
+    members = root / expand_host(phase["members"], host)
+    if not subjects.is_file():
+        return (f"no subject list at {subjects} for fingerprint phase "
+                f"{phase['name']} — fix subjects = ... in campaign.toml")
+    if not members.is_dir():
+        return (f"no members directory at {members} for fingerprint phase "
+                f"{phase['name']} — fix members = ... in campaign.toml")
+    if phase.get("design"):
+        design = root / expand_host(phase["design"], host)
+        if not design.is_file():
+            return (f"no design at {design} for fingerprint phase "
+                    f"{phase['name']} — fix design = ... in campaign.toml")
+    return None
+
+
+def pool_inputs_missing(root: Path, phase: dict, host: str):
+    """Why a pool phase cannot run here, or None: its design, subject list
+    and committed pool are inputs the checkout must hold."""
+    for key, what in (("design", "design"), ("subjects", "subject list")):
+        path = root / expand_host(phase[key], host)
+        if not path.is_file():
+            return (f"no {what} at {path} for pool phase {phase['name']} — "
+                    f"fix {key} = ... in campaign.toml")
+    if phase.get("copy_from"):
+        path = root / expand_host(phase["copy_from"], host)
+        if not path.is_dir():
+            return (f"no committed pool at {path} for pool phase "
+                    f"{phase['name']} — fix copy_from = ... in campaign.toml")
+    return None
+
+
+def phase_inputs_missing(root: Path, phase: dict, host: str):
+    """Why an unseeded phase cannot run here, or None."""
+    kind = phase_kind(phase)
+    if kind == "compare":
+        return pairs_file_missing(root, phase, host)
+    if kind == "pool":
+        return pool_inputs_missing(root, phase, host)
+    return fingerprint_inputs_missing(root, phase, host)
 
 
 def results_dir_missing(root: Path, phase: dict):
@@ -2884,6 +3399,8 @@ def tick_entry(entry: dict, campaign: dict, root: Path,
         write_entry(entry["path"], entry)
         return 0
     phase = campaign["phases"][index]
+    if phase_kind(phase) in UNSEEDED_KINDS:
+        return tick_compare_phase(entry, campaign, phase, index, root, args)
     text = entry_phase_seeds(entry, index)
     if not text:
         entry["phase"] = index + 1
@@ -2922,6 +3439,12 @@ def tick_entry(entry: dict, campaign: dict, root: Path,
         return 0
 
     code = run_phase(root, phase, seeds, log_path)
+    return finish_phase(entry, campaign, phase, index, code)
+
+
+def finish_phase(entry: dict, campaign: dict, phase: dict, index: int,
+                 code: int) -> int:
+    """Record a phase's exit: advance on 0, spend an attempt otherwise."""
     if code != 0:
         fail_or_requeue(entry, f"phase {index} ({phase['name']}) exited {code}")
     else:
@@ -2938,6 +3461,50 @@ def tick_entry(entry: dict, campaign: dict, root: Path,
     print(f"tick: {entry['file']} now {entry['state']}"
           + (f" ({entry['last_error']})" if entry["last_error"] else ""))
     return 0 if code == 0 else 1
+
+
+def tick_compare_phase(entry: dict, campaign: dict, phase: dict, index: int,
+                       root: Path, args: argparse.Namespace) -> int:
+    """tick_entry for a compare phase, which has no seeds to freeze or skip on.
+
+    Whether it runs here is read from the declaration, which the checkout
+    holds at the commit the entry froze, so it cannot have moved since the
+    enqueue. compare_pairs.py exits 0 only once every pair in the list has a
+    row, so a killed pass spends an attempt and the next one resumes.
+    """
+    host = entry.get("host") or ""
+    if not phase_runs_on(phase, host, []):
+        entry["phase"] = index + 1
+        log_line(entry, f"phase {index} ({phase['name']}) does not run on "
+                        f"{host}; skipped")
+        entry["state"] = ("done" if entry["phase"] >= len(campaign["phases"])
+                          else "queued")
+        write_entry(entry["path"], entry)
+        print(f"tick: {entry['file']} phase {index} ({phase['name']}) skipped")
+        return 0
+    blocked = phase_inputs_missing(root, phase, host)
+    if blocked is not None and not args.dry_run:
+        fail_or_requeue(entry, blocked)
+        write_entry(entry["path"], entry)
+        print(f"tick: {entry['file']} {entry['state']}: {entry['last_error']}")
+        return 1
+    entry["state"] = "running"
+    entry["pid"] = os.getpid()
+    log_line(entry, f"phase {index} ({phase['name']}) started")
+    write_entry(entry["path"], entry)
+    what = ("pairs" if phase_kind(phase) == "compare" else "subjects")
+    print(f"tick: {entry['file']} phase {index} ({phase['name']}) on {what} "
+          f"{expand_host(phase[what], host)}")
+    if args.dry_run:
+        entry["state"] = "queued"
+        log_line(entry, "dry run, phase not executed")
+        write_entry(entry["path"], entry)
+        print(f"  would run: {phase_command(phase, [], host)}")
+        if blocked is not None:
+            print(f"  blocked: {blocked}")
+        return 0
+    code = run_phase(root, phase, [], entry_log_path(entry, root), host)
+    return finish_phase(entry, campaign, phase, index, code)
 
 
 def checkout_branch(root: Path) -> tuple:
@@ -3269,6 +3836,12 @@ def build_parser() -> argparse.ArgumentParser:
                               "experiments/NAME/<host>/ and join the per-run "
                               "CSVs into experiments/NAME.csv. --profile, "
                               "--csv and --results-dir are not read.")
+    collect.add_argument("--outputs", metavar="NAME",
+                         help="Pull each host's experiments/NAME/ into "
+                              "experiments/NAME/<host>/ and join nothing, for "
+                              "pool, fingerprint and compare passes whose "
+                              "outputs are a tree. --profile, --csv and --results-dir "
+                              "are not read.")
     add_colour_flag(collect)
     collect.set_defaults(func=cmd_collect)
 

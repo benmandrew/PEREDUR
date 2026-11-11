@@ -14,8 +14,14 @@
 /// largest-remainder (Hamilton) method, so breeding pressure follows rank
 /// without discarding any distinct candidate. WeightedAverage ranks by the
 /// blended fitness scalar; it converges prematurely and is kept for
-/// comparison.
-enum class SelectionScheme : std::uint8_t { WeightedAverage, Nsga2Apportion };
+/// comparison. Random orders the parents and keeps the (mu + lambda)
+/// survivors by a uniform shuffle, ignoring every objective, and is the
+/// undirected baseline a search is compared against.
+enum class SelectionScheme : std::uint8_t {
+    WeightedAverage,
+    Nsga2Apportion,
+    Random
+};
 
 /// How the status objective grades the region below realizability. Mrs (the
 /// default) is the greedy maximal-realizable-subset fraction: the guarantee

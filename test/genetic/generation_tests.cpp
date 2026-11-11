@@ -710,4 +710,66 @@ TEST(test_maximality_demotion_moves_the_weaker_candidate_down) {
            "counted once");
 }
 
+// --- evolve_generation under the random scheme ---
+
+TEST(test_shuffle_population_is_fisher_yates) {
+    // Every draw answers 0: the last slot swaps with the first, then the
+    // second with the first.
+    std::vector<int> population = {1, 2, 3};
+    generation_detail::shuffle_population(population, make_source({}, 0));
+    expect(population == std::vector<int>{2, 3, 1},
+           "shuffle_population: draws of 0 give the Fisher-Yates order");
+}
+
+// One objective ranking p > r > t, or t > r > p when @p reversed.
+AggregateWeightedFitnessFunction ranked_fns(bool reversed) {
+    return AggregateWeightedFitnessFunction(
+        {{[reversed](const Specification& spec) {
+              const std::string cond = first_condition(spec);
+              double value = 0.0;
+              if (cond == "p") {
+                  value = 1.0;
+              } else if (cond == "r") {
+                  value = 0.5;
+              }
+              return reversed ? 1.0 - value : value;
+          },
+          1.0, "a"}});
+}
+
+std::vector<std::string> survivors_under(SelectionScheme scheme,
+                                         bool reversed) {
+    Config cfg;
+    cfg.selection_scheme = scheme;
+    cfg.crossover_rate = 0.0;
+    cfg.mutation_rate = 0.0;
+    const AggregateWeightedFitnessFunction fns = ranked_fns(reversed);
+    const std::vector<ScoredSpecification> pop = score_population(
+        cfg, {make_spec("p", "q"), make_spec("r", "s"), make_spec("t", "u")},
+        fns);
+    const auto next_gen =
+        evolve_generation(cfg, pop, 2, 0, fns, {}, make_source({1, 2}, 0));
+    std::vector<std::string> names;
+    names.reserve(next_gen.size());
+    for (const ScoredSpecification& scored : next_gen) {
+        names.push_back(first_condition(scored.specification));
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+TEST(test_evolve_generation_random_reads_no_objective) {
+    const std::vector<std::string> forward =
+        survivors_under(SelectionScheme::Random, false);
+    expect(forward.size() == 2,
+           "evolve_generation/random: the survivors fill target_size");
+    expect(forward == survivors_under(SelectionScheme::Random, true),
+           "evolve_generation/random: reversing the objective leaves the "
+           "survivors unchanged");
+    expect(survivors_under(SelectionScheme::Nsga2Apportion, false) !=
+               survivors_under(SelectionScheme::Nsga2Apportion, true),
+           "evolve_generation/random: under nsga2-apportion the same reversal "
+           "moves the survivors, so the check above has teeth");
+}
+
 }  // namespace

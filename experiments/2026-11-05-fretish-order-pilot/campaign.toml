@@ -1,0 +1,38 @@
+name = "2026-11-05-fretish-order-pilot"
+branch = "feat/fretish-order-eval"
+profile = "fretish-order"
+description = "One seed a host of every arm and spec of 2026-11-05-fretish-order, to measure run times before the full campaign. Its rows resume into that campaign."
+
+# One seed a host, inside the main campaign's ranges, so every row resumes
+# into 2026-11-05-fretish-order. The config line must match that campaign's.
+hosts = { av2 = "0", av3 = "15" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# Two calls into one tree: every sweep O arm under nsga2-apportion, and the two
+# random arms (base, only-climb) under random/. The budget is the TLSF paper's:
+# 1000 bred individuals at population 100, with generations high enough never
+# to bind. No --parallel: run_experiments.py sets it from jobs.
+configs = "python3 scripts/gen_configs.py --sweeps O --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order --pin-vintage && python3 scripts/gen_configs.py --sweeps O --levels base,only-climb --schemes random --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order --pin-vintage"
+
+# 9 small specs x 18 arms x 2 seeds = 324 runs.
+[[phases]]
+name = "small"
+profile = "fretish-order"
+jobs = 15
+
+# 3 arms x 2 seeds = 6 runs.
+[[phases]]
+name = "lift-full"
+profile = "fretish-order-large"
+specs = ["lift-plus-cruise-full"]
+jobs = 3
+
+# 2 specs x 3 arms x 2 seeds = 12 runs, most expected to reach the cap.
+[[phases]]
+name = "rad-vent"
+profile = "fretish-order-large"
+specs = ["rad", "ventilator-controller"]
+jobs = 7
+
+

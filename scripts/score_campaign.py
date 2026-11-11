@@ -5,7 +5,7 @@
         --out experiments/curves-rematch --seeds 0 1 2 3 [--workers 8] \\
         [--cores 4] [--cuts 20] [--maximal-timeout 900] \\
         [--compare-timeout 600] [--deadline-s 4500] [--wall-cap-s 5400] \\
-        [--allow-stale-binary] [--dry-run]
+        [--specs SPEC ...] [--allow-stale-binary] [--dry-run]
 
 The scoring twin of run_experiments.py, and what a `kind = "score"` phase in
 campaign.toml runs. The search writes one run directory per (spec, seed) under
@@ -22,7 +22,9 @@ requeued phase re-scores only what failed.
 
 A host scores only the seeds it is given. The seed split is enforced here, in
 the same place the runner enforces it, so two hosts sharing a results
-directory layout never score one run twice.
+directory layout never score one run twice. --specs narrows it further, to
+run directories ending `_<spec>_seed<N>`, for a campaign split between hosts
+by spec rather than by seed.
 
 Stdlib only, on python 3.10: this runs on the lab hosts from a cron tick.
 """
@@ -108,7 +110,16 @@ def seed_of(run_dir: Path):
     return int(match.group(1)) if match else None
 
 
-def queue_runs(results: Path, seeds) -> list:
+def spec_matches(run_dir: Path, specs) -> bool:
+    """Whether a run directory's name, its seed suffix cut, ends in
+    `_<spec>` for one of `specs`. None matches every run."""
+    if specs is None:
+        return True
+    stem = SEED_SUFFIX.sub("", run_dir.name)
+    return any(stem == spec or stem.endswith(f"_{spec}") for spec in specs)
+
+
+def queue_runs(results: Path, seeds, specs=None) -> list:
     """The run directories to score, smallest first.
 
     Directly under the results directory, following symlinks; named
@@ -125,7 +136,7 @@ def queue_runs(results: Path, seeds) -> list:
         if not entry.is_dir():
             continue
         seed = seed_of(entry)
-        if seed is None or seed not in wanted:
+        if seed is None or seed not in wanted or not spec_matches(entry, specs):
             continue
         found.append((index_lines(entry), entry.name, entry))
     found.sort()
@@ -355,6 +366,7 @@ def build_manifest(args, results: Path, out: Path, versions: dict, head,
         "out": str(args.out),
         "out_resolved": str(out),
         "seeds": list(args.seeds),
+        "specs": args.specs,
         "workers": args.workers,
         "cores": args.cores,
         "pinned": pinned,
@@ -433,6 +445,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--wall-cap-s", type=int, default=None,
                         help=f"outer timeout on one scorer (default: "
                              f"--deadline-s + {WALL_CAP_MARGIN_S})")
+    parser.add_argument("--specs", nargs="+", default=None, metavar="SPEC",
+                        help="score only run directories of these specs "
+                             "(default: every spec)")
     parser.add_argument("--allow-stale-binary", action="store_true",
                         help="score with maximal/compare built from another "
                              "commit or a dirty tree; recorded in the manifest")
@@ -472,7 +487,7 @@ def main(argv=None) -> int:
               file=sys.stderr)
         return 2
 
-    runs = queue_runs(results, args.seeds)
+    runs = queue_runs(results, args.seeds, args.specs)
     if not runs:
         # An empty queue is never a finished pass. Exiting 0 here would let a
         # tick mark the phase done over nothing, and status read 0 of 0.

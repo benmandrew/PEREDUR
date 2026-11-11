@@ -73,7 +73,40 @@ FRETISH_SPECS: dict[str, dict[str, Path]] = {
     "fsm-timing": _spec("fsm-timing", "json"),
     "fsm-combined": _spec("fsm-combined", "json"),
     "mode-arbiter": _spec("mode-arbiter", "json"),
+    # The rest of the bundled FRETISH examples, added for the order-search
+    # evaluation. rad, valu3s-uc6 and ventilator-controller have no fixes/
+    # directory, so their rows carry best_relation = "no-ideals".
+    "fsm-lmcps": _spec("fsm-lmcps", "json"),
+    "liquid-mixer": _spec("liquid-mixer", "json"),
+    "valu3s-uc6": _spec("valu3s-uc6", "json"),
+    "lift-plus-cruise-mini": _spec("lift-plus-cruise-mini", "json"),
+    "lift-plus-cruise-full": _spec("lift-plus-cruise-full", "json"),
+    "rad": _spec("rad", "json"),
+    "ventilator-controller": _spec("ventilator-controller", "json"),
+    # The ten unrealisable cores of rad, each as its own spec; written by
+    # scripts/make_core_specs.py. No fixes/, so no ideals.
+    **{name: _spec(name, "json") for name in (
+        "rad-core-1-18", "rad-core-10", "rad-core-12-18", "rad-core-17-18",
+        "rad-core-33", "rad-core-45", "rad-core-55", "rad-core-61",
+        "rad-core-65", "rad-core-68",
+    )},
 }
+
+# The FRETISH order-search evaluation (experiments/2026-11-05-fretish-order).
+# The small set runs every arm of sweep O (profile fretish-order); the large
+# set runs base, full and the random baseline only (fretish-order-large), at
+# fewer jobs and more threads per run.
+FRETISH_ORDER_SMALL: tuple[str, ...] = (
+    "fsm", "fsm-timing", "fsm-combined", "mode-arbiter", "takeoff",
+    "liquid-mixer", "valu3s-uc6", "fsm-lmcps", "lift-plus-cruise-mini",
+)
+FRETISH_ORDER_LARGE: tuple[str, ...] = (
+    "lift-plus-cruise-full", "rad", "ventilator-controller",
+)
+# rad's cores, run under every arm of the small set
+# (experiments/2026-11-09-fretish-order-cores, profile fretish-order-cores).
+FRETISH_ORDER_CORES: tuple[str, ...] = tuple(
+    s for s in FRETISH_SPECS if s.startswith("rad-core-"))
 
 # Basic-TLSF specs with ideal fixes. PEREDUR infers the TLSF format from the
 # .tlsf extension, and compare reads the .tlsf ideals the same way. The first
@@ -525,6 +558,71 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-arbiter-probe.csv",
         # jobs=1 for the same RAM reason as every other TLSF profile.
         "default_jobs": 1,
+    },
+    # The FRETISH order-directed search (the keys of 2026-10-31), against an
+    # all-off baseline and the random selection scheme, at the paper's budget:
+    # 1000 bred individuals at population 100 and a 7200 s cap. Sweep O holds
+    # the arms; random/ holds only base and only-climb. See
+    # experiments/2026-11-05-fretish-order/PLAN.md. Generate the configs with
+    # the `configs` line of that campaign's campaign.toml.
+    "fretish-order": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {},
+        "specs": list(FRETISH_ORDER_SMALL),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL},
+        # The arms differ in repair count, and the climb in particular moves
+        # it, so the default 600 s would censor one arm's comparisons first.
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order.csv",
+        "default_jobs": 16,
+    },
+    # The large FRETISH specs at the same budget, on the base and full arms and
+    # the random baseline alone: a whole-sweep ablation there would cost days.
+    # Same config tree as fretish-order, its own results, since it runs a
+    # different subset of the tree.
+    "fretish-order-large": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["base", "full"]},
+        "specs": list(FRETISH_ORDER_LARGE),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_LARGE},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order-large",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order-large.csv",
+        "default_jobs": 4,
+    },
+    # rad's ten cores under every arm of fretish-order, since whole rad finds
+    # nothing at the budget. Same config tree, its own results.
+    "fretish-order-cores": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {},
+        "specs": list(FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order-cores",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order-cores.csv",
+        "default_jobs": 16,
     },
 }
 
@@ -1032,6 +1130,12 @@ def run_one(config_path: Path, sweep: str, level_name: str, spec_name: str,
 
     if n_repairs == 0 or timed_out:
         return {**base, "best_relation": "none", "implies_ideal": 0, "n_implies": 0}
+
+    # A spec with no fixes/ has nothing to compare against; compare would exit
+    # non-zero and the row would read as a broken run.
+    if not Path(spec["ideals_dir"]).is_dir():
+        return {**base, "best_relation": "no-ideals", "implies_ideal": 0,
+                "n_implies": 0}
 
     # compare's cost scales with n_repairs * n_ideals, so an arm that produces
     # more repairs hits the timeout more often. Scoring that as implies_ideal = 0
