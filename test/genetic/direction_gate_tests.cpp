@@ -8,10 +8,12 @@
 #include <vector>
 
 #include "config.hpp"
+#include "fitness/status.hpp"
 #include "fixtures.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/order_moves.hpp"
 #include "genetic/random_source.hpp"
+#include "genetic/scored.hpp"
 #include "requirement.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
@@ -183,6 +185,50 @@ TEST(test_gate_leaves_crossover_offspring_alone) {
             "a crossover offspring should mutate as without the gate, seed " +
                 std::to_string(seed));
     }
+}
+
+// The step flag is set exactly when a step is counted, and settle counts a
+// held offspring only where the scored generation rates it realizable.
+TEST(test_step_offspring_are_settled_by_their_score) {
+    const Specification original = original_spec();
+    const ParentContext context = context_for(true, &original);
+    const Config cfg = gated_config();
+    std::vector<Specification> stepped_children;
+    for (std::size_t seed = 0; seed < k_seeds; ++seed) {
+        const RandomSource source = make_random_source_from_seed(seed);
+        const std::size_t steps_before = DirectionGateStats::n_steps.load();
+        bool stepped = true;
+        const Specification child = mutate_specification(
+            weakened_spec(), source, cfg, &context, &stepped);
+        expect(
+            stepped == (DirectionGateStats::n_steps.load() == steps_before + 1),
+            "the step flag should match the step count, seed " +
+                std::to_string(seed));
+        if (stepped) {
+            stepped_children.push_back(child);
+        }
+        DirectionGateStats::note_offspring(stepped, child);
+    }
+    expect(!stepped_children.empty(), "some mutation should take a step");
+
+    // Only the first stepped child scores realizable; status sits at index 0.
+    std::vector<Scored<Specification>> scored;
+    Scored<Specification> realizable;
+    realizable.specification = stepped_children.front();
+    realizable.objectives = {k_status_realizable};
+    scored.push_back(realizable);
+    std::size_t n_same = 0;
+    for (const Specification& child : stepped_children) {
+        n_same += child == stepped_children.front() ? 1 : 0;
+    }
+    const std::size_t before = DirectionGateStats::n_steps_realizable.load();
+    DirectionGateStats::settle(scored, 0);
+    expect(DirectionGateStats::n_steps_realizable.load() == before + n_same,
+           "settle should count each held offspring the generation scored "
+           "realizable");
+    DirectionGateStats::settle(scored, 0);
+    expect(DirectionGateStats::n_steps_realizable.load() == before + n_same,
+           "settle should forget what it has counted");
 }
 
 }  // namespace

@@ -12,6 +12,7 @@
 
 #include "filter/implication_check.hpp"
 #include "fitness/status.hpp"
+#include "genetic/nsga2.hpp"
 #include "hash_combine.hpp"
 #include "profile.hpp"
 #include "requirement.hpp"
@@ -131,4 +132,37 @@ std::vector<bool> proved_weaker_realizable(
         }
     }
     return demoted;
+}
+
+FrontGutting final_front_gutting(
+    const std::vector<Scored<Specification>>& population,
+    std::size_t status_index) {
+    std::vector<Scored<Specification>> distinct;
+    std::unordered_set<Specification> seen;
+    for (const Scored<Specification>& scored : population) {
+        if (seen.insert(scored.specification).second) {
+            distinct.push_back(scored);
+        }
+    }
+    FrontGutting front;
+    if (distinct.empty()) {
+        return front;
+    }
+    const std::vector<std::size_t> ranks =
+        non_domination_ranks(objectives_of(distinct));
+    const std::vector<bool> weaker =
+        proved_weaker_realizable(distinct, status_index);
+    for (std::size_t i = 0; i < distinct.size(); ++i) {
+        if (ranks[i] != 0) {
+            continue;
+        }
+        front.n_members++;
+        if (distinct[i].objectives[status_index] == k_status_realizable) {
+            front.n_realizable++;
+        }
+        if (weaker[i]) {
+            front.n_gutted++;
+        }
+    }
+    return front;
 }

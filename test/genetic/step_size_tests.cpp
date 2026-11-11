@@ -2,6 +2,7 @@
 // moves by the parent's status, and Config::bisect_steps moves a realizable
 // parent's timing step to the midpoint of its chain.
 
+#include <array>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -220,6 +221,53 @@ TEST(test_bisected_step_lands_on_the_midpoint) {
     expect(all_equal_to(timings_taken(adjacent, 1, cfg, context),
                         {timing::within_ticks(2)}),
            "an adjacent step should go to the original's timing");
+}
+
+// With the key at 0, a mutation a scale would have applied to tallies the
+// moves it takes, off the draws it takes anyway, so the baseline has a
+// large-move rate to compare with. A crossover offspring and a scaled
+// mutation tally nothing.
+TEST(test_unscaled_moves_are_tallied_at_zero) {
+    const Specification spec({},
+                             {make_req("a", "x", timing::for_ticks(8)),
+                              make_req("b", "y", timing::within_ticks(4))},
+                             inputs(), outputs());
+    Config off = timing_only_config();
+    off.step_scaling = 0.0;
+    const ParentContext context = context_at(0.0);
+    ParentContext crossed = context;
+    crossed.crossed = true;
+
+    const auto counts = [] {
+        return std::array<std::size_t, 3>{
+            StepScalingStats::n_unscaled.load(),
+            StepScalingStats::n_unscaled_large.load(),
+            StepScalingStats::n_unscaled_small.load()};
+    };
+    const auto before = counts();
+    for (std::size_t seed = 0; seed < k_seeds; ++seed) {
+        const RandomSource source = make_random_source_from_seed(seed);
+        static_cast<void>(mutate_specification(spec, source, off, &context));
+    }
+    const auto after = counts();
+    const std::size_t large = after[1] - before[1];
+    const std::size_t small = after[2] - before[2];
+    expect(after[0] - before[0] == k_seeds,
+           "at 0, each mutation with a status should be tallied once");
+    expect(large + small == k_seeds && large > 0 && small > 0,
+           "at 0, each tick-count step should tally as one large move or one "
+           "single edge, and both should turn up");
+
+    for (std::size_t seed = 0; seed < k_seeds; ++seed) {
+        const RandomSource crossed_source = make_random_source_from_seed(seed);
+        static_cast<void>(
+            mutate_specification(spec, crossed_source, off, &crossed));
+        const RandomSource scaled_source = make_random_source_from_seed(seed);
+        static_cast<void>(mutate_specification(spec, scaled_source,
+                                               timing_only_config(), &context));
+    }
+    expect(counts() == after,
+           "a crossover offspring or a scaled mutation should tally nothing");
 }
 
 }  // namespace

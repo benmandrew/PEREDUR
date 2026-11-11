@@ -357,6 +357,7 @@ std::vector<Spec> breed_offspring(
         Spec offspring = sorted_pop[i].specification;
         bool crossed = false;
         [[maybe_unused]] std::optional<OrderCrossoverKind> order_kind;
+        [[maybe_unused]] bool stepped = false;
         if (probability_check(cfg.crossover_rate, random_source)) {
             crossed = true;
             const std::size_t partner = random_source.next_index(top_n);
@@ -375,7 +376,7 @@ std::vector<Spec> breed_offspring(
                 const ParentContext parent = parent_context(
                     sorted_pop[i], crossed, original, status_objective);
                 offspring = mutate_specification(offspring, random_source, cfg,
-                                                 &parent);
+                                                 &parent, &stepped);
             }
         }
         // Counted before simplification, and only when the slot actually
@@ -391,6 +392,7 @@ std::vector<Spec> breed_offspring(
             offspring_pop.push_back(simplify_offspring(std::move(offspring)));
             OrderCrossoverStats::note_offspring(order_kind,
                                                 offspring_pop.back());
+            DirectionGateStats::note_offspring(stepped, offspring_pop.back());
             record_origin(origins, sorted_pop[i], i, offspring_pop.back(),
                           status_objective);
         }
@@ -806,6 +808,8 @@ void stage_score(GenerationContext<Spec>& ctx) {
     if constexpr (std::is_same_v<Spec, Specification>) {
         OrderCrossoverStats::settle(ctx.m_scored,
                                     status_objective_index(ctx.m_cfg));
+        DirectionGateStats::settle(ctx.m_scored,
+                                   status_objective_index(ctx.m_cfg));
     }
 }
 
