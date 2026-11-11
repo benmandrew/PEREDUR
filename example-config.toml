@@ -155,6 +155,9 @@ controller_reuse_min_guarantees = 10
 controller_reuse_min_screen_ms = 40
 # How long an abandoned MRS lookahead query may run before it is killed.
 mrs_lookahead_kill_grace_ms = 2000
+# Spot tool calls through spot-forkserver instead of an exec each.
+# Same answers, 4-5 ms less start-up a call.
+spot_server = false
 # 0.15, not 0.05: the ltl2tgba budget drops individuals by design, and enough
 # land in one generation on the heavy TLSF specs to trip a tighter bound.
 max_scoring_failure_rate = 0.15

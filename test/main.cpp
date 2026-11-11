@@ -37,6 +37,7 @@ const std::vector<Suite>& suites() {
         suite_named("long_formula_runner"),
         suite_named("process_runner"),
         suite_named("spot_runner"),
+        suite_named("spot_server_runner"),
         suite_named("accumulator"),
         suite_named("crossover"),
         suite_named("generation"),

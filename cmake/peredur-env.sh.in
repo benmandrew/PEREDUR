@@ -10,10 +10,13 @@
 _peredur_prefix=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")/../.." && pwd)
 
 PEREDUR_SPOT_BIN_DIR="$_peredur_prefix/@PEREDUR_TOOL_DIR@/spot/bin"
+# Read only under runtime.spot_server, and absent where the build makes none.
+PEREDUR_SPOT_SERVER_PATH="$_peredur_prefix/@PEREDUR_TOOL_DIR@/spot/spot-forkserver"
 PEREDUR_GANAK_PATH="$_peredur_prefix/@PEREDUR_TOOL_DIR@/ganak"
 PEREDUR_BLACK_PATH="$_peredur_prefix/@PEREDUR_TOOL_DIR@/black/bin/black"
 PEREDUR_FORMALISER_SCRIPT="$_peredur_prefix/@PEREDUR_DATA_DIR@/fretCLI.main.js"
 
-export PEREDUR_SPOT_BIN_DIR PEREDUR_GANAK_PATH PEREDUR_BLACK_PATH
+export PEREDUR_SPOT_BIN_DIR PEREDUR_SPOT_SERVER_PATH PEREDUR_GANAK_PATH
+export PEREDUR_BLACK_PATH
 export PEREDUR_FORMALISER_SCRIPT
 unset _peredur_prefix

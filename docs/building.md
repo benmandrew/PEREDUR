@@ -92,18 +92,19 @@ On macOS the dynamic loader ignores the wrappers' `LD_LIBRARY_PATH`, so the inst
 
 ### Environment overrides
 
-Four paths are compiled in, and each takes an environment variable that wins over it. `peredur-env.sh` sets all four; setting one by hand overrides that single path and leaves the rest alone.
+Five paths are compiled in, and each takes an environment variable that wins over it. `peredur-env.sh` sets all five; setting one by hand overrides that single path and leaves the rest alone.
 
 | Variable | Overrides |
 |---|---|
 | `PEREDUR_SPOT_BIN_DIR` | the directory holding `ltlsynt`, `ltl2tgba`, `ltlfilt` and `autfilt` |
+| `PEREDUR_SPOT_SERVER_PATH` | the `spot-forkserver` binary, read only when `runtime.spot_server` is on (Linux builds only) |
 | `PEREDUR_GANAK_PATH` | the `ganak` binary |
 | `PEREDUR_BLACK_PATH` | the `black` binary |
 | `PEREDUR_FORMALISER_SCRIPT` | the vendored FRET formaliser script |
 
 Each is read once, on first use. An unset or empty variable falls back to the compiled-in default, since a shell or container runtime that carries an unset variable around exports it as empty.
 
-The container image is the packaged form of the same install tree, with the four variables baked in as `ENV` because there is no shell to source anything from. [Docker](docker.md) covers building and running it.
+The container image is the packaged form of the same install tree, with the five variables baked in as `ENV` because there is no shell to source anything from. [Docker](docker.md) covers building and running it.
 
 ## Tests, linting and formatting
 

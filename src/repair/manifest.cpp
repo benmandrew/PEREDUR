@@ -34,6 +34,7 @@
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
 #include "runner/ltlfilt.hpp"
+#include "runner/process.hpp"
 #include "runner/spot.hpp"
 #include "runner/tool_paths.hpp"
 #include "version.hpp"
@@ -51,7 +52,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 63;
+constexpr int k_schema_version = 64;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -298,7 +299,17 @@ nlohmann::json external_tools_json() {
                                   ? nlohmann::json(nullptr)
                                   : nlohmann::json(version.m_error)}};
     };
+    // The server answers with the code of the Spot it was linked from, which
+    // the build ties to the `spot` row's version; `active` says whether the
+    // run's Spot calls went through it, which decides whether its controllers
+    // can be compared byte for byte with an exec run's.
+    const ToolPath& server = spot_server_path_source();
     return {{"spot", row(spot_bin_dir_source(), spot_version())},
+            {"spot_server",
+             {{"path", server.m_path.empty() ? nlohmann::json(nullptr)
+                                             : nlohmann::json(server.m_path)},
+              {"from_env", server.m_from_env},
+              {"active", tool_server_active()}}},
             {"ganak", row(ganak_path_source(), ganak_version())},
             {"black", row(black_path_source(), black_version())}};
 }
@@ -399,6 +410,16 @@ void write_run_manifest(const std::string& output_dir,
                                {"decided", BudgetScreen::decided}})},
         {"config", std::move(config)},
         {"tool_calls", tool_calls_json()},
+        // All zero unless runtime.spot_server is on. A failure is a call that
+        // fell back to an exec. At a timeout or cancellation, `killed` counts
+        // tools killed by a server that was kept, and `discarded` servers
+        // killed with their tool.
+        {"spot_server",
+         {{"started", ToolServerStats::n_started.load()},
+          {"requests", ToolServerStats::n_requests.load()},
+          {"killed", ToolServerStats::n_killed.load()},
+          {"discarded", ToolServerStats::n_discarded.load()},
+          {"failures", ToolServerStats::n_failures.load()}}},
         {"n_constant_folded", SatisfiabilityChecker::n_constant_folded.load()},
         {"n_spot_decided", SatisfiabilityChecker::n_spot_decided.load()},
         {"n_escalations_declined",

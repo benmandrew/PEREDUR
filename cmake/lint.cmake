@@ -23,12 +23,22 @@ set(PEREDUR_LINT_GLOBS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
 )
+# tools/spot-forkserver is an ordinary target with its own flags (C++20, no
+# sanitizers, Spot's headers), so it has a compile command of its own and
+# clang-tidy reads that. Only where the build makes it: elsewhere there is no
+# compile command, and no Spot install in the shape it includes.
+if(PEREDUR_SPOT_FORKSERVER)
+    list(APPEND PEREDUR_LINT_GLOBS ${CMAKE_CURRENT_SOURCE_DIR}/tools/*.cpp)
+endif()
 
 set(PEREDUR_LINT_CPP_GLOBS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/bench/*.cpp
 )
+if(PEREDUR_SPOT_FORKSERVER)
+    list(APPEND PEREDUR_LINT_CPP_GLOBS ${CMAKE_CURRENT_SOURCE_DIR}/tools/*.cpp)
+endif()
 
 # Optional allow-list restricting linting to an explicit set of files, passed
 # as an absolute-path list. CI sets this on pull requests to lint only the
@@ -51,10 +61,12 @@ if(PEREDUR_LINT_FILES_OVERRIDE)
     set(PEREDUR_LINT_FILES "")
     set(PEREDUR_LINT_CPP_FILES "")
     foreach(lint_file IN LISTS PEREDUR_LINT_FILES_OVERRIDE)
-        if(lint_file MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}/(src|test|bench|fuzz|include)/")
+        if(lint_file MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}/(src|test|bench|fuzz|include)/"
+           OR (PEREDUR_SPOT_FORKSERVER AND lint_file MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}/tools/"))
             list(APPEND PEREDUR_LINT_FILES ${lint_file})
         endif()
-        if(lint_file MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}/(src|test|bench)/.*\\.cpp$")
+        if(lint_file MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}/(src|test|bench)/.*\\.cpp$"
+           OR (PEREDUR_SPOT_FORKSERVER AND lint_file MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}/tools/.*\\.cpp$"))
             list(APPEND PEREDUR_LINT_CPP_FILES ${lint_file})
         endif()
     endforeach()
@@ -98,7 +110,11 @@ endif()
 if(PEREDUR_LINT_FILES_OVERRIDE)
     set(PEREDUR_CLANG_TIDY_FILTER ${PEREDUR_LINT_CPP_FILES})
 else()
-    set(PEREDUR_CLANG_TIDY_FILTER "^${CMAKE_CURRENT_SOURCE_DIR}/(src|test|bench)/.*\\.cpp$")
+    if(PEREDUR_SPOT_FORKSERVER)
+        set(PEREDUR_CLANG_TIDY_FILTER "^${CMAKE_CURRENT_SOURCE_DIR}/(src|test|bench|tools)/.*\\.cpp$")
+    else()
+        set(PEREDUR_CLANG_TIDY_FILTER "^${CMAKE_CURRENT_SOURCE_DIR}/(src|test|bench)/.*\\.cpp$")
+    endif()
 endif()
 
 if(PEREDUR_LINT_FILES_OVERRIDE AND NOT PEREDUR_LINT_CPP_FILES)

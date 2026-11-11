@@ -65,7 +65,7 @@ WORKDIR /src
 FROM toolchain AS spot
 ARG BUILD_DIR
 ARG BUILD_JOBS
-COPY cmake/spot.cmake cmake/third_party.cmake cmake/
+COPY cmake/spot.cmake cmake/spot_forkserver_objects.cmake cmake/third_party.cmake cmake/
 RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DPEREDUR_TOOL_MODULE=spot.cmake \
         ${BUILD_JOBS:+-DCMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS}} \
@@ -196,6 +196,7 @@ COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/peredur-entrypoint
 # which this image does not carry.
 ENV PATH=/opt/peredur/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     PEREDUR_SPOT_BIN_DIR=/opt/peredur/libexec/peredur/spot/bin \
+    PEREDUR_SPOT_SERVER_PATH=/opt/peredur/libexec/peredur/spot/spot-forkserver \
     PEREDUR_GANAK_PATH=/opt/peredur/libexec/peredur/ganak \
     PEREDUR_BLACK_PATH=/opt/peredur/libexec/peredur/black/bin/black \
     PEREDUR_FORMALISER_SCRIPT=/opt/peredur/share/peredur/fretCLI.main.js \

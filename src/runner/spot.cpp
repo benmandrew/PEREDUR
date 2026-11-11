@@ -236,6 +236,45 @@ std::string ltlsynt_path() { return spot_bin_dir() + "/ltlsynt"; }
 
 std::string autfilt_path() { return spot_bin_dir() + "/autfilt"; }
 
+const ToolPath& spot_server_path_source() {
+#ifdef SPOT_SERVER_PATH
+    static const ToolPath k_path =
+        tool_path_from_env("PEREDUR_SPOT_SERVER_PATH", SPOT_SERVER_PATH);
+#else
+    static const ToolPath k_path =
+        tool_path_from_env("PEREDUR_SPOT_SERVER_PATH", "");
+#endif
+    return k_path;
+}
+
+bool configure_spot_server(bool enabled) {
+    if (!enabled) {
+        set_tool_server({});
+        return false;
+    }
+    const ToolPath& server = spot_server_path_source();
+    std::string refusal;
+    if (server.m_path.empty()) {
+        refusal = "this build has no spot-forkserver";
+    } else if (spot_bin_dir_source().m_from_env && !server.m_from_env) {
+        refusal =
+            "PEREDUR_SPOT_BIN_DIR is set and PEREDUR_SPOT_SERVER_PATH is not, "
+            "and the built server may be another Spot than those tools";
+    } else if (access(server.m_path.c_str(), X_OK) != 0) {
+        refusal = server.m_path + " cannot be run";
+    }
+    if (!refusal.empty()) {
+        std::cerr << "peredur: runtime.spot_server is on, but " << refusal
+                  << "; running the Spot tools as execs\n";
+        set_tool_server({});
+        return false;
+    }
+    set_tool_server(
+        {server.m_path,
+         {ltlsynt_path(), ltlfilt_path(), ltl2tgba_path(), autfilt_path()}});
+    return true;
+}
+
 void RealizabilityChecker::set_timeout(std::chrono::milliseconds timeout) {
     g_ltlsynt_timeout_ms.store(timeout.count());
 }

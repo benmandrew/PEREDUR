@@ -100,6 +100,19 @@ struct SpecificationSides {
 /// Returns the full filesystem path to the autfilt binary.
 std::string autfilt_path();
 
+/// Turns the Spot fork server (`runtime.spot_server`) on or off for every
+/// later ltlsynt, ltlfilt, ltl2tgba and autfilt call made with an input; see
+/// set_tool_server. The server is `PEREDUR_SPOT_SERVER_PATH` when that is set
+/// and non-empty, and otherwise the `spot-forkserver` this build made.
+///
+/// Turning it on is refused, with a warning on stderr, where there is no
+/// server: on a platform the build makes none for, when the binary cannot be
+/// run, and when `PEREDUR_SPOT_BIN_DIR` points the tools elsewhere without a
+/// `PEREDUR_SPOT_SERVER_PATH` beside it, since a server answers with the code
+/// of the Spot it was linked from, whatever version the tools are. Returns
+/// whether the server is on.
+bool configure_spot_server(bool enabled);
+
 /// What RealizabilityChecker's controller store did: the queries it answered
 /// realizable without ltlsynt, and the execs that cost. Guarded by the
 /// checker's own lock, as the checker's counters are.

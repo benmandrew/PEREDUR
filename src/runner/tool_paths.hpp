@@ -35,6 +35,8 @@ ToolPath tool_path_from_env(const char* env_var, const char* compiled_default);
 /// the same function-local `static` its public resolver in `include/runner/`
 /// returns the path of.
 const ToolPath& spot_bin_dir_source();
+/// The Spot fork server, empty where the build makes none.
+const ToolPath& spot_server_path_source();
 const ToolPath& ganak_path_source();
 const ToolPath& black_path_source();
 
