@@ -50,6 +50,8 @@ Report "best fitness" as the population maximum, never `population[0]`/`front()`
 
 `peredur` rejects unknown arguments (`find_unknown_arg`), so a new flag must be added to the table in `src/main.cpp`.
 
+`<output-dir>/accumulated/` holds one file per gate-passing candidate, `index.tsv` with a `file`, `generation` and `elapsed_s` row for each, and `maximal.tsv` naming the files in the current maximal set. With `climb_output` on, every climbed result is accumulated too, under the generation after the search's last, so `maximal.tsv` lists every member of the final maximal set (see "Output climb" in `docs/dev/operators.md`).
+
 ## Generation pipeline
 
 `make_generation_pipeline` (`include/genetic/pipeline.hpp`) returns named `PipelineStage`s, and `run_generation_pipeline` reports each to an optional `StageObserver`, through which the `pipeline` suite reads every stage's name and population sizes. Breeding must stay a single stage, because crossover and mutation interleave per offspring slot and splitting them reorders the RNG draws; the `determinism` suite pins the draw stream. FRETISH mutation receives a `ParentContext` per offspring, built from the parent's `Scored` entry without a draw, and the original specification by pointer through `GenerationContext::m_original` (see "Blame-targeted slot choice" in `docs/dev/operators.md`).
