@@ -201,11 +201,24 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
             random_source, accumulator, budget, &original_spec);
         RepairTransform<Specification> climb;
         if (cfg.climb_output) {
-            climb = [&cfg, &original_spec,
+            // Every climb result passed the output gate, so it is accumulated
+            // like any other gate-passing candidate: it gets a file, an index
+            // row stamped with the time the climb ended, and a name in the
+            // stream, without which maximal.tsv could not list it. The
+            // generation in its file name is one past the last the search
+            // ran. A result the search had already accumulated keeps its
+            // first file.
+            climb = [&cfg, &original_spec, &accumulator, &budget,
                      accepts = climb_gate(
                          cfg, status_objective_of(fitness_function))](
                         const std::vector<Specification>& repairs) {
-                return climb_repairs(repairs, original_spec, cfg, accepts);
+                std::vector<Specification> climbed =
+                    climb_repairs(repairs, original_spec, cfg, accepts);
+                const std::size_t generation = budget.generations() + 1;
+                for (const Specification& spec : climbed) {
+                    accumulator.insert(spec, generation);
+                }
+                return climbed;
             };
         }
         const SearchOutput<Specification> output =

@@ -8,6 +8,7 @@
 #include <csignal>
 #include <cstddef>
 #include <filesystem>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -973,6 +974,47 @@ climb_order = "similarity"
 parallel = 1
 )";
 
+// examples/mode-arbiter, whose search at k_config_climb and seed 1 gates a
+// repair that the climb strengthens into one no generation accumulated.
+const char* const k_fretish_climbable = R"json({
+  "assumptions": [
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "!(degraded & maintenance)",
+      "timing": { "type": "Always" },
+      "weakenable": false
+    }
+  ],
+  "guarantees": [
+    {
+      "condition": "request",
+      "condition-type": "continual",
+      "response": "grant",
+      "timing": { "type": "Immediately" },
+      "scope": { "type": "NotIn", "mode": "degraded" }
+    },
+    {
+      "condition": "request",
+      "condition-type": "continual",
+      "response": "grant",
+      "timing": { "type": "WithinTicks", "ticks": 2 },
+      "scope": { "type": "In", "mode": "degraded" }
+    },
+    {
+      "condition": "true",
+      "condition-type": "continual",
+      "response": "!grant",
+      "timing": { "type": "Always" },
+      "scope": { "type": "In", "mode": "maintenance" }
+    }
+  ],
+  "in_atoms": ["request"],
+  "out_atoms": ["grant"],
+  "modes": ["degraded", "maintenance"]
+}
+)json";
+
 // Long enough that the run is still searching whenever the signal lands.
 const char* const k_config_endless = R"([genetic]
 generations = 1000000
@@ -1188,8 +1230,33 @@ TEST_IN("driver_peredur", test_peredur_filters_without_implication) {
     expect_run_manifest(out, input, 4, "peredur/dedup");
 }
 
-// Off, the climb counts nothing. On, it climbs every gated repair and a fixed
-// seed still writes the same repairs.
+// `accumulated/maximal.tsv` names one accumulated file per repair_N.json, each
+// holding that repair's specification. A climbed repair once reached the
+// output without an accumulated file, so the listing silently left it out.
+void expect_listing_matches_repairs(const std::filesystem::path& out) {
+    const std::filesystem::path accumulated = out / "accumulated";
+    std::vector<nlohmann::json> listed;
+    std::istringstream listing(read_text(accumulated / "maximal.tsv"));
+    std::string line;
+    std::getline(listing, line);
+    expect(line == "file", "peredur: maximal.tsv leads with its header");
+    while (std::getline(listing, line)) {
+        listed.push_back(nlohmann::json::parse(read_text(accumulated / line)));
+    }
+    const std::vector<std::filesystem::path> repairs = repair_files(out);
+    expect(listed.size() == repairs.size(),
+           "peredur: maximal.tsv lists " + std::to_string(listed.size()) +
+               " file(s) for " + std::to_string(repairs.size()) + " repair(s)");
+    for (const std::filesystem::path& repair : repairs) {
+        nlohmann::json spec = nlohmann::json::parse(read_text(repair));
+        spec.erase("fitness");
+        expect(std::find(listed.begin(), listed.end(), spec) != listed.end(),
+               "peredur: maximal.tsv lists " + repair.filename().string());
+    }
+}
+
+// Off, the climb counts nothing. On, it climbs every gated repair, a fixed
+// seed still writes the same repairs, and the climbed ones are accumulated.
 TEST_IN("driver_peredur", test_peredur_climbs_its_output) {
     const TempDir dir("e2e_peredur_climb");
     const std::string input =
@@ -1232,6 +1299,26 @@ TEST_IN("driver_peredur", test_peredur_climbs_its_output) {
                "peredur: a fixed seed climbs to the same " +
                    repair.filename().string());
     }
+    expect_listing_matches_repairs(dir.path() / "first");
+}
+
+// A climbed repair the search never accumulated is still listed. Before the
+// climb's results were accumulated, this run wrote one repair and listed none.
+TEST_IN("driver_peredur", test_peredur_lists_climbed_repairs) {
+    const TempDir dir("e2e_peredur_climb_listing");
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish_climbable).string();
+    const std::string config =
+        write_text(dir.path() / "climb.toml", k_config_climb).string();
+    const std::filesystem::path out = dir.path() / "out";
+    std::filesystem::create_directories(out);
+    const DriverRun run =
+        run_driver("peredur", {"--input", input, "--output-dir", out.string(),
+                               "--config", config, "--seed", "1"});
+    expect(run.m_exit_code == 0, "peredur: a climb run exits zero");
+    expect(!repair_files(out).empty(),
+           "peredur: the climb run writes a repair to list");
+    expect_listing_matches_repairs(out);
 }
 
 // The crash log lands in a `crashes/` directory under the working directory,

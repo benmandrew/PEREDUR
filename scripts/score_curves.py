@@ -22,6 +22,14 @@ accumulator wrote, `.tlsf` for TLSF and `.json` for FRETISH. The repairs are
 deliberately not scored here: they are the run's answer, and these are its
 working.
 
+One exception: a FRETISH run with `[filters] climb_output` on, written before
+the climb's results were accumulated, holds climbed repairs in `repair_N.json`
+and nowhere under `accumulated/`. Each such repair whose specification no
+accumulated file holds joins the index at the run's `wall_s`, the climb having
+run after the search, so the curves end where a run written since the fix
+would put them, a few seconds late at most. A run written since then has an
+accumulated file for every climbed result, and adds nothing here.
+
 "Ideal-implying" is `equivalent` or `strictly stronger` against any ideal,
 which is the collapse `run_experiments.parse_compare_output` applies to derive
 `implies_ideal`; the relation names come from `src/compare.cpp`. One `compare`
@@ -88,6 +96,8 @@ RELATION_LINE = re.compile(
 )
 MAXIMAL_SURVIVOR_LINE = re.compile(r"^class\s+\d+\s+(.+?)(?:\s+\(\+\d+ identical\))?$")
 
+REPAIR_NAME = re.compile(r"repair_(\d+)\.json")
+
 CURVE_METRICS = ("solutions", "ideal_solutions",
                  "maximal_solutions", "maximal_ideal_solutions")
 SCALAR_METRICS = ("time_to_first_repair", "time_to_first_ideal_repair")
@@ -151,6 +161,60 @@ CONFIG_KEY = {
     "status_grading": re.compile(r'^\s*status_grading\s*=\s*"([^"]*)"',
                                  re.MULTILINE),
 }
+
+
+def spec_key(path: Path) -> str:
+    """A FRETISH document's specification, without repair_N's fitness record.
+
+    The accumulator and repair_N go through the same serialiser, so two files
+    holding one specification parse to equal objects once `fitness` is gone.
+    """
+    document = json.loads(path.read_text())
+    document.pop("fitness", None)
+    return json.dumps(document, sort_keys=True)
+
+
+def climbed_repairs(run_dir: Path, manifest: dict,
+                    index: list[tuple[str, int, float]]
+                    ) -> list[tuple[str, int, float]]:
+    """Index rows for the repair_N.json files no accumulated file holds.
+
+    Only a run with the output climb on can have one, so any other run reads
+    nothing. They are stamped at the run's own `wall_s` and with the generation
+    after its last, as the accumulator now names a climbed result; a run with
+    no recorded wall time cannot place them and adds none.
+    """
+    config = manifest.get("config", {})
+    if not config.get("filters", {}).get("climb_output", False):
+        return []
+    end_s = manifest.get("wall_s")
+    if not isinstance(end_s, (int, float)):
+        print(f"WARN: {run_dir}: no wall_s, so its climbed repairs are left "
+              f"out", file=sys.stderr)
+        return []
+    accumulated = run_dir / ACCUMULATED_DIR
+    held = set()
+    for name, _, _ in index:
+        try:
+            held.add(spec_key(accumulated / name))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"WARN: {accumulated / name} unreadable — {exc}",
+                  file=sys.stderr)
+    generation = int(manifest.get("generations_run") or 0) + 1
+    rows = []
+    repairs = [(int(match.group(1)), path)
+               for path in run_dir.glob("repair_*.json")
+               if (match := REPAIR_NAME.fullmatch(path.name))]
+    for _, path in sorted(repairs):
+        try:
+            key = spec_key(path)
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"WARN: {path} unreadable — {exc}", file=sys.stderr)
+            continue
+        if key not in held:
+            held.add(key)
+            rows.append((path.name, generation, float(end_s)))
+    return rows
 
 
 def spec_from_dir_name(run_dir: Path) -> str:
@@ -339,7 +403,7 @@ def scalar_row(base: dict, metric: str, moment: float | None,
 
 
 def maximality_rows(base: dict, index: list[tuple[str, int, float]],
-                    accumulated: Path, implying: set[str] | None,
+                    paths: dict[str, Path], implying: set[str] | None,
                     n_cuts: int, jobs: int | None,
                     timeout_s: int, deadline: float | None) -> list[dict]:
     """Run `maximal` over prefixes of the accumulated set at bounded cuts.
@@ -387,7 +451,7 @@ def maximality_rows(base: dict, index: list[tuple[str, int, float]],
             continue
         seen_prefix = len(prefix)
         batch = sorted(survivors) + [row[0] for row in prefix[consumed:]]
-        found = maximal_over([accumulated / name for name in batch],
+        found = maximal_over([paths[name] for name in batch],
                              jobs, timeout_s)
         if found is None:
             # Stop, rather than try the next cut: nothing was consumed, so
@@ -416,18 +480,34 @@ def score_run(run_dir: Path, args, deadline: float | None = None) -> list[dict]:
     base = run_columns(manifest, spec, run_dir)
     index = read_index(run_dir)
     accumulated = run_dir / ACCUMULATED_DIR
+    paths = {name: accumulated / name for name, _, _ in index}
+    climbed = climbed_repairs(run_dir, manifest, index)
+    paths.update({name: run_dir / name for name, _, _ in climbed})
 
     ideals = Path(args.ideals) if args.ideals else EXAMPLES_DIR / spec / "fixes"
     implying: set[str] | None = None
-    if index and ideals.is_dir():
-        relations = compare_relations(accumulated, ideals, args.compare_timeout)
+    if (index or climbed) and ideals.is_dir():
+        relations = (compare_relations(accumulated, ideals,
+                                       args.compare_timeout)
+                     if index else {})
+        if relations is not None and climbed:
+            # The run directory's repair_N files, of which only the climbed
+            # ones are read: the rest are accumulated files under other names.
+            repaired = compare_relations(run_dir, ideals, args.compare_timeout)
+            names = {name for name, _, _ in climbed}
+            relations = (None if repaired is None else
+                         {**relations,
+                          **{name: relation
+                             for name, relation in repaired.items()
+                             if name in names}})
         if relations is not None:
             implying = {name for name, relation in relations.items()
                         if relation in IMPLYING_RELATIONS}
-    elif not index:
+    elif not index and not climbed:
         implying = set()
     else:
         print(f"WARN: no ideals directory at {ideals}", file=sys.stderr)
+    index = index + climbed
 
     times = [row[2] for row in index]
     ideal_times = ([row[2] for row in index if row[0] in implying]
@@ -447,7 +527,7 @@ def score_run(run_dir: Path, args, deadline: float | None = None) -> list[dict]:
                            min(ideal_times) if ideal_times else None,
                            implying is not None))
     if args.maximality and index:
-        rows += maximality_rows(base, index, accumulated, implying,
+        rows += maximality_rows(base, index, paths, implying,
                                 args.cuts, args.jobs, args.maximal_timeout,
                                 deadline)
     return rows
