@@ -61,7 +61,7 @@ Only-climb's `sub_a` is 0 on every subject: no frontier class of only-climb is s
 
 ### Pooled diversity
 
-The only-climb and full arms' nodes fall inside base's region less often than base's own other half does, at every K: only-climb 0.487 against 0.629 at K = 3, below on 17 of 18 subjects (Holm 0.0005); full 0.490 against 0.633, 16 of 18 (Holm 7.6e-05). In the other direction, base's nodes fall inside only-climb's region as often as in its control at every K (smallest Holm 0.30), and inside full's less often at K = 1 and 3 (Holm 0.008 and 0.024) and as often at K = 5. The climb therefore reaches points outside base's region while still covering base's. No other only-arm differs from its control at any K (smallest Holm 0.49).
+The only-climb and full arms' nodes fall inside base's region less often than base's own other half does, at every K: over subjects, a mean 0.487 of only-climb's nodes against 0.629 of base's at K = 3, below on 17 of 18 subjects (Holm 0.0005); full 0.490 against 0.633, 16 of 18 (Holm 7.6e-05). In the other direction, base's nodes fall inside only-climb's region as often as in its control at every K (smallest Holm 0.30), and inside full's less often at K = 1 and 3 (Holm 0.008 and 0.024) and as often at K = 5. The climb therefore reaches points outside base's region while still covering base's. No other only-arm differs from its control at any K (smallest Holm 0.27, only-blame at K = 1).
 
 ## Results of the first pass
 
