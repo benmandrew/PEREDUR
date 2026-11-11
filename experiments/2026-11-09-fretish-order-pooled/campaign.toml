@@ -1,6 +1,6 @@
 name = "2026-11-09-fretish-order-pooled"
 branch = "feat/fretish-order-pooled"
-description = "Pooled strength and diversity of the FRETISH order arms: each only-<feature> arm and full against base under nsga2-apportion, over the 9 small specs, lift-plus-cruise-full and rad's 10 cores. Per host: a pool phase copies the committed pools of its subjects and pools its own cores from all 30 seeds, a fingerprint phase draws black lasso words over the members and plans the pairs design.toml needs, and a compare phase decides them. The reduction runs locally (PLAN.md)."
+description = "Pooled strength and diversity of the FRETISH order arms: each only-<feature> arm and full against base under nsga2-apportion, over the 9 small specs and rad's 10 cores. Per host: a pool phase copies the committed pools of its subjects and pools its own cores from all 30 seeds, a fingerprint phase draws black lasso words over the members and plans the pairs design.toml needs, and a compare phase decides them. The reduction runs locally (PLAN.md)."
 
 # Not seed-split: each host takes whole subjects (subjects-<host>.txt). Enqueued
 # behind 2026-11-09-fretish-order-cores, so on each host it starts once that
@@ -25,8 +25,8 @@ out = "experiments/fretish-order-pooled-members"
 # Draw 32768 words a subject over the members (black, 30 s a draw, 8 at a
 # time), evaluate every node on them, and plan the pairs the design's
 # contrasts need with a direction no word refutes: every such pair for an
-# exhaustive subject, and 100 draws an arm for valu3s-uc6,
-# lift-plus-cruise-mini and lift-plus-cruise-full. Resumes per subject.
+# exhaustive subject, and 100 draws an arm for valu3s-uc6 and
+# lift-plus-cruise-mini. Resumes per subject.
 [[phases]]
 name = "fingerprint"
 kind = "fingerprint"

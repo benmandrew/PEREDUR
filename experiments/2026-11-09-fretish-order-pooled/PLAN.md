@@ -1,6 +1,6 @@
 # 2026-11-09-fretish-order-pooled
 
-The pooled strength-and-diversity pass of 2026-10-08-fretish-rerun-analysis, run on the arms of 2026-11-05-fretish-order and 2026-11-09-fretish-order-cores. `design.toml` declares the subjects, arms and contrasts: each `only-<f>` arm and `full` against `base`, all under nsga2-apportion, with `full` against `base` alone on lift-plus-cruise-full. valu3s-uc6, lift-plus-cruise-mini and lift-plus-cruise-full are estimated from 100 draws an arm; every other subject is exhaustive.
+The pooled strength-and-diversity pass of 2026-10-08-fretish-rerun-analysis, run on the arms of 2026-11-05-fretish-order and 2026-11-09-fretish-order-cores. `design.toml` declares the subjects, arms and contrasts: each `only-<f>` arm and `full` against `base`, all under nsga2-apportion. valu3s-uc6 and lift-plus-cruise-mini are estimated from 100 draws an arm; every other subject is exhaustive. lift-plus-cruise-full was dropped on 2026-11-11 (see "Audit of 2026-11-11").
 
 ## Order of work
 
@@ -21,7 +21,24 @@ Nodes in the 9 design arms, from `maximal.tsv`: fsm 2837, fsm-combined 5976, fsm
 
 A local fingerprint of fsm-timing at 32768 words (seed 3, 253 s at 8 workers) plans 335,899 pairs, or 337,999 directions (2,100 both ways). At the 2026-10-08 pass's 0.51 call-seconds a direction, that is about 48 CPU-h, about 2 h of wall time at 24 jobs. No calibration campaign measures it first; the main pass's first fsm-timing rows give the real figure.
 
+## Audit of 2026-11-11
+
+An audit found four faults that void the Results below, which are kept as the first pass's record. The pass must be re-run from the pool phase.
+
+1. Every arm with the output climb on was pooled from leftovers. With `members = "maximal"`, the pool read `accumulated/maximal.tsv`, which lists only stream members that carry a file name (`src/filter/streaming_maximal.hpp:274`). The climb pushes its results without one (`src/genetic/output_gate.cpp:257`, `:265`), so they reach `repair_N.json` and never the listing. On the cores, only-climb's listings hold 3,529 specs against 11,593 in its output, and full's 7,379 against 13,578. Without the climb, listing and output agree in all 3,000 core runs. `design.toml` now reads `members = "output"`, so the committed `members/` pool is stale and must be rebuilt from both hosts' small-spec runs.
+2. 1,424,061 of the 1,953,959 compare rows (73%) are SIGABRT, and no row timed out. `compare_pairs.py` pointed `PEREDUR_BLACK_PATH` at `third_party/black/install/bin/black`, which fails to load `libblack.so` without the build's wrapper; `src/runner/black.cpp:453` then throws uncaught. Every `?` verdict in this pass is such a crash: 99.99% of lift-plus-cruise-full's rows, 98.9% of lift-plus-cruise-mini's, 97.5% of rad-core-33's, 78% of fsm-combined's and 71% of fsm-timing's. `compare_pairs.py` now uses the wrapper and refuses to start when black does not run. A sample of 40 crashed pairs on each of the five worst subjects all decided with the wrapper, at 0.04 s a pair on rad-core-33 and 1.3 s on lift-plus-cruise-full.
+3. The `decided` reading equalled `non` on every exhaustive row, since a dropped pair's class stayed in the denominator and a skipped direction reads 0. `pooled_reduce.py` no longer reports it.
+4. A member whose K-th nearest other shares no word has radius 1.0, and a ball of radius 1.0 held every point. 4.5% of lift-plus-cruise-mini's base members had one at K = 1. A point sharing no word with a member is now outside its ball.
+
+lift-plus-cruise-full is dropped. Its base pool's 1,604 nodes have 44 distinct fingerprints, with a median pairwise distance of 0, so its pooled diversity reads duplicates, and its compare phase would have cost about 71 CPU-h of the re-run's estimated 90.
+
+The audit also checked, and found sound: the arm configs (each differs from base in exactly its keys, and only-climb's search matches base's in 300 of 300 core runs), the fingerprint plan (SPOT agrees with `fpdraw` on 40 of 40 checks), node numbering across hosts, the strength sign and estimator, the Wilcoxon and Holm code, and the ball-radius arithmetic (fsm/full recomputed to 4 decimals). Minor faults it left in place: Holm corrects within one family and one K only, so the one-contrast `full` family's Holm p is its raw p; a subject with K or fewer members is dropped at every K; and 15 core runs re-run in place hold a doubled `accumulated/index.tsv` (append mode, `src/genetic/accumulator.cpp:72`), which inflates their host-scored curves and leaves the pools alone.
+
+A sensitivity check on the first pass, restricted to the 11 subjects with under 1% crashed rows, left every non-climb contrast where it was: only-gate's median net is +0.188 there, stronger on 10 of 11, against +0.187 over all subjects. Eight of those 11 are rad cores. The climb and full rows have no such check, since their pools are wrong on every subject.
+
 ## Results
+
+The tables below are the first pass's, voided by "Audit of 2026-11-11".
 
 ### Strength
 

@@ -4,7 +4,6 @@ takeoff
 mode-arbiter
 liquid-mixer
 lift-plus-cruise-mini
-lift-plus-cruise-full
 rad-core-10
 rad-core-12-18
 rad-core-45
