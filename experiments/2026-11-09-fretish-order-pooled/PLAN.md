@@ -15,7 +15,9 @@ Each host's subject list holds its own cores and about half the planned pairs of
 
 ## Pool sizes
 
-Nodes in the 9 design arms, from `maximal.tsv`: fsm 2837, fsm-combined 5976, fsm-lmcps 8, fsm-timing 7457, lift-plus-cruise-mini 8977, liquid-mixer 12856, mode-arbiter 2312, takeoff 3319, valu3s-uc6 31777, lift-plus-cruise-full 2463 (base and full). On fsm-lmcps, only full (1 member) and only-blame (7) hold any member, and base holds none, so its contrasts carry almost no information. The cores are pooled on their hosts.
+Nodes in the 9 design arms, from the final outputs (re-pooled on 2026-11-11): fsm 3024, fsm-combined 6681, fsm-lmcps 10, fsm-timing 8548, lift-plus-cruise-mini 10593, liquid-mixer 14791, mode-arbiter 2583, takeoff 3756, valu3s-uc6 35754, and for the cores rad-core-1-18 11451, rad-core-10 195, rad-core-12-18 13791, rad-core-17-18 13709, rad-core-33 20097, rad-core-45 8533, rad-core-55 9850, rad-core-61 10532, rad-core-65 10193, rad-core-68 7392. On fsm-lmcps, base holds no member, so its contrasts carry almost no information.
+
+The first pass's pool, from `maximal.tsv`, held fsm 2837, fsm-combined 5976, fsm-lmcps 8, fsm-timing 7457, lift-plus-cruise-mini 8977, liquid-mixer 12856, mode-arbiter 2312, takeoff 3319 and valu3s-uc6 31777. The seven arms without the climb are identical in both pools on every subject. Only-climb's members grew on every subject except fsm-lmcps, where it has none: from 12 to 2,562 on valu3s-uc6, 27 to 1,250 on liquid-mixer, 60 to 583 on fsm-combined, and 2,353 to 2,457 on rad-core-33.
 
 ## Cost estimate
 
@@ -29,6 +31,8 @@ An audit found four faults that void the Results below, which are kept as the fi
 2. 1,424,061 of the 1,953,959 compare rows (73%) are SIGABRT, and no row timed out. `compare_pairs.py` pointed `PEREDUR_BLACK_PATH` at `third_party/black/install/bin/black`, which fails to load `libblack.so` without the build's wrapper; `src/runner/black.cpp:453` then throws uncaught. Every `?` verdict in this pass is such a crash: 99.99% of lift-plus-cruise-full's rows, 98.9% of lift-plus-cruise-mini's, 97.5% of rad-core-33's, 78% of fsm-combined's and 71% of fsm-timing's. `compare_pairs.py` now uses the wrapper and refuses to start when black does not run. A sample of 40 crashed pairs on each of the five worst subjects all decided with the wrapper, at 0.04 s a pair on rad-core-33 and 1.3 s on lift-plus-cruise-full.
 3. The `decided` reading equalled `non` on every exhaustive row, since a dropped pair's class stayed in the denominator and a skipped direction reads 0. `pooled_reduce.py` no longer reports it.
 4. A member whose K-th nearest other shares no word has radius 1.0, and a ball of radius 1.0 held every point. 4.5% of lift-plus-cruise-mini's base members had one at K = 1. A point sharing no word with a member is now outside its ball.
+
+On 2026-11-11, `campaign.py collect --profile fretish-order --host av2`, then the same for av3, brought home 4,860 small-spec runs with no duplicate key. `pool_members.py` then re-pooled all 19 subjects into `members/` in 59 s, with no missing run. The cores are in `members/` as well, since the host's pool phase copies any subject it finds there, and the cores' runs were already local. The re-run starts from the host's pool phase on this pool.
 
 lift-plus-cruise-full is dropped. Its base pool's 1,604 nodes have 44 distinct fingerprints, with a median pairwise distance of 0, so its pooled diversity reads duplicates, and its compare phase would have cost about 71 CPU-h of the re-run's estimated 90.
 
