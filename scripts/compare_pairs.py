@@ -80,6 +80,18 @@ def relation_of(stdout: str, rc: int) -> str:
     return rel
 
 
+def black_runs(path: str | None) -> bool:
+    """True when `path` is unset (compare's built-in path applies) or names a
+    black that starts."""
+    if not path:
+        return True
+    try:
+        return subprocess.run([path, "--version"], capture_output=True,
+                              timeout=60).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def directions_of(stderr: str, dirs: str) -> tuple:
     """(a_implies_b, b_implies_a) from the patched compare's DIR line. A
     direction the call never decided reads `?`, one it skipped `0`."""
@@ -190,14 +202,22 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     src, out = args.pairs, args.out
     env = dict(os.environ)
-    # Point compare at the checkout's solvers only where they sit at the
-    # source-built layout. Where they do not (av1 unpacks black from a .deb
-    # into third_party/black/black), compare's built-in paths already name
-    # this build's copies.
-    for var, path in (("PEREDUR_BLACK_PATH", THIRD_PARTY / "black" / "install" / "bin" / "black"),
-                      ("PEREDUR_SPOT_BIN_DIR", THIRD_PARTY / "spot" / "bin")):
-        if path.exists():
-            env.setdefault(var, str(path))
+    # Point compare at the checkout's solvers. For black that is the build's
+    # wrapper, which puts libblack.so on the library path: the source-built
+    # install/bin/black alone fails to load, and compare then aborts on every
+    # pair that reaches black (2026-11-09-fretish-order-pooled lost 73% of its
+    # verdicts that way).
+    black = THIRD_PARTY / "black" / "black"
+    if black.exists():
+        env.setdefault("PEREDUR_BLACK_PATH", str(black))
+    spot = THIRD_PARTY / "spot" / "bin"
+    if spot.exists():
+        env.setdefault("PEREDUR_SPOT_BIN_DIR", str(spot))
+    if not black_runs(env.get("PEREDUR_BLACK_PATH")):
+        print(f"black at {env['PEREDUR_BLACK_PATH']} does not run "
+              "(`--version` failed); refusing to start", file=sys.stderr,
+              flush=True)
+        return 2
     tmp = os.environ.get("COMPARE_PAIRS_TMP") or tempfile.gettempdir()
     os.makedirs(tmp, exist_ok=True)
 
