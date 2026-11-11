@@ -1,0 +1,21 @@
+name = "2026-11-11-fretish-order-rescore"
+branch = "campaign/fretish-order-rescore"
+description = "Re-score the anytime curves of 2026-11-05-fretish-order's small set with score_curves.py counting the output climb's repairs (6e5aa655), which the first pass missed because the climb never accumulated them. Scores the existing run directories in place; nothing is re-run."
+
+# The seed split of the runs: each host holds and scores only its own seeds.
+hosts = { av2 = "0-14", av3 = "15-29" }
+
+# The first pass's budgets (score_campaign.DEFAULTS at the time): 8 workers of
+# 4 cores, all 32 CPUs from CPU 0. Written to a new out, since a score pass
+# skips curves that already exist.
+[[phases]]
+name = "score-small"
+kind = "score"
+results = "experiments/results-fretish-order"
+out = "experiments/curves-fretish-order-v2"
+workers = 8
+cores = 4
+cuts = 20
+maximal_timeout = 900
+compare_timeout = 600
+deadline_s = 4500
