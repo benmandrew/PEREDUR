@@ -4282,11 +4282,13 @@ contrasts = [
     rows = {(r["subject"], r["contrast"]): r for r in csv.DictReader(
         open(rout / "strength" / "contrasts.csv", newline=""))}
     fsm_full, fsm_only = rows[("fsm", "full")], rows[("fsm", "only-a")]
-    check((fsm_full["a_front"], fsm_full["b_front"], fsm_full["net"],
+    check((fsm_full["a_front"], fsm_full["b_front"],
            fsm_full["net_imp"], fsm_full["net_non"]),
-          ("1", "1", "1.0", "1.0", "1.0"),
+          ("1", "1", "1.0", "1.0"),
           "full's lone node implies base's: a is the stronger, net +1")
-    check((fsm_only["a_front"], fsm_only["net"], fsm_only["queries"],
+    check_true("net" not in fsm_full and "sub_a" not in fsm_full,
+               "the dropped-pair reading writes no shares, being non's")
+    check((fsm_only["a_front"], fsm_only["net_non"], fsm_only["queries"],
            fsm_only["call_s_sum"]),
           ("1", "1.0", "4", "8"),
           "only's frontier is n2 alone, which implies base's n1")
@@ -4316,11 +4318,20 @@ contrasts = [
 
     # a's two members sit 0.5 apart, b's 1.0 apart. b's 0b0111 is within
     # a's radius of 0b0011 (1/3), b's 0b1000 is 1.0 from both; b's radius
-    # of 1.0 holds all of a.
+    # of 1.0 holds every point that shares a word with its member, which is
+    # all of a.
     hand = [0b0011, 0b0001, 0b0111, 0b1000]
     got = PR.pooled_draw(PR.Dist([0, 1, 2, 3], hand), [0, 1], [2, 3], [1])
     check(got, {1: (0.5, 1.0)},
           "pooled containment: half of b in a's region, all of a in b's")
+    # Every pair shares no word, so every radius is 1.0; no ball holds a
+    # point it shares nothing with (a ball of radius 1.0 once held all).
+    apart = [0b0001, 0b0010, 0b0100, 0b1000]
+    got = PR.pooled_draw(PR.Dist([0, 1, 2, 3], apart), [0, 1], [2, 3], [1])
+    check(got, {1: (0.0, 0.0)},
+          "a point sharing no word lies in no ball, even of radius 1.0")
+    check_true(PR.inside(0.5, 0.5) and not PR.inside(1.0, 1.0),
+               "a ball holds its boundary except at distance 1.0")
     rng = random.Random(7)
     same = True
     for _ in range(50):

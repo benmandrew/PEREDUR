@@ -24,9 +24,11 @@ and is not implied back, an undecided direction reading as no implication, as
 in `maximal`. The undominated nodes, merged by equivalence, are the arm's
 frontier classes. sub_a is the share of arm a's classes that some class of arm
 b strictly implies, sub_b the converse, and net = sub_b - sub_a, positive when
-a is the stronger. Three readings of an undecided direction are reported:
-`decided` drops a pair with one, `imp` reads it as an implication, `non` as
-none (the unsuffixed columns are `decided`).
+a is the stronger. Two readings of an undecided direction are reported: `imp`
+reads it as an implication, `non` as none. A third, dropping a pair with an
+undecided direction, is only classified (the `pairs_*` counts and
+relations.csv): its shares were `non`'s exactly, since a dropped pair's class
+stays in the denominator and a direction the plan skipped reads 0, never ?.
 
 An exhaustive subject reads every class pair (the 2026-10-08 FRETISH
 reduce.py). A sampled subject estimates each share from its draws (the
@@ -296,13 +298,14 @@ def exhaustive(subject: str, nodes: list, bits: list, V: dict, contrast: dict,
                     "b_implies_a": "1" if (x, y) in same else V.get((y, x), "0"),
                     "relation": r})
         counts["incomparable"] += len(ra) * len(rb) - len(pairs)
-        sfx = "" if mode == "decided" else f"_{mode}"
-        sa = len(sub_a) / len(ra) if ra else None
-        sb = len(sub_b) / len(rb) if rb else None
-        row[f"sub_a{sfx}"] = "" if sa is None else round(sa, 4)
-        row[f"sub_b{sfx}"] = "" if sb is None else round(sb, 4)
-        row[f"net{sfx}"] = "" if sa is None or sb is None else round(sb - sa, 4)
-        if mode == "decided":
+        if mode != "decided":
+            sa = len(sub_a) / len(ra) if ra else None
+            sb = len(sub_b) / len(rb) if rb else None
+            row[f"sub_a_{mode}"] = "" if sa is None else round(sa, 4)
+            row[f"sub_b_{mode}"] = "" if sb is None else round(sb, 4)
+            row[f"net_{mode}"] = ("" if sa is None or sb is None
+                                  else round(sb - sa, 4))
+        else:
             row.update({"pairs": len(ra) * len(rb),
                         "pairs_equivalent": counts["equivalent"],
                         "pairs_a_stronger": counts["a_stronger"],
@@ -382,6 +385,13 @@ CG = ("d", "u", "m")
 PAIRS = [x + y for x in CG for y in CG if x != y]
 
 
+def inside(d: float, r: float) -> bool:
+    """A point at distance d lies in a ball of radius r. A member whose K-th
+    nearest other shares no word has radius 1.0, and a ball of radius 1.0
+    would hold every point, so a point sharing no word is never inside."""
+    return d <= r and d < 1.0
+
+
 def jaccard(x: int, y: int) -> float:
     union = (x | y).bit_count()
     return (x ^ y).bit_count() / union if union else 0.0
@@ -408,10 +418,10 @@ def unit_row(groups: dict, prints: list, k: int, match) -> list:
             prec.append("")
             cov.append("")
             continue
-        inside = [[jaccard(prints[i], prints[j]) <= r for j in idx[b]]
-                  for i, r in zip(idx[a], radius[a])]
-        prec.append(round(sum(any(col) for col in zip(*inside)) / len(idx[b]), 4))
-        cov.append(round(sum(any(row) for row in inside) / len(idx[a]), 4))
+        held = [[inside(jaccard(prints[i], prints[j]), r) for j in idx[b]]
+                for i, r in zip(idx[a], radius[a])]
+        prec.append(round(sum(any(col) for col in zip(*held)) / len(idx[b]), 4))
+        cov.append(round(sum(any(row) for row in held) / len(idx[a]), 4))
     return [len(idx[g]) if g in idx else "" for g in CG] + prec + cov
 
 
@@ -550,9 +560,9 @@ def pooled_draw(dist: Dist, a: list, b: list, ks: list) -> dict:
             row, r = dist.rows[dist.pos[x]], rad_a[i]
             for j, c in enumerate(cols_b):
                 d = row[c]
-                if d <= r:
+                if inside(d, r):
                     in_a[j] = True
-                if d <= rad_b[j]:
+                if inside(d, rad_b[j]):
                     in_b[i] = True
         out[k] = (sum(in_a) / len(b), sum(in_b) / len(a))
     return out
@@ -692,7 +702,7 @@ def summary(rows: list, design: dict) -> str:
         for c in rec["contrasts"]:
             if c["name"] not in families[c["family"]]:
                 families[c["family"]].append(c["name"])
-    for sfx in ("", "_imp", "_non"):
+    for sfx in ("_imp", "_non"):
         ps, stats = {}, {}
         for fam, names in families.items():
             for name in names:
@@ -702,7 +712,7 @@ def summary(rows: list, design: dict) -> str:
                     continue
                 ps[name] = wilcoxon_p(net)
                 stats[name] = net
-        lines.append(f"== net{sfx or '_decided'} (a stronger when positive)")
+        lines.append(f"== net{sfx} (a stronger when positive)")
         for fam, names in families.items():
             adj = holm({n: ps[n] for n in names if n in ps})
             for name in names:
