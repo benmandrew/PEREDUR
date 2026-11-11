@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -321,6 +322,28 @@ TEST(test_nsga2_sort_demotes_a_flagged_member_one_front) {
     expect(population[1].rank == 1 && population[2].rank == 1,
            "nsga2_sort: the demoted member joins front 1 beside the member "
            "that was already there");
+}
+
+// The front is ranked on the objectives alone over the distinct members, so a
+// gutted member counts though demotion would move it, and a duplicate counts
+// once.
+TEST(test_final_front_counts_gutted_members) {
+    const Specification loose = two_guarantees(timing::within_ticks(3));
+    Scored<Specification> dominated = scored_with_status(loose, 0.2);
+    dominated.specification = two_guarantees(timing::within_ticks(4));
+    dominated.objectives = {0.2, 0.1};
+    const std::vector<Scored<Specification>> population = {
+        scored_with_status(tight_spec(), k_status_realizable),
+        scored_with_status(loose, k_status_realizable),
+        scored_with_status(tight_spec(), k_status_realizable), dominated};
+    const FrontGutting front = final_front_gutting(population, 0);
+    expect(
+        front.n_members == 2 && front.n_realizable == 2 && front.n_gutted == 1,
+        "final front: two distinct members, both realizable, and the "
+        "looser one gutted; got " +
+            std::to_string(front.n_members) + "/" +
+            std::to_string(front.n_realizable) + "/" +
+            std::to_string(front.n_gutted));
 }
 
 TEST(test_crowding_skips_an_empty_front) {

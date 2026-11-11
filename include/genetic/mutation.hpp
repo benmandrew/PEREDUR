@@ -13,6 +13,7 @@
 
 #include "config.hpp"
 #include "genetic/random_source.hpp"
+#include "genetic/scored.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
 
@@ -144,6 +145,19 @@ struct SlotTargetingStats {
     inline static std::atomic<std::size_t> n_targeted{0};
 };
 
+/// How many mutations a run made, the denominator for the per-arm counts
+/// beside it. Reported under `--diagnostics` and in run.json.
+struct MutationStats {
+    /// Calls of mutate_specification: every FRETISH offspring the
+    /// mutation_rate draw sent to mutation.
+    inline static std::atomic<std::size_t> n_mutations{0};
+    /// Of those, the ones that reached the single `next_index` over the slots
+    /// (and, under the gate, the steps): no structural action fired and
+    /// something was left to draw. SlotTargetingStats::n_targeted counts a
+    /// subset of these.
+    inline static std::atomic<std::size_t> n_slot_draws{0};
+};
+
 /// What Config::direction_gated_mutation did over a run. Reported under
 /// `--diagnostics` and in run.json.
 struct DirectionGateStats {
@@ -159,6 +173,18 @@ struct DirectionGateStats {
     /// Of those steps, the timing steps Config::bisect_steps moved to the
     /// midpoint of their chain.
     inline static std::atomic<std::size_t> n_bisected{0};
+    /// Of those steps, the offspring that scored realizable in the generation
+    /// that bred them, as OrderCrossoverStats::n_realizable counts its own.
+    inline static std::atomic<std::size_t> n_steps_realizable{0};
+
+    /// Holds @p offspring until the generation is scored where @p stepped says
+    /// its mutation took a step; does nothing otherwise.
+    static void note_offspring(bool stepped, const Specification& offspring);
+
+    /// Counts each held offspring that @p scored rates realizable, then
+    /// forgets them all: an offspring a filter dropped was never scored.
+    static void settle(const std::vector<Scored<Specification>>& scored,
+                       std::optional<std::size_t> status_index);
 };
 
 /// What Config::step_scaling did over a run. Reported under `--diagnostics`
@@ -172,6 +198,16 @@ struct StepScalingStats {
     inline static std::atomic<std::size_t> n_large{0};
     /// Tick-count steps under a scale that took their single edge.
     inline static std::atomic<std::size_t> n_small{0};
+    /// Mutations a scale would have applied to had the key been above 0: the
+    /// key at 0, and the parent carrying a status, crossover not having
+    /// fired. Zero whenever the key is on.
+    inline static std::atomic<std::size_t> n_unscaled{0};
+    /// The large moves those unscaled mutations took, counted as n_large
+    /// counts them, so that the two rates compare.
+    inline static std::atomic<std::size_t> n_unscaled_large{0};
+    /// The tick-count steps of those unscaled mutations that took their single
+    /// edge.
+    inline static std::atomic<std::size_t> n_unscaled_small{0};
 };
 
 /// The slots Config::blame_targeted_slots narrows a rewrite to, as global
@@ -232,10 +268,13 @@ std::vector<std::size_t> targeted_mutation_slots(
 /// @param cfg           Configuration providing mutation probabilities
 /// @param parent        What breeding knows about the parent; null aims
 ///                      nothing
+/// @param stepped       Where non-null, set to whether the mutation took a
+///                      step from steps_towards under the gate. Draws nothing.
 /// @return              A specification with one requirement mutated
 /// @throws std::invalid_argument if specification is empty or random_source is
 ///         not callable
 Specification mutate_specification(const Specification& specification,
                                    const RandomSource& random_source,
                                    const Config& cfg,
-                                   const ParentContext* parent = nullptr);
+                                   const ParentContext* parent = nullptr,
+                                   bool* stepped = nullptr);

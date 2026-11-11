@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -167,6 +168,7 @@ ClimbPredicate climb_gate(const Config& cfg, FitnessFunction status) {
 std::vector<Specification> climb_repairs(
     const std::vector<Specification>& repairs, const Specification& original,
     const Config& cfg, const ClimbPredicate& accepts) {
+    const auto started = std::chrono::steady_clock::now();
     std::vector<Specification> starts;
     std::unordered_set<Specification> seen;
     for (const Specification& spec : repairs) {
@@ -230,6 +232,9 @@ std::vector<Specification> climb_repairs(
     ClimbStats::n_rule_subsumed += after[3] - before[3];
     ClimbStats::n_satisfiability_routed += after[4] - before[4];
     ClimbStats::n_controller_hits += after[5] - before[5];
+    ClimbStats::wall_s += std::chrono::duration<double>(
+                              std::chrono::steady_clock::now() - started)
+                              .count();
     std::vector<Specification> distinct;
     std::unordered_set<Specification> emitted;
     for (std::vector<Specification>& climbed : results) {

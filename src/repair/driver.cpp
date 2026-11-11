@@ -21,9 +21,11 @@
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
 #include "genetic/climb.hpp"
+#include "genetic/demotion.hpp"
 #include "genetic/filter_report.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/generation_loop.hpp"
+#include "genetic/order_crossover.hpp"
 #include "genetic/output_gate.hpp"
 #include "genetic/random_source.hpp"
 #include "manifest.hpp"
@@ -199,6 +201,11 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
         SearchResult<Specification> evolved = run_generations(
             cfg, std::move(population), fitness_function, filter_functions,
             random_source, accumulator, budget, &original_spec);
+        if (const std::optional<std::size_t> status_index =
+                status_objective_index(cfg)) {
+            DemotionStats::final_front =
+                final_front_gutting(evolved.population, *status_index);
+        }
         RepairTransform<Specification> climb;
         if (cfg.climb_output) {
             // Every climb result passed the output gate, so it is accumulated

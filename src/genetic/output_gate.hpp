@@ -71,6 +71,15 @@ std::unique_ptr<StreamingMaximalFilter<Spec>> make_maximal_stream(
     const Spec& original, const Config& cfg, const std::string& output_dir);
 
 // What the post-search tail hands back for writing out.
+// How long the post-search tail took, for run.json.
+struct OutputTailStats {
+    // Wall-clock seconds in finish_search: gating the final population,
+    // merging the accumulated repairs, the climb where there is one, the final
+    // filters (the implication stream's drain included) and the rescore.
+    // Written by the driver's thread alone.
+    inline static double wall_s{0.0};
+};
+
 // What one search leaves behind: the final population, and each
 // per-generation filter's in/out totals summed over every generation.
 template <typename Spec>

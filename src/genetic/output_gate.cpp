@@ -233,6 +233,7 @@ SearchOutput<Spec> finish_search(
     const std::vector<Spec>& accumulated,
     const AggregateWeightedFitnessFunctionT<Spec>& fitness,
     StreamingMaximalFilter<Spec>* stream, const RepairTransform<Spec>& climb) {
+    const auto started = std::chrono::steady_clock::now();
     // The per-generation filters screen only offspring, and elites bypass
     // them, so the final population is gated here whatever the search did.
     const std::vector<Scored<Spec>>& population = searched.population;
@@ -288,6 +289,9 @@ SearchOutput<Spec> finish_search(
         output.repairs.push_back(std::move(scored));
     }
     order_population(cfg, output.repairs);
+    OutputTailStats::wall_s += std::chrono::duration<double>(
+                                   std::chrono::steady_clock::now() - started)
+                                   .count();
     return output;
 }
 
