@@ -1,0 +1,53 @@
+name = "2026-11-11-fretish-order-pooled-noclimb"
+branch = "campaign/fretish-order-pooled-noclimb"
+description = "Pooled strength and diversity of the no-climb arm against base and against full, under nsga2-apportion, over the 9 small specs and rad's 10 cores: does full's strength over base come from the climb alone? Every subject is pooled locally into members/, so av2 runs all of them. The reduction runs locally (PLAN.md)."
+
+# One host takes every subject: the pool is committed whole, so the pool
+# phase only copies it. 16 compare jobs, by agreement with the other
+# sessions sharing av2 (16 CPUs for each of two users).
+hosts = { av2 = "" }
+
+# fpdraw is EXCLUDE_FROM_ALL, so the build names it.
+build = "sh -c 'cmake --build build-release && cmake --build build-release --target fpdraw'"
+
+# A subject already in the committed pool (members/, built locally from both
+# hosts' seeds) is copied byte for byte; a core is pooled from this host's
+# results directory, and a missing or unfinished seed fails the phase. The
+# output is under an ignored directory, so the checkout stays clean.
+[[phases]]
+name = "2026-11-11-fretish-order-pooled-noclimb"
+kind = "pool"
+design = "experiments/2026-11-11-fretish-order-pooled-noclimb/design.toml"
+subjects = "experiments/2026-11-11-fretish-order-pooled-noclimb/subjects-{host}.txt"
+copy_from = "experiments/2026-11-11-fretish-order-pooled-noclimb/members"
+out = "experiments/fretish-order-pooled-noclimb-members"
+
+# Draw 32768 words a subject over the members (black, 30 s a draw, 8 at a
+# time), evaluate every node on them, and plan the pairs the design's
+# contrasts need with a direction no word refutes: every such pair for an
+# exhaustive subject, and 100 draws an arm for valu3s-uc6 and
+# lift-plus-cruise-mini. Resumes per subject.
+[[phases]]
+name = "2026-11-11-fretish-order-pooled-noclimb"
+kind = "fingerprint"
+subjects = "experiments/2026-11-11-fretish-order-pooled-noclimb/subjects-{host}.txt"
+members = "experiments/fretish-order-pooled-noclimb-members"
+design = "experiments/2026-11-11-fretish-order-pooled-noclimb/design.toml"
+work = "experiments/fretish-order-pooled-noclimb-work"
+out = "experiments/fretish-order-pooled-noclimb/fp"
+pairs = "experiments/fretish-order-pooled-noclimb-work/pairs-{host}.csv"
+words = 32768
+seed = 3
+workers = 8
+black_timeout = 30
+
+# Every planned pair, each unrefuted direction at the archive's 20 s.
+[[phases]]
+name = "2026-11-11-fretish-order-pooled-noclimb"
+kind = "compare"
+pairs = "experiments/fretish-order-pooled-noclimb-work/pairs-{host}.csv"
+out = "experiments/fretish-order-pooled-noclimb/subsumption-{host}.csv"
+jobs = 16
+black_timeout = 20
+wall_timeout = 180
+vmem_kb = 8388608
