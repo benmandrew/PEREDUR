@@ -323,4 +323,28 @@ TEST(test_nsga2_sort_demotes_a_flagged_member_one_front) {
            "that was already there");
 }
 
+TEST(test_crowding_skips_an_empty_front) {
+    // Ranks with no member at 0, as when every front-0 member is demoted.
+    const std::vector<std::vector<double>> objectives = {
+        {0.0, 1.0}, {0.5, 0.5}, {1.0, 0.0}};
+    const std::vector<std::size_t> ranks = {1, 1, 1};
+    const std::vector<double> distances = crowding_distances(objectives, ranks);
+    expect(std::isinf(distances[0]) && std::isinf(distances[2]) &&
+               distances[1] == 2.0,
+           "crowding: an empty front is skipped and the next is measured as "
+           "usual");
+}
+
+TEST(test_nsga2_sort_demotes_a_whole_front) {
+    std::vector<Scored<int>> population;
+    population.push_back(make_scored(0, {0.9, 0.1}));    // front 0
+    population.push_back(make_scored(1, {0.1, 0.9}));    // front 0
+    population.push_back(make_scored(2, {0.05, 0.05}));  // front 1
+    nsga2_sort(population, {true, true, false});
+    expect(population[0].rank == 1 && population[1].rank == 1 &&
+               population[2].rank == 1,
+           "nsga2_sort: demoting all of front 0 leaves it empty and every "
+           "member in front 1");
+}
+
 }  // namespace

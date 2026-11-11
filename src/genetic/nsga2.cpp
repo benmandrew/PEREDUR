@@ -94,6 +94,11 @@ std::vector<double> crowding_distances(
 
     constexpr double k_infinity = std::numeric_limits<double>::infinity();
     for (std::vector<std::size_t>& front : fronts) {
+        // Maximality demotion can move every member of a front down one rank,
+        // which leaves that front empty.
+        if (front.empty()) {
+            continue;
+        }
         for (std::size_t obj = 0; obj < n_objectives; ++obj) {
             std::sort(front.begin(), front.end(),
                       [&objectives, obj](std::size_t lhs, std::size_t rhs) {
