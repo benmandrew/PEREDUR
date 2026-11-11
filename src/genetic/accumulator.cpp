@@ -61,15 +61,17 @@ std::string AccumulatedRepairWriter::write(std::size_t generation,
 // The generation is already in the file name and is repeated here so a reader
 // needs no filename parsing, and the elapsed time is here rather than in the
 // name because the name is an artefact format that campaign scripts already
-// glob. Opened in append mode and closed per row, for the reason the
-// specification files are: a run killed by a wall-clock cap has to keep the
-// rows it had already written.
+// glob. Closed per row, for the reason the specification files are: a run
+// killed by a wall-clock cap has to keep the rows it had already written. The
+// first row truncates and the rest append, so a run started again in the same
+// output directory replaces the index rather than doubling it.
 void AccumulatedRepairWriter::append_index_row(const std::string& file_name,
                                                std::size_t generation) {
     const std::string path =
         (std::filesystem::path(m_directory) / k_index_name).string();
     const bool first = m_sequence == 0;
-    std::ofstream index(path, std::ios::out | std::ios::app);
+    std::ofstream index(path, first ? std::ios::out | std::ios::trunc
+                                    : std::ios::out | std::ios::app);
     if (!index) {
         warn("could not open " + path);
         return;

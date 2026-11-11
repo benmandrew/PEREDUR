@@ -255,6 +255,29 @@ TEST(test_the_index_carries_a_row_per_specification) {
            "accumulator: rows follow accumulation order, got " + rows[2]);
 }
 
+// A run started again in an output directory that already holds an index
+// replaces it. Appending doubled the rows of 15 re-run campaign directories,
+// and every curve scored from them counted each repair twice.
+TEST(test_a_fresh_run_replaces_an_existing_index) {
+    const TempDir dir("accumulator_tests");
+    {
+        RepairAccumulator<Specification> earlier = json_accumulator(dir);
+        earlier.insert(make_spec("x"), 1);
+        earlier.insert(make_spec("y"), 2);
+    }
+    RepairAccumulator<Specification> later = json_accumulator(dir);
+    later.insert(make_spec("y"), 1);
+
+    const std::vector<std::string> rows = index_rows(dir);
+    expect(rows.size() == 2,
+           "accumulator: a second run leaves a header and its own row, found " +
+               std::to_string(rows.size()) + " line(s)");
+    expect(rows[0] == "file\tgeneration\telapsed_s",
+           "accumulator: the replaced index leads with its header");
+    expect(rows.size() < 2 || rows[1].rfind("gen01_0000.json\t1\t", 0) == 0,
+           "accumulator: the replaced index holds the second run's row");
+}
+
 // A writer given no clock still writes its files; the column reads zero rather
 // than the row being absent, so a reader never has to handle a ragged index.
 TEST(test_the_index_reports_zero_without_a_clock) {

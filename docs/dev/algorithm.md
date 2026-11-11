@@ -50,7 +50,7 @@ Report "best fitness" as the population maximum, never `population[0]`/`front()`
 
 `peredur` rejects unknown arguments (`find_unknown_arg`), so a new flag must be added to the table in `src/main.cpp`.
 
-`<output-dir>/accumulated/` holds one file per gate-passing candidate, `index.tsv` with a `file`, `generation` and `elapsed_s` row for each, and `maximal.tsv` naming the files in the current maximal set. With `climb_output` on, every climbed result is accumulated too, under the generation after the search's last, so `maximal.tsv` lists every member of the final maximal set (see "Output climb" in `docs/dev/operators.md`).
+`<output-dir>/accumulated/` holds one file per gate-passing candidate, `index.tsv` with a `file`, `generation` and `elapsed_s` row for each, and `maximal.tsv` naming the files in the current maximal set. With `climb_output` on, every climbed result is accumulated too, under the generation after the search's last, so `maximal.tsv` lists every member of the final maximal set (see "Output climb" in `docs/dev/operators.md`). The first row of a run truncates `index.tsv`, so a run started again in the same directory replaces its index rather than doubling it; before 2026-11-11 the index was appended to throughout, and 15 re-run `2026-11-09-fretish-order-pooled` core runs held two runs' rows. Nothing else in the directory is removed, so a file from the earlier run that the new one did not overwrite stays on disk without a row; readers count by the index or `maximal.tsv`, never by listing the directory. No run reads its own earlier output, so no resume path depended on appending.
 
 ## Generation pipeline
 
