@@ -6,6 +6,7 @@ add_executable(peredur_tests
     runner/long_formula_tests.cpp
     runner/process_tests.cpp
     runner/spot_tests.cpp
+    runner/spot_server_tests.cpp
     filter/correctness_tests.cpp
     filter/implication_tests.cpp
     filter/vacuity_tests.cpp
@@ -72,6 +73,7 @@ target_link_libraries(peredur_tests PRIVATE peredur_formaliser)
 # signal a whole process group the way timeout does without killing itself.
 add_executable(contained_child_helper runner/contained_child_helper.cpp)
 target_link_libraries(contained_child_helper PRIVATE peredur_fitness)
+target_include_directories(contained_child_helper PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_dependencies(peredur_tests contained_child_helper)
 
 # Not a test: scripts/field_orders.py runs it to check requirement_implies
@@ -96,10 +98,11 @@ target_link_libraries(scope_order_table PRIVATE peredur_fitness)
 # generator expression covers all of them.
 add_dependencies(peredur_tests
     peredur compare lint-ideals ltl maximal mucs realize
-    signal_tracer)
+    signal_tracer tool_health)
 target_compile_definitions(peredur_tests PRIVATE
     PEREDUR_DRIVER_DIR="$<TARGET_FILE_DIR:peredur>"
-    PEREDUR_CONTAINED_CHILD_HELPER="$<TARGET_FILE:contained_child_helper>")
+    PEREDUR_CONTAINED_CHILD_HELPER="$<TARGET_FILE:contained_child_helper>"
+    PEREDUR_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/runner/data")
 
 # One entry per suite in the table in main.cpp, which also fixes which tests
 # each runs. The drivers' end-to-end suites are separate entries so a failure
@@ -114,6 +117,7 @@ set(peredur_test_suites
     long_formula_runner
     process_runner
     spot_runner
+    spot_server_runner
     accumulator
     crossover
     generation
@@ -192,6 +196,20 @@ set_tests_properties(peredur_tests.thread_pool_sized PROPERTIES
 # The checked-in schema and template must equal what k_config_keys generates.
 add_test(NAME config_reference
          COMMAND peredur --check-config-reference ${CMAKE_SOURCE_DIR})
+
+# The suite tests the solvers this build installed. A shell that has sourced an
+# install's peredur-env.sh, or exported an override for a campaign, would point
+# every test at other binaries without a word, so the overrides are cleared for
+# each test. An empty value reads as unset (src/runner/tool_paths.cpp).
+get_property(_peredur_registered_tests DIRECTORY PROPERTY TESTS)
+foreach(_peredur_test IN LISTS _peredur_registered_tests)
+    set_property(TEST ${_peredur_test} APPEND PROPERTY ENVIRONMENT
+        "PEREDUR_SPOT_BIN_DIR="
+        "PEREDUR_SPOT_SERVER_PATH="
+        "PEREDUR_GANAK_PATH="
+        "PEREDUR_BLACK_PATH="
+        "PEREDUR_FORMALISER_SCRIPT=")
+endforeach()
 
 add_custom_target(tests
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure

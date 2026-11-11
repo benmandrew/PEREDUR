@@ -167,6 +167,9 @@ Config golden_config() {
     // that a golden gaining one fails here rather than re-recording.
     cfg.parent_verdict_filter = false;
     cfg.parallel = 1;
+    // Off, its default. A faster Spot call decides some timeout-bounded
+    // queries an exec does not, so a later default flip must fail here.
+    cfg.spot_server = false;
     return cfg;
 }
 

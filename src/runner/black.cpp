@@ -175,15 +175,25 @@ SatisfiabilityChecker& global_sat_checker() {
     return instance;
 }
 
-std::string black_executable_path() {
+const ToolPath& black_path_source() {
 #ifdef BLACK_EXECUTABLE_PATH
     static const ToolPath k_path =
         tool_path_from_env("PEREDUR_BLACK_PATH", BLACK_EXECUTABLE_PATH);
-    return k_path.m_path;
 #else
+    static const ToolPath k_path;
     assert(false);
-    return "";
 #endif
+    return k_path;
+}
+
+std::string black_executable_path() { return black_path_source().m_path; }
+
+const ToolVersion& black_version() {
+    // `--version` prints a banner and the licence text; the version is the
+    // one line that reads `version 25.09.0`.
+    static const ToolVersion k_version =
+        probe_tool_version({black_executable_path(), "--version"}, "version");
+    return k_version;
 }
 
 std::optional<bool> SatisfiabilityChecker::check_satisfiability(

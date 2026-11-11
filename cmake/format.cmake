@@ -1,4 +1,4 @@
-find_program(CLANG_FORMAT_EXE NAMES clang-format)
+peredur_find_program(CLANG_FORMAT_EXE NAMES clang-format)
 
 set(PEREDUR_FORMAT_GLOBS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
@@ -15,6 +15,7 @@ set(PEREDUR_FORMAT_GLOBS
     ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/*.cpp
 )
 
 file(GLOB_RECURSE PEREDUR_FORMAT_FILES CONFIGURE_DEPENDS ${PEREDUR_FORMAT_GLOBS})

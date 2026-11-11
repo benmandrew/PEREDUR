@@ -34,7 +34,9 @@
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
 #include "runner/ltlfilt.hpp"
+#include "runner/process.hpp"
 #include "runner/spot.hpp"
+#include "runner/tool_paths.hpp"
 #include "version.hpp"
 
 template <>
@@ -50,7 +52,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 62;
+constexpr int k_schema_version = 64;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -281,6 +283,37 @@ nlohmann::json caches_json() {
         {"spot_satisfiable", row(0, LtlfiltStats::n_satisfiable_execs)}};
 }
 
+// The external tools as this process resolved them. Two hosts at one commit
+// can run different solvers, and an environment override can swap one in
+// without a rebuild, so `commit` alone does not say what gave the verdicts.
+// Spot's `path` is its bin directory, since every Spot tool is read from it.
+// The formaliser is absent: it is a test oracle, and no binary runs it.
+nlohmann::json external_tools_json() {
+    auto row = [](const ToolPath& path, const ToolVersion& version) {
+        return nlohmann::json{
+            {"path", path.m_path},
+            {"from_env", path.m_from_env},
+            {"version", version.m_version ? nlohmann::json(*version.m_version)
+                                          : nlohmann::json(nullptr)},
+            {"version_error", version.m_error.empty()
+                                  ? nlohmann::json(nullptr)
+                                  : nlohmann::json(version.m_error)}};
+    };
+    // The server answers with the code of the Spot it was linked from, which
+    // the build ties to the `spot` row's version; `active` says whether the
+    // run's Spot calls went through it, which decides whether its controllers
+    // can be compared byte for byte with an exec run's.
+    const ToolPath& server = spot_server_path_source();
+    return {{"spot", row(spot_bin_dir_source(), spot_version())},
+            {"spot_server",
+             {{"path", server.m_path.empty() ? nlohmann::json(nullptr)
+                                             : nlohmann::json(server.m_path)},
+              {"from_env", server.m_from_env},
+              {"active", tool_server_active()}}},
+            {"ganak", row(ganak_path_source(), ganak_version())},
+            {"black", row(black_path_source(), black_version())}};
+}
+
 nlohmann::json fitness_cache_json() {
     return {{"hits", FitnessCacheStats::n_hits},
             {"misses", FitnessCacheStats::n_misses}};
@@ -335,6 +368,7 @@ void write_run_manifest(const std::string& output_dir,
         {"commit", version::commit()},
         {"commit_short", version::commit_short()},
         {"dirty", version::dirty()},
+        {"external_tools", external_tools_json()},
         {"finished_utc", utc_timestamp()},
         {"wall_s", wall_s},
         // Which budget ended the run, the generations it completed, and the
@@ -376,6 +410,16 @@ void write_run_manifest(const std::string& output_dir,
                                {"decided", BudgetScreen::decided}})},
         {"config", std::move(config)},
         {"tool_calls", tool_calls_json()},
+        // All zero unless runtime.spot_server is on. A failure is a call that
+        // fell back to an exec. At a timeout or cancellation, `killed` counts
+        // tools killed by a server that was kept, and `discarded` servers
+        // killed with their tool.
+        {"spot_server",
+         {{"started", ToolServerStats::n_started.load()},
+          {"requests", ToolServerStats::n_requests.load()},
+          {"killed", ToolServerStats::n_killed.load()},
+          {"discarded", ToolServerStats::n_discarded.load()},
+          {"failures", ToolServerStats::n_failures.load()}}},
         {"n_constant_folded", SatisfiabilityChecker::n_constant_folded.load()},
         {"n_spot_decided", SatisfiabilityChecker::n_spot_decided.load()},
         {"n_escalations_declined",

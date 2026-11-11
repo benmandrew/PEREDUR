@@ -57,6 +57,11 @@ std::vector<std::string> ignored_non_default_keys(const Config& cfg,
 /// runs of one seed can differ legitimately, and the timeout counts are what
 /// separates that from a real difference.
 ///
+/// Records each external tool's resolved path, whether an environment
+/// override supplied it, and its version line, in `external_tools`. Each tool
+/// is run once for its version here; one that cannot be run records a null
+/// version and the reason, and the manifest is still written.
+///
 /// Reports how the run ended, from @p budget: `stopped_by`, `generations_run`
 /// and `individuals_bred`. A survival analysis needs to tell a run that spent
 /// its whole budget from one that finished early, and the wall time alone

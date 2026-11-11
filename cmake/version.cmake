@@ -1,4 +1,7 @@
+# See cmake/find_tool.cmake: git is a /nix/store path inside the dev shell.
+peredur_refresh_found(GIT_EXECUTABLE)
 find_package(Git QUIET)
+peredur_record_found(GIT_EXECUTABLE)
 
 set(PEREDUR_VERSION_HEADER_DIR "${CMAKE_BINARY_DIR}/generated")
 set(PEREDUR_VERSION_HEADER "${PEREDUR_VERSION_HEADER_DIR}/git_version.hpp")

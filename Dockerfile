@@ -65,7 +65,7 @@ WORKDIR /src
 FROM toolchain AS spot
 ARG BUILD_DIR
 ARG BUILD_JOBS
-COPY cmake/spot.cmake cmake/
+COPY cmake/spot.cmake cmake/spot_forkserver_objects.cmake cmake/third_party.cmake cmake/
 RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DPEREDUR_TOOL_MODULE=spot.cmake \
         ${BUILD_JOBS:+-DCMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS}} \
@@ -74,7 +74,7 @@ RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
 FROM toolchain AS black
 ARG BUILD_DIR
 ARG BUILD_JOBS
-COPY cmake/black.cmake cmake/
+COPY cmake/black.cmake cmake/third_party.cmake cmake/
 RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DPEREDUR_TOOL_MODULE=black.cmake \
         ${BUILD_JOBS:+-DCMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS}} \
@@ -83,7 +83,7 @@ RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
 FROM toolchain AS ganak
 ARG BUILD_DIR
 ARG BUILD_JOBS
-COPY cmake/ganak.cmake cmake/
+COPY cmake/ganak.cmake cmake/third_party.cmake cmake/
 RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DPEREDUR_TOOL_MODULE=ganak.cmake \
         ${BUILD_JOBS:+-DCMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS}} \
@@ -91,8 +91,8 @@ RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
 
 # Eigen, cpptrace, nlohmann_json and tomlplusplus. FetchContent populates at
 # configure time into ${CMAKE_BINARY_DIR}/_deps, and re-reads the stamps it
-# leaves there, so staging them here keeps four git clones out of the loop that
-# every source edit re-enters.
+# leaves there, so staging them here keeps five archive downloads out of the
+# loop that every source edit re-enters.
 FROM toolchain AS deps
 ARG BUILD_DIR
 COPY cmake/dependencies.cmake cmake/
@@ -107,13 +107,10 @@ RUN cmake -S . -B "${BUILD_DIR}" -G Ninja -DCMAKE_BUILD_TYPE=Release \
 FROM toolchain AS tools
 ARG BUILD_DIR
 
-# The install tree and the stamp, not the unpacked source tree beside them,
-# which is the larger of the two by far: cmake/spot.cmake reads the stamp to
-# decide whether to declare the external project at all, and nothing downstream
-# of that reads the sources.
+# The install trees only. Each carries the marker (cmake/third_party.cmake)
+# that the real configure reads before running the tool, and Spot's build tree
+# is deleted once it installs.
 COPY --from=spot ${BUILD_DIR}/third_party/spot ${BUILD_DIR}/third_party/spot
-COPY --from=spot ${BUILD_DIR}/third_party/spot_src/src/spot_project-stamp/spot_project-done \
-                 ${BUILD_DIR}/third_party/spot_src/src/spot_project-stamp/
 COPY --from=black ${BUILD_DIR}/third_party/black ${BUILD_DIR}/third_party/black
 COPY --from=ganak ${BUILD_DIR}/third_party/ganak ${BUILD_DIR}/third_party/ganak
 COPY --from=deps ${BUILD_DIR}/_deps ${BUILD_DIR}/_deps
@@ -170,6 +167,8 @@ RUN find /opt/peredur/libexec -type f -exec sh -c \
 FROM ${BASE_IMAGE} AS runtime
 
 # libfmt9 is black's and libunwind8 is cpptrace's, and both paths need them.
+# libz3-4 is the solver a source-built black links (arm64, or any base other
+# than noble); without it black cannot load, and only the smoke test notices.
 #
 # nodejs is off by default because nothing the image runs calls it. It runs the
 # vendored FRET formaliser, and the only callers of that are
@@ -182,13 +181,17 @@ ARG WITH_NODE=0
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         libfmt9 \
         libunwind8 \
+        libz3-4 \
     && if [ "${WITH_NODE}" = "1" ]; then \
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs; \
     fi \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/peredur /opt/peredur
-COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/peredur-entrypoint
+# COPY --chmod needs BuildKit, which a Docker without the buildx plugin lacks,
+# so the mode is set in a step of its own.
+COPY docker/entrypoint.sh /usr/local/bin/peredur-entrypoint
+RUN chmod 755 /usr/local/bin/peredur-entrypoint
 
 # The same values cmake writes into share/peredur/peredur-env.sh, set as ENV
 # because there is no shell to source that file from. Each overrides a path
@@ -196,6 +199,7 @@ COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/peredur-entrypoint
 # which this image does not carry.
 ENV PATH=/opt/peredur/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     PEREDUR_SPOT_BIN_DIR=/opt/peredur/libexec/peredur/spot/bin \
+    PEREDUR_SPOT_SERVER_PATH=/opt/peredur/libexec/peredur/spot/spot-forkserver \
     PEREDUR_GANAK_PATH=/opt/peredur/libexec/peredur/ganak \
     PEREDUR_BLACK_PATH=/opt/peredur/libexec/peredur/black/bin/black \
     PEREDUR_FORMALISER_SCRIPT=/opt/peredur/share/peredur/fretCLI.main.js \

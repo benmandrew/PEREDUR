@@ -1,6 +1,37 @@
-# FRETish timing proofs
+# FRETish order proofs
 
-Lean 4 proofs that the timing order `RuleSearch` uses holds for every tick count, and that its scope and condition-type orders are exact. `scripts/field_orders.py` checks the same order against SPOT, but only for tick counts up to 3. The proofs now give the exact timing orders for every tick count, every edge and every non-edge, and they use core Lean with `omega` and no Mathlib.
+PEREDUR decides *implication* between FRETISH requirements by rule, without calling a solver. The rules live in three C++ tables: `timing_implies` and `scope_implies` (with its helper `scope_edges`) in `src/requirement.cpp`, and `condition_type_step` in `src/filter/implication_check.cpp`. The proofs ask whether each table returns true exactly when the *lowering* of one requirement to linear temporal logic (LTL), `requirement_to_ltl`, implies the other's, at every tick count. `scripts/field_orders.py` checks this with SPOT, but only up to tick count 3. The answer is yes. Each table matches the lowering exactly, for every tick count, within the limits under [What is not proved](#what-is-not-proved). The proofs use core Lean 4 with `omega` and no Mathlib.
+
+## Main results
+
+Each theorem is stated about a Lean *transcription* of a C++ function (`timingImplies`, `scopeImplies` or `conditionTypeStep`). [The checks below](#checking-the-transcription-against-the-c) tie each transcription to the C++.
+
+| Theorem | C++ it covers | What it says |
+|---|---|---|
+| `timing_implies_exact` (`Fretish/Cpp.lean`) | `timing_implies` | Under every scope, for every pair of timings the C++ accepts (neither is `within 0` or `for 0`), one timing implies the other exactly when `timing_implies` returns true. |
+| `scope_implies_exact` (`Fretish/ScopeOrder.lean`) | `scope_implies`, `scope_edges` | For a condition other than the literal `true`, one scope implies another at every stop, mode, condition and response exactly when `scope_implies` returns true. |
+| `scope_implies_sound` (`Fretish/ScopeOrder.lean`) | `scope_implies`, `scope_edges` | Every pair `scope_implies` accepts also holds at the literal condition `true`. |
+| `condition_type_step_exact` (`Fretish/CondOrder.lean`) | `condition_type_step` | For a condition other than the literal `true`, a change of condition type holds exactly when `condition_type_step` accepts it. |
+| `condition_type_step_sound` (`Fretish/CondOrder.lean`) | `condition_type_step` | Every change `condition_type_step` accepts also holds at the literal condition `true`. |
+| `eval_lowerSyn` (`Fretish/Syntax.lean`) | `requirement_to_ltl` | The formula built as LTL syntax, branch for branch like the C++, means what the model of the lowering says, so the theorems above hold of real formulas. |
+
+The proofs also establish five facts that a reader of the C++ needs.
+
+- The timing order depends on the scope class. Global and after scopes use an unbounded order. In, not in and before scopes use a bounded one, because the mode boundary discharges `next`, `within n` and `after n` but not `eventually`, so those three no longer imply it. The three only scopes negate the response, so their order is the base order between the timings' duals, plus extra edges into `after n`.
+- Until 2026-11-04, `timing_implies` missed `after 0 ⇒ next`, and `next ⇒ after 0` under the only scopes. The first version of `timing_implies_exact` had to carry both as an exception, which is how they were found.
+- A continual requirement implies its trigger form under every scope and timing. A trigger implies its continual form only where the body is a release: `always` under a plain scope, and `eventually` under an only scope.
+- At tick count 0, `within 0`, `for 0` and `immediately` coincide. Distinct timings then imply each other, so the orders are *preorders*.
+- At the literal condition `true`, the scope and condition-type theorems give *soundness* only, because the tables reject some implications that hold there.
+
+## How the proof goes
+
+Each file named below is `Fretish/<Name>.lean`, and its module header explains its own lemmas.
+
+1. **Model.** The lowering becomes a function on infinite *traces*, with the condition, response, mode and stop as arbitrary predicates on positions (`Trace`, `Timing`, `Only`, `Scope`).
+2. **Edges.** An *edge* is a pair of timings that an order relates. Every edge of each order holds for all tick counts, and the scope wrappers are monotone in the body, so each edge lifts to whole requirements under any condition type and mode (`Timing`, `Only`, `Scope`).
+3. **Non-edges.** An explicit trace refutes every pair an order leaves out, which makes each order exact (`Exact`, `ExactOnly`, `Witness`).
+4. **Transcriptions.** The C++ functions are transcribed branch for branch, and each transcription is proved equal to the exact order (`Cpp`, `ScopeOrder`, `CondOrder`).
+5. **Syntax.** `lowerSyn` builds the formula `requirement_to_ltl` builds as LTL syntax, expanding bounded operators into `X` chains as the C++ does. `eval_lowerSyn` proves that its meaning is the model from step 1 (`Syntax`).
 
 ## Building
 
@@ -12,46 +43,33 @@ lake build
 
 The `proofs` shell is separate from the default one because `lean4` is a 650 MB download on x86_64-linux, and on aarch64-darwin it has no binary cache entry and builds from source. `lean-toolchain` pins the same release as the flake's nixpkgs (4.30.0), for anyone using elan instead.
 
-## What is proved
+## Checking the transcription against the C++
 
-The model is `requirement_to_ltl` over infinite traces, with the condition, response, mode and stop as arbitrary predicates on positions.
+The Lean model and the transcriptions were written by reading the C++, so three scripts compare them with the C++ output. Each script also runs a control, a deliberately mismatched pairing that must differ, which shows that the comparison can fail. The results below are from the time of writing.
 
-- **`Fretish/Trace.lean`.** The operators the lowering emits: `X`, `F[0,n]`, `G[0,n]`, `U`, `R` and `W`.
-- **`Fretish/Timing.lean`.** `body` transcribes `timing_body` for an arbitrary boundary predicate. `body_ff` shows that with the boundary set to false it equals the unbounded branch the lowering takes for global, after and only before. The edge lemmas prove every covering edge of the bounded order (`impliesB`) and of the unbounded one (`implies0`) for all tick counts. The file also proves the response and stop polarities.
-- **`Fretish/Only.lean`.** `onlyBody` transcribes `negated_timing_body`. Its edges are the edges above read at the negated response, plus the edges into `after n`. The response is antitone and the stops swap polarity.
-- **`Fretish/Scope.lean`.** `inner` and `wrap` transcribe the condition and `scope_wrap`, and both are monotone in the body. The four `lower_*` theorems carry an edge of the right order to whole requirements, under either condition type and any mode. `lower_condition_anti` proves that the condition is antitone under a continual requirement.
-- **`Fretish/Exact.lean`.** `exact0` and `exactB` state `implies0 T T' ↔ le0 T T'` and `impliesB T T' ↔ leB T T'` for every pair of stop-free timings (`Basic`) at every tick count, so each order is characterised exactly. The `→` direction refutes every pair the relation leaves out with an explicit trace, and the `←` direction reuses the edge lemmas. `exact0K` and `exactBK` extend this to `until` and `before`, with the stop quantified like the response, as `field_orders.py` treats it as a free atom. `until_stop_exact` and `before_stop_exact` show that `until s` implies `until s'` exactly when `s` implies `s'`, and `before` reverses it. Tick count 0 is included, where `within 0`, `for 0` and `immediately` coincide, so the orders are *preorders*.
-- **`Fretish/ExactOnly.lean`.** `exactO0` (only before) and `exactOB` (only in, only after) give the only orders exactly. Between two kinds other than `after n`, the only order is the base order between their duals, since negating the response is a bijection. `after n` implies only itself, and is implied by `next` at `n = 0`, by `within m` for `m > n`, and by `eventually`.
-- **`Fretish/Cpp.lean`.** `timingImplies` transcribes `timing_implies` branch for branch, over the same `Kind`s, so a stop is one free atom on both sides. `timing_implies_exact` states the result for every scope and every pair of timings the C++ accepts (neither is `within 0` or `for 0`): the lowering's timing order holds exactly when `timing_implies` returns true. Until 2026-11-04 `timing_implies` missed `after 0 ⇒ next`, and `next ⇒ after 0` under the only scopes, and the first version of this theorem carried them as an exception.
-- **`Fretish/Witness.lean`.** This file holds the counterexample machinery the next two files share. With the mode constant (always false or always true), every scope lowers at position 0 to one of three things: nothing, the condition over the plain body, or the condition over the only body. `lower_ff` and `lower_tt` give that table. The lemmas `wBot`, `wTop`, `wD` and `wDN` give, for each kind of timing, a response and stop that make a body hold or fail where a refutation needs it.
-- **`Fretish/ScopeOrder.lean`.** `scopeImplies` and `scopeEdges` transcribe `scope_implies` and `scope_edges` in `src/requirement.cpp` branch for branch, over the same `Kind`s as `Cpp.lean`. The two scopes' modes are reduced to whether they are the same. A global scope carries the empty mode, so two global scopes always share one. `scope_implies_exact` covers a condition other than the literal `true`. For every condition type, timing and pair of scopes, at the same mode or two different ones, a scope implies another at every stop, mode, condition and response exactly when `scopeImplies` returns true. Each accepted pair is proved for an arbitrary timing. Each rejected pair is refuted by an explicit trace, most by a constant mode and the rest by a mode that falls at 0 or changes at 1. `scope_implies_sound` shows that every accepted pair also holds when the condition is the literal `true`.
-- **`Fretish/CondOrder.lean`.** `conditionTypeStep` transcribes `condition_type_step` in `src/filter/implication_check.cpp`. `condition_type_step_exact` states, for a condition other than the literal `true`, that a change of condition type holds at every stop, mode, condition and response exactly when `conditionTypeStep` accepts it. A continual requirement implies its trigger form under every scope and timing. A trigger implies its continual form only where the body is a *release*: `always` under a plain scope, and `eventually` under an only scope, whose negated body is `always` over the negated response. `condition_type_step_sound` covers the literal `true`.
-- **`Fretish/Syntax.lean`.** An `LTL` syntax with the textbook semantics `evalL`, and `lowerSyn`, which builds the formula `requirement_to_ltl` builds, branch for branch, expanding bounded operators into `X` chains as the C++ does. `eval_lowerSyn` proves that `evalL σ (lowerSyn k ct T m c r)` equals `lower` at the same arguments, so the theorems above hold of the formulas `lowerSyn` prints. `LTL.render` prints a formula in SPOT syntax.
+| Script | What it compares | Grid | Control | Result |
+|---|---|---|---|---|
+| `check_lean_lowering.py` | `lowerSyn`, printed by `Lowering.lean`, against `build/ltl`, with `ltlfilt` deciding equivalence | 8 scopes × 2 condition types × 2 conditions (`c` or `true`) × 18 timings at tick counts 0 to 3: 576 requirements | Each Lean formula against the next requirement's C++ formula | 576 of 576 agree; 544 of 576 shifted pairs differ |
+| `check_lean_timing_order.py` | `timingImplies`, printed by `TimingOrder.lean`, against `timing_implies`, printed by `timing_order_table` | Every scope × every ordered pair of 19 timings (tick counts 0 to 4, less `within 0` and `for 0`) | The C++ table with the two timings swapped | 2,888 cells agree, 768 of them edges; 1,232 swapped cells differ |
+| `check_lean_scope_order.py` | `scopeImplies`, printed by `ScopeOrderTable.lean`, against `scope_implies`, printed by `scope_order_table` | 2 condition types × the same 19 timings × every ordered pair of scopes, with the weaker scope at the stronger's mode or another one | The C++ table with the two scopes swapped | 4,864 cells agree, 568 of them edges; 452 swapped cells differ |
 
-## Checking the transcription
+Both timing functions compare tick counts only with each other and with 0 or 1, so the 19-timing grid reaches every branch of either. `scope_edges` branches only on the condition type and on whether the timing is `eventually` or `always`, so the scope grid reaches every branch too.
 
-Before the proofs were written, the four relations were checked by script against the orders `field_orders.py` measures. They agree on all 210 ordered pairs of the 15 measured timings in each of the four scope classes.
-
-`Lowering.lean` prints `lowerSyn` for every scope (8), condition type (2), condition (`c` or `true`) and timing with tick counts 0 to 3 (18), 576 requirements in all, each as `ltl` driver JSON and a formula. `scripts/check_lean_lowering.py` runs it (`lake env lean --run Lowering.lean`, so it needs the proofs shell), lowers the same requirements with `build/ltl`, and asks `ltlfilt` whether each pair is equivalent. As a control it pairs each Lean formula with the next requirement's C++ formula, and those must differ. At the time of writing, all 576 agree and 544 of the 576 shifted pairs differ, in about 10 seconds. Run it from the repo root, after building `build/ltl`:
+Run the scripts from the repo root, after building the C++ helpers. `check_lean_lowering.py` runs `lake env lean --run Lowering.lean`, so all three run inside the proofs shell.
 
 ```sh
+cmake --build build --target ltl timing_order_table scope_order_table
 nix develop '.#proofs' --command python3 scripts/check_lean_lowering.py
-```
-
-`TimingOrder.lean` prints `timingImplies` for every scope and every ordered pair of 19 timings: tick counts 0 to 4, less `within 0` and `for 0`. The test helper `timing_order_table` prints `timing_implies` over the same grid, and `scripts/check_lean_timing_order.py` compares the two tables cell by cell. Both functions compare tick counts only with each other and with 0 or 1, so the grid reaches every branch of either. As a control it reads the C++ table with the two timings swapped, and those cells must differ. At the time of writing, all 2,888 cells agree, 768 of them edges, and 1,232 swapped cells differ, in about 4 seconds. Build the helper first:
-
-```sh
-cmake --build build --target timing_order_table
 nix develop '.#proofs' --command python3 scripts/check_lean_timing_order.py
-```
-
-`ScopeOrderTable.lean` prints `scopeImplies` for every condition type (2), timing (the same 19 as `TimingOrder.lean`) and ordered pair of scopes, with the weaker scope at the stronger's mode or at another one. The test helper `scope_order_table` prints `scope_implies` over the same grid, with the empty mode for a global scope as the C++ requires, and `scripts/check_lean_scope_order.py` compares the two tables cell by cell. `scope_edges` branches only on the condition type and on whether the timing is `eventually` or `always`, so the grid reaches every branch. As a control it reads the C++ table with the two scopes swapped, and those cells must differ. At the time of writing, all 4,864 cells agree, 568 of them edges, and 452 swapped cells differ, in about 1.5 seconds. Build the helper first:
-
-```sh
-cmake --build build --target scope_order_table
 nix develop '.#proofs' --command python3 scripts/check_lean_scope_order.py
 ```
 
+Before the proofs were written, a script checked the four relations against the orders `field_orders.py` measures. They agreed on all 210 ordered pairs of the 15 measured timings in each of the four scope classes.
+
 ## What is not proved
 
-`scope_implies` is now tied to `scopeImplies` by the table check above. `condition_type_step` is still tied to its Lean transcription only by reading, because it is a private member of a class in `src/filter/implication_check.cpp` and a helper cannot call it as it stands. At the literal condition `true` the theorems give soundness only. `field_orders.py` finds further true implications there that `scope_implies` rejects, such as global implying each only scope under a continual `after n`, and rejecting them costs only completeness. `timing_implies` itself is tied to the proofs through `timingImplies` and the table check above. How `requirement_implies` chains its edges across fields is checked only by the `implication_oracle` stage of `field_orders.py`, at 1 and 2 ticks. `lowerSyn` is still written by reading `src/requirement.cpp`, so the link to the C++ is the differential check above, which covers tick counts up to 3; above that it rests on the expansions in `lowerSyn` following the same recursion as the C++ loops. `eval_lowerSyn`, the exact-order theorems, `scope_implies_exact`, `scope_implies_sound`, `condition_type_step_exact` and `condition_type_step_sound` depend on `propext`, `Classical.choice` and `Quot.sound`; the edge theorems depend on `propext` alone.
+- `condition_type_step` is tied to `conditionTypeStep` only by reading. It is a private member of a class in `src/filter/implication_check.cpp`, so a helper cannot call it as it stands.
+- At the literal condition `true`, the theorems give soundness only. `field_orders.py` finds further true implications there that `scope_implies` rejects, such as global implying each only scope under a continual `after n`. Rejecting them costs only *completeness*.
+- How `requirement_implies` chains edges across fields is checked only by the `implication_oracle` stage of `field_orders.py`, at 1 and 2 ticks.
+- `lowerSyn` is tied to the C++ by the differential check above, which covers tick counts up to 3. Above that, the link rests on `lowerSyn` expanding bounded operators with the same recursion as the C++ loops.
+- `eval_lowerSyn` and the exact and sound theorems depend on `propext`, `Classical.choice` and `Quot.sound`. The edge theorems depend on `propext` alone.

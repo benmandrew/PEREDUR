@@ -65,21 +65,21 @@ jobs:
         if: steps.gate.outputs.run == 'true'
         uses: actions/cache@v5
         with:
-          # The installed halves only -- see the same step in ci.yml for why
-          # the ExternalProject source and object trees are excluded and why
-          # the key carries a version segment and the repository name.
+          # The installed halves only, pruned by the last step of this job --
+          # see the same step in ci.yml for why the ExternalProject source and
+          # object trees are excluded, why that cannot be done with `!`
+          # patterns here, and why the key carries the flake, a version segment
+          # and the repository name.
           path: |
             build-bench/third_party
-            !build-bench/third_party/**/*_project
-            !build-bench/third_party/**/*_project/**
-            !build-bench/third_party/**/*_project-build
-            !build-bench/third_party/**/*_project-build/**
             build-bench/_deps
-          key: ${{ runner.os }}-${{ github.event.repository.name }}-bench-ninja-v2-${{ hashFiles('cmake/spot.cmake', 'cmake/ganak.cmake', 'cmake/black.cmake', 'bench/CMakeLists.txt', 'cmake/dependencies.cmake') }}
+          key: ${{ runner.os }}-${{ github.event.repository.name }}-bench-ninja-v3-${{ hashFiles('flake.lock', 'flake.nix', 'cmake/third_party.cmake', 'cmake/spot.cmake', 'cmake/ganak.cmake', 'cmake/black.cmake', 'bench/CMakeLists.txt', 'cmake/dependencies.cmake') }}
           restore-keys: |
-            ${{ runner.os }}-${{ github.event.repository.name }}-bench-ninja-v2-
+            ${{ runner.os }}-${{ github.event.repository.name }}-bench-ninja-v3-
 
-      - name: Configure and build
+      # One dev shell for the build and both benchmark runs, so the binaries
+      # run under the PATH and library environment they were built in.
+      - name: Configure, build, run benchmarks
         if: steps.gate.outputs.run == 'true'
         env:
           CMAKE_C_COMPILER_LAUNCHER: sccache
@@ -93,19 +93,26 @@ jobs:
             echo "::group::Build"
             cmake --build --preset bench --target peredur_bench
             echo "::endgroup::"
+
+            echo "::group::Check regression assertions"
+            ./build-bench/bench/peredur_bench --check-assertions
+            echo "::endgroup::"
+
+            echo "::group::Run benchmarks"
+            ./build-bench/bench/peredur_bench \
+              --benchmark_format=json \
+              --benchmark_out=bench_results.json \
+              --benchmark_time_unit=ns
+            echo "::endgroup::"
           '
 
-      - name: Check regression assertions
+      # Before the results step rather than last, because github-action-benchmark
+      # switches the checkout to gh-pages when it pushes, and the script would
+      # not be there. Nothing after this reads the tree, and the cache's post
+      # step saves what is left.
+      - name: Prune the third-party tree before the cache saves it
         if: steps.gate.outputs.run == 'true'
-        run: ./build-bench/bench/peredur_bench --check-assertions
-
-      - name: Run benchmarks
-        if: steps.gate.outputs.run == 'true'
-        run: |
-          ./build-bench/bench/peredur_bench \
-            --benchmark_format=json \
-            --benchmark_out=bench_results.json \
-            --benchmark_time_unit=ns
+        run: scripts/prune_third_party.sh build-bench/third_party
 
       - name: Store benchmark results
         if: steps.gate.outputs.run == 'true'

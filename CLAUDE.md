@@ -13,7 +13,7 @@ Detail lives in `docs/dev/`. Read the file covering an area before changing it. 
 | `docs/dev/algorithm.md` | Algorithm flow, Elitism, Maximality demotion, Termination modes, Run output, Generation pipeline, Parent-verdict stage, TLSF repair modes, Key types |
 | `docs/dev/operators.md` | Crossover, Operator repairs of 2026-08-19, Implication in the TLSF grammar, Monotone rewrites, Cloned assumptions, Assumption construction, Timing donation, Scope-aware timing moves, Removable guarantees, Order moves, Blame-targeted slot choice, Output climb, Status-gated mutation direction, Distance-dependent step size |
 | `docs/dev/fretish-scopes.md` | FRETISH scopes |
-| `docs/dev/performance.md` | Cache keys, Scoring dispatch, Implication prefilter, Implication residual query, Satisfiability route, Decomposition re-ask, Controller-store gate, Tool subprocesses, Profiling |
+| `docs/dev/performance.md` | Cache keys, Scoring dispatch, Implication prefilter, Implication residual query, Satisfiability route, Decomposition re-ask, Controller-store gate, Tool subprocesses, Spot fork server, Profiling |
 | `docs/dev/config-and-provenance.md` | Config keys (including config vintage and retired keys), Commit provenance, Run manifest schema versions |
 | `docs/dev/campaigns.md` | Campaigns: the operating manual for `scripts/campaign.py` |
 | `docs/dev/testing.md` | Tests, Coverage |
@@ -69,7 +69,7 @@ Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves w
 - A new `FilterKind::Correctness` filter needs a row in the correctness table, or the output gate never applies it.
 - Tombstoned requirements (`m_removed`) are skipped at every read site and never erased, because slots pair by index.
 - A cache storing a verdict or count keys on `formula_key::renamed()`; one storing a formula or automaton keys on `canonical()`.
-- Pipes are created with `pipe2(..., O_CLOEXEC)`, and nothing forks outside `src/runner/process.cpp`.
+- Pipes are created with `pipe2(..., O_CLOEXEC)`, and nothing forks outside `src/runner/process.cpp`. The one exception is `tools/spot-forkserver/`, a separate single-threaded binary that `process.cpp` spawns.
 - Tool paths come from `tool_path_from_env`, held in a function-local `static`.
 - Formulas reach tools on stdin (`execute_and_capture_with_input`, `-F -`), never as a `-f` argument: one argv string over 128 KiB fails the exec with `E2BIG`.
 - Atom names are screened at load (`src/runner/atom_names.hpp`), and an unsafe one exits 1 on every driver: `ltlsynt --ins` never matches a name containing an uppercase letter, and since only `--ins` is passed, such an *input* silently becomes an output and the verdict errs towards realizable; separately, a name starting with `F`, `G` or `X` followed by a letter or `_` loses that letter to the operator (`Fail` reads as `F(ail)`). Uppercase outputs are safe, and the FRETISH path's `k_atom_prefix` (`iap_`) already blocks the second case.

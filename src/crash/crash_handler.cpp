@@ -71,6 +71,21 @@ void warmup_cpptrace() {
     }
 }
 
+// glibc's fork() is not async-signal-safe: it runs the atfork handlers and
+// takes malloc's arena locks (and, under ASan, the sanitizer allocator's), so a
+// signal that lands while any thread holds one of those leaves the handler
+// waiting on a futex forever, with the crashed process alive and its output
+// open. _Fork (glibc 2.34) is the async-signal-safe variant: no handlers, no
+// locks. The tracer child only execs, so it needs none of what they protect.
+pid_t handler_fork() {
+#if defined(__GLIBC__) && \
+    (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 34))
+    return _Fork();
+#else
+    return fork();
+#endif
+}
+
 // Everything in this function runs inside a signal handler, so it is confined
 // to async-signal-safe calls: no malloc, no iostreams, no std::string, no
 // locks. That one constraint is what every design choice here answers to --
@@ -164,7 +179,7 @@ void crash_handler(int signo, [[maybe_unused]] siginfo_t* siginfo,
         _exit(1);
     }
 
-    pid_t child_pid = fork();
+    pid_t child_pid = handler_fork();
     if (child_pid == 0) {
         close(pipefd[1]);
         // dup2 clears close-on-exec on the new descriptor, which is what lets

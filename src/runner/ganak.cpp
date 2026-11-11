@@ -94,15 +94,25 @@ Count parse_ganak_exact_count(const std::string& output) {
 
 }  // namespace
 
-std::string ganak_executable_path() {
+const ToolPath& ganak_path_source() {
 #ifdef GANAK_EXECUTABLE_PATH
     static const ToolPath k_path =
         tool_path_from_env("PEREDUR_GANAK_PATH", GANAK_EXECUTABLE_PATH);
-    return k_path.m_path;
 #else
+    static const ToolPath k_path;
     assert(false);
-    return "";
 #endif
+    return k_path;
+}
+
+std::string ganak_executable_path() { return ganak_path_source().m_path; }
+
+const ToolVersion& ganak_version() {
+    // Ganak has no release number. `--version` prints the commit of each
+    // component it links, as `c o Ganak SHA1: <sha>` first.
+    static const ToolVersion k_version = probe_tool_version(
+        {ganak_executable_path(), "--version"}, "Ganak SHA1:");
+    return k_version;
 }
 
 Count run_ganak_on_dimacs(const std::string& dimacs_path, unsigned seed,

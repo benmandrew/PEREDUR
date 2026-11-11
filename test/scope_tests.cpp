@@ -82,6 +82,19 @@ bool ltl_implies(const std::string& lhs, const std::string& rhs) {
     return ltl_equivalent("(" + lhs + ") & (" + rhs + ")", "(" + lhs + ")");
 }
 
+// --- The ltlfilt oracle is live --------------------------------------------
+
+// ltl_equivalent reads any ltlfilt failure, a missing binary included, as
+// "equivalent", and ltl_implies inherits that, so an equivalence-only
+// assertion below would pass vacuously. First in the suite, so a filtered run
+// that keeps it fails loudly instead.
+TEST(test_oracle_is_live) {
+    expect(ltl_equivalent("a", "a"), "oracle: a is equivalent to itself");
+    expect(!ltl_equivalent("a", "X(a)"), "oracle: a is not equivalent to X a");
+    expect(ltl_implies("G(a)", "a") && !ltl_implies("a", "G(a)"),
+           "oracle: G a implies a, and not the converse");
+}
+
 // --- The lowering against the vendored FRET formaliser --------------------
 
 // --- Global scope is byte-identical to the pre-scope lowering -------------

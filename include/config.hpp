@@ -327,6 +327,12 @@ struct Config {
     /// CPU. The walk kills whatever is still running when it returns,
     /// whatever the grace, since it waits for those tasks.
     std::chrono::milliseconds mrs_lookahead_kill_grace{2'000};
+    /// Run ltlsynt, ltlfilt, ltl2tgba and autfilt through spot-forkserver, one
+    /// forked child of the tool's own code per call, in place of an exec
+    /// each. Same answers, without the 4-5 ms of start-up a call; see "Tool
+    /// subprocesses" in docs/dev/performance.md. Off by default: a faster
+    /// call decides some timeout-bounded queries an exec would not.
+    bool spot_server = false;
     /// A fitness function that throws (in practice an external tool failing on
     /// one evolved formula) costs that individual rather than the whole run.
     /// Above this fraction of a generation the tooling is broken rather than

@@ -115,7 +115,11 @@
           # is built from source against z3 — and fmt 9.1.0's test suite does
           # not compile under clang 21 (it specialises std::is_floating_point),
           # so pulling it in on darwin breaks the shell for a file nothing reads.
-          ++ lib.optional stdenv.hostPlatform.isLinux fmt_9;
+          ++ lib.optional stdenv.hostPlatform.isLinux fmt_9
+          # The source build of black on darwin links fmt as well as z3. Without
+          # this the build found Homebrew's fmt, and a `brew upgrade fmt` left
+          # the cached black unable to load, as z3's did on 2026-11-05.
+          ++ lib.optional stdenv.hostPlatform.isDarwin fmt;
 
           # Point curl/git at the nix CA bundle — required on NixOS, harmless on Ubuntu
           SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";

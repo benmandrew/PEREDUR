@@ -45,16 +45,33 @@ UNREALIZABLE
 
 ## Building the image
 
-`PEREDUR_GIT_COMMIT` is a required build argument and must be a full 40-character lowercase hex sha:
+Build from a checkout with [`scripts/docker_build.sh`](../scripts/docker_build.sh). It works out both provenance arguments from the working tree and passes them to `docker build`:
 
 ```console
+$ scripts/docker_build.sh
+$ scripts/docker_build.sh --build-arg BUILD_JOBS=8 -t peredur:local
+```
+
+With no arguments the image is tagged `benmandrew/peredur:<short sha>`, and `-dirty` is added to the tag when the tree is dirty. Any arguments replace that tag and go to `docker build` unchanged, and the context is always the repository root. The script calls a tree dirty when a tracked file differs from `HEAD` and ignores untracked files. `cmake/write_version_header.cmake` applies the same rule to a build outside a container.
+
+[`scripts/docker_smoke.sh`](../scripts/docker_smoke.sh) runs a built image through `--version`, one short call per solver, a `realize` and a one-generation repair. CI runs the same script before it publishes:
+
+```console
+$ scripts/docker_smoke.sh benmandrew/peredur:<short sha>
+```
+
+`PEREDUR_GIT_COMMIT` is a required build argument and must be a full 40-character lowercase hex sha. A plain `docker build` has to pass both provenance arguments itself:
+
+```console
+$ dirty=$(test -z "$(git status --porcelain --untracked-files=no)" && echo false || echo true)
 $ docker build --build-arg PEREDUR_GIT_COMMIT="$(git rev-parse HEAD)" \
+      --build-arg PEREDUR_GIT_DIRTY="$dirty" \
       -t benmandrew/peredur:$(git rev-parse --short HEAD) .
 ```
 
 It is required rather than optional because the build cannot answer the question itself. `.dockerignore` keeps `.git` out of the *build context*, so the history never lands in a layer and the context hash stops changing on every commit. That leaves no repository for `cmake/version.cmake` to read, and every binary answers `--version` with a `commit=` line naming what it was built from. Without the argument that line reads `commit=unknown`, and `scripts/run_experiments.py` refuses to launch a campaign against a binary that cannot say what it was built from.
 
-Two optional companions go with it. `PEREDUR_GIT_COMMIT_SHORT` sets the abbreviation, defaulting to the first 7 characters of the sha. `PEREDUR_GIT_DIRTY=true` marks a build whose source is not a clean checkout of the commit it names. Both are rejected on their own, a short sha and a dirty flag meaning nothing without the commit they qualify.
+Two optional companions go with it. `PEREDUR_GIT_COMMIT_SHORT` sets the abbreviation, defaulting to the first 7 characters of the sha. `PEREDUR_GIT_DIRTY=true` marks a build whose source is not a clean checkout of the commit it names. Both are rejected on their own, a short sha and a dirty flag meaning nothing without the commit they qualify. `PEREDUR_GIT_DIRTY` defaults to `false` because CI builds from a clean checkout, and the build has no way to check that default. A hand-typed `docker build` from an edited tree that leaves the argument out therefore makes an image that reports a clean build of `HEAD`, and `scripts/run_experiments.py` accepts it. `scripts/docker_build.sh` exists to close that gap.
 
 | Build argument | Effect |
 |---|---|
@@ -73,13 +90,13 @@ Node.js is absent by default because nothing the image runs calls it, and it is 
 
 ## Publishing
 
-[`.github/workflows/docker.yml`](../.github/workflows/docker.yml) builds the image on every push to `main` and on every `v*` tag, and publishes one *manifest list* to Docker Hub covering `linux/amd64` and `linux/arm64`. Nothing else publishes: a pull request and a manual `workflow_dispatch` both build the image and stop there, which still catches a Dockerfile that has stopped working. The condition is the event rather than whether the secrets can be read, since a pull request raised from a branch in this repository does get them and only a fork's does not.
+[`.github/workflows/docker.yml`](../.github/workflows/docker.yml) builds the image on every push to `main` and on every `v*` tag, and publishes one *manifest list* to Docker Hub covering `linux/amd64` and `linux/arm64`. Nothing else publishes: a pull request and a manual `workflow_dispatch` both build and smoke-test the image and stop there, which still catches a Dockerfile or an image that has stopped working. The condition is the event rather than whether the secrets can be read, since a pull request raised from a branch in this repository does get them and only a fork's does not.
 
 The primary tag is the short commit sha, and it is deliberately the same seven characters the binaries print for `commit_short`. `cmake/write_version_header.cmake` takes the first seven of the sha and `docker/metadata-action`'s `type=sha,format=short` does the same, so an image tag and the `--version` inside that image name the commit identically. `latest` follows the default branch, and a `v*` git tag publishes under its own name as well.
 
 There is no `docker/setup-qemu-action` anywhere in the workflow. Each architecture is built on a runner of its own architecture — `ubuntu-24.04` and `ubuntu-24.04-arm`, both free to public repositories — rather than by emulating arm64 on an amd64 host. Spot is the one dependency that compiles rather than downloads, so emulation would put an autotools C++ build behind an instruction translator, and that is where the cost would land.
 
-Each build job pushes its image *by digest*, under no tag at all, and uploads that digest as an artefact. A merge job then downloads the digests and assembles them into the tagged manifest list with `docker buildx imagetools create`. A matrix that tagged as it went would publish a tag resolving for one architecture and not the other whenever half of it failed.
+Each build job first builds its image into the runner's own Docker daemon and runs `scripts/docker_smoke.sh` against it. That catches a broken tool wrapper, a wrong `ENV` path or a solver that cannot load its libraries, and a successful build shows none of these. The script also checks that `--version` names the commit being built as a clean build. Only an image that passes is pushed, by a second build that replays the first from the builder's layer cache. That push goes *by digest*, under no tag at all, and the job uploads the digest as an artefact. A merge job then downloads the digests and assembles them into the tagged manifest list with `docker buildx imagetools create`. A matrix that tagged as it went would publish a tag resolving for one architecture and not the other whenever half of it failed.
 
 Both build jobs read and write a layer cache through `cache-from`/`cache-to: type=gha`, scoped per architecture. The per-dependency stage split pays off here, Spot's stage copying `cmake/spot.cmake` and nothing else, so a change anywhere else in the tree reuses its layer. GitHub documents that cache as holding 10GB per repository and evicting least recently used entries, and the two architectures share it with every other workflow, so a cold Spot rebuild is a possibility the scoping makes less likely rather than one it rules out.
 

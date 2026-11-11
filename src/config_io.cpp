@@ -359,4 +359,6 @@ void apply_tool_timeouts(const Config& cfg) {
         cfg.controller_reuse_min_guarantees);
     global_real_checker().set_controller_reuse_min_screen(
         cfg.controller_reuse_min_screen);
+    // Here because every driver that reads a config calls this.
+    configure_spot_server(cfg.spot_server);
 }

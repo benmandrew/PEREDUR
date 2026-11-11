@@ -9,6 +9,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -195,3 +196,55 @@ void harden_child_after_fork(ParentDeathPolicy policy, pid_t parent_pid);
 /// group. Returns the child's user+sys CPU seconds. For a child that is asked
 /// to shut down cleanly first, such as the formaliser on stdin EOF.
 double reap_with_grace(pid_t pid, std::chrono::milliseconds grace);
+
+/// A long-lived server that answers some tools' calls by running the tool's
+/// own code in a forked child, in place of an exec. `spot-forkserver`
+/// (`tools/spot-forkserver/`) is the one there is; see "Tool subprocesses" in
+/// `docs/dev/performance.md`.
+struct ToolServer {
+    /// The server binary. Empty turns the server off.
+    std::string m_path;
+    /// The `arguments[0]` values the server answers for, compared whole, so a
+    /// tool of the same name from another directory still runs as an exec.
+    std::vector<std::string> m_served;
+};
+
+/// Routes every later execute_and_capture_with_input whose `arguments[0]` is
+/// in `server.m_served` through a server, with the same arguments, input,
+/// timeout and cancellation, and a ProcessResult of the same meaning. A call
+/// without an input, or with a newline in an argument, still runs as an exec.
+///
+/// Servers are pooled, one per concurrent caller. On a timeout or
+/// cancellation the server kills its running tool and is kept; one that does
+/// not answer that kill within two seconds is killed with its tool. A server
+/// that dies or breaks the protocol is dropped and the call runs as an exec
+/// instead; after three such failures in a row the server is turned off for the
+/// rest of the run, with a warning on stderr. Idle servers of an earlier
+/// setting are killed.
+void set_tool_server(ToolServer server);
+
+/// Whether a server is set and has not been turned off by failures.
+bool tool_server_active();
+
+/// What the tool server did over the run, for the run manifest.
+struct ToolServerStats {
+    /// Servers spawned, one per concurrent caller plus one per replacement.
+    static inline std::atomic<std::size_t> n_started{0};
+    /// Calls the server answered, timeouts included.
+    static inline std::atomic<std::size_t> n_requests{0};
+    /// Tools killed at a timeout or a cancellation whose server was kept.
+    static inline std::atomic<std::size_t> n_killed{0};
+    /// Servers killed with their tool at a timeout or a cancellation, because
+    /// the server did not answer the kill in time or the call stopped part-way
+    /// through a request or a reply.
+    static inline std::atomic<std::size_t> n_discarded{0};
+    /// Calls that fell back to an exec because a server died or broke the
+    /// protocol.
+    static inline std::atomic<std::size_t> n_failures{0};
+    /// Tool CPU the server's replies reported, in nanoseconds: an integer, so
+    /// that concurrent calls add to it without a lock. The tool children are
+    /// the zygote's, never reaped by peredur, so this CPU reaches no
+    /// getrusage(RUSAGE_CHILDREN) of peredur's. A timed-out tool's CPU is
+    /// counted here when its server was kept, and nowhere when it was not.
+    static inline std::atomic<std::uint64_t> n_cpu_ns{0};
+};
