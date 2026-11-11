@@ -584,6 +584,29 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order.csv",
         "default_jobs": 16,
     },
+    # fretish-order again at be57f58f, which adds run.json counters for the
+    # paper (climb wall time, mutation totals, the final front's gutting).
+    # The search is unchanged; its own results, so nothing resumes from the
+    # first pass (experiments/2026-11-11-fretish-order-counters).
+    "fretish-order-counters": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {},
+        "specs": list(FRETISH_ORDER_SMALL),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL},
+        # The arms differ in repair count, and the climb in particular moves
+        # it, so the default 600 s would censor one arm's comparisons first.
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order-counters",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order-counters.csv",
+        "default_jobs": 16,
+    },
     # The large FRETISH specs at the same budget, on the base and full arms and
     # the random baseline alone: a whole-sweep ablation there would cost days.
     # Same config tree as fretish-order, its own results, since it runs a
