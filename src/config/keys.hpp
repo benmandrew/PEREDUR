@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 52> k_config_keys{{
+inline constexpr std::array<ConfigKey, 53> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -478,6 +478,16 @@ inline constexpr std::array<ConfigKey, 52> k_config_keys{{
      "is above 0. A killed query records no verdict.",
      "How long an abandoned MRS lookahead query may run before it is "
      "killed.\n"},
+    {"runtime", "spot_server", &Config::spot_server, KeyCheck::None,
+     KeyReader::Both,
+     "Run ltlsynt, ltlfilt, ltl2tgba and autfilt through spot-forkserver, "
+     "which forks one child of the tool's own code per call, in place of an "
+     "exec each. Answers are the tools' own; each call skips 4-5 ms of "
+     "start-up. Off by default, because faster calls decide some queries an "
+     "exec would time out on, which changes a run's output where many calls "
+     "time out. Ignored with a warning where the build has no server.",
+     "Spot tool calls through spot-forkserver instead of an exec each.\n"
+     "Same answers, 4-5 ms less start-up a call.\n"},
     {"runtime", "max_scoring_failure_rate", &Config::max_scoring_failure_rate,
      KeyCheck::Probability, KeyReader::Both,
      "Fraction of a generation whose fitness scoring may throw before the run "

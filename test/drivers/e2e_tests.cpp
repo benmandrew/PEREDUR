@@ -15,6 +15,7 @@
 #include <nlohmann/json.hpp>
 
 #include "runner/process.hpp"
+#include "runner/tool_paths.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
 
@@ -417,6 +418,63 @@ TEST_IN("driver_peredur", test_peredur_repairs_fretish) {
                "peredur: a FRETISH run writes FRETISH repairs");
         expect(nlohmann::json::parse(read_text(repair)).contains("guarantees"),
                "peredur: each repair parses as a specification");
+    }
+}
+
+// The run's Spot calls through spot-forkserver. Each tool child starts from
+// one zygote heap, so an answer is a function of its request alone and one seed
+// still writes one set of repairs, whichever server answered which call.
+TEST_IN("driver_peredur", test_peredur_is_deterministic_under_the_spot_server) {
+    const TempDir dir("e2e_peredur_spot_server");
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish).string();
+    const std::string config =
+        write_text(dir.path() / "config.toml",
+                   std::string(k_config_with_tlsf_key) + "spot_server = true\n")
+            .string();
+    const bool have_server = !spot_server_path_source().m_path.empty();
+    std::vector<std::filesystem::path> runs;
+    for (const char* name : {"first", "second"}) {
+        const std::filesystem::path out = dir.path() / name;
+        std::filesystem::create_directories(out);
+        const DriverRun run = run_driver(
+            "peredur", {"--input", input, "--output-dir", out.string(),
+                        "--config", config, "--seed", "5"});
+        expect(run.m_exit_code == 0,
+               "peredur: a run under the Spot server exits zero");
+        const nlohmann::json manifest =
+            nlohmann::json::parse(read_text(out / "run.json"));
+        expect(
+            manifest.at("config").at("runtime").at("spot_server").get<bool>(),
+            "peredur: the manifest echoes spot_server");
+        const nlohmann::json& server =
+            manifest.at("external_tools").at("spot_server");
+        expect(server.at("active").get<bool>() == have_server,
+               "peredur: the manifest says whether the server answered");
+        if (have_server) {
+            expect(
+                manifest.at("spot_server").at("requests").get<std::size_t>() >
+                    0,
+                "peredur: the Spot calls went through the server");
+            expect(
+                manifest.at("spot_server").at("failures").get<std::size_t>() ==
+                    0,
+                "peredur: no call fell back to an exec");
+        } else {
+            expect(contains(run.m_output, "runtime.spot_server is on, but"),
+                   "peredur: a build without a server warns that it is off");
+        }
+        runs.push_back(out);
+    }
+    const std::vector<std::filesystem::path> first = repair_files(runs[0]);
+    const std::vector<std::filesystem::path> second = repair_files(runs[1]);
+    expect(first.size() == second.size(),
+           "peredur: one seed under the server writes the same number of "
+           "repairs twice");
+    for (std::size_t i = 0; i < first.size() && i < second.size(); ++i) {
+        expect(read_text(first[i]) == read_text(second[i]),
+               "peredur: one seed under the server writes byte-identical "
+               "repairs twice");
     }
 }
 

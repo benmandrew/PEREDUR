@@ -160,6 +160,15 @@ target_compile_definitions(peredur_fitness PRIVATE
     SPOT_BIN_DIR="${SPOT_BIN_DIR}"
     BLACK_EXECUTABLE_PATH="${BLACK_EXECUTABLE}"
 )
+# The fork server (tools/spot-forkserver), where it is built. Without the
+# definition, runtime.spot_server reads as unavailable and every Spot query
+# runs as an exec.
+if(PEREDUR_SPOT_FORKSERVER)
+    add_subdirectory(tools/spot-forkserver)
+    target_compile_definitions(peredur_fitness PRIVATE
+        SPOT_SERVER_PATH="$<TARGET_FILE:spot-forkserver>")
+    add_dependencies(peredur_fitness spot-forkserver)
+endif()
 
 # Defaults to the vendored copy (vendor/fretCLI.main.js, see vendor/README.md
 # for provenance); override with

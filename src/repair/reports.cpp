@@ -21,6 +21,7 @@
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
 #include "runner/ltlfilt.hpp"
+#include "runner/process.hpp"
 #include "runner/spot.hpp"
 
 // Silent when nothing was dropped, so a clean run's output is unchanged and
@@ -251,7 +252,13 @@ void print_cpu_report(double wall_s) {
     getrusage(RUSAGE_SELF, &self_ru);
     getrusage(RUSAGE_CHILDREN, &child_ru);
     const double self_cpu = secs(self_ru.ru_utime) + secs(self_ru.ru_stime);
-    const double child_cpu = secs(child_ru.ru_utime) + secs(child_ru.ru_stime);
+    // Under runtime.spot_server the tools are children of the server's
+    // zygote, which peredur never reaps, so their CPU is missing from
+    // RUSAGE_CHILDREN and is added from what the replies reported. The
+    // server never reaps its zygote either, so nothing is counted twice.
+    const double child_cpu =
+        secs(child_ru.ru_utime) + secs(child_ru.ru_stime) +
+        (static_cast<double>(ToolServerStats::n_cpu_ns.load()) / 1e9);
     const double total_cpu = self_cpu + child_cpu;
 
     auto pct = [total_cpu](double part) {

@@ -97,6 +97,14 @@ if(PEREDUR_INSTALL_TOOLS)
             PATTERN "libbddx*.dylib"
             PATTERN "pkgconfig" EXCLUDE)
 
+    # Spot is linked in statically, so the server needs neither a wrapper nor
+    # the libraries above.
+    if(PEREDUR_SPOT_FORKSERVER)
+        install(PROGRAMS "$<TARGET_FILE:spot-forkserver>"
+            DESTINATION "${PEREDUR_TOOL_DIR}/spot"
+            COMPONENT peredur)
+    endif()
+
     # Statically linked, so it needs no wrapper.
     install(PROGRAMS "${GANAK_EXECUTABLE}"
         DESTINATION "${PEREDUR_TOOL_DIR}" RENAME ganak COMPONENT peredur)
