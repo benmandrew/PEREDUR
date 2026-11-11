@@ -416,8 +416,8 @@ template <typename T>
 void shuffle_population(std::vector<T>& population,
                         const RandomSource& random_source) {
     for (std::size_t i = population.size(); i > 1; --i) {
-        const std::size_t j = random_source.next_index(i);
-        std::swap(population[i - 1], population[j]);
+        const std::size_t pick = random_source.next_index(i);
+        std::swap(population[i - 1], population[pick]);
     }
 }
 

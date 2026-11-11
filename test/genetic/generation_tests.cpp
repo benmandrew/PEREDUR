@@ -750,6 +750,7 @@ std::vector<std::string> survivors_under(SelectionScheme scheme,
     const auto next_gen =
         evolve_generation(cfg, pop, 2, 0, fns, {}, make_source({1, 2}, 0));
     std::vector<std::string> names;
+    names.reserve(next_gen.size());
     for (const ScoredSpecification& scored : next_gen) {
         names.push_back(first_condition(scored.specification));
     }
