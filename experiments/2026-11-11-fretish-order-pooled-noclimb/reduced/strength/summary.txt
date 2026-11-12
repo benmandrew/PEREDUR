@@ -1,0 +1,6 @@
+== net_imp (a stronger when positive)
+  no-climb       n=18 median=+0.1907 mean=+0.1879 a>b 17, b>a 1, tie 0, Wilcoxon p=1.526e-05, Holm (no-climb) p=1.526e-05
+  full-over-no-climb n=19 median=+0.7383 mean=+0.6271 a>b 18, b>a 0, tie 1, Wilcoxon p=7.629e-06, Holm (no-climb) p=1.526e-05
+== net_non (a stronger when positive)
+  no-climb       n=18 median=+0.1907 mean=+0.1879 a>b 17, b>a 1, tie 0, Wilcoxon p=1.526e-05, Holm (no-climb) p=1.526e-05
+  full-over-no-climb n=19 median=+0.7383 mean=+0.6271 a>b 18, b>a 0, tie 1, Wilcoxon p=7.629e-06, Holm (no-climb) p=1.526e-05

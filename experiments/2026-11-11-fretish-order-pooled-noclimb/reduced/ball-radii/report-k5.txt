@@ -1,0 +1,8 @@
+no-climb: a = nsga2-apportion/no-climb, b = nsga2-apportion/base (xtriple)
+  b in a vs control a    n=17  0.752 vs 0.739  below 7/17  p 0.487
+  a in b vs control b    n=17  0.682 vs 0.694  below 11/17  p 0.404
+  b in a vs a in b       n=17  0.752 vs 0.682  below 4/17  p 0.0505
+full-over-no-climb: a = nsga2-apportion/full, b = nsga2-apportion/no-climb (xtriple)
+  b in a vs control a    n=17  0.823 vs 0.761  below 2/17  p 0.00316
+  a in b vs control b    n=17  0.633 vs 0.739  below 14/17  p 0.000214
+  b in a vs a in b       n=17  0.823 vs 0.633  below 1/16  p 9.16e-05

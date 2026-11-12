@@ -1,0 +1,10 @@
+Pooled ball radii, K=1: each arm's distinct nodes over its odd and over its even seeds, all four half-pools subsampled to the smallest; a contrast pairs halves of opposite parity, a control an arm's own two halves. Paired over subjects; p is the exact Wilcoxon signed-rank, Holm within a family and test.
+== no-climb: b in a vs control a
+  no-climb       n=18  0.455 vs 0.461  median diff -0.043  below 10/18  p 0.393  Holm 0.393
+  full-over-no-climb n=18  0.451 vs 0.523  median diff -0.031  below 15/18  p 0.00401  Holm 0.00801
+== no-climb: a in b vs control b
+  no-climb       n=18  0.394 vs 0.430  median diff -0.018  below 11/18  p 0.0737  Holm 0.147
+  full-over-no-climb n=18  0.427 vs 0.457  median diff -0.002  below 9/18  p 0.523  Holm 0.523
+== no-climb: b in a vs a in b
+  no-climb       n=18  0.455 vs 0.394  median diff +0.043  below 6/18  p 0.181  Holm 0.363
+  full-over-no-climb n=18  0.451 vs 0.427  median diff +0.024  below 6/18  p 0.246  Holm 0.363
