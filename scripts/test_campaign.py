@@ -1101,6 +1101,98 @@ phases = [ {{ profile = "arbiter-probe", jobs = 1 }} ]
         check_true("configs must be a non-empty string" in got,
                    f"{why} must be refused ({got!r})")
 
+    # ── confine: a CPU set and a memory cap on a run phase ───────────────────
+    #
+    # A campaign sharing a host with other users' jobs. The unconfined launch
+    # must stay byte for byte what it was, since every archived campaign's
+    # queue log records it.
+    def confined(confine: str, phase_extra: str = "") -> dict:
+        write_declaration(decl_root, "confined", f"""
+name = "confined"
+branch = "feat/x"
+hosts = {{ av2 = "0-1", av3 = "2-3" }}
+{confine}
+phases = [ {{ profile = "arbiter-probe", jobs = 2 {phase_extra}}} ]
+""")
+        return C.load_campaign("confined", decl_root)["phases"][0]
+
+    base_cmd = C.phase_command(confined(""), [0, 1], "av2")
+    plain = confined("")
+    check(C.confine_prefix(plain, "av2", "u"), [],
+          "no confine key gives no prefix")
+    check(C.phase_command(plain, [0, 1], "av2",
+                          prefix=C.confine_prefix(plain, "av2", "u")),
+          base_cmd, "and the launch command is unchanged")
+    check(base_cmd, " ".join([C.RUNNER_CMD, "--profile", "arbiter-probe",
+                              "--jobs", "2", "--seeds", "0", "1"]),
+          "which is the runner and its arguments alone")
+    unit = C.confine_unit({"file": "007-confined.toml"}, 1)
+    check(unit, "peredur-007-confined-p1", "the scope is named by entry and phase")
+    only_cpus = confined('confine = { av2 = { cpus = "0-15" } }')
+    check(C.confine_prefix(only_cpus, "av2", unit), ["taskset", "-c", "0-15"],
+          "cpus alone is taskset alone, with no scope")
+    check(C.confine_prefix(only_cpus, "av3", unit), [],
+          "and confines only the host it names")
+    only_mem = confined('confine = { av2 = { memory_max = "24G" } }')
+    check(C.confine_prefix(only_mem, "av2", unit),
+          ["systemd-run", "--user", "--scope", "-q", "--collect", "--unit",
+           unit, "-p", "MemoryMax=24G", "-p", "MemorySwapMax=0"],
+          "memory_max alone is a scope with no swap, and no taskset")
+    both = confined('confine = { av2 = { cpus = "0-15", memory_max = "24G" } }')
+    check(C.phase_command(both, [0, 1], "av2",
+                          prefix=C.confine_prefix(both, "av2", unit)),
+          "systemd-run --user --scope -q --collect --unit "
+          "peredur-007-confined-p1 -p MemoryMax=24G -p MemorySwapMax=0 "
+          "taskset -c 0-15 " + base_cmd,
+          "both keys wrap the scope around taskset around the runner")
+    over = confined('confine = { av2 = { cpus = "0-15", memory_max = "24G" } }',
+                    ', confine = { av2 = { cpus = "0-7" }, av3 = {} }')
+    check((C.confine_prefix(over, "av2", unit), C.confine_prefix(over, "av3", unit)),
+          (["taskset", "-c", "0-7"], []),
+          "a phase's table replaces the campaign's entry for each host it names")
+    check(C.confine_prefix(confined('confine = { av2 = { cpus = "0-3,8,10-11" } }'),
+                           "av2", unit)[-1], "0-3,8,10-11",
+          "a comma-separated CPU list is passed through as written")
+    check(C.confine_prefix(confined('confine = { av2 = { memory_max = "50%" } }'),
+                           "av2", unit)[-3], "MemoryMax=50%",
+          "a percentage cap is accepted")
+
+    for bad, want in (
+            ('{ av2 = { cpus = "0-15:2" } }', "not a CPU or a LOW-HIGH range"),
+            ('{ av2 = { cpus = "0 - 15" } }', "not a CPU or a LOW-HIGH range"),
+            ('{ av2 = { cpus = "" } }', "cpus must be a non-empty string"),
+            ('{ av2 = { cpus = 15 } }', "cpus must be a non-empty string"),
+            ('{ av2 = { cpus = "15-0" } }', "counts backwards"),
+            ('{ av2 = { cpus = "0-7,4-9" } }', "names a CPU twice"),
+            ('{ av2 = { memory_max = "24GB" } }', "memory_max must be a string"),
+            ('{ av2 = { memory_max = "1.5G" } }', "memory_max must be a string"),
+            ('{ av2 = { memory_max = 24 } }', "memory_max must be a string"),
+            ('{ av2 = { memory_max = "0G" } }', "is zero"),
+            ('{ av2 = { memory_max = "150%" } }', "not a percentage"),
+            ('{ av2 = { allowed_cpus = "0-15" } }', "unknown key(s) allowed_cpus"),
+            ('{ av1 = { cpus = "0-15" } }', "not declared in the campaign's hosts"),
+            ('{ av2 = "0-15" }', "must be a table with"),
+            ('"0-15"', "must be a table keyed by host")):
+        got = declaration_error(decl_root, "confined", f"""
+name = "confined"
+branch = "feat/x"
+hosts = {{ av2 = "0-1" }}
+confine = {bad}
+phases = [ {{ profile = "arbiter-probe", jobs = 1 }} ]
+""")
+        check_true(want in got, f"confine = {bad} must be refused with "
+                                f"{want!r} ({got!r})")
+    got = declaration_error(decl_root, "confined", """
+name = "confined"
+branch = "feat/x"
+hosts = { av2 = "0-1" }
+phases = [ { profile = "arbiter-probe", jobs = 1 },
+           { kind = "score", profile = "arbiter-probe", confine = { av2 = { cpus = "0-3" } } } ]
+""")
+    check_true("unknown key(s) confine on a score phase" in got,
+               f"a score phase, which pins its own workers, refuses confine "
+               f"({got!r})")
+
     # Every profile the phases name, not only the campaign-level default: the
     # second phase's configs directory is the one nothing else would check.
     write_declaration(decl_root, "twoprofiles", """
@@ -2554,6 +2646,116 @@ try:
                                                entry="001-queued.toml")), 0,
               "requeue is the way back")
     check(only_entry()["state"], "queued", "which is a stop, not a withdrawal")
+    (control_dir / "sleep").unlink()
+    calls.unlink() if calls.exists() else None
+
+    # ── a confined phase: launched through the wrapper, stopped through it ────
+    #
+    # Stub systemd-run and taskset on PATH record their arguments and exec the
+    # rest of the line, as the real ones do (a scope execs its command in
+    # place). The runner is then still the tick's child, so dequeue's process
+    # tree reaches it and status still reads it as a runner by its profile.
+    # The tick runs with neither XDG_RUNTIME_DIR nor DBUS_SESSION_BUS_ADDRESS,
+    # as under cron, where `systemd-run --user` cannot find the bus without one.
+    confine_root = queue_root / "confine"
+    confine_repo = confine_root / "checkout"
+    make_repo(confine_repo, "confined", """
+name = "confined"
+branch = "feat/confined"
+build = "true"
+hosts = { local = "0-1" }
+confine = { local = { cpus = "0", memory_max = "1G" } }
+phases = [ { profile = "arbiter-probe", jobs = 1 } ]
+""", "feat/confined")
+    git(confine_repo, "checkout", "-q", "feat/confined")
+    confine_bin = confine_repo / C.PEREDUR_BINARY
+    confine_bin.parent.mkdir(parents=True, exist_ok=True)
+    confine_bin.write_text(FAKE_BINARY)
+    confine_bin.chmod(0o755)
+    confine_cfg = (confine_repo / C.profile_configs_dir("arbiter-probe")
+                   / "default" / "x.toml")
+    confine_cfg.parent.mkdir(parents=True, exist_ok=True)
+    confine_cfg.write_text("generations = 1\n")
+    wrap_dir = confine_root / "bin"
+    wrap_dir.mkdir()
+    wrapped = confine_root / "wrapped.txt"
+    wrapper_stub = f'''#!{sys.executable}
+import os, sys
+name = os.path.basename(sys.argv[0])
+args = sys.argv[1:]
+with open({str(wrapped)!r}, "a") as handle:
+    handle.write(name + " " + " ".join(args) + " XDG="
+                 + os.environ.get("XDG_RUNTIME_DIR", "") + "\\n")
+i = 0
+if name == "systemd-run":
+    while args[i].startswith("-"):
+        i += 2 if args[i] in ("--unit", "-p") else 1
+else:
+    i = 2
+os.execvp(args[i], args[i:])
+'''
+    for tool in ("systemd-run", "taskset"):
+        (wrap_dir / tool).write_text(wrapper_stub)
+        (wrap_dir / tool).chmod(0o755)
+    runner_pid_file.unlink() if runner_pid_file.exists() else None
+    (control_dir / "sleep").write_text("120")
+    confine_entry = C.new_entry(C.load_campaign("confined", confine_repo),
+                                "local", 2,
+                                git(confine_repo, "rev-parse", "HEAD").strip())
+    confine_entry["file"] = "001-confined.toml"
+    confine_entry["path"] = C.queue_dir(confine_repo) / confine_entry["file"]
+    confine_entry["path"].parent.mkdir(parents=True, exist_ok=True)
+    C.write_entry(confine_entry["path"], confine_entry)
+    confine_env = {k: v for k, v in env.items()
+                   if k not in ("XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS")}
+    confine_env["PATH"] = f"{wrap_dir}{os.pathsep}{env.get('PATH', '')}"
+    child = subprocess.Popen(
+        [sys.executable, str(CAMPAIGN_PY), "tick", "--root", str(confine_repo),
+         "--lock", str(confine_root / "queue.lock"), "--host", "local"],
+        env=confine_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True)
+    deadline = time.time() + 60
+    while time.time() < deadline and not runner_pid_file.exists():
+        time.sleep(0.1)
+    check_true(runner_pid_file.exists(), "the confined runner starts")
+    runner_pid = int(runner_pid_file.read_text() or 0)
+    check(wrapped.read_text().splitlines(),
+          ["systemd-run --user --scope -q --collect --unit "
+           "peredur-001-confined-p0 -p MemoryMax=1G -p MemorySwapMax=0 "
+           f"taskset -c 0 {sys.executable} {stub} --profile arbiter-probe "
+           f"--jobs 1 --seeds 0 1 XDG=/run/user/{os.getuid()}",
+           f"taskset -c 0 {sys.executable} {stub} --profile arbiter-probe "
+           f"--jobs 1 --seeds 0 1 XDG=/run/user/{os.getuid()}"],
+          "the tick launches the runner through the scope and taskset, "
+          "giving systemd-run the user bus cron does not")
+    # live_processes keys on comm and --profile. The stub is not named
+    # run_experiments.py, so the two are read off ps directly: the wrapper
+    # has exec'd away and left the runner's own comm and arguments.
+    comm, _, ps_args = subprocess.run(
+        ["ps", "-o", "comm=,args=", "-p", str(runner_pid)],
+        capture_output=True, text=True).stdout.strip().partition(" ")
+    check((comm.startswith("python"), C.profile_of_args(ps_args)),
+          (True, "arbiter-probe"),
+          f"status reads the wrapped runner by its profile ({comm} {ps_args})")
+    ppid = subprocess.run(["ps", "-o", "ppid=", "-p", str(runner_pid)],
+                          capture_output=True, text=True).stdout.strip()
+    check(ppid, str(child.pid), "and the runner is still the tick's child")
+    saved_repo_root = C.REPO_ROOT
+    C.REPO_ROOT = confine_repo
+    try:
+        code, printed = dequeue(entry="001-confined.toml")
+    finally:
+        C.REPO_ROOT = saved_repo_root
+        if child.poll() is None and code != 0:
+            child.kill()
+    check(code, 0, "dequeue stops a confined phase")
+    check_true(str(runner_pid) in printed,
+               f"killing the runner under the wrapper ({printed!r})")
+    child.wait(timeout=30)
+    deadline = time.time() + 30
+    while time.time() < deadline and alive(runner_pid):
+        time.sleep(0.1)
+    check_true(not alive(runner_pid), "which dies with the tick")
     (control_dir / "sleep").unlink()
     calls.unlink() if calls.exists() else None
 

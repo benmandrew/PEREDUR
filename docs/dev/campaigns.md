@@ -34,6 +34,16 @@ A phase's `hosts` table overrides the campaign split for that phase under the sa
 
 A declaration names a profile `run_experiments.py` defines and never redefines one, since archived campaigns vendor that file. The load fails on an unknown profile, a `name` that disagrees with its directory, a malformed range, an unknown key, or overlapping host ranges, the last being invisible once the merge has kept one row per key.
 
+### Confining a host
+
+A campaign sharing a lab host with other users' jobs declares `confine = { av2 = { cpus = "0-15", memory_max = "24G" } }` at the top level. The table is keyed by host, like `hosts`, because a CPU set names one machine's cores; a run phase may carry its own table, which replaces the campaign's entry for each host it names (`av2 = {}` runs that phase unconfined there). Only run phases take it: a score phase pins its own workers with `taskset`, and the other kinds refuse the key by name. `cpus` is a `taskset -c` list without strides, and `memory_max` a systemd size, a whole number with an optional `K`, `M`, `G`, `T`, `P` or `E` suffix or a percentage from 1% to 100%. The load refuses anything else, an unknown key, and a host not in `hosts`.
+
+With either key set for the host, the tick launches the runner as `systemd-run --user --scope -q --collect --unit peredur-<entry stem>-p<phase index> -p MemoryMax=<memory_max> -p MemorySwapMax=0 taskset -c <cpus> <runner command>`, keeping only the parts whose key is set; with neither, the command is unchanged. The scope holds the runner and every engine process under it, and refuses swap. The unit name is one per queue entry and phase, so it is stable across attempts, and `--collect` unloads a scope the OOM killer failed, which would otherwise block the next attempt's scope of the same name. Cron sets neither `XDG_RUNTIME_DIR` nor `DBUS_SESSION_BUS_ADDRESS`, without which `systemd-run --user` cannot reach the user manager, so the tick supplies `XDG_RUNTIME_DIR=/run/user/<uid>` when both are unset. The queue log's `started` line records the wrapper.
+
+The CPU set goes through `taskset` because `-p AllowedCPUs=` does nothing on these hosts: their user systemd managers delegate the cpu, memory and pids controllers but not cpuset, so the property is accepted, ignored in silence, and the runner still sees CPUs 0-31. `os.cpu_count()` also reports the whole host inside the set, so `run_experiments.py` sizes each run's thread pool from `os.sched_getaffinity(0)`, and `peredur` reads its own affinity.
+
+`systemd-run --scope` and `taskset` both exec their command in place, so the runner keeps the tick as its parent and its own `comm` and arguments. `dequeue`'s process tree and `status`'s profile match therefore work through the wrapper unchanged; `test_campaign.py` checks both against stub wrappers.
+
 ## Staging a host
 
 ```sh

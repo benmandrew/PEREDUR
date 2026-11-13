@@ -1677,7 +1677,7 @@ class CampaignError(Exception):
 
 
 CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
-                 "configs", "description"}
+                 "configs", "description", "confine"}
 # A phase is a search run (`kind = "run"`, the default) or an offline scoring
 # pass over a results directory (`kind = "score"`). Each kind reads its own
 # keys, and a key from the other kind is refused by name.
@@ -1699,7 +1699,11 @@ CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
 # pool is copied instead. Unseeded, as the two above.
 PHASE_KINDS = ("run", "score", "compare", "fingerprint", "pool")
 UNSEEDED_KINDS = ("compare", "fingerprint", "pool")
-RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts"}
+RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts",
+                  "confine"}
+# What `confine` may set for one host: a CPU set and a memory cap on a run
+# phase's runner, for a campaign that shares a host with other users' jobs.
+CONFINE_KEYS = ("cpus", "memory_max")
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s")
 SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
@@ -1795,6 +1799,95 @@ def format_seed_range(seeds: list) -> str:
     return ",".join(parts)
 
 
+CPU_LIST_RE = re.compile(r"\d+(-\d+)?")
+MEMORY_MAX_RE = re.compile(r"(\d+)([KMGTPE]?)|(\d+)%")
+
+
+def parse_cpu_list(text, where: str) -> str:
+    """A `taskset -c` list such as ``"0-15"`` or ``"0-7,16-23"``, checked.
+
+    Returned as written, since taskset reads the same syntax. Strides
+    (``0-15:2``) are refused, so the set is plain to read in the declaration.
+    """
+    if not isinstance(text, str) or not text:
+        raise CampaignError(f"{where}: cpus must be a non-empty string such "
+                            f"as \"0-15\", not {text!r}")
+    seen: set = set()
+    for part in text.split(","):
+        if not CPU_LIST_RE.fullmatch(part):
+            raise CampaignError(f"{where}: cpus {text!r} has {part!r}, which "
+                                f"is not a CPU or a LOW-HIGH range; write a "
+                                f"taskset list such as \"0-15\" or "
+                                f"\"0-7,16-23\", without spaces")
+        lo_text, _, hi_text = part.partition("-")
+        lo, hi = int(lo_text), int(hi_text or lo_text)
+        if hi < lo:
+            raise CampaignError(f"{where}: cpus {text!r}: {part!r} counts "
+                                f"backwards")
+        span = set(range(lo, hi + 1))
+        if span & seen:
+            raise CampaignError(f"{where}: cpus {text!r} names a CPU twice")
+        seen |= span
+    return text
+
+
+def parse_memory_max(text, where: str) -> str:
+    """A systemd `MemoryMax=` size such as ``"24G"`` or ``"50%"``, checked.
+
+    Bytes with an optional base-1024 suffix K, M, G, T, P or E, or a
+    percentage of the host's memory from 1 to 100. Zero is refused, since the
+    scope would be killed at its first allocation.
+    """
+    match = (MEMORY_MAX_RE.fullmatch(text)
+             if isinstance(text, str) else None)
+    if match is None:
+        raise CampaignError(f"{where}: memory_max must be a string such as "
+                            f"\"24G\": a whole number with an optional "
+                            f"suffix K, M, G, T, P or E, or a percentage "
+                            f"such as \"50%\"; not {text!r}")
+    if match.group(3) is not None:
+        if not 1 <= int(match.group(3)) <= 100:
+            raise CampaignError(f"{where}: memory_max {text!r} is not a "
+                                f"percentage from 1% to 100%")
+    elif int(match.group(1)) == 0:
+        raise CampaignError(f"{where}: memory_max {text!r} is zero, which "
+                            f"kills the runner at once")
+    return text
+
+
+def parse_confine(table, where: str, hosts: dict) -> dict:
+    """A ``confine`` table to a host -> {cpus, memory_max} map, checked.
+
+    Keyed by host, since a CPU set names one machine's cores. A host must be
+    declared in ``hosts``; a host given ``{}`` runs unconfined.
+    """
+    if not isinstance(table, dict):
+        raise CampaignError(f"{where} must be a table keyed by host, e.g. "
+                            f"confine = {{ av2 = {{ cpus = \"0-15\", "
+                            f"memory_max = \"24G\" }} }}")
+    out: dict = {}
+    for host, limits in table.items():
+        if host not in hosts:
+            raise CampaignError(f"{where}: host {host!r} is not declared in "
+                                f"the campaign's hosts table")
+        if not isinstance(limits, dict):
+            raise CampaignError(f"{where}.{host} must be a table with "
+                                f"{' and/or '.join(CONFINE_KEYS)}")
+        unknown = sorted(set(limits) - set(CONFINE_KEYS))
+        if unknown:
+            raise CampaignError(f"{where}.{host}: unknown key(s) "
+                                f"{', '.join(unknown)}; known: "
+                                f"{', '.join(CONFINE_KEYS)}")
+        record = {}
+        if "cpus" in limits:
+            record["cpus"] = parse_cpu_list(limits["cpus"], f"{where}.{host}")
+        if "memory_max" in limits:
+            record["memory_max"] = parse_memory_max(limits["memory_max"],
+                                                    f"{where}.{host}")
+        out[host] = record
+    return out
+
+
 def known_profiles() -> set:
     """Profiles the runner in *this* checkout defines.
 
@@ -1880,6 +1973,8 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
 
     seeds_by_host = parse_host_split(raw.get("hosts"), f"{path}: hosts",
                                      allow_empty=True)
+    confine = (parse_confine(raw["confine"], f"{path}: confine", seeds_by_host)
+               if raw.get("confine") is not None else {})
 
     phases = raw.get("phases")
     if not isinstance(phases, list) or not phases:
@@ -1973,11 +2068,20 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
                     and all(isinstance(v, str) for v in value)):
                 raise CampaignError(f"{where}: {key} must be an array of "
                                     f"strings")
+        # A phase's table replaces the campaign's entry for each host it
+        # names; the others keep the campaign's.
+        phase_confine = dict(confine)
+        if phase.get("confine") is not None:
+            phase_confine.update(parse_confine(phase["confine"],
+                                               f"{where}: confine",
+                                               seeds_by_host))
         normalised.append({"name": phase.get("name", profile), "kind": "run",
                            "profile": profile, "jobs": jobs,
                            "sweeps": phase.get("sweeps"),
                            "specs": phase.get("specs"),
-                           "hosts": phase_hosts})
+                           "hosts": phase_hosts,
+                           "confine": {h: c for h, c in phase_confine.items()
+                                       if c}})
 
     build = raw.get("build", DEFAULT_BUILD_CMD)
     if not isinstance(build, str) or not build:
@@ -2369,8 +2473,41 @@ def phase_launcher(phase: dict) -> str:
     return SCORER_CMD if kind == "score" else RUNNER_CMD
 
 
-def phase_command(phase: dict, seeds: list, host: str | None = None) -> str:
-    return " ".join([phase_launcher(phase)]
+def confine_unit(entry: dict, index: int) -> str:
+    """The scope a confined phase runs in: one name per entry and phase.
+
+    Entry files are numbered per host queue, so the name is unique on the
+    host, and stable across the entry's attempts.
+    """
+    stem = Path(str(entry.get("file", "entry"))).stem
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", f"peredur-{stem}-p{index}")
+
+
+def confine_prefix(phase: dict, host: str | None, unit: str) -> list:
+    """The words a confined run phase's launch starts with, or none.
+
+    `systemd-run --user --scope` sets the memory cap and `taskset -c` the CPU
+    set. AllowedCPUs= is not used: the lab hosts' user managers lack the
+    cpuset controller and ignore it in silence. A scope execs its command in
+    place, so the runner keeps the tick as its parent and dequeue's process
+    tree still reaches it. `--collect` lets a scope the OOM killer failed be
+    unloaded, or the next attempt's scope of the same name would be refused.
+    """
+    limits = (phase.get("confine") or {}).get(host or "") or {}
+    prefix: list = []
+    if limits.get("memory_max"):
+        prefix += ["systemd-run", "--user", "--scope", "-q", "--collect",
+                   "--unit", unit, "-p", f"MemoryMax={limits['memory_max']}",
+                   "-p", "MemorySwapMax=0"]
+    if limits.get("cpus"):
+        prefix += ["taskset", "-c", limits["cpus"]]
+    return prefix
+
+
+def phase_command(phase: dict, seeds: list, host: str | None = None,
+                  prefix: list | None = None) -> str:
+    return " ".join([shlex.quote(a) for a in prefix or []]
+                    + [phase_launcher(phase)]
                     + [shlex.quote(a) for a in phase_args(phase, seeds, host)])
 
 
@@ -2989,7 +3126,8 @@ def restart_after_stage(lock, entry: dict):
     return 0
 
 
-def run_step(root: Path, command, log_path: Path, shell: bool = False) -> int:
+def run_step(root: Path, command, log_path: Path, shell: bool = False,
+             env: dict | None = None) -> int:
     """Run one command in the checkout, appending everything it says to a log.
 
     No deadline: a phase is hours of work and the lock keeps a second tick
@@ -3002,14 +3140,21 @@ def run_step(root: Path, command, log_path: Path, shell: bool = False) -> int:
         log.write(f"\n=== {time.strftime('%Y-%m-%dT%H:%M:%S')} {shown}\n")
         log.flush()
         proc = subprocess.run(command, cwd=str(root), shell=shell, stdout=log,
-                              stderr=subprocess.STDOUT)
+                              stderr=subprocess.STDOUT, env=env)
     return proc.returncode
 
 
 def run_phase(root: Path, phase: dict, seeds: list, log_path: Path,
-              host: str | None = None) -> int:
-    return run_step(root, shlex.split(phase_launcher(phase))
-                    + phase_args(phase, seeds, host), log_path)
+              host: str | None = None, prefix: list | None = None) -> int:
+    env = None
+    if prefix and prefix[0] == "systemd-run" and not (
+            os.environ.get("XDG_RUNTIME_DIR")
+            or os.environ.get("DBUS_SESSION_BUS_ADDRESS")):
+        # cron sets neither, and `systemd-run --user` then cannot find the
+        # user manager's bus and exits 1.
+        env = dict(os.environ, XDG_RUNTIME_DIR=f"/run/user/{os.getuid()}")
+    return run_step(root, list(prefix or []) + shlex.split(phase_launcher(phase))
+                    + phase_args(phase, seeds, host), log_path, env=env)
 
 
 def pairs_file_missing(root: Path, phase: dict, host: str):
@@ -3423,9 +3568,13 @@ def tick_entry(entry: dict, campaign: dict, root: Path,
         print(f"tick: {entry['file']} {entry['state']}: {entry['last_error']}")
         return 1
 
+    prefix = (confine_prefix(phase, entry.get("host"),
+                             confine_unit(entry, index))
+              if phase_kind(phase) == "run" else [])
     entry["state"] = "running"
     entry["pid"] = os.getpid()
-    log_line(entry, f"phase {index} ({phase['name']}) started")
+    log_line(entry, f"phase {index} ({phase['name']}) started"
+             + (f" under {' '.join(prefix)}" if prefix else ""))
     write_entry(entry["path"], entry)
     print(f"tick: {entry['file']} phase {index} ({phase['name']}) "
           f"on seeds {text}")
@@ -3433,12 +3582,12 @@ def tick_entry(entry: dict, campaign: dict, root: Path,
         entry["state"] = "queued"
         log_line(entry, "dry run, phase not executed")
         write_entry(entry["path"], entry)
-        print(f"  would run: {phase_command(phase, seeds)}")
+        print(f"  would run: {phase_command(phase, seeds, prefix=prefix)}")
         if blocked is not None:
             print(f"  blocked: {blocked}")
         return 0
 
-    code = run_phase(root, phase, seeds, log_path)
+    code = run_phase(root, phase, seeds, log_path, prefix=prefix)
     return finish_phase(entry, campaign, phase, index, code)
 
 

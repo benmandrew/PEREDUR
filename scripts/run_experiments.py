@@ -297,6 +297,15 @@ SCHEME_ALIASES: dict[str, str] = {
 }
 
 
+def usable_cpus() -> int:
+    """The CPUs this process may run on, falling back to the host's count
+    where the platform has no affinity call."""
+    try:
+        return len(os.sched_getaffinity(0)) or 1
+    except AttributeError:
+        return os.cpu_count() or 1
+
+
 def canonical_scheme(name: str) -> str:
     """Current spelling of a selection scheme; any other name passes through."""
     return SCHEME_ALIASES.get(name, name)
@@ -1419,7 +1428,10 @@ def main() -> None:
                   f"appending without it")
 
     # Cap each run's internal thread pool so jobs * parallel ≈ core count.
-    parallel_k = max(1, (os.cpu_count() or 1) // jobs) if jobs > 1 else None
+    # The count is the CPUs this process may run on: under a campaign's
+    # `confine` taskset, os.cpu_count() still reports the whole host. With one
+    # job the engine reads its affinity itself.
+    parallel_k = max(1, usable_cpus() // jobs) if jobs > 1 else None
     if parallel_k is not None:
         print(f"Per-run PEREDUR thread pool capped at parallel = {parallel_k}")
 
