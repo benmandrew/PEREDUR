@@ -614,6 +614,49 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order-large.csv",
         "default_jobs": 4,
     },
+    # fretish-order-large's full arm again at a commit whose run.json records
+    # the climb's wall time, on the two large specs whose runs finish, seeds
+    # 0-9. Own results, so nothing resumes from the first pass
+    # (experiments/2026-11-13-fretish-order-large-counters).
+    "fretish-order-large-counters": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["full"]},
+        "specs": ["lift-plus-cruise-full", "rad"],
+        "seeds": list(range(10)),
+        "timeout_caps": {"lift-plus-cruise-full": 7200, "rad": 7200},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order-large-counters",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order-large-counters.csv",
+        "default_jobs": 2,
+    },
+    # ventilator-controller's full arm under a 3000 s search deadline, so each
+    # run stops itself and writes run.json; in the first pass every run met
+    # the 7200 s harness cap and wrote none. Runs overrun the deadline by up to
+    # 2.2x (docs/dev/algorithm.md, Termination modes), which stays under the
+    # cap. Its own config tree, the first pass's with genetic.max_wall_s.
+    "fretish-order-vent-deadline": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["full"]},
+        "specs": ["ventilator-controller"],
+        "seeds": list(range(10)),
+        "timeout_caps": {"ventilator-controller": 7200},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order-deadline",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order-vent-deadline",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order-vent-deadline.csv",
+        "default_jobs": 4,
+    },
     # rad's ten cores under every arm of fretish-order, since whole rad finds
     # nothing at the budget. Same config tree, its own results.
     "fretish-order-cores": {
