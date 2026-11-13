@@ -262,7 +262,28 @@ ARBITER_PROBE_SPECS: list[str] = [
 ]
 
 # Unified lookup for run_one()/--specs; each profile picks its own subset.
-SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **TLSF_SPECS}
+# The seeded mutant corpus (experiments/2026-11-13-seeded-corpus): each
+# subject is a realisable base strengthened by a compound seed, with the base
+# as its one ideal. scripts/seeded/ writes them under subjects/, and
+# selected.txt names the ones the campaign runs, one per line.
+SEEDED_DIR = EXPERIMENTS_DIR / "2026-11-13-seeded-corpus"
+
+
+def _seeded_specs() -> dict[str, dict[str, Path]]:
+    listing = SEEDED_DIR / "selected.txt"
+    if not listing.is_file():
+        return {}
+    names = [ln.strip() for ln in listing.read_text().splitlines()
+             if ln.strip() and not ln.startswith("#")]
+    return {n: {"input": SEEDED_DIR / "subjects" / n / "spec.json",
+                "ideals_dir": SEEDED_DIR / "subjects" / n / "fixes"}
+            for n in names}
+
+
+SEEDED_SPECS: dict[str, dict[str, Path]] = _seeded_specs()
+
+SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **SEEDED_SPECS,
+                                     **TLSF_SPECS}
 
 # compare runs n_repairs * n_ideals * 2 implication checks, each with compare's
 # own 20s black budget. fsm-timing (bounded-interval operators) is slow, and
@@ -656,6 +677,26 @@ PROFILES: dict[str, dict] = {
         "results_dir": EXPERIMENTS_DIR / "results-fretish-order-vent-deadline",
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order-vent-deadline.csv",
         "default_jobs": 4,
+    },
+    # The seeded mutant corpus under every arm of sweep O, at the order
+    # campaign's budget, with its own config tree and results. See
+    # experiments/2026-11-13-seeded-corpus/PLAN.md.
+    "fretish-seeded": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {},
+        "specs": list(SEEDED_SPECS),
+        "seeds": list(range(5)),
+        "timeout_caps": {s: 7200 for s in SEEDED_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-seeded",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-seeded",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-seeded.csv",
+        "default_jobs": 8,
     },
     # rad's ten cores under every arm of fretish-order, since whole rad finds
     # nothing at the budget. Same config tree, its own results.
