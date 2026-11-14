@@ -39,7 +39,59 @@
           exec ${pkgs.python3}/bin/python3 \
             ${ctcacheSrc}/src/ctcache/clang_tidy_cache.py "$@"
         '';
+        docsPythonPackages = ps: with ps; [
+          sphinx
+          breathe
+          furo
+          sphinxcontrib-katex
+        ];
+
+        # Only the files the docs-only configure reads (see PEREDUR_DOCS_ONLY in
+        # CMakeLists.txt), so a commit that leaves them alone gives the same
+        # store path and a consumer rebuilds nothing. docs/dev, docs/design and
+        # the Markdown pages are not Sphinx sources, and CI rewrites
+        # docs/coverage.svg on every push to main.
+        docsSrc = pkgs.lib.fileset.toSource {
+          root = ./.;
+          fileset = pkgs.lib.fileset.unions [
+            ./CMakeLists.txt
+            ./cmake/find_tool.cmake
+            ./cmake/docs.cmake
+            ./include
+            (pkgs.lib.fileset.difference ./docs (pkgs.lib.fileset.unions [
+              ./docs/dev
+              ./docs/design
+              ./docs/coverage.svg
+              (pkgs.lib.fileset.fileFilter (f: f.hasExt "md") ./docs)
+            ]))
+          ];
+        };
       in {
+        # `nix build .#docs`: the HTML site, built in the sandbox with no
+        # network, which the full configure needs for Spot, ganak and black.
+        packages.docs = pkgs.stdenv.mkDerivation {
+          pname = "peredur-docs";
+          version = "0.1.0";
+          src = docsSrc;
+          nativeBuildInputs = [
+            pkgs.cmake
+            pkgs.ninja
+            pkgs.doxygen
+            (pkgs.python3.withPackages docsPythonPackages)
+          ];
+          cmakeFlags = [
+            "-DPEREDUR_DOCS_ONLY=ON"
+            "-DKATEX_DIST_DIR=${pkgs.katex}/lib/node_modules/katex/dist"
+          ];
+          ninjaFlags = [ "docs" ];
+          installPhase = ''
+            runHook preInstall
+            cp -r docs/sphinx $out
+            rm -rf $out/.doctrees $out/.buildinfo
+            runHook postInstall
+          '';
+        };
+
         devShells.default = mkShell {
           packages = with pkgs; [
             # clang-tidy result cache (used whenever present; see above)
@@ -86,13 +138,7 @@
             # scripts/import_fret.py, which asks z3 which combinations of
             # comparison atoms over shared variables some values realise.
             doxygen
-            (python3.withPackages (ps: with ps; [
-              sphinx
-              breathe
-              furo
-              sphinxcontrib-katex
-              z3-solver
-            ]))
+            (python3.withPackages (ps: docsPythonPackages ps ++ [ ps.z3-solver ]))
 
             # KaTeX renders the maths in doc comments. The extension above
             # bundles the JS but not the stylesheet, whose upstream default is a

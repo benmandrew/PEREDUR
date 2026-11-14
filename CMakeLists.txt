@@ -20,6 +20,16 @@ enable_testing()
 # before this file existed from a fresh one.
 include(cmake/find_tool.cmake)
 
+# The docs target needs Doxygen, Sphinx and KaTeX, and none of the code. A
+# caller that only builds the docs, such as the site that embeds them, sets
+# this to skip the third-party tools (Spot alone cost the site's CI 785-880 s
+# per cold build), the FetchContent dependencies, and every compiled target.
+option(PEREDUR_DOCS_ONLY "Configure the docs target and nothing else" OFF)
+if(PEREDUR_DOCS_ONLY)
+    include(cmake/docs.cmake)
+    return()
+endif()
+
 # Spot, black and ganak are spawned as subprocesses and nothing links against
 # them, so their trees carry none of a preset's flags -- every preset builds a
 # byte-equivalent copy. Hoisting the location behind a variable lets a caller
