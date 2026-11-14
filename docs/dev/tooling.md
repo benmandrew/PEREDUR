@@ -52,4 +52,6 @@ Every header in `include/` needs a `.rst` page under `docs/api/` and an entry in
 
 Only `///` reaches Doxygen. Its text goes through Doxygen's comment parser, so a bare `<input>` parses as an HTML tag and `WARN_AS_ERROR` fails the build; wrap it in backticks.
 
+`-DPEREDUR_DOCS_ONLY=ON` configures the `docs` target alone, then returns before the third-party tools, the FetchContent dependencies and every compiled target. The site that embeds these docs configures this way, because a full configure builds Spot from cold on each new commit, and its CI measured 785–880 s for that step against about 20 s without it. `nix build .#docs` runs the same configure in the sandbox and leaves the HTML in `result/`. Its source is a `lib.fileset` of the files that configure reads, so a commit that touches neither `include/` nor the Sphinx sources under `docs/` keeps the same store path. A file the docs start to read has to join `docsSrc` in `flake.nix`, or the sandbox build cannot see it.
+
 Maths is `\f$ ... \f$` / `\f[ ... \f]`, rendered by KaTeX with nothing fetched at view time. `sphinxcontrib-katex` points `katex_css_path` at a CDN, so `cmake/docs.cmake` stages `katex.min.css` and its fonts into `_static/katex/` and `docs/conf.py.in` overrides the path. The stylesheet resolves its fonts relatively, so the two must share a directory.
