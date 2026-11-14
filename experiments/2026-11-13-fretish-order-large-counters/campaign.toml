@@ -1,0 +1,37 @@
+name = "2026-11-13-fretish-order-large-counters"
+branch = "campaign/fretish-order-large-counters"
+profile = "fretish-order-large-counters"
+description = "The full arm of 2026-11-05-fretish-order's large set run again at a commit whose run.json records the climb's wall time and the final front's gutting: lift-plus-cruise-full and rad as before, and ventilator-controller under a 3000 s search deadline so its runs write a manifest. PLAN.md gives the questions."
+
+# Seeds 0-9 on av2 only, on CPUs 0-15 under one 24 GB cap, the share agreed
+# with GAWAIN and veribee for after hlwide-run ends on 2026-11-13. av3 stays
+# theirs.
+hosts = { av2 = "0-9" }
+confine = { av2 = { cpus = "0-15", memory_max = "24G" } }
+
+build = "sh -c 'cmake --build build-release'"
+
+configs = "python3 scripts/gen_configs.py --sweeps O --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order --pin-vintage && python3 scripts/gen_configs.py --sweeps O --levels full --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --max-wall-s 3000 --out-dir experiments/configs-fretish-order-deadline --pin-vintage"
+
+# rad first: 10 runs, full's longest first-pass run took 192 s, so a few
+# minutes. Its peak memory is the first reading of what a large run needs.
+[[phases]]
+name = "rad"
+profile = "fretish-order-large-counters"
+specs = ["rad"]
+jobs = 2
+
+# lift-plus-cruise-full: 10 runs at 2 jobs of 8 threads. Full's 30 first-pass
+# runs took 22.2 run-hours at 8 threads, so estimate 3.5-4 h.
+[[phases]]
+name = "lift-full"
+profile = "fretish-order-large-counters"
+specs = ["lift-plus-cruise-full"]
+jobs = 2
+
+# ventilator-controller: 10 runs at 4 jobs of 4 threads, each stopping on its
+# 3000 s deadline and overrunning it by up to 2.2x; estimate 3-5 h.
+[[phases]]
+name = "vent"
+profile = "fretish-order-vent-deadline"
+jobs = 4
