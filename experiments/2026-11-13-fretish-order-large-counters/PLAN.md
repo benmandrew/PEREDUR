@@ -18,4 +18,10 @@ About 8-9 h: rad a few minutes, lift-plus-cruise-full 3.5-4 h at 2 jobs of 8 thr
 
 ## Result
 
-Pending.
+Queue entry 073 ran on av2 from 17:15 to 23:22 UTC on 2026-11-13, 6 h 7 min, inside the estimate. All 30 runs wrote run.json at f557c5d, and `collect` merged 20 rows into `results-fretish-order-large-counters.csv` and 10 into `results-fretish-order-vent-deadline.csv`.
+
+- **Climb's share of wall time.** On lift-plus-cruise-full every run found a repair, and the climb took 4.0% of the summed wall time (median 3.3% per run), against 9.7% on the small set. It climbed 1,257 repairs over the 10 runs. On rad no run found a repair, each stopping in 82-98 s, so the climb had nothing to do and took no measurable time.
+- **Gutting on ventilator-controller.** At the 3000 s deadline no run found a repair. Every run stopped on its own deadline: the engine's wall_s is 1.01-1.18x the 3000 s, and the harness's wall time, which adds start-up and output, is 3294-3774 s. The final fronts hold 7-20 members, none of them realisable, so none is gutted, and gutting cannot be checked at this budget.
+- **Where ventilator-controller's time goes.** A run completes 4 or 5 generations, breeding a median of 150 individuals. Summed tool time is 3.96x the summed wall time. ltlsynt takes 94.8% of it and the stored-controller check 4.4%; Ganak is never called, because nothing is scored past the status stage. Of 29,899 ltlsynt queries, 12,180 (40.7%) hit the 10 s timeout, at a mean of 4.2 s per query. The budget screen on the original specification itself times out at 10 s. The bottleneck is the realisability query, which at this size mostly fails to decide.
+
+Peak memory: the ventilator phase's scope peaked at 13.6 GB (with page cache) under the 24 GiB cap. The first two phases' scopes had unloaded before they could be read, and no run records its peak RSS.
