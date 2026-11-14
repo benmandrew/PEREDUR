@@ -23,7 +23,9 @@ Outcomes: ``ideal`` (implies_ideal), ``found`` (found_repair), ``equal``
 (best_relation is equivalent: the run recovered the base itself),
 ``repairs`` (n_repairs) and ``wall`` (wall_time_s, the per-subject median).
 
-Writes ``<out>/stats.json`` and prints a summary table.
+Writes ``<out>/stats.json`` (or ``--stats``) and prints a summary table.
+``--exclude-clusters rad --stats stats-no-rad.json`` is the sensitivity
+run that leaves out rad, whose input/output partition is suspect.
 """
 
 from __future__ import annotations
@@ -160,9 +162,15 @@ def main() -> int:
                     default=repo / "experiments" / "results-fretish-seeded.csv")
     ap.add_argument("--out", type=Path,
                     default=repo / "experiments" / "2026-11-13-seeded-corpus")
+    ap.add_argument("--exclude-clusters", default="",
+                    help="comma-separated clusters to leave out (sensitivity)")
+    ap.add_argument("--stats", default="stats.json",
+                    help="file name for the output, under --out")
     args = ap.parse_args()
 
-    subj = {r["subject"]: r for r in csv.DictReader((args.out / "subjects.csv").open())}
+    drop = set(filter(None, args.exclude_clusters.split(",")))
+    subj = {r["subject"]: r for r in csv.DictReader((args.out / "subjects.csv").open())
+            if r["cluster"] not in drop}
     rows = [r for r in csv.DictReader(args.results.open())
             if r["selection"] == "nsga2-apportion" and r["spec"] in subj]
     cells = per_subject(rows)
@@ -192,7 +200,7 @@ def main() -> int:
                 for f, h in holm(ps).items():
                     st[direction][f][o]["holm"] = h
         stats["strata"][stratum] = st
-    (args.out / "stats.json").write_text(json.dumps(stats, indent=1) + "\n")
+    (args.out / args.stats).write_text(json.dumps(stats, indent=1) + "\n")
 
     for stratum, st in stats["strata"].items():
         print(f"\n== {stratum}: {st['subjects']} subjects, {st['clusters']} clusters")

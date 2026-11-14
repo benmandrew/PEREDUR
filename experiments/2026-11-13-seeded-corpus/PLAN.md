@@ -10,7 +10,7 @@ The ablation of `2026-11-05-fretish-order` ran on 9 small subjects from about 7 
 
 - **Base B.** A realisable FRETish specification with a fixed input/output partition. It is taken from the `fixes/` ideals of the bundled examples, and from realisable guarantee subsets of the unrealisable examples that have no ideals. Every base must pass the single-requirement screen: each live guarantee realisable alone.
 - **Mutant O.** B strengthened by a compound seed of 2 to 4 primitive edits, drawn from fault classes (deadline tightening, duration lengthening, response conjunction, trigger widening, condition-type change). O must be satisfiable, unrealisable, and proved strictly stronger than B (`compare`). B is written as O's only ideal, so `implies_ideal` counts repairs R with B ⊑ R.
-- **Trivial-reversion probe.** For each O, sample random mutation chains of length 1 and 2 from O with the real `mutate_specification`, under the `base` and `full` configs. Count the chains that end realisable and imply B. A mutant whose estimated depth-2 reversion probability is above the threshold is kept out of the headline set and reported as its own stratum.
+- **Trivial-reversion probe.** For each O, sample random mutation chains of length 1 and 2 from O with the real `mutate_specification`, under the `base` arm's config. Count the chains that end realisable and imply B. A mutant whose estimated depth-2 reversion probability is above the threshold is kept out of the headline set and reported as its own stratum.
 - **Clustering.** Mutants of one base, and bases of one system, are not independent. The unit of analysis is the system cluster; tests reduce to per-cluster effects or use a cluster bootstrap.
 - **Arms.** Sweep O as in the order campaign: `base`, `full`, `no-<f>`, `only-<f>` under `nsga2-apportion`. Same budget: 1000 individuals, population 100, 7200 s cap.
 - **Measures.** found-repair rate, ideal rate (`implies_ideal`), equivalence to B (`best_relation = equivalent`), maximal repairs per run, wall time. Strata by seed size and by reversion probability.
@@ -41,9 +41,9 @@ python3 scripts/seeded/select.py --out $E
 - [x] `scripts/seeded/seed.py`: fault classes, filters, write subjects to `subjects/<id>/{spec.json,fixes/base.json}`.
 - [x] `sample-mutants` binary and `scripts/seeded/probe.py`: reversion probability with the real mutation operator.
 - [x] `fretish-seeded` profile in `scripts/run_experiments.py`, subjects discovered from `subjects/`.
-- [ ] Pilot: a few subjects, `base` and `full`, 2 seeds. Check timing and that scoring works.
-- [ ] Main run: subjects x 16 arms x seeds sized to fit by Sunday evening.
-- [ ] Analysis (`scripts/seeded/analyse.py`, written) and `REPORT.md`; data ready for the paper's `make import`.
+- [x] Pilot: seed 0 over all 120 subjects and 16 arms.
+- [x] Main run: 120 subjects x 16 arms x 5 seeds.
+- [x] Analysis (`scripts/seeded/analyse.py`), `REPORT.md`, and `data/` in the paper's import format.
 
 ## Decisions
 
@@ -60,3 +60,7 @@ python3 scripts/seeded/select.py --out $E
 - Generation (2-4 edits, 15 candidates per base): 246 of 1140 kept. The lift-plus-cruise and ventilator slices never became unrealisable: their requirements are loosely coupled and mostly `eventually`/`next` under mode scopes, so the controller separates conflicting obligations in time. A second pass on lpc, ventilator and valu3s (3-6 edits, plus `conflict-now`, which pins the edited deadline to `immediately`) kept 2 of 570, both valu3s. Clusters with subjects: fsm, lmcps, liquid-mixer, rad, mode-arbiter, valu3s.
 - Probe test, 3 subjects at 20000 draws: p1 from 0 to 0.012. Cut to 5000 draws for the full pass.
 - 2026-11-13 21:00. Probe done: 22 of 248 mutants trivial (p1 or p2 at least 0.01). Selected 120: 110 headline (fsm 40 of 156, lmcps 36, rad 17, liquid-mixer 11, mode-arbiter 5, valu3s 1) and 10 trivial controls.
+- 2026-11-14 00:20. Seed 0 done: 1920 runs in 200 min at 8 jobs, median wall 42 s, no run or compare timeouts, all at `b2d3b91c`, clean. Two runs (`full`, `no-verdict` on `fsm-combined__add-request-extend-within__m11`) failed: the engine exits fatally when `ltl2tgba` times out on a long nested-`X` formula, where it could treat the candidate as unknown. Engine left unchanged mid-campaign; the missing cells drop out of their contrasts.
+- Seed-0 snapshot, headline (110 subjects): ideal rate `base` 0.21, `full` 0.37; found rate about 0.93 in both. No headline run recovered B exactly (`equal` 0): every repair that implies B is strictly stronger. `only-climb` +14.5 pp (Holm 0.000, up in 5 of 6 clusters); `only-gate` +9.1 pp and `only-scale` +6.4 pp, not significant on one seed. Seeds 1-4 launched 00:25.
+- 2026-11-14 13:40. Seeds 1-4 done: 7680 runs in 801 min, no errors or timeouts. 9598 rows in all.
+- Analysis: climb holds in both directions and all 6 clusters. Gate's time saving holds; its ideal gain in addition halves and loses significance without rad. Blame's removal raises the ideal rate by 6.9 pp (Holm 0.044), but that comes from rad and falls to 1.5 pp without it. Demote costs 1.8 s per run in all 6 clusters with no strength effect. Details in REPORT.md.
