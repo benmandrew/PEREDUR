@@ -431,6 +431,8 @@ def _pruned_sweep() -> list[tuple[str, dict]]:
 
     "lean" is full without demote, scale, xover and verdict, which showed no
     strength effect there; "climb-gate" is base with only climb and gate.
+    "full-rerun" and "base-rerun" repeat full and base so that wall times
+    compare under the same machine load as the pruned arms.
     """
     levels = dict(SWEEP_O)
     feats = dict(ORDER_FEATURES)
@@ -439,7 +441,9 @@ def _pruned_sweep() -> list[tuple[str, dict]]:
     for name in ("demote", "scale", "xover", "verdict"):
         lean.update({k: base[k] for k in feats[name]})
     return [("lean", lean),
-            ("climb-gate", {**base, **feats["climb"], **feats["gate"]})]
+            ("climb-gate", {**base, **feats["climb"], **feats["gate"]}),
+            ("full-rerun", dict(levels["full"])),
+            ("base-rerun", dict(base))]
 
 
 SWEEP_P: list[tuple[str, dict]] = _pruned_sweep()

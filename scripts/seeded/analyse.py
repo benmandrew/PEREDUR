@@ -19,7 +19,7 @@ For each contrast and outcome:
   (clusters resampled with replacement), since mutants of one system are not
   independent.
 
-Where sweep P ran, ``pruned`` compares its arms (``lean``, ``climb-gate``)\nwith ``full`` and ``base``, uncorrected.\n\nOutcomes: ``ideal`` (implies_ideal), ``found`` (found_repair), ``equal``
+Where sweep P ran, ``pruned`` compares its arms (``lean``, ``climb-gate``)\nwith ``full-rerun`` and ``base-rerun``, which ran under the same load, and\neach rerun with its original; uncorrected.\n\nOutcomes: ``ideal`` (implies_ideal), ``found`` (found_repair), ``equal``
 (best_relation is equivalent: the run recovered the base itself),
 ``repairs`` (n_repairs) and ``wall`` (wall_time_s, the per-subject median).
 
@@ -190,9 +190,14 @@ def main() -> int:
                 "subjects": len(vals)}
         st["full_vs_base"] = contrast(cells, "full", "base", subjects, cluster_of)
         # Pruned defaults (sweep P), where they ran.
+        # The reruns share the pruned arms' machine load, so wall times compare;
+        # rerun against original checks that the ideal rate reproduces.
+        pairs = [(a, r) for a in ("lean", "climb-gate")
+                 for r in ("full-rerun", "base-rerun")]
+        pairs += [("full-rerun", "full"), ("base-rerun", "base")]
         st["pruned"] = {f"{a}-vs-{r}": contrast(cells, a, r, subjects, cluster_of)
-                        for a in ("lean", "climb-gate") for r in ("full", "base")
-                        if any(k == (a, s) for s in subjects for k in cells)}
+                        for a, r in pairs
+                        if any((a, s) in cells for s in subjects)}
         for direction, (fmt, ref) in {"addition": ("only-{}", "base"),
                                       "removal": ("no-{}", "full")}.items():
             for f in FEATURES:
