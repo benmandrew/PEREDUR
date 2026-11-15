@@ -9,7 +9,8 @@ and implies B. ``compare`` decides the implication (forward direction only);
 a result that also implies O is unrealisable and skips ``realize``.
 
 ``p1`` and ``p2`` are the shares of the draws at depth 1 and depth 2 that are
-reversions. Writes ``<out>/probe.csv``.
+reversions. Writes ``<out>/probe<tag>.csv``; ``--config`` swaps the arm
+whose mutation settings drive the chains (default ``base``).
 """
 
 from __future__ import annotations
@@ -66,12 +67,12 @@ def realizable(paths: list[Path], timeout: int) -> set[str]:
 
 
 def probe(task):
-    subject, root, draws, timeout = task
-    work = root / "probe-work" / subject.name
+    subject, root, draws, timeout, config, tag = task
+    work = root / f"probe-work{tag}" / subject.name
     shutil.rmtree(work, ignore_errors=True)
     samples = work / "samples"
     subprocess.run([str(BIN / "sample-mutants"), str(subject / "spec.json"),
-                    "--config", str(CONFIG), "--out", str(samples),
+                    "--config", str(config), "--out", str(samples),
                     "--draws", str(draws), "--depth", "2", "--seed", "1"],
                    capture_output=True, text=True, check=True, timeout=timeout)
     index = list(csv.DictReader((samples / "index.tsv").open(), delimiter="\t"))
@@ -105,16 +106,26 @@ def main() -> int:
     ap.add_argument("--draws", type=int, default=5000)
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--timeout", type=int, default=3600)
+    ap.add_argument("--config", type=Path, default=CONFIG,
+                    help="arm config whose mutation keys drive the chains")
+    ap.add_argument("--tag", default="",
+                    help="suffix for probe-work<tag>/ and probe<tag>.csv")
+    ap.add_argument("--only-selected", action="store_true",
+                    help="probe only the subjects in selected.txt")
     args = ap.parse_args()
     subjects = sorted(p for p in (args.out / "subjects").iterdir() if p.is_dir())
+    if args.only_selected:
+        keep = {ln.strip() for ln in (args.out / "selected.txt").read_text().splitlines()
+                if ln.strip() and not ln.startswith("#")}
+        subjects = [p for p in subjects if p.name in keep]
     rows = []
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        for row in pool.map(probe, [(s, args.out, args.draws, args.timeout)
+        for row in pool.map(probe, [(s, args.out, args.draws, args.timeout, args.config, args.tag)
                                     for s in subjects]):
             rows.append(row)
             print(f"{row['subject']}: p1={row['p1']:.4f} p2={row['p2']:.4f} "
                   f"({row['reversions']} of {row['distinct']})", file=sys.stderr)
-    with (args.out / "probe.csv").open("w", newline="") as fh:
+    with (args.out / f"probe{args.tag}.csv").open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
