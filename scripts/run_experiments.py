@@ -686,7 +686,7 @@ PROFILES: dict[str, dict] = {
         "weakenings": ["wkoff"],
         "metrics": ["log"],
         "repair_modes": None,
-        "sweeps": ["O"],
+        "sweeps": ["O", "P"],
         "levels": {},
         "specs": list(SEEDED_SPECS),
         "seeds": list(range(5)),

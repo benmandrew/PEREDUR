@@ -425,6 +425,25 @@ def _order_sweep() -> list[tuple[str, dict]]:
 
 SWEEP_O: list[tuple[str, dict]] = _order_sweep()
 
+
+def _pruned_sweep() -> list[tuple[str, dict]]:
+    """Two pruned defaults the seeded corpus (2026-11-13) pointed to.
+
+    "lean" is full without demote, scale, xover and verdict, which showed no
+    strength effect there; "climb-gate" is base with only climb and gate.
+    """
+    levels = dict(SWEEP_O)
+    feats = dict(ORDER_FEATURES)
+    base = levels["base"]
+    lean = {**levels["full"]}
+    for name in ("demote", "scale", "xover", "verdict"):
+        lean.update({k: base[k] for k in feats[name]})
+    return [("lean", lean),
+            ("climb-gate", {**base, **feats["climb"], **feats["gate"]})]
+
+
+SWEEP_P: list[tuple[str, dict]] = _pruned_sweep()
+
 # Keys whose built-in default has changed at least once since campaigns began
 # being archived. A generated config states a key only where a sweep overrides
 # it, so everything else is inherited from the binary at run time — which means
@@ -446,6 +465,7 @@ SWEEPS: list[tuple[str, list]] = [
     ("C", SWEEP_C),
     ("R", SWEEP_R),
     ("O", SWEEP_O),
+    ("P", SWEEP_P),
 ]
 
 # Sweeps emitted when --sweeps is omitted. O is held back, so a grid generated

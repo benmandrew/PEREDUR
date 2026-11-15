@@ -19,7 +19,7 @@ For each contrast and outcome:
   (clusters resampled with replacement), since mutants of one system are not
   independent.
 
-Outcomes: ``ideal`` (implies_ideal), ``found`` (found_repair), ``equal``
+Where sweep P ran, ``pruned`` compares its arms (``lean``, ``climb-gate``)\nwith ``full`` and ``base``, uncorrected.\n\nOutcomes: ``ideal`` (implies_ideal), ``found`` (found_repair), ``equal``
 (best_relation is equivalent: the run recovered the base itself),
 ``repairs`` (n_repairs) and ``wall`` (wall_time_s, the per-subject median).
 
@@ -189,6 +189,10 @@ def main() -> int:
             st["levels"][arm] = {o: mean(v[o] for v in vals) for o in OUTCOMES} | {
                 "subjects": len(vals)}
         st["full_vs_base"] = contrast(cells, "full", "base", subjects, cluster_of)
+        # Pruned defaults (sweep P), where they ran.
+        st["pruned"] = {f"{a}-vs-{r}": contrast(cells, a, r, subjects, cluster_of)
+                        for a in ("lean", "climb-gate") for r in ("full", "base")
+                        if any(k == (a, s) for s in subjects for k in cells)}
         for direction, (fmt, ref) in {"addition": ("only-{}", "base"),
                                       "removal": ("no-{}", "full")}.items():
             for f in FEATURES:
@@ -218,6 +222,13 @@ def main() -> int:
                     f"c{i['cluster']['up']}/{i['cluster']['down']} "
                     f"wall {w['shift']['estimate']:+6.1f}s")
             print(f"{f:8} {cells_txt[0]:>40} | {cells_txt[1]:>40}")
+        for name, c in st["pruned"].items():
+            i, w = c["ideal"], c["wall"]
+            print(f"{name:18} ideal {100 * i['mean']:+5.1f}pp p={i['p']:.3f} "
+                  f"c{i['cluster']['up']}/{i['cluster']['down']} "
+                  f"boot[{100 * i['cluster']['boot_low']:+.1f},"
+                  f"{100 * i['cluster']['boot_high']:+.1f}] "
+                  f"wall {w['shift']['estimate']:+6.1f}s p={w['p']:.3f}")
     return 0
 
 
