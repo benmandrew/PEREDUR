@@ -245,7 +245,15 @@ void print_diagnostics_report() {
               << " drawn from a blame-targeted slot list\n";
     std::cout << "Candidates demoted as proved weaker than another realizable "
                  "one: "
-              << DemotionStats::n_demoted << "\n";
+              << DemotionStats::n_demoted
+              << ", removed: " << DemotionStats::n_removed
+              << ", removal fallbacks: " << DemotionStats::n_removal_fallbacks
+              << "\n";
+    std::cout << "Survivor selections: " << SurvivorSelectionStats::n_selections
+              << ", " << SurvivorSelectionStats::n_truncated << " truncated, "
+              << SurvivorSelectionStats::n_replicated
+              << " replicated, distinct pool sizes summing to "
+              << SurvivorSelectionStats::pool_size_sum << "\n";
     if (DemotionStats::final_front.has_value()) {
         std::cout << "Final first front: "
                   << DemotionStats::final_front->n_members << " members, "

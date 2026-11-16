@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 52> k_config_keys{{
+inline constexpr std::array<ConfigKey, 53> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -166,6 +166,16 @@ inline constexpr std::array<ConfigKey, 52> k_config_keys{{
      "FRETISH only, under nsga2-apportion: demote a realizable candidate one "
      "front\n"
      "when another realizable one is proved strictly stronger.\n"},
+    {"genetic", "maximality_removal", &Config::maximality_removal,
+     KeyCheck::None, KeyReader::Fretish,
+     "With maximality_demotion on, remove a candidate the rule flags from the "
+     "(mu + lambda) pool at survivor selection instead of moving it one front "
+     "down, so a gutted repair keeps no slot even when the pool is smaller "
+     "than population_size. The candidate proved stronger stays. The parent "
+     "ordering still demotes. Requires maximality_demotion.",
+     "With maximality_demotion: remove the flagged candidate at survivor "
+     "selection\n"
+     "instead of demoting it. Requires maximality_demotion.\n"},
     {"fitness", "weight_syntactic", &Config::fitness_weight_syntactic,
      KeyCheck::NonNegative, KeyReader::Both,
      "Syntactic similarity component weight. The defaults match AuRUS's "

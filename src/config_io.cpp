@@ -303,6 +303,17 @@ void require_elitism_below_selection(const Config& cfg) {
     }
 }
 
+// Removal is a mode of maximality demotion, which computes the flags it
+// reads, so on its own it would do nothing. Rejected rather than ignored, so a
+// sweep that sets it alone does not silently run the base search.
+void require_demotion_for_removal(const Config& cfg) {
+    if (cfg.maximality_removal && !cfg.maximality_demotion) {
+        throw std::runtime_error(
+            "config: genetic.maximality_removal requires "
+            "genetic.maximality_demotion = true");
+    }
+}
+
 Config apply_toml(const toml::table& tbl) {
     warn_unknown_keys(tbl, config_key_spec(), "");
     Config cfg;
@@ -316,6 +327,8 @@ Config apply_toml(const toml::table& tbl) {
             require_termination_budget(cfg);
         } else if (entry.member == ConfigMember{&Config::selection_scheme}) {
             require_elitism_below_selection(cfg);
+        } else if (entry.member == ConfigMember{&Config::maximality_removal}) {
+            require_demotion_for_removal(cfg);
         }
     }
     return cfg;

@@ -54,7 +54,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 69;
+constexpr int k_schema_version = 70;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -472,6 +472,22 @@ void write_run_manifest(const std::string& output_dir,
         // Candidates maximality demotion moved one front down at survivor
         // selection, over every generation. Zero wherever the key is off.
         {"n_maximality_demotions", DemotionStats::n_demoted},
+        // Candidates maximality_removal erased from the survivor pool instead
+        // of demoting, over every generation. Zero wherever the key is off.
+        {"n_maximality_removals", DemotionStats::n_removed},
+        // Selections where removal would have emptied the pool and demoted
+        // instead. Zero wherever the key is off.
+        {"n_maximality_removal_fallbacks", DemotionStats::n_removal_fallbacks},
+        // Every Nsga2Apportion survivor selection, and those whose distinct
+        // pool (after any removal) was truncated to population_size or
+        // replicated up to it; pool_size_sum / selections is the mean distinct
+        // pool. Counted whether or not demotion is on; zero under the other
+        // schemes.
+        {"survivor_selection",
+         {{"selections", SurvivorSelectionStats::n_selections.load()},
+          {"truncated", SurvivorSelectionStats::n_truncated.load()},
+          {"replicated", SurvivorSelectionStats::n_replicated.load()},
+          {"pool_size_sum", SurvivorSelectionStats::pool_size_sum.load()}}},
         // The final population's first front by objectives alone, and its
         // realizable members another realizable member is proved strictly
         // stronger than. Measured whether or not demotion is on; null without

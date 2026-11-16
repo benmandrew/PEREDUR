@@ -149,6 +149,8 @@ Config golden_config() {
     // Off, its default: selection then runs no proof, so the goldens hold what
     // they held before the rule existed.
     cfg.maximality_demotion = false;
+    // Off, its default, and inert while demotion is off.
+    cfg.maximality_removal = false;
     // At its default of 0 the order crossover returns before reading a verdict
     // or drawing. The golden fitness has no status objective, so no parent
     // here reads realizable at any value; pinned so that stays a decision.
@@ -209,19 +211,21 @@ double spec_size(const Specification& spec) {
 /// specifications, the other larger ones -- so NSGA-II ordering is
 /// non-degenerate and the population golden is sensitive to selection changes.
 /// Stubs rather than the real fitness functions, which need external tools.
-AggregateWeightedFitnessFunction golden_fitness() {
+double golden_compact(const Specification& spec) {
     constexpr double k_compact_scale = 100.0;
+    return 1.0 / (1.0 + (spec_size(spec) / k_compact_scale));
+}
+
+double golden_expressive(const Specification& spec) {
     constexpr double k_expressive_scale = 400.0;
+    const double scaled = spec_size(spec) / k_expressive_scale;
+    return scaled > 1.0 ? 1.0 : scaled;
+}
+
+AggregateWeightedFitnessFunction golden_fitness() {
     return AggregateWeightedFitnessFunction(
-        {{[](const Specification& spec) {
-              return 1.0 / (1.0 + (spec_size(spec) / k_compact_scale));
-          },
-          1.0, "compact"},
-         {[](const Specification& spec) {
-              const double scaled = spec_size(spec) / k_expressive_scale;
-              return scaled > 1.0 ? 1.0 : scaled;
-          },
-          1.0, "expressive"}});
+        {{golden_compact, 1.0, "compact"},
+         {golden_expressive, 1.0, "expressive"}});
 }
 
 struct GoldenRun {
@@ -687,6 +691,39 @@ TEST(test_evolved_population_is_pinned) {
                "; the evolved population has changed. If the draw-sequence "
                "golden still passes, the change is in scoring, ordering, "
                "elitism, padding or selection rather than in breeding");
+}
+
+// The golden run with a status objective that reads realizable everywhere and
+// maximality demotion on, so the proof runs and flags at both applications.
+// The hash covers the draw stream and the evolved population. It was recorded
+// from the build before maximality_removal existed, so it pins that the key,
+// off, changes neither.
+TEST(test_demotion_run_is_pinned_with_removal_off) {
+    constexpr std::uint64_t k_expected_hash = 4787815568288516762ULL;
+
+    Config cfg = golden_config();
+    cfg.maximality_demotion = true;
+    cfg.maximality_removal = false;
+    const AggregateWeightedFitnessFunction fns(
+        {{[](const Specification&) { return k_status_realizable; }, 1.0,
+          "status"},
+         {golden_compact, 1.0, "compact"},
+         {golden_expressive, 1.0, "expressive"}});
+    auto trace = std::make_shared<DrawTrace>();
+    const RandomSource source = make_recording_source(k_seed, trace);
+    std::vector<ScoredSpecification> population =
+        score_population(cfg, golden_population(), fns);
+    for (std::size_t gen = 0; gen < k_generations; ++gen) {
+        population = evolve_generation(cfg, population, k_target_size,
+                                       k_elitism_size, fns, {}, source);
+    }
+    const std::uint64_t hash =
+        fnv1a(render_trace(*trace) + "\n==\n" + render_population(population));
+    expect(hash == k_expected_hash,
+           "demotion golden: hash " + std::to_string(hash) + " != pinned " +
+               std::to_string(k_expected_hash) +
+               "; maximality_removal off must leave a demotion run's draws "
+               "and population as they were before the key existed");
 }
 
 TEST(test_same_seed_reproduces_evolution) {
