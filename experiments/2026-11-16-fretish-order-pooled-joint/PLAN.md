@@ -2,13 +2,17 @@
 
 The net subsumption share of 2026-11-09-fretish-order-pooled compares each arm with base alone. It is a binary measure, so it does not rank the arms: only-climb's +0.90 and full's +0.37 over base say nothing about full against only-climb. It also favours an arm whose search is base's, since only-climb's maximal set is base's own outputs climbed. This pass scores five arms against one shared reference instead. The arms are base, the three features on the collaboration slides (only-climb, only-gate, only-blame) and full, all under nsga2-apportion, on the same 18 subjects and 30 seeds.
 
-## Measure
+## Measures
 
-For each subject, take the frontier classes of the five arms, merge classes that are equivalent across arms, and keep the classes that no class of another arm strictly implies. That is the *joint front*. An arm's *reach* is the share of the joint front for which the arm holds an equivalent or stronger class. Reach is one number per arm and subject on a common scale, so arms can be ranked.
+Three measures, fixed before the results. All three come from this pass's outputs: the fingerprints in `fp/<subject>/fp.tsv` and the verdicts in `subsumption-av3.csv`.
 
-Reported, per arm: the median and mean reach over subjects. Per pair of arms: the paired difference in reach, with the exact Wilcoxon signed-rank p over subjects and a Holm correction over the ten pairs. The reduction also reports the net subsumption share of the six new contrasts (`family = "joint"` in `design.toml`), as `pooled_reduce.py` does for the four against base. valu3s-uc6 and lift-plus-cruise-mini are sampled (100 draws an arm), so their reach is estimated from the drawn nodes and is reported apart. fsm-lmcps has no base member and is reported but carries almost no information.
+1. **Accepted-trace share (the ranking).** Each node's share of the subject's 32,768 sampled words that it accepts, read from `fp.tsv`. A repair that accepts fewer words is stronger, and the order agrees with implication: if A implies B, A accepts a subset of B's words. Unlike implication, it also orders incomparable repairs, and an arm's score does not depend on which other arms are pooled. An arm's score on a subject is the median share over its frontier classes. Arms are compared pair by pair on the paired difference over subjects, with the exact Wilcoxon signed-rank p and a Holm correction over the ten pairs, and the Hodges–Lehmann shift with its 95% interval. The words are drawn from models of this pool's members, so the scale holds within a subject and scores are not compared across subjects. All words count equally. This measure was planned for the PEREDUR paper and dropped for time.
+2. **Net subsumption share (the paper's measure).** For the six new contrasts (`family = "joint"` in `design.toml`), as `pooled_reduce.py` reports it for the four against base, with Holm within each family. It is valid head to head. Scores taken against different references are not compared with each other.
+3. **Joint-front reach (supplementary).** For each subject, take the frontier classes of the five arms, merge classes that are equivalent across arms, and keep the classes that no class of another arm strictly implies. That is the *joint front*. An arm's *reach* is the share of the joint front for which it holds an equivalent or stronger class, tested pair by pair as in measure 1. Reach depends on which arms are pooled, and a class incomparable with the joint front counts as not reached, so it is reported as a second view only.
 
-The question for the slides is whether full's repairs reach less of the joint front than only-climb's. The pass decides that by the full-against-only-climb reach difference and its Holm p. A null result is reported as such.
+valu3s-uc6 and lift-plus-cruise-mini are sampled (100 draws an arm), so their frontier, and every measure built on it, is estimated from the drawn nodes and is reported apart. fsm-lmcps has no base member and is reported but carries almost no information.
+
+The question for the slides is whether full's repairs are weaker than only-climb's. Measure 1 decides it, by the full-against-only-climb difference and its Holm p. Measure 2's full-over-climb share is reported beside it. Where the two disagree, both are reported and the disagreement is stated. A null result is reported as such.
 
 ## Inputs
 
