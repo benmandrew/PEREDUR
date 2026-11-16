@@ -1,0 +1,50 @@
+name = "2026-11-17-fretish-order-xover-rate"
+branch = "campaign/fretish-order-xover-rate"
+profile = "fretish-order-xover-rate"
+description = "Order crossover at p_order_crossover = 1.0 against its control, on base and lean, at crossover rates 0.1, 0.3 and 0.5, over the small set and rad's ten cores, seeds 0-29. The ablation's 0.3 under rate 0.1 reached about 3% of children. PLAN.md gives the design and the analysis."
+
+# Split by subject, not by seed, as in 2026-11-09-fretish-order-cores: each
+# host runs all 30 seeds of its own subjects, so every arm of a (subject, seed)
+# cell runs on one host and the pooled pass can pool each subject on its host.
+# Both hosts take every seed, which a campaign-level table refuses as an
+# overlap, so the level gives each host no seeds and every phase names its own.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# The flags of 2026-11-05-fretish-order's line, with sweep X, its own tree and
+# --parallel 2. The confined phases below run fewer jobs than the 15 of the
+# earlier campaigns, and run_experiments.py would then derive more threads per
+# run; stating 2 keeps every run at the earlier campaigns' thread count, so a
+# cell's arms match whatever CPUs its phase holds.
+configs = "python3 scripts/gen_configs.py --sweeps X --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 2 --out-dir experiments/configs-fretish-order-xover-rate --pin-vintage"
+
+# 7 subjects x 12 arms x 30 seeds = 2,520 runs. The three timing-bound
+# specifications sit here, on one CPU set for the whole campaign. av3 CPUs
+# 16-31 come free when entry 071 (fretish-order-pooled-joint) ends, expected
+# 21:30-22:30 on Mon 16 Nov; this entry queues behind it. 0-15 stay with
+# veribee-33 until Tue 17 Nov 09:00. 8 jobs x 2 threads fill the 16 CPUs, the
+# per-agent share.
+[[phases]]
+name = "run-av3"
+profile = "fretish-order-xover-rate"
+specs = ["lift-plus-cruise-mini", "liquid-mixer", "valu3s-uc6",
+         "rad-core-10", "rad-core-12-18", "rad-core-45", "rad-core-55"]
+hosts = { av3 = "0-29" }
+confine = { av3 = { cpus = "16-31", memory_max = "32G" } }
+jobs = 8
+
+# 12 subjects x 12 arms x 30 seeds = 4,320 runs. av2 CPUs 0-5 are free until
+# Tue 17 Nov 09:00 and 6-31 held until then, so the phase starts on 0-5 at 3
+# jobs x 2 threads. After 09:30 on Tue, widen it to cpus = "0-15",
+# memory_max = "32G", jobs = 8, commit, dequeue and enqueue again; resume
+# keeps the finished rows (PLAN.md, Launch).
+[[phases]]
+name = "run-av2"
+profile = "fretish-order-xover-rate"
+specs = ["fsm", "fsm-timing", "fsm-combined", "mode-arbiter", "takeoff",
+         "fsm-lmcps", "rad-core-1-18", "rad-core-17-18", "rad-core-33",
+         "rad-core-61", "rad-core-65", "rad-core-68"]
+hosts = { av2 = "0-29" }
+confine = { av2 = { cpus = "0-5", memory_max = "12G" } }
+jobs = 3

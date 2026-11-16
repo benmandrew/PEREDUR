@@ -464,6 +464,40 @@ def _pruned_sweep() -> list[tuple[str, dict]]:
 
 SWEEP_P: list[tuple[str, dict]] = _pruned_sweep()
 
+# The crossover rates and the order-crossover probability of the 2026-11-17
+# arms. In sweep O, order crossover fires only inside the crossover draw, so
+# p_order_crossover = 0.3 under crossover_rate = 0.1 reached about 3% of
+# children; these arms set it to 1.0 and raise the crossover rate.
+XOVER_RATES: tuple[float, ...] = (0.1, 0.3, 0.5)
+XOVER_P_ORDER: float = 1.0
+
+
+def _xover_rate_sweep() -> list[tuple[str, dict]]:
+    """Order crossover at p = 1.0, at three crossover rates.
+
+    At each rate r, "base" and "lean" are sweep O's base and sweep P's lean,
+    and "only-xover" and "lean-xover" add p_order_crossover = 1.0 to each.
+    A level is named cr<100 r>-<arm>, so cr30-lean-xover is lean plus order
+    crossover at crossover_rate 0.3. Every arm states crossover_rate and every
+    order key, as in sweep O. ORDER_FEATURES is left alone: archived campaigns
+    regenerate sweeps O and P from it, at 0.3.
+    """
+    base = dict(SWEEP_O)["base"]
+    lean = dict(SWEEP_P)["lean"]
+    on = {"p_order_crossover": XOVER_P_ORDER}
+    levels: list[tuple[str, dict]] = []
+    for rate in XOVER_RATES:
+        tag = f"cr{round(rate * 100)}"
+        rate_key = {"crossover_rate": rate}
+        levels += [(f"{tag}-base", {**base, **rate_key}),
+                   (f"{tag}-only-xover", {**base, **on, **rate_key}),
+                   (f"{tag}-lean", {**lean, **rate_key}),
+                   (f"{tag}-lean-xover", {**lean, **on, **rate_key})]
+    return levels
+
+
+SWEEP_X: list[tuple[str, dict]] = _xover_rate_sweep()
+
 # Keys whose built-in default has changed at least once since campaigns began
 # being archived. A generated config states a key only where a sweep overrides
 # it, so everything else is inherited from the binary at run time — which means
@@ -486,10 +520,12 @@ SWEEPS: list[tuple[str, list]] = [
     ("R", SWEEP_R),
     ("O", SWEEP_O),
     ("P", SWEEP_P),
+    ("X", SWEEP_X),
 ]
 
-# Sweeps emitted when --sweeps is omitted. O is held back, so a grid generated
-# without --sweeps stays byte-identical to the one before it existed.
+# Sweeps emitted when --sweeps is omitted. O, P and X are held back, so a grid
+# generated without --sweeps stays byte-identical to the one before they
+# existed.
 DEFAULT_SWEEPS: list[str] = ["A", "B", "C", "R"]
 
 # ── TLSF campaign grid ───────────────────────────────────────────────────────
