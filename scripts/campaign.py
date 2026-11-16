@@ -1701,22 +1701,24 @@ PHASE_KINDS = ("run", "score", "compare", "fingerprint", "pool")
 UNSEEDED_KINDS = ("compare", "fingerprint", "pool")
 RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts",
                   "confine"}
-# What `confine` may set for one host: a CPU set and a memory cap on a run
-# phase's runner, for a campaign that shares a host with other users' jobs.
+# What `confine` may set for one host: a CPU set and a memory cap on the
+# runner of a run, compare, fingerprint or pool phase, for a campaign that
+# shares a host with other users' jobs. A score phase pins its own workers.
 CONFINE_KEYS = ("cpus", "memory_max")
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s")
 SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
                     "specs", *SCORE_BUDGET_KEYS}
 COMPARE_BUDGET_KEYS = ("jobs", "black_timeout", "wall_timeout", "vmem_kb")
-COMPARE_PHASE_KEYS = {"name", "kind", "pairs", "out", "hosts",
+COMPARE_PHASE_KEYS = {"name", "kind", "pairs", "out", "hosts", "confine",
                       *COMPARE_BUDGET_KEYS}
 FINGERPRINT_BUDGET_KEYS = ("words", "seed", "workers", "black_timeout")
 FINGERPRINT_PATH_KEYS = ("subjects", "members", "work", "out")
-FINGERPRINT_PHASE_KEYS = {"name", "kind", "pairs", "hosts", "design",
+FINGERPRINT_PHASE_KEYS = {"name", "kind", "pairs", "hosts", "design", "confine",
                           *FINGERPRINT_PATH_KEYS, *FINGERPRINT_BUDGET_KEYS}
 POOL_PATH_KEYS = ("design", "subjects", "out")
-POOL_PHASE_KEYS = {"name", "kind", "hosts", "copy_from", *POOL_PATH_KEYS}
+POOL_PHASE_KEYS = {"name", "kind", "hosts", "copy_from", "confine",
+                   *POOL_PATH_KEYS}
 KIND_PHASE_KEYS = {"run": RUN_PHASE_KEYS, "score": SCORE_PHASE_KEYS,
                    "compare": COMPARE_PHASE_KEYS,
                    "fingerprint": FINGERPRINT_PHASE_KEYS,
@@ -1997,17 +1999,14 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
             raise CampaignError(f"{where}: unknown key(s) {', '.join(unknown)} "
                                 f"on a {kind} phase; known: "
                                 f"{', '.join(sorted(allowed))}")
-        if kind == "compare":
-            normalised.append(normalise_compare_phase(phase, where, name,
-                                                      seeds_by_host))
-            continue
-        if kind == "fingerprint":
-            normalised.append(normalise_fingerprint_phase(phase, where, name,
-                                                          seeds_by_host))
-            continue
-        if kind == "pool":
-            normalised.append(normalise_pool_phase(phase, where, name,
-                                                   seeds_by_host))
+        if kind in UNSEEDED_KINDS:
+            normalise = {"compare": normalise_compare_phase,
+                         "fingerprint": normalise_fingerprint_phase,
+                         "pool": normalise_pool_phase}[kind]
+            record = normalise(phase, where, name, seeds_by_host)
+            record["confine"] = merge_confine(confine, phase, where,
+                                              seeds_by_host)
+            normalised.append(record)
             continue
         profile = phase.get("profile", raw.get("profile"))
         if kind == "score":
@@ -2068,20 +2067,13 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
                     and all(isinstance(v, str) for v in value)):
                 raise CampaignError(f"{where}: {key} must be an array of "
                                     f"strings")
-        # A phase's table replaces the campaign's entry for each host it
-        # names; the others keep the campaign's.
-        phase_confine = dict(confine)
-        if phase.get("confine") is not None:
-            phase_confine.update(parse_confine(phase["confine"],
-                                               f"{where}: confine",
-                                               seeds_by_host))
         normalised.append({"name": phase.get("name", profile), "kind": "run",
                            "profile": profile, "jobs": jobs,
                            "sweeps": phase.get("sweeps"),
                            "specs": phase.get("specs"),
                            "hosts": phase_hosts,
-                           "confine": {h: c for h, c in phase_confine.items()
-                                       if c}})
+                           "confine": merge_confine(confine, phase, where,
+                                                    seeds_by_host)})
 
     build = raw.get("build", DEFAULT_BUILD_CMD)
     if not isinstance(build, str) or not build:
@@ -2138,6 +2130,18 @@ def normalise_score_phase(phase: dict, where: str, profile,
     return {"name": phase.get("name", Path(out).name), "kind": "score",
             "profile": profile, "jobs": None, "sweeps": None, "specs": specs,
             "hosts": phase_hosts, "results": results, "out": out, **budgets}
+
+
+def merge_confine(confine: dict, phase: dict, where: str,
+                  seeds_by_host: dict) -> dict:
+    """The phase's host -> limits map: the campaign's ``confine``, with the
+    phase's own table replacing the entry of each host it names. A host left
+    with ``{}`` runs unconfined, so it is dropped."""
+    merged = dict(confine)
+    if phase.get("confine") is not None:
+        merged.update(parse_confine(phase["confine"], f"{where}: confine",
+                                    seeds_by_host))
+    return {h: c for h, c in merged.items() if c}
 
 
 def normalise_compare_phase(phase: dict, where: str, campaign: str,
@@ -2484,7 +2488,7 @@ def confine_unit(entry: dict, index: int) -> str:
 
 
 def confine_prefix(phase: dict, host: str | None, unit: str) -> list:
-    """The words a confined run phase's launch starts with, or none.
+    """The words a confined phase's launch starts with, or none.
 
     `systemd-run --user --scope` sets the memory cap and `taskset -c` the CPU
     set. AllowedCPUs= is not used: the lab hosts' user managers lack the
@@ -3637,9 +3641,11 @@ def tick_compare_phase(entry: dict, campaign: dict, phase: dict, index: int,
         write_entry(entry["path"], entry)
         print(f"tick: {entry['file']} {entry['state']}: {entry['last_error']}")
         return 1
+    prefix = confine_prefix(phase, host, confine_unit(entry, index))
     entry["state"] = "running"
     entry["pid"] = os.getpid()
-    log_line(entry, f"phase {index} ({phase['name']}) started")
+    log_line(entry, f"phase {index} ({phase['name']}) started"
+             + (f" under {' '.join(prefix)}" if prefix else ""))
     write_entry(entry["path"], entry)
     what = ("pairs" if phase_kind(phase) == "compare" else "subjects")
     print(f"tick: {entry['file']} phase {index} ({phase['name']}) on {what} "
@@ -3648,11 +3654,12 @@ def tick_compare_phase(entry: dict, campaign: dict, phase: dict, index: int,
         entry["state"] = "queued"
         log_line(entry, "dry run, phase not executed")
         write_entry(entry["path"], entry)
-        print(f"  would run: {phase_command(phase, [], host)}")
+        print(f"  would run: {phase_command(phase, [], host, prefix=prefix)}")
         if blocked is not None:
             print(f"  blocked: {blocked}")
         return 0
-    code = run_phase(root, phase, [], entry_log_path(entry, root), host)
+    code = run_phase(root, phase, [], entry_log_path(entry, root), host,
+                     prefix=prefix)
     return finish_phase(entry, campaign, phase, index, code)
 
 

@@ -1192,6 +1192,51 @@ phases = [ { profile = "fretish-order-pairs", jobs = 1 },
                f"a score phase, which pins its own workers, refuses confine "
                f"({got!r})")
 
+    # The unseeded kinds take confine too, so a compare pass can share a host.
+    write_declaration(decl_root, "confunseeded", """
+name = "confunseeded"
+branch = "feat/x"
+hosts = { av2 = "", av3 = "" }
+confine = { av3 = { cpus = "16-31", memory_max = "24G" } }
+
+[[phases]]
+kind = "pool"
+design = "d.toml"
+subjects = "s-{host}.txt"
+out = "m"
+
+[[phases]]
+kind = "fingerprint"
+subjects = "s-{host}.txt"
+members = "m"
+work = "w"
+out = "o"
+confine = { av3 = { cpus = "16-23" } }
+
+[[phases]]
+kind = "compare"
+pairs = "p-{host}.csv"
+out = "c-{host}.csv"
+jobs = 16
+confine = { av2 = { cpus = "0-7" }, av3 = {} }
+""")
+    pool_p, fp_p, cmp_p = C.load_campaign("confunseeded", decl_root)["phases"]
+    check(C.confine_prefix(pool_p, "av3", unit),
+          ["systemd-run", "--user", "--scope", "-q", "--collect", "--unit",
+           unit, "-p", "MemoryMax=24G", "-p", "MemorySwapMax=0",
+           "taskset", "-c", "16-31"],
+          "a pool phase inherits the campaign's confine")
+    check(C.confine_prefix(pool_p, "av2", unit), [],
+          "and only on the host it names")
+    check(C.confine_prefix(fp_p, "av3", unit), ["taskset", "-c", "16-23"],
+          "a fingerprint phase's own table replaces the campaign's entry")
+    check((C.confine_prefix(cmp_p, "av2", unit), C.confine_prefix(cmp_p, "av3", unit)),
+          (["taskset", "-c", "0-7"], []),
+          "a compare phase's table confines av2 and frees av3")
+    check(C.phase_command(cmp_p, [], "av2", prefix=C.confine_prefix(cmp_p, "av2", unit))
+          .startswith("taskset -c 0-7 " + C.phase_launcher(cmp_p)),
+          True, "and the compare launch starts with the prefix")
+
     # Every profile the phases name, not only the campaign-level default: the
     # second phase's configs directory is the one nothing else would check.
     write_declaration(decl_root, "twoprofiles", """
