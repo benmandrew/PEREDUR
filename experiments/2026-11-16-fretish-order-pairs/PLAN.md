@@ -18,4 +18,14 @@ av2 CPUs 18-31 under a 24 GB cap, announced to veribee-33, veribee-0b and gawain
 
 ## Result
 
-Pending.
+- 2026-11-16 15:24. Entry 075 done: 810 rows at commit `3d15f9b`, clean build, no run or compare step timed out. Collected at 15:27 with `campaign.py collect --profile fretish-order-pairs --host av2`. `interactions.py` in this directory computes the table below from the merged CSV and the first pass.
+
+The interaction of a and b is (full − no-a-b) − (full − no-a) − (full − no-b), so a positive value means removing both loses more than the two single removals together, which is what overlapping features would show. Each value is the mean over (spec, seed) cells in percentage points, with a Wilcoxon signed-rank p over the non-zero cells. Ideal rate uses the 7 specifications with a reachable ideal (210 cells), and found-repair rate uses all 9 (270 cells). The timing-bound rows (lift-plus-cruise-mini, valu3s-uc6, liquid-mixer) compare arms across commits, since the first pass ran at `f7ffb99` and `43b2fce`, so they are reported apart.
+
+| Pair | Ideal, all | Ideal, not timing-bound | Ideal, timing-bound | Found, all |
+|---|---|---|---|---|
+| climb + gate | +3.8 pp, p = 0.074 | +2.0 pp, p = 0.38 | +8.3 pp, p = 0.20 | 0.0 pp |
+| climb + demote | −0.5 pp, p = 1.0 | −0.7 pp, p = 1.0 | 0.0 pp | 0.0 pp |
+| blame + scale | −1.9 pp, p = 0.55 | −3.3 pp, p = 0.23 | +1.7 pp, p = 0.85 | −0.7 pp, p = 0.50 |
+
+No interaction is significant on either rate. Climb and gate is the one positive one, in the direction of overlap, and its size (+3.8 pp) matches the climb's own addition-removal gap in the first pass (4.3 pp, p = 0.072). Most of it sits on the timing-bound specifications, where no-climb-gate reaches the ideal in 3.3% of runs against 15.0% for no-climb and 25.0% for no-gate, but those cells cross commits. Outside them it falls to +2.0 pp. Climb and demote show no interaction, so the two do not overlap on ideal rate even though both act on gutted repairs. Blame and scale lean the other way (−1.9 pp), and their found-repair rate on fsm-lmcps is 0 of 30, as for no-blame and no-scale alone. The wall times ran at 14 jobs against the first pass's load, so they are not compared. As the plan warned, power is low, and these nulls do not show the pairs are independent.
