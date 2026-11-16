@@ -10,7 +10,7 @@ Power is low: the climb's own addition-removal gap, the largest, reached only p 
 
 ## Hosts
 
-av3 CPUs 8-23 under a 24 GB cap, announced to veribee-33, veribee-0b and gawain-76 before enqueuing. veribee-33 holds av3 CPUs 0-7 and the GPU until Tue 17 Nov 11:00; nothing else holds av3. The user approved the run in session on Mon 16 Nov.
+av2 CPUs 16-31 under a 24 GB cap, announced to veribee-33, veribee-0b and gawain-76 before enqueuing. veribee-33 holds av2 CPUs 0-15 and the GPU until Tue 17 Nov 11:00, and nothing else holds av2. av3 was the first choice, but on Mon 16 Nov 12:10 UTC it did not answer ssh (no route to host). The user approved the run in session on Mon 16 Nov.
 
 ## Estimate
 

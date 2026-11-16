@@ -3,10 +3,11 @@ branch = "campaign/fretish-order-pairs"
 profile = "fretish-order-pairs"
 description = "The small set's full arm without each of three feature pairs (climb+gate, climb+demote, blame+scale), seeds 0-29, for the interactions the one-at-a-time ablation of 2026-11-05-fretish-order cannot attribute. PLAN.md gives the questions."
 
-# av3 CPUs 8-23 under one 24 GB cap: veribee-33 holds 0-7 and the GPU, and
-# 24-31 stay free. Within the 16-core, 32 GB per-agent share.
-hosts = { av3 = "0-29" }
-confine = { av3 = { cpus = "8-23", memory_max = "24G" } }
+# av2 CPUs 16-31 under one 24 GB cap: veribee-33 holds 0-15 and the GPU
+# until Tue 17 Nov 11:00, and av3 was unreachable on Mon 16 Nov. Within the
+# 16-core, 32 GB per-agent share.
+hosts = { av2 = "0-29" }
+confine = { av2 = { cpus = "16-31", memory_max = "24G" } }
 
 build = "sh -c 'cmake --build build-release'"
 
