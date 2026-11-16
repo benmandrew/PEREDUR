@@ -53,7 +53,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 65;
+constexpr int k_schema_version = 66;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -152,9 +152,16 @@ nlohmann::json tool_calls_json() {
                               {"total_s", total_s}};
     };
     return {
+        // `killed` beside `timeouts`: a signal-killed count is scored as
+        // unknown, as a timed-out one is.
         {"ltl2tgba",
-         row(Ltl2tgbaStats::n_cache_misses, Ltl2tgbaStats::n_cache_hits,
-             Ltl2tgbaStats::n_timeouts, Ltl2tgbaStats::total_time_s)},
+         [&row] {
+             nlohmann::json ltl2tgba =
+                 row(Ltl2tgbaStats::n_cache_misses, Ltl2tgbaStats::n_cache_hits,
+                     Ltl2tgbaStats::n_timeouts, Ltl2tgbaStats::total_time_s);
+             ltl2tgba["killed"] = Ltl2tgbaStats::n_killed;
+             return ltl2tgba;
+         }()},
         // Every ltlfilt exec, over both counted entry points, which is the
         // set total_s is over. Its per-entry-point split is in `caches`.
         {"ltlfilt", row(LtlfiltStats::n_execs(), LtlfiltStats::n_remove_wm_hits,
