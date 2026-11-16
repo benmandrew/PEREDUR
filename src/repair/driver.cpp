@@ -172,8 +172,8 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
     }
     AggregateWeightedFitnessFunction fitness_function =
         get_fitness_function(original_spec, cfg);
-    const std::vector<FilterFunction> filter_functions =
-        get_filter_functions(original_spec, global_sat_checker());
+    const std::vector<FilterFunction> filter_functions = get_filter_functions(
+        original_spec, global_sat_checker(), cfg.max_scoring_failure_rate);
     std::vector<ScoredSpecification> population = original_population(
         original_spec, fitness_function, cfg.population_size);
 

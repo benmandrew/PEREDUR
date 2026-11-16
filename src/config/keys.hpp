@@ -494,8 +494,10 @@ inline constexpr std::array<ConfigKey, 53> k_config_keys{{
      "Same answers, 4-5 ms less start-up a call.\n"},
     {"runtime", "max_scoring_failure_rate", &Config::max_scoring_failure_rate,
      KeyCheck::Probability, KeyReader::Both,
-     "Fraction of a generation whose fitness scoring may throw before the run "
-     "aborts. A single failure per generation is always tolerated. Default "
+     "Fraction of a generation whose fitness scoring, or whose check in any "
+     "one "
+     "per-generation filter, may throw before the run aborts. A single failure "
+     "per generation is always tolerated. Default "
      "0.15, set while an ltl2tgba timeout still dropped its individual; a "
      "timeout now scores the pair as unknown instead.",
      "0.15, not 0.05: set while an ltl2tgba timeout still dropped its "

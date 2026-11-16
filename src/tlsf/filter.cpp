@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "filter/implication.hpp"
+#include "filter/implication_check.hpp"
 #include "genetic/generation.hpp"
 #include "prop_formula.hpp"
 #include "runner/black.hpp"
@@ -150,9 +151,8 @@ std::optional<bool> tlsf_spec_implies(const tlsf::Specification& from,
             1, std::memory_order_relaxed);
     }
     const tlsf::Specification& target = residual.has_value() ? *residual : dest;
-    const std::optional<bool> sat = checker.check_satisfiability(
-        "(" + from.to_ltl() + ") & !(" + target.to_ltl() + ")",
-        QueryPolarity::ExpectUnsat);
+    const std::optional<bool> sat = implication_query(
+        checker, "(" + from.to_ltl() + ") & !(" + target.to_ltl() + ")");
     if (!sat.has_value()) {
         // Counted as the FRETISH spec_implies counts it, so the implication
         // report's timeout figure covers both paths.

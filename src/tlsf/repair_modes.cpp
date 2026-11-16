@@ -31,7 +31,8 @@ SearchOutput<Specification> run_monolithic(
             [](const Specification& spec) { return write(spec); }, budget,
             stream);
     const std::vector<FilterFunctionT<Specification>> filters =
-        get_filter_functions(original, global_sat_checker());
+        get_filter_functions(original, global_sat_checker(),
+                             cfg.max_scoring_failure_rate);
     const std::vector<Specification> seed_population(cfg.population_size,
                                                      original);
     SearchResult<Specification> searched =

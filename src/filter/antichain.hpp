@@ -248,6 +248,7 @@ inline void reset_stats() {
     ImplicationFilterStats::n_skipped.store(0, std::memory_order_relaxed);
     ImplicationFilterStats::n_duplicates.store(0, std::memory_order_relaxed);
     ImplicationFilterStats::n_timeouts.store(0, std::memory_order_relaxed);
+    ImplicationFilterStats::n_errors.store(0, std::memory_order_relaxed);
     ImplicationFilterStats::n_equivalent_collapsed.store(
         0, std::memory_order_relaxed);
     ImplicationFilterStats::n_fingerprint_refuted.store(
