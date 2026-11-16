@@ -2,7 +2,7 @@
 
 ## Summary
 
-The ablation in `2026-11-05-fretish-order` judged seven optional features of the PEREDUR genetic algorithm (GA) on 9 real small subjects from about 7 sources. This experiment repeats the same 16 arms on 110 *seeded mutants* drawn from 6 systems, so that each verdict rests on more subjects with a known *ideal* repair. The *full* configuration repairs a mutant back to an implication of its base in 34.2% of runs against 23.1% for *base*, a gain of 11.1 percentage points (pp) with p = 0.0001 and all 6 clusters up. Climb alone adds 16.7 pp. Gate saves time. Demote now costs time and buys nothing measurable.
+The ablation in `2026-11-05-fretish-order` judged seven optional features of the PEREDUR genetic algorithm (GA) on 9 real small subjects from about 7 sources. This experiment repeats the same 16 arms on 110 *seeded mutants* drawn from 6 systems, so that each verdict rests on more subjects with a known *ideal* repair. The *full* configuration repairs a mutant back to an implication of its base in 34.2% of runs against 23.1% for *base*, a gain of 11.1 percentage points (pp) with p = 0.0001 and all 6 clusters up. Climb alone adds 16.7 pp. Gate saves time. Demote now costs time and buys nothing measurable. A pruned default with only climb, gate and blame (`lean`) matches `full` on strength and runs 0.6 s faster per run at the median.
 
 | Feature | 9-subject verdict | Seeded verdict |
 |---|---|---|
@@ -20,7 +20,7 @@ A *base* B is a realisable FRETish specification with a fixed input/output parti
 
 A seeded corpus invites a shortcut, since one or two random mutations might undo the seed. The *trivial-reversion probe* measures that risk with the GA's own `mutate_specification` operator. It samples 5000 mutation chains of depth 1 and 2 from each O under the `base` arm's configuration and counts chains that end realisable and imply B. A subject is *headline* when both estimated probabilities, p1 and p2, are below 0.01, a threshold fixed before any arm ran. Of 248 mutants, 22 were trivial. The selection kept 120 subjects: 110 headline subjects (fsm 40 of 156, lmcps 36, rad 17, liquid-mixer 11, mode-arbiter 5, valu3s 1) and 10 trivial controls.
 
-The arms are those of the order campaign: `base`, `full`, `no-<f>` (full without feature f) and `only-<f>` (base with feature f). Every run used `nsga2-apportion` with a budget of 1000 individuals, a population of 100 and a 7200 s cap. Five seeds over 16 arms and 120 subjects make 9600 runs, of which 9598 produced rows. All runs used commit `b2d3b91c` from a clean build. Seed 0 took 200 min and seeds 1 to 4 took 801 min, at 8 parallel jobs on 16 cores under a 20 GB cap (`systemd-run --user --scope -q --collect -p MemoryMax=20G -p MemorySwapMax=0 taskset -c 0-15 ...`). No run or compare step timed out, and the two failures are an engine bug described under corpus findings.
+The arms are those of the order campaign: `base`, `full`, `no-<f>` (full without feature f) and `only-<f>` (base with feature f). Every run used `nsga2-apportion` with a budget of 1000 individuals, a population of 100 and a 7200 s cap. Five seeds over 16 arms and 120 subjects make 9600 runs, of which 9598 produced rows. All runs used commit `b2d3b91c` from a clean build. Seed 0 took 200 min and seeds 1 to 4 took 801 min, at 8 parallel jobs on 16 cores under a 20 GB cap (`systemd-run --user --scope -q --collect -p MemoryMax=20G -p MemorySwapMax=0 taskset -c 0-15 ...`). No run or compare step timed out, and the two failures are an engine bug described under corpus findings. At 8 jobs the machine was contended, so the absolute wall times in sweep O are about 30 s per run higher than on a quiet machine (see Pruned defaults); the contrasts between arms are unaffected.
 
 The unit of analysis is the subject, with each outcome averaged over its 5 seeds. Contrasts are paired differences over subjects, tested with the exact Wilcoxon signed-rank test. A *Holm correction* runs over the seven features, separately for each direction and outcome. Each contrast also reports a *Hodges–Lehmann (HL) shift* with a 95% interval, the number of clusters that moved up and down, and a 95% *cluster bootstrap* of the mean difference that resamples the 6 systems. Six clusters is few. The bootstrap is coarse, and one system (rad) can move a result on its own.
 
@@ -100,6 +100,30 @@ Climb holds in both directions and in every remaining cluster. Gate's strength g
 Each extra edit lowers the ideal rate in all three arms. Climb's margin over `full` narrows from 10 pp at 2 edits to 2 pp at 4 edits. One headline subject has a 5-edit seed and is left out of this table.
 
 The 10 trivial controls (2 clusters) reach an ideal rate of 0.92 under `base` and 1.00 under `full`, and no contrast is significant. They confirm the probe. Low-depth reversions make the task easy for every arm, which is why these subjects sit outside the headline set.
+
+## Pruned defaults
+
+The ablation points to a smaller default: climb and gate carry the strength gain, blame and gate save time, and the other four features buy nothing. Sweep P tests two candidates on the same 120 subjects and 5 seeds. `lean` is `full` without demote, scale, xover and verdict. `climb-gate` is `base` with only climb and gate. The sweep ran at 2 parallel jobs, the workstation's standing limit, against 8 jobs for sweep O. At 2 jobs a run takes about 15 s against about 47 s at 8, so sweep P also reruns `full` and `base` (`full-rerun`, `base-rerun`) and the pruned arms' wall times are compared with those reruns only.
+
+The reruns reproduce `full` and `base` exactly on ideal rate, found rate and repair count: with the budget set in individuals and a fixed seed, the search result does not depend on machine load, and only the wall time moves. Load inflated every sweep-O wall time by about 30 s per run (`full-rerun` against `full`: HL −29.1 s). The sweep-O wall contrasts between arms stand, since every arm ran under the same load, but their absolute sizes do not carry over to an unloaded machine.
+
+| Arm (headline, 110 subjects) | Ideal rate | Found-repair rate | Maximal repairs per run | Median wall time at 2 jobs |
+|---|---|---|---|---|
+| `base-rerun` | 0.231 | 0.933 | 25.4 | 15.3 s |
+| `full-rerun` | 0.342 | 0.922 | 13.4 | 15.4 s |
+| `lean` | 0.320 | 0.931 | 12.5 | 13.9 s |
+| `climb-gate` | 0.375 | 0.927 | 14.4 | 15.7 s |
+
+| Contrast | Ideal Δ | p | Clusters up/down | Bootstrap 95% | Wall HL shift |
+|---|---|---|---|---|---|
+| `lean` − `full-rerun` | −2.2 pp | 0.17 | 1/4 | [−7.5, 0.0] pp | −0.6 s [−1.0, −0.3], p = 0.0001 |
+| `climb-gate` − `full-rerun` | +3.3 pp | 0.23 | 2/4 | [−5.7, +17.0] pp | +0.9 s [+0.5, +1.3], p < 0.0001 |
+| `lean` − `base-rerun` | +8.9 pp | 0.002 | 6/0 | [+3.5, +22.6] pp | −0.5 s |
+| `climb-gate` − `base-rerun` | +14.4 pp | <0.0001 | 6/0 | [+4.8, +43.8] pp | +1.1 s |
+
+Neither pruned arm differs from `full` on ideal rate at the 5% level, and both keep the found-repair rate within 1 pp of it. `lean` is 0.6 s faster per run than `full` at the median, and its mean wall time is 1.5 s lower, about 10% of an unloaded run; its ideal rate sits 2.2 pp below, with a cluster-bootstrap interval that touches 0 from below. `climb-gate` is 0.9 s slower than `full` and has the highest ideal rate of any arm, 0.375, but its 3.3 pp lead rests on rad: without rad it falls to −1.7 pp (p = 0.43), and `lean` stays at −2.2 pp (p = 0.18). The uncorrected p values cover four planned contrasts.
+
+Either pruned arm can replace `full` as the default without a measurable loss of strength. `lean` keeps blame's time saving and drops the four features with no effect, so it is the smaller change from `full` and the faster arm.
 
 ## Corpus findings
 
