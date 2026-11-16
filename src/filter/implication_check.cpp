@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -303,6 +304,22 @@ std::optional<Specification> residual_destination(const Specification& from,
     return residual;
 }
 
+std::optional<bool> implication_query(SatisfiabilityChecker& checker,
+                                      const std::string& counterexample) {
+    // A raising query is undecided in the sense a timeout is, and every caller
+    // already reads undecided as "not shown to imply". Left to propagate, one
+    // unreadable black answer in the final implication sweep would end a run
+    // whose search had finished.
+    try {
+        return checker.check_satisfiability(counterexample,
+                                            QueryPolarity::ExpectUnsat);
+    } catch (const std::exception&) {
+        ImplicationFilterStats::n_errors.fetch_add(1,
+                                                   std::memory_order_relaxed);
+        return std::nullopt;
+    }
+}
+
 std::optional<bool> spec_implies(const Specification& from,
                                  const Specification& dest,
                                  SatisfiabilityChecker& checker) {
@@ -321,9 +338,8 @@ std::optional<bool> spec_implies(const Specification& from,
             1, std::memory_order_relaxed);
     }
     const Specification& target = residual.has_value() ? *residual : dest;
-    const std::optional<bool> sat = checker.check_satisfiability(
-        "(" + from.to_ltl() + ") & !(" + target.to_ltl() + ")",
-        QueryPolarity::ExpectUnsat);
+    const std::optional<bool> sat = implication_query(
+        checker, "(" + from.to_ltl() + ") & !(" + target.to_ltl() + ")");
     if (!sat.has_value()) {
         ImplicationFilterStats::n_timeouts.fetch_add(1,
                                                      std::memory_order_relaxed);

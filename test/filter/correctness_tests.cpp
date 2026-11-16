@@ -75,8 +75,9 @@ tlsf::Specification tlsf_spec(const std::string& main_body) {
 TEST(test_every_correctness_stage_has_a_gate_check) {
     const Config cfg;
     const Specification original = fretish_spec();
-    const std::vector<std::string> stages = correctness_stage_names(
-        get_filter_functions(original, global_sat_checker()));
+    const std::vector<std::string> stages =
+        correctness_stage_names(get_filter_functions(
+            original, global_sat_checker(), Config{}.max_scoring_failure_rate));
     expect(!stages.empty(),
            "correctness: the generation chain should run correctness "
            "stages");
@@ -94,8 +95,9 @@ TEST(test_every_tlsf_correctness_stage_has_a_gate_check) {
     const Config cfg;
     const tlsf::Specification original =
         tlsf_spec("INPUTS { a; } OUTPUTS { b; } GUARANTEE { G (a -> b); }");
-    const std::vector<std::string> stages = tlsf_correctness_stage_names(
-        get_filter_functions(original, global_sat_checker()));
+    const std::vector<std::string> stages =
+        tlsf_correctness_stage_names(get_filter_functions(
+            original, global_sat_checker(), Config{}.max_scoring_failure_rate));
     expect(!stages.empty(),
            "correctness: the TLSF generation chain should run correctness "
            "stages");
@@ -145,8 +147,9 @@ TEST(test_well_separation_is_the_last_check) {
 TEST(test_gate_only_row_has_no_stage_but_keeps_its_check) {
     const Config cfg;
     const Specification original = fretish_spec();
-    const std::vector<std::string> stages = correctness_stage_names(
-        get_filter_functions(original, global_sat_checker()));
+    const std::vector<std::string> stages =
+        correctness_stage_names(get_filter_functions(
+            original, global_sat_checker(), Config{}.max_scoring_failure_rate));
     expect(std::find(stages.begin(), stages.end(), "not-well-separated") ==
                stages.end(),
            "correctness: well-separation should run no per-generation stage");

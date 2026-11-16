@@ -28,6 +28,7 @@
 #include "genetic/accumulator.hpp"
 #include "genetic/climb.hpp"
 #include "genetic/demotion.hpp"
+#include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/order_crossover.hpp"
 #include "genetic/output_gate.hpp"
@@ -53,7 +54,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 66;
+constexpr int k_schema_version = 67;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -218,6 +219,7 @@ nlohmann::json implication_json() {
         {"skipped", ImplicationFilterStats::n_skipped.load()},
         {"duplicates", ImplicationFilterStats::n_duplicates.load()},
         {"timeouts", ImplicationFilterStats::n_timeouts.load()},
+        {"errors", ImplicationFilterStats::n_errors.load()},
         {"equivalent_collapsed",
          ImplicationFilterStats::n_equivalent_collapsed.load()},
         {"fingerprint_refuted",
@@ -493,6 +495,7 @@ void write_run_manifest(const std::string& output_dir,
           {"rule_subsumed", ClimbStats::n_rule_subsumed.load()},
           {"satisfiability_routed", ClimbStats::n_satisfiability_routed.load()},
           {"controller_hits", ClimbStats::n_controller_hits.load()},
+          {"gate_errors", ClimbStats::n_gate_errors.load()},
           {"wall_s", ClimbStats::wall_s}}},
         // What direction_gated did: free rewrites returned as the parent for
         // moving the forbidden way or for a refused sideways draw, and steps
@@ -530,6 +533,9 @@ void write_run_manifest(const std::string& output_dir,
         // Well-separation queries that raised instead of answering, resolved as
         // undecided (the candidate is dropped) rather than propagating.
         {"n_well_separation_errors", WellSeparationStats::n_errors.load()},
+        // Candidates a per-generation filter rejected because its check
+        // raised, within the budget make_predicate_filter allows.
+        {"n_filter_errors", FilterErrorStats::n_rejected},
         {"fitness_cache", fitness_cache_json()},
         {"caches", caches_json()},
         {"implication", implication_json()}};

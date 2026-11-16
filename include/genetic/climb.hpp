@@ -42,6 +42,8 @@ struct ClimbStats {
     inline static std::atomic<std::size_t> n_satisfiability_routed{0};
     /// Queries a stored controller was shown to realize.
     inline static std::atomic<std::size_t> n_controller_hits{0};
+    /// Gate checks that raised instead of answering, each refusing its step.
+    inline static std::atomic<std::size_t> n_gate_errors{0};
     /// Wall-clock seconds spent in climb_repairs, from the distinct repairs in
     /// to the distinct results out. Written by the calling thread alone.
     inline static double wall_s{0.0};

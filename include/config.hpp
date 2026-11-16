@@ -335,7 +335,9 @@ struct Config {
     /// call decides some timeout-bounded queries an exec would not.
     bool spot_server = false;
     /// A fitness function that throws (in practice an external tool failing on
-    /// one evolved formula) costs that individual rather than the whole run.
+    /// one evolved formula) costs that individual rather than the whole run,
+    /// and so does a per-generation filter check that throws (see
+    /// make_predicate_filter), each stage held to this fraction separately.
     /// Above this fraction of a generation the tooling is broken rather than
     /// the formula, and the run aborts. A single failure is always tolerated,
     /// whatever the population size. 0.15 dates from when an ltl2tgba timeout

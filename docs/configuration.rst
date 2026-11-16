@@ -298,7 +298,7 @@ What that sample cannot do is bound ``ltlsynt``. It is censored precisely where 
 
 So the cap guarded a rare tail rather than the typical call, which is why it defaulted to unlimited and why it was removed rather than tuned. On a memory-constrained machine, or on a corpus with the heavy SYNTCOMP arbiters in it, lower ``parallel`` instead. Bounding ``ltlfilt`` concurrency is the lever for the *common* case, and there is no key for it yet.
 
-``runtime.max_scoring_failure_rate`` (0.15) bounds what fraction of a generation may fail to score before the run aborts. A fitness function that throws — in practice an external tool failing on one evolved formula — costs that individual rather than the whole run. The search is stochastic, so one lost candidate out of a population is noise, whereas aborting at generation 23 of 40 loses everything. Above this fraction the tooling is broken rather than the formula, and continuing would only evolve noise into the output.
+``runtime.max_scoring_failure_rate`` (0.15) bounds what fraction of a generation may fail to score before the run aborts, and separately what fraction may fail one per-generation filter's check, such as vacuity's ``black`` queries. A candidate whose filter check raises is rejected. A fitness function that throws — in practice an external tool failing on one evolved formula — costs that individual rather than the whole run. The search is stochastic, so one lost candidate out of a population is noise, whereas aborting at generation 23 of 40 loses everything. Above this fraction the tooling is broken rather than the formula, and continuing would only evolve noise into the output.
 
 Per-tool budgets
 ~~~~~~~~~~~~~~~~

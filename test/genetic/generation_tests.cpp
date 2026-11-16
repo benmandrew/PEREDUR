@@ -148,6 +148,80 @@ TEST(test_make_predicate_filter_keeps_matching) {
            "make_predicate_filter: should keep the matching specification");
 }
 
+// A check that raises on one candidate rejects that candidate, the safe
+// reading for a correctness check, and the rest of the population is judged
+// as usual. Before the budget, the raise ended the run.
+TEST(test_make_predicate_filter_rejects_a_candidate_whose_check_raises) {
+    const std::vector<Specification> pop = {
+        make_spec("p", "q"), make_spec("r", "s"), make_spec("t", "u"),
+        make_spec("v", "w")};
+    const std::size_t before = FilterErrorStats::n_rejected;
+    for (const std::size_t in_flight : {std::size_t{1}, std::size_t{4}}) {
+        const FilterFunction filter = make_predicate_filter(
+            "raising",
+            [](const Specification& spec) {
+                if (first_condition(spec) == "r") {
+                    throw std::runtime_error("unexpected output from black");
+                }
+                return true;
+            },
+            in_flight, FilterKind::Correctness, 0.15);
+        const auto survivors = filter(pop);
+        expect(survivors.size() == 3,
+               "make_predicate_filter: a raising check rejects its candidate "
+               "alone");
+        expect(std::none_of(survivors.begin(), survivors.end(),
+                            [](const Specification& spec) {
+                                return first_condition(spec) == "r";
+                            }),
+               "make_predicate_filter: the candidate whose check raised is "
+               "the one rejected");
+    }
+    expect(FilterErrorStats::n_rejected == before + 2,
+           "make_predicate_filter: each rejection is tallied");
+    expect(FilterErrorStats::reasons.count(
+               "raising: unexpected output from black") == 1,
+           "make_predicate_filter: the tally names the filter and the error");
+}
+
+// Above the budget the tooling is broken rather than the formulae, and the
+// filter throws rather than reject the whole population, so a missing tool
+// still ends the run in its first generation.
+TEST(test_make_predicate_filter_throws_above_its_failure_budget) {
+    const std::vector<Specification> pop = {
+        make_spec("p", "q"), make_spec("r", "s"), make_spec("t", "u"),
+        make_spec("v", "w")};
+    const FilterFunction filter = make_predicate_filter(
+        "broken",
+        [](const Specification& /*spec*/) -> bool {
+            throw std::runtime_error("black: cannot load libblack.so");
+        },
+        1, FilterKind::Correctness, 0.15);
+    bool raised = false;
+    try {
+        (void)filter(pop);
+    } catch (const std::runtime_error& error) {
+        raised = std::string(error.what())
+                     .find(
+                         "the broken filter's check "
+                         "failed for 4 of 4") != std::string::npos;
+    }
+    expect(raised,
+           "make_predicate_filter: a check failing on every candidate should "
+           "end the run, naming the filter");
+}
+
+TEST(test_tolerated_failures_matches_the_scoring_rule) {
+    expect(tolerated_failures(0.15, 0) == 0,
+           "tolerated_failures: nothing to tolerate in an empty stage");
+    expect(tolerated_failures(0.15, 1) == 0,
+           "tolerated_failures: never the whole of a stage");
+    expect(tolerated_failures(0.15, 4) == 1,
+           "tolerated_failures: always one, where the fraction rounds to 0");
+    expect(tolerated_failures(0.15, 100) == 15,
+           "tolerated_failures: the fraction of a large stage");
+}
+
 TEST(test_filter_population_empty_filter_list_keeps_all) {
     const std::vector<Specification> pop = {make_spec("p", "q"),
                                             make_spec("r", "s")};

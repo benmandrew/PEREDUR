@@ -1,6 +1,6 @@
 # A failure budget for filters
 
-Status: proposed, not built. Written after #117 and #119 fixed the two call sites where a raising external tool was cheapest to handle, leaving the harder half unaddressed.
+Status: built on 2026-11-16, as described under "What was built" at the end. Written after #117 and #119 fixed the two call sites where a raising external tool was cheapest to handle, leaving the harder half unaddressed.
 
 ## The problem
 
@@ -45,3 +45,9 @@ The two are complementary. The budget stops any tool failure ending a run; the r
 ## Open questions
 
 Whether one budget key or one per stage. Whether a stage that exhausts its budget should abort the run or drop out of the chain for the rest of the generation, given the filter fallback already re-applies `FilterKind::Correctness` filters when the chain empties the offspring. And whether a raising query should be memoised as undecided, as timeouts already are — today the throw precedes the cache insert, so every re-encounter re-execs the tool.
+
+## What was built
+
+The budget sits in `make_predicate_filter` rather than at the stage boundary. Since this note was written, both front ends build their per-generation correctness filters from the one `correctness_checks` table through that wrapper, so it now covers every per-generation site. A candidate whose check raises is rejected, the safe reading for a correctness check, and is tallied in `FilterErrorStats`. Above `tolerated_failures(max_scoring_failure_rate, n)` of one call's input, the filter throws a message naming itself and the first error. The key is the scoring pool's, for the reason given above: what it detects is a broken toolchain.
+
+Two sites outside the per-generation chain read an error the way they already read a timeout. `implication_query`, shared by `spec_implies` and `tlsf_spec_implies`, reads one as undecided, and the output climb's gate refuses the step, which leaves the climb on a repair that has passed the gate. The final survivor gate and the start-up checks still throw, for the reasons given under "What this does not cover".

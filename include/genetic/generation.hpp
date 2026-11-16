@@ -131,16 +131,67 @@ struct NonDeduced {
 /// Either way the survivors and their order are identical: verdicts are
 /// collected by index and the survivors rebuilt in population order.
 ///
-/// @param name          Display name used in diagnostic output
-/// @param predicate     A predicate returning true for specifications to keep
-/// @param max_in_flight Concurrent predicate evaluations; 1 evaluates serially
-/// @param kind          Whether the fallback may re-admit this filter's rejects
-/// @return              A filter that applies the predicate element-wise
+/// A candidate whose predicate throws is rejected, the safe reading for a
+/// correctness check: admitting it would let through a specification nothing
+/// verified. The rejection is tallied in FilterErrorStats. Above
+/// tolerated_failures(@p max_failure_rate, n) of one call's input the tooling
+/// is taken to be broken rather than the formula, and the filter throws, so a
+/// missing or broken tool still ends the run in its first generation.
+///
+/// @param name             Display name used in diagnostic output
+/// @param predicate        A predicate returning true for specifications to
+///                         keep
+/// @param max_in_flight    Concurrent predicate evaluations; 1 evaluates
+///                         serially
+/// @param kind             Whether the fallback may re-admit this filter's
+///                         rejects
+/// @param max_failure_rate Fraction of one call's input whose predicate may
+///                         throw (Config::max_scoring_failure_rate)
+/// @return                 A filter that applies the predicate element-wise
+/// @throws std::runtime_error if more predicates threw than are tolerated
 template <typename Spec = Specification>
 FilterFunctionT<Spec> make_predicate_filter(
     std::string name,
     std::function<bool(const typename NonDeduced<Spec>::type&)> predicate,
-    std::size_t max_in_flight = 1, FilterKind kind = FilterKind::Correctness);
+    std::size_t max_in_flight = 1, FilterKind kind = FilterKind::Correctness,
+    double max_failure_rate = 0.0);
+
+/// How many of @p n elements may fail before a stage takes its tool to be
+/// broken: @p rate of them, but always one, so a small population is not held
+/// to a stricter standard than a large one, and never all @p n, since nothing
+/// can continue from an empty result. Shared by score_population and
+/// make_predicate_filter so the two stages draw the line in the same place.
+inline std::size_t tolerated_failures(double rate, std::size_t n) {
+    if (n == 0) {
+        return 0;
+    }
+    return std::min(
+        n - 1, std::max<std::size_t>(
+                   1, static_cast<std::size_t>(rate * static_cast<double>(n))));
+}
+
+/// Candidates a per-generation filter rejected because its check threw (see
+/// make_predicate_filter), reported at the end of a run beside ScoringStats.
+/// Distinct messages are capped for the same reason ScoringStats caps them.
+struct FilterErrorStats {
+    static constexpr std::size_t k_max_distinct_reasons = 8;
+
+    inline static std::size_t n_rejected = 0;
+    inline static std::size_t n_reasons_elided = 0;
+    inline static std::map<std::string, std::size_t> reasons;
+
+    static void record(const std::string& reason) {
+        n_rejected++;
+        const auto found = reasons.find(reason);
+        if (found != reasons.end()) {
+            found->second++;
+        } else if (reasons.size() < k_max_distinct_reasons) {
+            reasons.emplace(reason, 1);
+        } else {
+            n_reasons_elided++;
+        }
+    }
+};
 
 /// An individual whose fitness scoring throws is dropped from the returned
 /// population rather than aborting the run (see
@@ -468,17 +519,8 @@ std::vector<Scored<Spec>> score_population(
             return part_at(item).cost;
         }));
 
-    // A single failure is tolerated whatever the population size, so a small
-    // population is not held to a stricter standard than a large one -- but
-    // never the whole population, since evolution cannot continue from nothing.
     const std::size_t tolerated =
-        population.empty()
-            ? 0
-            : std::min(population.size() - 1,
-                       std::max<std::size_t>(
-                           1, static_cast<std::size_t>(
-                                  cfg.max_scoring_failure_rate *
-                                  static_cast<double>(population.size()))));
+        tolerated_failures(cfg.max_scoring_failure_rate, population.size());
     if (errors.size() > tolerated) {
         throw std::runtime_error(
             "scoring failed for " + std::to_string(errors.size()) + " of " +
@@ -539,12 +581,16 @@ std::vector<Spec> filter_population(
 /// make_maximal_stream). Instantiated for Specification and
 /// tlsf::Specification.
 ///
-/// @param original  The reference specification the bloat cap is sized against
-/// @param checker   Satisfiability checker; captured by reference, must
-///                  outlive the returned filters
+/// @param original         The reference specification the bloat cap is sized
+///                         against
+/// @param checker          Satisfiability checker; captured by reference, must
+///                         outlive the returned filters
+/// @param max_failure_rate The correctness rows' failure budget (see
+///                         make_predicate_filter)
 template <typename Spec>
 std::vector<FilterFunctionT<Spec>> get_filter_functions(
-    const Spec& original, SatisfiabilityChecker& checker);
+    const Spec& original, SatisfiabilityChecker& checker,
+    double max_failure_rate);
 
 /// Wraps each filter as a named pipeline stage, so a consumer walking the stage
 /// list sees one entry per active filter. The filters keep their own n_in/n_out

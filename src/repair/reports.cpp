@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <iostream>
 
+#include "filter/implication.hpp"
 #include "filter/well_separation.hpp"
 #include "fitness/function.hpp"
 #include "fitness/semantic_similarity.hpp"
@@ -26,7 +27,31 @@
 
 // Silent when nothing was dropped, so a clean run's output is unchanged and
 // any drop at all stands out.
+namespace {
+
+// The candidates a per-generation filter rejected because its check threw.
+// Printed with the scoring report, and on the same terms: a rejection costs a
+// candidate the run asked for, which must not pass for a clean sweep.
+void print_filter_error_report() {
+    if (FilterErrorStats::n_rejected == 0) {
+        return;
+    }
+    std::cout << "\nFilter error report:\n"
+              << FilterErrorStats::n_rejected
+              << " candidate(s) rejected after a filter check threw.\n";
+    for (const auto& [reason, count] : FilterErrorStats::reasons) {
+        std::cout << "  " << std::setw(6) << count << "x  " << reason << "\n";
+    }
+    if (FilterErrorStats::n_reasons_elided > 0) {
+        std::cout << "  (" << FilterErrorStats::n_reasons_elided
+                  << " further failure(s) with other messages not listed)\n";
+    }
+}
+
+}  // namespace
+
 void print_scoring_report() {
+    print_filter_error_report();
     if (ScoringStats::n_dropped == 0) {
         return;
     }
@@ -165,6 +190,15 @@ void print_diagnostics_report() {
         std::cout << "\nWell-separation queries that raised (resolved as "
                      "undecided, candidate dropped): "
                   << WellSeparationStats::n_errors << "\n";
+    }
+    if (ImplicationFilterStats::n_errors > 0) {
+        std::cout << "\nImplication queries that raised (resolved as "
+                     "undecided): "
+                  << ImplicationFilterStats::n_errors << "\n";
+    }
+    if (ClimbStats::n_gate_errors > 0) {
+        std::cout << "\nOutput climb gate checks that raised (step refused): "
+                  << ClimbStats::n_gate_errors << "\n";
     }
     std::cout << "\nConstant-folded (decided by ltlfilt, no black call): "
               << SatisfiabilityChecker::n_constant_folded << "\n";

@@ -256,8 +256,8 @@ TEST(test_chain_always_carries_the_vacuity_stage) {
         with_guarantees({conditional("req", "grant")});
     const Specification vacuous = with_guarantees({conditional("req", "true")});
 
-    const std::vector<FilterFunction> filters =
-        get_filter_functions(original, checker);
+    const std::vector<FilterFunction> filters = get_filter_functions(
+        original, checker, Config{}.max_scoring_failure_rate);
     expect(chain_has_vacuity_stage(filters),
            "vacuity: the chain always carries a vacuity stage");
     expect(filter_population({original, vacuous}, filters).size() == 1,
