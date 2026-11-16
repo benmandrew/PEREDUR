@@ -260,6 +260,9 @@ target_link_libraries(mucs PRIVATE peredur_fitness)
 
 add_executable(maximal src/maximal.cpp)
 target_link_libraries(maximal PRIVATE peredur_fitness)
+
+add_executable(sample-mutants src/sample_mutants.cpp)
+target_link_libraries(sample-mutants PRIVATE peredur_fitness)
 # maximal reaches one internal header, src/fingerprint/prefilter.hpp, so
 # that its equivalence quotient prefilters on the same words the pairwise sweep
 # does. include/ stays the published surface.
