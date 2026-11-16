@@ -6,6 +6,12 @@ set -e
 # cmake/githooks.cmake.
 REPO_ROOT=$(git rev-parse --show-toplevel)
 
+# The one check that needs no build, so it runs before the build gate below.
+# Guarded so the hook still works on branches predating the script.
+if [ -x "$REPO_ROOT/scripts/check_blob_size.sh" ]; then
+    "$REPO_ROOT/scripts/check_blob_size.sh" --cached
+fi
+
 if [ ! -d "$REPO_ROOT/build" ]; then
     echo "pre-commit: $REPO_ROOT/build is not configured; skipping checks."
     echo "            Run 'cmake --preset debug' to enable them."

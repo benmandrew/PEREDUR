@@ -67,6 +67,15 @@ jobs:
           # commit. The pack is about 4MB, so the depth costs nothing.
           fetch-depth: 0
 
+      # Here rather than in a job of its own, which would bill a minute for a
+      # check that needs only this job's full clone. Pull requests only: by the
+      # time a push to main fails, the blob is already in history.
+      - name: Reject blobs over the size limit
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: scripts/check_blob_size.sh "$PR_BASE..HEAD"
+
       - name: Decide what this run has to do
         id: plan
         env:

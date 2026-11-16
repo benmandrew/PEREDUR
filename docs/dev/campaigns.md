@@ -257,6 +257,14 @@ Closing a campaign means the archive can be read without the git history. Rename
 
 `campaign.toml` stays in the archive, keeping the seed split reproducible; queue entries do not.
 
+## Large outputs
+
+No blob over 500 KiB enters history. A blob in history stays in every clone, and removing it rewrites every commit SHA that `PROVENANCE.json` files and results CSVs record. `scripts/check_blob_size.sh` enforces the limit, from `.githooks/pre-commit` on staged files and from CI over every pull request. Paths under `vendor/` are exempt.
+
+A large output stays in its campaign directory in this machine's checkout, untracked, where `/experiments/*/*` in `.gitignore` already puts it. Never `git add -f` it. For redundancy, copy it to the same path in the av2 and av3 checkouts with `rsync -a`; a stage never runs `git clean`, so the copies survive. The archive's `PROVENANCE.json` records each such file's path and SHA-256, so any copy can be checked and the archive reads without the file.
+
+The pool under `experiments/2026-11-09-fretish-order-pooled/members/` predates the limit and is still tracked, because that campaign's `pool` phase reads it from each host's checkout.
+
 ## Testing this
 
 ```sh
