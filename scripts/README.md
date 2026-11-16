@@ -339,13 +339,13 @@ A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and
 inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and
 stop at the first failure.
 
-A campaign that shares a host with other users' jobs confines its run phases there with `confine`, a table keyed by host:
+A campaign that shares a host with other users' jobs confines its phases there with `confine`, a table keyed by host:
 
 ```toml
 confine = { av2 = { cpus = "0-15", memory_max = "24G" } }
 ```
 
-`cpus` is a `taskset -c` list (`"0-15"`, `"0-7,16-23"`; no strides) and `memory_max` a systemd size (a whole number with an optional `K`, `M`, `G`, `T`, `P` or `E` suffix, or a percentage such as `"50%"`). Either may be given alone. The tick then launches the runner as `systemd-run --user --scope -q --collect --unit peredur-<entry>-p<phase> -p MemoryMax=24G -p MemorySwapMax=0 taskset -c 0-15 python3 scripts/run_experiments.py …`, with only the parts whose key is set, so the cap covers the runner and every engine process under it with no swap. A host without the key launches exactly as before. A run phase may carry its own `confine` table, which replaces the campaign's entry for each host it names; `av2 = {}` there runs that phase unconfined. Score, compare, fingerprint and pool phases refuse the key. The load refuses an unknown key, a host not in `hosts`, and a malformed or zero value.
+`cpus` is a `taskset -c` list (`"0-15"`, `"0-7,16-23"`; no strides) and `memory_max` a systemd size (a whole number with an optional `K`, `M`, `G`, `T`, `P` or `E` suffix, or a percentage such as `"50%"`). Either may be given alone. The tick then launches the runner as `systemd-run --user --scope -q --collect --unit peredur-<entry>-p<phase> -p MemoryMax=24G -p MemorySwapMax=0 taskset -c 0-15 python3 scripts/run_experiments.py …`, with only the parts whose key is set, so the cap covers the runner and every engine process under it with no swap. A host without the key launches exactly as before. Compare, fingerprint and pool phases are confined the same way, so a compare pass can share a host; their `compare_pairs.py`, `fingerprint_members.py` or `pool_members.py` takes the runner's place in the command. Any of these phases may carry its own `confine` table, which replaces the campaign's entry for each host it names; `av2 = {}` there runs that phase unconfined. A score phase refuses the key. The load refuses an unknown key, a host not in `hosts`, and a malformed or zero value.
 
 The CPU set goes through `taskset`, not `-p AllowedCPUs=`, because the lab hosts' user systemd managers have no cpuset controller: `AllowedCPUs` is accepted and silently ignored there, and the runner still sees every CPU.
 
