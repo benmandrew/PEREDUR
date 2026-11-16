@@ -101,6 +101,13 @@ bool is_tautology_print_error(const ProcessResult& result) {
                std::string::npos;
 }
 
+// Whether a signal ended the child, in ProcessResult's 128 + signal encoding.
+// SPOT's own exits are 0, 1 and 2, so the encoding is unambiguous here. The
+// caller checks m_timed_out first, since a timeout is this process's SIGKILL.
+bool exited_on_signal(const ProcessResult& result) {
+    return result.m_exit_code > 128;
+}
+
 // ltlsynt refuses a formula needing more acceptance sets than SPOT's
 // compile-time ceiling, 32 unless SPOT was configured with
 // --enable-max-accsets=N. It is telling us it cannot answer, which is what a
@@ -304,10 +311,11 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
     // it back needs its own names on those labels (see formula_key.hpp).
     const std::string& key = formula_key::canonical(formula);
     static std::unordered_map<std::string, std::string> cache;
-    // Formulae whose determinization was abandoned at the budget. Memoised
-    // like the automata themselves: the blowup is a property of the formula,
-    // not of the moment, so re-running it buys the same timeout at full price
-    // and the pair scores as unknown either way.
+    // Formulae whose determinization was abandoned at the budget or killed.
+    // Memoised like the automata themselves: the blowup is a property of the
+    // formula, not of the moment, so re-running it buys the same timeout or
+    // the same out-of-memory kill at full price, and the pair scores as
+    // unknown either way.
     static std::unordered_set<std::string> timed_out;
     static std::mutex cache_mutex;
     {
@@ -321,7 +329,8 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
             // Same error as the exec would have raised, so a caller sees one
             // behaviour whether or not this formula has been tried before.
             Ltl2tgbaStats::n_cache_hits++;
-            throw Ltl2tgbaTimeout("ltl2tgba timed out for formula: " + formula);
+            throw Ltl2tgbaAbandoned("ltl2tgba abandoned for formula: " +
+                                    formula);
         }
         Ltl2tgbaStats::n_cache_misses++;
     }
@@ -341,7 +350,7 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
             record_exec<Ltl2tgbaStats>(result);
             timed_out.insert(key);
         }
-        throw Ltl2tgbaTimeout("ltl2tgba timed out for formula: " + formula);
+        throw Ltl2tgbaAbandoned("ltl2tgba timed out for formula: " + formula);
     }
     if (is_tautology_print_error(result)) {
         // The formula is a tautology: it accepts every trace, so the universal
@@ -354,6 +363,20 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
         Ltl2tgbaStats::n_tautology_substitutions++;
         cache.emplace(key, k_universal_hoa);
         return k_universal_hoa;
+    }
+    if (exited_on_signal(result)) {
+        // A long nested-X determinisation can exhaust a memory-capped
+        // campaign's cgroup, and the kernel kills the child. That says no more
+        // about the formula than a timeout does, so it is scored the same way.
+        {
+            std::scoped_lock lock(cache_mutex);
+            record_exec<Ltl2tgbaStats>(result);
+            Ltl2tgbaStats::n_killed++;
+            timed_out.insert(key);
+        }
+        throw Ltl2tgbaAbandoned("ltl2tgba killed by signal " +
+                                std::to_string(result.m_exit_code - 128) +
+                                " for formula: " + formula);
     }
     if (result.m_exit_code != 0) {
         // A non-zero exit here (e.g. a subprocess spawn failure under heavy

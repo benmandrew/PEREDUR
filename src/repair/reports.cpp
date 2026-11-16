@@ -151,6 +151,11 @@ void print_diagnostics_report() {
                      "treated as trivially true): "
                   << Ltl2tgbaStats::n_tautology_substitutions << "\n";
     }
+    if (Ltl2tgbaStats::n_killed > 0) {
+        std::cout << "\nltl2tgba counts killed by a signal (scored as "
+                     "unknown): "
+                  << Ltl2tgbaStats::n_killed << "\n";
+    }
     if (RealizabilityChecker::n_capability_errors > 0) {
         std::cout << "\nltlsynt queries past SPOT's acceptance-set limit "
                      "(resolved as undecided): "

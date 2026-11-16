@@ -187,7 +187,7 @@ double semantic_similarity(const Requirement& requirement,
         const SemanticSimilarityCounts counts = count_semantic_similarity_terms(
             requirement, other_requirement, step_count);
         return semantic_similarity_from_counts(counts);
-    } catch (const Ltl2tgbaTimeout&) {
+    } catch (const Ltl2tgbaAbandoned&) {
         // Unknown, paid what the worst score pays, as an undecided status
         // query is: a timeout must not promote a candidate. Raising instead
         // drops the individual, and a timeout on a formula every candidate

@@ -64,7 +64,7 @@ double formula_pair_semantic_similarity(const Formula& first,
             cached_count_traces(ltl_second, n_atoms, step_count),
             cached_count_traces(conjunction, n_atoms, step_count)};
         return semantic_similarity_from_counts(counts);
-    } catch (const Ltl2tgbaTimeout&) {
+    } catch (const Ltl2tgbaAbandoned&) {
         // Unknown, scored as the FRETISH pair scores it; see
         // semantic_similarity in fitness/semantic_similarity.cpp.
         return 0.0;

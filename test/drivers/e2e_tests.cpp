@@ -7,6 +7,7 @@
 #include <chrono>
 #include <csignal>
 #include <cstddef>
+#include <cstdlib>
 #include <filesystem>
 #include <sstream>
 #include <string>
@@ -16,6 +17,7 @@
 #include <nlohmann/json.hpp>
 
 #include "runner/process.hpp"
+#include "runner/spot.hpp"
 #include "runner/tool_paths.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
@@ -420,6 +422,45 @@ TEST_IN("driver_peredur", test_peredur_repairs_fretish) {
         expect(nlohmann::json::parse(read_text(repair)).contains("guarantees"),
                "peredur: each repair parses as a specification");
     }
+}
+
+// A Spot directory whose ltl2tgba kills itself with SIGKILL, as the kernel's
+// out-of-memory kill does to a determinisation that exhausts a campaign's
+// memory cap. Every other tool is the real one. Each counting call is killed,
+// so every changed requirement pair, the original's own included, comes back
+// unknown. Raised as an error, that dropped the whole generation and aborted
+// the run at max_scoring_failure_rate.
+TEST_IN("driver_peredur", test_peredur_survives_a_killed_ltl2tgba) {
+    const TempDir dir("e2e_peredur_killed_ltl2tgba");
+    const std::filesystem::path bin = dir.path() / "spot-bin";
+    std::filesystem::create_directories(bin);
+    for (const char* tool : {"ltlsynt", "ltlfilt", "autfilt"}) {
+        std::filesystem::create_symlink(
+            std::filesystem::path(spot_bin_dir()) / tool, bin / tool);
+    }
+    const std::filesystem::path fake =
+        write_text(bin / "ltl2tgba", "#!/bin/sh\nkill -KILL $$\n");
+    std::filesystem::permissions(fake, std::filesystem::perms::owner_all);
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish).string();
+    const std::string config =
+        write_text(dir.path() / "config.toml", k_config_with_tlsf_key).string();
+    const std::filesystem::path out = dir.path() / "out";
+    std::filesystem::create_directories(out);
+
+    setenv("PEREDUR_SPOT_BIN_DIR", bin.c_str(), 1);
+    const DriverRun run =
+        run_driver("peredur", {"--input", input, "--output-dir", out.string(),
+                               "--config", config, "--seed", "5"});
+    unsetenv("PEREDUR_SPOT_BIN_DIR");
+    expect(run.m_exit_code == 0,
+           "peredur: a run whose ltl2tgba is killed exits zero");
+    expect(contains(run.m_output, "Done in"),
+           "peredur: a run whose ltl2tgba is killed reaches its closing line");
+    const nlohmann::json manifest =
+        expect_run_manifest(out, input, 5, "peredur/fretish");
+    expect(manifest.at("tool_calls").at("ltl2tgba").at("killed").get<int>() > 0,
+           "peredur: run.json counts the killed ltl2tgba execs");
 }
 
 // The run's Spot calls through spot-forkserver. Each tool child starts from
