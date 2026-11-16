@@ -503,8 +503,8 @@ TLSF_LTLSYNT_TIMEOUT_MS = 10000
 # Default per-call ltl2tgba (model-counting) timeout (ms) for the TLSF campaign.
 # The counting path has no internal timeout and its -D determinization blows up
 # super-exponentially on some deep formulae. The bound sits well above any
-# legitimate count while cutting that tail. A timed-out count drops that
-# individual (absorbed by max_scoring_failure_rate).
+# legitimate count while cutting that tail. A timed-out count scores its
+# formula pair 0, as unknown, and the individual stays in the run.
 TLSF_LTL2TGBA_TIMEOUT_MS = 60000
 
 # Scoring-failure tolerance for the TLSF campaign. The one-hot balancer/direction

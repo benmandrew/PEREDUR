@@ -1,6 +1,8 @@
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <functional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -9,8 +11,10 @@
 #include "config.hpp"
 #include "fitness/semantic_similarity.hpp"
 #include "fitness/syntactic_similarity.hpp"
+#include "genetic/generation.hpp"
 #include "prop_formula.hpp"
 #include "requirement.hpp"
+#include "runner/spot.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
 
@@ -450,6 +454,84 @@ TEST(test_changed_requirement_pairs_rebuild_the_score) {
     expect(changed_requirement_pairs(original, original).empty() &&
                semantic_similarity(original, original, k_keyword_bound) == 1.0,
            "changed-pairs: no pair differs, and the score is 1");
+}
+
+// Sets the counting path's budget for one scope. Every exec pays 4-5 ms of
+// start-up, so 1 ms abandons any formula not already cached.
+class ScopedLtl2tgbaTimeout {
+   public:
+    explicit ScopedLtl2tgbaTimeout(std::chrono::milliseconds timeout) {
+        set_ltl2tgba_timeout(timeout);
+    }
+    ScopedLtl2tgbaTimeout(const ScopedLtl2tgbaTimeout&) = delete;
+    ScopedLtl2tgbaTimeout& operator=(const ScopedLtl2tgbaTimeout&) = delete;
+    ScopedLtl2tgbaTimeout(ScopedLtl2tgbaTimeout&&) = delete;
+    ScopedLtl2tgbaTimeout& operator=(ScopedLtl2tgbaTimeout&&) = delete;
+    ~ScopedLtl2tgbaTimeout() {
+        set_ltl2tgba_timeout(std::chrono::milliseconds(0));
+    }
+};
+
+// A count whose construction times out is unknown, and scores what the worst
+// pair scores. The atom names are unique to this test, because the counting
+// path memoises the abandonment under them.
+TEST(test_semantic_similarity_counting_timeout_scores_zero) {
+    const Requirement requirement{Formula("tsz_c & tsz_d"), Formula("tsz_r"),
+                                  timing::within_ticks(5)};
+    const Requirement other_requirement{Formula("tsz_c & tsz_d"),
+                                        Formula("tsz_r | tsz_s"),
+                                        timing::within_ticks(5)};
+    const std::size_t before = Ltl2tgbaStats::n_timeouts;
+    double score = -1.0;
+    {
+        const ScopedLtl2tgbaTimeout timeout(std::chrono::milliseconds(1));
+        score = semantic_similarity(requirement, other_requirement, 5);
+    }
+    expect(Ltl2tgbaStats::n_timeouts > before,
+           "semantic-similarity: the 1 ms budget should abandon the count");
+    expect(score == 0.0,
+           "semantic-similarity: a timed-out count should score the pair 0");
+}
+
+// The regression: a timeout on the original's requirement, which every
+// candidate changing that slot shares, once threw for the whole generation
+// and aborted the run at max_scoring_failure_rate.
+TEST(test_shared_counting_timeout_does_not_abort_scoring) {
+    const Formula condition("tst_c & !tst_d");
+    const Specification original(
+        {}, {Requirement(condition, Formula("tst_r"), timing::within_ticks(6))},
+        {"tst_c", "tst_d"}, {"tst_r", "tst_s"});
+    std::vector<Specification> population;
+    for (const char* response :
+         {"tst_r | tst_s", "tst_s", "tst_r & tst_s", "!tst_r"}) {
+        population.emplace_back(
+            std::vector<Requirement>{},
+            std::vector<Requirement>{Requirement(condition, Formula(response),
+                                                 timing::within_ticks(6))},
+            std::vector<std::string>{"tst_c", "tst_d"},
+            std::vector<std::string>{"tst_r", "tst_s"});
+    }
+    const AggregateWeightedFitnessFunction fitness(
+        {{[&original](const Specification& spec) {
+              return semantic_similarity(spec, original, 6);
+          },
+          1.0, "semantic"}});
+    const Config cfg;
+    std::vector<ScoredSpecification> scored;
+    bool aborted = false;
+    {
+        const ScopedLtl2tgbaTimeout timeout(std::chrono::milliseconds(1));
+        try {
+            scored = score_population(cfg, population, fitness);
+        } catch (const std::runtime_error&) {
+            aborted = true;
+        }
+    }
+    expect(!aborted,
+           "semantic-similarity: a counting timeout should not abort scoring");
+    expect(scored.size() == population.size(),
+           "semantic-similarity: every timed-out candidate should be scored, "
+           "not dropped");
 }
 
 }  // namespace

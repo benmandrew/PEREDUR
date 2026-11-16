@@ -420,7 +420,8 @@ inline constexpr std::array<ConfigKey, 53> k_config_keys{{
      "Per-call ltl2tgba automaton-construction timeout in milliseconds. "
      "Default 60000; 0 is no timeout. Looser than the ltlsynt budget because a "
      "legitimate determinisation can take tens of seconds. A call exceeding it "
-     "drops the individual against max_scoring_failure_rate.",
+     "scores its requirement pair 0, as unknown, and the individual stays in "
+     "the run.",
      ""},
     {"runtime", "ltlfilt_timeout_ms", &Config::ltlfilt_timeout,
      KeyCheck::NonNegative, KeyReader::Both,
@@ -495,13 +496,10 @@ inline constexpr std::array<ConfigKey, 53> k_config_keys{{
      KeyCheck::Probability, KeyReader::Both,
      "Fraction of a generation whose fitness scoring may throw before the run "
      "aborts. A single failure per generation is always tolerated. Default "
-     "0.15, because the ltl2tgba budget drops individuals by design and enough "
-     "land in one generation on the heavy TLSF specifications to trip a "
-     "tighter bound.",
-     "0.15, not 0.05: the ltl2tgba budget drops individuals by design, and "
-     "enough\n"
-     "land in one generation on the heavy TLSF specs to trip a tighter "
-     "bound.\n"},
+     "0.15, set while an ltl2tgba timeout still dropped its individual; a "
+     "timeout now scores the pair as unknown instead.",
+     "0.15, not 0.05: set while an ltl2tgba timeout still dropped its "
+     "individual.\n"},
     {"tlsf.mutation", "p_assumption", &Config::tlsf_p_assumption,
      KeyCheck::Probability, KeyReader::Tlsf,
      "Probability of mutating an assumption-side section "

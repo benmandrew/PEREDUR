@@ -323,11 +323,11 @@ Each external tool has a per-call wall-clock budget in milliseconds. A budget of
      - The realisability query is undecided.
    * - ``runtime.ltl2tgba_timeout_ms``
      - 60000
-     - The individual is dropped.
+     - The requirement pair's semantic score is unknown and scores 0.
 
 What decides whether a budget defaults on is the cost of abandoning a call weighed against the cost of not doing so. ``black`` has its own internal timeout, so bounding it is routine. ``ltlfilt`` is bounded because its passes can blow up on the deep nested-``X`` conjunctions the search builds, and an abandoned call there costs one undecided query, never a candidate.
 
-``ltlsynt`` and ``ltl2tgba`` are bounded despite an abandoned call costing a candidate, because an unbounded one can cost the whole run: ``ltlsynt`` occasionally runs for minutes with no upper limit, and ``ltl2tgba``'s deterministic construction has the same super-exponential blowup as ``ltlfilt``, running for hours and leaking orphaned multi-gigabyte processes over a long campaign. Losing one candidate out of a population is the noise ``max_scoring_failure_rate`` already exists to absorb; losing the run at generation 23 of 40 is not. Both defaults are what every archived TLSF campaign set explicitly, which is the other half of the argument — the shipped default should be the configuration real runs use.
+``ltlsynt`` and ``ltl2tgba`` are bounded despite an abandoned call costing a verdict or a score, because an unbounded one can cost the whole run: ``ltlsynt`` occasionally runs for minutes with no upper limit, and ``ltl2tgba``'s deterministic construction has the same super-exponential blowup as ``ltlfilt``, running for hours and leaking orphaned multi-gigabyte processes over a long campaign. One unknown answer among a generation's is noise; losing the run at generation 23 of 40 is not. Both defaults are what every archived TLSF campaign set explicitly, which is the other half of the argument — the shipped default should be the configuration real runs use.
 
 The two budgets differ by two orders of magnitude because the tools' distributions do. ``ltlsynt`` call durations are sharply bimodal: 95% of a TLSF campaign's calls finished under 50 ms, the 0.5–1 s band was almost empty, and a 500 ms cap abandoned within 0.1% of the calls a 10 s cap did — so a query that blows 500 ms is in the minutes-long tail rather than near the boundary. A legitimate ``ltl2tgba`` determinisation, by contrast, can genuinely take tens of seconds, so its budget is set to bound the blowup rather than to discriminate a tail.
 
@@ -337,7 +337,7 @@ The two budgets differ by two orders of magnitude because the tools' distributio
 
    A wall-clock budget makes a run's output depend on the machine it ran on. A slower host abandons a call that a faster one completes, so the same ``--seed`` can give different repairs on different hardware — and a loaded machine differs from an idle one. The seed fixes the search; the budgets do not. When reproducing a result exactly, match the hardware, and read the ``tool_calls`` timeout counts in ``<output-dir>/run.json``, which every run that completes writes regardless of any reporting flag, to tell a genuine difference from an abandoned call.
 
-An undecided ``ltlsynt`` answer is resolved by each caller in its own direction — no repair is admitted on one, and the well-separation check at the gate refuses the candidate, for the reason given under `Filters`_. A dropped individual counts against ``max_scoring_failure_rate``.
+An undecided ``ltlsynt`` answer is resolved by each caller in its own direction — no repair is admitted on one, and the well-separation check at the gate refuses the candidate, for the reason given under `Filters`_. An abandoned ``ltl2tgba`` count scores its requirement pair 0, the score a removed requirement gets, so a timeout never promotes a candidate. Until 2026-11-16 it dropped the individual instead. A timeout on the original specification's own requirement then dropped every candidate that changed that requirement, which tripped ``max_scoring_failure_rate`` and aborted the run.
 
 Reporting
 ~~~~~~~~~

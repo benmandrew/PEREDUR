@@ -307,7 +307,7 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
     // Formulae whose determinization was abandoned at the budget. Memoised
     // like the automata themselves: the blowup is a property of the formula,
     // not of the moment, so re-running it buys the same timeout at full price
-    // and the individual is dropped either way.
+    // and the pair scores as unknown either way.
     static std::unordered_set<std::string> timed_out;
     static std::mutex cache_mutex;
     {
@@ -321,8 +321,7 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
             // Same error as the exec would have raised, so a caller sees one
             // behaviour whether or not this formula has been tried before.
             Ltl2tgbaStats::n_cache_hits++;
-            throw std::runtime_error("ltl2tgba timed out for formula: " +
-                                     formula);
+            throw Ltl2tgbaTimeout("ltl2tgba timed out for formula: " + formula);
         }
         Ltl2tgbaStats::n_cache_misses++;
     }
@@ -333,16 +332,16 @@ std::string run_ltl2tgba_for_counting(const std::string& formula) {
     const ProcessResult result = execute_and_capture_with_input(
         {binary, "-D", "-S", "-H", "-F", "-"}, spot_formula_line(key), timeout);
     if (result.m_timed_out) {
-        // The determinization did not finish within budget; drop the individual
-        // (counted against max_scoring_failure_rate) rather than caching a
-        // partial result or stalling the run. execute_and_capture has already
+        // The determinization did not finish within budget. The similarity
+        // term that asked scores it as unknown, rather than caching a partial
+        // result or stalling the run. execute_and_capture has already
         // SIGKILLed and reaped the child, so no process is left behind.
         {
             std::scoped_lock lock(cache_mutex);
             record_exec<Ltl2tgbaStats>(result);
             timed_out.insert(key);
         }
-        throw std::runtime_error("ltl2tgba timed out for formula: " + formula);
+        throw Ltl2tgbaTimeout("ltl2tgba timed out for formula: " + formula);
     }
     if (is_tautology_print_error(result)) {
         // The formula is a tautology: it accepts every trace, so the universal
