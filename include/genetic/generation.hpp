@@ -131,8 +131,6 @@ struct NonDeduced {
 /// Either way the survivors and their order are identical: verdicts are
 /// collected by index and the survivors rebuilt in population order.
 ///
-/// @param name          Display name used in diagnostic output
-/// @param predicate     A predicate returning true for specifications to keep
 /// A candidate whose predicate throws is rejected, the safe reading for a
 /// correctness check: admitting it would let through a specification nothing
 /// verified. The rejection is tallied in FilterErrorStats. Above
