@@ -407,6 +407,16 @@ ORDER_FEATURES: list[tuple[str, dict]] = [
     ("verdict", {"parent_verdict": True}),
 ]
 
+# The pairs the 2026-11-16 pair arms remove together. The single-feature
+# ablation points to overlap between these, through a shared step set
+# (climb, gate), shared gutted targets (climb, demote) and one mutation call
+# (blame, scale).
+ORDER_PAIRS: list[tuple[str, str]] = [
+    ("climb", "gate"),
+    ("climb", "demote"),
+    ("blame", "scale"),
+]
+
 
 def _order_sweep() -> list[tuple[str, dict]]:
     full: dict = {}
@@ -420,6 +430,12 @@ def _order_sweep() -> list[tuple[str, dict]]:
         levels.append((f"no-{name}", {**full, **{k: base[k] for k in on}}))
     for name, on in ORDER_FEATURES:
         levels.append((f"only-{name}", {**base, **on}))
+    # full without a pair: an interaction between the two shows as the pair's
+    # removal effect differing from the sum of its members' removal effects.
+    features = dict(ORDER_FEATURES)
+    for a, b in ORDER_PAIRS:
+        off = {k: base[k] for k in {**features[a], **features[b]}}
+        levels.append((f"no-{a}-{b}", {**full, **off}))
     return levels
 
 

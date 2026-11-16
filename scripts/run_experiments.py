@@ -661,6 +661,26 @@ PROFILES: dict[str, dict] = {
     # the 7200 s harness cap and wrote none. Runs overrun the deadline by up to
     # 2.2x (docs/dev/algorithm.md, Termination modes), which stays under the
     # cap. Its own config tree, the first pass's with genetic.max_wall_s.
+    # The small set's full arm without each of three feature pairs, for the
+    # interactions the one-at-a-time ablation cannot attribute. The configs
+    # are the first pass's except for the pair, in their own tree.
+    "fretish-order-pairs": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["no-climb-gate", "no-climb-demote", "no-blame-scale"]},
+        "specs": list(FRETISH_ORDER_SMALL),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order-pairs",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order-pairs",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order-pairs.csv",
+        "default_jobs": 16,
+    },
     "fretish-order-vent-deadline": {
         "schemes": ["nsga2-apportion"],
         "weakenings": ["wkoff"],

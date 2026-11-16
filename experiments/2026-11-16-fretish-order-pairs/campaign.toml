@@ -1,0 +1,22 @@
+name = "2026-11-16-fretish-order-pairs"
+branch = "campaign/fretish-order-pairs"
+profile = "fretish-order-pairs"
+description = "The small set's full arm without each of three feature pairs (climb+gate, climb+demote, blame+scale), seeds 0-29, for the interactions the one-at-a-time ablation of 2026-11-05-fretish-order cannot attribute. PLAN.md gives the questions."
+
+# av2 CPUs 18-31 under one 24 GB cap: veribee-33 holds 0-15 and the GPU
+# until Tue 17 Nov 11:00, hlwide-trap holds 16-17 for under an hour from
+# 12:10 on Mon 16 Nov, and av3 was unreachable that day. Within the 16-core,
+# 32 GB per-agent share.
+hosts = { av2 = "0-29" }
+confine = { av2 = { cpus = "18-31", memory_max = "24G" } }
+
+build = "sh -c 'cmake --build build-release'"
+
+configs = "python3 scripts/gen_configs.py --sweeps O --levels no-climb-gate,no-climb-demote,no-blame-scale --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order-pairs --pin-vintage"
+
+# 810 runs at 14 jobs of one thread each; the small set's arms took about
+# 1 h each on 16 CPUs in the counters re-run, so estimate 3.5-4 h.
+[[phases]]
+name = "pairs"
+profile = "fretish-order-pairs"
+jobs = 14
