@@ -125,6 +125,12 @@ Neither pruned arm differs from `full` on ideal rate at the 5% level, and both k
 
 Either pruned arm can replace `full` as the default without a measurable loss of strength. `lean` keeps blame's time saving and drops the four features with no effect, so it is the smaller change from `full` and the faster arm.
 
+## Probe under the directed arms
+
+The headline threshold came from a probe under the `base` arm's mutation settings. Rerunning it with the `full` arm's settings gave the same result for all 120 selected subjects, row for row. Gate, scale and blame act only through what breeding knows about the parent, and the probe's chains carried no parent context, so the two configurations drew from the same operator. A second rerun (`sample-mutants --unrealizable-parent 0.5`, at `4b9b938f`) gives every draw the context of an unrealisable parent at status 0.5. Under that context the gate admits only weaker or sideways moves, which are the moves that point back towards B, and step scaling stays neutral.
+
+The gated probe moves little. The mean depth-1 reversion probability over the 110 headline subjects goes from 0.0015 to 0.0016, and the mean depth-2 probability stays at 0.0011. 18 subjects rise and 9 fall. One subject, `fsm-timing__assume-not-standby-and-supported__m06`, crosses the 0.01 threshold, from 0.0090 to 0.0104. The headline set therefore holds under the gate, and the gate's strength gain does not come from undoing the seed in one or two steps.
+
 ## Corpus findings
 
 These findings concern the subjects and the engine, not the features.
@@ -139,14 +145,14 @@ These findings concern the subjects and the engine, not the features.
 
 ## Limits
 
-The corpus spans 6 systems with unbalanced sizes, from 40 headline subjects in fsm to 1 in valu3s. Seeded mutants are strengthenings of realisable specifications, which is a narrower fault model than the faults in real requirements. Each subject has one ideal B, so a repair weaker than B but still useful counts as a miss. The probe estimates use the `base` arm's configuration only, and arms with other mutation settings can revert a mutant at a different rate.
+The corpus spans 6 systems with unbalanced sizes, from 40 headline subjects in fsm to 1 in valu3s. Seeded mutants are strengthenings of realisable specifications, which is a narrower fault model than the faults in real requirements. Each subject has one ideal B, so a repair weaker than B but still useful counts as a miss. The probe gives the gate a fixed unrealisable-parent context with status 0.5, so it tests the gate's direction rule but not step scaling at other statuses or blame's targeted slots (see the probe check below).
 
 ## Files
 
 The `data/` directory next to this report holds the results. Like all experiment data in this repository it is untracked; `PLAN.md` gives the commands that regenerate the corpus.
 
 - `results-fretish-seeded.csv` and `counters-fretish-seeded.csv`, in the same format the paper's `make import` produces.
-- `subjects.csv`, `probe.csv`, `bases.csv` and `mutants.csv`, which describe the corpus and the probe.
+- `subjects.csv`, `probe.csv`, `bases.csv` and `mutants.csv`, which describe the corpus and the probe; `probe-full.csv` and `probe-gated.csv` hold the two probe reruns.
 - `stats.json` for the headline analysis and `stats-no-rad.json` for the sensitivity analysis.
 
 The paper's `scripts/import_data.py` hard-codes `CAMPAIGN = "fretish-order"` and also copies a `-large` CSV, so importing this campaign needs a small change there. The paper repository was not touched. From the worktree root, `python3 scripts/seeded/analyse.py` reproduces `stats.json`, and `python3 scripts/seeded/analyse.py --exclude-clusters rad --stats stats-no-rad.json` reproduces the sensitivity file.
