@@ -1,0 +1,56 @@
+name = "2026-11-16-fretish-order-pooled-joint"
+branch = "campaign/fretish-order-pooled-joint"
+description = "Joint front of five FRETISH order arms under nsga2-apportion (base, only-climb, only-gate, only-blame, full) over the 9 small specs and rad's 10 cores: every pair of the five arms is contrasted, so each arm can be scored against the pooled maximal set of all five. Every subject is pooled locally, so av3 runs all of them. The reduction runs locally (PLAN.md)."
+
+# One host takes every subject. The pool, design and subject list are
+# ignored files, copied to av3's checkout by rsync before enqueue (PLAN.md).
+hosts = { av3 = "" }
+
+# av3 CPUs 0-15 carry veribee-33's hunt.slice until Tue 17 Nov 09:00; 16-31
+# were agreed free with veribee-33 and gawain-ad on 16 Nov. Every phase, and
+# the build, stays on 16-31.
+confine = { av3 = { cpus = "16-31", memory_max = "32G" } }
+
+# fpdraw is EXCLUDE_FROM_ALL, so the build names it. taskset keeps the
+# build's compiler jobs on the agreed CPUs too.
+build = "taskset -c 16-31 sh -c 'cmake --build build-release -j 16 && cmake --build build-release -j 16 --target fpdraw'"
+
+# Every subject is in the copied pool, so this phase only copies it, after
+# checking each file against its index row.
+[[phases]]
+name = "2026-11-16-fretish-order-pooled-joint"
+kind = "pool"
+design = "experiments/2026-11-16-fretish-order-pooled-joint/design.toml"
+subjects = "experiments/2026-11-16-fretish-order-pooled-joint/subjects-{host}.txt"
+copy_from = "experiments/2026-11-16-fretish-order-pooled-joint/members"
+out = "experiments/fretish-order-pooled-joint-members"
+
+# Draw 32768 words a subject over the members (black, 30 s a draw, 8 at a
+# time), evaluate every node on them, and plan the pairs the design's ten
+# contrasts need with a direction no word refutes: every such pair for an
+# exhaustive subject, and 100 draws an arm for valu3s-uc6 and
+# lift-plus-cruise-mini. Resumes per subject.
+[[phases]]
+name = "2026-11-16-fretish-order-pooled-joint"
+kind = "fingerprint"
+subjects = "experiments/2026-11-16-fretish-order-pooled-joint/subjects-{host}.txt"
+members = "experiments/fretish-order-pooled-joint-members"
+design = "experiments/2026-11-16-fretish-order-pooled-joint/design.toml"
+work = "experiments/fretish-order-pooled-joint-work"
+out = "experiments/fretish-order-pooled-joint/fp"
+pairs = "experiments/fretish-order-pooled-joint-work/pairs-{host}.csv"
+words = 32768
+seed = 3
+workers = 8
+black_timeout = 30
+
+# Every planned pair, each unrefuted direction at the archive's 20 s.
+[[phases]]
+name = "2026-11-16-fretish-order-pooled-joint"
+kind = "compare"
+pairs = "experiments/fretish-order-pooled-joint-work/pairs-{host}.csv"
+out = "experiments/fretish-order-pooled-joint/subsumption-{host}.csv"
+jobs = 16
+black_timeout = 20
+wall_timeout = 180
+vmem_kb = 8388608
