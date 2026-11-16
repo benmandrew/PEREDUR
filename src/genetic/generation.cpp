@@ -54,61 +54,60 @@ FilterFunctionT<Spec> make_predicate_filter(
     std::string name,
     std::function<bool(const typename NonDeduced<Spec>::type&)> predicate,
     std::size_t max_in_flight, FilterKind kind, double max_failure_rate) {
-    return {name,
-            [name, predicate = std::move(predicate), max_in_flight,
-             max_failure_rate](std::vector<Spec> pop) {
-                std::vector<Spec> survivors;
-                survivors.reserve(pop.size());
-                // Predicates draw no randomness, so running them concurrently
-                // leaves seed reproducibility unaffected.
-                std::vector<PredicateOutcome> outcomes(pop.size());
-                if (max_in_flight <= 1) {
-                    for (std::size_t idx = 0; idx < pop.size(); ++idx) {
-                        outcomes[idx] = evaluate_predicate(predicate, pop[idx]);
-                    }
-                } else {
-                    run_bounded_async(
-                        pop.size(), max_in_flight,
-                        [&predicate, &pop](std::size_t idx) {
-                            return [&predicate, &spec = pop[idx]] {
-                                return evaluate_predicate(predicate, spec);
-                            };
-                        },
-                        [&outcomes](std::size_t idx, PredicateOutcome outcome) {
-                            outcomes[idx] = std::move(outcome);
-                        });
-                }
-                // Read in population order, so the first error named is the
-                // same whichever worker finished first.
-                std::vector<const std::string*> errors;
-                for (const PredicateOutcome& outcome : outcomes) {
-                    if (!outcome.error.empty()) {
-                        errors.push_back(&outcome.error);
-                    }
-                }
-                const std::size_t tolerated =
-                    tolerated_failures(max_failure_rate, pop.size());
-                if (errors.size() > tolerated) {
-                    throw std::runtime_error(
-                        "the " + name + " filter's check failed for " +
-                        std::to_string(errors.size()) + " of " +
-                        std::to_string(pop.size()) +
-                        " candidates (tolerating " + std::to_string(tolerated) +
-                        "); the tooling is broken rather than the formulae. "
-                        "First error: " +
-                        *errors.front());
-                }
-                for (const std::string* error : errors) {
-                    FilterErrorStats::record(name + ": " + *error);
-                }
-                for (std::size_t idx = 0; idx < pop.size(); ++idx) {
-                    if (outcomes[idx].keep && outcomes[idx].error.empty()) {
-                        survivors.push_back(std::move(pop[idx]));
-                    }
-                }
-                return survivors;
-            },
-            kind};
+    auto run = [name, predicate = std::move(predicate), max_in_flight,
+                max_failure_rate](std::vector<Spec> pop) {
+        std::vector<Spec> survivors;
+        survivors.reserve(pop.size());
+        // Predicates draw no randomness, so running them concurrently
+        // leaves seed reproducibility unaffected.
+        std::vector<PredicateOutcome> outcomes(pop.size());
+        if (max_in_flight <= 1) {
+            for (std::size_t idx = 0; idx < pop.size(); ++idx) {
+                outcomes[idx] = evaluate_predicate(predicate, pop[idx]);
+            }
+        } else {
+            run_bounded_async(
+                pop.size(), max_in_flight,
+                [&predicate, &pop](std::size_t idx) {
+                    return [&predicate, &spec = pop[idx]] {
+                        return evaluate_predicate(predicate, spec);
+                    };
+                },
+                [&outcomes](std::size_t idx, PredicateOutcome outcome) {
+                    outcomes[idx] = std::move(outcome);
+                });
+        }
+        // Read in population order, so the first error named is the
+        // same whichever worker finished first.
+        std::vector<const std::string*> errors;
+        for (const PredicateOutcome& outcome : outcomes) {
+            if (!outcome.error.empty()) {
+                errors.push_back(&outcome.error);
+            }
+        }
+        const std::size_t tolerated =
+            tolerated_failures(max_failure_rate, pop.size());
+        if (errors.size() > tolerated) {
+            throw std::runtime_error(
+                "the " + name + " filter's check failed for " +
+                std::to_string(errors.size()) + " of " +
+                std::to_string(pop.size()) + " candidates (tolerating " +
+                std::to_string(tolerated) +
+                "); the tooling is broken rather than the formulae. "
+                "First error: " +
+                *errors.front());
+        }
+        for (const std::string* error : errors) {
+            FilterErrorStats::record(name + ": " + *error);
+        }
+        for (std::size_t idx = 0; idx < pop.size(); ++idx) {
+            if (outcomes[idx].keep && outcomes[idx].error.empty()) {
+                survivors.push_back(std::move(pop[idx]));
+            }
+        }
+        return survivors;
+    };
+    return {std::move(name), std::move(run), kind};
 }
 
 template FilterFunctionT<Specification> make_predicate_filter<Specification>(
