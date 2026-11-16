@@ -67,13 +67,14 @@ def realizable(paths: list[Path], timeout: int) -> set[str]:
 
 
 def probe(task):
-    subject, root, draws, timeout, config, tag = task
+    subject, root, draws, timeout, config, tag, parent = task
     work = root / f"probe-work{tag}" / subject.name
     shutil.rmtree(work, ignore_errors=True)
     samples = work / "samples"
     subprocess.run([str(BIN / "sample-mutants"), str(subject / "spec.json"),
                     "--config", str(config), "--out", str(samples),
-                    "--draws", str(draws), "--depth", "2", "--seed", "1"],
+                    "--draws", str(draws), "--depth", "2", "--seed", "1",
+                    *(["--unrealizable-parent", str(parent)] if parent is not None else [])],
                    capture_output=True, text=True, check=True, timeout=timeout)
     index = list(csv.DictReader((samples / "index.tsv").open(), delimiter="\t"))
     b = work / "b.json"
@@ -110,6 +111,10 @@ def main() -> int:
                     help="arm config whose mutation keys drive the chains")
     ap.add_argument("--tag", default="",
                     help="suffix for probe-work<tag>/ and probe<tag>.csv")
+    ap.add_argument("--unrealizable-parent", type=float, default=None,
+                    metavar="STATUS",
+                    help="pass sample-mutants an unrealizable parent context, "
+                         "so the gate and step scaling act")
     ap.add_argument("--only-selected", action="store_true",
                     help="probe only the subjects in selected.txt")
     args = ap.parse_args()
@@ -120,7 +125,7 @@ def main() -> int:
         subjects = [p for p in subjects if p.name in keep]
     rows = []
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        for row in pool.map(probe, [(s, args.out, args.draws, args.timeout, args.config, args.tag)
+        for row in pool.map(probe, [(s, args.out, args.draws, args.timeout, args.config, args.tag, args.unrealizable_parent)
                                     for s in subjects]):
             rows.append(row)
             print(f"{row['subject']}: p1={row['p1']:.4f} p2={row['p2']:.4f} "
