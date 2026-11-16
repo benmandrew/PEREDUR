@@ -15,6 +15,19 @@
 #include "requirement.hpp"
 #include "runner/black.hpp"
 
+/// Asks whether @p counterexample, the `from & !dest` formula of an
+/// implication check, is satisfiable, expecting it not to be. A query that
+/// raises reads as undecided, as a timeout does, and is counted in
+/// ImplicationFilterStats::n_errors. Shared by spec_implies and
+/// tlsf_spec_implies.
+///
+/// @param checker         Satisfiability checker
+/// @param counterexample  The formula whose satisfiability refutes the
+///                        implication
+/// @return                Whether it is satisfiable, or nullopt if undecided
+std::optional<bool> implication_query(SatisfiabilityChecker& checker,
+                                      const std::string& counterexample);
+
 /// Returns whether spec `from` logically implies spec `dest`, as one query
 /// over the two whole-specification lowerings: `from.to_ltl() & !dest.to_ltl()`
 /// is unsatisfiable exactly when the implication holds.

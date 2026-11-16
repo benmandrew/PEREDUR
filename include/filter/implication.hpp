@@ -16,7 +16,7 @@
 /// the start of each invocation of the returned FilterFunction. n_timeouts is
 /// the exception: the FRETISH spec_implies increments it wherever it is
 /// called, and tlsf_spec_implies does not count at all, so it reads 0 on the
-/// TLSF path.
+/// TLSF path. n_errors counts on both paths, wherever either is called.
 struct ImplicationFilterStats {
     /// Unordered pairs for which the dominance check actually ran.
     inline static std::atomic<std::size_t> n_comparisons{0};
@@ -29,6 +29,10 @@ struct ImplicationFilterStats {
     inline static std::atomic<std::size_t> n_duplicates{0};
     /// black calls that timed out (inconclusive) during this sweep.
     inline static std::atomic<std::size_t> n_timeouts{0};
+    /// Implication queries that raised instead of answering, read as
+    /// undecided, as a timeout is. Counted on both paths, wherever
+    /// spec_implies or tlsf_spec_implies is called.
+    inline static std::atomic<std::size_t> n_errors{0};
     /// Ordered pairs a sampled lasso word refuted before any solver call: one
     /// side accepts a word the other rejects, which is a witness for
     /// `a & !b` and settles `a -> b` as false. Two of these per unordered

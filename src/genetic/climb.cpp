@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -153,15 +155,25 @@ Specification climb(const Specification& start, const Specification& original,
 
 ClimbPredicate climb_gate(const Config& cfg, FitnessFunction status) {
     return [&cfg, status = std::move(status)](const Specification& spec) {
-        // The gate's status walk would ask every subset after the first part
-        // a step touched, where one query on the whole settles most refusals,
-        // and its verdict is the decided entry the memo's rules read.
-        if (count_live(spec.m_guarantees) > 0 &&
-            global_real_checker().check_realizability(spec) ==
-                std::optional<bool>(false)) {
+        // A check that raises refuses the step. The climb then stays on the
+        // repair it stood on, which has already passed the gate, so a tool
+        // failure here costs one step and never writes an unchecked repair.
+        // Left to propagate, it ended a run whose search had finished.
+        try {
+            // The gate's status walk would ask every subset after the first
+            // part a step touched, where one query on the whole settles most
+            // refusals, and its verdict is the decided entry the memo's rules
+            // read.
+            if (count_live(spec.m_guarantees) > 0 &&
+                global_real_checker().check_realizability(spec) ==
+                    std::optional<bool>(false)) {
+                return false;
+            }
+            return passes_output_gate(spec, cfg, status);
+        } catch (const std::exception&) {
+            ClimbStats::n_gate_errors.fetch_add(1, std::memory_order_relaxed);
             return false;
         }
-        return passes_output_gate(spec, cfg, status);
     };
 }
 
