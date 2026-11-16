@@ -470,6 +470,26 @@ def _pruned_sweep() -> list[tuple[str, dict]]:
 
 SWEEP_P: list[tuple[str, dict]] = _pruned_sweep()
 
+
+def _removal_sweep() -> list[tuple[str, dict]]:
+    """Maximality removal against demotion, on top of sweep P's lean.
+
+    "lean" is sweep P's lean, "lean-demote" adds maximality_demotion and
+    "lean-remove" adds maximality_removal as well, so a flagged candidate
+    leaves the survivor pool rather than dropping one front. Every arm states
+    maximality_removal, off as well as on, so no arm inherits its default.
+    ORDER_FEATURES is left alone, so sweeps O and P regenerate as they ran
+    (experiments/2026-11-17-fretish-order-removal).
+    """
+    lean = {**dict(SWEEP_P)["lean"], "maximality_removal": False}
+    demote = {**lean, "maximality_demotion": True}
+    return [("lean", lean),
+            ("lean-demote", demote),
+            ("lean-remove", {**demote, "maximality_removal": True})]
+
+
+SWEEP_D: list[tuple[str, dict]] = _removal_sweep()
+
 # Keys whose built-in default has changed at least once since campaigns began
 # being archived. A generated config states a key only where a sweep overrides
 # it, so everything else is inherited from the binary at run time — which means
@@ -492,10 +512,12 @@ SWEEPS: list[tuple[str, list]] = [
     ("R", SWEEP_R),
     ("O", SWEEP_O),
     ("P", SWEEP_P),
+    ("D", SWEEP_D),
 ]
 
-# Sweeps emitted when --sweeps is omitted. O is held back, so a grid generated
-# without --sweeps stays byte-identical to the one before it existed.
+# Sweeps emitted when --sweeps is omitted. O, P and D are held back, so a grid
+# generated without --sweeps stays byte-identical to the one before they
+# existed.
 DEFAULT_SWEEPS: list[str] = ["A", "B", "C", "R"]
 
 # ── TLSF campaign grid ───────────────────────────────────────────────────────

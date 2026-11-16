@@ -681,6 +681,27 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order-pairs.csv",
         "default_jobs": 16,
     },
+    # Maximality removal against demotion, both on top of lean, on the small
+    # set and rad's cores: sweep D, in its own config tree
+    # (experiments/2026-11-17-fretish-order-removal).
+    "fretish-order-removal": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D"],
+        "levels": {},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200
+                         for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order-removal",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order-removal",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order-removal.csv",
+        "default_jobs": 8,
+    },
     "fretish-order-vent-deadline": {
         "schemes": ["nsga2-apportion"],
         "weakenings": ["wkoff"],

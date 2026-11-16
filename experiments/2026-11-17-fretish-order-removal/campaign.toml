@@ -1,0 +1,45 @@
+name = "2026-11-17-fretish-order-removal"
+branch = "campaign/fretish-order-removal"
+profile = "fretish-order-removal"
+description = "Maximality removal against maximality demotion, both on top of lean, against lean alone, over the small set and rad's ten cores, seeds 0-29. PLAN.md gives the design and the analysis."
+
+# Split by subject, not by seed, as in 2026-11-17-fretish-order-xover-rate:
+# each host runs all 30 seeds of its own subjects, so every arm of a (subject,
+# seed) cell runs on one host and the pooled pass can pool each subject on its
+# host. Both hosts take every seed, which a campaign-level table refuses as an
+# overlap, so the level gives each host no seeds and every phase names its own.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# The flags of 2026-11-05-fretish-order's line, with sweep D, its own tree and
+# --parallel 2, which keeps every run at 2 threads whatever CPUs its phase
+# holds (see 2026-11-17-fretish-order-xover-rate).
+configs = "python3 scripts/gen_configs.py --sweeps D --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 2 --out-dir experiments/configs-fretish-order-removal --pin-vintage"
+
+# 7 subjects x 3 arms x 30 seeds = 630 runs, the three timing-bound
+# specifications among them, on one CPU set for the whole campaign. Queues
+# behind the xover-rate entry on av3 (072). 8 jobs x 2 threads fill the 16
+# CPUs, the per-agent share.
+[[phases]]
+name = "run-av3"
+profile = "fretish-order-removal"
+specs = ["lift-plus-cruise-mini", "liquid-mixer", "valu3s-uc6",
+         "rad-core-10", "rad-core-12-18", "rad-core-45", "rad-core-55"]
+hosts = { av3 = "0-29" }
+confine = { av3 = { cpus = "16-31", memory_max = "32G" } }
+jobs = 8
+
+# 12 subjects x 3 arms x 30 seeds = 1,080 runs. Queues behind the xover-rate
+# entry on av2 (076). Declared on CPUs 0-5 at 3 jobs x 2 threads, as that
+# entry was; if av2 is free when this phase starts, widen it to cpus = "0-15",
+# memory_max = "32G", jobs = 8 before enqueuing (PLAN.md, Launch).
+[[phases]]
+name = "run-av2"
+profile = "fretish-order-removal"
+specs = ["fsm", "fsm-timing", "fsm-combined", "mode-arbiter", "takeoff",
+         "fsm-lmcps", "rad-core-1-18", "rad-core-17-18", "rad-core-33",
+         "rad-core-61", "rad-core-65", "rad-core-68"]
+hosts = { av2 = "0-29" }
+confine = { av2 = { cpus = "0-5", memory_max = "12G" } }
+jobs = 3
