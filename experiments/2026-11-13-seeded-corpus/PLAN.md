@@ -31,7 +31,7 @@ python3 scripts/seeded/seed.py --out $E --bases-csv $E/bases.csv --per-base 15 -
 python3 scripts/seeded/seed.py --out $E --bases-csv $E/bases.csv --per-base 15 --jobs 14 --only-clusters lpc,ventilator,valu3s --edits 3,4,5,6 --extra-edits conflict-now --tag x --seed 20261114
 tail -n +2 $E/mutants-x.csv >> $E/mutants.csv
 python3 scripts/seeded/probe.py --out $E --jobs 6
-python3 scripts/seeded/select.py --out $E
+python3 scripts/seeded/choose.py --out $E
 ```
 
 ## Steps
@@ -65,3 +65,5 @@ python3 scripts/seeded/select.py --out $E
 - 2026-11-14 13:40. Seeds 1-4 done: 7680 runs in 801 min, no errors or timeouts. 9598 rows in all.
 - Analysis: climb holds in both directions and all 6 clusters. Gate's time saving holds; its ideal gain in addition halves and loses significance without rad. Blame's removal raises the ideal rate by 6.9 pp (Holm 0.044), but that comes from rad and falls to 1.5 pp without it. Demote costs 1.8 s per run in all 6 clusters with no strength effect. Details in REPORT.md.
 - 2026-11-15 01:00. Extension, under a relayed instruction from the user to use the time before the deadline. Local runs are capped at 2 parallel jobs and nice -j4 builds (the workstation's standing limit, relayed by veribee-ee), so the extension runs at `--jobs 2`. Sweep P adds two pruned defaults: `lean` (full without demote, scale, xover and verdict) and `climb-gate` (base plus climb and gate). At 2 jobs a run takes about 13 s, against about 45 s at 8 jobs: the main campaign's wall times include contention, which affects every arm alike, so its wall contrasts stand but its absolute times do not transfer. Sweep P therefore also reruns `full` and `base` (`full-rerun`, `base-rerun`) so the pruned arms' wall times compare under one load. 2400 runs at `1077b43b`, ETA 05:40. Next: the reversion probe under the `full` config, at 2 jobs.
+- 2026-11-15 01:47. Claude Code stopped the sweep-P run at 312 of 2400 because the machine was low on memory (machine-wide, not this run). One failure: `full-rerun` on `fsm-combined__add-request-extend-within__m11` seed 0, the same `ltl2tgba` fatal as in sweep O.
+- 2026-11-15 20:57. Restarted on the user's relayed instruction, resuming at run 312 with the runner's default resume, at 2 jobs in a scope capped at 8 GB with no swap. The rows already written are at `1077b43b`; the remaining rows are at `de2ebcda`, which changes only scripts, so the engine is the same. The `full`-config reversion probe (`probe.py --config .../sweep_O_full.toml --tag -full --only-selected --jobs 2`) runs after it in the same scope.

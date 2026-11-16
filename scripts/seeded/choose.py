@@ -71,7 +71,7 @@ def main() -> int:
         w.writeheader()
         w.writerows(rows)
     (args.out / "selected.txt").write_text(
-        "# Written by scripts/seeded/select.py; see subjects.csv.\n"
+        "# Written by scripts/seeded/choose.py; see subjects.csv.\n"
         + "".join(f"{s}\n" for s in sorted(chosen)))
     counts = defaultdict(lambda: [0, 0])
     for r in rows:
