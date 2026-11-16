@@ -52,6 +52,9 @@ selection_scheme = "nsga2-apportion"
 # FRETISH only, under nsga2-apportion: demote a realizable candidate one front
 # when another realizable one is proved strictly stronger.
 maximality_demotion = false
+# With maximality_demotion: remove the flagged candidate at survivor selection
+# instead of demoting it. Requires maximality_demotion.
+maximality_removal = false
 
 [fitness]
 # AuRUS's weights (Settings.java): its lost- and won-model terms, 0.1 each, are

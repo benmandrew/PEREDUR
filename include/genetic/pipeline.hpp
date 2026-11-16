@@ -180,11 +180,64 @@ struct ParentVerdictStats {
     inline static std::atomic<std::size_t> n_unproved{0};
 };
 
+/// What Nsga2Apportion survivor selection did with its distinct (mu + lambda)
+/// pool over a run, counted whether or not maximality demotion is on. The
+/// pool is measured after deduplication and after any maximality removal, as
+/// the size the truncate-or-replicate step compares with target_size. Counting
+/// draws nothing. Reported under `--diagnostics` and in run.json.
+struct SurvivorSelectionStats {
+    /// Survivor selections run under Nsga2Apportion.
+    inline static std::atomic<std::size_t> n_selections{0};
+    /// Of those, the ones whose distinct pool exceeded target_size and was
+    /// truncated, so a low-ranked candidate could be cut.
+    inline static std::atomic<std::size_t> n_truncated{0};
+    /// Of those, the ones whose distinct pool fell short of target_size and
+    /// was replicated, so every distinct candidate kept at least one slot.
+    inline static std::atomic<std::size_t> n_replicated{0};
+    /// The distinct pool sizes summed over every selection, so that
+    /// pool_size_sum / n_selections is the mean.
+    inline static std::atomic<std::size_t> pool_size_sum{0};
+};
+
 /// The name the parent-verdict stage reports under, in the stage list and in
 /// the filter report.
 inline constexpr const char* k_parent_verdict_stage = "parent-verdict";
 
 namespace generation_detail {
+
+/// Maximality removal over @p pool: erase every element @p flags marks, keep
+/// the rest in order and clear @p flags, counting the removals in
+/// DemotionStats::n_removed. The flags are computed over the whole pool
+/// before any is erased. A strict order proved by rule leaves its maximal
+/// candidates unflagged, but the rule proves implication one direction at a
+/// time, so a cycle among equivalent candidates can flag every element. Where
+/// removal would empty the pool, nothing is erased, @p flags is left to demote
+/// them all, and the selection counts in DemotionStats::n_removal_fallbacks
+/// and its demotions in n_demoted. Draws nothing.
+template <typename T>
+void remove_flagged(std::vector<T>& pool, std::vector<bool>& flags) {
+    assert(flags.empty() || flags.size() == pool.size());
+    const auto n_flagged =
+        static_cast<std::size_t>(std::count(flags.begin(), flags.end(), true));
+    if (n_flagged == 0) {
+        return;
+    }
+    if (n_flagged == pool.size()) {
+        DemotionStats::n_removal_fallbacks++;
+        DemotionStats::n_demoted += n_flagged;
+        return;
+    }
+    std::vector<T> kept;
+    kept.reserve(pool.size() - n_flagged);
+    for (std::size_t i = 0; i < pool.size(); ++i) {
+        if (!flags[i]) {
+            kept.push_back(std::move(pool[i]));
+        }
+    }
+    pool = std::move(kept);
+    flags.clear();
+    DemotionStats::n_removed += n_flagged;
+}
 
 constexpr std::size_t k_rate_granularity = 1'000'000;
 
@@ -675,6 +728,11 @@ void stage_order_parents(GenerationContext<Spec>& ctx) {
     if (uses_nsga2_ranking(ctx.m_cfg)) {
         // The rule is applied again here, or a candidate demoted at the last
         // selection would breed and stand as an elite from its old front.
+        // Under maximality_removal it demotes here all the same: the
+        // population holds no candidate flagged at the survivor step, and one
+        // flagged only now (its stronger partner is new to the pool) still
+        // breeds from one front lower rather than being dropped from a
+        // population that must keep target_size slots.
         nsga2_sort(ctx.m_scored, demotion_flags(ctx, ctx.m_scored));
         return;
     }
@@ -853,14 +911,22 @@ void stage_select(GenerationContext<Spec>& ctx) {
     // holding them stops the truncation below from cutting arbitrarily through
     // the rank-0 front.
     pool = generation_detail::dedup_by_specification(std::move(pool));
-    const std::vector<bool> demoted = demotion_flags(ctx, pool);
-    DemotionStats::n_demoted += static_cast<std::size_t>(
-        std::count(demoted.begin(), demoted.end(), true));
+    std::vector<bool> demoted = demotion_flags(ctx, pool);
+    if (ctx.m_cfg.maximality_removal) {
+        generation_detail::remove_flagged(pool, demoted);
+    } else {
+        DemotionStats::n_demoted += static_cast<std::size_t>(
+            std::count(demoted.begin(), demoted.end(), true));
+    }
     nsga2_sort(pool, demoted);
 
+    SurvivorSelectionStats::n_selections++;
+    SurvivorSelectionStats::pool_size_sum += pool.size();
     if (pool.size() > ctx.m_target_size) {
+        SurvivorSelectionStats::n_truncated++;
         pool.resize(ctx.m_target_size);
     } else if (pool.size() < ctx.m_target_size) {
+        SurvivorSelectionStats::n_replicated++;
         // Deduplication alone would leave too few slots to breed from, so
         // selection pressure is re-expressed as replication multiplicity.
         pool = generation_detail::replicate_to_size(pool, ctx.m_target_size);

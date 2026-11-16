@@ -161,6 +161,12 @@ struct Config {
     /// down when a rule proves another realizable candidate in the pool
     /// strictly stronger (see "Maximality demotion" in docs/dev/algorithm.md).
     bool maximality_demotion = false;
+    /// With maximality_demotion on, remove a flagged candidate from the
+    /// survivor pool instead of moving it one front down. The candidate proved
+    /// stronger stays, so the pool cannot empty. The parent ordering still
+    /// demotes (see "Maximality demotion" in docs/dev/algorithm.md). Requires
+    /// maximality_demotion.
+    bool maximality_removal = false;
     double selection_rate = 0.5;
     /// The top elitism_rate fraction of the population carries over into the
     /// next generation verbatim, bypassing crossover, mutation and the

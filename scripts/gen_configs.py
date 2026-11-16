@@ -106,6 +106,10 @@ DEFAULTS: dict = {
     # byte-identical.
     "p_order_crossover": 0.0,
     "maximality_demotion": False,
+    # With maximality_demotion: remove the flagged candidate at survivor
+    # selection instead of demoting it. Emitted only when a sweep overrides it,
+    # like maximality_demotion.
+    "maximality_removal": False,
     "weight_syntactic": 0.33,
     "weight_semantic": 0.33,
     "weight_status": 0.33,
@@ -259,6 +263,8 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         if "p_order_crossover" in overrides else []) + (
         [f"maximality_demotion = {_fmt(d['maximality_demotion'])}"]
         if "maximality_demotion" in overrides else []) + (
+        [f"maximality_removal = {_fmt(d['maximality_removal'])}"]
+        if "maximality_removal" in overrides else []) + (
         [f"max_wall_s      = {d['max_wall_s']}"]
         if d.get("max_wall_s") else []) + (
         [f'termination     = "{d["termination"]}"']
