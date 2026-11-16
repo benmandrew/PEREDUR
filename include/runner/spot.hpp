@@ -11,6 +11,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -36,13 +37,23 @@ std::string ltl2tgba_path();
 /// -H (HOA output) on the given LTL formula and returns the raw HOA text.
 /// Asserts that the binary is accessible; the result is memoised by formula.
 ///
-/// None of the three non-clean exits is an assertion. A non-zero exit throws,
-/// and so does a timeout (see set_ltl2tgba_timeout), which drops the
-/// individual. SPOT's exit 2 on a tautology is neither: the universal
-/// automaton is substituted for it, because a formula accepting every trace
-/// is a correct answer rather than a scoring failure (PR #29 — still unfixed
-/// upstream).
+/// None of the three non-clean exits is an assertion. A non-zero exit throws
+/// `std::runtime_error`, which drops the individual. A timeout (see
+/// set_ltl2tgba_timeout) throws Ltl2tgbaTimeout, which the similarity terms
+/// catch and score as unknown. SPOT's exit 2 on a tautology is neither: the
+/// universal automaton is substituted for it, because a formula accepting
+/// every trace is a correct answer rather than a scoring failure (PR #29 —
+/// still unfixed upstream).
 std::string run_ltl2tgba_for_counting(const std::string& formula);
+
+/// Raised by run_ltl2tgba_for_counting when the construction overruns its
+/// budget, and again on every later call for the same formula, since the
+/// abandonment is memoised. Distinct from the other failures so that a caller
+/// can score the comparison as unknown and leave the individual in the run.
+class Ltl2tgbaTimeout : public std::runtime_error {
+   public:
+    using std::runtime_error::runtime_error;
+};
 
 /// Per-call wall-clock budget for the ltl2tgba counting exec (process-global,
 /// like RealizabilityChecker's ltlsynt timeout). A call exceeding it is killed
@@ -62,10 +73,10 @@ struct Ltl2tgbaStats {
     /// ltl2tgba exit-2-on-tautology results substituted with the universal
     /// automaton (see run_ltl2tgba_for_counting) rather than raised as errors.
     inline static std::size_t n_tautology_substitutions = 0;
-    /// Counting calls abandoned at the per-call timeout (raised as errors, so
-    /// the individual is dropped). Counts execs, not calls: the abandonment is
-    /// memoised, and a repeat of the same formula re-raises it as a cache hit
-    /// without paying the budget again.
+    /// Counting calls abandoned at the per-call timeout (raised as
+    /// Ltl2tgbaTimeout, which scores the pair as unknown). Counts execs, not
+    /// calls: the abandonment is memoised, and a repeat of the same formula
+    /// re-raises it as a cache hit without paying the budget again.
     inline static std::size_t n_timeouts = 0;
 };
 

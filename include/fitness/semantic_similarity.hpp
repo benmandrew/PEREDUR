@@ -78,7 +78,8 @@ double semantic_similarity_from_counts(const SemanticSimilarityCounts& counts);
 /// @param requirement       The first requirement to compare
 /// @param other_requirement The second requirement to compare
 /// @param step_count        The bound k on trace length for model counting
-/// @return                  A semantic similarity score in [0, 1]
+/// @return                  A semantic similarity score in [0, 1], and 0 when
+///                          a count's ltl2tgba construction times out
 double semantic_similarity(const Requirement& requirement,
                            const Requirement& other_requirement,
                            std::size_t step_count);

@@ -58,11 +58,17 @@ double formula_pair_semantic_similarity(const Formula& first,
     // re-counted against every offspring in the population, so one shared
     // memo covers the whole run -- and it is the same cache the FRETISH path
     // uses.
-    const SemanticSimilarityCounts counts{
-        cached_count_traces(ltl_first, n_atoms, step_count),
-        cached_count_traces(ltl_second, n_atoms, step_count),
-        cached_count_traces(conjunction, n_atoms, step_count)};
-    return semantic_similarity_from_counts(counts);
+    try {
+        const SemanticSimilarityCounts counts{
+            cached_count_traces(ltl_first, n_atoms, step_count),
+            cached_count_traces(ltl_second, n_atoms, step_count),
+            cached_count_traces(conjunction, n_atoms, step_count)};
+        return semantic_similarity_from_counts(counts);
+    } catch (const Ltl2tgbaTimeout&) {
+        // Unknown, scored as the FRETISH pair scores it; see
+        // semantic_similarity in fitness/semantic_similarity.cpp.
+        return 0.0;
+    }
 }
 
 }  // namespace

@@ -18,6 +18,7 @@
 #include "fitness/syntactic_similarity.hpp"
 #include "fitness/transfer_matrix.hpp"
 #include "formula_key.hpp"
+#include "runner/spot.hpp"
 
 namespace {
 
@@ -182,9 +183,18 @@ double semantic_similarity_from_counts(const SemanticSimilarityCounts& counts) {
 double semantic_similarity(const Requirement& requirement,
                            const Requirement& other_requirement,
                            std::size_t step_count) {
-    const SemanticSimilarityCounts counts = count_semantic_similarity_terms(
-        requirement, other_requirement, step_count);
-    return semantic_similarity_from_counts(counts);
+    try {
+        const SemanticSimilarityCounts counts = count_semantic_similarity_terms(
+            requirement, other_requirement, step_count);
+        return semantic_similarity_from_counts(counts);
+    } catch (const Ltl2tgbaTimeout&) {
+        // Unknown, paid what the worst score pays, as an undecided status
+        // query is: a timeout must not promote a candidate. Raising instead
+        // drops the individual, and a timeout on a formula every candidate
+        // shares (the original's own requirement) drops a whole generation
+        // and aborts the run at max_scoring_failure_rate.
+        return 0.0;
+    }
 }
 
 double semantic_pair_similarity(const Requirement& requirement,

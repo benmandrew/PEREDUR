@@ -158,8 +158,7 @@ mrs_lookahead_kill_grace_ms = 2000
 # Spot tool calls through spot-forkserver instead of an exec each.
 # Same answers, 4-5 ms less start-up a call.
 spot_server = false
-# 0.15, not 0.05: the ltl2tgba budget drops individuals by design, and enough
-# land in one generation on the heavy TLSF specs to trip a tighter bound.
+# 0.15, not 0.05: set while an ltl2tgba timeout still dropped its individual.
 max_scoring_failure_rate = 0.15
 
 [tlsf.mutation]

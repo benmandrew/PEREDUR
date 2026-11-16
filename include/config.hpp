@@ -134,9 +134,10 @@ struct Config {
     /// Per-call wall-clock budget for the ltl2tgba model-counting exec; 0
     /// disables it. The deterministic (-D) construction can blow up
     /// super-exponentially on deeply nested formulae (multi-GB, minutes to
-    /// hours). A call over budget is killed and the individual is dropped,
-    /// counted against max_scoring_failure_rate. Looser than the ltlsynt
-    /// budget because a legitimate determinisation can take tens of seconds.
+    /// hours). A call over budget is killed and the requirement pair it was
+    /// counting scores 0, as unknown, leaving the individual in the run. Looser
+    /// than the ltlsynt budget because a legitimate determinisation can take
+    /// tens of seconds.
     std::chrono::milliseconds ltl2tgba_timeout{60'000};
     /// Per-call wall-clock budget for each ltlfilt exec. Its passes can blow up
     /// on the deep nested-X conjunctions the search builds, and an abandoned
@@ -337,9 +338,10 @@ struct Config {
     /// one evolved formula) costs that individual rather than the whole run.
     /// Above this fraction of a generation the tooling is broken rather than
     /// the formula, and the run aborts. A single failure is always tolerated,
-    /// whatever the population size. The ltl2tgba budget drops individuals by
-    /// design, and on the heavy TLSF specifications enough land in one
-    /// generation to trip a 5% bound.
+    /// whatever the population size. 0.15 dates from when an ltl2tgba timeout
+    /// dropped its individual, and enough landed in one generation on the heavy
+    /// TLSF specifications to trip a 5% bound; a timeout now scores the pair
+    /// as unknown (see ltl2tgba_timeout).
     double max_scoring_failure_rate = 0.15;
 };
 
