@@ -76,7 +76,7 @@ Climb's effect is positive in every cluster, but rad supplies the largest share 
 
 ## Sensitivity without rad
 
-Rad's input/output partition is suspect, because 8 of its 10 unrealisable cores consist of a single guarantee that is unrealisable alone. Rerunning the analysis without rad leaves 93 subjects in 5 clusters.
+Rad's input/output partition is suspect, because 7 of its 10 unrealisable cores consist of a single guarantee that is unrealisable alone. Rerunning the analysis without rad leaves 93 subjects in 5 clusters.
 
 | Contrast | With rad (110 subjects) | Without rad (93 subjects) |
 |---|---|---|
@@ -137,7 +137,7 @@ These findings concern the subjects and the engine, not the features.
 
 **Unsatisfiable real subjects.** Two of the nine real small subjects are unsatisfiable, not merely unrealisable. `takeoff` has no inputs at all, so it yields no satisfiable mutant, and `lift-plus-cruise-mini` is the other.
 
-**Suspect partition in rad.** Of rad's 10 cores, 8 are a single guarantee that is unrealisable alone. Its input/output partition is therefore suspect, which motivated the sensitivity analysis. Rad's drop-one bases have at most one guarantee and went unused, but rad slices that passed the single-requirement screen were used.
+**Suspect partition in rad.** Of rad's 10 cores, 7 are a single guarantee that is unrealisable alone; each guarantee of the other 3 is realisable alone. In 5 of the 7 (cores 45, 55, 61, 65 and 68) the response requires an atom that the RAD authors' FRET exports label `Input`, such as `pose_detected` or `collision_detected`, and relabelling that atom as an output makes the core realisable. Core 10 is a `before` timing whose stop is an input, and core 33 is an `after 2 ticks` timing whose windows the environment can make overlap; neither becomes realisable with every atom relabelled. Its input/output partition is therefore suspect, which motivated the sensitivity analysis. Rad's drop-one bases have at most one guarantee and went unused, but rad slices that passed the single-requirement screen were used.
 
 **Systems the fault model cannot break.** The lift-plus-cruise and ventilator slices never became unrealisable under the fault model. Their requirements are loosely coupled and mostly `eventually` or `next` under mode scopes, so a controller separates conflicting obligations in time. The first generation pass kept 246 of 1140 candidates. A second pass on lpc, ventilator and valu3s used 3 to 6 edits plus a `conflict-now` edit that pins the edited deadline to `immediately`, and it kept 2 of 570, both from valu3s. The corpus therefore covers 6 systems and is dominated by fsm and lmcps.
 
