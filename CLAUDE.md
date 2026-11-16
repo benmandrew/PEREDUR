@@ -90,3 +90,4 @@ Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves w
 - `campaign.py status` is the source of truth. Re-run it instead of recalling state, never poll in a loop, and never spawn an agent to watch a run: `enqueue` and let the tick drive it.
 - `KEY_FIELDS` in `merge_experiments.py` and the resume key in `run_experiments.py` are off limits, and `commit`/`dirty` never join either. Renaming a factor directory means extending `canonical_scheme()` in both scripts.
 - Never delete a `provenance/*` tag. Cut a campaign branch's tag before rebasing or splitting that branch.
+- No blob over 500 KiB enters history, and nothing under `experiments/` is committed with `git add -f`. Large outputs stay untracked here and on av2 and av3 ("Large outputs" in `docs/dev/campaigns.md`); `scripts/check_blob_size.sh` enforces the limit in the pre-commit hook and in CI.
