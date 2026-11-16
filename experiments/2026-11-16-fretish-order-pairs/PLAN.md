@@ -10,11 +10,11 @@ Power is low: the climb's own addition-removal gap, the largest, reached only p 
 
 ## Hosts
 
-av2 CPUs 16-31 under a 24 GB cap, announced to veribee-33, veribee-0b and gawain-76 before enqueuing. veribee-33 holds av2 CPUs 0-15 and the GPU until Tue 17 Nov 11:00, and nothing else holds av2. av3 was the first choice, but on Mon 16 Nov 12:10 UTC it did not answer ssh (no route to host). The user approved the run in session on Mon 16 Nov.
+av2 CPUs 18-31 under a 24 GB cap, announced to veribee-33, veribee-0b and gawain-76 before enqueuing. veribee-33 holds av2 CPUs 0-15 and the GPU until Tue 17 Nov 11:00, and hlwide-trap holds 16-17 for under an hour from about 12:10. av3 was the first choice, but on Mon 16 Nov 12:10 UTC it did not answer ssh (no route to host). The user approved the run in session on Mon 16 Nov.
 
 ## Estimate
 
-810 runs at 16 jobs: about 3-3.5 h.
+810 runs at 14 jobs: about 3.5-4 h.
 
 ## Result
 
