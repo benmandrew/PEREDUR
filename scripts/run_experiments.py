@@ -745,6 +745,51 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order-full4-no-f.csv",
         "default_jobs": 8,
     },
+    # The four-mechanism full (sweep D's full4, = lean-demote), its no-<f> and
+    # reruns of lean (= no-demote) and base on the seeded corpus, all under one
+    # load (experiments/2026-11-17-fretish-extension-share).
+    "fretish-seeded-full4": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D"],
+        "levels": {"D": ["full4", "full4-no-climb", "full4-no-gate",
+                         "full4-no-blame", "lean", "base"]},
+        "specs": list(SEEDED_SPECS),
+        "seeds": list(range(5)),
+        "timeout_caps": {s: 7200 for s in SEEDED_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-seeded-full4",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-seeded-full4",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-seeded-full4.csv",
+        "default_jobs": 8,
+    },
+    # The new ablation on whole rad and lift-plus-cruise-full: the four-mechanism
+    # full, its no-<f> (lean is no-demote) and sweep O's only-<f>, against
+    # fretish-order-large's base (experiments/2026-11-17-fretish-extension-share).
+    # No parallel line: threads come from CPUs over jobs, as base's did.
+    "fretish-order-large-full4": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D", "O"],
+        "levels": {"D": ["full4", "full4-no-climb", "full4-no-gate",
+                         "full4-no-blame", "lean"],
+                   "O": ["only-climb", "only-gate", "only-blame",
+                         "only-demote"]},
+        "specs": ["rad", "lift-plus-cruise-full"],
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in ("rad", "lift-plus-cruise-full")},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order-large-full4",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order-large-full4",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order-large-full4.csv",
+        "default_jobs": 4,
+    },
     # lean-remove on the seeded corpus, against fretish-seeded's sweep P lean,
     # with lean's seed 0 rerun to check that it reproduces.
     "fretish-seeded-removal": {

@@ -1,0 +1,71 @@
+name = "2026-11-17-fretish-extension-share"
+branch = "campaign/fretish-extension-share"
+profile = "fretish-seeded-full4"
+description = "peredur-extension's half-host share before 06:00 on 18 Nov: the new ablation's arms on the seeded corpus, the new ablation on whole rad, and the first lift-plus-cruise-full runs (PLAN.md)."
+
+# Each phase names its own host and seeds. Queued per host with --host, av2
+# behind fret-collab's 081 and av3 behind its av3 entries, on the CPUs
+# peredur-extension-d5 allocated until veribee-ab releases at 06:00.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# Seeded at --parallel 2, the thread count its sweep O arms ran at (20 CPUs
+# over 8 jobs on ben). The large tree has no parallel line, as base's had, so
+# threads come from the phase's CPUs over its jobs: 4 on rad, 10 on
+# lift-plus-cruise-full.
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage\"; $G --sweeps D --parallel 2 --out-dir experiments/configs-fretish-seeded-full4 && $G --sweeps D O --out-dir experiments/configs-fretish-order-large-full4'"
+
+# Seeded: 120 subjects x 6 arms. Outcomes there do not depend on the host, so
+# the seeds split by load: av2 is free first and takes three.
+[[phases]]
+name = "seeded-av2"
+profile = "fretish-seeded-full4"
+hosts = { av2 = "0-2" }
+confine = { av2 = { cpus = "0-15", memory_max = "80G" } }
+jobs = 8
+
+[[phases]]
+name = "seeded-av3"
+profile = "fretish-seeded-full4"
+hosts = { av3 = "3-4" }
+confine = { av3 = { cpus = "16-31", memory_max = "80G" } }
+jobs = 8
+
+# Whole rad, 9 arms x 5 seeds per host on base's seeds, at 4 threads a run.
+[[phases]]
+name = "rad-av2"
+profile = "fretish-order-large-full4"
+specs = ["rad"]
+hosts = { av2 = "0-4" }
+confine = { av2 = { cpus = "0-15", memory_max = "80G" } }
+jobs = 4
+
+[[phases]]
+name = "rad-av3"
+profile = "fretish-order-large-full4"
+specs = ["rad"]
+hosts = { av3 = "15-19" }
+confine = { av3 = { cpus = "16-31", memory_max = "80G" } }
+jobs = 4
+
+# lift-plus-cruise-full, one run at a time on 10 CPUs until 06:00: the five
+# sweep D arms (full4, the three full4-no-<f>, lean) of one seed per host.
+# 2026-11-18-fretish-extension-lpc finishes the seeds on whole hosts.
+[[phases]]
+name = "lpc-night-av2"
+profile = "fretish-order-large-full4"
+specs = ["lift-plus-cruise-full"]
+sweeps = ["D"]
+hosts = { av2 = "0" }
+confine = { av2 = { cpus = "0-9", memory_max = "80G" } }
+jobs = 1
+
+[[phases]]
+name = "lpc-night-av3"
+profile = "fretish-order-large-full4"
+specs = ["lift-plus-cruise-full"]
+sweeps = ["D"]
+hosts = { av3 = "15" }
+confine = { av3 = { cpus = "16-25", memory_max = "80G" } }
+jobs = 1
