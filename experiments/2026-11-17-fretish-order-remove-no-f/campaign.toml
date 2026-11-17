@@ -1,0 +1,29 @@
+name = "2026-11-17-fretish-order-remove-no-f"
+branch = "campaign/fretish-order-remove-no-f"
+profile = "fretish-order-remove-no-f"
+description = "The paper's no-climb, no-gate and no-blame once removal replaced demotion: lean-remove without each, over the small set and rad's ten cores, seeds 0-29, split by seed across av2 and av3. full (lean-remove) and no-remove (lean) are reused from 2026-11-17-fretish-order-removal (PLAN.md)."
+
+# Split by seed, as the ablation's base was, on av2 CPUs 0-15 and av3 CPUs
+# 16-31, the CPUs this session's earlier entries held. Approved by the user
+# on 17 Nov, after they switched the paper's fourth mechanism to removal.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release'"
+
+configs = "python3 scripts/gen_configs.py --sweeps D --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 2 --out-dir experiments/configs-fretish-order-remove-no-f --pin-vintage"
+
+# 19 subjects x 4 arms x 15 seeds = 1,140 runs.
+[[phases]]
+name = "run-av2"
+profile = "fretish-order-remove-no-f"
+hosts = { av2 = "0-14" }
+confine = { av2 = { cpus = "0-15", memory_max = "32G" } }
+jobs = 8
+
+# 19 subjects x 4 arms x 15 seeds = 1,140 runs.
+[[phases]]
+name = "run-av3"
+profile = "fretish-order-remove-no-f"
+hosts = { av3 = "15-29" }
+confine = { av3 = { cpus = "16-31", memory_max = "32G" } }
+jobs = 8
