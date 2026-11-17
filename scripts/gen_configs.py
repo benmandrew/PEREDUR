@@ -476,16 +476,21 @@ def _removal_sweep() -> list[tuple[str, dict]]:
 
     "lean" is sweep P's lean, "lean-demote" adds maximality_demotion and
     "lean-remove" adds maximality_removal as well, so a flagged candidate
-    leaves the survivor pool rather than dropping one front. Every arm states
+    leaves the survivor pool rather than dropping one front. "only-remove" is
+    sweep O's base with demotion and removal on, for the ablation's footing
+    (experiments/2026-11-17-fretish-order-removal-followup). Every arm states
     maximality_removal, off as well as on, so no arm inherits its default.
     ORDER_FEATURES is left alone, so sweeps O and P regenerate as they ran
     (experiments/2026-11-17-fretish-order-removal).
     """
     lean = {**dict(SWEEP_P)["lean"], "maximality_removal": False}
     demote = {**lean, "maximality_demotion": True}
+    only = {**dict(SWEEP_O)["base"], "maximality_demotion": True,
+            "maximality_removal": True}
     return [("lean", lean),
             ("lean-demote", demote),
-            ("lean-remove", {**demote, "maximality_removal": True})]
+            ("lean-remove", {**demote, "maximality_removal": True}),
+            ("only-remove", only)]
 
 
 SWEEP_D: list[tuple[str, dict]] = _removal_sweep()

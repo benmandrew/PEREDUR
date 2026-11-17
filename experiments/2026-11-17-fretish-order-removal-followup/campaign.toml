@@ -1,0 +1,53 @@
+name = "2026-11-17-fretish-order-removal-followup"
+branch = "campaign/fretish-order-removal-followup"
+profile = "fretish-order-only-remove"
+description = "Maximality removal on the ablation's footing: only-remove against sweep O's base over the small set and rad's ten cores, and lean-remove against lean on the seeded corpus. Base and seeded lean are reused from earlier campaigns; only the new arms and two reproduction checks run (PLAN.md)."
+
+# Every phase on av3 CPUs 16-31: veribee-33 holds av3 0-15 until about 06:00
+# Wed, and peredur-extension-7e has av2 0-15 for a smoke test.
+hosts = { av3 = "" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# Sweep O's flags with sweep D and O for the ablation footing, at --parallel 2
+# as in fretish-order-removal; the seeded line is fretish-seeded's own, with no
+# --parallel, so its lean config is byte-identical to the one that ran.
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage\"; $G --sweeps D O --parallel 2 --out-dir experiments/configs-fretish-order-only-remove && $G --sweeps D P --out-dir experiments/configs-fretish-seeded-removal'"
+
+# only-remove: 19 subjects x 30 seeds = 570 runs.
+[[phases]]
+name = "only-remove"
+profile = "fretish-order-only-remove"
+sweeps = ["D"]
+hosts = { av3 = "0-29" }
+confine = { av3 = { cpus = "16-31", memory_max = "32G" } }
+jobs = 8
+
+# base on the two subjects whose cr10-base runs did not reproduce in
+# fretish-order-removal's lean check (PLAN.md): 2 x 30 = 60 runs.
+[[phases]]
+name = "base-rerun"
+profile = "fretish-order-only-remove"
+sweeps = ["O"]
+specs = ["lift-plus-cruise-mini", "valu3s-uc6"]
+hosts = { av3 = "0-29" }
+confine = { av3 = { cpus = "16-31", memory_max = "32G" } }
+jobs = 8
+
+# lean-remove on the seeded corpus: 120 subjects x 5 seeds = 600 runs.
+[[phases]]
+name = "seeded-lean-remove"
+profile = "fretish-seeded-removal"
+sweeps = ["D"]
+hosts = { av3 = "0-4" }
+confine = { av3 = { cpus = "16-31", memory_max = "32G" } }
+jobs = 8
+
+# seeded lean at seed 0, to check it reproduces fretish-seeded's: 120 runs.
+[[phases]]
+name = "seeded-lean-check"
+profile = "fretish-seeded-removal"
+sweeps = ["P"]
+hosts = { av3 = "0" }
+confine = { av3 = { cpus = "16-31", memory_max = "32G" } }
+jobs = 8

@@ -690,7 +690,7 @@ PROFILES: dict[str, dict] = {
         "metrics": ["log"],
         "repair_modes": None,
         "sweeps": ["D"],
-        "levels": {},
+        "levels": {"D": ["lean", "lean-demote", "lean-remove"]},
         "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
         "seeds": list(range(30)),
         "timeout_caps": {s: 7200
@@ -700,6 +700,47 @@ PROFILES: dict[str, dict] = {
         "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order-removal",
         "results_dir": EXPERIMENTS_DIR / "results-fretish-order-removal",
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order-removal.csv",
+        "default_jobs": 8,
+    },
+    # Follow-up of fretish-order-removal on the ablation's footing: only-remove
+    # against sweep O's base, which 2026-11-17-fretish-order-xover-rate's
+    # cr10-base already ran. Base reruns only where that campaign's runs did
+    # not reproduce (experiments/2026-11-17-fretish-order-removal-followup).
+    "fretish-order-only-remove": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D", "O"],
+        "levels": {"D": ["only-remove"], "O": ["base"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200
+                         for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order-only-remove",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order-only-remove",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order-only-remove.csv",
+        "default_jobs": 8,
+    },
+    # lean-remove on the seeded corpus, against fretish-seeded's sweep P lean,
+    # with lean's seed 0 rerun to check that it reproduces.
+    "fretish-seeded-removal": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D", "P"],
+        "levels": {"D": ["lean-remove"], "P": ["lean"]},
+        "specs": list(SEEDED_SPECS),
+        "seeds": list(range(5)),
+        "timeout_caps": {s: 7200 for s in SEEDED_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-seeded-removal",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-seeded-removal",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-seeded-removal.csv",
         "default_jobs": 8,
     },
     "fretish-order-vent-deadline": {
