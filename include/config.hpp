@@ -63,6 +63,16 @@ enum class TerminationMode : std::uint8_t { Generations, Individuals };
 /// the original first. Neither draws a random number.
 enum class ClimbOrder : std::uint8_t { Slot, Similarity };
 
+/// How a realizable parent strengthens under @ref
+/// Config::direction_gated_mutation. Towards draws its directed moves from
+/// steps_towards the original and rewrites freely otherwise. Free takes no
+/// step towards the original and rewrites with the directed arms on, so a slot
+/// may move above the original's value. Exchange takes one step towards the
+/// original in a slot that differs from it and one weakening in a slot still
+/// equal to it, in the same mutation. An unrealizable parent weakens under
+/// all three.
+enum class GateRealizable : std::uint8_t { Towards, Free, Exchange };
+
 struct Config {
     std::size_t generations = 10;
     /// Offspring budget for the whole run under
@@ -249,6 +259,11 @@ struct Config {
     /// indexes, so it costs no draw; off, the stream is the one before it
     /// existed.
     bool blame_targeted_slots = false;
+    /// FRETISH only, under blame_targeted_slots: whether a realizable parent's
+    /// slot is drawn from the slots that differ from the original. False
+    /// leaves a realizable parent every live weakenable slot, while an
+    /// unrealizable parent is still narrowed. Costs no draw.
+    bool blame_realizable = true;
     /// FRETISH only: aim a mutation's direction by the parent's status where
     /// crossover did not fire. An unrealizable parent keeps the weakening
     /// moves; a realizable one skips add_assumption and remove_guarantee,
@@ -266,6 +281,10 @@ struct Config {
     /// returning the parent. Drawn only with the gate on and only for an
     /// incomparable result, and not at all at 0 or 1.
     double p_sideways = 1.0;
+    /// FRETISH only, under direction_gated_mutation: how a realizable parent
+    /// strengthens (see GateRealizable). Towards is the behaviour before the
+    /// key existed, and costs no draw beyond it.
+    GateRealizable gate_realizable = GateRealizable::Towards;
     /// FRETISH only: how far the parent's status scales the choice between a
     /// large move and a single edge, in [0, 1]. Each large move's probability
     /// (removing a guarantee, moving a timing off Always or Eventually, and
