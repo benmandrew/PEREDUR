@@ -1,7 +1,7 @@
 name = "2026-11-18-fretish-extension-lpc"
 branch = "campaign/fretish-extension-share"
-profile = "fretish-order-large-full4"
-description = "The new ablation's 9 arms on lift-plus-cruise-full, 2 seeds per host plus one stretch seed, on whole hosts from 06:00 on 18 Nov (2026-11-17-fretish-extension-share/PLAN.md)."
+profile = "fretish-order-large-remove"
+description = "The removal-based ablation's 9 arms on lift-plus-cruise-full, 2 seeds per host plus one stretch seed, on whole hosts from 06:00 on 18 Nov (2026-11-17-fretish-extension-share/PLAN.md)."
 
 # Enqueued per host at its full release (av3 07:45, av2 09:00, or earlier on
 # veribee-ab's message), behind -lpc-2job. CPUs 30-31 stay free
@@ -11,9 +11,9 @@ hosts = { av2 = "", av3 = "" }
 
 build = "sh -c 'cmake --build build-release'"
 
-configs = "sh -c 'G=\"python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage\"; $G --sweeps D --parallel 2 --out-dir experiments/configs-fretish-seeded-full4 && $G --sweeps D O --out-dir experiments/configs-fretish-order-large-full4'"
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage\"; $G --sweeps D --parallel 2 --out-dir experiments/configs-fretish-seeded-remove && $G --sweeps D O --out-dir experiments/configs-fretish-order-large-remove'"
 
-# 9 arms x 2 seeds, less the night phase's 5 runs: 13 runs per host.
+# 9 arms x 2 seeds, less the sweep D runs of the night and 2-job phases.
 [[phases]]
 name = "lpc-av2"
 specs = ["lift-plus-cruise-full"]

@@ -495,14 +495,24 @@ def _removal_sweep() -> list[tuple[str, dict]]:
     no_f = [(f"full4-no-{name}",
              {**demote, **{k: DEFAULTS[k] for k in features[name]}})
             for name in ("climb", "gate", "blame")]
+    remove = {**demote, "maximality_removal": True}
+    # The paper's full became lean-remove (climb, gate, blame and removal), so
+    # "remove-no-<f>" is lean-remove without one of the other three features
+    # (experiments/2026-11-17-fretish-order-remove-no-f). Its no-remove is lean.
+    remove_no_f = [(f"remove-no-{name}",
+                    {**remove, **{k: DEFAULTS[k] for k in features[name]}})
+                   for name in ("climb", "gate", "blame")]
     return [("lean", lean),
             ("lean-demote", demote),
-            ("lean-remove", {**demote, "maximality_removal": True}),
+            ("lean-remove", remove),
             ("only-remove", only)] + no_f + [
         # Reruns of full (lean-demote) and sweep O's base under the no-<f>
         # arms' load, so that wall-time contrasts pair within one campaign.
         ("full4", dict(demote)),
-        ("base", dict(dict(SWEEP_O)["base"]))]
+        ("base", dict(dict(SWEEP_O)["base"]))] + remove_no_f + [
+        # A rerun of lean-remove under the remove-no-<f> arms' load, so that
+        # their wall-time contrasts pair within one campaign.
+        ("remove-full", dict(remove))]
 
 
 SWEEP_D: list[tuple[str, dict]] = _removal_sweep()
