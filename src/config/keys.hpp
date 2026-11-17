@@ -26,7 +26,7 @@ using ConfigMember =
     std::variant<double Config::*, std::size_t Config::*, bool Config::*,
                  std::chrono::milliseconds Config::*, SelectionScheme Config::*,
                  TerminationMode Config::*, StatusGrading Config::*,
-                 MrsAdmissionOrder Config::*>;
+                 MrsAdmissionOrder Config::*, GateRealizable Config::*>;
 
 struct ConfigKey {
     const char* section;  // dotted, as in "tlsf.mutation"
@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 50> k_config_keys{{
+inline constexpr std::array<ConfigKey, 52> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -304,6 +304,17 @@ inline constexpr std::array<ConfigKey, 50> k_config_keys{{
      "(and the assumptions) when the parent is unrealizable, or at the slots "
      "that\n"
      "differ from the original when it is realizable. Off by default.\n"},
+    {"mutation", "blame_realizable", &Config::blame_realizable, KeyCheck::None,
+     KeyReader::Fretish,
+     "FRETISH only, under blame_targeted_slots: whether a realizable parent's "
+     "slot is drawn from the slots that differ from the original. False "
+     "leaves a realizable parent every live weakenable slot, while an "
+     "unrealizable parent is still narrowed. Costs no draw.",
+     "FRETISH only, under blame_targeted_slots: narrow a realizable parent's "
+     "rewrite\n"
+     "to the slots that differ from the original. Set to false to narrow only "
+     "an\n"
+     "unrealizable parent. On by default.\n"},
     {"mutation", "direction_gated", &Config::direction_gated_mutation,
      KeyCheck::None, KeyReader::Fretish,
      "FRETISH only: aim a mutation's direction by the parent's status where "
@@ -316,6 +327,20 @@ inline constexpr std::array<ConfigKey, 50> k_config_keys{{
      "towards the original, and return the parent when a free rewrite moves "
      "the\n"
      "forbidden way. Off by default.\n"},
+    {"mutation", "gate_realizable", &Config::gate_realizable, KeyCheck::None,
+     KeyReader::Fretish,
+     "FRETISH only, under direction_gated: how a realizable parent "
+     "strengthens. \"towards\" steps back towards the original and rewrites "
+     "freely otherwise. \"free\" takes no step towards the original and "
+     "rewrites with the directed arms strengthening, so a slot may move above "
+     "the original. \"exchange\" takes one step towards the original in a "
+     "slot that differs from it and one weakening in a slot still equal to "
+     "it, in the same mutation.",
+     "FRETISH only, under direction_gated: how a realizable parent "
+     "strengthens:\n"
+     "\"towards\" the original, \"free\" in any direction, or "
+     "\"exchange\" (one step back\n"
+     "and one weakening of an untouched slot). \"exchange\" by default.\n"},
     {"mutation", "step_scaling", &Config::step_scaling, KeyCheck::Probability,
      KeyReader::Fretish,
      "FRETISH only: how far the parent's status scales the choice between a "

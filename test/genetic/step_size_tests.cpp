@@ -196,6 +196,8 @@ TEST(test_bisected_step_lands_on_the_midpoint) {
     context.original = &original;
     Config cfg;
     cfg.direction_gated_mutation = true;
+    // Bisection acts on the Towards branch's steps.
+    cfg.gate_realizable = GateRealizable::Towards;
 
     expect(all_equal_to(timings_taken(spec, 1, cfg, context),
                         {timing::within_ticks(2)}),
