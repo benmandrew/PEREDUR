@@ -282,6 +282,23 @@ def _seeded_specs() -> dict[str, dict[str, Path]]:
 
 SEEDED_SPECS: dict[str, dict[str, Path]] = _seeded_specs()
 
+
+def _seeded_headline() -> list[str]:
+    """The selected seeded subjects whose stratum in subjects.csv is headline.
+
+    Empty where the corpus is absent, as SEEDED_SPECS is.
+    """
+    table = SEEDED_DIR / "subjects.csv"
+    if not table.is_file():
+        return []
+    with table.open(newline="") as f:
+        headline = {row["subject"] for row in csv.DictReader(f)
+                    if row["stratum"] == "headline"}
+    return [n for n in SEEDED_SPECS if n in headline]
+
+
+SEEDED_HEADLINE: list[str] = _seeded_headline()
+
 SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **SEEDED_SPECS,
                                      **TLSF_SPECS}
 
@@ -789,6 +806,62 @@ PROFILES: dict[str, dict] = {
         "results_dir": EXPERIMENTS_DIR / "results-fretish-order-large-full4",
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order-large-full4.csv",
         "default_jobs": 4,
+    },
+    # full4 with the gate's exchange mode, on the small set (seeds 0-29) and the
+    # seeded corpus's headline subjects (seeds 0-4), and full4-no-blame with it
+    # on the seeded subjects. Run outside the queue by a per-host driver
+    # (experiments/2026-11-18-fretish-full4-exchange). The configs are those
+    # of full4's campaigns (sweep D, parallel = 2) but for gate_realizable.
+    "fretish-full4-exchange": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D"],
+        "levels": {"D": ["full4-exchange"]},
+        "specs": list(FRETISH_ORDER_SMALL),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-full4-exchange",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-full4-exchange",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-full4-exchange.csv",
+        "default_jobs": 1,
+    },
+    "fretish-full4-exchange-seeded": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D"],
+        "levels": {"D": ["full4-exchange"]},
+        "specs": list(SEEDED_HEADLINE),
+        "seeds": list(range(5)),
+        "timeout_caps": {s: 7200 for s in SEEDED_HEADLINE},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-full4-exchange",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-full4-exchange-seeded",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-full4-exchange-seeded.csv",
+        "default_jobs": 1,
+    },
+    "fretish-full4-no-blame-exchange-seeded": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D"],
+        "levels": {"D": ["full4-no-blame-exchange"]},
+        "specs": list(SEEDED_HEADLINE),
+        "seeds": list(range(5)),
+        "timeout_caps": {s: 7200 for s in SEEDED_HEADLINE},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-full4-exchange",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-full4-no-blame-exchange-seeded",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-full4-no-blame-exchange-seeded.csv",
+        "default_jobs": 1,
     },
     # lean-remove on the seeded corpus, against fretish-seeded's sweep P lean,
     # with lean's seed 0 rerun to check that it reproduces.

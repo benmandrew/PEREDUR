@@ -513,7 +513,12 @@ def _removal_sweep() -> list[tuple[str, dict]]:
         # Reruns of full (lean-demote) and sweep O's base under the no-<f>
         # arms' load, so that wall-time contrasts pair within one campaign.
         ("full4", dict(demote)),
-        ("base", dict(dict(SWEEP_O)["base"]))]
+        ("base", dict(dict(SWEEP_O)["base"]))] + [
+        # full4 and full4-no-blame with the gate's exchange mode for realisable
+        # parents (experiments/2026-11-18-fretish-full4-exchange).
+        ("full4-exchange", {**demote, "gate_realizable": "exchange"}),
+        ("full4-no-blame-exchange",
+         {**dict(no_f)["full4-no-blame"], "gate_realizable": "exchange"})]
 
 
 SWEEP_D: list[tuple[str, dict]] = _removal_sweep()
