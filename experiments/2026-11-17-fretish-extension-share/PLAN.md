@@ -41,3 +41,4 @@ Memory is capped at 80G per half-host and 110G per whole host, with no swap. Per
 ## Log
 
 - 2026-11-17 18:14 UTC. av2 entry 082 queued behind fret-collab's 081 at `510412d`.
+- 2026-11-17 19:10 UTC. av3 entry 079 queued behind fret-collab's 078 at `6ddf36d`, with at most 2 attempts per phase. The user, in the peredur-extension session, approved the av3 half and approved enqueuing both lift-plus-cruise-full campaigns overnight. Local timers enqueue `-lpc-2job` on both hosts at 06:00, `-lpc` on av3 at 07:45 and `-lpc` on av2 at 09:00. A veribee-ab release message brings a timer's step forward. A second enqueue of a queued campaign is refused, so the timers cannot double-queue.
