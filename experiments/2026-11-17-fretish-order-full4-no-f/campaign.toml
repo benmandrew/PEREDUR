@@ -1,0 +1,29 @@
+name = "2026-11-17-fretish-order-full4-no-f"
+branch = "campaign/fretish-order-full4-no-f"
+profile = "fretish-order-full4-no-f"
+description = "The paper's new no-climb, no-gate and no-blame: the four-mechanism full (lean-demote) without each, with reruns of that full and of base under the same load, over the small set and rad's ten cores, seeds 0-29, split by seed across av2 and av3 (PLAN.md)."
+
+# Split by seed, as the ablation's base was, on the CPUs peredur-extension-d5
+# allocated: av2 0-15 after entry 080, av3 16-31 after
+# 2026-11-17-fretish-order-removal-followup and its pooled pass.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release'"
+
+configs = "python3 scripts/gen_configs.py --sweeps D --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --parallel 2 --out-dir experiments/configs-fretish-order-full4-no-f --pin-vintage"
+
+# 19 subjects x 5 arms x 15 seeds = 1,425 runs.
+[[phases]]
+name = "run-av2"
+profile = "fretish-order-full4-no-f"
+hosts = { av2 = "0-14" }
+confine = { av2 = { cpus = "0-15", memory_max = "32G" } }
+jobs = 8
+
+# 19 subjects x 5 arms x 15 seeds = 1,425 runs.
+[[phases]]
+name = "run-av3"
+profile = "fretish-order-full4-no-f"
+hosts = { av3 = "15-29" }
+confine = { av3 = { cpus = "16-31", memory_max = "32G" } }
+jobs = 8

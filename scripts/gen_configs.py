@@ -487,10 +487,22 @@ def _removal_sweep() -> list[tuple[str, dict]]:
     demote = {**lean, "maximality_demotion": True}
     only = {**dict(SWEEP_O)["base"], "maximality_demotion": True,
             "maximality_removal": True}
+    # lean-demote is the paper's full after step scaling, order crossover and
+    # parent_verdict were cut (climb, gate, blame and demote). "full4-no-<f>"
+    # is that full without one of its other three features, the paper's new
+    # no-<f> (experiments/2026-11-17-fretish-order-full4-no-f).
+    features = dict(ORDER_FEATURES)
+    no_f = [(f"full4-no-{name}",
+             {**demote, **{k: DEFAULTS[k] for k in features[name]}})
+            for name in ("climb", "gate", "blame")]
     return [("lean", lean),
             ("lean-demote", demote),
             ("lean-remove", {**demote, "maximality_removal": True}),
-            ("only-remove", only)]
+            ("only-remove", only)] + no_f + [
+        # Reruns of full (lean-demote) and sweep O's base under the no-<f>
+        # arms' load, so that wall-time contrasts pair within one campaign.
+        ("full4", dict(demote)),
+        ("base", dict(dict(SWEEP_O)["base"]))]
 
 
 SWEEP_D: list[tuple[str, dict]] = _removal_sweep()

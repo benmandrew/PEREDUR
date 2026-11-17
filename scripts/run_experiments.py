@@ -724,6 +724,27 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order-only-remove.csv",
         "default_jobs": 8,
     },
+    # The paper's new no-<f> for climb, gate and blame: lean-demote (the
+    # four-mechanism full) without each (experiments/2026-11-17-fretish-order-full4-no-f).
+    "fretish-order-full4-no-f": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D"],
+        "levels": {"D": ["full4-no-climb", "full4-no-gate", "full4-no-blame",
+                         "full4", "base"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200
+                         for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-order-full4-no-f",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-order-full4-no-f",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-order-full4-no-f.csv",
+        "default_jobs": 8,
+    },
     # lean-remove on the seeded corpus, against fretish-seeded's sweep P lean,
     # with lean's seed 0 rerun to check that it reproduces.
     "fretish-seeded-removal": {
