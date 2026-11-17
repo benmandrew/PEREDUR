@@ -807,60 +807,61 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order-large-full4.csv",
         "default_jobs": 4,
     },
-    # full4 with the gate's exchange mode, on the small set (seeds 0-29) and the
-    # seeded corpus's headline subjects (seeds 0-4), and full4-no-blame with it
-    # on the seeded subjects. Run outside the queue by a per-host driver
-    # (experiments/2026-11-18-fretish-full4-exchange). The configs are those
-    # of full4's campaigns (sweep D, parallel = 2) but for gate_realizable.
-    "fretish-full4-exchange": {
+    # lean-remove (the paper's full) with the gate's exchange mode, on the small
+    # set (seeds 0-29) and the seeded corpus's headline subjects (seeds 0-4),
+    # and remove-no-blame with it on the seeded subjects. Run outside the queue
+    # by a per-host driver (experiments/2026-11-18-fretish-full4-exchange). The
+    # configs are those of the removal campaigns (sweep D, parallel = 2) but
+    # for gate_realizable.
+    "fretish-remove-exchange": {
         "schemes": ["nsga2-apportion"],
         "weakenings": ["wkoff"],
         "metrics": ["log"],
         "repair_modes": None,
         "sweeps": ["D"],
-        "levels": {"D": ["full4-exchange"]},
+        "levels": {"D": ["remove-exchange"]},
         "specs": list(FRETISH_ORDER_SMALL),
         "seeds": list(range(30)),
         "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL},
         "compare_timeout": 1800,
         "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-full4-exchange",
-        "results_dir": EXPERIMENTS_DIR / "results-fretish-full4-exchange",
-        "results_csv": EXPERIMENTS_DIR / "results-fretish-full4-exchange.csv",
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-remove-exchange",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-remove-exchange",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-remove-exchange.csv",
         "default_jobs": 1,
     },
-    "fretish-full4-exchange-seeded": {
+    "fretish-remove-exchange-seeded": {
         "schemes": ["nsga2-apportion"],
         "weakenings": ["wkoff"],
         "metrics": ["log"],
         "repair_modes": None,
         "sweeps": ["D"],
-        "levels": {"D": ["full4-exchange"]},
+        "levels": {"D": ["remove-exchange"]},
         "specs": list(SEEDED_HEADLINE),
         "seeds": list(range(5)),
         "timeout_caps": {s: 7200 for s in SEEDED_HEADLINE},
         "compare_timeout": 1800,
         "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-full4-exchange",
-        "results_dir": EXPERIMENTS_DIR / "results-fretish-full4-exchange-seeded",
-        "results_csv": EXPERIMENTS_DIR / "results-fretish-full4-exchange-seeded.csv",
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-remove-exchange",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-remove-exchange-seeded",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-remove-exchange-seeded.csv",
         "default_jobs": 1,
     },
-    "fretish-full4-no-blame-exchange-seeded": {
+    "fretish-remove-no-blame-exchange-seeded": {
         "schemes": ["nsga2-apportion"],
         "weakenings": ["wkoff"],
         "metrics": ["log"],
         "repair_modes": None,
         "sweeps": ["D"],
-        "levels": {"D": ["full4-no-blame-exchange"]},
+        "levels": {"D": ["remove-no-blame-exchange"]},
         "specs": list(SEEDED_HEADLINE),
         "seeds": list(range(5)),
         "timeout_caps": {s: 7200 for s in SEEDED_HEADLINE},
         "compare_timeout": 1800,
         "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-full4-exchange",
-        "results_dir": EXPERIMENTS_DIR / "results-fretish-full4-no-blame-exchange-seeded",
-        "results_csv": EXPERIMENTS_DIR / "results-fretish-full4-no-blame-exchange-seeded.csv",
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-remove-exchange",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-remove-no-blame-exchange-seeded",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-remove-no-blame-exchange-seeded.csv",
         "default_jobs": 1,
     },
     # lean-remove on the seeded corpus, against fretish-seeded's sweep P lean,

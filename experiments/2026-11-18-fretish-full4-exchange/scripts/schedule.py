@@ -8,10 +8,10 @@ SCHEDULE = {
     "av2": {
         "build_cpus": "20-23",
         "hard_stop": "2026-11-18T11:59:30Z",
-        "configs": "python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps D --levels full4-exchange,full4-no-blame-exchange --parallel 2 --out-dir experiments/configs-fretish-full4-exchange",
+        "configs": "python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps D --levels remove-exchange,remove-no-blame-exchange --parallel 2 --out-dir experiments/configs-fretish-remove-exchange",
         "blocks": [
             {
-                "profile": "fretish-full4-exchange",
+                "profile": "fretish-remove-exchange",
                 "kind": "required",
                 "seeds": [
                     0,
@@ -32,7 +32,7 @@ SCHEDULE = {
                 ]
             },
             {
-                "profile": "fretish-full4-exchange-seeded",
+                "profile": "fretish-remove-exchange-seeded",
                 "kind": "required",
                 "seeds": [
                     0,
@@ -41,7 +41,7 @@ SCHEDULE = {
                 ]
             },
             {
-                "profile": "fretish-full4-no-blame-exchange-seeded",
+                "profile": "fretish-remove-no-blame-exchange-seeded",
                 "kind": "optional",
                 "seeds": [
                     0,
@@ -106,10 +106,10 @@ SCHEDULE = {
     "av3": {
         "build_cpus": "28-31",
         "hard_stop": "2026-11-18T11:59:30Z",
-        "configs": "python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps D --levels full4-exchange,full4-no-blame-exchange --parallel 2 --out-dir experiments/configs-fretish-full4-exchange",
+        "configs": "python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps D --levels remove-exchange,remove-no-blame-exchange --parallel 2 --out-dir experiments/configs-fretish-remove-exchange",
         "blocks": [
             {
-                "profile": "fretish-full4-exchange",
+                "profile": "fretish-remove-exchange",
                 "kind": "required",
                 "seeds": [
                     15,
@@ -130,7 +130,7 @@ SCHEDULE = {
                 ]
             },
             {
-                "profile": "fretish-full4-exchange-seeded",
+                "profile": "fretish-remove-exchange-seeded",
                 "kind": "required",
                 "seeds": [
                     3,
@@ -138,7 +138,7 @@ SCHEDULE = {
                 ]
             },
             {
-                "profile": "fretish-full4-no-blame-exchange-seeded",
+                "profile": "fretish-remove-no-blame-exchange-seeded",
                 "kind": "optional",
                 "seeds": [
                     3,

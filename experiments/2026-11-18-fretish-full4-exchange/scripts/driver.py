@@ -269,6 +269,9 @@ def main() -> None:
                     help="test only: a shell command in place of "
                          "run_experiments.py, with {profile} {spec} {seed} {cpu}")
     ap.add_argument("--no-build", action="store_true")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="print the schedule and work list, then exit: no "
+                         "build, no configs, no runs, no status file")
     args = ap.parse_args()
 
     if args.schedule:
@@ -277,6 +280,19 @@ def main() -> None:
         sys.path.insert(0, str(HERE))
         from schedule import SCHEDULE  # noqa: E402
         host = SCHEDULE[args.host]
+    if args.dry_run:
+        items = test_work_list(host) if args.runner else work_list(host)
+        print(f"host {args.host}: hard stop {host['hard_stop']}, "
+              f"build on CPUs {host['build_cpus']}")
+        for lane in host["lanes"]:
+            print(f"  lane cpu {lane['cpu']}: {lane['start']} to "
+                  f"{lane['stop_new']}, kinds {','.join(lane['kinds'])}")
+        for block in host["blocks"]:
+            n = sum(1 for i in items if i["profile"] == block["profile"])
+            print(f"  {block['kind']:8} {block['profile']}: seeds "
+                  f"{block['seeds'][0]}-{block['seeds'][-1]}, {n} items")
+        print(f"  first item: {items[0]}" if items else "  no items")
+        return
     run_dir = (Path(args.run_dir) if args.run_dir
                else CAMPAIGN / f"run-{args.host}")
     (run_dir / "logs").mkdir(parents=True, exist_ok=True)

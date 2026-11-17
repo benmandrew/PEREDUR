@@ -506,19 +506,30 @@ def _removal_sweep() -> list[tuple[str, dict]]:
     no_f = [(f"full4-no-{name}",
              {**demote, **{k: DEFAULTS[k] for k in features[name]}})
             for name in ("climb", "gate", "blame")]
+    remove = {**demote, "maximality_removal": True}
+    # The paper's full became lean-remove (climb, gate, blame and removal), so
+    # "remove-no-<f>" is lean-remove without one of the other three features
+    # (experiments/2026-11-17-fretish-order-remove-no-f). Its no-remove is lean.
+    remove_no_f = [(f"remove-no-{name}",
+                    {**remove, **{k: DEFAULTS[k] for k in features[name]}})
+                   for name in ("climb", "gate", "blame")]
     return [("lean", lean),
             ("lean-demote", demote),
-            ("lean-remove", {**demote, "maximality_removal": True}),
+            ("lean-remove", remove),
             ("only-remove", only)] + no_f + [
         # Reruns of full (lean-demote) and sweep O's base under the no-<f>
         # arms' load, so that wall-time contrasts pair within one campaign.
         ("full4", dict(demote)),
-        ("base", dict(dict(SWEEP_O)["base"]))] + [
-        # full4 and full4-no-blame with the gate's exchange mode for realisable
-        # parents (experiments/2026-11-18-fretish-full4-exchange).
-        ("full4-exchange", {**demote, "gate_realizable": "exchange"}),
-        ("full4-no-blame-exchange",
-         {**dict(no_f)["full4-no-blame"], "gate_realizable": "exchange"})]
+        ("base", dict(dict(SWEEP_O)["base"]))] + remove_no_f + [
+        # A rerun of lean-remove under the remove-no-<f> arms' load, so that
+        # their wall-time contrasts pair within one campaign.
+        ("remove-full", dict(remove))] + [
+        # lean-remove and remove-no-blame with the gate's exchange mode for
+        # realisable parents (experiments/2026-11-18-fretish-full4-exchange).
+        ("remove-exchange", {**remove, "gate_realizable": "exchange"}),
+        ("remove-no-blame-exchange",
+         {**dict(remove_no_f)["remove-no-blame"],
+          "gate_realizable": "exchange"})]
 
 
 SWEEP_D: list[tuple[str, dict]] = _removal_sweep()

@@ -1,23 +1,31 @@
 # 2026-11-18-fretish-full4-exchange
 
-Registered 2026-11-17, before launch. The paper's four-mechanism full (`full4`: climb, gate, blame and demote) with the gate's exchange mode for realisable parents (`gate_realizable = "exchange"`). The arm runs on the small set and on the seeded corpus's headline subjects, and `full4-no-blame` gets the same mode on the seeded subjects. The 2026-11-17 smoke test (`2026-11-17-fretish-gate-smoke`) suggested exchange widens the spread of candidates. This campaign measures it against `full4` at full seed counts. The user approved the plan and the timer launch in the peredur-extension session on 17 Nov.
+Registered 2026-11-17, before launch. The paper's full (sweep D's `lean-remove`: climb, gate, blame and maximality removal) with the gate's exchange mode for realisable parents (`gate_realizable = "exchange"`). The arm runs on the small set and on the seeded corpus's headline subjects, and `remove-no-blame` gets the same mode on the seeded subjects. The 2026-11-17 smoke test (`2026-11-17-fretish-gate-smoke`) suggested exchange widens the spread of candidates. This campaign measures it against the paper's full at full seed counts. The directory keeps its first name, `fretish-full4-exchange`, from when the paper's full was `full4` (lean-demote), because the installed timer unit names the driver's path in it. The user approved the plan and the timer launch in the peredur-extension session on 17 Nov.
 
 ## Arms
 
-- `full4-exchange`: sweep D's `full4` (= `lean-demote`) with `gate_realizable = "exchange"`. Required.
-- `full4-no-blame-exchange`: sweep D's `full4-no-blame` with `gate_realizable = "exchange"`. Optional, seeded corpus only.
+- `remove-exchange`: sweep D's `lean-remove` with `gate_realizable = "exchange"`. Required.
+- `remove-no-blame-exchange`: sweep D's `remove-no-blame`, as `580a6cc7` defines it, with `gate_realizable = "exchange"`. Optional, seeded corpus only.
 
-The configs come from the generator line of `2026-11-17-fretish-order-full4-no-f` and `2026-11-17-fretish-extension-share` (sweep D, `--parallel 2`, the order campaign's flags, `--pin-vintage`), in `configs-fretish-full4-exchange`. Regenerated, `full4-exchange` differs from `full4` only by the line `gate_realizable = "exchange"`, and `full4-no-blame-exchange` from `full4-no-blame` likewise. The configs state `parallel = 2`, as full4's do. Here each run is pinned to one CPU, so its two threads share that CPU, and wall times do not compare with full4's.
+The configs come from the generator line of the removal campaigns (sweep D, `--parallel 2`, the order campaign's flags, `--pin-vintage`), in `configs-fretish-remove-exchange`. Regenerated, `remove-exchange` differs from `lean-remove` only by the line `gate_realizable = "exchange"`, and `remove-no-blame-exchange` from `remove-no-blame` likewise. The configs state `parallel = 2`, as the controls' do. Here each run is pinned to one CPU, so its two threads share that CPU.
+
+## Controls
+
+- Small set: `remove-full`, the rerun of `lean-remove` in `2026-11-17-fretish-order-remove-no-f`, seeds 0-29.
+- Seeded, against `remove-exchange`: `lean-remove` from fret-collab's seeded removal run (`results-fretish-seeded-removal.csv` in `~/projects/peredur-wt-demote`, commit `612876c`, seeds 0-4).
+- Seeded, against `remove-no-blame-exchange`: `remove-no-blame` from peredur-extension-26's profile `fretish-seeded-remove` (commit `739edd4` on `campaign/fretish-extension-share`, all 120 subjects, seeds 0-4). Its config is byte-identical to the one in `configs-fretish-order-remove-no-f`.
+
+The outcomes pair across these commits, because `gate_realizable = "towards"` keeps the old path byte for byte (the determinism tests check this). The wall times do not pair, since load, host and threads per CPU differ. Both arms are kept.
 
 ## Runs
 
 | Block | Profile | Subjects | Seeds, av2 | Seeds, av3 | Runs |
 |---|---|---|---|---|---|
-| required | `fretish-full4-exchange` | small set (9) | 0-14 | 15-29 | 270 |
-| required | `fretish-full4-exchange-seeded` | seeded headline (110) | 0-2 | 3-4 | 550 |
-| optional | `fretish-full4-no-blame-exchange-seeded` | seeded headline (110) | 0-2 | 3-4 | 550 |
+| required | `fretish-remove-exchange` | small set (9) | 0-14 | 15-29 | 270 |
+| required | `fretish-remove-exchange-seeded` | seeded headline (110) | 0-2 | 3-4 | 550 |
+| optional | `fretish-remove-no-blame-exchange-seeded` | seeded headline (110) | 0-2 | 3-4 | 550 |
 
-The small set splits by seed as `full4` did in `2026-11-17-fretish-order-full4-no-f`. The seeded corpus splits as `2026-11-17-fretish-extension-share` split it (seeds 0-2 on av2, 3-4 on av3). Each host takes its items in the order of the table, seed-major within a block, so a partial block covers whole seeds. The headline subjects are those in both `selected.txt` and the headline stratum of `subjects.csv`. Those files are untracked, so they were copied into each host's checkout with `rsync -a`.
+The small set splits by seed as `2026-11-17-fretish-order-remove-no-f` did. The seeded corpus splits as `2026-11-17-fretish-extension-share` split it (seeds 0-2 on av2, 3-4 on av3). Each host takes its items in the order of the table, seed-major within a block, so a partial block covers whole seeds. The headline subjects are those in both `selected.txt` and the headline stratum of `subjects.csv`. Those files are untracked, so they were copied into each host's checkout with `rsync -a`.
 
 The smoke test's exchange runs took about 126 s on the small set and 69 s on the seeded corpus. Capacity is about 16 CPU-hours on av2 and 14.5 on av3, against about 11 and 9 CPU-hours of required work. The required blocks should therefore finish on both hosts, and the optional block will only partly finish. Whatever is not done at the hard stop is lost.
 
