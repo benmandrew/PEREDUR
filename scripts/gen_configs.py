@@ -447,6 +447,17 @@ def _order_sweep() -> list[tuple[str, dict]]:
     for a, b in ORDER_PAIRS:
         off = {k: base[k] for k in {**features[a], **features[b]}}
         levels.append((f"no-{a}-{b}", {**full, **off}))
+    # The realisable-parent alternatives of 2026-11-17. blame-unreal is full
+    # without scale, as no-scale is, and with blame narrowing only unrealisable
+    # parents. It is the control for the two gate modes, which each change how
+    # a realisable parent strengthens under the gate (see "Status-gated
+    # mutation direction" in docs/dev/operators.md).
+    no_scale = {k: base[k] for k in features["scale"]}
+    blame_unreal = {**full, **no_scale, "blame_realizable": False}
+    levels.append(("blame-unreal", dict(blame_unreal)))
+    levels.append(("gate-free", {**blame_unreal, "gate_realizable": "free"}))
+    levels.append(("gate-exchange",
+                   {**blame_unreal, "gate_realizable": "exchange"}))
     return levels
 
 

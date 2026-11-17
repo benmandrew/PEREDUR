@@ -282,6 +282,23 @@ def _seeded_specs() -> dict[str, dict[str, Path]]:
 
 SEEDED_SPECS: dict[str, dict[str, Path]] = _seeded_specs()
 
+
+def _seeded_headline() -> list[str]:
+    """The selected seeded subjects whose stratum in subjects.csv is headline.
+
+    Empty where the corpus is absent, as SEEDED_SPECS is.
+    """
+    table = SEEDED_DIR / "subjects.csv"
+    if not table.is_file():
+        return []
+    with table.open(newline="") as f:
+        headline = {row["subject"] for row in csv.DictReader(f)
+                    if row["stratum"] == "headline"}
+    return [n for n in SEEDED_SPECS if n in headline]
+
+
+SEEDED_HEADLINE: list[str] = _seeded_headline()
+
 SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **SEEDED_SPECS,
                                      **TLSF_SPECS}
 
@@ -717,6 +734,45 @@ PROFILES: dict[str, dict] = {
         "results_dir": EXPERIMENTS_DIR / "results-fretish-seeded",
         "results_csv": EXPERIMENTS_DIR / "results-fretish-seeded.csv",
         "default_jobs": 8,
+    },
+    # The realisable-parent alternatives of 2026-11-17 (blame narrowing only
+    # unrealisable parents, then the free and exchange gate modes on top), a
+    # smoke test on the small set at seeds 0-9 and on the seeded corpus's
+    # headline subjects at seeds 0-1. Own config tree and results. See
+    # experiments/2026-11-17-fretish-gate-smoke/PLAN.md.
+    "fretish-gate-smoke": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["blame-unreal", "gate-free", "gate-exchange"]},
+        "specs": list(FRETISH_ORDER_SMALL),
+        "seeds": list(range(10)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-gate-smoke",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-gate-smoke",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-gate-smoke.csv",
+        "default_jobs": 16,
+    },
+    "fretish-gate-smoke-seeded": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["O"],
+        "levels": {"O": ["blame-unreal", "gate-free", "gate-exchange"]},
+        "specs": list(SEEDED_HEADLINE),
+        "seeds": list(range(2)),
+        "timeout_caps": {s: 7200 for s in SEEDED_HEADLINE},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-gate-smoke",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-gate-smoke-seeded",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-gate-smoke-seeded.csv",
+        "default_jobs": 16,
     },
     # rad's ten cores under every arm of fretish-order, since whole rad finds
     # nothing at the budget. Same config tree, its own results.

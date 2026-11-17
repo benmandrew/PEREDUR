@@ -1,0 +1,28 @@
+name = "2026-11-17-fretish-gate-smoke"
+branch = "campaign/fretish-gate-smoke"
+profile = "fretish-gate-smoke"
+description = "Smoke test of the realisable-parent alternatives: full without step scaling and with blame narrowing only unrealisable parents (blame-unreal), and that with the free and exchange gate modes, on the small set at seeds 0-9 and the seeded corpus's headline subjects at seeds 0-1. PLAN.md gives the question."
+
+# av2 CPUs 0-15 under one 32 GB cap: veribee-33 holds av2 16-31 until about
+# 06:00 Wed 18 Nov. peredur-extension-30's reduction on av2 0-2 ended at 16:46
+# UTC on Tue 17 Nov.
+hosts = { av2 = "0-9" }
+confine = { av2 = { cpus = "0-15", memory_max = "32G" } }
+
+build = "sh -c 'cmake --build build-release'"
+
+configs = "python3 scripts/gen_configs.py --sweeps O --levels blame-unreal,gate-free,gate-exchange --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-gate-smoke --pin-vintage"
+
+# 270 runs: 9 specifications x 3 arms x seeds 0-9.
+[[phases]]
+name = "small"
+profile = "fretish-gate-smoke"
+jobs = 16
+
+# 660 runs: 110 headline subjects x 3 arms x seeds 0-1. The subjects are
+# untracked; they were copied into av2's checkout with rsync (see PLAN.md).
+[[phases]]
+name = "seeded"
+profile = "fretish-gate-smoke-seeded"
+jobs = 16
+hosts = { av2 = "0-1" }
