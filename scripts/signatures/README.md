@@ -1,0 +1,3 @@
+Difference signatures of FRETISH repair candidates against the original specification, as used for the 2026-11-17 gate smoke test (`experiments/2026-11-17-fretish-gate-smoke`). `sig.py` and `dirsig.py` classify each changed slot as weaker than, stronger than or incomparable with the original under the field orders; `allsig.py`, `strat.py` and the `smoke_*.py` drivers count distinct signatures per run, by weakening depth, and basin hits and recovery on the seeded corpus.
+
+The paths at the top of `sig.py` and `dirsig.py` point at `~/projects/peredur`; `smoke_small.py` and `smoke_seeded.py` take the new arms' results directory as their one argument and read the archived arms from the default paths.
