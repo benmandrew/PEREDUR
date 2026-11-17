@@ -143,6 +143,9 @@ Config golden_config() {
     // arm would leave every list alone even on; pinned so that a golden
     // gaining one fails here rather than re-recording.
     cfg.blame_targeted_slots = false;
+    // On, its default; it is read only under blame_targeted_slots, which is
+    // off above. Pinned so that flipping its default is a decision.
+    cfg.blame_realizable = true;
     // Off, its default: selection then runs no proof, so the goldens hold what
     // they held before the rule existed.
     cfg.maximality_demotion = false;
@@ -156,6 +159,10 @@ Config golden_config() {
     // a golden gaining one fails here rather than re-recording.
     cfg.direction_gated_mutation = false;
     cfg.p_sideways = 1.0;
+    // Towards, its default, which is the gate's behaviour before the key
+    // existed. The gate is off above, so no golden reads it; pinned so that a
+    // golden gaining a status objective fails here rather than re-recording.
+    cfg.gate_realizable = GateRealizable::Towards;
     // Off, their defaults. At 0 the scale reads no status and the tick-count
     // steps draw as they did before it existed; bisection draws nothing even
     // on and acts only under the gate. Pinned so that a golden gaining a

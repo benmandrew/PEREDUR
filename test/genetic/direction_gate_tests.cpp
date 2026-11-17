@@ -231,4 +231,93 @@ TEST(test_step_offspring_are_settled_by_their_score) {
            "settle should forget what it has counted");
 }
 
+// Only the timing arm, always firing, so the one field a rewrite moves is
+// the timing and each mode's moves are easy to read off.
+Config timing_only(GateRealizable mode) {
+    Config cfg = gated_config();
+    cfg.p_response = 0.0;
+    cfg.p_trigger = 0.0;
+    cfg.p_stop = 0.0;
+    cfg.p_condition_type = 0.0;
+    cfg.p_scope = 0.0;
+    cfg.p_timing = 1.0;
+    cfg.gate_realizable = mode;
+    return cfg;
+}
+
+// Under Free a realizable parent at the original strengthens a slot past it,
+// which Towards never does, since its only strengthenings are steps back.
+TEST(test_free_gate_moves_a_slot_above_the_original) {
+    const Specification original = original_spec();
+    const ParentContext context = context_for(true, &original);
+    std::size_t above_free = 0;
+    std::size_t above_towards = 0;
+    for (std::size_t seed = 0; seed < k_seeds; ++seed) {
+        const Specification free_child =
+            mutate_specification(original, make_random_source_from_seed(seed),
+                                 timing_only(GateRealizable::Free), &context);
+        const Specification towards_child = mutate_specification(
+            original, make_random_source_from_seed(seed),
+            timing_only(GateRealizable::Towards), &context);
+        expect(classify_move(original, free_child) != MoveOrder::Weaker,
+               "free gate: a realizable parent must not yield a child proved "
+               "weaker, seed " +
+                   std::to_string(seed));
+        if (classify_move(original, free_child) == MoveOrder::Stronger) {
+            above_free++;
+        }
+        if (classify_move(original, towards_child) == MoveOrder::Stronger) {
+            above_towards++;
+        }
+    }
+    expect(above_free > 0,
+           "free gate: some child of the original should be proved stronger "
+           "than it");
+    expect(above_towards == 0,
+           "towards gate: no child of the original should pass it");
+}
+
+// Under Exchange a realizable parent that differs from the original in one
+// guarantee steps that guarantee back and weakens a slot still equal to the
+// original's in the same mutation. Towards never edits an untouched slot here,
+// since its rewrites run with the timing arm off.
+TEST(test_exchange_gate_steps_back_and_weakens_an_untouched_slot) {
+    const Specification original = original_spec();
+    const Specification parent(
+        {make_req("true", "a", timing::eventually())},
+        {make_req("a", "x"), make_req("b", "y", timing::within_ticks(4)),
+         make_req("a", "y", timing::eventually())},
+        inputs(), outputs());
+    const ParentContext context = context_for(true, &original);
+    const auto touched_elsewhere = [&original](const Specification& child) {
+        return !(child.m_assumptions[0] == original.m_assumptions[0]) ||
+               !(child.m_guarantees[0] == original.m_guarantees[0]) ||
+               !(child.m_guarantees[2] == original.m_guarantees[2]);
+    };
+    std::size_t exchanged = 0;
+    for (std::size_t seed = 0; seed < k_seeds; ++seed) {
+        const Specification child = mutate_specification(
+            parent, make_random_source_from_seed(seed),
+            timing_only(GateRealizable::Exchange), &context);
+        expect(child.m_guarantees.size() == 3 &&
+                   child.m_guarantees[1] == original.m_guarantees[1],
+               "exchange gate: the differing guarantee should step back to "
+               "the original, seed " +
+                   std::to_string(seed));
+        if (touched_elsewhere(child)) {
+            exchanged++;
+        }
+        const Specification towards_child = mutate_specification(
+            parent, make_random_source_from_seed(seed),
+            timing_only(GateRealizable::Towards), &context);
+        expect(!touched_elsewhere(towards_child),
+               "towards gate: an untouched slot should stay as the original "
+               "has it, seed " +
+                   std::to_string(seed));
+    }
+    expect(exchanged > 0,
+           "exchange gate: some child should also weaken a slot equal to the "
+           "original's");
+}
+
 }  // namespace

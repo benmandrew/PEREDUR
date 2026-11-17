@@ -212,28 +212,28 @@ SlotFixture slot_fixture() {
 TEST(test_targeted_slots_follow_the_parent_status) {
     const SlotFixture fixture = slot_fixture();
     const std::vector<std::size_t> weakenable = {0, 1, 2, 3, 4, 5};
+    const Config cfg;
 
     ParentContext unrealizable;
     unrealizable.status = 2.0 / 3.0;
     unrealizable.refused_guarantees = {1};
-    expect(
-        targeted_mutation_slots(fixture.candidate, weakenable, unrealizable) ==
-            std::vector<std::size_t>{0, 1, 2, 4},
-        "targeted slots: an unrealizable parent should keep every "
-        "assumption and the refused guarantee");
+    expect(targeted_mutation_slots(fixture.candidate, weakenable, unrealizable,
+                                   cfg) == std::vector<std::size_t>{0, 1, 2, 4},
+           "targeted slots: an unrealizable parent should keep every "
+           "assumption and the refused guarantee");
 
     ParentContext realizable;
     realizable.status = k_status_realizable;
     realizable.realizable = true;
     realizable.original = &fixture.original;
-    expect(targeted_mutation_slots(fixture.candidate, weakenable, realizable) ==
-               std::vector<std::size_t>{1, 2, 3},
+    expect(targeted_mutation_slots(fixture.candidate, weakenable, realizable,
+                                   cfg) == std::vector<std::size_t>{1, 2, 3},
            "targeted slots: a realizable parent should keep the slots that "
            "differ from the original, an appended assumption among them");
 
     expect(
-        targeted_mutation_slots(fixture.candidate, {0, 2, 3, 5},
-                                unrealizable) == std::vector<std::size_t>{0, 2},
+        targeted_mutation_slots(fixture.candidate, {0, 2, 3, 5}, unrealizable,
+                                cfg) == std::vector<std::size_t>{0, 2},
         "targeted slots: a refused guarantee that is not weakenable should "
         "not be drawn");
 
@@ -247,12 +247,47 @@ TEST(test_targeted_slots_follow_the_parent_status) {
     no_original.original = nullptr;
     for (const ParentContext& context :
          {crossed, unscored, ungraded, no_original}) {
-        expect(targeted_mutation_slots(fixture.candidate, weakenable, context)
-                   .empty(),
-               "targeted slots: a crossover offspring, a parent without a "
-               "status, one the walk never graded, or a realizable one "
-               "without an original should leave the list alone");
+        expect(
+            targeted_mutation_slots(fixture.candidate, weakenable, context, cfg)
+                .empty(),
+            "targeted slots: a crossover offspring, a parent without a "
+            "status, one the walk never graded, or a realizable one "
+            "without an original should leave the list alone");
     }
+}
+
+TEST(test_blame_realizable_gates_the_realizable_branch) {
+    const SlotFixture fixture = slot_fixture();
+    const std::vector<std::size_t> weakenable = {0, 1, 2, 3, 4, 5};
+    Config on;
+    on.blame_realizable = true;
+    Config off;
+    off.blame_realizable = false;
+
+    ParentContext realizable;
+    realizable.status = k_status_realizable;
+    realizable.realizable = true;
+    realizable.original = &fixture.original;
+    expect(targeted_mutation_slots(fixture.candidate, weakenable, realizable,
+                                   on) == std::vector<std::size_t>{1, 2, 3},
+           "blame_realizable: on, a realizable parent should keep the slots "
+           "that differ from the original");
+    expect(
+        targeted_mutation_slots(fixture.candidate, weakenable, realizable, off)
+            .empty(),
+        "blame_realizable: off, a realizable parent should keep every "
+        "live weakenable slot");
+
+    ParentContext unrealizable;
+    unrealizable.status = 2.0 / 3.0;
+    unrealizable.refused_guarantees = {1};
+    const std::vector<std::size_t> expected = {0, 1, 2, 4};
+    expect(targeted_mutation_slots(fixture.candidate, weakenable, unrealizable,
+                                   on) == expected &&
+               targeted_mutation_slots(fixture.candidate, weakenable,
+                                       unrealizable, off) == expected,
+           "blame_realizable: an unrealizable parent's list should not "
+           "depend on the key");
 }
 
 TEST(test_mutation_draws_only_targeted_slots) {

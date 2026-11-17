@@ -213,7 +213,8 @@ struct StepScalingStats {
 /// The slots Config::blame_targeted_slots narrows a rewrite to, as global
 /// indices (assumptions first, then guarantees) drawn from @p weakenable, in
 /// its order. Empty means no narrowing: no context, no status, a crossover
-/// offspring, or a list that would be empty.
+/// offspring, a realizable parent with Config::blame_realizable off, or a list
+/// that would be empty.
 ///
 /// An unrealizable parent keeps the refused guarantees and every assumption,
 /// since a guarantee outside every unrealizable core cannot make the
@@ -226,9 +227,11 @@ struct StepScalingStats {
 /// @param weakenable    Its live weakenable slots, as mutate_specification
 ///                      collects them
 /// @param parent        What breeding knows about the parent
+/// @param cfg           Read for Config::blame_realizable alone
 std::vector<std::size_t> targeted_mutation_slots(
     const Specification& specification,
-    const std::vector<std::size_t>& weakenable, const ParentContext& parent);
+    const std::vector<std::size_t>& weakenable, const ParentContext& parent,
+    const Config& cfg);
 
 /// Mutates a specification by picking one requirement at random and replacing
 /// it with a mutated version. The pool of atom names is taken from the
