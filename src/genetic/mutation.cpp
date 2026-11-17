@@ -1136,6 +1136,76 @@ Specification take_step(BackSteps& back, std::size_t choice, bool* stepped) {
     return std::move(back.m_steps[choice].m_result);
 }
 
+// GateRealizable::Exchange for a realizable parent: one of @p back's steps
+// towards @p original, then one weakening of a live weakenable slot still
+// equal to the original's, which no edit has touched. Either half runs alone
+// where the other has nothing to act on. The step moves only a slot that
+// differs from the original, a tombstone or an appended assumption, so the
+// slot the weakening picks is still in place after it. The step is proved
+// stronger by construction; a free rewrite in the weakening is sorted against
+// the stepped specification as an unrealizable parent's would be, and where
+// it is refused the step stands alone.
+Specification exchange(const Specification& specification, BackSteps& back,
+                       const std::vector<std::size_t>& weakenable,
+                       const Specification& original,
+                       const std::vector<std::string>& atoms,
+                       const std::vector<Timing>& timing_pool,
+                       const RandomSource& random_source, const Config& cfg,
+                       StepScale scale, bool* stepped) {
+    const std::size_t n_assumptions = specification.m_assumptions.size();
+    std::vector<std::size_t> untouched;
+    for (const std::size_t idx : weakenable) {
+        const bool is_assumption = idx < n_assumptions;
+        const std::size_t local = is_assumption ? idx : idx - n_assumptions;
+        const std::vector<Requirement>& own = is_assumption
+                                                  ? specification.m_assumptions
+                                                  : specification.m_guarantees;
+        const std::vector<Requirement>& theirs =
+            is_assumption ? original.m_assumptions : original.m_guarantees;
+        if (local < theirs.size() && own[local] == theirs[local]) {
+            untouched.push_back(idx);
+        }
+    }
+    MutationStats::n_slot_draws++;
+    Specification current = specification;
+    if (!back.m_steps.empty()) {
+        const std::size_t choice =
+            random_source.next_index(back.m_steps.size());
+        current = take_step(back, choice, stepped);
+    }
+    if (untouched.empty() || atoms.empty()) {
+        return current;
+    }
+    const std::size_t idx =
+        untouched[random_source.next_index(untouched.size())];
+    const bool is_assumption = idx < n_assumptions;
+    const std::size_t local = is_assumption ? idx : idx - n_assumptions;
+    std::vector<Requirement> assumptions = current.m_assumptions;
+    std::vector<Requirement> guarantees = current.m_guarantees;
+    std::vector<Requirement>& target = is_assumption ? assumptions : guarantees;
+    assert(local < target.size());
+    const std::vector<std::string>& condition_atoms =
+        current.m_in_atoms.empty() ? atoms : current.m_in_atoms;
+    // Weakening the specification strengthens an assumption.
+    const Direction direction =
+        is_assumption ? Direction::Strengthen : Direction::Weaken;
+    bool free_rewrite = false;
+    target[local] = mutate_requirement_tracked(
+        target[local], atoms, condition_atoms, direction, timing_pool,
+        current.m_modes, random_source, cfg, &free_rewrite, scale);
+    if (creates_duplicate(target, local)) {
+        return current;
+    }
+    Specification weakened(std::move(assumptions), std::move(guarantees),
+                           current.m_in_atoms, current.m_out_atoms,
+                           current.m_modes);
+    if (free_rewrite && !admitted_by_gate(Gate::Weaken, current, weakened, cfg,
+                                          random_source)) {
+        return current;
+    }
+    return weakened;
+}
+
 // The rates a realizable parent's rewrite runs at: every arm that moves along
 // an order is off, since its strengthenings come from steps_towards instead,
 // and only the free rewrites remain. An arm at 0 that still draws its
@@ -1153,7 +1223,8 @@ Config free_rewrite_rates(const Config& cfg) {
 
 std::vector<std::size_t> targeted_mutation_slots(
     const Specification& specification,
-    const std::vector<std::size_t>& weakenable, const ParentContext& parent) {
+    const std::vector<std::size_t>& weakenable, const ParentContext& parent,
+    const Config& cfg) {
     if (!parent.status.has_value() || parent.crossed) {
         return {};
     }
@@ -1175,7 +1246,7 @@ std::vector<std::size_t> targeted_mutation_slots(
         }
         return targeted;
     }
-    if (parent.original == nullptr) {
+    if (!cfg.blame_realizable || parent.original == nullptr) {
         return {};
     }
     const Specification& original = *parent.original;
@@ -1223,18 +1294,28 @@ Specification mutate_specification(const Specification& specification,
     const std::vector<Timing> timing_pool = collect_timing_pool(specification);
     std::vector<std::size_t> weakenable_indices =
         collect_weakenable_indices(specification);
+    // How a realizable parent strengthens; Towards for every other parent, so
+    // the key is read only under the gate.
+    const GateRealizable mode =
+        strengthening ? cfg.gate_realizable : GateRealizable::Towards;
     // A realizable parent's strengthenings, each proved by classify_move and
     // moving one field, tombstone or appended assumption back towards the
-    // original. Empty without the gate.
-    BackSteps back =
-        strengthening ? steps_back(specification, parent, cfg) : BackSteps{};
+    // original. Empty without the gate, and under Free, which takes none.
+    BackSteps back = strengthening && mode != GateRealizable::Free
+                         ? steps_back(specification, parent, cfg)
+                         : BackSteps{};
     const std::vector<Step>& steps = back.m_steps;
     if (weakenable_indices.empty() && steps.empty()) {
         return specification;
     }
+    if (mode == GateRealizable::Exchange && parent->original != nullptr) {
+        return exchange(specification, back, weakenable_indices,
+                        *parent->original, atoms, timing_pool, random_source,
+                        cfg, scale, stepped);
+    }
     if (cfg.blame_targeted_slots && parent != nullptr) {
-        std::vector<std::size_t> targeted =
-            targeted_mutation_slots(specification, weakenable_indices, *parent);
+        std::vector<std::size_t> targeted = targeted_mutation_slots(
+            specification, weakenable_indices, *parent, cfg);
         if (!targeted.empty()) {
             if (targeted.size() < weakenable_indices.size()) {
                 SlotTargetingStats::n_targeted++;
@@ -1294,7 +1375,10 @@ Specification mutate_specification(const Specification& specification,
     target[local_idx] = mutate_requirement_tracked(
         target[local_idx], mutation_atoms, condition_atoms, direction,
         timing_pool, specification.m_modes, random_source,
-        strengthening ? free_rewrite_rates(cfg) : cfg, &free_rewrite, scale);
+        strengthening && mode == GateRealizable::Towards
+            ? free_rewrite_rates(cfg)
+            : cfg,
+        &free_rewrite, scale);
     if (creates_duplicate(target, local_idx)) {
         return specification;
     }

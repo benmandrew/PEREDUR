@@ -251,6 +251,15 @@ TEST(test_config_io_enum_keys) {
          {{"slot", ClimbOrder::Slot}, {"similarity", ClimbOrder::Similarity}},
          "random",
          false});
+    expect_enum_key<GateRealizable>({"mutation",
+                                     "gate_realizable",
+                                     &Config::gate_realizable,
+                                     GateRealizable::Towards,
+                                     {{"towards", GateRealizable::Towards},
+                                      {"free", GateRealizable::Free},
+                                      {"exchange", GateRealizable::Exchange}},
+                                     "away",
+                                     false});
 }
 
 // Pinned because every archived config omits these keys and inherits whatever
