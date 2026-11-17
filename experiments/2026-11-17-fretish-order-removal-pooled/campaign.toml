@@ -1,0 +1,58 @@
+name = "2026-11-17-fretish-order-removal-pooled"
+branch = "campaign/fretish-order-removal-pooled"
+description = "Pooled pass of 2026-11-17-fretish-order-removal: its 3 arms over the small set and rad's 10 cores, for accepted-trace share and net containment at K = 3. Split by subject: av3 takes rad-core-33 and the two sampled subjects, av2 the other 16. The reduction runs locally (PLAN.md)."
+
+# Each host pools its own subjects. The pool, design and subject lists are
+# ignored files, copied to each host's checkout by rsync before enqueue
+# (PLAN.md).
+hosts = { av2 = "", av3 = "" }
+
+# Agreed on 17 Nov: veribee-33 holds av2 CPUs 16-31 and av3 CPUs 0-15 until
+# about 22:00, so this pass takes av2 CPUs 0-15 and av3 CPUs 16-31. On each
+# host it queues behind peredur-extension-12's xover-pooled entry (av2 078,
+# av3 074) on the same CPUs. Every phase, and the build, stays on them.
+confine = { av2 = { cpus = "0-15", memory_max = "32G" }, av3 = { cpus = "16-31", memory_max = "32G" } }
+
+# fpdraw is EXCLUDE_FROM_ALL, so the build names it. `confine` does not reach
+# the build, so taskset holds it to the host's agreed CPUs, chosen by short
+# host name: av2 reports itself as avlab12.
+build = "sh -c 'case $(hostname -s) in av3) c=16-31;; *) c=0-15;; esac; taskset -c $c sh -c \"cmake --build build-release -j 16 && cmake --build build-release -j 16 --target fpdraw\"'"
+
+# Every subject is in the copied pool, so this phase only copies it, after
+# checking each file against its index row.
+[[phases]]
+name = "2026-11-17-fretish-order-removal-pooled"
+kind = "pool"
+design = "experiments/2026-11-17-fretish-order-removal-pooled/design.toml"
+subjects = "experiments/2026-11-17-fretish-order-removal-pooled/subjects-{host}.txt"
+copy_from = "experiments/2026-11-17-fretish-order-removal-pooled/members"
+out = "experiments/fretish-order-removal-pooled-members"
+
+# 32768 words a subject over the members (black, 30 s a draw, 8 at a time),
+# every node evaluated on them, and the pairs the design's three contrasts need:
+# within each arm, which the frontier and so the share need, and across each
+# contrast's two arms, which the plan check in pooled_reduce.py expects.
+[[phases]]
+name = "2026-11-17-fretish-order-removal-pooled"
+kind = "fingerprint"
+subjects = "experiments/2026-11-17-fretish-order-removal-pooled/subjects-{host}.txt"
+members = "experiments/fretish-order-removal-pooled-members"
+design = "experiments/2026-11-17-fretish-order-removal-pooled/design.toml"
+work = "experiments/fretish-order-removal-pooled-work"
+out = "experiments/fretish-order-removal-pooled/fp"
+pairs = "experiments/fretish-order-removal-pooled-work/pairs-{host}.csv"
+words = 32768
+seed = 3
+workers = 8
+black_timeout = 30
+
+# Every planned pair, each unrefuted direction at the archive's 20 s.
+[[phases]]
+name = "2026-11-17-fretish-order-removal-pooled"
+kind = "compare"
+pairs = "experiments/fretish-order-removal-pooled-work/pairs-{host}.csv"
+out = "experiments/fretish-order-removal-pooled/subsumption-{host}.csv"
+jobs = 16
+black_timeout = 20
+wall_timeout = 180
+vmem_kb = 8388608
