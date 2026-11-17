@@ -81,7 +81,7 @@ The estimate scales the figure of `2026-11-17-fretish-order-xover-rate`, about 6
 
 ## Hosts and the queue
 
-The host split and the CPU confinement are those of `2026-11-17-fretish-order-xover-rate`: av3 on CPUs 16–31 under 32 GB at 8 jobs, and av2 on CPUs 0–5 under 12 GB at 3 jobs. This campaign queues behind the xover-rate entries, 072 on av3 and 076 on av2, so it starts on each host when that entry ends. If av2's CPUs 0–15 are free by then, widen the av2 phase to `confine = { av2 = { cpus = "0-15", memory_max = "32G" } }` and `jobs = 8` before you enqueue it.
+The host split and the CPU confinement are those of `2026-11-17-fretish-order-xover-rate`: av3 on CPUs 16–31 under 32 GB at 8 jobs, and av2 on CPUs 0–15 under 32 GB at 8 jobs, widened from the xover-rate campaign's CPUs 0–5 once veribee-33 released av2 on Tue 17 Nov. This campaign queues behind the xover-rate entries, 072 on av3 and 076 on av2, so it starts on each host when that entry ends. If av2's CPUs 0–15 are free by then, widen the av2 phase to `confine = { av2 = { cpus = "0-15", memory_max = "32G" } }` and `jobs = 8` before you enqueue it.
 
 ## Launch
 

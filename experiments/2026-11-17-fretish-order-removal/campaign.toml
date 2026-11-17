@@ -31,9 +31,8 @@ confine = { av3 = { cpus = "16-31", memory_max = "32G" } }
 jobs = 8
 
 # 12 subjects x 3 arms x 30 seeds = 1,080 runs. Queues behind the xover-rate
-# entry on av2 (076). Declared on CPUs 0-5 at 3 jobs x 2 threads, as that
-# entry was; if av2 is free when this phase starts, widen it to cpus = "0-15",
-# memory_max = "32G", jobs = 8 before enqueuing (PLAN.md, Launch).
+# entry on av2 (076). Widened to CPUs 0-15 at 8 jobs x 2 threads on Tue
+# 17 Nov, once veribee-33 released av2 (PLAN.md, Launch).
 [[phases]]
 name = "run-av2"
 profile = "fretish-order-removal"
@@ -41,5 +40,5 @@ specs = ["fsm", "fsm-timing", "fsm-combined", "mode-arbiter", "takeoff",
          "fsm-lmcps", "rad-core-1-18", "rad-core-17-18", "rad-core-33",
          "rad-core-61", "rad-core-65", "rad-core-68"]
 hosts = { av2 = "0-29" }
-confine = { av2 = { cpus = "0-5", memory_max = "12G" } }
-jobs = 3
+confine = { av2 = { cpus = "0-15", memory_max = "32G" } }
+jobs = 8
