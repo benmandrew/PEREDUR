@@ -15,9 +15,13 @@ These use the arm names of `2026-11-17-fretish-order-full4-no-f`. `full4` is the
 | rad-av2 | `fretish-order-large-full4` | rad | full4, 3 × full4-no-f, lean, 4 × only-f | 0–4 | av2, 0–15, 4 | 45 |
 | rad-av3 | `fretish-order-large-full4` | rad | the same | 15–19 | av3, 16–31, 4 | 45 |
 | lpc-night-av2 | `fretish-order-large-full4` | lift-plus-cruise-full | sweep D's five | 0 | av2, 0–9, 1 | 5 |
-| lpc-night-av3 | `fretish-order-large-full4` | lift-plus-cruise-full | sweep D's five | 15 | av3, 16–25, 1 | 5 |
 
-The counts come from `run_experiments.py --dry-run`. `2026-11-18-fretish-extension-lpc` adds the rest of lift-plus-cruise-full on whole hosts from 06:00, once veribee-ab releases its halves: seeds 0–1 on av2 and 15–16 on av3 (13 runs per host after the night phase), then one stretch seed per host (2 and 17), on CPUs 0–29 at 3 jobs. If a stretch seed has not finished all 9 arms by 12:00, it is dequeued and left out of the contrasts.
+The counts come from `run_experiments.py --dry-run`. av3 has no night phase, because its share starts after fret-collab's 076–078 and the phase would still be running at about 08:30. Two more campaigns on this branch finish lift-plus-cruise-full:
+
+- `2026-11-18-fretish-extension-lpc-2job`, enqueued at 06:00: sweep D at 2 jobs on av2 CPUs 0–19 (seeds 0–1, 5 runs after the night phase) and on av3 CPUs 8–27 (seed 15, 5 runs). veribee-ab keeps av2 24–31 and av3 0–7 until its release, and peredur-extension-55 holds av2 20–23 and av3 28–31.
+- `2026-11-18-fretish-extension-lpc`, enqueued per host at its full release (av3 07:45, av2 09:00, or earlier on veribee-ab's message): every remaining arm of seeds 0–1 and 15–16 on CPUs 0–29 at 3 jobs, then stretch seeds 2 and 17. The user allowed the stretch seeds to run past 12:00 until all 9 arms finish. Everything else must be off both hosts by 12:00.
+
+A phase that fails is resumed once. If it fails again, it is skipped and the loss is logged below.
 
 Memory is capped at 80G per half-host and 110G per whole host, with no swap. Per-run peak memory has never been measured.
 
@@ -33,3 +37,7 @@ Memory is capped at 80G per half-host and 110G per whole host, with no swap. Per
 - av2: behind `2026-11-17-fretish-order-full4-no-f`'s entry 081.
 - av3: behind that campaign's av3 entries.
 - Each host is enqueued with `--host`, and a phase with no seeds on a host is skipped there.
+
+## Log
+
+- 2026-11-17 18:14 UTC. av2 entry 082 queued behind fret-collab's 081 at `510412d`.

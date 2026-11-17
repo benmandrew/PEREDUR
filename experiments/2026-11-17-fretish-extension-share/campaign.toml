@@ -50,8 +50,9 @@ confine = { av3 = { cpus = "16-31", memory_max = "80G" } }
 jobs = 4
 
 # lift-plus-cruise-full, one run at a time on 10 CPUs until 06:00: the five
-# sweep D arms (full4, the three full4-no-<f>, lean) of one seed per host.
-# 2026-11-18-fretish-extension-lpc finishes the seeds on whole hosts.
+# sweep D arms (full4, the three full4-no-<f>, lean) of seed 0, on av2 only:
+# av3's share starts later, so its night phase would still hold the queue at
+# about 08:30. 2026-11-18-fretish-extension-lpc-2job and -lpc finish the seeds.
 [[phases]]
 name = "lpc-night-av2"
 profile = "fretish-order-large-full4"
@@ -59,13 +60,4 @@ specs = ["lift-plus-cruise-full"]
 sweeps = ["D"]
 hosts = { av2 = "0" }
 confine = { av2 = { cpus = "0-9", memory_max = "80G" } }
-jobs = 1
-
-[[phases]]
-name = "lpc-night-av3"
-profile = "fretish-order-large-full4"
-specs = ["lift-plus-cruise-full"]
-sweeps = ["D"]
-hosts = { av3 = "15" }
-confine = { av3 = { cpus = "16-25", memory_max = "80G" } }
 jobs = 1

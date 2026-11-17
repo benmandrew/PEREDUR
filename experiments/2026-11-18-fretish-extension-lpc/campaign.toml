@@ -3,7 +3,8 @@ branch = "campaign/fretish-extension-share"
 profile = "fretish-order-large-full4"
 description = "The new ablation's 9 arms on lift-plus-cruise-full, 2 seeds per host plus one stretch seed, on whole hosts from 06:00 on 18 Nov (2026-11-17-fretish-extension-share/PLAN.md)."
 
-# Enqueued once veribee-ab releases its halves at 06:00. CPUs 30-31 stay free
+# Enqueued per host at its full release (av3 07:45, av2 09:00, or earlier on
+# veribee-ab's message), behind -lpc-2job. CPUs 30-31 stay free
 # for peredur-extension-55. 3 jobs over 30 CPUs give 10 threads a run, as
 # base's lift-plus-cruise-full runs had. Seeds pair with base's hosts.
 hosts = { av2 = "", av3 = "" }
@@ -27,8 +28,8 @@ hosts = { av3 = "15-16" }
 confine = { av3 = { cpus = "0-29", memory_max = "110G" } }
 jobs = 3
 
-# Stretch: one more seed per host. Dequeue at 12:00 if its 9 arms have not
-# all finished; a seed short of an arm is dropped from the contrasts.
+# Stretch: one more seed per host. The user allowed it to run past 12:00 until
+# all 9 arms finish.
 [[phases]]
 name = "lpc-stretch-av2"
 specs = ["lift-plus-cruise-full"]

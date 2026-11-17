@@ -1,0 +1,31 @@
+name = "2026-11-18-fretish-extension-lpc-2job"
+branch = "campaign/fretish-extension-share"
+profile = "fretish-order-large-full4"
+description = "lift-plus-cruise-full's sweep D arms at 2 jobs x 10 threads from 06:00 on 18 Nov, while veribee-ab keeps av2 CPUs 24-31 and av3 CPUs 0-7 and peredur-extension-55 holds av2 20-23 and av3 28-31 (2026-11-17-fretish-extension-share/PLAN.md)."
+
+# Enqueued at 06:00. Sized to end near each host's full release (av3 about
+# 07:45, av2 09:00), when 2026-11-18-fretish-extension-lpc takes the rest at
+# 3 jobs on CPUs 0-29. 20 CPUs over 2 jobs give 10 threads a run, as base had.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release'"
+
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage\"; $G --sweeps D --parallel 2 --out-dir experiments/configs-fretish-seeded-full4 && $G --sweeps D O --out-dir experiments/configs-fretish-order-large-full4'"
+
+# Sweep D, seeds 0-1: 10 runs, less the night phase's 5 on seed 0.
+[[phases]]
+name = "lpc-2job-av2"
+specs = ["lift-plus-cruise-full"]
+sweeps = ["D"]
+hosts = { av2 = "0-1" }
+confine = { av2 = { cpus = "0-19", memory_max = "110G" } }
+jobs = 2
+
+# Sweep D, seed 15: 5 runs, about 1.9 h.
+[[phases]]
+name = "lpc-2job-av3"
+specs = ["lift-plus-cruise-full"]
+sweeps = ["D"]
+hosts = { av3 = "15" }
+confine = { av3 = { cpus = "8-27", memory_max = "110G" } }
+jobs = 2
