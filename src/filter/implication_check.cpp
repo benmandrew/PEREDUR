@@ -47,6 +47,7 @@ constexpr unsigned k_all_moved = (1U << k_field_count) - 1;
 // the monotone arm reads (response_direction, condition_direction and
 // stop_direction in src/genetic/mutation.cpp), and the keyword steps those of
 // timing_implies, scope_implies and the condition-type order.
+// `reach_sound` in proofs/Fretish/Chain.lean proves the search sound.
 class RuleSearch {
    public:
     RuleSearch(const Requirement& from, const Requirement& dest)
