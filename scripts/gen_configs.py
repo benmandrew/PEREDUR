@@ -19,7 +19,6 @@ Usage:
     python scripts/gen_configs.py --generations 40 --population-size 1000 \\
         --out-dir experiments/configs-cj-large          # a larger operating point
     python scripts/gen_configs.py --weakening off       # nest under <scheme>/wkoff/
-    python scripts/gen_configs.py --tlsf                # the TLSF campaign grid
 """
 
 import argparse
@@ -492,72 +491,6 @@ SWEEPS: list[tuple[str, list]] = [
 # without --sweeps stays byte-identical to the one before it existed.
 DEFAULT_SWEEPS: list[str] = ["A", "B", "C", "R"]
 
-# ── TLSF campaign grid ───────────────────────────────────────────────────────
-
-# The basic-TLSF examples are far slower than the FRETISH specs, and cost
-# scales with generations*population, so the TLSF campaign sweeps only the two
-# operating-point axes over a coarse four-level cross rather than the fine
-# FRETISH grid. The two axes cross at the gen10/pop200 baseline (shared level),
-# matching the FRETISH aliasing so B/pop200 collapses onto A/gen10. Emitted by
-# `--tlsf` into configs-tlsf/.
-TLSF_SWEEP_A: list[tuple[str, dict]] = [
-    ("gen5",  {"generations": 5}),
-    ("gen10", {"generations": 10}),   # baseline (shared with B/pop200)
-    ("gen20", {"generations": 20}),
-    ("gen40", {"generations": 40}),
-]
-
-TLSF_SWEEP_B: list[tuple[str, dict]] = [
-    ("pop50",  {"population_size": 50}),
-    ("pop100", {"population_size": 100}),
-    ("pop200", {"population_size": 200}),   # baseline (shared with A/gen10)
-    ("pop500", {"population_size": 500}),
-]
-
-# TLSF sweep R: the elitism cross of the FRETISH sweep R, at the TLSF baseline
-# operating point (gen10/pop200) and carrying the TLSF runtime settings --tlsf
-# supplies. Same letter as the FRETISH sweep because it is the same factor; the
-# two never share a table, exactly as A and B do not.
-TLSF_SWEEP_R: list[tuple[str, dict]] = list(SWEEP_R)
-
-TLSF_SWEEPS: list[tuple[str, list]] = [
-    ("A", TLSF_SWEEP_A),
-    ("B", TLSF_SWEEP_B),
-    ("R", TLSF_SWEEP_R),
-]
-
-TLSF_CONFIGS_DIR = Path(__file__).parent.parent / "experiments" / "configs-tlsf"
-
-# Default per-call ltlsynt timeout (ms) for the TLSF campaign. ltlsynt has no
-# internal timeout, and these specs occasionally produce synthesis queries that
-# run for minutes; without a bound one such query stalls a whole run. A
-# timed-out check is undecided: it admits no repair, and drops the candidate at
-# the well-separation filter.
-#
-# The value matches the C++ default (Config::ltlsynt_timeout). The budget must
-# exceed each spec's *own* realizability query: below it, every run of that
-# spec scores a constant status objective and has its repairs rejected at the
-# final gate.
-TLSF_LTLSYNT_TIMEOUT_MS = 10000
-
-# Default per-call ltl2tgba (model-counting) timeout (ms) for the TLSF campaign.
-# The counting path has no internal timeout and its -D determinization blows up
-# super-exponentially on some deep formulae. The bound sits well above any
-# legitimate count while cutting that tail. A timed-out count scores its
-# formula pair 0, as unknown, and the individual stays in the run.
-TLSF_LTL2TGBA_TIMEOUT_MS = 60000
-
-# Scoring-failure tolerance for the TLSF campaign. The one-hot balancer/direction
-# encodings mutate into tautological guarantees (e.g. G((b2 -> !x) | !b0 | b1 | b2)),
-# which SPOT 2.15.1's ltl2tgba rejects with exit 2. score_population's circuit
-# breaker drops those individuals, but its tolerance is max_scoring_failure_rate *
-# population floored at 1, so at the smallest rung (pop50 -> ~25 offspring) the
-# default 0.05 tolerates only 1 and an unlucky seed hitting 2-3 tautologies aborts
-# the whole run. 0.15 absorbs the observed rate while still catching a genuinely
-# broken tool (which fails ~all individuals). Larger populations already clear it.
-TLSF_MAX_SCORING_FAILURE_RATE = 0.15
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -588,14 +521,11 @@ def parse_args() -> argparse.Namespace:
                         metavar="SCHEME",
                         help=f"Selection schemes to emit (default: "
                              f"{' '.join(SCHEMES)})")
-    # Every TLSF sweep letter is also a FRETISH one, so the FRETISH table's
-    # letters are the whole choice list.
     parser.add_argument("--sweeps", nargs="+",
                         choices=[n for n, _ in SWEEPS],
                         default=DEFAULT_SWEEPS, metavar="SWEEP",
                         help="Sweeps to emit (default: "
-                             f"{' '.join(DEFAULT_SWEEPS)}, the selected table's "
-                             "sweeps among them; the FRETISH order sweep O is "
+                             f"{' '.join(DEFAULT_SWEEPS)}; the FRETISH order sweep O is "
                              "emitted only when named)")
     parser.add_argument("--levels", default=None, metavar="NAMES",
                         help="Comma-separated level names; each selected sweep "
@@ -617,13 +547,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", type=Path, default=CONFIGS_DIR, metavar="PATH",
                         help=f"Directory to write <scheme>/ dirs into (default: "
                              f"{CONFIGS_DIR})")
-    parser.add_argument("--tlsf", action="store_true",
-                        help="Emit the TLSF campaign grid: a coarse "
-                             "generations x population cross (sweeps A, B) and "
-                             "the elitism sweep R, for nsga2-apportion only, "
-                             "into configs-tlsf. Unless overridden, sets "
-                             "--schemes nsga2-apportion and --out-dir "
-                             "configs-tlsf")
     parser.add_argument("--pin-vintage", action="store_true",
                         help="Write every key whose built-in default has moved "
                              f"({', '.join(VINTAGE_KEYS)}) into each config "
@@ -676,16 +599,14 @@ def parse_args() -> argparse.Namespace:
                              "key is omitted from the emitted TOML when 0. "
                              "ltlsynt has no internal timeout and the heavy TLSF "
                              "specs occasionally generate multi-minute synthesis "
-                             f"queries, so --tlsf defaults to "
-                             f"{TLSF_LTLSYNT_TIMEOUT_MS} ms")
+                             "queries")
     parser.add_argument("--ltl2tgba-timeout", type=int, default=None,
                         metavar="MS",
                         help="Per-call ltl2tgba model-counting timeout in ms "
                              "(runtime.ltl2tgba_timeout_ms). 0 = no timeout; the "
                              "key is omitted from the emitted TOML when 0. The "
                              "counting-path -D determinization blows up on some "
-                             "deep formulae (multi-GB, hours), so --tlsf defaults "
-                             f"to {TLSF_LTL2TGBA_TIMEOUT_MS} ms")
+                             "deep formulae (multi-GB, hours)")
     parser.add_argument("--max-scoring-failure-rate", type=float, default=None,
                         metavar="RATE",
                         help="Fraction of a population allowed to fail scoring "
@@ -694,8 +615,8 @@ def parse_args() -> argparse.Namespace:
                              "to the built-in 0.05; the key is omitted from the "
                              "emitted TOML when 0, keeping the standard grids "
                              "byte-identical. The TLSF one-hot encodings produce "
-                             "tautologies that ltl2tgba rejects, so --tlsf "
-                             f"defaults to {TLSF_MAX_SCORING_FAILURE_RATE}")
+                             "tautologies that ltl2tgba rejects, so a TLSF grid "
+                             "may need a higher rate")
     args = parser.parse_args()
     # The binary rejects the mode at a cap of 0, so refuse it here rather than
     # emitting a grid of configs that every run exits 1 on.
@@ -718,39 +639,15 @@ def main() -> None:
     if args.weights is not None:
         defaults["weight_syntactic"], defaults["weight_semantic"], \
             defaults["weight_status"] = args.weights
-    # --tlsf swaps in the coarse TLSF cross and, unless the user overrode them,
-    # pins the scheme and output directory the campaign expects. Comparing
-    # against the argparse defaults is how "left unset" is detected.
-    sweep_table = SWEEPS
-    schemes = args.schemes
-    out_dir = args.out_dir
-    ltlsynt_timeout = args.ltlsynt_timeout
-    ltl2tgba_timeout = args.ltl2tgba_timeout
-    max_scoring_failure_rate = args.max_scoring_failure_rate
-    if args.tlsf:
-        sweep_table = TLSF_SWEEPS
-        if schemes == SCHEMES:
-            schemes = ["nsga2-apportion"]
-        if out_dir == CONFIGS_DIR:
-            out_dir = TLSF_CONFIGS_DIR
-        if ltlsynt_timeout is None:
-            ltlsynt_timeout = TLSF_LTLSYNT_TIMEOUT_MS
-        if ltl2tgba_timeout is None:
-            ltl2tgba_timeout = TLSF_LTL2TGBA_TIMEOUT_MS
-        if max_scoring_failure_rate is None:
-            max_scoring_failure_rate = TLSF_MAX_SCORING_FAILURE_RATE
-    # Neither of these gets a --tlsf default: a deadline and a thread-pool size
-    # belong to the campaign that measured them, not to the path, and silently
-    # bounding every TLSF grid at one would change what the archived ones mean.
     defaults["max_wall_s"] = args.max_wall_s or 0
     defaults["termination"] = args.termination or "generations"
     defaults["max_individuals"] = args.max_individuals or 0
     defaults["parallel"] = args.parallel or 0
-    defaults["ltlsynt_timeout_ms"] = ltlsynt_timeout or 0
-    defaults["ltl2tgba_timeout_ms"] = ltl2tgba_timeout or 0
-    defaults["max_scoring_failure_rate"] = max_scoring_failure_rate or 0.0
+    defaults["ltlsynt_timeout_ms"] = args.ltlsynt_timeout or 0
+    defaults["ltl2tgba_timeout_ms"] = args.ltl2tgba_timeout or 0
+    defaults["max_scoring_failure_rate"] = args.max_scoring_failure_rate or 0.0
     wanted = set(args.sweeps)
-    sweeps = [(name, levels) for name, levels in sweep_table if name in wanted]
+    sweeps = [(name, levels) for name, levels in SWEEPS if name in wanted]
     # --levels restricts every selected sweep to the named levels (a sweep left
     # with none is dropped). Unknown names abort rather than warn: the flag
     # exists to keep a grid's cell count exact, so a typo silently emitting a
@@ -779,10 +676,10 @@ def main() -> None:
     pinned = {k: defaults[k] for k in VINTAGE_KEYS} if args.pin_vintage else {}
 
     count = 0
-    for scheme in schemes:
+    for scheme in args.schemes:
         for wk_dir, wk_override in weakenings:
             segments = [p for p in (scheme, wk_dir, METRIC_DIR) if p is not None]
-            out = out_dir.joinpath(*segments)
+            out = args.out_dir.joinpath(*segments)
             out.mkdir(parents=True, exist_ok=True)
             for sweep_name, levels in sweeps:
                 for level_name, overrides in levels:
@@ -794,7 +691,7 @@ def main() -> None:
                     count += 1
             print(f"  {'/'.join(segments):24} "
                   f"{len(list(out.glob('sweep_*.toml'))):3} configs")
-    print(f"\nGenerated {count} config files in {out_dir}")
+    print(f"\nGenerated {count} config files in {args.out_dir}")
 
 
 if __name__ == "__main__":

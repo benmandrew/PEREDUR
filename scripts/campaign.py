@@ -3,13 +3,13 @@
 
     python scripts/campaign.py status            # one table of live state
     python scripts/campaign.py status --json     # the same, machine-readable
-    python scripts/campaign.py collect --profile tlsf --dry-run
-    python scripts/campaign.py collect --profile tlsf
-    python scripts/campaign.py stage arbiter-probe --dry-run
-    python scripts/campaign.py enqueue arbiter-probe
+    python scripts/campaign.py collect --profile fretish-order --dry-run
+    python scripts/campaign.py collect --profile fretish-order
+    python scripts/campaign.py stage 2026-11-16-fretish-order-pairs --dry-run
+    python scripts/campaign.py enqueue 2026-11-16-fretish-order-pairs
     python scripts/campaign.py queue
-    python scripts/campaign.py requeue --host av2 001-tlsf.toml
-    python scripts/campaign.py dequeue --host av2 001-tlsf.toml
+    python scripts/campaign.py requeue --host av2 001-2026-11-16-fretish-order-pairs.toml
+    python scripts/campaign.py dequeue --host av2 001-2026-11-16-fretish-order-pairs.toml
     python scripts/campaign.py tick --host av2
     python scripts/campaign.py cron --print --host av2
 

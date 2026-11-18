@@ -71,8 +71,6 @@ Sweeps generated, each holding every other parameter at its default:
 | C | Fitness weight presets | default, syntactic-heavy, semantic-heavy, status-only |
 | R | `elitism_rate` | 0.0, 0.1 |
 
-`--tlsf` swaps in the TLSF table: A and B as a coarse four-level cross
-(generations 5, 10, 20, 40; population 50, 100, 200, 500) and R as above.
 These are the sweeps a kept profile reads. A sweep no profile reads is removed
 rather than kept for a later campaign; an archived campaign regenerates its
 own grid from the `gen_configs.py` vendored beside it.
@@ -105,8 +103,8 @@ order repairs are written in and the reported `best_fitness`.
 ## 3. Run the experiments
 
 ```sh
-python scripts/run_experiments.py --profile tlsf            # one profile
-python scripts/run_experiments.py --profile tlsf --jobs 4   # four runs at a time
+python scripts/run_experiments.py --profile fretish-order            # one profile
+python scripts/run_experiments.py --profile fretish-order --jobs 4   # four runs at a time
 ```
 
 Runs the selected combinations of (sweep, level, spec, seed) and appends
@@ -124,39 +122,23 @@ read it from there.
 
 | Profile | Schemes | Sweeps / levels | Specs | Seeds | Results CSV |
 |---|---|---|---|---|---|
-| `tlsf` | nsga2-truncate | A + B, coarse 4-level cross (7 operating points) | the six core TLSF specs | 0–59 (ceiling) | `results-tlsf.csv` |
-| `h2h-tlsf` | nsga2-truncate, `log` metric | C/default | `H2H_TLSF_SPECS_2026_07` | 0–19 | `results-ablate-tlsf.csv` |
 | `aurus-h2h` | nsga2-apportion, `log` metric | C/default | `H2H_TLSF_READY` | 0–19 | `results-aurus-h2h.csv` |
-| `arbiter-probe` | nsga2-truncate, nsga2-apportion | R/elit0.1 | `ARBITER_PROBE_SPECS` | 0–39 | `results-arbiter-probe.csv` |
 | `fretish-order` | nsga2-apportion, random, `log` metric | O (random: base, only-climb) | `FRETISH_ORDER_SMALL` | 0–29 | `results-fretish-order.csv` |
 | `fretish-order-large` | nsga2-apportion, random, `log` metric | O/base, O/full | `FRETISH_ORDER_LARGE` | 0–29 | `results-fretish-order-large.csv` |
 
-`tlsf` runs the six basic-TLSF examples (arbiter, gyro-var1, humanoid-531,
-lift, lily02, minepump) rather than the four FRETISH specs, swept over
-generations (A) and population (B). These specs are far heavier: `ltlsynt`
-turns multi-gigabyte resident on them, and three — lift, gyro-var1,
-humanoid-531 — take about three minutes each even at the `gen10/pop200`
-baseline, against a few seconds for the FRETISH specs. So the grid is a coarse
-four-level cross per axis (seven distinct operating points, sharing the
-baseline) rather than the fine FRETISH grid: the budget is spent on seeds
-instead of gradations. It reads its own `experiments/configs-tlsf/nsga2-truncate/`
-grid, generated with `--tlsf` before `nsga2-truncate` and the flat metric layout
-were retired; `--tlsf` now writes `configs-tlsf/nsga2-apportion/log/`, so a new
-TLSF campaign needs a profile pointing there:
+The `tlsf`, `h2h-tlsf` and `arbiter-probe` profiles were retired on 2026-11-18,
+since each read `nsga2-truncate` configs and the binary has rejected that
+scheme since 2026-10-30. Every campaign that ran them vendors the
+`run_experiments.py` that defines them.
 
-```sh
-python scripts/gen_configs.py --tlsf
-python scripts/run_experiments.py --profile tlsf
-```
-
-On the lab machines, declare the campaign in `campaign.toml` instead and let
+On the lab machines, declare the campaign in `campaign.toml` and let
 `campaign.py` give each host its seed range (section 4). The seed count is a
 ceiling, not a commitment: ordering is seed-major, so a machine killed at its
 deadline leaves a balanced design at whatever seed depth it reached, and
 disjoint seed ranges merge to one balanced dataset whether or not either
 finishes.
 
-The profile runs at `--jobs 1`, unlike the FRETISH profiles' `--jobs 4`, for two
+The TLSF profile `aurus-h2h` runs at `--jobs 1`, unlike the FRETISH profiles, for two
 reasons. First, `ltlsynt` turns multi-gigabyte resident on these specs, and
 nothing caps its concurrency except the PEREDUR process's `runtime.parallel`, so
 one process per machine keeps that the machine-wide limit — on the 128 GB
@@ -171,13 +153,13 @@ almost-empty 0.5-1 s band) so such a query is killed and reported as undecided
 rather than stalling the run: it admits no repair, and the well-separation
 check at the output gate refuses its candidate — the count of these appears as `(N timeouts)` in
 each run's `ltlsynt` timing row. `compare` decides implies-ideal on TLSF the
-same way it does on FRETISH, via the whole-formula implication check, so
-`results-tlsf.csv` carries the same columns.
+same way it does on FRETISH, via the whole-formula implication check, so a
+TLSF results CSV carries the same columns.
 
 `--sweeps`, `--specs`, and `--seeds` narrow a profile without defining a new
-one: `--specs` and `--seeds` replace the profile's set (so `--specs lift` runs
-that spec alone), and `--sweeps` selects which sweeps run (so `--sweeps A`
-runs the four A levels).
+one: `--specs` and `--seeds` replace the profile's set (so `--specs fsm` runs
+that spec alone), and `--sweeps` selects which sweeps run (so `--sweeps O`
+runs the O levels).
 
 ### Parallel runs (`--jobs`)
 
@@ -195,8 +177,9 @@ runner caps each run's pool: it writes a derived config
 
 Every sweep holds the other parameters at their defaults, so a sweep's default
 level can be byte-identical to another sweep's. A profile's `baseline_aliases`
-names such pairs: the `tlsf` profile maps `B/pop200` onto the `A/gen10`
-baseline (generations 10, population 200). The runner executes the canonical
+names such pairs: the retired `tlsf` profile mapped `B/pop200` onto the
+`A/gen10` baseline (generations 10, population 200), and no current profile
+names one. The runner executes the canonical
 `A/gen10` run once per (scheme, spec, seed) and emits one CSV row per
 requested alias — the rows differ only in `sweep`/`level_name`/`level_value`.
 Identity is verified byte-for-byte before aliasing; if the files ever diverge
@@ -264,25 +247,25 @@ deliberate.
 
 ```sh
 # Preview what would run without executing anything
-python scripts/run_experiments.py --profile tlsf --dry-run
+python scripts/run_experiments.py --profile fretish-order --dry-run
 
 # Run only specific sweeps
-python scripts/run_experiments.py --profile tlsf --sweeps A
+python scripts/run_experiments.py --profile fretish-order --sweeps O
 
 # Run only specific specs
-python scripts/run_experiments.py --profile tlsf --specs lift
+python scripts/run_experiments.py --profile fretish-order --specs fsm
 
 # Run a small set of seeds for a quick check
-python scripts/run_experiments.py --profile tlsf --seeds 0 1 2
+python scripts/run_experiments.py --profile fretish-order --seeds 0 1 2
 
 # Re-run even if results already exist in the CSV
-python scripts/run_experiments.py --profile tlsf --no-resume
+python scripts/run_experiments.py --profile fretish-order --no-resume
 
 # Launch anyway when the binaries do not match the working tree's HEAD
-python scripts/run_experiments.py --profile tlsf --allow-stale-binary
+python scripts/run_experiments.py --profile fretish-order --allow-stale-binary
 
 # Combine flags
-python scripts/run_experiments.py --profile tlsf --sweeps A --specs lift --seeds 0 1 2
+python scripts/run_experiments.py --profile fretish-order --sweeps O --specs fsm --seeds 0 1 2
 ```
 
 Per-run outputs (repair JSON files) land in `experiments/results/<run-id>/`.
@@ -305,19 +288,19 @@ the command surface.
 negation because the hosts get it by checking out the campaign's branch:
 
 ```toml
-name = "arbiter-probe"          # must equal the directory name
-branch = "feat/arbiter-probe"   # the branch every host runs from
-profile = "arbiter-probe"       # default profile for phases that omit one
+name = "2026-11-05-fretish-order"     # must equal the directory name
+branch = "feat/fretish-order-eval"    # the branch every host runs from
+profile = "fretish-order"             # default profile for phases that omit one
 build = "cmake --build build-release"   # optional; this is the default
-configs = "python3 scripts/gen_configs.py --sweeps C --out-dir experiments/configs-arbiter-probe"   # optional; no default
+configs = "python3 scripts/gen_configs.py --sweeps O --out-dir experiments/configs-fretish-order"   # optional; no default
 hosts = { av2 = "0-99", av3 = "100-199" }
 
 [[phases]]
-profile = "arbiter-probe"
+profile = "fretish-order"
 jobs = 4
 
 [[phases]]
-profile = "tlsf"
+profile = "fretish-order-large"
 jobs = 1
 hosts = { av2 = "0-24", av3 = "100-124" }   # this phase alone
 ```
@@ -423,9 +406,9 @@ provides. On Python 3.10 it falls back to the `tomli` package.
 ### Staging the hosts
 
 ```sh
-python scripts/campaign.py stage arbiter-probe --dry-run   # probe only
-python scripts/campaign.py stage arbiter-probe
-python scripts/campaign.py stage arbiter-probe --force     # asks before it does
+python scripts/campaign.py stage 2026-11-05-fretish-order --dry-run   # probe only
+python scripts/campaign.py stage 2026-11-05-fretish-order
+python scripts/campaign.py stage 2026-11-05-fretish-order --force     # asks before it does
 ```
 
 Pushes the branch, then per host fetches it, checks it out at the pushed commit,
@@ -605,10 +588,10 @@ per-run radii. `--jobs` runs the (subject, contrast) tasks in parallel.
 ### The queue
 
 ```sh
-python scripts/campaign.py enqueue arbiter-probe        # one entry per host
+python scripts/campaign.py enqueue 2026-11-05-fretish-order   # one entry per host
 python scripts/campaign.py queue                        # every host, read-only
 python scripts/campaign.py cron --host av2 --print      # the crontab line
-python scripts/campaign.py requeue --host av2 001-arbiter-probe.toml
+python scripts/campaign.py requeue --host av2 001-2026-11-05-fretish-order.toml
 ```
 
 An entry is `experiments/queue/NNN-<name>.toml` on the host that runs it,
@@ -653,7 +636,7 @@ before.
 ```sh
 python scripts/campaign.py status                   # every host, plus this checkout
 python scripts/campaign.py status --host av3        # one host (av2, av3 or local)
-python scripts/campaign.py status --campaign tlsf   # one profile
+python scripts/campaign.py status --campaign fretish-order   # one profile
 python scripts/campaign.py status --json            # machine-readable
 python scripts/campaign.py status --all             # include older manifests
 ```
@@ -766,14 +749,14 @@ prints a table, and a non-empty `NO_COLOR` in the environment both turn it off;
 
 ```sh
 # What would move, without moving any of it
-python scripts/campaign.py collect --profile tlsf --dry-run
+python scripts/campaign.py collect --profile fretish-order --dry-run
 
 # rsync back, merge, verify
-python scripts/campaign.py collect --profile tlsf
+python scripts/campaign.py collect --profile fretish-order
 
 # One host, or the CSV without the per-run trees
-python scripts/campaign.py collect --profile tlsf --host av2
-python scripts/campaign.py collect --profile tlsf --no-results
+python scripts/campaign.py collect --profile fretish-order --host av2
+python scripts/campaign.py collect --profile fretish-order --no-results
 
 # A score phase's curves
 python scripts/campaign.py collect --curves curves-rematch --dry-run
