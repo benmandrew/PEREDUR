@@ -44,6 +44,15 @@ The CPU allotment was set by peredur-extension-d5 for the morning of Wed 18 Nov.
 
 `scripts/driver.py`, with the per-host lanes in `scripts/schedule.py`, runs in `~/projects/peredur-full4-exchange` on each host. A systemd user timer that `scripts/install.sh` installs starts it at 06:00. It first builds `build-release` on the 06:00 CPUs (`taskset -c`, 4 jobs) and generates the configs. It then runs one lane per CPU. A lane waits for its start time, takes the next item it may take, and runs `run_experiments.py --profile P --specs S --seeds N --jobs 1` under `taskset -c <cpu>`. It takes no new item after its cutoff. A run counts as done when the profile's CSV holds its row. A failed run is run once more (the runner resumes), and a second failure skips it. Every event is one line, with a UTC time, in `experiments/2026-11-18-fretish-full4-exchange/run-<host>/status.log`. The events are `start`, `build-start`, `build-done`, `configs-done`, `work-list`, `lane-start`, `item-start`, `item-done`, `item-failed`, `item-skipped`, `item-killed`, `lane-stopped`, `finished` and `hard-stopped`. Each attempt's output is in `run-<host>/logs/`.
 
+## Log
+
+Times are UTC on 2026-11-18.
+
+- 06:00:00. Both timers fired. The release build started on av2 CPUs 20-23 and av3 CPUs 28-31.
+- 06:08:03 (av3) and 06:09:16 (av2). Build and configs done. Work lists: av2 795 items (465 required, 330 optional), av3 575 items (355 required, 220 optional). Four lanes started on each host.
+- 06:20. 21 items done on av2 and 22 on av3, with no failures.
+- 06:00. veribee-ab released av2 CPUs 16-23 and av3 CPUs 8-15 and raised its own memory cap to 20G per host. This run's CPUs and 8G cap are unchanged.
+
 ## Result
 
 Not run yet.
