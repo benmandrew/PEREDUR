@@ -11,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+#include "live_slots.hpp"
 #include "prop_formula/atoms.hpp"
 
 namespace {
@@ -649,20 +650,11 @@ std::vector<std::string> environment_signals(
 }
 
 std::size_t count_live(const std::vector<Requirement>& reqs) {
-    return static_cast<std::size_t>(
-        std::count_if(reqs.begin(), reqs.end(),
-                      [](const Requirement& req) { return !req.m_removed; }));
+    return count_live_slots(reqs);
 }
 
 std::vector<std::size_t> live_indices(const std::vector<Requirement>& reqs) {
-    std::vector<std::size_t> indices;
-    indices.reserve(reqs.size());
-    for (std::size_t i = 0; i < reqs.size(); ++i) {
-        if (!reqs[i].m_removed) {
-            indices.push_back(i);
-        }
-    }
-    return indices;
+    return live_slot_indices(reqs);
 }
 
 bool operator<(const Requirement& lhs, const Requirement& rhs) {

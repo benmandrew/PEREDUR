@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "live_slots.hpp"
 #include "prop_formula.hpp"
 
 namespace tlsf {
@@ -39,20 +40,11 @@ std::vector<Formula> live_formulae(const Section& section) {
 }
 
 std::size_t count_live(const Section& section) {
-    return static_cast<std::size_t>(std::count_if(
-        section.begin(), section.end(),
-        [](const SectionEntry& entry) { return !entry.m_removed; }));
+    return count_live_slots(section);
 }
 
 std::vector<std::size_t> live_indices(const Section& section) {
-    std::vector<std::size_t> indices;
-    indices.reserve(section.size());
-    for (std::size_t i = 0; i < section.size(); ++i) {
-        if (!section[i].m_removed) {
-            indices.push_back(i);
-        }
-    }
-    return indices;
+    return live_slot_indices(section);
 }
 
 std::array<const Section*, 6> sections_of(const Specification& spec) {
