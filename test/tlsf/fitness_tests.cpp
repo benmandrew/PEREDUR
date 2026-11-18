@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include "config.hpp"
+#include "fitness/function.hpp"
 #include "fitness/status.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"
@@ -27,9 +28,18 @@ TEST(test_semantic_self_similarity_is_one) {
     cfg.default_model_counting_bound = 4;
     const tlsf::Specification spec =
         parse_main("INPUTS { r; } OUTPUTS { g; } GUARANTEE { G(r -> F g); }");
-    expect(tlsf_semantic_similarity(spec, spec, cfg) == 1.0,
-           "semantic: identical section formulae contribute nothing, so self "
-           "similarity is 1.0");
+    bool found = false;
+    for (const WeightedFitnessFunctionT<tlsf::Specification>& objective :
+         tlsf_get_fitness_function(spec, cfg)) {
+        if (objective.name != "semantic") {
+            continue;
+        }
+        found = true;
+        expect(objective(spec) == 1.0,
+               "semantic: identical section formulae contribute nothing, so "
+               "self similarity is 1.0");
+    }
+    expect(found, "semantic: default weights include the semantic objective");
 }
 
 TEST(test_status_realizable_is_one) {

@@ -11,7 +11,6 @@
 #include <cfloat>
 #include <cmath>
 #include <cstddef>
-#include <cstdio>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -74,19 +73,6 @@ inline bool count_add_overflow(Count lhs, Count rhs, Count& result) {
 inline bool count_mul_overflow(Count lhs, Count rhs, Count& result) {
     result = lhs * rhs;
     return !std::isfinite(result);
-}
-
-/// Converts a Count value to a decimal string representation.
-/// @param value The Count value to convert
-/// @return A string representation in decimal
-inline std::string count_to_string(Count value) {
-    // A Count near the top of long double's range needs ~4932 digits, so size
-    // the buffer from snprintf rather than guessing.
-    const int length = std::snprintf(nullptr, 0, "%.0Lf", value);
-    assert(length > 0);
-    std::string digits(static_cast<std::size_t>(length), '\0');
-    std::snprintf(digits.data(), digits.size() + 1, "%.0Lf", value);
-    return digits;
 }
 
 /// Parses a count value from a decimal string representation. Digits beyond
