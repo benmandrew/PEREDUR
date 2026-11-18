@@ -65,7 +65,7 @@ Neither takes a seed range; `enqueue` freezes the split into the entry, so editi
 
 ## Scoring phases
 
-`2026-08-29-aurus-matched` and `2026-09-04-aurus-rematch` each hand-rolled a `score_curves.py --maximality` pass after their search from ssh'd bash scripts, at 716 and 312 worker-hours. A `score` phase runs that pass as a phase.
+A `score` phase runs a `score_curves.py --maximality` pass over the search's results as a phase of the campaign ("Scoring phases" in `docs/dev/history.md` has the hand-rolled passes it replaced).
 
 ```toml
 [[phases]]

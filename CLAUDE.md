@@ -11,7 +11,7 @@ Detail lives in `docs/dev/`. Read the file covering an area before changing it. 
 | File | Sections |
 |---|---|
 | `docs/dev/algorithm.md` | Algorithm flow, Elitism, Maximality demotion, Termination modes, Run output, Generation pipeline, Parent-verdict stage, TLSF repair modes, Key types |
-| `docs/dev/operators.md` | Crossover, Order crossover, Operator repairs of 2026-08-19, Implication in the TLSF grammar, Monotone rewrites, Cloned assumptions, Assumption construction, Timing donation, Scope-aware timing moves, Removable guarantees, Order moves, Blame-targeted slot choice, Output climb, Status-gated mutation direction, Distance-dependent step size, Measured feature interactions |
+| `docs/dev/operators.md` | Crossover, Order crossover, Grammar fixes, Implication in the TLSF grammar, Monotone rewrites, Cloned assumptions, Assumption construction, Timing donation, Scope-aware timing moves, Removable guarantees, Order moves, Blame-targeted slot choice, Output climb, Status-gated mutation direction, Distance-dependent step size, Measured feature interactions |
 | `docs/dev/fretish-scopes.md` | FRETISH scopes |
 | `docs/dev/performance.md` | Cache keys, Scoring dispatch, Per-generation gate, Implication prefilter, Implication residual query, Implication model probe, Satisfiability route, Decomposition re-ask, Controller-store gate, Tool subprocesses, Spot fork server, Profiling |
 | `docs/dev/config-and-provenance.md` | Config keys, Commit provenance, Run manifest schema versions, Where the campaign records are, Config vintage (including retired keys) |
@@ -19,6 +19,7 @@ Detail lives in `docs/dev/`. Read the file covering an area before changing it. 
 | `docs/dev/testing.md` | Tests, Python tests, Coverage |
 | `docs/dev/tooling.md` | Build, Lint & Format, Docs |
 | `docs/dev/packaging.md` | External tools, Packaging |
+| `docs/dev/history.md` | Dated evidence moved out of the notes above: Order crossover default, Grammar fixes, Assumption reach, Measured feature interactions, Scoring phases, Ubuntu mirror, VM testing, Run manifest schema versions (2 to 62), Config vintage (rows before 2026-10-29) |
 
 ## Build, test, lint
 
