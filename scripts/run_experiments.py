@@ -6,13 +6,13 @@ CSV they land in (see PROFILES below and scripts/README.md). --profile is
 required: there is no default campaign.
 
 Usage:
-    python scripts/run_experiments.py --profile tlsf                # one profile
-    python scripts/run_experiments.py --profile tlsf --jobs 8       # 8 parallel runs
-    python scripts/run_experiments.py --profile tlsf --sweeps A     # specific sweeps
-    python scripts/run_experiments.py --profile tlsf --specs lift   # specific specs
-    python scripts/run_experiments.py --profile tlsf --seeds 0 1 2  # specific seeds
-    python scripts/run_experiments.py --profile tlsf --dry-run      # print plan only
-    python scripts/run_experiments.py --profile tlsf --no-resume    # ignore results
+    python scripts/run_experiments.py --profile fretish-order              # one profile
+    python scripts/run_experiments.py --profile fretish-order --jobs 8     # 8 parallel runs
+    python scripts/run_experiments.py --profile fretish-order --sweeps O   # specific sweeps
+    python scripts/run_experiments.py --profile fretish-order --specs fsm  # specific specs
+    python scripts/run_experiments.py --profile fretish-order --seeds 0 1  # specific seeds
+    python scripts/run_experiments.py --profile fretish-order --dry-run    # print plan only
+    python scripts/run_experiments.py --profile fretish-order --no-resume  # ignore results
 
 Every row records the commit the PEREDUR binary was built from, read once at
 startup from `peredur --version` rather than from the working tree — the two
@@ -170,13 +170,6 @@ TLSF_SPECS: dict[str, dict[str, Path]] = {
     "pcar-v2-888": _spec("pcar-v2-888", "tlsf"),
 }
 
-# The original six-family TLSF corpus. The tlsf profile pins this list rather
-# than list(TLSF_SPECS), so extending the table above does not silently grow
-# what it runs.
-TLSF_CORE_SPECS: list[str] = [
-    "arbiter", "gyro-var1", "humanoid-531", "lift", "lily02", "minepump",
-]
-
 # The head-to-head corpus IS the AuRUS paper's evaluation set: the 26
 # specifications the paper's tables evaluate. Both arms target all 26, so this
 # is the campaign's declared scope rather than whatever PEREDUR happens to be
@@ -236,29 +229,6 @@ H2H_UNSCOREABLE: list[str] = ["humanoid-741"]
 H2H_TLSF_READY: list[str] = [
     s for s in H2H_TLSF_SPECS
     if s not in H2H_PENDING_IMPORT and s not in H2H_UNSCOREABLE
-]
-
-# The corpus of the `h2h-tlsf` profile, frozen so that changing the live list
-# above cannot change what that profile means. Written out rather than derived
-# from H2H_TLSF_SPECS, so a change to the live corpus cannot carry over.
-H2H_TLSF_SPECS_2026_07: list[str] = [
-    "gyro-var1", "gyro-var2", "humanoid-458", "humanoid-531", "lift",
-    "lily02", "minepump", "codesample-un1", "codesample-un2", "rg1", "rg2",
-    "arbiter-aurus",
-]
-
-# The arbiter-probe corpus: every fixes-backed family whose unrealizability is
-# an arbitration conflict -- the seven arbiters, plus amba (a bus arbiter) and
-# load-balancer (arbitration over servers).
-#
-# lily02 is the tenth and is not an arbiter. It is the counter-signal control:
-# a probe that only sampled families the scheme helps would report the upside
-# alone.
-ARBITER_PROBE_SPECS: list[str] = [
-    "arbiter", "arbiter-aurus", "arbiter-handshake", "full-arbiter",
-    "prioritized-arbiter", "round-robin-arbiter", "simple-arbiter",
-    "amba", "load-balancer",
-    "lily02",
 ]
 
 # Unified lookup for run_one()/--specs; each profile picks its own subset.
@@ -417,11 +387,7 @@ DROPPED_RE = re.compile(r"^(\d+) individual\(s\) dropped", re.MULTILINE)
 # enforces that, since the configs differ on selection_scheme.
 #
 # The canonical is per-profile: it must be a level the profile actually runs.
-# The tlsf profile runs only sweeps A (generations) and B (population), which
-# cross at the gen10/pop200 baseline, so B/pop200 aliases onto A/gen10.
-TLSF_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
-    ("B", "pop200"): ("A", "gen10"),
-}
+# A profile maps (sweep, level) to its canonical in `baseline_aliases`.
 
 
 # ── Profiles ─────────────────────────────────────────────────────────────────
@@ -441,90 +407,22 @@ TLSF_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
 # `timeout_caps` is a per-spec cap in seconds, and must name every spec the
 # profile runs.
 #
-# The generator lines quoted with each profile below ran before gen_configs.py
-# stopped writing nsga2-truncate, the direct metric and the flat metric layout.
-# At this commit they no longer reproduce those grids: regenerate one at the
-# commit its campaign archive names.
-#
 # `configs_dir` and `results_dir` are per-profile because run_id names collide
 # across profiles: the same (sweep, level, scheme, spec, seed) is one directory
 # name regardless of operating point, so two profiles sharing a results_dir
 # would have parse_repair_files() read the other's stale repair_*.json.
+#
+# The tlsf, h2h-tlsf and arbiter-probe profiles were retired on 2026-11-18:
+# each read nsga2-truncate configs, which the binary has rejected since
+# 2026-10-30. Every campaign that ran them vendors the run_experiments.py that
+# defines them, so reproduce one from its archive at the revision it names.
+# Never reuse those names for a new profile.
 PROFILES: dict[str, dict] = {
-    # The basic-TLSF examples swept over generations (A) and population (B), the
-    # two operating-point parameters, NSGA-II only, default weakening. These
-    # specs are much slower than the FRETISH ones and scale with
-    # generations*population, so the grid is a coarse cross (four levels per
-    # axis, sharing the baseline) rather than the fine FRETISH grid. Reads its
-    # own experiments/configs-tlsf/ grid; generate it with
-    #   python scripts/gen_configs.py --tlsf
-    "tlsf": {
-        "schemes": ["nsga2-truncate"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["A", "B"],
-        "levels": {},
-        "specs": list(TLSF_CORE_SPECS),
-        # A generous ceiling, not a commitment. Ordering is seed-major, so a
-        # machine killed at a wall-clock deadline leaves a balanced design at
-        # whatever seed depth it reached; disjoint seed ranges per host keep a
-        # truncated pair mergeable into one balanced dataset.
-        "seeds": list(range(60)),
-        # Flat per-spec caps generous enough that the largest operating point
-        # (gen40 / pop500) never censors a slow-but-progressing run — a cap that
-        # bites records implies_ideal = 0 for a run that merely ran long, which
-        # corrupts the response variable.
-        "timeout_caps": {"arbiter": 2400, "gyro-var1": 3600,
-                         "humanoid-531": 3600, "lift": 3600,
-                         "lily02": 1200, "minepump": 1200},
-        "baseline_aliases": TLSF_ALIASES,
-        "configs_dir": EXPERIMENTS_DIR / "configs-tlsf",
-        "results_dir": EXPERIMENTS_DIR / "results-tlsf",
-        "results_csv": EXPERIMENTS_DIR / "results-tlsf.csv",
-        # jobs=1: one PEREDUR process per machine, using its full internal
-        # thread pool. ltlsynt is multi-GB resident per call on these specs, so
-        # running several PEREDUR processes at once (jobs>1) would multiply
-        # peak RAM by jobs and risk an OOM.
-        "default_jobs": 1,
-    },
-    # Head-to-head top-up against the AuRUS baseline:
-    # the control cell only (nsga2 / log metric / C-default weights), at seeds
-    # 0-19 over H2H_TLSF_SPECS_2026_07. It reads and writes the paths of the
-    # retired ablate-tlsf profile, whose 2x2 factorial contained this cell, and
-    # the resume key (sweep, level, selection, weakening, metric, repair_mode,
-    # spec, seed) fully identifies a control-cell row, so the (spec, seed) rows
-    # that campaign completed are skipped and only the top-up executes.
-    # Its configs were generated with
-    #   python scripts/gen_configs.py --sweeps C --levels default \
-    #       --schemes nsga2-truncate weighted --metric both \
-    #       --ltlsynt-timeout 500 --ltl2tgba-timeout 60000 \
-    #       --max-scoring-failure-rate 0.15 \
-    #       --out-dir experiments/configs-ablate-tlsf
-    "h2h-tlsf": {
-        "schemes": ["nsga2-truncate"],
-        "weakenings": None,
-        # ["log"] (not None): keeps the factor-cell key, run_id and CSV metric
-        # column identical to the ablation's log cell, which is what makes the
-        # shared-CSV dedup hold.
-        "metrics": ["log"],
-        "repair_modes": None,
-        "sweeps": ["C"],
-        "levels": {"C": ["default"]},
-        "specs": H2H_TLSF_SPECS_2026_07,
-        "seeds": list(range(20)),
-        "timeout_caps": {s: 600 for s in H2H_TLSF_SPECS_2026_07},
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-ablate-tlsf",
-        "results_dir": EXPERIMENTS_DIR / "results-ablate-tlsf",
-        "results_csv": EXPERIMENTS_DIR / "results-ablate-tlsf.csv",
-        "default_jobs": 1,
-    },
-    # The head-to-head at AuRUS's own budget. Separate from `h2h-tlsf` in
-    # every path it writes, because it differs from that profile in the two
-    # things the resume key does not carry: the corpus and the wall cap.
-    # Sharing the ablation's CSV as `h2h-tlsf` does would put rows from both
-    # caps under one key and let the merge keep whichever arrived first.
+    # The head-to-head at AuRUS's own budget. Separate from the retired
+    # `h2h-tlsf` profile in every path it writes, because it differs from that
+    # profile in the two things the resume key does not carry: the corpus and
+    # the wall cap. Sharing that profile's CSV would put rows from both caps
+    # under one key and let the merge keep whichever arrived first.
     #
     # 7200s matches AuRUS's `--gato 7200`, the published 2 h budget, so
     # neither tool's figure needs a budget caveat.
@@ -552,41 +450,6 @@ PROFILES: dict[str, dict] = {
         "configs_dir": EXPERIMENTS_DIR / "configs-aurus-h2h",
         "results_dir": EXPERIMENTS_DIR / "results-aurus-h2h",
         "results_csv": EXPERIMENTS_DIR / "results-aurus-h2h.csv",
-        "default_jobs": 1,
-    },
-    # Does nsga2-apportion's diversity unlock the arbiter family, or only the
-    # one `arbiter` spec? Both schemes, one level. Sweep R restricted to
-    # elit0.1 pins elitism_rate into the config at the shipped default rather
-    # than inheriting it, so a later change of default cannot restate what
-    # this profile runs.
-    #
-    # Generate the configs with
-    #   python scripts/gen_configs.py --tlsf \
-    #       --schemes nsga2-truncate nsga2-apportion --sweeps R --levels elit0.1 \
-    #       --out-dir experiments/configs-arbiter-probe
-    "arbiter-probe": {
-        "schemes": ["nsga2-truncate", "nsga2-apportion"],
-        "weakenings": None,
-        "metrics": None,
-        "repair_modes": None,
-        "sweeps": ["R"],
-        "levels": {"R": ["elit0.1"]},
-        "specs": list(ARBITER_PROBE_SPECS),
-        # 40 seeds x 9 arbiter families = 360 pooled pairs: enough to separate
-        # "unlocks the family" from "unlocked one spec".
-        "seeds": list(range(40)),
-        # A flat cap sized never to bite: a tighter cap would censor the
-        # treatment arm (apportion) alone.
-        "timeout_caps": {spec: 900 for spec in ARBITER_PROBE_SPECS},
-        # apportion's whole claim is more distinct survivors, so it returns
-        # more repairs and compare's cost scales with them; the 600 s default
-        # would censor its comparisons.
-        "compare_timeout": 1800,
-        "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-arbiter-probe",
-        "results_dir": EXPERIMENTS_DIR / "results-arbiter-probe",
-        "results_csv": EXPERIMENTS_DIR / "results-arbiter-probe.csv",
-        # jobs=1 for the same RAM reason as every other TLSF profile.
         "default_jobs": 1,
     },
     # The FRETISH order-directed search (the keys of 2026-10-31), against an

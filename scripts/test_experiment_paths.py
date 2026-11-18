@@ -143,51 +143,32 @@ for f in ("selection", "weakening", "metric", "repair_mode"):
 
 P = R.PROFILES
 
-# Extending TLSF_SPECS must not grow the corpus of the profile pinned to the
-# original six families.
-check(P["tlsf"]["specs"], R.TLSF_CORE_SPECS, "tlsf profile corpus")
+# The profiles that read nsga2-truncate configs were retired once the binary
+# rejected the scheme. Their names stay unused, so an archived campaign's
+# vendored definition is the only one.
+for retired in ("tlsf", "h2h-tlsf", "arbiter-probe"):
+    assert retired not in P, f"{retired} is a retired profile name"
+# No live profile may read a scheme the binary rejects.
+for name, prof in P.items():
+    assert "nsga2-truncate" not in prof["schemes"], \
+        f"{name} reads nsga2-truncate, which the binary rejects"
 
-# h2h-tlsf dedups against the retired ablate-tlsf campaign by reading and
-# writing its configs dir, results dir and results CSV: the resume key carries
-# every factor, so the control-cell rows that campaign completed are skipped
-# rather than re-run. If any of these three move the dedup silently breaks and
-# the top-up re-runs those rows.
-for field, name in (("configs_dir", "configs-ablate-tlsf"),
-                    ("results_dir", "results-ablate-tlsf"),
-                    ("results_csv", "results-ablate-tlsf.csv")):
-    check(P["h2h-tlsf"][field].name, name,
-          f"h2h-tlsf keeps the ablation's {field}")
-# ... and it must stay inside the control cell, with the metric crossed (not
-# None/legacy) so its run_id and CSV metric column match the ablation's log cell.
-check(P["h2h-tlsf"]["schemes"], ["nsga2-truncate"], "h2h-tlsf control scheme")
-check(P["h2h-tlsf"]["metrics"], ["log"], "h2h-tlsf control metric")
-check(P["h2h-tlsf"]["levels"], {"C": ["default"]}, "h2h-tlsf control level")
-check(P["h2h-tlsf"]["specs"], R.H2H_TLSF_SPECS_2026_07, "h2h-tlsf corpus")
 check(P["aurus-h2h"]["specs"], R.H2H_TLSF_READY, "aurus-h2h corpus")
-# The two profiles differ in the two things the resume key does not carry, so
-# they must never share a results CSV: a 600s row and a 7200s row would land
-# under one key and the merge would keep whichever arrived first.
-assert (P["aurus-h2h"]["results_csv"] != P["h2h-tlsf"]["results_csv"]), \
-    "aurus-h2h must not share h2h-tlsf's results CSV"
+# aurus-h2h differs from the retired h2h-tlsf in the two things the resume key
+# does not carry, so it must never share that profile's results CSV: a 600s
+# row and a 7200s row would land under one key and the merge would keep
+# whichever arrived first.
+check(P["aurus-h2h"]["results_csv"].name != "results-ablate-tlsf.csv", True,
+      "aurus-h2h must not share h2h-tlsf's results CSV")
 check(sorted(set(P["aurus-h2h"]["timeout_caps"].values())), [7200],
       "aurus-h2h wall cap matches AuRUS's published 2h GATO")
 
 # The head-to-head corpus is the AuRUS paper's evaluation set, all 26 rows.
 check(len(R.H2H_TLSF_SPECS), 26, "h2h TLSF corpus size")
-# The h2h-tlsf corpus is frozen separately so changing the live list cannot
-# change what that profile means.
-check(len(R.H2H_TLSF_SPECS_2026_07), 12, "2026-07 h2h TLSF corpus size")
-# codesample-un1 and codesample-un2 are in the frozen corpus and are not rows
-# in the paper's tables, so the two corpora differ in both directions. amba is
-# in neither.
-for dropped in ("codesample-un1", "codesample-un2"):
-    assert dropped in R.H2H_TLSF_SPECS_2026_07, \
-        f"{dropped} should be in the 2026-07 corpus"
+# codesample-un1, codesample-un2 and amba are not rows in the paper's tables.
+for dropped in ("codesample-un1", "codesample-un2", "amba"):
     assert dropped not in R.H2H_TLSF_SPECS, \
         f"{dropped} is not a row in the AuRUS paper's tables"
-assert "amba" not in R.H2H_TLSF_SPECS_2026_07 \
-    and "amba" not in R.H2H_TLSF_SPECS, \
-    "amba is a row in neither head-to-head corpus"
 # PEREDUR's own arbiter, detector, full-arbiter and the rest are different
 # parameter instances from AuRUS's, which is why the imports carry an -aurus
 # suffix. The bare names must never appear, or the corpus would assert a
@@ -251,7 +232,8 @@ for name, prof in P.items():
     for key in ("results_csv", "results_dir"):
         check(prof[key].parent, R.EXPERIMENTS_DIR,
               f"{name}: {key} sits directly under experiments/")
-check(M.PROFILE_CSVS["tlsf"], "results-tlsf.csv", "merge CSV for tlsf")
+check(M.PROFILE_CSVS["aurus-h2h"], "results-aurus-h2h.csv",
+      "merge CSV for aurus-h2h")
 
 # Every spec a profile names must resolve to an on-disk input, and every
 # profile must cap every spec it runs (execute() indexes caps[spec]).
