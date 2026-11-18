@@ -1,0 +1,798 @@
+# Catalogue of the result sets under experiments/ and the papers they serve.
+#
+# The results stay at the paths their tools wrote: campaign.py, the av2 and
+# av3 mirrors and the papers' import scripts find them by name. This file says
+# what each set is. `scripts/catalogue.py check` fails on an entry of
+# experiments/ that no set claims, and `render` writes CATALOGUE.md.
+#
+# Per set:
+#   name           unique; usually the campaign or the set's main path
+#   paths          entries of experiments/ (or of `location`) that make it up
+#   location       where the set lives when it is not this checkout's
+#                  experiments/: another checkout, or "av2, av3: <dir>"
+#   paper          ext, tlsf or none
+#   status         cited | supporting | superseded | pilot | development | inputs
+#   superseded_by  the set that replaced it, when status = "superseded"
+#   question       the paper's research question or section it serves
+#   campaign       the campaign that produced it
+#   date, commits, purpose, note
+
+[paper.ext]
+title = "FRETISH order-directed search (the extension paper)"
+repo = "~/projects/writing/peredur-extension"
+note = "`make import` (`scripts/import_data.py`) copies or reduces each cited set into the paper's `data/`; the research questions are those of `2026-11-05-fretish-order/PLAN.md`."
+
+[paper.tlsf]
+title = "TLSF repair against AuRUS (the TLSF paper, peredur2027)"
+repo = "~/projects/writing/peredur-paper"
+note = "The paper's `data/*/PROVENANCE*.txt` name every input. Its cited sets were written while this repository was called counter, so on av2 and av3 they sit under `~/projects/counter/experiments`."
+
+# --- Extension paper: cited ---------------------------------------------------
+
+[[set]]
+name = "fretish-order"
+paths = ["2026-11-05-fretish-order", "results-fretish-order", "results-fretish-order.csv"]
+paper = "ext"
+status = "cited"
+question = "RQ1, RQ2"
+campaign = "2026-11-05-fretish-order"
+date = "2026-11-05"
+commits = ["f7ffb997", "43b2fce2"]
+purpose = "The small set's 4,860 runs: every arm of the order-directed search against base and random, 30 seeds."
+note = "Since 2026-11-17 the paper takes `full` and `no-<f>` from the removal campaigns; `base`, `random` and `only-<f>` still come from here."
+
+[[set]]
+name = "fretish-order-large"
+paths = ["results-fretish-order-large", "results-fretish-order-large.csv"]
+paper = "ext"
+status = "cited"
+question = "RQ3"
+campaign = "2026-11-05-fretish-order"
+date = "2026-11-06"
+commits = ["f7ffb997", "43b2fce2"]
+purpose = "The large set's runs (lift-plus-cruise-full, rad, ventilator-controller), from the `lift-full` and `rad-vent` phases."
+
+[[set]]
+name = "curves-fretish-order-v2"
+paths = ["curves-fretish-order-v2", "curves-fretish-order-v2.csv"]
+paper = "ext"
+status = "cited"
+question = "RQ1 anytime"
+date = "2026-11-12"
+commits = ["fb9ec73c"]
+purpose = "Anytime curves of the small set, re-scored after the counter and climbed-repair fixes."
+note = "`extract_curves.py` reads the per-host directory; the CSV is its merged copy."
+
+[[set]]
+name = "curves-fretish-order-large-v2"
+paths = ["curves-fretish-order-large-v2", "curves-fretish-order-large-v2.csv"]
+paper = "ext"
+status = "cited"
+question = "RQ3 anytime"
+date = "2026-11-12"
+commits = ["fb9ec73c"]
+purpose = "Anytime curves of the large set, re-scored after the climbed-repair fix."
+note = "`extract_curves.py` reads the per-host directory."
+
+[[set]]
+name = "fretish-order-counters"
+paths = ["results-fretish-order-counters", "results-fretish-order-counters.csv"]
+paper = "ext"
+status = "cited"
+question = "RQ2 mechanism counters"
+date = "2026-11-12"
+commits = ["fb9ec73c"]
+purpose = "The small set rerun at a commit whose run.json records each mechanism's counters."
+note = "`extract_counters_rerun.py` writes `data/counters-fretish-order-v2.csv` and `data/repro-fretish-order.csv` from it."
+
+[[set]]
+name = "fretish-order-large-counters"
+paths = ["2026-11-13-fretish-order-large-counters", "results-fretish-order-large-counters", "results-fretish-order-large-counters.csv", "results-fretish-order-vent-deadline", "results-fretish-order-vent-deadline.csv"]
+paper = "ext"
+status = "cited"
+question = "RQ3"
+campaign = "2026-11-13-fretish-order-large-counters"
+date = "2026-11-13"
+commits = ["f557c5dd"]
+purpose = "The large set's full arm rerun to record the climb's wall time and the final front's gutting; ventilator-controller under a 3000 s deadline."
+note = "`extract_large_counters.py` reads both run directories."
+
+[[set]]
+name = "fretish-order-pooled-v2"
+paths = ["2026-11-09-fretish-order-pooled", "fretish-order-pooled-v2"]
+paper = "ext"
+status = "cited"
+question = "RQ2 strength and diversity"
+campaign = "2026-11-09-fretish-order-pooled"
+date = "2026-11-11"
+purpose = "Pooled strength and diversity of each only-<f> arm and full against base, over the 9 small specs and rad's 10 cores, after the audit of 2026-11-11."
+note = "Source of `data/pooled-strength.csv`, `pooled-balls.csv` and `pooled-share.csv`. The tracked reduction is in the campaign directory."
+
+[[set]]
+name = "fretish-order-pooled-noclimb"
+paths = ["fretish-order-pooled-noclimb"]
+paper = "ext"
+status = "cited"
+question = "RQ2 strength and diversity"
+campaign = "2026-11-09-fretish-order-pooled"
+date = "2026-11-12"
+purpose = "The pooled pass with the output climb's repairs left out, to read each arm's strength without the climb."
+note = "Source of `data/pooled-*-noclimb.csv`."
+
+[[set]]
+name = "seeded-corpus"
+paths = ["2026-11-13-seeded-corpus", "results-fretish-seeded", "results-fretish-seeded.csv", "results-fretish-seeded-manifest-ben.json"]
+paper = "ext"
+status = "cited"
+question = "Seeded corpus"
+campaign = "2026-11-13-seeded-corpus"
+date = "2026-11-15"
+commits = ["b2d3b91c", "de2ebcda", "1077b43b"]
+purpose = "Specifications seeded with known fault classes, run under every arm; REPORT.md gives the campaign's own analysis."
+note = "`import_data.py` copies `2026-11-13-seeded-corpus/data/`; `summarise.py` ports `scripts/seeded/analyse.py`."
+
+# The removal campaigns of 2026-11-17 live in campaign worktrees, where each
+# collect wrote its data. import_data.py reads them there (REMOVAL).
+
+[[set]]
+name = "fretish-order-remove-no-f"
+location = "~/projects/peredur-wt-demote/experiments"
+paths = ["2026-11-17-fretish-order-remove-no-f", "results-fretish-order-remove-no-f", "results-fretish-order-remove-no-f.csv", "configs-fretish-order-remove-no-f"]
+paper = "ext"
+status = "cited"
+question = "RQ1, RQ2"
+campaign = "2026-11-17-fretish-order-remove-no-f"
+date = "2026-11-17"
+commits = ["580a6cc"]
+purpose = "`remove-full` (a rerun of lean-remove, the paper's `full`) and each `remove-no-<f>` on the small set."
+
+[[set]]
+name = "fretish-order-only-remove"
+location = "~/projects/peredur-wt-demote/experiments"
+paths = ["results-fretish-order-only-remove", "results-fretish-order-only-remove.csv", "configs-fretish-order-only-remove"]
+paper = "ext"
+status = "cited"
+question = "RQ2"
+campaign = "2026-11-17-fretish-order-removal-followup"
+date = "2026-11-17"
+commits = ["612876c"]
+purpose = "The `only-remove` arm on the small set."
+
+[[set]]
+name = "fretish-seeded-removal"
+location = "~/projects/peredur-wt-demote/experiments"
+paths = ["results-fretish-seeded-removal", "results-fretish-seeded-removal.csv", "configs-fretish-seeded-removal"]
+paper = "ext"
+status = "cited"
+question = "Seeded corpus"
+date = "2026-11-17"
+commits = ["612876c"]
+purpose = "`lean-remove` on the seeded corpus."
+
+[[set]]
+name = "fretish-order-full4-no-f"
+location = "~/projects/peredur-wt-demote/experiments"
+paths = ["2026-11-17-fretish-order-full4-no-f", "results-fretish-order-full4-no-f", "results-fretish-order-full4-no-f.csv", "configs-fretish-order-full4-no-f"]
+paper = "ext"
+status = "development"
+question = "RQ2"
+campaign = "2026-11-17-fretish-order-full4-no-f"
+date = "2026-11-17"
+purpose = "A four-feature `full` without each feature in turn, run while the cut of 2026-11-17 was decided."
+note = "`import_data.py` does not read it."
+
+[[set]]
+name = "fretish-order-removal"
+location = "~/projects/peredur-removal-pooled/experiments"
+paths = ["results-fretish-order-removal", "results-fretish-order-removal.csv"]
+paper = "ext"
+status = "cited"
+question = "RQ2 removal against demotion"
+campaign = "2026-11-17-fretish-order-removal"
+date = "2026-11-17"
+commits = ["d815233", "56bfb69"]
+purpose = "`lean` (the paper's `no-remove`), `lean-demote` and `lean-remove` on the small set."
+note = "The campaign directory is on the worktrees `peredur-wt-demote` and `peredur-ext-share`. `~/projects/peredur-ext-share/experiments/results-fretish-order-removal` holds a 452 MB run tree without a CSV."
+
+[[set]]
+name = "fretish-seeded-remove"
+location = "~/projects/peredur-ext-share/experiments"
+paths = ["results-fretish-seeded-remove", "results-fretish-seeded-remove.csv", "configs-fretish-seeded-remove"]
+paper = "ext"
+status = "cited"
+question = "Seeded corpus"
+campaign = "2026-11-17-fretish-extension-share"
+date = "2026-11-17"
+commits = ["739edd4"]
+purpose = "`remove-no-<f>`, `lean` and `base` on the seeded corpus."
+
+[[set]]
+name = "fretish-order-large-remove"
+location = "~/projects/peredur-ext-share/experiments"
+paths = ["results-fretish-order-large-remove", "results-fretish-order-large-remove.csv", "configs-fretish-order-large-remove"]
+paper = "ext"
+status = "cited"
+question = "RQ3"
+campaign = "2026-11-17-fretish-extension-share"
+date = "2026-11-18"
+commits = ["739edd4", "c1a35b6"]
+purpose = "`lean-remove`, `remove-no-<f>`, `lean`, `only-remove` and `only-<f>` on rad and lift-plus-cruise-full."
+
+[[set]]
+name = "fretish-order-only-remove-pooled"
+location = "~/projects/peredur-removal-pooled/experiments"
+paths = ["2026-11-17-fretish-order-only-remove-pooled", "fretish-order-only-remove-pooled", "fretish-order-only-remove-pooled-reduced", "results-fretish-order-only-remove-pooled-runs"]
+paper = "ext"
+status = "cited"
+question = "RQ2 strength and diversity"
+campaign = "2026-11-17-fretish-order-only-remove-pooled"
+date = "2026-11-17"
+purpose = "Pooled pass of `only-remove` against `base`."
+note = "Source of `data/pooled-share-remove.csv` and `data/pooled-balls-remove.csv`."
+
+[[set]]
+name = "fretish-order-pooled-joint"
+location = "~/projects/peredur-joint/experiments"
+paths = ["2026-11-16-fretish-order-pooled-joint", "fretish-order-pooled-joint", "fretish-order-pooled-joint-reduced"]
+paper = "ext"
+status = "supporting"
+question = "RQ2 strength and diversity"
+campaign = "2026-11-16-fretish-order-pooled-joint"
+date = "2026-11-16"
+purpose = "Joint pooled measures across arms, which the paper's draft names."
+
+[[set]]
+name = "fretish-order-removal-pooled"
+location = "~/projects/peredur-removal-pooled/experiments"
+paths = ["2026-11-17-fretish-order-removal-pooled", "fretish-order-removal-pooled", "fretish-order-removal-pooled-reduced", "2026-11-17-fretish-order-remove-no-f-pooled", "fretish-order-remove-no-f-pooled", "fretish-order-remove-no-f-pooled-reduced", "results-fretish-order-remove-no-f-exchange"]
+paper = "ext"
+status = "supporting"
+question = "RQ2 strength and diversity"
+date = "2026-11-17"
+purpose = "Pooled passes of the removal arms (`full`, `no-<f>`, `no-remove`)."
+note = "Not yet merged into the paper: its draft keeps pooled `full` and `no-<f>` as to-dos."
+
+# --- Extension paper: development, pilots and inputs --------------------------
+
+[[set]]
+name = "fretish-order-pilot"
+paths = ["2026-11-05-fretish-order-pilot"]
+paper = "ext"
+status = "pilot"
+question = "Budget"
+campaign = "2026-11-05-fretish-order-pilot"
+date = "2026-11-05"
+purpose = "One seed a host of every arm, to measure run times; its rows resumed into fretish-order."
+
+[[set]]
+name = "fretish-order-cores"
+paths = ["2026-11-09-fretish-order-cores", "results-fretish-order-cores", "results-fretish-order-cores.csv"]
+paper = "ext"
+status = "supporting"
+question = "RQ3"
+campaign = "2026-11-09-fretish-order-cores"
+date = "2026-11-09"
+commits = ["8d88c5f5", "798bf22a"]
+purpose = "rad's ten unrealisable cores, each as its own spec, under every arm; whole rad found no repair."
+note = "The cores are subjects of the pooled pass."
+
+[[set]]
+name = "fretish-order-pairs"
+paths = ["2026-11-16-fretish-order-pairs", "results-fretish-order-pairs", "results-fretish-order-pairs.csv"]
+paper = "ext"
+status = "development"
+question = "RQ2 interactions"
+campaign = "2026-11-16-fretish-order-pairs"
+date = "2026-11-16"
+commits = ["3d15f9bb"]
+purpose = "full without each of three feature pairs (climb+gate, climb+demote, blame+scale), for interactions the one-at-a-time ablation cannot attribute."
+note = "Two of its pairs involve features cut on 2026-11-17; `docs/dev/history.md` \"Measured feature interactions\" reports it."
+
+[[set]]
+name = "fretish-order-xover-rate"
+paths = ["results-fretish-order-xover-rate", "results-fretish-order-xover-rate.csv"]
+paper = "ext"
+status = "development"
+question = "Order crossover"
+campaign = "2026-11-17-fretish-order-xover-rate"
+date = "2026-11-16"
+commits = ["3c42822c"]
+purpose = "Order crossover at rates 0.1, 0.3 and 0.5 on base, lean and lean-xover over 19 subjects."
+note = "Order crossover was cut on 2026-11-17."
+
+[[set]]
+name = "fretish-order-xover-pooled"
+location = "~/projects/peredur-xover-pooled/experiments"
+paths = ["2026-11-17-fretish-order-xover-pooled", "fretish-order-xover-pooled", "fretish-order-xover-pooled-reduced"]
+paper = "ext"
+status = "development"
+question = "Order crossover"
+campaign = "2026-11-17-fretish-order-xover-pooled"
+date = "2026-11-17"
+purpose = "Pooled pass of the order-crossover arms."
+note = "Order crossover was cut on 2026-11-17."
+
+[[set]]
+name = "configs-fretish-order"
+paths = ["configs-fretish-order"]
+paper = "ext"
+status = "inputs"
+date = "2026-11-05"
+purpose = "Generated configs for the fretish-order campaigns."
+
+[[set]]
+name = "configs-fretish-seeded"
+paths = ["configs-fretish-seeded"]
+paper = "ext"
+status = "inputs"
+date = "2026-11-15"
+purpose = "Generated configs for the seeded corpus."
+
+[[set]]
+name = "configs-fretish-order-xover-rate"
+paths = ["configs-fretish-order-xover-rate"]
+paper = "ext"
+status = "inputs"
+date = "2026-11-16"
+purpose = "Generated configs for the order-crossover rate test."
+
+[[set]]
+name = "ventilator-scale"
+paths = ["2026-09-18-ventilator-scale"]
+paper = "ext"
+status = "development"
+date = "2026-09-18"
+commits = ["f0062d0f"]
+purpose = "Why whole-spec ltlsynt never decides the 114-guarantee ventilator import, and the routes tried; working notes."
+
+[[set]]
+name = "curves-fretish-order"
+paths = ["curves-fretish-order", "curves-fretish-order.csv"]
+paper = "ext"
+status = "superseded"
+superseded_by = "curves-fretish-order-v2"
+question = "RQ1 anytime"
+date = "2026-11-11"
+purpose = "First scoring of the small set's anytime curves."
+
+[[set]]
+name = "curves-fretish-order-large"
+paths = ["curves-fretish-order-large", "curves-fretish-order-large.csv"]
+paper = "ext"
+status = "superseded"
+superseded_by = "curves-fretish-order-large-v2"
+question = "RQ3 anytime"
+date = "2026-11-11"
+purpose = "First scoring of the large set's anytime curves."
+
+[[set]]
+name = "fretish-order-pooled"
+paths = ["fretish-order-pooled"]
+paper = "ext"
+status = "superseded"
+superseded_by = "fretish-order-pooled-v2"
+question = "RQ2 strength and diversity"
+campaign = "2026-11-09-fretish-order-pooled"
+date = "2026-11-10"
+purpose = "First pooled pass, voided by the audit of 2026-11-11 (see the campaign's PLAN.md)."
+
+# --- TLSF paper: cited, on the lab hosts --------------------------------------
+
+[[set]]
+name = "tlsf-rerun"
+location = "av2, av3: ~/projects/counter/experiments"
+paths = ["results-tlsf-rerun", "results-tlsf-rerun.csv", "configs-tlsf-rerun", "curves-tlsf-rerun", "curves-tlsf-rerun-rescore", "curves-tlsf-rerun-rescore-retry", "separation-recount-tlsf-rerun-s0", "analysis-tlsf-rerun"]
+paper = "tlsf"
+status = "cited"
+question = "RQ1, RQ2"
+campaign = "2026-10-07-tlsf-rerun"
+date = "2026-10-07"
+purpose = "The 2x2 (selection by status grading) over 25 TLSF families and 30 seeds, its re-score and its 65,536-word separation recount."
+note = "Seeds are split across av1, av2 and av3; `peredur-paper/data/rerun-2026-10/PROVENANCE.txt` names each input and the paper's staged copies."
+
+[[set]]
+name = "aurus-rerun"
+location = "av2, av3: ~/projects/counter/experiments"
+paths = ["results-aurus-rerun", "aurus-rerun-out", "curves-aurus-rerun", "curves-aurus-uncensored", "anytime-aurus-uncensored", "separation-aurus-uncensored", "separation-recount-aurus-rerun-s0"]
+paper = "tlsf"
+status = "cited"
+question = "RQ1, RQ2 against AuRUS"
+campaign = "2026-09-22-aurus-rerun"
+date = "2026-09-22"
+purpose = "AuRUS's side of the head-to-head, uncensored, with its curves and the 2026-10-09 separation recount."
+note = "`peredur-paper/data/rerun-2026-10/PROVENANCE-aurus.txt` records it."
+
+[[set]]
+name = "maoz-coverage-rerun"
+location = "av2, av3: ~/projects/counter/experiments"
+paths = ["results-maoz-baselines-gfix", "maoz-coverage-rerun-screen", "maoz-coverage-rerun-frontier", "maoz-coverage-rerun-relations", "maoz-peredur-pool-tlsf-rerun"]
+paper = "tlsf"
+status = "cited"
+question = "GR(1) baselines"
+campaign = "2026-10-12-maoz-coverage-rerun"
+date = "2026-10-12"
+purpose = "Coverage under implication of GLASS, JVTS-Repair and AMT13 repairs against the tlsf-rerun frontiers."
+note = "`peredur-paper/data/maoz-coverage-2026-10/PROVENANCE.txt` records it."
+
+[[set]]
+name = "pooled-rq2"
+location = "av2, av3: ~/projects/counter/experiments"
+paths = ["2026-10-06-pooled-rq2"]
+paper = "tlsf"
+status = "cited"
+question = "RQ2 strength"
+campaign = "2026-10-06-pooled-rq2"
+date = "2026-10-06"
+purpose = "Pooled strength of PEREDUR's repairs against AuRUS's screened runs."
+note = "`peredur-paper/data/strength-2026-10/PROVENANCE.txt` records it; tag `provenance/pooled-rq2`."
+
+[[set]]
+name = "fretish-mixed"
+location = "av2, av3: ~/projects/counter/experiments"
+paths = ["results-fretish-mixed", "results-fretish-mixed.csv", "curves-fretish-mixed", "configs-fretish-mixed"]
+paper = "tlsf"
+status = "cited"
+question = "FRETISH ablation"
+campaign = "2026-10-01-fretish-mixed"
+date = "2026-10-01"
+purpose = "The FRETISH runs behind the paper's `fretish-ablation-2026-10` data and the pooled RQ3 diversity pass."
+note = "Tag `provenance/pooled-rq3` keeps the diversity analysis."
+
+[[set]]
+name = "overlap"
+paths = ["2026-09-25-overlap"]
+paper = "tlsf"
+status = "cited"
+question = "RQ3 overlap"
+date = "2026-09-25"
+purpose = "Pooled-frontier overlap of PEREDUR and AuRUS repairs under implication, family by family."
+note = "`rerun-2026-10/PROVENANCE.txt` records `overlap.csv` as unchanged by the rerun."
+
+# --- TLSF paper: superseded and development ---------------------------------
+
+[[set]]
+name = "ablation-2026-07"
+paths = ["2026-07-24-ablation"]
+paper = "tlsf"
+status = "superseded"
+superseded_by = "tlsf-rerun"
+date = "2026-07-24"
+purpose = "2x2x2 factorial (selection, metric, Halstead) on FRETISH and TLSF, with the first AuRUS head-to-head on 12 families."
+
+[[set]]
+name = "aurus-h2h"
+paths = ["2026-08-14-aurus-h2h", "results-aurus-h2h", "results-aurus-h2h.csv"]
+paper = "tlsf"
+status = "superseded"
+superseded_by = "tlsf-rerun"
+date = "2026-08-14"
+commits = ["1d18cf3b", "a719a047", "3b749962"]
+purpose = "First head-to-head against AuRUS on its 26-spec corpus; AuRUS scored higher on the registered endpoint."
+note = "Then 2026-08-21-aurus-h2h-ship."
+
+[[set]]
+name = "aurus-h2h-ship"
+paths = ["2026-08-21-aurus-h2h-ship", "configs-aurus-h2h-ship"]
+paper = "tlsf"
+status = "superseded"
+superseded_by = "tlsf-rerun"
+date = "2026-08-21"
+purpose = "The head-to-head at the shipping configuration, 25 families, 20 seeds; no separation (0.502 against 0.504)."
+
+[[set]]
+name = "selection-grading"
+paths = ["2026-08-28-selection-grading", "results-curves", "results-curves.csv", "results-curves-av2.csv", "results-curves-av3.csv", "curves-grading.csv"]
+paper = "tlsf"
+status = "superseded"
+superseded_by = "tlsf-rerun"
+date = "2026-08-28"
+commits = ["1816e272"]
+purpose = "2x2 of selection by status grading on TLSF at a 400 s wall budget; curves only."
+
+[[set]]
+name = "aurus-matched"
+paths = ["2026-08-29-aurus-matched", "results-matched"]
+paper = "tlsf"
+status = "superseded"
+superseded_by = "tlsf-rerun"
+date = "2026-08-29"
+commits = ["ec0abe07"]
+purpose = "The 2x2 at AuRUS's own budget (1000 individuals, population 100), 25 families, 30 seeds."
+note = "Then 2026-09-04-aurus-rematch."
+
+[[set]]
+name = "aurus-rematch"
+paths = ["2026-09-04-aurus-rematch"]
+paper = "tlsf"
+status = "superseded"
+superseded_by = "tlsf-rerun"
+date = "2026-09-04"
+purpose = "The matched 2x2 unchanged at the post-PR-171 engine; parity with AuRUS."
+note = "The paper's file names still say rematch. Then the paper rerun of 2026-09-14."
+
+[[set]]
+name = "aurus-curves"
+paths = ["2026-09-08-aurus-curves", "curves-aurus", "curves-aurus.csv"]
+paper = "tlsf"
+status = "superseded"
+superseded_by = "aurus-rerun"
+date = "2026-09-08"
+purpose = "Maximality scoring of the rematch's AuRUS arm (596 runs, 21 families)."
+
+[[set]]
+name = "aurus-reference"
+paths = ["aurus-reference"]
+paper = "tlsf"
+status = "superseded"
+superseded_by = "aurus-rerun"
+date = "2026-09-01"
+purpose = "AuRUS reference series (aurus_full.csv, aurus_series.csv) from the August arm, read by the rematch analysis."
+
+[[set]]
+name = "separation-curves"
+paths = ["2026-09-09-separation-curves", "separation-rematch", "separation-rematch.csv", "separation-aurus", "separation-aurus.csv"]
+paper = "tlsf"
+status = "superseded"
+superseded_by = "tlsf-rerun"
+date = "2026-09-09"
+commits = ["c558f7cb"]
+purpose = "Behavioural separation over every gate-passing candidate, PEREDUR's 2x2 against AuRUS, 21 shared families."
+note = "AuRUS's side is replaced by aurus-rerun's recount."
+
+[[set]]
+name = "separation-maximal"
+paths = ["2026-09-09-separation-maximal", "separation-maximal-rematch", "separation-maximal-rematch.csv", "separation-maximal-aurus", "separation-maximal-aurus.csv"]
+paper = "tlsf"
+status = "superseded"
+superseded_by = "tlsf-rerun"
+date = "2026-09-09"
+commits = ["c558f7cb"]
+purpose = "Behavioural separation over the maximal antichain, PEREDUR's 2x2 against AuRUS."
+
+[[set]]
+name = "paper-rerun"
+paths = ["results-paper-rerun", "results-paper-rerun.csv", "results-paper-rerun-calib", "results-paper-rerun-calib.csv", "separation-paper-rerun", "separation-paper-rerun.csv"]
+paper = "tlsf"
+status = "superseded"
+superseded_by = "tlsf-rerun"
+date = "2026-09-14"
+commits = ["57fcefbe"]
+purpose = "The paper's 2x2 rerun after dropping ltlfilt --simplify, with its calibration runs and separation counts."
+
+[[set]]
+name = "status-grading"
+paths = ["2026-08-11-status-grading"]
+paper = "tlsf"
+status = "development"
+date = "2026-08-11"
+commits = ["8d212660"]
+purpose = "MRS against tiered status grading on 480 paired TLSF runs; MRS yields more (410 against 367) at more wall time, and became the default."
+
+[[set]]
+name = "accumulator"
+paths = ["2026-08-19-accumulator"]
+paper = "tlsf"
+status = "development"
+date = "2026-08-19"
+commits = ["a0acb0b7"]
+purpose = "Whether accumulating repairs across the run raises yield (79 to 81 of 100); made the default."
+
+[[set]]
+name = "weakening-arbiter"
+paths = ["2026-08-19-weakening-arbiter"]
+paper = "tlsf"
+status = "development"
+date = "2026-08-19"
+commits = ["864ae63a", "80c27902"]
+purpose = "Weakening screen on the arbiter families; 9 of 120 pairs repair only with the screen off, none the other way."
+
+[[set]]
+name = "monotone"
+paths = ["2026-08-23-monotone"]
+paper = "tlsf"
+status = "development"
+date = "2026-08-23"
+purpose = "TLSF sweep T crossing p_monotone, p_clone_assumption and elitism; the primary was null, shipped at 0.25."
+
+[[set]]
+name = "ops-weakening"
+paths = ["results-opswk-fret", "results-opswk-fret.csv", "results-opswk-tlsf", "results-opswk-tlsf.csv"]
+paper = "tlsf"
+status = "development"
+date = "2026-08-20"
+commits = ["09a5eb8f"]
+purpose = "The repaired operator grammar with the weakening screen off; the screen off gains 38 of 720 paired TLSF runs and loses none, so it shipped off."
+
+# --- Not used by a paper: engine development --------------------------------
+
+[[set]]
+name = "fretish-sweeps-2026-07-10"
+paths = ["2026-07-10-fretish-sweeps"]
+paper = "none"
+status = "development"
+date = "2026-07-10"
+purpose = "The earliest archived FRETISH sweeps (generations, population, fitness weights) on four specs."
+
+[[set]]
+name = "fretish-sweeps-2026-07-13"
+paths = ["2026-07-13-fretish-sweeps"]
+paper = "none"
+status = "superseded"
+superseded_by = "factorial"
+date = "2026-07-13"
+purpose = "The same sweeps after an engine change; 130 of 889 repair rows have pruned run directories."
+
+[[set]]
+name = "factorial"
+paths = ["2026-07-14-factorial"]
+paper = "none"
+status = "development"
+date = "2026-07-14"
+purpose = "One-factor-at-a-time FRETISH screen (sweeps A-J); first showed the weakening filter hurts."
+
+[[set]]
+name = "cj-large"
+paths = ["2026-07-15-cj-large"]
+paper = "none"
+status = "development"
+date = "2026-07-15"
+purpose = "The weakening filter as a crossed factor at 40 generations and population 1000 on FRETISH; turning it off raised implies_ideal."
+note = "20 GB, the largest set here."
+
+[[set]]
+name = "genpop-sweeps"
+paths = ["2026-07-16-genpop-sweeps"]
+paper = "none"
+status = "development"
+date = "2026-07-16"
+purpose = "Generation and population capacity sweeps on FRETISH and TLSF; the FRETISH ideal columns are stale lower bounds."
+
+[[set]]
+name = "metric"
+paths = ["2026-07-16-metric"]
+paper = "none"
+status = "development"
+date = "2026-07-16"
+purpose = "Log against direct semantic-similarity metric, 800 FRETISH runs; the direct metric was retired on 2026-10-30."
+
+[[set]]
+name = "tlsf-genpop"
+paths = ["2026-07-17-tlsf-genpop"]
+paper = "none"
+status = "development"
+date = "2026-07-17"
+purpose = "TLSF rerun testing the ltlsynt timeout guard (ltlsynt_timeout_ms = 500) later campaigns adopted."
+
+[[set]]
+name = "muc"
+paths = ["2026-07-21-muc"]
+paper = "none"
+status = "development"
+date = "2026-07-21"
+purpose = "Monolithic against MUC-guided TLSF repair; MUC mode was removed on 2026-10-30."
+
+[[set]]
+name = "padd"
+paths = ["2026-07-22-padd"]
+paper = "none"
+status = "development"
+date = "2026-07-22"
+purpose = "p_add_assumption sweep crossed with repair mode on five TLSF specs; a weak lever."
+
+[[set]]
+name = "arbiter-hp"
+paths = ["2026-07-23-arbiter-hp"]
+paper = "none"
+status = "development"
+date = "2026-07-23"
+purpose = "Sweep-W arms on the arbiter family; no repairs in any cell."
+
+[[set]]
+name = "arbiter-padd"
+paths = ["2026-07-23-arbiter-padd"]
+paper = "none"
+status = "development"
+date = "2026-07-23"
+purpose = "p_add 0.1 to 0.8 crossed with filter arms on arbiter; no repairs, so p_add is not what unlocks arbiter."
+
+[[set]]
+name = "wellsep"
+paths = ["2026-07-23-wellsep"]
+paper = "none"
+status = "development"
+date = "2026-07-23"
+purpose = "The well-separation filter crossed with output assumptions on TLSF; inert until output assumptions fire."
+
+[[set]]
+name = "libspot-soak"
+paths = ["2026-08-03-libspot-soak"]
+paper = "none"
+status = "development"
+date = "2026-08-03"
+purpose = "24-hour soak of in-process libspot on av2 and av3, 2,656 runs: drift, leaks or differing answers."
+
+[[set]]
+name = "wellsep-timing"
+paths = ["2026-08-06-wellsep-timing"]
+paper = "none"
+status = "development"
+date = "2026-08-06"
+purpose = "Well-separation every generation, once at the end, or never; every generation is cheaper."
+
+[[set]]
+name = "elitism"
+paths = ["2026-08-07-elitism", "configs-elitism", "configs-elitism-tlsf"]
+paper = "none"
+status = "development"
+date = "2026-08-07"
+purpose = "elitism_rate 0 against 0.1 under nsga2-truncate on FRETISH and TLSF; kept 0.1 on cost."
+
+[[set]]
+name = "arbiter-probe"
+paths = ["2026-08-10-arbiter-probe"]
+paper = "none"
+status = "development"
+date = "2026-08-10"
+commits = ["b093374f"]
+purpose = "Whether nsga2-apportion's yield on arbiter is family-wide; only examples/arbiter unlocks."
+
+[[set]]
+name = "seldefault"
+paths = ["results-seldefault", "results-seldefault.csv", "results-seldefault-tlsf", "results-seldefault-tlsf.csv"]
+paper = "none"
+status = "development"
+date = "2026-08-13"
+commits = ["7500759a"]
+purpose = "The selection-default A/B on FRETISH and TLSF that led to the nsga2-apportion default."
+
+[[set]]
+name = "ops-grammar"
+paths = ["results-ops-fret", "results-ops-fret.csv", "results-ops-tlsf", "results-ops-tlsf.csv"]
+paper = "none"
+status = "development"
+date = "2026-08-20"
+commits = ["201d925d"]
+purpose = "The repaired mutation and crossover grammar; TLSF repair rate 0.333 to 0.388 (p = 0.047), FRETISH 0.667 to 0.717 (p = 0.146)."
+
+[[set]]
+name = "constrained-dom"
+paths = ["results-constrained-dom.csv", "results-constrained-dom-av2.csv", "results-constrained-dom-av3.csv", "results-constrained-dom-manifest-av3.json", "results-constrained-dom-manifest-avlab12.json", "curves-constrained-dom", "curves-constrained-dom.csv"]
+paper = "none"
+status = "development"
+date = "2026-09-08"
+purpose = "Constrained-domination NSGA-II, 630 paired cases; the primary was null (McNemar p = 0.68), so it did not become the default."
+
+[[set]]
+name = "gradsel-fret-m"
+paths = ["results-gradsel-fret-m", "results-gradsel-fret-m.csv", "results-gradsel-fret-m-manifest-avlab12.json", "curves-gradsel-fret-m", "curves-gradsel-fret-m.csv", "configs-gradsel-fret"]
+paper = "none"
+status = "development"
+date = "2026-09-12"
+commits = ["c365aa51"]
+purpose = "FRETISH selection by status grading at the matched operating point, five families, 30 seeds."
+
+[[set]]
+name = "fretish-frontier-approx"
+paths = ["2026-10-01-fretish-frontier-approx"]
+paper = "none"
+status = "superseded"
+superseded_by = "fretish-order-pooled-v2"
+date = "2026-10-01"
+purpose = "Offline placement filling four rows of the October directed-against-uniform frontier table, a study cut on 2026-11-12."
+
+[[set]]
+name = "keyword-weight"
+paths = ["2026-10-06-keyword-weight"]
+paper = "none"
+status = "development"
+date = "2026-10-06"
+purpose = "Offline re-score of 4,694 FRETISH candidates under keyword-similarity weights 0.25 to 0.75; they agree, so 0.5 stayed."
+
+[[set]]
+name = "mrs-screen-rate"
+paths = ["2026-10-06-mrs-screen-rate"]
+paper = "none"
+status = "development"
+date = "2026-10-06"
+commits = ["b694a000"]
+purpose = "How often the MRS whole-specification screen fires, from 120 s runs over TLSF and FRETISH subjects."

@@ -17,6 +17,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `fingerprint_members.py` | Fingerprints pooled nodes on drawn lasso words and plans the pairs a compare phase decides. What a `kind = "fingerprint"` phase runs. |
 | `draw_black.py` | Draws lasso words that satisfy random repairs through `black`. `fingerprint_members.py` calls it. |
 | `fpdraw.cpp` | Source of the `fpdraw` tool that `fingerprint_members.py` calls to write and evaluate words. It is outside the default build: `cmake --build build-release --target fpdraw`. |
+| `catalogue.py` | Checks and renders `experiments/catalogue.toml`, which records what each result set under `experiments/` is: the paper it serves, the question, whether it is cited or superseded, and where it lives. `check` fails on an uncatalogued entry; `render` writes `experiments/CATALOGUE.md`. |
 | `pooled_design.py` | Reads the TOML design of a pooled pass (arms, seeds, contrasts) that `pool_members.py`, `fingerprint_members.py` and `pooled_reduce.py` share. |
 | `pooled_reduce.py` | Reduces a pooled pass's collected fingerprints and verdicts to strength and ball-radii tables, with Holm-corrected signed-rank tests. Run locally. |
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
@@ -35,6 +36,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `prune_third_party.sh` | Deletes what nothing reads from an installed third-party tree, before CI caches it. |
 | `import_fret.py` | Converts FRET project exports into a FRETISH `spec.json` for `examples/`. Its docstring lists every conversion rule, and its stderr summary names each requirement a lossy rule touched. Comparisons over several variables or arithmetic need z3's Python bindings, which `nix develop` provides. |
 | `test_campaign.py` | Covers `campaign.py`. No pytest; run it directly. CI's `python-tests` job runs every `test_*.py` here. |
+| `test_catalogue.py` | Covers `catalogue.py` against temporary trees, and holds the committed catalogue valid and `CATALOGUE.md` current. |
 | `test_score_campaign.py` | Covers `score_campaign.py` against a fake results tree and stub binaries. |
 | `test_pooled.py` | Covers the pooled pass: `compare_pairs.py`, `fingerprint_members.py`, `pool_members.py`, `pooled_design.py` and `pooled_reduce.py`, against stub tools. |
 | `test_score_curves.py` | Covers `score_curves.py`'s reading of a run directory, with `compare` and `maximal` stubbed. |

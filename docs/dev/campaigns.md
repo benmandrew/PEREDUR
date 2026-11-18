@@ -263,6 +263,8 @@ No blob over 500 KiB enters history. A blob in history stays in every clone, and
 
 A large output stays in its campaign directory in this machine's checkout, untracked, where `/experiments/*/*` in `.gitignore` already puts it. Never `git add -f` it. For redundancy, copy it to the same path in the av2 and av3 checkouts with `rsync -a`; a stage never runs `git clean`, so the copies survive. The archive's `PROVENANCE.json` records each such file's path and SHA-256, so any copy can be checked and the archive reads without the file.
 
+Every result set, here or in another checkout, has an entry in `experiments/catalogue.toml` saying which paper it serves, for which question, and whether that paper's numbers come from it or a later set replaced it. Add the entry when a campaign's `collect` writes the set, mark what it supersedes, and run `scripts/catalogue.py render`. `scripts/catalogue.py check` fails on an entry of `experiments/` that no set claims. `experiments/CATALOGUE.md` is the readable form.
+
 The pool under `experiments/2026-11-09-fretish-order-pooled/members/` predates the limit and is still tracked, because that campaign's `pool` phase reads it from each host's checkout.
 
 ## Testing this
