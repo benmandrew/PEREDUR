@@ -474,7 +474,7 @@ SWEEP_P: list[tuple[str, dict]] = _pruned_sweep()
 # reproduced.
 VINTAGE_KEYS: tuple[str, ...] = (
     "status_grading", "mrs_admission_order",
-    "p_condition_type", "p_scope", "p_monotone",
+    "p_condition_type", "p_scope", "p_monotone", "gate_realizable",
 )
 
 
