@@ -1,29 +1,12 @@
 # Build, lint and docs tooling
 
-Build presets, lint caching, git hooks and the documentation site.
+The developer side of the build: preset flags, lint caching, CI, git hooks and the documentation site. Build instructions are in [`docs/building.md`](../building.md).
 
 ## Build
 
-Enter the dev shell first (Nix is the primary workflow):
-
-```sh
-nix develop
-```
-
-Six presets: `debug` (ASAN+UBSAN, `build/`), `release` (`build-release/`), `relwithdebinfo`, `coverage`, `tsan` and `bench`. The table in `docs/building.md` lists their build directories.
-
-```sh
-cmake --workflow --preset debug      # configure + build + test
-cmake --workflow --preset release
-
-# Incremental build only (after initial configure):
-cmake --build build
-cmake --build build-release
-```
+[`docs/building.md`](../building.md) is the one source for building: the Nix and non-Nix workflows, the six presets and their build directories, incremental builds and installing. This section keeps what matters when changing the build itself.
 
 The release and bench presets set no `CMAKE_CXX_FLAGS`. Their former `-Wall -Werror` reached cpptrace's feature probes, `HAS_UNWIND` and `HAS_CXX_EXCEPTION_TYPE`, which failed under it, and CMake cached the failed results. `-Werror` on in-tree targets comes from `cmake/warnings.cmake` instead. On an older tree the root `CMakeLists.txt` clears that exact cached value and both probe results once.
-
-Non-Nix: requires CMake ≥ 3.25, Ninja, a C++17 compiler, `libunwind` and Node.js; CMake fetches the rest.
 
 ## Lint & Format
 
