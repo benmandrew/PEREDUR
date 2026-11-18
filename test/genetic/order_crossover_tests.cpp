@@ -25,26 +25,11 @@ namespace {
 
 constexpr std::string_view k_test_suite = "order_crossover";
 
-Requirement req(const std::string& condition, const std::string& response,
-                Timing timing) {
-    return Requirement(Formula(condition), Formula(response), std::move(timing),
-                       ConditionType::Continual);
-}
-
-Requirement removed(Requirement requirement) {
-    requirement.m_removed = true;
-    return requirement;
-}
-
 Specification spec(std::vector<Requirement> assumptions,
                    std::vector<Requirement> guarantees) {
     return Specification(std::move(assumptions), std::move(guarantees),
                          {"a", "b", "c"}, {"x", "y"});
 }
-
-Requirement assumption0() { return req("a", "b", timing::eventually()); }
-Requirement guarantee0() { return req("a", "x", timing::within_ticks(2)); }
-Requirement guarantee1() { return req("b", "y", timing::immediately()); }
 
 Specification original() {
     return spec({assumption0()}, {guarantee0(), guarantee1()});
@@ -54,7 +39,7 @@ Specification original() {
 // Q removes guarantee 1.
 Specification parent_p() {
     return spec({assumption0()},
-                {req("a", "x", timing::within_ticks(3)), guarantee1()});
+                {make_req("a", "x", timing::within_ticks(3)), guarantee1()});
 }
 Specification parent_q() {
     return spec({assumption0()}, {guarantee0(), removed(guarantee1())});
@@ -120,8 +105,8 @@ TEST(test_status_objective_index_matches_the_factory) {
 Specification conflicting(std::vector<Requirement> assumptions,
                           std::vector<Requirement> extra) {
     std::vector<Requirement> guarantees = {
-        req("a", "x", timing::immediately()),
-        req("a", "!x", timing::immediately())};
+        make_req("a", "x", timing::immediately()),
+        make_req("a", "!x", timing::immediately())};
     guarantees.insert(guarantees.end(), extra.begin(), extra.end());
     return spec(std::move(assumptions), std::move(guarantees));
 }
@@ -214,19 +199,21 @@ TEST(test_meet_is_implied_by_both_parents) {
     expect(specification_implies_by_rule(parent_p(), child) &&
                specification_implies_by_rule(parent_q(), child),
            "meet_crossover: both parents imply the child");
-    const Specification both_fixes =
-        spec({assumption0()},
-             {req("a", "x", timing::within_ticks(3)), removed(guarantee1())});
+    const Specification both_fixes = spec(
+        {assumption0()},
+        {make_req("a", "x", timing::within_ticks(3)), removed(guarantee1())});
     expect(child == both_fixes,
            "meet_crossover: the child carries both fixes, got " +
                child.to_string());
 }
 
 TEST(test_unproved_slot_takes_a_parent_on_a_coin) {
-    const Specification lhs = spec(
-        {assumption0()}, {req("a", "x", timing::after_ticks(2)), guarantee1()});
-    const Specification rhs = spec(
-        {assumption0()}, {req("a", "y", timing::after_ticks(2)), guarantee1()});
+    const Specification lhs =
+        spec({assumption0()},
+             {make_req("a", "x", timing::after_ticks(2)), guarantee1()});
+    const Specification rhs =
+        spec({assumption0()},
+             {make_req("a", "y", timing::after_ticks(2)), guarantee1()});
     for (const std::size_t coin : {0, 1}) {
         const RandomSource source = make_source({coin}, 0);
         const OrderCrossoverOutcome outcome =
@@ -243,9 +230,9 @@ TEST(test_unproved_slot_takes_a_parent_on_a_coin) {
 
 TEST(test_relink_strengthens_the_realizable_parent) {
     // R carries both fixes, U neither: U is stronger in both slots.
-    const Specification realizable =
-        spec({assumption0()},
-             {req("a", "x", timing::within_ticks(3)), removed(guarantee1())});
+    const Specification realizable = spec(
+        {assumption0()},
+        {make_req("a", "x", timing::within_ticks(3)), removed(guarantee1())});
     const Specification unrealizable = original();
     const std::optional<Specification> upper =
         assemble(specification_join(realizable, unrealizable, 1), realizable);

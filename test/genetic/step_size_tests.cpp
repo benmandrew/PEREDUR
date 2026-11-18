@@ -22,9 +22,6 @@ constexpr std::string_view k_test_suite = "step_size";
 
 constexpr std::size_t k_seeds = 200;
 
-std::vector<std::string> inputs() { return {"a", "b"}; }
-std::vector<std::string> outputs() { return {"x", "y"}; }
-
 // Only the timing arm fires, at every mutation, under full scaling.
 Config timing_only_config() {
     Config cfg;

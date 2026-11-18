@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "fixtures.hpp"
 #include "genetic/order_moves.hpp"
 #include "ltl_oracle.hpp"
 #include "prop_formula.hpp"
@@ -16,23 +17,10 @@ namespace {
 
 constexpr std::string_view k_test_suite = "order_moves";
 
-Requirement req(const std::string& condition, const std::string& response,
-                Timing timing, ConditionType ctype = ConditionType::Continual,
-                Scope scope = Scope{}) {
-    return Requirement(Formula(condition), Formula(response), std::move(timing),
-                       ctype, /*weakenable=*/true, /*removed=*/false,
-                       std::move(scope));
-}
-
 Requirement locked(const std::string& condition, const std::string& response,
                    Timing timing) {
     return Requirement(Formula(condition), Formula(response), std::move(timing),
                        ConditionType::Continual, /*weakenable=*/false);
-}
-
-Requirement removed(Requirement requirement) {
-    requirement.m_removed = true;
-    return requirement;
 }
 
 Specification spec(std::vector<Requirement> assumptions,
@@ -44,13 +32,9 @@ Specification spec(std::vector<Requirement> assumptions,
 Scope in_m() { return Scope{ScopeKind::In, "m"}; }
 Scope only_in_m() { return Scope{ScopeKind::OnlyIn, "m"}; }
 
-// The original most tests move away from: one assumption, two guarantees.
-Requirement assumption0() { return req("a", "b", timing::eventually()); }
-Requirement guarantee0() { return req("a", "x", timing::within_ticks(2)); }
-Requirement guarantee1() { return req("b", "y", timing::immediately()); }
-Requirement appended_u() { return req("true", "c", timing::eventually()); }
-Requirement appended_v() { return req("c", "a", timing::eventually()); }
-Requirement appended_w() { return req("true", "b", timing::eventually()); }
+Requirement appended_u() { return make_req("true", "c", timing::eventually()); }
+Requirement appended_v() { return make_req("c", "a", timing::eventually()); }
+Requirement appended_w() { return make_req("true", "b", timing::eventually()); }
 
 Specification original() {
     return spec({assumption0()}, {guarantee0(), guarantee1()});
@@ -79,7 +63,7 @@ TEST(test_classify_move_equal) {
 TEST(test_classify_move_guarantee_timing) {
     const Specification looser =
         spec({assumption0()},
-             {req("a", "x", timing::within_ticks(3)), guarantee1()});
+             {make_req("a", "x", timing::within_ticks(3)), guarantee1()});
     expect_order(original(), looser, MoveOrder::Weaker, "within 2 to within 3");
     expect_order(looser, original(), MoveOrder::Stronger,
                  "within 3 to within 2");
@@ -88,7 +72,7 @@ TEST(test_classify_move_guarantee_timing) {
 // A stronger assumption weakens `A -> G`.
 TEST(test_classify_move_assumption_side_flips) {
     const Specification tighter =
-        spec({req("a", "b & c", timing::eventually())},
+        spec({make_req("a", "b & c", timing::eventually())},
              {guarantee0(), guarantee1()});
     expect_order(original(), tighter, MoveOrder::Weaker,
                  "a stronger assumption");
@@ -122,17 +106,18 @@ TEST(test_classify_move_tombstone) {
 
 TEST(test_classify_move_combines_slots) {
     const Specification both_weaker =
-        spec({assumption0()}, {req("a", "x", timing::within_ticks(3)),
-                               req("b", "x | y", timing::immediately())});
+        spec({assumption0()}, {make_req("a", "x", timing::within_ticks(3)),
+                               make_req("b", "x | y", timing::immediately())});
     expect_order(original(), both_weaker, MoveOrder::Weaker,
                  "two weaker slots");
     const Specification mixed =
-        spec({assumption0()}, {req("a", "x", timing::within_ticks(3)),
-                               req("b", "x & y", timing::immediately())});
+        spec({assumption0()}, {make_req("a", "x", timing::within_ticks(3)),
+                               make_req("b", "x & y", timing::immediately())});
     expect_order(original(), mixed, MoveOrder::Incomparable,
                  "one weaker and one stronger slot");
-    const Specification sideways = spec(
-        {assumption0()}, {guarantee0(), req("b", "x", timing::immediately())});
+    const Specification sideways =
+        spec({assumption0()},
+             {guarantee0(), make_req("b", "x", timing::immediately())});
     expect_order(original(), sideways, MoveOrder::Incomparable,
                  "a sideways response");
 }
@@ -140,26 +125,26 @@ TEST(test_classify_move_combines_slots) {
 // --- requirement_join and requirement_meet -----------------------------------
 
 TEST(test_bound_of_comparable_pair_is_an_input) {
-    const Requirement tight = req("a", "x", timing::within_ticks(2));
-    const Requirement loose = req("a", "x", timing::within_ticks(3));
+    const Requirement tight = make_req("a", "x", timing::within_ticks(2));
+    const Requirement loose = make_req("a", "x", timing::within_ticks(3));
     expect_requirement(requirement_join(loose, tight), tight, "join");
     expect_requirement(requirement_meet(tight, loose), loose, "meet");
 }
 
 TEST(test_bound_of_responses) {
-    const Requirement lhs = req("a", "x", timing::immediately());
-    const Requirement rhs = req("a", "y", timing::immediately());
+    const Requirement lhs = make_req("a", "x", timing::immediately());
+    const Requirement rhs = make_req("a", "y", timing::immediately());
     expect_requirement(requirement_join(lhs, rhs),
-                       req("a", "x & y", timing::immediately()), "join");
+                       make_req("a", "x & y", timing::immediately()), "join");
     expect_requirement(requirement_meet(lhs, rhs),
-                       req("a", "x | y", timing::immediately()), "meet");
+                       make_req("a", "x | y", timing::immediately()), "meet");
 }
 
 // The response sits under a negation in an only scope.
 TEST(test_bound_of_responses_swaps_under_only_scope) {
     const auto only = [](const std::string& response) {
-        return req("a", response, timing::immediately(),
-                   ConditionType::Continual, only_in_m());
+        return make_req("a", response, timing::immediately(),
+                        ConditionType::Continual, only_in_m());
     };
     expect_requirement(requirement_join(only("x"), only("y")), only("x | y"),
                        "join");
@@ -169,93 +154,95 @@ TEST(test_bound_of_responses_swaps_under_only_scope) {
 
 // `after n ticks` holds its response at both polarities.
 TEST(test_bound_of_after_responses_is_unproved) {
-    const Requirement lhs = req("a", "x", timing::after_ticks(2));
-    const Requirement rhs = req("a", "y", timing::after_ticks(2));
+    const Requirement lhs = make_req("a", "x", timing::after_ticks(2));
+    const Requirement rhs = make_req("a", "y", timing::after_ticks(2));
     expect(!requirement_join(lhs, rhs).has_value(), "join under after");
     expect(!requirement_meet(lhs, rhs).has_value(), "meet under after");
 }
 
 TEST(test_bound_of_continual_conditions) {
-    const Requirement lhs = req("a", "x", timing::immediately());
-    const Requirement rhs = req("b", "x", timing::immediately());
+    const Requirement lhs = make_req("a", "x", timing::immediately());
+    const Requirement rhs = make_req("b", "x", timing::immediately());
     expect_requirement(requirement_join(lhs, rhs),
-                       req("a | b", "x", timing::immediately()), "join");
+                       make_req("a | b", "x", timing::immediately()), "join");
     expect_requirement(requirement_meet(lhs, rhs),
-                       req("a & b", "x", timing::immediately()), "meet");
+                       make_req("a & b", "x", timing::immediately()), "meet");
 }
 
 TEST(test_bound_of_trigger_conditions) {
     const Requirement lhs =
-        req("a", "x", timing::immediately(), ConditionType::Trigger);
+        make_req("a", "x", timing::immediately(), ConditionType::Trigger);
     const Requirement rhs =
-        req("b", "x", timing::immediately(), ConditionType::Trigger);
+        make_req("b", "x", timing::immediately(), ConditionType::Trigger);
     expect_requirement(requirement_join(lhs, rhs),
-                       req("a | b", "x", timing::immediately()),
+                       make_req("a | b", "x", timing::immediately()),
                        "join turns continual");
     expect(!requirement_meet(lhs, rhs).has_value(),
            "meet of inequivalent triggers");
 }
 
 TEST(test_bound_of_timings) {
-    const Requirement lhs = req("a", "x", timing::immediately());
-    const Requirement rhs = req("a", "y", timing::next_timepoint());
+    const Requirement lhs = make_req("a", "x", timing::immediately());
+    const Requirement rhs = make_req("a", "y", timing::next_timepoint());
     expect_requirement(requirement_join(lhs, rhs),
-                       req("a", "x & y", timing::for_ticks(1)), "join");
+                       make_req("a", "x & y", timing::for_ticks(1)), "join");
     expect_requirement(requirement_meet(lhs, rhs),
-                       req("a", "x | y", timing::within_ticks(1)), "meet");
+                       make_req("a", "x | y", timing::within_ticks(1)), "meet");
 }
 
 // `after 2` and `after 3` are incomparable and nothing implies both, but both
 // imply `within 4`, one tick past the larger count.
 TEST(test_bound_of_after_timings) {
-    const Requirement lhs = req("a", "x", timing::after_ticks(2));
-    const Requirement rhs = req("a", "x", timing::after_ticks(3));
+    const Requirement lhs = make_req("a", "x", timing::after_ticks(2));
+    const Requirement rhs = make_req("a", "x", timing::after_ticks(3));
     expect(!requirement_join(lhs, rhs).has_value(), "join of two afters");
     expect_requirement(requirement_meet(lhs, rhs),
-                       req("a", "x", timing::within_ticks(4)), "meet");
+                       make_req("a", "x", timing::within_ticks(4)), "meet");
 }
 
 TEST(test_bound_of_condition_types) {
     const Requirement lhs =
-        req("a", "x", timing::immediately(), ConditionType::Trigger);
-    const Requirement rhs = req("a", "y", timing::immediately());
+        make_req("a", "x", timing::immediately(), ConditionType::Trigger);
+    const Requirement rhs = make_req("a", "y", timing::immediately());
     expect_requirement(requirement_join(lhs, rhs),
-                       req("a", "x & y", timing::immediately()), "join");
+                       make_req("a", "x & y", timing::immediately()), "join");
     expect_requirement(
         requirement_meet(lhs, rhs),
-        req("a", "x | y", timing::immediately(), ConditionType::Trigger),
+        make_req("a", "x | y", timing::immediately(), ConditionType::Trigger),
         "meet");
 }
 
 TEST(test_bound_of_scopes) {
-    const Requirement lhs = req("a", "x", timing::immediately());
-    const Requirement rhs =
-        req("a", "y", timing::immediately(), ConditionType::Continual, in_m());
+    const Requirement lhs = make_req("a", "x", timing::immediately());
+    const Requirement rhs = make_req("a", "y", timing::immediately(),
+                                     ConditionType::Continual, in_m());
     expect_requirement(requirement_join(lhs, rhs),
-                       req("a", "x & y", timing::immediately()), "join");
+                       make_req("a", "x & y", timing::immediately()), "join");
     expect_requirement(requirement_meet(lhs, rhs),
-                       req("a", "x | y", timing::immediately(),
-                           ConditionType::Continual, in_m()),
+                       make_req("a", "x | y", timing::immediately(),
+                                ConditionType::Continual, in_m()),
                        "meet");
 }
 
 TEST(test_bound_of_stops) {
-    const Requirement lhs = req("a", "x", timing::until(Formula("s")));
-    const Requirement rhs = req("a", "x", timing::until(Formula("t")));
+    const Requirement lhs = make_req("a", "x", timing::until(Formula("s")));
+    const Requirement rhs = make_req("a", "x", timing::until(Formula("t")));
     expect_requirement(requirement_join(lhs, rhs),
-                       req("a", "x", timing::until(Formula("s & t"))), "join");
+                       make_req("a", "x", timing::until(Formula("s & t"))),
+                       "join");
     expect_requirement(requirement_meet(lhs, rhs),
-                       req("a", "x", timing::until(Formula("s | t"))), "meet");
+                       make_req("a", "x", timing::until(Formula("s | t"))),
+                       "meet");
 }
 
 // `x & (x | y)` is `x`, and the bound keeps the simpler spelling.
 TEST(test_bound_keeps_simpler_field) {
-    const Requirement lhs = req("a", "x", timing::immediately());
-    const Requirement rhs = req("a", "x | y", timing::next_timepoint());
+    const Requirement lhs = make_req("a", "x", timing::immediately());
+    const Requirement rhs = make_req("a", "x | y", timing::next_timepoint());
     expect_requirement(requirement_join(lhs, rhs),
-                       req("a", "x", timing::for_ticks(1)), "join");
+                       make_req("a", "x", timing::for_ticks(1)), "join");
     expect_requirement(requirement_meet(lhs, rhs),
-                       req("a", "x | y", timing::within_ticks(1)), "meet");
+                       make_req("a", "x | y", timing::within_ticks(1)), "meet");
 }
 
 TEST(test_bound_of_locked_requirements) {
@@ -280,7 +267,7 @@ TEST(test_specification_bound_tombstones) {
 }
 
 TEST(test_specification_bound_flips_assumptions) {
-    const Requirement tighter = req("a", "b & c", timing::eventually());
+    const Requirement tighter = make_req("a", "b & c", timing::eventually());
     const Specification lhs = spec({tighter}, {guarantee0(), guarantee1()});
     const SlotwiseBound join = specification_join(lhs, original(), 1);
     const SlotwiseBound meet = specification_meet(lhs, original(), 1);
@@ -309,10 +296,12 @@ TEST(test_specification_bound_appended_assumptions) {
 }
 
 TEST(test_specification_bound_unproved_slot) {
-    const Specification lhs = spec(
-        {assumption0()}, {req("a", "x", timing::after_ticks(2)), guarantee1()});
-    const Specification rhs = spec(
-        {assumption0()}, {req("a", "y", timing::after_ticks(2)), guarantee1()});
+    const Specification lhs =
+        spec({assumption0()},
+             {make_req("a", "x", timing::after_ticks(2)), guarantee1()});
+    const Specification rhs =
+        spec({assumption0()},
+             {make_req("a", "y", timing::after_ticks(2)), guarantee1()});
     const SlotwiseBound join = specification_join(lhs, rhs, 1);
     expect(!join.m_guarantees[0].has_value(), "the after slot is unproved");
     expect_requirement(join.m_guarantees[1], guarantee1(),
@@ -324,8 +313,8 @@ TEST(test_specification_bound_unproved_slot) {
 // Two slots whose joins coincide would merge in the constructor and shift
 // every later slot.
 TEST(test_assemble_refuses_a_merge) {
-    const Requirement tight = req("a", "x", timing::within_ticks(2));
-    const Requirement loose = req("a", "x", timing::within_ticks(3));
+    const Requirement tight = make_req("a", "x", timing::within_ticks(2));
+    const Requirement loose = make_req("a", "x", timing::within_ticks(3));
     const Specification lhs = spec({}, {tight, loose});
     const Specification rhs = spec({}, {loose, tight});
     const SlotwiseBound join = specification_join(lhs, rhs, 0);
@@ -336,9 +325,9 @@ TEST(test_assemble_refuses_a_merge) {
 // --- steps_towards -----------------------------------------------------------
 
 TEST(test_steps_towards_every_kind) {
-    const Specification current =
-        spec({req("a", "b & c", timing::eventually()), appended_u()},
-             {req("a", "x", timing::within_ticks(4)), removed(guarantee1())});
+    const Specification current = spec(
+        {make_req("a", "b & c", timing::eventually()), appended_u()},
+        {make_req("a", "x", timing::within_ticks(4)), removed(guarantee1())});
     const std::vector<Step> steps = steps_towards(current, original());
     expect(steps.size() == 4,
            "steps_towards: four steps, got " + std::to_string(steps.size()));
@@ -371,12 +360,12 @@ TEST(test_steps_towards_every_kind) {
 TEST(test_steps_towards_sideways_slot) {
     const Specification current =
         spec({assumption0()},
-             {req("a", "y", timing::within_ticks(2)), guarantee1()});
+             {make_req("a", "y", timing::within_ticks(2)), guarantee1()});
     const std::vector<Step> steps = steps_towards(current, original());
     expect(steps.size() == 1 && steps[0].m_field == RequirementField::Response,
            "steps_towards: one response step");
     expect(steps[0].m_result.m_guarantees[0] ==
-               req("a", "y & x", timing::within_ticks(2)),
+               make_req("a", "y & x", timing::within_ticks(2)),
            "steps_towards: the response moves to the join, got " +
                steps[0].m_result.m_guarantees[0].to_string());
 }
@@ -474,8 +463,8 @@ std::vector<Requirement> requirement_family() {
                 for (const ConditionType ctype :
                      {ConditionType::Continual, ConditionType::Trigger}) {
                     for (const Scope& scope : scopes) {
-                        family.push_back(
-                            req(condition, response, timing, ctype, scope));
+                        family.push_back(make_req(condition, response, timing,
+                                                  ctype, scope));
                     }
                 }
             }

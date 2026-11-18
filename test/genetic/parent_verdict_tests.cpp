@@ -27,9 +27,6 @@ namespace {
 
 constexpr std::string_view k_test_suite = "parent_verdict";
 
-std::vector<std::string> inputs() { return {"a", "b"}; }
-std::vector<std::string> outputs() { return {"x", "y"}; }
-
 Specification spec_of(std::vector<Requirement> guarantees) {
     return Specification({}, std::move(guarantees), inputs(), outputs());
 }
