@@ -457,6 +457,85 @@ TEST(test_config_io_removed_operator_keys_warn_and_are_ignored) {
     }
 }
 
+// The full warning for every removed key, pinned word for word: campaign
+// scripts and readers match on these lines, so moving the hints into a table
+// must not change one.
+TEST(test_config_io_retired_key_hints_are_pinned) {
+    const std::vector<std::pair<std::string, std::string>> expected = {
+        {"fitness.weight_halstead",
+         "removed: the Halstead objective no longer exists"},
+        {"mutation.strengthen_assumptions",
+         "removed: assumptions are always mutated in the strengthening "
+         "direction"},
+        {"tlsf.mutation.p_union_assumption",
+         "removed: the union crossover no longer exists"},
+        {"tlsf.mutation.p_monotone",
+         "removed: set [mutation] p_monotone, which both paths read"},
+        {"tlsf.mutation.connective_implies",
+         "removed: the case (2d) graft always offers ->"},
+        {"tlsf.mutation.monotone_atom_rules",
+         "removed: the monotone rewrite always offers every rule"},
+        {"tlsf.mutation.monotone_extra_rules",
+         "removed: the monotone rewrite always offers every rule"},
+        {"filters.run_weakening",
+         "removed: the final weakening screen no longer exists"},
+        {"filters.run_well_separation",
+         "removed: the status score and the output gate enforce "
+         "well-separation"},
+        {"filters.run_vacuity",
+         "removed: vacuity now always runs per generation"},
+        {"mutation.allow_output_assumptions",
+         "removed: output assumptions are always allowed"},
+        {"tlsf.mutation.p_remove_assumption", "removed with its operator"},
+        {"tlsf.mutation.p_burst_continue", "removed with its operator"},
+        {"runtime.ganak_timeout_ms", "removed: ganak runs without a timeout"},
+        {"tlsf.mutation.max_assumption_width",
+         "removed: an appended assumption's body is one literal"},
+        {"tlsf.mutation.p_bare_assumption",
+         "removed: an appended fairness assumption is always G F"},
+        {"model_counting.metric",
+         "removed: trace counts always combine on the logarithmic metric"},
+        {"genetic.accumulate_repairs",
+         "removed: every run accumulates gate-passing repairs"},
+        {"fitness.keyword_similarity",
+         "removed: the keyword orders always join the semantic objective, at "
+         "weight 1/2"},
+        {"fitness.semantic_trace_weight",
+         "removed: the keyword orders always join the semantic objective, at "
+         "weight 1/2"},
+        {"tlsf.repair_mode",
+         "removed: TLSF repair always evolves the whole specification; the "
+         "mucs tool still extracts cores"},
+        {"tlsf.muc_max_iterations",
+         "removed: TLSF repair always evolves the whole specification; the "
+         "mucs tool still extracts cores"},
+        {"runtime.max_concurrent_realizability",
+         "removed: no concurrency cap; bound RAM with runtime.parallel"},
+        {"runtime.dashboard", "removed: the live dashboard no longer exists"},
+    };
+    for (const auto& [path, hint] : expected) {
+        const std::size_t dot = path.rfind('.');
+        std::string toml = "[";
+        toml += path.substr(0, dot);
+        toml += "]\n";
+        toml += path.substr(dot + 1);
+        toml += " = 1\n";
+        std::string line = "config: unknown key ";
+        line += path;
+        line += " (";
+        line += hint;
+        line += "), ignoring\n";
+        const std::string warnings = warnings_from(toml);
+        std::string message = "config_io: the warning for ";
+        message += path;
+        message += " should read exactly: ";
+        message += line;
+        message += "got: ";
+        message += warnings;
+        expect(warnings == line, message);
+    }
+}
+
 TEST(test_config_io_unknown_section_warns) {
     const std::string warnings = warnings_from("[genetics]\ngenerations = 5\n");
     expect(warnings.find("unknown section [genetics]") != std::string::npos,
