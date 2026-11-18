@@ -13,5 +13,5 @@
 - `--allow-stale-binary` is only for reproducing an archive at its recorded commit or topping up rows a later commit did not affect. Never use it to skip a rebuild.
 - The crontab line must not wrap `tick` in `flock`: the tick then deadlocks on its own lock and logs nothing that reads as an error. `campaign.py cron --print` emits the correct line.
 - `KEY_FIELDS` in `merge_experiments.py` and the resume key in `run_experiments.py` are off limits, and `commit`/`dirty` never join either.
-- Launch-path changes are tested with `python3 scripts/test_campaign.py` against stubs, never on a lab host. Read its closing summary, since it reports every failure at the end.
+- Launch-path changes are tested with `python3 scripts/test_campaign.py` against stubs, never on a lab host, and changes to a phase's script with `test_score_campaign.py` or `test_pooled.py`. Read each closing summary, since each reports every failure at the end.
 - Remote shell scripts never contain a bare glob, because the hosts' zsh aborts on `NOMATCH`.
