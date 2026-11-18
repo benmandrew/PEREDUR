@@ -32,7 +32,7 @@ The budget itself mirrors `max_scoring_failure_rate`: count failures within a st
 
 ## What this does not cover, deliberately
 
-The final survivor gate keeps throwing. It is the enforcement point, so swallowing an error there means writing a repair nothing checked, and that is worse than losing the run. `is_realizable_repair` short-circuits on the memoised status score, so `first_failing_check` only runs for candidates already about to be written — the loss is real but it lands on a completed search, and no budget makes emitting an unverified repair acceptable.
+The final survivor gate keeps throwing. It is the enforcement point, so swallowing an error there means writing a repair nothing checked, and that is worse than losing the run. `passes_output_gate` (`src/genetic/output_gate.cpp`) short-circuits on the memoised status score, so `first_failing_check` only runs for candidates already about to be written — the loss is real but it lands on a completed search, and no budget makes emitting an unverified repair acceptable.
 
 The standalone binaries (`mucs`, `realize`, `lint_ideals`) are one-shot tools where terminating on a tool failure is the correct behaviour and the message is already the output.
 

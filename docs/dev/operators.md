@@ -113,9 +113,9 @@ The After scope keeps the Global order. In, NotIn and Before drop the edges from
 
 `p_remove_guarantee` (default 0.05, matching `p_add_assumption`) deletes one FRETISH guarantee or one TLSF conjunct from PRESET, ASSERT and GUARANTEE. Some ideals need it: amba, full-arbiter, load-balancer, prioritized-arbiter and round-robin-arbiter have only `drop-*` ideals. `lint-ideals`' `reachable` check asserts a guarantee side may shrink, never grow, to a floor of one.
 
-A deleted guarantee is *tombstoned in place, never erased* (`Requirement::m_removed`, `tlsf::SectionEntry::m_removed`), because specifications pair by position: `average_timing_similarity` and both semantic-similarity folds zip by index and crossovers write back into the source slot.
+A deleted guarantee is *tombstoned in place, never erased* (`Requirement::m_removed`, `tlsf::SectionEntry::m_removed`), because specifications pair by position: `average_keyword_similarity` and both semantic-similarity folds zip by index and crossovers write back into the source slot.
 
-The flag is in `operator<`, `operator==` and `hash`, so a deleted guarantee cannot inherit a live one's cached fitness. Every requirement-list reader skips tombstones: LTL lowering, status components and the MRS index map, vacuity, well-separation, the bloat cap, `all_implied_by_some`, the timing, mutation and simplification pools, MUC extraction and the guarantee-part split. Crossover never draws a tombstone, so removal is mutation's alone. `tlsf::SectionEntry` converts implicitly from `Formula` but not back, so a new read site fails to compile.
+The flag is in `operator<`, `operator==` and `hash`, so a deleted guarantee cannot inherit a live one's cached fitness. Every requirement-list reader skips tombstones: LTL lowering, status components and the MRS index map, vacuity, well-separation, the bloat cap, the implication filter's lowering and rule cover (`src/filter/implication_check.cpp`), the timing, mutation and simplification pools, MUC extraction and the guarantee-part split. Crossover never draws a tombstone, so removal is mutation's alone. `tlsf::SectionEntry` converts implicitly from `Formula` but not back, so a new read site fails to compile.
 
 `to_json` and `tlsf::write` omit tombstones, so a written repair carries no flag to misread.
 

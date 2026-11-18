@@ -28,7 +28,7 @@ The lowering is in `src/requirement.cpp`. Each scope adds an outer wrapper and a
 
 **A mode travels with a non-Global move.** `notin m` implies `before m` and nothing about `before m'`, so only a move off Global draws from `Specification::m_modes`.
 
-**Syntactic similarity averages five terms.** They are condition, response, timing, scope and condition type, in both overloads in `src/fitness/syntactic_similarity.cpp`. The last three pair by index (`average_timing_similarity`, `average_scope_similarity`, `average_condition_type_similarity`), because slot *i* of a candidate descends from slot *i* of the original. Timing and condition type are *Jaccard* overlaps of downward closures in the field's implication order, so neither carries a chosen penalty.
+**Syntactic similarity averages five terms.** They are condition, response, timing, scope and condition type, in both overloads in `src/fitness/syntactic_similarity.cpp`. The last three pair by index, through one `average_keyword_similarity` called once per field, because slot *i* of a candidate descends from slot *i* of the original. Timing and condition type are *Jaccard* overlaps of downward closures in the field's implication order, so neither carries a chosen penalty.
 
 **A stop timing is scored outside the timing measure**, so every stop-free pair keeps its value. Across kinds, the only overlap is `until s` inside the downset of Always, one element of weight 0.01 against 2.04 + 0.01; `before s` shares nothing with any other kind. Two timings of the same stop kind average the kind match with the syntactic similarity of their stops, as the scope term averages regions with the mode.
 

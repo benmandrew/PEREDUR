@@ -10,7 +10,7 @@ Enter the dev shell first (Nix is the primary workflow):
 nix develop
 ```
 
-Two presets — `debug` (ASAN+UBSAN, `build/`) and `release` (`build-release/`):
+Six presets: `debug` (ASAN+UBSAN, `build/`), `release` (`build-release/`), `relwithdebinfo`, `coverage`, `tsan` and `bench`. The table in `docs/building.md` lists their build directories.
 
 ```sh
 cmake --workflow --preset debug      # configure + build + test
