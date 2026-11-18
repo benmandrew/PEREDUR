@@ -48,7 +48,7 @@ $ UBUNTU_MIRROR=http://mirrors.ukfast.co.uk/sites/archive.ubuntu.com \
       scripts/build_vm_image.sh benmandrew/peredur:$(git rev-parse --short HEAD)
 ```
 
-The knob exists because of one build machine's network. On 2026-09-11 Canonical's archive served a small file to that machine at 13 KB/s and then timed out, and `security.ubuntu.com` timed out at 30 s. d2vm's kernel install sat in apt for 36 minutes without finishing. From the same machine, `http://mirrors.ukfast.co.uk/sites/archive.ubuntu.com` served 1.8 MB at 12 MB/s.
+The knob exists for a build machine on which Canonical's archive was too slow for d2vm's kernel install to finish ("Ubuntu mirror" in [the history notes](dev/history.md)).
 
 ## Importing the appliance
 
@@ -93,20 +93,7 @@ Every VM imported from one `.ova` would otherwise share an identity. The layerin
 
 ## Testing
 
-The disk was tested on 2026-09-11. It was booted under QEMU (Quick Emulator) with the Kernel-based Virtual Machine (KVM), on VirtualBox's default hardware: an AHCI disk, an e1000 network adapter and BIOS firmware. It was then checked over SSH on a forwarded port. The checks that passed:
-
-- SSH answered 5 s after power-on.
-- The tty1 autologin was active.
-- `/etc/environment` supplied `PATH` and the `PEREDUR_*` variables to a non-interactive `ssh` command.
-- `peredur --version` ran, and `realize $PEREDUR_EXAMPLES/lily02/spec.tlsf` printed `UNREALIZABLE`.
-- A two-generation `peredur` run wrote `run.json`, and `scp` copied it out.
-- `sudo` worked.
-- The SSH host keys and `/etc/machine-id` were generated at first boot.
-- The apt sources named the mirror.
-
-`scripts/build_vm_image.sh`, run on that machine with `UBUNTU_MIRROR` set to the mirror above, took 1 min 55 s. The `.ova` it wrote is 171 MB and the `.vdi` 448 MB.
-
-The appliance has not been booted in VirtualBox itself. The build machine runs Ubuntu 22.04.5 with kernel 6.8.0-138 and VirtualBox 6.1.50 from Ubuntu's packages. There VirtualBox intermittently halted VMs with *Guru Meditation* -2708 (`VERR_VMM_SET_JMP_ABORTED_RESUME`) within milliseconds of power-on, at the BIOS reset vector. A freshly created VM with no disk attached halted the same way. The fault is therefore in that host's VirtualBox, and says nothing about the appliance.
+The disk was last tested on 2026-09-11, booted under QEMU (Quick Emulator) with the Kernel-based Virtual Machine (KVM) on VirtualBox's default hardware and checked over SSH. The appliance has not been booted in VirtualBox itself. "VM testing" in [the history notes](dev/history.md) lists the checks, the build time and sizes, and the VirtualBox fault on the build machine.
 
 ## Memory and CPUs
 
