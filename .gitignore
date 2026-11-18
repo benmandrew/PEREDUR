@@ -66,6 +66,9 @@ semantics.txt
 # at the campaign subdirectory — run dirs and CSVs are never walked.
 /experiments*/*
 !/experiments/*/
+# The catalogue of the result sets above (scripts/catalogue.py).
+!/experiments/catalogue.toml
+!/experiments/CATALOGUE.md
 /experiments/*/*
 !/experiments/*/PROVENANCE.json
 # A campaign's pre-registered plan, where one was written before it launched.
