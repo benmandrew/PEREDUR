@@ -1,0 +1,85 @@
+name = "2026-11-18-fretish-exchange-rerun"
+branch = "campaign/seeded-corpus-sideways"
+profile = "fretish-exchange-rerun"
+description = "The gate's exchange mode became the default on 18 Nov (user), so every paper arm with the gate on is rerun under it: full (remove-exchange), no-remove (lean-exchange), no-climb, no-blame and only-gate, with remove-no-gate and base under the same load, on the small set, rad's cores, rad, lift-plus-cruise-full and ventilator-controller."
+
+# Shares 2026-11-18-seeded-corpus-sideways's branch and commit, so the tick
+# needs no restage when that entry ends; the queue runs this entry after it on
+# each host. Seeds pair with each spec's base: small set and cores av2 0-14,
+# av3 15-29; rad and ventilator-controller 0-4 and 15-19; lift-plus-cruise-full
+# 0-2 and 15-17. Launch approved by the user on 18 Nov.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+# The small set at 2 threads a run, as fretish-order-remove-no-f ran; the
+# large specs with no parallel line, so threads are CPUs over jobs.
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps D\"; $G --parallel 2 --out-dir experiments/configs-fretish-exchange-rerun && $G --out-dir experiments/configs-fretish-exchange-rerun-large'"
+
+# 19 subjects x 7 arms x 15 seeds = 1,995 runs per host, 14 jobs x 2 threads.
+# CPUs 30-31 stay free for the Ollama server.
+[[phases]]
+name = "small-av2"
+profile = "fretish-exchange-rerun"
+hosts = { av2 = "0-14" }
+confine = { av2 = { cpus = "0-29", memory_max = "64G" } }
+jobs = 14
+
+[[phases]]
+name = "small-av3"
+profile = "fretish-exchange-rerun"
+hosts = { av3 = "15-29" }
+confine = { av3 = { cpus = "0-29", memory_max = "64G" } }
+jobs = 14
+
+# rad: 6 arms x 5 seeds = 30 runs per host; 7 jobs over 30 CPUs give 4
+# threads a run, as base's rad runs had.
+[[phases]]
+name = "rad-av2"
+profile = "fretish-exchange-rerun-large"
+specs = ["rad"]
+hosts = { av2 = "0-4" }
+confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 7
+
+[[phases]]
+name = "rad-av3"
+profile = "fretish-exchange-rerun-large"
+specs = ["rad"]
+hosts = { av3 = "15-19" }
+confine = { av3 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 7
+
+# ventilator-controller: full alone, 5 runs per host at 4 threads; every run
+# is expected to reach the 7,200 s cap.
+[[phases]]
+name = "vent-av2"
+profile = "fretish-exchange-rerun-vent"
+hosts = { av2 = "0-4" }
+confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 7
+
+[[phases]]
+name = "vent-av3"
+profile = "fretish-exchange-rerun-vent"
+hosts = { av3 = "15-19" }
+confine = { av3 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 7
+
+# lift-plus-cruise-full: 6 arms x 3 seeds = 18 runs per host, 3 jobs x 10
+# threads, as base's and the removal arms' runs had. About 45-90 min a run.
+[[phases]]
+name = "lpc-av2"
+profile = "fretish-exchange-rerun-large"
+specs = ["lift-plus-cruise-full"]
+hosts = { av2 = "0-2" }
+confine = { av2 = { cpus = "0-29", memory_max = "110G" } }
+jobs = 3
+
+[[phases]]
+name = "lpc-av3"
+profile = "fretish-exchange-rerun-large"
+specs = ["lift-plus-cruise-full"]
+hosts = { av3 = "15-17" }
+confine = { av3 = { cpus = "0-29", memory_max = "110G" } }
+jobs = 3

@@ -822,6 +822,71 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-seeded-sideways.csv",
         "default_jobs": 8,
     },
+    # The gate's exchange mode became the default on 18 Nov, so the paper's
+    # full is lean-remove with it. Reruns the arms with the gate on (full,
+    # no-remove, no-climb, no-blame, only-gate) under exchange on the small set
+    # and rad's cores, with remove-no-gate and base under the same load so the
+    # wall-time contrasts pair within one campaign
+    # (experiments/2026-11-18-fretish-exchange-rerun).
+    "fretish-exchange-rerun": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D"],
+        "levels": {"D": ["remove-exchange", "lean-exchange", "remove-no-climb-exchange",
+                         "remove-no-gate", "remove-no-blame-exchange",
+                         "only-gate-exchange",
+                         "base"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES)},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-exchange-rerun",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-exchange-rerun",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-exchange-rerun.csv",
+        "default_jobs": 8,
+    },
+    # The same arms, less base, on whole rad and lift-plus-cruise-full. No
+    # parallel line: threads come from CPUs over jobs, as base's did.
+    "fretish-exchange-rerun-large": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D"],
+        "levels": {"D": ["remove-exchange", "lean-exchange", "remove-no-climb-exchange",
+                         "remove-no-gate", "remove-no-blame-exchange",
+                         "only-gate-exchange"]},
+        "specs": ["rad", "lift-plus-cruise-full"],
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in ["rad", "lift-plus-cruise-full"]},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-exchange-rerun-large",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-exchange-rerun-large",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-exchange-rerun-large.csv",
+        "default_jobs": 4,
+    },
+    # The new full alone on ventilator-controller, whose full predated removal.
+    "fretish-exchange-rerun-vent": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D"],
+        "levels": {"D": ["remove-exchange"]},
+        "specs": ["ventilator-controller"],
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in ["ventilator-controller"]},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-exchange-rerun-large",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-exchange-rerun-vent",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-exchange-rerun-vent.csv",
+        "default_jobs": 4,
+    },
     # The removal-based ablation on whole rad and lift-plus-cruise-full:
     # lean-remove (the paper's full), its no-<f> (lean is no-remove), only-remove
     # and sweep O's only-<f>, against fretish-order-large's base
