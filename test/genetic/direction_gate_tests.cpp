@@ -24,9 +24,6 @@ constexpr std::string_view k_test_suite = "direction_gate";
 
 constexpr std::size_t k_seeds = 400;
 
-std::vector<std::string> inputs() { return {"a", "b"}; }
-std::vector<std::string> outputs() { return {"x", "y"}; }
-
 // The original: one fairness assumption and three guarantees.
 Specification original_spec() {
     return Specification(

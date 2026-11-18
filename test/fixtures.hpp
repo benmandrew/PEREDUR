@@ -33,8 +33,35 @@ inline RandomSource make_source(std::vector<std::size_t> values,
 
 inline Requirement make_req(const std::string& trigger,
                             const std::string& response,
-                            Timing timing = timing::immediately()) {
-    return Requirement{Formula(trigger), Formula(response), std::move(timing)};
+                            Timing timing = timing::immediately(),
+                            ConditionType ctype = ConditionType::Continual,
+                            Scope scope = Scope{}) {
+    return Requirement{Formula(trigger),    Formula(response),
+                       std::move(timing),   ctype,
+                       /*weakenable=*/true,
+                       /*removed=*/false,   std::move(scope)};
+}
+
+/// @p requirement, tombstoned.
+inline Requirement removed(Requirement requirement) {
+    requirement.m_removed = true;
+    return requirement;
+}
+
+/// The inputs a, b and outputs x, y most specifications here are over.
+inline std::vector<std::string> inputs() { return {"a", "b"}; }
+inline std::vector<std::string> outputs() { return {"x", "y"}; }
+
+/// The original the order-search suites move away from: one assumption and two
+/// guarantees.
+inline Requirement assumption0() {
+    return make_req("a", "b", timing::eventually());
+}
+inline Requirement guarantee0() {
+    return make_req("a", "x", timing::within_ticks(2));
+}
+inline Requirement guarantee1() {
+    return make_req("b", "y", timing::immediately());
 }
 
 /// One immediate `trigger -> response` guarantee and no assumptions.

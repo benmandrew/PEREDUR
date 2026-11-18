@@ -8,6 +8,7 @@
 
 #include "config.hpp"
 #include "fitness/syntactic_similarity.hpp"
+#include "fixtures.hpp"
 #include "genetic/climb.hpp"
 #include "genetic/order_moves.hpp"
 #include "genetic/output_gate.hpp"
@@ -20,17 +21,6 @@ namespace {
 
 constexpr std::string_view k_test_suite = "climb";
 
-Requirement req(const std::string& condition, const std::string& response,
-                Timing timing, ConditionType ctype = ConditionType::Continual) {
-    return Requirement(Formula(condition), Formula(response), std::move(timing),
-                       ctype);
-}
-
-Requirement removed(Requirement requirement) {
-    requirement.m_removed = true;
-    return requirement;
-}
-
 Specification spec(std::vector<Requirement> assumptions,
                    std::vector<Requirement> guarantees) {
     return Specification(std::move(assumptions), std::move(guarantees), {"req"},
@@ -40,10 +30,15 @@ Specification spec(std::vector<Requirement> assumptions,
 // A request is granted at once, and grant never holds: unrealizable, since
 // the environment may request.
 Requirement grant_now() {
-    return req("req", "grant", timing::immediately(), ConditionType::Trigger);
+    return make_req("req", "grant", timing::immediately(),
+                    ConditionType::Trigger);
 }
-Requirement never_grant() { return req("true", "!grant", timing::always()); }
-Requirement never_request() { return req("true", "!req", timing::always()); }
+Requirement never_grant() {
+    return make_req("true", "!grant", timing::always());
+}
+Requirement never_request() {
+    return make_req("true", "!req", timing::always());
+}
 
 Specification conflict() { return spec({}, {grant_now(), never_grant()}); }
 
@@ -63,10 +58,10 @@ std::size_t within_count(const Specification& candidate, std::size_t slot) {
 // one tick at a time stops.
 TEST(test_bisection_matches_a_linear_walk) {
     const Specification original =
-        spec({}, {req("req", "grant", timing::within_ticks(1))});
+        spec({}, {make_req("req", "grant", timing::within_ticks(1))});
     constexpr std::size_t k_from = 9;
     const Specification start =
-        spec({}, {req("req", "grant", timing::within_ticks(k_from))});
+        spec({}, {make_req("req", "grant", timing::within_ticks(k_from))});
     for (std::size_t threshold = 1; threshold <= k_from; ++threshold) {
         const ClimbPredicate accepts =
             [threshold](const Specification& candidate) {
@@ -75,9 +70,10 @@ TEST(test_bisection_matches_a_linear_walk) {
                 return within != nullptr && within->m_ticks >= threshold;
             };
         std::size_t linear = k_from;
-        while (linear > 1 &&
-               accepts(spec({}, {req("req", "grant",
-                                     timing::within_ticks(linear - 1))}))) {
+        while (
+            linear > 1 &&
+            accepts(spec({}, {make_req("req", "grant",
+                                       timing::within_ticks(linear - 1))}))) {
             --linear;
         }
         const std::vector<Step> steps = steps_towards(start, original);
@@ -126,11 +122,11 @@ void expect_permutation(const std::vector<Step>& steps,
 }
 
 TEST(test_orders_are_permutations_of_the_steps) {
-    const Specification original =
-        spec({}, {req("req", "grant", timing::within_ticks(1)), never_grant()});
+    const Specification original = spec(
+        {}, {make_req("req", "grant", timing::within_ticks(1)), never_grant()});
     const Specification start = spec(
-        {never_request()},
-        {req("req", "grant", timing::within_ticks(4)), removed(never_grant())});
+        {never_request()}, {make_req("req", "grant", timing::within_ticks(4)),
+                            removed(never_grant())});
     const std::vector<Step> slot = steps_towards(start, original);
     expect(slot.size() == 3,
            "climb: a timing step, a restore and a drop, got " +
@@ -165,9 +161,9 @@ TEST(test_orders_are_permutations_of_the_steps) {
 TEST(test_climbed_repair_is_maximal_over_its_steps) {
     const Specification original = conflict();
     const Specification start = spec(
-        {never_request()},
-        {req("req", "grant", timing::within_ticks(3), ConditionType::Trigger),
-         never_grant()});
+        {never_request()}, {make_req("req", "grant", timing::within_ticks(3),
+                                     ConditionType::Trigger),
+                            never_grant()});
     Config cfg;
     const ClimbPredicate gate = climb_gate(cfg, nullptr);
     expect(!passes_output_gate(original, cfg),
@@ -202,10 +198,10 @@ TEST(test_climbed_repair_is_maximal_over_its_steps) {
 // the gate refuses, and the timing still climbs.
 TEST(test_climb_restores_only_what_stays_realizable) {
     const Specification original = conflict();
-    const Specification start = spec(
-        {},
-        {req("req", "grant", timing::within_ticks(5), ConditionType::Trigger),
-         removed(never_grant())});
+    const Specification start =
+        spec({}, {make_req("req", "grant", timing::within_ticks(5),
+                           ConditionType::Trigger),
+                  removed(never_grant())});
     Config cfg;
     const std::vector<Specification> climbed =
         climb_repairs({start, start}, original, cfg, climb_gate(cfg, nullptr));
@@ -224,9 +220,9 @@ TEST(test_climb_restores_only_what_stays_realizable) {
 TEST(test_extra_orders_give_distinct_results) {
     const Specification original = conflict();
     const Specification start = spec(
-        {never_request()},
-        {req("req", "grant", timing::within_ticks(3), ConditionType::Trigger),
-         removed(never_grant())});
+        {never_request()}, {make_req("req", "grant", timing::within_ticks(3),
+                                     ConditionType::Trigger),
+                            removed(never_grant())});
     Config cfg;
     cfg.climb_orders = 4;
     const ClimbPredicate gate = climb_gate(cfg, nullptr);
