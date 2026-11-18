@@ -17,13 +17,13 @@ The verbs are `stage` (put a host on the branch and rebuild it), `enqueue` plus 
 A campaign is one directory, `experiments/<name>/`, holding `campaign.toml` and, where it answers a question, the pre-registered `PLAN.md`:
 
 ```toml
-name = "arbiter-probe"          # must equal the directory name
-branch = "feat/arbiter-probe"   # the branch every host runs from
-profile = "arbiter-probe"       # default profile for phases that omit one
-build = "cmake --build build-release"   # optional, this is the default
-configs = "python3 scripts/gen_configs.py --sweeps C --out-dir experiments/configs-arbiter-probe"  # optional, no default
-hosts = { av2 = "0-99", av3 = "100-199" }
-phases = [ { profile = "arbiter-probe", jobs = 4 } ]
+name = "2026-11-16-fretish-order-pairs"   # must equal the directory name
+branch = "campaign/fretish-order-pairs"   # the branch every host runs from
+profile = "fretish-order-pairs"           # default profile for phases that omit one
+build = "cmake --build build-release"     # optional, this is the default
+configs = "python3 scripts/gen_configs.py --sweeps O --out-dir experiments/configs-fretish-order-pairs"  # optional, no default
+hosts = { av2 = "0-14", av3 = "15-29" }
+phases = [ { profile = "fretish-order-pairs", jobs = 4 } ]
 ```
 
 `configs` runs on the host during `stage`, after the build and before the version check so a failing generator reports as itself, in a subshell so `&&` behaves as written. It has no default, since no line suits every campaign and config trees are untracked.
@@ -47,8 +47,8 @@ The CPU set goes through `taskset` because `-p AllowedCPUs=` does nothing on the
 ## Staging a host
 
 ```sh
-python scripts/campaign.py stage arbiter-probe --dry-run   # probe only
-python scripts/campaign.py stage arbiter-probe
+python scripts/campaign.py stage 2026-11-16-fretish-order-pairs --dry-run   # probe only
+python scripts/campaign.py stage 2026-11-16-fretish-order-pairs
 ```
 
 `stage` pushes the branch, then on each host fetches it, checks out the pushed commit, builds, runs `configs`, checks the configs directory of every phase's profile, and confirms `build-release/peredur --version` names that commit with `dirty=0`. A failing host is reported and nothing launches. The configs check runs even with no `configs` key, because `run_experiments.py` exits 1 on a directory holding no `.toml` and a queued campaign would spend its attempts discovering that one tick at a time.
@@ -239,8 +239,8 @@ An entry with no frozen commit refuses; run `stage` by hand.
 ## Collecting and closing
 
 ```sh
-python scripts/campaign.py collect --profile tlsf --dry-run
-python scripts/campaign.py collect --profile tlsf
+python scripts/campaign.py collect --profile fretish-order-pairs --dry-run
+python scripts/campaign.py collect --profile fretish-order-pairs
 ```
 
 `collect` rsyncs each host's results and merges on the natural key through `merge_experiments.py`, verifying a union rather than a sum: disjoint ranges overlap on nothing, a re-collect on everything, and only the union separates either from a silent loss. A host that answers with nothing prints INCOMPLETE, since arithmetic over the hosts that answered agrees with itself. For a profile absent from `run_experiments.PROFILES` (an unmerged branch, or a retired campaign), give `--csv` and `--results-dir`; `collect` refuses to guess.
@@ -269,8 +269,10 @@ The pool under `experiments/2026-11-09-fretish-order-pooled/members/` predates t
 
 ```sh
 python3 scripts/test_campaign.py
+python3 scripts/test_score_campaign.py
+python3 scripts/test_pooled.py
 ```
 
-A plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. It never touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `PEREDUR_RUNNER_CMD`, `PEREDUR_SCORER_CMD`, `PEREDUR_COMPARE_PAIRS_CMD`, `PEREDUR_FINGERPRINT_CMD` and `PEREDUR_POOL_CMD` stubs that record their arguments. `compare_pairs.py` runs against a stub `compare`, and `fingerprint_members.py` against a stub `fpdraw` and draw script. `score_campaign.py` uses a fake results tree, a `PEREDUR_SCORE_CURVES_CMD` stub, and stub binaries under `PEREDUR_BIN_DIR`. New launch-path code must be tested the same way.
+`test_campaign.py` covers `campaign.py`; `test_score_campaign.py` and `test_pooled.py` cover the phase scripts it calls. Each is a plain script, no pytest, that reports every failure together at the end; read the summary, not the first `FAIL`. None touches a lab machine: remote output is captured, `collect` uses throwaway checkouts, and stage and queue paths use temporary git repositories with `PEREDUR_RUNNER_CMD`, `PEREDUR_SCORER_CMD`, `PEREDUR_COMPARE_PAIRS_CMD`, `PEREDUR_FINGERPRINT_CMD` and `PEREDUR_POOL_CMD` stubs that record their arguments. `compare_pairs.py` runs against a stub `compare`, and `fingerprint_members.py` against a stub `fpdraw` and draw script. `score_campaign.py` uses a fake results tree, a `PEREDUR_SCORE_CURVES_CMD` stub, and stub binaries under `PEREDUR_BIN_DIR`. New launch-path code must be tested the same way.
 
 `campaign.py` reads TOML through `tomllib`, which the hosts' Python 3.12 provides, and falls back to `tomli` on Python 3.10. Remote shell scripts never use bare globs, since zsh's `NOMATCH` aborts on an unmatched pattern and every later section vanishes in silence.
