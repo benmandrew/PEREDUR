@@ -58,6 +58,7 @@ import sys
 import time
 
 import pooled_design as D
+from common import write_manifest
 
 REPAIR = re.compile(r"^repair_(\d+)\.json$")
 
@@ -182,14 +183,6 @@ def copy_pool(subject: dict, src_dir: str, out: str) -> tuple:
     shutil.copyfile(src, dest + ".part")
     os.replace(dest + ".part", dest)
     return rows, int(rows[0]["nodes_total"]), sha
-
-
-def write_manifest(path: str, manifest: dict) -> None:
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w") as handle:
-        handle.write(json.dumps(manifest, indent=2) + "\n")
-    os.replace(tmp, path)
 
 
 def checkout_head() -> dict:

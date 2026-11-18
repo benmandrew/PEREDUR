@@ -68,8 +68,6 @@ import array
 import collections
 import csv
 import glob
-import gzip
-import json
 import math
 import multiprocessing
 import os
@@ -77,6 +75,7 @@ import random
 import statistics
 import sys
 
+import common
 import pooled_design as D
 
 MODES = ("decided", "imp", "non")
@@ -85,8 +84,9 @@ MODES = ("decided", "imp", "non")
 # ── inputs ──────────────────────────────────────────────────────────────────
 
 def load_nodes(members_dir: str, subject: str) -> list:
-    with gzip.open(os.path.join(members_dir, f"{subject}.jsonl.gz"), "rt") as h:
-        nodes = [json.loads(line) for line in h if line.strip()]
+    """common.load_nodes, refusing a pool whose nodes are not numbered
+    0..n-1."""
+    nodes = common.load_nodes(members_dir, subject)
     if [n["node"] for n in nodes] != list(range(len(nodes))):
         sys.exit(f"pooled_reduce: {subject}: nodes are not numbered 0..n-1")
     return nodes

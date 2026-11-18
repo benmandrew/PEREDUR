@@ -30,7 +30,6 @@ Stdlib only, on python 3.10: this runs on the lab hosts from a cron tick.
 """
 
 import argparse
-import json
 import os
 import platform
 import queue
@@ -48,6 +47,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import run_experiments as R  # noqa: E402
+from common import write_manifest  # noqa: E402
 
 REPO_ROOT = Path(__file__).parent.parent
 
@@ -402,12 +402,6 @@ def build_manifest(args, results: Path, out: Path, versions: dict, head,
     }
 
 
-def write_manifest(path: Path, manifest: dict) -> None:
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(manifest, indent=2) + "\n")
-    os.replace(tmp, path)
-
-
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -539,7 +533,8 @@ def main(argv=None) -> int:
     started = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     manifest = build_manifest(args, results, out, versions, head, pinned,
                               timeout_bin, counts, started)
-    write_manifest(manifest_path(out), manifest)
+    write_manifest(manifest_path(out), manifest,
+                   make_parents=False)
 
     child_env = dict(os.environ)
     child_env.setdefault("MAXIMAL_BIN", str(MAXIMAL_BIN))
@@ -550,7 +545,8 @@ def main(argv=None) -> int:
     counts.update({"scored": ledger.scored, "failed": ledger.failed})
     manifest["counts"] = dict(counts)
     manifest["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    write_manifest(manifest_path(out), manifest)
+    write_manifest(manifest_path(out), manifest,
+                   make_parents=False)
     missing = [r for r in runs if not is_scored(csv_path(out, r))]
     print(f"\nDone: {counts['scored']} scored, {counts['failed']} failed, "
           f"{counts['already_scored']} already there; "
