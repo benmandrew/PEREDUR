@@ -143,6 +143,7 @@ target_sources(peredur_fitness PRIVATE
     src/genetic/order_crossover.cpp
     src/genetic/climb.cpp
     src/genetic/order_moves.cpp
+    src/genetic/pipeline.cpp
     src/genetic/simplify.cpp
     src/tlsf/fitness.cpp
     src/tlsf/mutation.cpp
