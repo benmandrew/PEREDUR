@@ -795,9 +795,10 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-seeded-remove.csv",
         "default_jobs": 8,
     },
-    # The paper's seeded arms on the sideways corpus, at one commit: full
-    # (lean-remove), no-remove (lean), each remove-no-<f>, only-remove and
-    # base from sweep D, and each only-<f> from sweep O
+    # The paper's seeded arms on the sideways corpus, at one commit, with the
+    # gate's exchange mode wherever the gate is on: full (remove-exchange),
+    # no-remove (lean-exchange), each remove-no-<f>-exchange, only-gate-exchange,
+    # only-remove and base from sweep D, and only-climb and only-blame from O
     # (experiments/2026-11-18-seeded-corpus-sideways/PLAN.md).
     "fretish-seeded-sideways": {
         "schemes": ["nsga2-apportion"],
@@ -805,10 +806,11 @@ PROFILES: dict[str, dict] = {
         "metrics": ["log"],
         "repair_modes": None,
         "sweeps": ["D", "O"],
-        "levels": {"D": ["lean-remove", "lean", "remove-no-climb",
-                         "remove-no-gate", "remove-no-blame", "only-remove",
-                         "base"],
-                   "O": ["only-climb", "only-gate", "only-blame"]},
+        "levels": {"D": ["remove-exchange", "lean-exchange",
+                         "remove-no-climb-exchange", "remove-no-gate-exchange",
+                         "remove-no-blame-exchange", "only-gate-exchange",
+                         "only-remove", "base"],
+                   "O": ["only-climb", "only-blame"]},
         "specs": list(SIDEWAYS_SPECS),
         "seeds": list(range(5)),
         "timeout_caps": {s: 7200 for s in SIDEWAYS_SPECS},
