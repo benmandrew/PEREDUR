@@ -46,7 +46,7 @@ std::vector<LassoWord> sample_words(const std::vector<std::string>& signals,
 /// An atom no word names is false at every position. That covers the `false`
 /// constant and a signal the specification declares without a word carrying
 /// it; `true` is recognised by name, as it is everywhere else in the codebase
-/// (is_constant_atom in src/requirement.cpp).
+/// (is_constant_atom in src/prop_formula/atoms.hpp).
 ///
 /// @throws std::invalid_argument if @p formula does not render to a string
 ///         this codebase's own parser reads back.

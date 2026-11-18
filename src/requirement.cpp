@@ -11,16 +11,9 @@
 #include <variant>
 #include <vector>
 
-namespace {
+#include "prop_formula/atoms.hpp"
 
-// "true"/"false" are logical constants, not user atoms: they are special-cased
-// throughout (requirement_to_ltl, condition_to_string,
-// specification_has_false_condition, Formula::simplify) and are boolean
-// constants to SPOT/black. Prefixing them would turn a constant into a free
-// atom and break that handling, so they are never tagged.
-bool is_constant_atom(const std::string& name) {
-    return name == "true" || name == "false";
-}
+namespace {
 
 std::string prefix_atom_name(const std::string& name) {
     if (is_constant_atom(name)) {
