@@ -52,7 +52,13 @@ Times are UTC on 2026-11-18.
 - 06:08:03 (av3) and 06:09:16 (av2). Build and configs done. Work lists: av2 795 items (465 required, 330 optional), av3 575 items (355 required, 220 optional). Four lanes started on each host.
 - 06:20. 21 items done on av2 and 22 on av3, with no failures.
 - 06:00. veribee-ab released av2 CPUs 16-23 and av3 CPUs 8-15 and raised its own memory cap to 20G per host. This run's CPUs and 8G cap are unchanged.
+- 07:31 and 07:39 (av3). CPUs 29 and 28 stopped at their 07:30 cutoff, as planned. Both hosts finished the small set (135 runs each) by 07:42.
+- 08:30 (av2). CPUs 20-23 stopped at their cutoff, as planned, with 280 of 465 required items done. CPUs 30-31 took over at 09:00.
+- 10:40:52 (av2). Required block done. CPUs 30-31 moved on to the optional block.
+- 10:49 (av3). Finished: all 575 items done (355 required, 220 optional), none untaken.
+- 11:59:30 (av2). Hard stop. The driver killed one running optional item (`rad__s22-23-26-51-52__m07`, seed 1), which has no row and is excluded. av2 finished 670 items (465 required, 205 optional: seed 0 complete, seed 1 95 of 110, seed 2 not started). Both units are inactive.
+- Totals: 1245 items done, no failures, no retries, no skips. Mean time per item 83 s on av2 and 77 s on av3.
 
 ## Result
 
-Not run yet.
+See `REPORT.md`. The merged arm results are in `data/`, the analysis scripts are in `scripts/`, and their output is in `analysis/`, untracked.
