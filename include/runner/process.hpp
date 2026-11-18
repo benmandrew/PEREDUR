@@ -167,13 +167,6 @@ struct PipedChild {
 PipedChild spawn_piped_child(const std::vector<std::string>& arguments,
                              ParentDeathPolicy policy, ExecutableLookup lookup);
 
-/// Reads `read_fd` until the writer closes it, or until `timeout` expires.
-/// Returns what was read and whether the deadline was hit; on a timeout the
-/// content is partial and the caller still owns the kill and the reap. Zero
-/// means no deadline, which is the only way this can block indefinitely.
-std::pair<std::string, bool> read_until_eof(int read_fd,
-                                            std::chrono::milliseconds timeout);
-
 /// Applies the child half of the containment policy: puts the child in its own
 /// process group, and applies `policy`. Call only between fork() and exec(),
 /// where it must stay async-signal-safe; under KillWithParentThread it _exit()s
