@@ -32,7 +32,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 EXAMPLES = REPO / "examples"
 
 # Example -> system cluster. Examples written for this project that share a

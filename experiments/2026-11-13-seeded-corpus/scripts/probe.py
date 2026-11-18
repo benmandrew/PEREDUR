@@ -25,7 +25,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 BIN = REPO / "build-release"
 CONFIG = (REPO / "experiments" / "configs-fretish-seeded" / "nsga2-apportion"
           / "wkoff" / "log" / "sweep_O_base.toml")

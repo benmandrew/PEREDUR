@@ -49,7 +49,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 BIN = REPO / "build-release"
 
 # --------------------------------------------------------------------------

@@ -19,7 +19,6 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `fpdraw.cpp` | Source of the `fpdraw` tool that `fingerprint_members.py` calls to write and evaluate words. It is outside the default build: `cmake --build build-release --target fpdraw`. |
 | `pooled_design.py` | Reads the TOML design of a pooled pass (arms, seeds, contrasts) that `pool_members.py`, `fingerprint_members.py` and `pooled_reduce.py` share. |
 | `pooled_reduce.py` | Reduces a pooled pass's collected fingerprints and verdicts to strength and ball-radii tables, with Holm-corrected signed-rank tests. Run locally. |
-| `seeded/` | Builds the seeded mutant corpus of `experiments/2026-11-13-seeded-corpus` (`bases.py`, `seed.py`, `probe.py`, `choose.py`) and reduces its results (`analyse.py`). |
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
 | `merge_experiments.py` | Joins per-host CSVs on `KEY_FIELDS`, keeping one row per key. Vendored likewise. |
 | `common.py` | Helpers several scripts share: `write_manifest`, `git_field`, `load_nodes` and `lean_output`. A script vendored into a campaign archive takes it along. |
