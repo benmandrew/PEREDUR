@@ -1,6 +1,6 @@
 # Experiment Scripts
 
-Scripts for running and scoring parameter sweep experiments. Analysis scripts are vendored into the campaign they analyse and are not kept here.
+Scripts for running, scoring and analysing campaigns, and the helpers that CI, the Docker image and the proofs use. Analysis that a campaign phase runs, or that more than one campaign reads, is kept here. An analysis written for one campaign alone is kept in that campaign's `experiments/<campaign>/scripts/`.
 
 ## What is in here
 
@@ -11,16 +11,34 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `campaign.py` | The operating surface for a campaign: `stage`, `enqueue`, `tick`, `status`, `queue`, `collect`. Everything that acts on a campaign goes through it. See `docs/dev/campaigns.md` for the state each verb leaves behind. |
 | `run_experiments.py` | Runs one phase of a sweep on one host and appends rows to the results CSV. Vendored into every campaign archive. |
 | `score_campaign.py` | The runner's scoring twin: one `score_curves.py --maximality` per run directory over one host's seeds, under a pinned worker pool, with a manifest of the budgets and binaries. What a `kind = "score"` phase runs. |
+| `score_curves.py` | Scores one finished run's accumulated repairs as curves over time (solutions, ideal, maximal and maximal-ideal, plus time to first repair). `score_campaign.py` runs it once per run directory. |
+| `compare_pairs.py` | Runs `compare` once per row of a planned pair list, under a memory and wall cap. What a `kind = "compare"` phase runs. |
+| `pool_members.py` | Pools each subject's repairs over its seeds and arms into distinct nodes. Run locally after `collect`, or on a host by a `kind = "pool"` phase. |
+| `fingerprint_members.py` | Fingerprints pooled nodes on drawn lasso words and plans the pairs a compare phase decides. What a `kind = "fingerprint"` phase runs. |
+| `draw_black.py` | Draws lasso words that satisfy random repairs through `black`. `fingerprint_members.py` calls it. |
+| `fpdraw.cpp` | Source of the `fpdraw` tool that `fingerprint_members.py` calls to write and evaluate words. It is outside the default build: `cmake --build build-release --target fpdraw`. |
+| `pooled_design.py` | Reads the TOML design of a pooled pass (arms, seeds, contrasts) that `pool_members.py`, `fingerprint_members.py` and `pooled_reduce.py` share. |
+| `pooled_reduce.py` | Reduces a pooled pass's collected fingerprints and verdicts to strength and ball-radii tables, with Holm-corrected signed-rank tests. Run locally. |
+| `seeded/` | Builds the seeded mutant corpus of `experiments/2026-11-13-seeded-corpus` (`bases.py`, `seed.py`, `probe.py`, `choose.py`) and reduces its results (`analyse.py`). |
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
 | `merge_experiments.py` | Joins per-host CSVs on `KEY_FIELDS`, keeping one row per key. Vendored likewise. |
 | `check_config_schema.py` | Lint, wired into CI and the pre-commit hook. Holds `gen_configs.DEFAULTS` against the defaults in the generated `example-config.toml`. |
 | `coverage_badge.py` | Measures coverage and writes `docs/coverage.svg`. `--check` fails on drift; CI rewrites and commits the badge when it does. |
-| `check_well_separated.py` | Standalone `ltlsynt` well-separation check that bypasses PEREDUR's cached verdict. |
+| `check_blob_size.sh` | Rejects a blob over 500 KiB, on staged files from the pre-commit hook and over a pull request's range in CI. |
+| `check_lean_lowering.py` | Checks that the Lean model of the lowering in `proofs/` agrees with the C++ `ltl` driver, formula by formula, through SPOT. |
+| `check_lean_scope_order.py` | Checks the Lean `scopeImplies` table against the C++ `scope_implies`, cell by cell. |
+| `check_lean_timing_order.py` | Checks the Lean `timingImplies` table against the C++ `timing_implies`, cell by cell. |
+| `field_orders.py` | Measures the FRETISH timing, scope and condition-type orders and field polarities from the engine's lowering and Spot. |
+| `docker_build.sh` | Builds the PEREDUR Docker image, stamped with the commit and whether the tree is dirty. |
+| `docker_smoke.sh` | Runs a built image through one short call per tool it carries. CI's Docker job runs it. |
+| `build_vm_image.sh` | Builds a VirtualBox appliance (`.ova`) from a PEREDUR Docker image. |
+| `prune_third_party.sh` | Deletes what nothing reads from an installed third-party tree, before CI caches it. |
 | `import_fret.py` | Converts FRET project exports into a FRETISH `spec.json` for `examples/`. Its docstring lists every conversion rule, and its stderr summary names each requirement a lossy rule touched. Comparisons over several variables or arithmetic need z3's Python bindings, which `nix develop` provides. |
 | `test_campaign.py` | Covers `campaign.py`. No pytest; run it directly. CI's `python-tests` job runs every `test_*.py` here. |
+| `test_score_curves.py` | Covers `score_curves.py`'s reading of a run directory, with `compare` and `maximal` stubbed. |
 | `test_experiment_paths.py` | Covers the factor-path parsers and the resume-key invariants in `run_experiments.py` and `gen_configs.py`. |
+| `make_core_specs.py` | Writes each unrealisable core of the large FRETISH examples as its own example. `--check` exits 1 if one is stale. |
 | `test_import_fret.py` | Covers `import_fret.py` over a synthetic export, including property tests of its domain constraints. No pytest; run it directly inside `nix develop`, which provides z3's Python bindings. |
-| `test_domain_constraints_lpc.py` | Checks `import_fret.py`'s domain constraints against the hand-written ones in the two Lift-Plus-Cruise examples, then runs `realize` to confirm they reproduce every realizability claim of the paper. Needs a built `realize` (`PEREDUR_REALIZE`, default `build-release/realize`). |
 
 A campaign's own `experiments/<campaign>/scripts/` holds verbatim copies of the scripts that ran it, so the archive reproduces without the git history. Those copies are frozen at the commit named in the campaign's `PROVENANCE.json`; the versions here are the maintained ones, and the two are expected to diverge.
 
