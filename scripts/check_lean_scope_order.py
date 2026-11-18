@@ -27,23 +27,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+from common import lean_output
+
 REPO = Path(__file__).resolve().parent.parent
 
 Key = tuple[str, str, str, str, str]
 Table = dict[Key, str]
-
-
-def lean_output(args: argparse.Namespace) -> str:
-    if args.lean_output is not None:
-        return args.lean_output.read_text()
-    return subprocess.run(
-        ["lake", "env", "lean", "--run", "ScopeOrderTable.lean"],
-        cwd=REPO / "proofs",
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=1800,
-    ).stdout
 
 
 def cpp_output(helper: Path) -> str:
@@ -88,7 +77,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    lean = parse(lean_output(args), "Lean")
+    lean = parse(lean_output(args, "ScopeOrderTable.lean"), "Lean")
     cpp = parse(cpp_output(args.helper), "C++")
     if lean.keys() != cpp.keys():
         only_lean = sorted(lean.keys() - cpp.keys())

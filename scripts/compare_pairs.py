@@ -35,7 +35,6 @@ Stdlib only, on python 3.10: this runs on the lab hosts from a cron tick.
 
 import argparse
 import csv
-import json
 import os
 import shutil
 import socket
@@ -46,6 +45,8 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+from common import git_field, write_manifest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUILD = REPO_ROOT / "build-release"
@@ -149,23 +150,6 @@ def compare_version(binary: str) -> dict:
         if sep:
             out[key.strip()] = value.strip()
     return out
-
-
-def git_field(*argv: str) -> str:
-    try:
-        proc = subprocess.run(["git", "-C", str(REPO_ROOT), *argv],
-                              capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):
-        return "?"
-    return proc.stdout.strip() or "?"
-
-
-def write_manifest(path: str, manifest: dict) -> None:
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w") as handle:
-        handle.write(json.dumps(manifest, indent=2) + "\n")
-    os.replace(tmp, path)
 
 
 def parse_args(argv=None) -> argparse.Namespace:

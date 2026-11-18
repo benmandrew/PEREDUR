@@ -22,6 +22,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `seeded/` | Builds the seeded mutant corpus of `experiments/2026-11-13-seeded-corpus` (`bases.py`, `seed.py`, `probe.py`, `choose.py`) and reduces its results (`analyse.py`). |
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
 | `merge_experiments.py` | Joins per-host CSVs on `KEY_FIELDS`, keeping one row per key. Vendored likewise. |
+| `common.py` | Helpers several scripts share: `write_manifest`, `git_field`, `load_nodes` and `lean_output`. A script vendored into a campaign archive takes it along. |
 | `check_config_schema.py` | Lint, wired into CI and the pre-commit hook. Holds `gen_configs.DEFAULTS` against the defaults in the generated `example-config.toml`. |
 | `coverage_badge.py` | Measures coverage and writes `docs/coverage.svg`. `--check` fails on drift; CI rewrites and commits the badge when it does. |
 | `check_blob_size.sh` | Rejects a blob over 500 KiB, on staged files from the pre-commit hook and over a pull request's range in CI. |

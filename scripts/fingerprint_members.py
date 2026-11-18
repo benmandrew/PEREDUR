@@ -50,7 +50,6 @@ Stdlib only, on python 3.10: this runs on the lab hosts from a cron tick.
 
 import argparse
 import csv
-import gzip
 import hashlib
 import json
 import os
@@ -61,6 +60,7 @@ import time
 from pathlib import Path
 
 import pooled_design
+from common import git_field, load_nodes, write_manifest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUILD = REPO_ROOT / "build-release"
@@ -83,11 +83,6 @@ PAIRS_HEADER = ["id", "a_path", "b_path", "dirs"]
 
 def log(*parts) -> None:
     print(time.strftime("%H:%M:%S"), *parts, flush=True)
-
-
-def load_nodes(members_dir: str, subject: str) -> list:
-    with gzip.open(os.path.join(members_dir, f"{subject}.jsonl.gz"), "rt") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
 
 
 def node_path(work: str, subject: str, node: int) -> str:
@@ -292,23 +287,6 @@ def version_of(binary: str) -> dict:
         if sep:
             out[key.strip()] = value.strip()
     return out
-
-
-def git_field(*argv: str) -> str:
-    try:
-        proc = subprocess.run(["git", "-C", str(REPO_ROOT), *argv],
-                              capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):
-        return "?"
-    return proc.stdout.strip() or "?"
-
-
-def write_manifest(path: str, manifest: dict) -> None:
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w") as handle:
-        handle.write(json.dumps(manifest, indent=2) + "\n")
-    os.replace(tmp, path)
 
 
 def parse_args(argv=None) -> argparse.Namespace:

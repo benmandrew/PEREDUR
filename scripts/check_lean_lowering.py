@@ -27,22 +27,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+from common import lean_output
 from field_orders import default_spot_bin_dir
 
 REPO = Path(__file__).resolve().parent.parent
-
-
-def lean_output(args: argparse.Namespace) -> str:
-    if args.lean_output is not None:
-        return args.lean_output.read_text()
-    return subprocess.run(
-        ["lake", "env", "lean", "--run", "Lowering.lean"],
-        cwd=REPO / "proofs",
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=1800,
-    ).stdout
 
 
 def cpp_formulas(ltl: Path, guarantees: list[dict], jobs: int) -> list[str]:
@@ -128,7 +116,8 @@ def main() -> int:
     args = parser.parse_args()
 
     ltlfilt = (args.spot_bin_dir or default_spot_bin_dir()) / "ltlfilt"
-    rows = [line.split("\t") for line in lean_output(args).splitlines() if line]
+    lean = lean_output(args, "Lowering.lean")
+    rows = [line.split("\t") for line in lean.splitlines() if line]
     if not rows or any(len(row) != 2 for row in rows):
         sys.exit("Lean output is not one `json<TAB>formula` row per line")
     guarantees = [json.loads(row[0]) for row in rows]
