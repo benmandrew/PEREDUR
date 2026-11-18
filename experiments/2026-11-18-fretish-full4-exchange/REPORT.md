@@ -60,3 +60,14 @@ On 18 November, from 13:11 to 13:30 UTC, the paper's diversity measure (net cont
 | `mode-arbiter` | 238 / 207 | 0.915 (0.913) | 0.918 (0.939) | −0.003 |
 
 Net is negative on all four subjects, so on the paper's measure exchange's repairs spread no wider than full's, and on `fsm-timing` narrower. Four subjects cannot give a significant signed-rank result (the smallest exact p is 0.125). The syntactic signature counts above point the other way: exchange varies more places, but its repairs cover less of the semantic space.
+
+## Pooled pass, paper's measures
+
+The pooled pass (4) of `2026-11-17-fretish-order-remove-no-f-pooled`, at `ff9f2119`, added `remove-exchange` against `remove-full` as its own contrast family, uncorrected. av2 entry 090 finished at 18:18 and av3 entry 087 at 20:53 UTC on 18 November, with every pair decided. The output is in `~/projects/peredur-removal-pooled/experiments/fretish-order-remove-no-f-pooled-reduced/` (peredur-extension-7b's report). `fsm-lmcps` drops out of every test, which leaves 8 small subjects. Positive means exchange is stronger (a lower accepted-trace share) or wider (net containment at K = 3).
+
+| Measure | Shift, exchange vs full [95% interval] | Subjects | p |
+|---|---|---|---|
+| Accepted-trace share | +0.015 [−0.008, +0.083] | 5 stronger, 3 weaker | 0.46 |
+| Net containment, K = 3 | −0.010 [−0.063, +0.072] | 3 wider, 5 narrower | 0.64 |
+
+Exchange cannot be told apart from full on either measure. Its `fsm-timing` net of −0.113 matches the local smoke's −0.116. All the pooled nodes went into one word sample with the removal contrasts, so the removal family's strength numbers shift slightly from a pass without exchange.
