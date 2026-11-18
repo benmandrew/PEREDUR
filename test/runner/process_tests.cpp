@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+#include "read_until_eof.hpp"
 #include "runner/process.hpp"
 #include "test_registry.hpp"
 #include "test_support.hpp"

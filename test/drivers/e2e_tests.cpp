@@ -16,6 +16,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "read_until_eof.hpp"
 #include "runner/process.hpp"
 #include "runner/spot.hpp"
 #include "runner/tool_paths.hpp"
