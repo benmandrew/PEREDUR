@@ -54,7 +54,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 67;
+constexpr int k_schema_version = 68;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -498,12 +498,10 @@ void write_run_manifest(const std::string& output_dir,
           {"gate_errors", ClimbStats::n_gate_errors.load()},
           {"wall_s", ClimbStats::wall_s}}},
         // What direction_gated did: free rewrites returned as the parent for
-        // moving the forbidden way or for a refused sideways draw, and steps
-        // a realizable parent took back towards the original. Zero whenever
-        // the key is off.
+        // moving the forbidden way, and steps a realizable parent took back
+        // towards the original. Zero whenever the key is off.
         {"direction_gate",
          {{"forbidden", DirectionGateStats::n_forbidden.load()},
-          {"sideways_refused", DirectionGateStats::n_sideways_refused.load()},
           {"steps", DirectionGateStats::n_steps.load()},
           {"bisected", DirectionGateStats::n_bisected.load()},
           {"steps_realizable", DirectionGateStats::n_steps_realizable.load()}}},

@@ -215,12 +215,12 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
             // generation in its file name is one past the last the search
             // ran. A result the search had already accumulated keeps its
             // first file.
-            climb = [&cfg, &original_spec, &accumulator, &budget,
+            climb = [&original_spec, &accumulator, &budget,
                      accepts = climb_gate(
                          cfg, status_objective_of(fitness_function))](
                         const std::vector<Specification>& repairs) {
                 std::vector<Specification> climbed =
-                    climb_repairs(repairs, original_spec, cfg, accepts);
+                    climb_repairs(repairs, original_spec, accepts);
                 const std::size_t generation = budget.generations() + 1;
                 for (const Specification& spec : climbed) {
                     accumulator.insert(spec, generation);

@@ -132,17 +132,6 @@ TEST(test_realizable_parent_never_yields_a_proved_weakening) {
     }
 }
 
-TEST(test_no_sideways_share_keeps_only_strengthenings) {
-    const Specification original = original_spec();
-    const ParentContext context = context_for(true, &original);
-    Config cfg = gated_config();
-    cfg.p_sideways = 0.0;
-    const OrderTally counts = tally(weakened_spec(), cfg, &context);
-    expect(counts.n_weaker == 0 && counts.n_incomparable == 0,
-           "with no sideways share a realizable parent's children should all "
-           "be stronger or equal");
-}
-
 // A realizable parent's strengthenings are the steps back towards the
 // original. On a parent weaker than the original in every slot, a step never
 // passes it, so no child is proved stronger than the original.

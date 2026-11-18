@@ -224,14 +224,6 @@ TEST(test_config_io_enum_keys) {
                                          {"degree", MrsAdmissionOrder::Degree}},
                                         "rotate",
                                         false});
-    expect_enum_key<ClimbOrder>(
-        {"filters",
-         "climb_order",
-         &Config::climb_order,
-         ClimbOrder::Slot,
-         {{"slot", ClimbOrder::Slot}, {"similarity", ClimbOrder::Similarity}},
-         "random",
-         false});
 }
 
 // Pinned because every archived config omits these keys and inherits whatever
@@ -434,6 +426,9 @@ TEST(test_config_io_removed_operator_keys_warn_and_are_ignored) {
         {"fitness", "semantic_trace_weight = 0.5"},
         {"tlsf", "muc_max_iterations = 32"},
         {"runtime", "dashboard = true"},
+        {"mutation", "p_sideways = 0.5"},
+        {"filters", "climb_order = \"similarity\""},
+        {"filters", "climb_orders = 4"},
     };
     for (const auto& [section, line] : removed) {
         const std::string key = line.substr(0, line.find(' '));
@@ -512,6 +507,15 @@ TEST(test_config_io_retired_key_hints_are_pinned) {
         {"runtime.max_concurrent_realizability",
          "removed: no concurrency cap; bound RAM with runtime.parallel"},
         {"runtime.dashboard", "removed: the live dashboard no longer exists"},
+        {"mutation.p_sideways",
+         "removed: under direction_gated an incomparable free rewrite is "
+         "always kept"},
+        {"filters.climb_order",
+         "removed: the output climb tries its steps in slot order, once per "
+         "repair"},
+        {"filters.climb_orders",
+         "removed: the output climb tries its steps in slot order, once per "
+         "repair"},
     };
     for (const auto& [path, hint] : expected) {
         const std::size_t dot = path.rfind('.');

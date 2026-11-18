@@ -133,11 +133,9 @@ DEFAULTS: dict = {
     # into [mutation] only when a sweep overrides it (see make_toml), so
     # existing grids stay byte-identical.
     "blame_targeted_slots": False,
-    # FRETISH only: gate mutation's direction on the parent's status, and the
-    # share of incomparable free rewrites kept under the gate. Emitted into
-    # [mutation] only when a sweep overrides them (see make_toml).
+    # FRETISH only: gate mutation's direction on the parent's status. Emitted
+    # into [mutation] only when a sweep overrides it (see make_toml).
     "direction_gated": False,
-    "p_sideways": 1.0,
     # FRETISH only: scale the share of large moves by the parent's status, and
     # bisect a realizable parent's timing steps under direction_gated. Emitted
     # into [mutation] only when a sweep overrides them (see make_toml).
@@ -149,12 +147,9 @@ DEFAULTS: dict = {
     # memo shows unrealizable. Emitted into [filters] only when a sweep
     # overrides it (see make_toml).
     "parent_verdict": False,
-    # FRETISH only: climb each gated repair towards the original, the order its
-    # steps are tried in, and how many orders. Emitted into [filters] only when
-    # a sweep overrides them (see make_toml).
+    # FRETISH only: climb each gated repair towards the original. Emitted into
+    # [filters] only when a sweep overrides it (see make_toml).
     "climb_output": False,
-    "climb_order": "slot",
-    "climb_orders": 1,
     # Keys in VINTAGE_KEYS must follow the binary rather than be pinned, because
     # VINTAGE_KEYS sources its written-out values from this table -- a stale
     # entry here is a wrong value written into every config generated with
@@ -295,8 +290,6 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         if "blame_targeted_slots" in overrides else []) + (
         [f"direction_gated = {_fmt(d['direction_gated'])}"]
         if "direction_gated" in overrides else []) + (
-        [f"p_sideways = {_fmt(d['p_sideways'])}"]
-        if "p_sideways" in overrides else []) + (
         [f"step_scaling = {_fmt(d['step_scaling'])}"]
         if "step_scaling" in overrides else []) + (
         [f"bisect_steps = {_fmt(d['bisect_steps'])}"]
@@ -310,11 +303,7 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
     ] + ([f"parent_verdict = {_fmt(d['parent_verdict'])}"]
          if "parent_verdict" in overrides else []) + (
         [f"climb_output = {_fmt(d['climb_output'])}"]
-        if "climb_output" in overrides else []) + (
-        [f'climb_order = "{d["climb_order"]}"']
-        if "climb_order" in overrides else []) + (
-        [f"climb_orders = {d['climb_orders']}"]
-        if "climb_orders" in overrides else []) + [
+        if "climb_output" in overrides else []) + [
         "",
         "[runtime]",
         f"black_timeout_ms = {d['black_timeout_ms']}",

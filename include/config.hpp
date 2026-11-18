@@ -56,13 +56,6 @@ enum class MrsAdmissionOrder : std::uint8_t { Spec, Degree };
 /// for AuRUS, and @ref Config::max_wall_s is independent of the choice.
 enum class TerminationMode : std::uint8_t { Generations, Individuals };
 
-/// The order the output climb tries its steps in (see @ref Config::climb_output
-/// and `genetic/climb.hpp`). Slot is the order steps_towards lists them in:
-/// assumption slots, then guarantee slots, then the appended assumptions.
-/// Similarity tries the step with the largest gain in syntactic similarity to
-/// the original first. Neither draws a random number.
-enum class ClimbOrder : std::uint8_t { Slot, Similarity };
-
 struct Config {
     std::size_t generations = 10;
     /// Offspring budget for the whole run under
@@ -103,17 +96,11 @@ struct Config {
     /// final filters, one proved step at a time, keeping a step only where the
     /// result still passes the output gate.
     bool climb_output = false;
-    /// The step order of the first climb (see ClimbOrder).
-    ClimbOrder climb_order = ClimbOrder::Slot;
     /// FRETISH only: after deduplication, drop each offspring proved stronger
     /// than a parent that an unrealizable query already asked proves
     /// unrealizable (RealizabilityChecker::proved_unrealizable). Off, nothing
     /// is recorded and no stage runs.
     bool parent_verdict_filter = false;
-    /// Climbs per repair. Each one after the first tries the steps under a
-    /// fixed pseudo-random priority of its own, and every distinct result goes
-    /// on to the final filters.
-    std::size_t climb_orders = 1;
     std::chrono::milliseconds black_timeout{1000};
     /// Per-call wall-clock budget for ltlsynt realizability checks; 0 disables
     /// it. ltlsynt has no internal timeout, and the search occasionally builds
@@ -249,17 +236,13 @@ struct Config {
     /// draws its directed moves from steps_towards the original, and rewrites
     /// freely otherwise. A free rewrite moving the forbidden way (stronger for
     /// an unrealizable parent, weaker for a realizable one) returns the
-    /// parent. Off, the stream is the one before it existed.
+    /// parent; an incomparable one is kept. Off, the stream is the one before
+    /// it existed.
     bool direction_gated_mutation = false;
     /// FRETISH only, under direction_gated_mutation: a realizable parent's
     /// timing step on a `within n` or `for n` chain moves to the chain's
     /// midpoint rather than to the original's value. Costs no draw.
     bool bisect_steps = false;
-    /// Under direction_gated_mutation, the probability that a free rewrite
-    /// whose result is incomparable with the parent is kept rather than
-    /// returning the parent. Drawn only with the gate on and only for an
-    /// incomparable result, and not at all at 0 or 1.
-    double p_sideways = 1.0;
     /// FRETISH only: how far the parent's status scales the choice between a
     /// large move and a single edge, in [0, 1]. Each large move's probability
     /// (removing a guarantee, moving a timing off Always or Eventually, and
