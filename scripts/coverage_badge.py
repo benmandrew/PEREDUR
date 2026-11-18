@@ -38,6 +38,8 @@ PROFDATA = BUILD / "coverage.profdata"
 # src/ and include/, and a driver nothing runs is uncovered code rather than
 # absent code. Naming them explicitly means a new binary that nothing measures
 # fails here rather than quietly leaving its lines out of the denominator.
+# sample-mutants is left out: it is a research tool for the seeded corpus that
+# no test runs and no install ships.
 BINARIES = (
     "peredur",
     "compare",
