@@ -10,14 +10,9 @@
 #include <vector>
 
 #include "prop_formula.hpp"
+#include "prop_formula/atoms.hpp"
 
 namespace {
-
-// The boolean constants are ordinary atoms by convention (see Formula's
-// constructor), and renaming them would turn a constant into a free variable.
-bool is_constant_atom(const std::string& name) {
-    return name == "true" || name == "false";
-}
 
 // Atoms in the order Formula::to_string renders them, first occurrence only,
 // so that two formulae equal up to renaming produce the same sequence.

@@ -56,7 +56,7 @@ class Formula {
     /// "true" (implemented as a single atom named "true"). The parser gives
     /// "true" and "false" no special treatment — both parse as ordinary atoms.
     /// They are reserved by convention and recognised downstream instead; see
-    /// is_constant_atom in src/requirement.cpp.
+    /// is_constant_atom in src/prop_formula/atoms.hpp.
     Formula();
 
     /// Static instance of the logical constant "true" for convenience.
