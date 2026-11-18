@@ -1003,14 +1003,13 @@ run_implication = false
 parallel = 1
 )";
 
-// k_config_small with the output climb on, in the similarity order.
+// k_config_small with the output climb on.
 const char* const k_config_climb = R"([genetic]
 generations = 2
 population_size = 8
 
 [filters]
 climb_output = true
-climb_order = "similarity"
 
 [runtime]
 parallel = 1
@@ -1324,10 +1323,6 @@ TEST_IN("driver_peredur", test_peredur_climbs_its_output) {
 
     const nlohmann::json first = run_into(on_config, dir.path() / "first");
     run_into(on_config, dir.path() / "second");
-    expect(
-        first.at("config").at("filters").at("climb_order").get<std::string>() ==
-            "similarity",
-        "peredur: the manifest records the climb order");
     const std::vector<std::filesystem::path> repairs =
         repair_files(dir.path() / "first");
     expect(repairs.empty() ||

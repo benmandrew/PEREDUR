@@ -52,23 +52,6 @@ struct ClimbStats {
 /// Whether a candidate the climb reached is still a repair.
 using ClimbPredicate = std::function<bool(const Specification&)>;
 
-/// How one climb orders its steps.
-struct ClimbRule {
-    ClimbOrder order = ClimbOrder::Slot;
-    /// 0 for @ref order itself. Each later index orders the steps by a fixed
-    /// pseudo-random priority over their slot, side, kind and field, which is
-    /// the same in every round of the climb and draws no random number.
-    std::size_t permutation = 0;
-    /// Syntactic similarity to the original, read under
-    /// ClimbOrder::Similarity when @ref permutation is 0.
-    std::function<double(const Specification&)> similarity;
-};
-
-/// @p steps reordered under @p rule. The slot order is the input order, and
-/// every reordering is stable, so ties keep it.
-void order_steps(std::vector<Step>& steps, const Specification& current,
-                 const ClimbRule& rule);
-
 /// The furthest result of @p step from @p current that @p accepts, or nothing
 /// where it accepts none.
 ///
@@ -84,7 +67,9 @@ std::optional<Specification> furthest_accepted(const Specification& current,
                                                const ClimbPredicate& accepts);
 
 /// @p start climbed towards @p original: in each round the steps_towards the
-/// original are tried in @p rule's order, the first one with an accepted
+/// original are tried in the order it lists them (assumption slots, then
+/// guarantee slots, then the appended assumptions), the first one with an
+/// accepted
 /// result is taken, and the climb stops in the first round where none is.
 ///
 /// The result implies @p start by rule, @p accepts holds of it wherever it
@@ -92,7 +77,7 @@ std::optional<Specification> furthest_accepted(const Specification& current,
 /// already visited is never taken again, so the climb ends even where two
 /// steps are proved stronger than each other.
 Specification climb(const Specification& start, const Specification& original,
-                    const ClimbPredicate& accepts, const ClimbRule& rule);
+                    const ClimbPredicate& accepts);
 
 /// The predicate the output gate applies, passes_output_gate on @p cfg with the
 /// run's @p status objective, behind a whole-specification realizability
@@ -101,10 +86,10 @@ Specification climb(const Specification& start, const Specification& original,
 /// the realizability memo settle later candidates by rule.
 ClimbPredicate climb_gate(const Config& cfg, FitnessFunction status);
 
-/// Every distinct climb result of @p repairs, in order: the results of each
-/// distinct repair, @p cfg.climb_orders climbs of it, in input order. The
-/// repairs are climbed concurrently and the results collected by index, so
-/// the answer does not depend on how the gate's queries interleave.
+/// Every distinct climb result of @p repairs, in order: one climb of each
+/// distinct repair, in input order. The repairs are climbed concurrently and
+/// the results collected by index, so the answer does not depend on how the
+/// gate's queries interleave.
 std::vector<Specification> climb_repairs(
     const std::vector<Specification>& repairs, const Specification& original,
-    const Config& cfg, const ClimbPredicate& accepts);
+    const ClimbPredicate& accepts);

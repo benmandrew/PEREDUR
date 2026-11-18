@@ -150,12 +150,10 @@ Config golden_config() {
     // or drawing. The golden fitness has no status objective, so no parent
     // here reads realizable at any value; pinned so that stays a decision.
     cfg.p_order_crossover = 0.0;
-    // Off, its default, with the sideways share at its default of 1, where it
-    // draws nothing even with the gate on. The golden fitness has no status
-    // objective, so the gate would stay shut even on; both are pinned so that
-    // a golden gaining one fails here rather than re-recording.
+    // Off, its default. The golden fitness has no status objective, so the
+    // gate would stay shut even on; pinned so that a golden gaining one fails
+    // here rather than re-recording.
     cfg.direction_gated_mutation = false;
-    cfg.p_sideways = 1.0;
     // Off, their defaults. At 0 the scale reads no status and the tick-count
     // steps draw as they did before it existed; bisection draws nothing even
     // on and acts only under the gate. Pinned so that a golden gaining a
@@ -596,27 +594,6 @@ TEST(test_direction_gate_costs_no_draw_when_off) {
                strengthened.draws[0].first != k_real_bound,
            "direction_gated: on, a realizable parent should skip the "
            "add-assumption draw");
-
-    // The sideways share draws only strictly between 0 and 1.
-    constexpr std::size_t k_seeds = 64;
-    for (std::size_t seed = 0; seed < k_seeds; ++seed) {
-        const auto stream = [&](double p_sideways,
-                                const ParentContext& context) {
-            Config cfg = gate_on;
-            cfg.p_sideways = p_sideways;
-            auto trace = std::make_shared<DrawTrace>();
-            const RandomSource source = make_recording_source(seed, trace);
-            static_cast<void>(
-                mutate_specification(spec, source, cfg, &context));
-            return render_trace(*trace);
-        };
-        for (const ParentContext* context : {&unrealizable, &realizable}) {
-            expect(stream(0.0, *context) == stream(1.0, *context),
-                   "p_sideways: at 0 and at 1 the share must cost no draw, "
-                   "seed " +
-                       std::to_string(seed));
-        }
-    }
 }
 
 // The step scale reads its key before the parent's status, so at 0 a context in

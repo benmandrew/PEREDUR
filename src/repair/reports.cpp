@@ -269,8 +269,7 @@ void print_diagnostics_report() {
                   << " ltlsynt\n";
     }
     std::cout << "Direction gate: " << DirectionGateStats::n_forbidden
-              << " forbidden and " << DirectionGateStats::n_sideways_refused
-              << " sideways rewrites returned to the parent, "
+              << " forbidden rewrites returned to the parent, "
               << DirectionGateStats::n_steps << " steps towards the original ("
               << DirectionGateStats::n_bisected << " bisected, "
               << DirectionGateStats::n_steps_realizable

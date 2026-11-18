@@ -26,7 +26,7 @@ using ConfigMember =
     std::variant<double Config::*, std::size_t Config::*, bool Config::*,
                  std::chrono::milliseconds Config::*, SelectionScheme Config::*,
                  TerminationMode Config::*, StatusGrading Config::*,
-                 MrsAdmissionOrder Config::*, ClimbOrder Config::*>;
+                 MrsAdmissionOrder Config::*>;
 
 struct ConfigKey {
     const char* section;  // dotted, as in "tlsf.mutation"
@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 53> k_config_keys{{
+inline constexpr std::array<ConfigKey, 50> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -315,15 +315,7 @@ inline constexpr std::array<ConfigKey, 53> k_config_keys{{
      "one\n"
      "towards the original, and return the parent when a free rewrite moves "
      "the\n"
-     "forbidden way. p_sideways is the share of incomparable rewrites kept. "
-     "Off by\n"
-     "default.\n"},
-    {"mutation", "p_sideways", &Config::p_sideways, KeyCheck::Probability,
-     KeyReader::Fretish,
-     "FRETISH only, under direction_gated: probability that a free rewrite "
-     "incomparable with its parent is kept rather than returning the parent. "
-     "Draws nothing at 0 or 1.",
-     ""},
+     "forbidden way. Off by default.\n"},
     {"mutation", "step_scaling", &Config::step_scaling, KeyCheck::Probability,
      KeyReader::Fretish,
      "FRETISH only: how far the parent's status scales the choice between a "
@@ -358,19 +350,6 @@ inline constexpr std::array<ConfigKey, 53> k_config_keys{{
      "The lattice climb at the output: each gated repair is strengthened "
      "towards\n"
      "the original one proved step at a time, while it stays a repair.\n"},
-    {"filters", "climb_order", &Config::climb_order, KeyCheck::None,
-     KeyReader::Fretish,
-     "Order in which the output climb tries its steps: 'slot' is slot order, "
-     "assumptions first; 'similarity' tries the largest gain in syntactic "
-     "similarity to the original first. The order decides which maximal "
-     "repair the climb reaches. Read only when climb_output is true.",
-     ""},
-    {"filters", "climb_orders", &Config::climb_orders, KeyCheck::Positive,
-     KeyReader::Fretish,
-     "Climbs per repair. The first uses climb_order and each later one a "
-     "fixed pseudo-random step priority of its own; every distinct result "
-     "goes on to the final filters. Read only when climb_output is true.",
-     ""},
     {"filters", "parent_verdict", &Config::parent_verdict_filter,
      KeyCheck::None, KeyReader::Fretish,
      "FRETISH only: after deduplication, drop each offspring proved stronger "

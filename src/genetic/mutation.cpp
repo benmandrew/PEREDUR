@@ -1033,23 +1033,14 @@ Gate gate_of(const Config& cfg, const ParentContext* parent) {
 
 // True when @p child, a free rewrite of @p parent, may stand under @p gate.
 // A result proved to move the forbidden way is refused. One the rules cannot
-// order either way is kept with probability cfg.p_sideways, which is read
-// before the RandomSource is touched, so at 0 or 1 it costs no draw.
+// order either way is kept. Nothing here draws.
 bool admitted_by_gate(Gate gate, const Specification& parent,
-                      const Specification& child, const Config& cfg,
-                      const RandomSource& random_source) {
+                      const Specification& child) {
     const MoveOrder order = classify_move(parent, child);
     const MoveOrder forbidden =
         gate == Gate::Weaken ? MoveOrder::Stronger : MoveOrder::Weaker;
     if (order == forbidden) {
         DirectionGateStats::n_forbidden++;
-        return false;
-    }
-    if (order != MoveOrder::Incomparable || cfg.p_sideways >= 1.0) {
-        return true;
-    }
-    if (cfg.p_sideways <= 0.0 || random_source.next_real() >= cfg.p_sideways) {
-        DirectionGateStats::n_sideways_refused++;
         return false;
     }
     return true;
@@ -1305,7 +1296,7 @@ Specification mutate_specification(const Specification& specification,
     // a free rewrite needs sorting. Returning the parent leaves an offspring
     // equal to it, which deduplication removes.
     if (gate != Gate::None && free_rewrite &&
-        !admitted_by_gate(gate, specification, mutated, cfg, random_source)) {
+        !admitted_by_gate(gate, specification, mutated)) {
         return specification;
     }
     return mutated;

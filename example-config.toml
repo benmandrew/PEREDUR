@@ -105,10 +105,8 @@ p_conditional_assumption = 0.25
 blame_targeted_slots = false
 # FRETISH only: weaken an unrealizable parent and strengthen a realizable one
 # towards the original, and return the parent when a free rewrite moves the
-# forbidden way. p_sideways is the share of incomparable rewrites kept. Off by
-# default.
+# forbidden way. Off by default.
 direction_gated = false
-p_sideways = 1.0
 # FRETISH only: take more large moves from a parent far from realizable and
 # fewer from one near it, scaled by the parent's status. Off (0) by default.
 step_scaling = 0.0
@@ -122,8 +120,6 @@ run_implication = true
 # The lattice climb at the output: each gated repair is strengthened towards
 # the original one proved step at a time, while it stays a repair.
 climb_output = false
-climb_order = "slot"
-climb_orders = 1
 # FRETISH only: drop, before scoring, each offspring proved stronger than a parent
 # an unrealizable query already asked proves unrealizable. Off by default.
 parent_verdict = false
