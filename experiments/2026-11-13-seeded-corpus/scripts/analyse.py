@@ -157,7 +157,7 @@ def contrast(cells, arm: str, ref: str, subjects: list[str],
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
-    repo = Path(__file__).resolve().parents[2]
+    repo = Path(__file__).resolve().parents[3]
     ap.add_argument("--results", type=Path,
                     default=repo / "experiments" / "results-fretish-seeded.csv")
     ap.add_argument("--out", type=Path,

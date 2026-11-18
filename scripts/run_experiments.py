@@ -234,7 +234,7 @@ H2H_TLSF_READY: list[str] = [
 # Unified lookup for run_one()/--specs; each profile picks its own subset.
 # The seeded mutant corpus (experiments/2026-11-13-seeded-corpus): each
 # subject is a realisable base strengthened by a compound seed, with the base
-# as its one ideal. scripts/seeded/ writes them under subjects/, and
+# as its one ideal. The campaign's scripts/ writes them under subjects/, and
 # selected.txt names the ones the campaign runs, one per line.
 SEEDED_DIR = EXPERIMENTS_DIR / "2026-11-13-seeded-corpus"
 

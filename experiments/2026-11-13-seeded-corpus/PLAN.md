@@ -26,24 +26,24 @@ The corpus files are untracked, as every experiment's data is here. From the wor
 ```sh
 E=experiments/2026-11-13-seeded-corpus
 python3 scripts/gen_configs.py --sweeps O --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-seeded --pin-vintage
-python3 scripts/seeded/bases.py --out $E --jobs 14 --slices 12
-python3 scripts/seeded/seed.py --out $E --bases-csv $E/bases.csv --per-base 15 --jobs 14
-python3 scripts/seeded/seed.py --out $E --bases-csv $E/bases.csv --per-base 15 --jobs 14 --only-clusters lpc,ventilator,valu3s --edits 3,4,5,6 --extra-edits conflict-now --tag x --seed 20261114
+python3 experiments/2026-11-13-seeded-corpus/scripts/bases.py --out $E --jobs 14 --slices 12
+python3 experiments/2026-11-13-seeded-corpus/scripts/seed.py --out $E --bases-csv $E/bases.csv --per-base 15 --jobs 14
+python3 experiments/2026-11-13-seeded-corpus/scripts/seed.py --out $E --bases-csv $E/bases.csv --per-base 15 --jobs 14 --only-clusters lpc,ventilator,valu3s --edits 3,4,5,6 --extra-edits conflict-now --tag x --seed 20261114
 tail -n +2 $E/mutants-x.csv >> $E/mutants.csv
-python3 scripts/seeded/probe.py --out $E --jobs 6
-python3 scripts/seeded/choose.py --out $E
+python3 experiments/2026-11-13-seeded-corpus/scripts/probe.py --out $E --jobs 6
+python3 experiments/2026-11-13-seeded-corpus/scripts/choose.py --out $E
 ```
 
 ## Steps
 
 - [x] Worktree, release build, tests pass (68/68).
-- [x] `scripts/seeded/bases.py`: collect bases, realise them, single-requirement screen.
-- [x] `scripts/seeded/seed.py`: fault classes, filters, write subjects to `subjects/<id>/{spec.json,fixes/base.json}`.
-- [x] `sample-mutants` binary and `scripts/seeded/probe.py`: reversion probability with the real mutation operator.
+- [x] `experiments/2026-11-13-seeded-corpus/scripts/bases.py`: collect bases, realise them, single-requirement screen.
+- [x] `experiments/2026-11-13-seeded-corpus/scripts/seed.py`: fault classes, filters, write subjects to `subjects/<id>/{spec.json,fixes/base.json}`.
+- [x] `sample-mutants` binary and `experiments/2026-11-13-seeded-corpus/scripts/probe.py`: reversion probability with the real mutation operator.
 - [x] `fretish-seeded` profile in `scripts/run_experiments.py`, subjects discovered from `subjects/`.
 - [x] Pilot: seed 0 over all 120 subjects and 16 arms.
 - [x] Main run: 120 subjects x 16 arms x 5 seeds.
-- [x] Analysis (`scripts/seeded/analyse.py`), `REPORT.md`, and `data/` in the paper's import format.
+- [x] Analysis (`experiments/2026-11-13-seeded-corpus/scripts/analyse.py`), `REPORT.md`, and `data/` in the paper's import format.
 
 ## Decisions
 
@@ -51,7 +51,7 @@ python3 scripts/seeded/choose.py --out $E
 
 - Headline threshold, fixed before any arm runs: a subject is headline when p1 and p2 are both below 0.01 (under one expected reversion among the first 100 mutations of O). Clusters capped at 40 subjects, drawn round-robin over bases; 10 trivial subjects run as a control stratum.
 - Seed 0 over every selected subject doubles as the pilot; seeds 1-4 follow once its timings are known.
-- Analysis unit is the subject (outcomes averaged over seeds), with Holm over the seven features and a cluster bootstrap over systems (`scripts/seeded/analyse.py`).
+- Analysis unit is the subject (outcomes averaged over seeds), with Holm over the seven features and a cluster bootstrap over systems (`experiments/2026-11-13-seeded-corpus/scripts/analyse.py`).
 
 ## Log
 
