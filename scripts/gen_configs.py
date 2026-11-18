@@ -524,12 +524,12 @@ def _removal_sweep() -> list[tuple[str, dict]]:
         # A rerun of lean-remove under the remove-no-<f> arms' load, so that
         # their wall-time contrasts pair within one campaign.
         ("remove-full", dict(remove))] + [
-        # The arms on lean-remove, and only-gate, with the gate's exchange
-        # mode for realisable parents, the default from 18 Nov
-        # (experiments/2026-11-18-seeded-corpus-sideways). remove-no-gate
-        # carries the key too, though without the gate it reads nothing.
+        # The gated arms with the gate's exchange mode for realisable parents,
+        # the default from 18 Nov (experiments/2026-11-18-seeded-corpus-
+        # sideways). remove-no-gate has no gate, so it has no variant.
         (f"{name}-exchange", {**arm, "gate_realizable": "exchange"})
-        for name, arm in [("remove", remove), ("lean", lean)] + remove_no_f] + [
+        for name, arm in [("remove", remove), ("lean", lean)]
+        + [a for a in remove_no_f if a[0] != "remove-no-gate"]] + [
         ("only-gate-exchange",
          {**dict(SWEEP_O)["only-gate"], "gate_realizable": "exchange"})]
 
