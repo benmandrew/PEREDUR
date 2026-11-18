@@ -24,15 +24,6 @@ double tlsf_syntactic_similarity(const tlsf::Specification& spec,
                                  const tlsf::Specification& original,
                                  const Config& cfg);
 
-/// Positional per-section semantic similarity of @p spec against @p original.
-/// Identical formula pairs are excluded; each differing pair contributes the
-/// harmonic mean of its two bounded-model-counting containment ratios at bound
-/// `cfg.default_model_counting_bound`. The result averages over the differing
-/// pairs, in [0, 1]. When no pair differs the result is 1.0.
-double tlsf_semantic_similarity(const tlsf::Specification& spec,
-                                const tlsf::Specification& original,
-                                const Config& cfg);
-
 /// Realizability status of @p spec on the scale Config::status_grading picks
 /// from `fitness/status.hpp`. Under StatusGrading::Mrs, the default:
 ///   0.0 — some section formula, or the whole specification, is unsatisfiable
@@ -74,6 +65,13 @@ std::vector<std::string> tlsf_status_components(
 /// Builds the weighted aggregate of the three TLSF fitness components, gated on
 /// the same `cfg.fitness_weight_*` fields the FRETISH factory uses. Components
 /// with a non-positive weight are omitted.
+///
+/// The semantic component is positional per section, like
+/// @ref tlsf_syntactic_similarity. Identical formula pairs are excluded; each
+/// differing pair contributes the harmonic mean of its two
+/// bounded-model-counting containment ratios at bound
+/// `cfg.default_model_counting_bound`. The score averages over the differing
+/// pairs, in [0, 1]. When no pair differs the score is 1.0.
 AggregateWeightedFitnessFunctionT<tlsf::Specification>
 tlsf_get_fitness_function(const tlsf::Specification& original,
                           const Config& cfg);

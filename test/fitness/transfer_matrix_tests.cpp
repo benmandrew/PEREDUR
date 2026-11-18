@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <limits>
 #include <optional>
 #include <sstream>
@@ -172,6 +173,16 @@ Count brute_force_trace_count(const Requirement& req, std::size_t step_count) {
         }
     }
     return count;
+}
+
+std::string count_to_string(Count value) {
+    // A Count near the top of long double's range needs ~4932 digits, so size
+    // the buffer from snprintf rather than guessing.
+    const int length = std::snprintf(nullptr, 0, "%.0Lf", value);
+    expect(length > 0, "count_to_string: snprintf measured the count");
+    std::string digits(static_cast<std::size_t>(length), '\0');
+    std::snprintf(digits.data(), digits.size() + 1, "%.0Lf", value);
+    return digits;
 }
 
 void expect_exact_count(Count actual, Count expected,

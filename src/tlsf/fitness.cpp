@@ -9,7 +9,6 @@
 
 #include "filter/well_separation.hpp"
 #include "fitness/factory.hpp"
-#include "fitness/mean_or_perfect.hpp"
 #include "fitness/semantic_similarity.hpp"
 #include "fitness/status.hpp"
 #include "guarantee_parts.hpp"
@@ -139,19 +138,6 @@ std::vector<std::function<double()>> tlsf_semantic_similarity_terms(
 }
 
 }  // namespace
-
-double tlsf_semantic_similarity(const tlsf::Specification& spec,
-                                const tlsf::Specification& original,
-                                const Config& cfg) {
-    const std::vector<std::function<double()>> terms =
-        tlsf_semantic_similarity_terms(spec, original, cfg);
-    std::vector<double> values;
-    values.reserve(terms.size());
-    for (const std::function<double()>& term : terms) {
-        values.push_back(term());
-    }
-    return mean_or_perfect(values);
-}
 
 std::vector<std::string> tlsf_status_components(
     const tlsf::Specification& spec) {
