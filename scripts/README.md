@@ -35,6 +35,8 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `prune_third_party.sh` | Deletes what nothing reads from an installed third-party tree, before CI caches it. |
 | `import_fret.py` | Converts FRET project exports into a FRETISH `spec.json` for `examples/`. Its docstring lists every conversion rule, and its stderr summary names each requirement a lossy rule touched. Comparisons over several variables or arithmetic need z3's Python bindings, which `nix develop` provides. |
 | `test_campaign.py` | Covers `campaign.py`. No pytest; run it directly. CI's `python-tests` job runs every `test_*.py` here. |
+| `test_score_campaign.py` | Covers `score_campaign.py` against a fake results tree and stub binaries. |
+| `test_pooled.py` | Covers the pooled pass: `compare_pairs.py`, `fingerprint_members.py`, `pool_members.py`, `pooled_design.py` and `pooled_reduce.py`, against stub tools. |
 | `test_score_curves.py` | Covers `score_curves.py`'s reading of a run directory, with `compare` and `maximal` stubbed. |
 | `test_experiment_paths.py` | Covers the factor-path parsers and the resume-key invariants in `run_experiments.py` and `gen_configs.py`. |
 | `make_core_specs.py` | Writes each unrealisable core of the large FRETISH examples as its own example. `--check` exits 1 if one is stale. |
@@ -848,6 +850,8 @@ watching.
 
 ```sh
 python scripts/test_campaign.py
+python scripts/test_score_campaign.py   # the score phase's scorer
+python scripts/test_pooled.py           # the pool, fingerprint and compare phases
 ```
 
 A plain script with no pytest dependency, like `test_experiment_paths.py`. It
