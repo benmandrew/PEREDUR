@@ -1,6 +1,6 @@
 name = "2026-11-17-fretish-order-remove-no-f-pooled"
 branch = "campaign/fretish-order-remove-no-f-pooled"
-description = "The paper's run (4) once removal replaced demotion: pooled pass of remove-full against remove-no-climb, remove-no-gate and remove-no-blame over the small set and rad's 10 cores, for accepted-trace share and net containment at K = 3 (PLAN.md)."
+description = "The paper's run (4) once removal replaced demotion: pooled pass of remove-full against remove-no-climb, remove-no-gate and remove-no-blame over the small set and rad's 10 cores, and against remove-exchange over the small set, for accepted-trace share and net containment at K = 3 (PLAN.md)."
 
 # Each host pools its own subjects. The pool, design and subject lists are
 # ignored files, copied to each host's checkout by rsync before enqueue
@@ -28,7 +28,7 @@ copy_from = "experiments/2026-11-17-fretish-order-remove-no-f-pooled/members"
 out = "experiments/fretish-order-remove-no-f-pooled-members"
 
 # 32768 words a subject over the members (black, 30 s a draw, 8 at a time),
-# every node evaluated on them, and the pairs the design's three contrasts need:
+# every node evaluated on them, and the pairs the design's contrasts need:
 # within each arm, which the frontier and so the share need, and across each
 # contrast's two arms, which the plan check in pooled_reduce.py expects.
 [[phases]]
