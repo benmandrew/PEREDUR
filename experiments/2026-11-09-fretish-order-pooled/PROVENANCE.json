@@ -1,0 +1,101 @@
+{
+  "campaign": "2026-11-09-fretish-order-pooled",
+  "status": "open",
+  "untracked_outputs": {
+    "note": "The local reductions' output, kept untracked in this campaign directory under docs/dev/campaigns.md \"Large outputs\". 5ae0a4b6 added it with git add -f; it left the index on 2026-11-18 and stays in that commit's history. Paths are relative to this directory. reduced/ is the first pass and reduced-v2/ the re-pool with the output climb (PLAN.md).",
+    "recipe": "sha256sum <path>",
+    "last_tracked_at": "5ae0a4b6",
+    "files": [
+      {
+        "path": "reduced-v2/ball-radii-pooled/pooled.csv",
+        "sha256": "4c648f6a90eb5a69ff2f154fa3a6620e82a096360d9e241c338a3740cfea6968",
+        "bytes": 43071
+      },
+      {
+        "path": "reduced-v2/ball-radii-pooled/report-k1.txt",
+        "sha256": "1d348940977d599900862b8f0b17952bb4d79f9823886d87547b81d04107d516",
+        "bytes": 2633
+      },
+      {
+        "path": "reduced-v2/ball-radii-pooled/report-k3.txt",
+        "sha256": "efb33165a86f4db3780115a821d844e9fcd9368b9ff86aa9cf9b9dbd77733d3b",
+        "bytes": 2631
+      },
+      {
+        "path": "reduced-v2/ball-radii-pooled/report-k5.txt",
+        "sha256": "533efe371a23c2a6d5135080a987e83728edb14008c6fdd58c2e015f2f631fd9",
+        "bytes": 2621
+      },
+      {
+        "path": "reduced-v2/ball-radii/report-k1.txt",
+        "sha256": "07f1a0ffe58c3d3ab91361ca822a02387dd05434c5f3ac1b8e1879815117b9e3",
+        "bytes": 2250
+      },
+      {
+        "path": "reduced-v2/ball-radii/report-k3.txt",
+        "sha256": "34d34f983e940516b9bba29069d2166d9ff1da40a77819e4eb055a12ff408b4a",
+        "bytes": 2258
+      },
+      {
+        "path": "reduced-v2/ball-radii/report-k5.txt",
+        "sha256": "fc25d7907fb2a081f0c138e0e63717df524cacc3de95e1e32253618e613748e6",
+        "bytes": 2263
+      },
+      {
+        "path": "reduced-v2/strength/contrasts.csv",
+        "sha256": "f11449235dcbd316d86253323475e1ca020971f88af396342f4568573bdbdc31",
+        "bytes": 29860
+      },
+      {
+        "path": "reduced-v2/strength/summary.txt",
+        "sha256": "323372cfa66651fb6895f8f56ba05aed3cf8fe55fdd38238d9eefc747738d36c",
+        "bytes": 1880
+      },
+      {
+        "path": "reduced/ball-radii-pooled/pooled.csv",
+        "sha256": "113d08dfe3cbb93c3cefaaf72e4e446b50002241212cf9ac45cd7a8208d13014",
+        "bytes": 42203
+      },
+      {
+        "path": "reduced/ball-radii-pooled/report-k1.txt",
+        "sha256": "c8543c88ba24921f184d70a82f724b963989af5a83ebadd04f498b0bf97651f7",
+        "bytes": 2608
+      },
+      {
+        "path": "reduced/ball-radii-pooled/report-k3.txt",
+        "sha256": "3d72bc595f2a534758a23159fca11ab4a7deb8ffd15512201e79bd931906c069",
+        "bytes": 2611
+      },
+      {
+        "path": "reduced/ball-radii-pooled/report-k5.txt",
+        "sha256": "27c1cb773c1f5b4d99e183b6c86274c7b219014598ea70dbd34f91546e830f92",
+        "bytes": 2615
+      },
+      {
+        "path": "reduced/ball-radii/report-k1.txt",
+        "sha256": "6463624d5edc2f617dad43bb7e8fd584e2bfdba6ff62c0107971d74550b53d7d",
+        "bytes": 2246
+      },
+      {
+        "path": "reduced/ball-radii/report-k3.txt",
+        "sha256": "b45edc442dc153f9d20d39ed8b4bd44ec6b2577d1550710716711cb7d4ee99cf",
+        "bytes": 2250
+      },
+      {
+        "path": "reduced/ball-radii/report-k5.txt",
+        "sha256": "87d16b3e8e9f485635d90484b01e82b307b20ccd25bb699aca0561e416b1969b",
+        "bytes": 2249
+      },
+      {
+        "path": "reduced/strength/contrasts.csv",
+        "sha256": "a63d48f417882c77ec784bba45123b76f60c3409a9f51bace2b78c0f300b2691",
+        "bytes": 32540
+      },
+      {
+        "path": "reduced/strength/summary.txt",
+        "sha256": "a90ff8512bf673639f4247f4856133f859fc1b8515850e7fe1496f681f9cf251",
+        "bytes": 2839
+      }
+    ]
+  }
+}
