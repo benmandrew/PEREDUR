@@ -133,9 +133,16 @@ DEFAULTS: dict = {
     # into [mutation] only when a sweep overrides it (see make_toml), so
     # existing grids stay byte-identical.
     "blame_targeted_slots": False,
+    # FRETISH only, under blame_targeted_slots: narrow a realizable parent too.
+    # Emitted into [mutation] only when a sweep overrides it (see make_toml).
+    "blame_realizable": True,
     # FRETISH only: gate mutation's direction on the parent's status. Emitted
     # into [mutation] only when a sweep overrides it (see make_toml).
     "direction_gated": False,
+    # FRETISH only, under direction_gated: how a realizable parent strengthens
+    # ("towards", "free" or "exchange"). Emitted into [mutation] only when a
+    # sweep overrides it (see make_toml).
+    "gate_realizable": "exchange",
     # FRETISH only: scale the share of large moves by the parent's status, and
     # bisect a realizable parent's timing steps under direction_gated. Emitted
     # into [mutation] only when a sweep overrides them (see make_toml).
@@ -288,8 +295,12 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         if "p_remove_guarantee" in overrides else []) + (
         [f"blame_targeted_slots = {_fmt(d['blame_targeted_slots'])}"]
         if "blame_targeted_slots" in overrides else []) + (
+        [f"blame_realizable = {_fmt(d['blame_realizable'])}"]
+        if "blame_realizable" in overrides else []) + (
         [f"direction_gated = {_fmt(d['direction_gated'])}"]
         if "direction_gated" in overrides else []) + (
+        [f'gate_realizable = "{d["gate_realizable"]}"']
+        if "gate_realizable" in overrides else []) + (
         [f"step_scaling = {_fmt(d['step_scaling'])}"]
         if "step_scaling" in overrides else []) + (
         [f"bisect_steps = {_fmt(d['bisect_steps'])}"]
@@ -463,7 +474,7 @@ SWEEP_P: list[tuple[str, dict]] = _pruned_sweep()
 # reproduced.
 VINTAGE_KEYS: tuple[str, ...] = (
     "status_grading", "mrs_admission_order",
-    "p_condition_type", "p_scope", "p_monotone",
+    "p_condition_type", "p_scope", "p_monotone", "gate_realizable",
 )
 
 

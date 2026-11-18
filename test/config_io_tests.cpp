@@ -224,6 +224,15 @@ TEST(test_config_io_enum_keys) {
                                          {"degree", MrsAdmissionOrder::Degree}},
                                         "rotate",
                                         false});
+    expect_enum_key<GateRealizable>({"mutation",
+                                     "gate_realizable",
+                                     &Config::gate_realizable,
+                                     GateRealizable::Exchange,
+                                     {{"towards", GateRealizable::Towards},
+                                      {"free", GateRealizable::Free},
+                                      {"exchange", GateRealizable::Exchange}},
+                                     "away",
+                                     false});
 }
 
 // Pinned because every archived config omits these keys and inherits whatever

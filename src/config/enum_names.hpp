@@ -44,6 +44,14 @@ struct EnumNames<TerminationMode> {
                  {TerminationMode::Individuals, "individuals"}}};
 };
 
+template <>
+struct EnumNames<GateRealizable> {
+    static constexpr std::array<std::pair<GateRealizable, const char*>, 3>
+        k_names{{{GateRealizable::Towards, "towards"},
+                 {GateRealizable::Free, "free"},
+                 {GateRealizable::Exchange, "exchange"}}};
+};
+
 template <typename Enum>
 const char* enum_name(Enum value) {
     for (const auto& [candidate, name] : EnumNames<Enum>::k_names) {
