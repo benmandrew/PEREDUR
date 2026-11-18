@@ -117,6 +117,8 @@ cmake --build build --target format        # apply clang-format in-place
 cmake --build build --target format-ci     # dry-run, fails if unformatted
 ```
 
+[`docs/dev/tooling.md`](dev/tooling.md) lists the individual lint targets and covers the clang-tidy cache, CI and the git hooks. [`docs/dev/testing.md`](dev/testing.md) covers the test harness and what a new suite or binary needs.
+
 ### Driver tests
 
 `test/drivers/e2e_tests.cpp` holds one *end-to-end* suite per built driver, registered as `peredur_tests.driver_peredur`, `driver_realize`, `driver_ltl`, `driver_mucs`, `driver_compare`, `driver_maximal`, `driver_lint_ideals` and `driver_signal_tracer`. Each spawns the binary through `execute_and_capture` rather than calling into the library, so these are the only tests that cover `src/main.cpp`, `src/repair/`, `src/crash/` and each standalone tool's own argument handling. `signal_tracer` is the exception, spawned through `spawn_piped_child`: it reads its frames from stdin, which `execute_and_capture` leaves as the test process's own, so under ctest its input would be whatever invoked the run rather than anything this suite chose. They locate the binaries through the `PEREDUR_DRIVER_DIR` compile definition (`$<TARGET_FILE_DIR:peredur>`), and `test/CMakeLists.txt` declares the eight drivers as dependencies of `peredur_tests` so they are built before ctest runs. A new driver needs all three — a suite, the dependency and the ctest registration.
