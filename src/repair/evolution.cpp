@@ -3,13 +3,13 @@
 #include <cstddef>
 #include <fstream>
 #include <iostream>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
 
+#include "repair_file.hpp"
 #include "serialisation.hpp"
 
 std::vector<ScoredSpecification> original_population(
@@ -100,22 +100,12 @@ void write_specifications(
     const AggregateWeightedFitnessFunction& fitness_function,
     const std::string& output_dir) {
     for (std::size_t i = 0; i < scored.size(); ++i) {
-        const std::string path =
-            output_dir + "/repair_" + std::to_string(i) + ".json";
-        std::ofstream file(path);
-        if (!file) {
-            throw std::runtime_error("cannot open output file: " + path);
-        }
-        serialisation::FitnessRecord record;
-        record.total = scored[i].fitness;
-        std::size_t objective = 0;
-        for (const WeightedFitnessFunction& wff : fitness_function) {
-            record.components.push_back(
-                {wff.name, scored[i].objectives[objective++], wff.weight});
-        }
-        const serialisation::ScoredSpecification ssc{scored[i].specification,
-                                                     record};
-        nlohmann::json jobj = ssc;
+        std::ofstream file = open_repair_file(output_dir + "/repair_" +
+                                              std::to_string(i) + ".json");
+        const serialisation::ScoredSpecification ssc{
+            scored[i].specification,
+            repair_fitness_record(scored[i], fitness_function)};
+        const nlohmann::json jobj = ssc;
         file << jobj.dump(2) << "\n";
     }
 }

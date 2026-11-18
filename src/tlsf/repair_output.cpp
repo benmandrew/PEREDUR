@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <fstream>
 #include <iostream>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -11,6 +10,7 @@
 
 #include "fitness/function.hpp"
 #include "genetic/scored.hpp"
+#include "repair_file.hpp"
 #include "serialisation.hpp"
 #include "tlsf/specification.hpp"
 #include "tlsf/writer.hpp"
@@ -23,28 +23,13 @@ void write_survivors(
     const std::string& output_dir) {
     for (std::size_t i = 0; i < survivors.size(); ++i) {
         const std::string base = output_dir + "/repair_" + std::to_string(i);
-        std::ofstream spec_file(base + ".tlsf");
-        if (!spec_file) {
-            throw std::runtime_error("cannot open output file: " + base +
-                                     ".tlsf");
-        }
+        std::ofstream spec_file = open_repair_file(base + ".tlsf");
         spec_file << write(survivors[i].specification);
 
-        std::ofstream fitness_file(base + ".fitness.json");
-        if (!fitness_file) {
-            throw std::runtime_error("cannot open output file: " + base +
-                                     ".fitness.json");
-        }
-        // Mirror the FRETISH per-objective breakdown: the weighted total plus
-        // each component's score and weight, in registration order.
-        serialisation::FitnessRecord record;
-        record.total = survivors[i].fitness;
-        std::size_t objective = 0;
-        for (const WeightedFitnessFunctionT<Specification>& wff : fitness) {
-            record.components.push_back(
-                {wff.name, survivors[i].objectives[objective++], wff.weight});
-        }
-        const nlohmann::json jobj = record;
+        // The same per-objective breakdown the FRETISH repair_N.json carries.
+        std::ofstream fitness_file = open_repair_file(base + ".fitness.json");
+        const nlohmann::json jobj =
+            repair_fitness_record(survivors[i], fitness);
         fitness_file << jobj.dump(2) << "\n";
     }
 }
