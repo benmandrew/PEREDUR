@@ -113,9 +113,11 @@ target_sources(peredur_fitness PRIVATE
     src/fitness/function.cpp
     src/runner/atom_names.cpp
     src/runner/black.cpp
+    src/runner/controller_store.cpp
     src/runner/ganak.cpp
     src/runner/ltlfilt.cpp
     src/runner/process.cpp
+    src/runner/realizability_memo.cpp
     src/runner/spot.cpp
     src/runner/tool_paths.cpp
     src/thread_pool.cpp
