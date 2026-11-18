@@ -120,6 +120,7 @@ target_sources(peredur_fitness PRIVATE
     src/runner/realizability_memo.cpp
     src/runner/spot.cpp
     src/runner/tool_paths.cpp
+    src/runner/tool_server.cpp
     src/thread_pool.cpp
     src/filter/bloat.cpp
     src/filter/correctness.cpp
