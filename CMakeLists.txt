@@ -35,13 +35,42 @@ endif()
 # byte-equivalent copy. Hoisting the location behind a variable lets a caller
 # point every preset at one tree; CI does, so its four matrix legs share a
 # single cached copy rather than building Spot four times under four keys. The
-# default keeps each build directory self-contained.
-set(PEREDUR_THIRD_PARTY_DIR "${CMAKE_BINARY_DIR}/third_party" CACHE PATH
+# default keeps each build directory self-contained, except in a linked git
+# worktree, which shares the main checkout's build/third_party: a fresh worktree
+# would otherwise rebuild Spot, and the install lock in cmake/third_party.cmake
+# already makes the sharing safe.
+set(_peredur_third_party_default "${CMAKE_BINARY_DIR}/third_party")
+execute_process(
+    COMMAND git -C "${CMAKE_SOURCE_DIR}" rev-parse --path-format=absolute
+            --git-dir --git-common-dir
+    OUTPUT_VARIABLE _peredur_git_dirs
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE _peredur_git_result
+    ERROR_QUIET)
+if(_peredur_git_result EQUAL 0)
+    string(REPLACE "\n" ";" _peredur_git_dirs "${_peredur_git_dirs}")
+    list(GET _peredur_git_dirs 0 _peredur_git_dir)
+    list(GET _peredur_git_dirs 1 _peredur_git_common_dir)
+    get_filename_component(_peredur_git_common_name
+        "${_peredur_git_common_dir}" NAME)
+    if(NOT _peredur_git_dir STREQUAL _peredur_git_common_dir
+       AND _peredur_git_common_name STREQUAL ".git")
+        get_filename_component(_peredur_main_checkout
+            "${_peredur_git_common_dir}" DIRECTORY)
+        set(_peredur_third_party_default
+            "${_peredur_main_checkout}/build/third_party")
+    endif()
+endif()
+set(PEREDUR_THIRD_PARTY_DIR "${_peredur_third_party_default}" CACHE PATH
     "Directory holding the built Spot, black and ganak trees")
+message(STATUS "Third-party tools: ${PEREDUR_THIRD_PARTY_DIR}")
 
 include(cmake/ganak.cmake)
 include(cmake/spot.cmake)
 include(cmake/black.cmake)
+# After the tool modules, which pass a launcher through to their sub-builds as a
+# single word and could not take this one.
+include(cmake/ccache.cmake)
 include(cmake/dependencies.cmake)
 include(cmake/version.cmake)
 

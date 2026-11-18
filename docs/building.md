@@ -51,6 +51,12 @@ cmake --workflow --preset debug      # configure + build + test
 
 Always go through a preset. `cmake -B build` on its own configures with CMake's default generator — Unix Makefiles on Linux — which conflicts with the Ninja tree every preset produces. The conflict reaches the sub-builds that CMake uses to fetch dependencies too, so the failure can be reported against one of those rather than against the generator. To recover, delete `CMakeCache.txt` and `CMakeFiles/` from the affected build directory and configure again with the preset. `build/third_party` survives that, so Spot is not rebuilt.
 
+### Worktrees and ccache
+
+A build in a linked git worktree uses the main checkout's `build/third_party` by default, so a new worktree does not rebuild Spot, black or Ganak. The install lock in `cmake/third_party.cmake` makes sharing the directory safe. Pass `-DPEREDUR_THIRD_PARTY_DIR=<path>` to use a different tree.
+
+If `ccache` is on `PATH`, every C++ compile goes through it, with `CCACHE_BASEDIR` set to the source tree and the build directory mapped to `.` in the debug info. Two checkouts of one commit then share object files: a fresh worktree's debug build took 182 compiles, 176 of them from the cache, and finished in 60 seconds at two jobs. A compile still misses when its command line embeds an absolute path into the tree, such as the paths to the Spot server and the driver directory. `-DPEREDUR_CCACHE=OFF` turns ccache off, and the coverage preset does so already, because coverage mapping records the compilation directory. A launcher set through `CMAKE_CXX_COMPILER_LAUNCHER` replaces this one.
+
 ## Fetched dependencies
 
 These are obtained by CMake regardless of workflow, so they need no manual installation:

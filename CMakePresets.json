@@ -51,7 +51,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_CXX_FLAGS": "-fprofile-instr-generate -fcoverage-mapping",
-        "CMAKE_EXE_LINKER_FLAGS": "-fprofile-instr-generate"
+        "CMAKE_EXE_LINKER_FLAGS": "-fprofile-instr-generate",
+        "PEREDUR_CCACHE": "OFF"
       }
     },
     {
