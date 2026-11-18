@@ -323,7 +323,93 @@ GUARANTEE_EDITS = {
 EXTRA_EDITS = {"conflict-now": t_conflict_now}
 
 
+# --------------------------------------------------------------------------
+# Sideways edits (2026-11-18-seeded-corpus-sideways). Each models an error that
+# in general neither strengthens nor weakens the requirement; compare decides
+# the compound mutant's relation to B. Used only where --sideways is given.
+
+
+def atom_paths(f: F, path: tuple = ()) -> list[tuple]:
+    """Paths (child indices from the root) of every atom occurrence."""
+    if f.op == "atom":
+        return [path]
+    return [q for k, a in enumerate(f.args) for q in atom_paths(a, path + (k,))]
+
+
+def node_at(f: F, path: tuple) -> F:
+    for k in path:
+        f = f.args[k]
+    return f
+
+
+def replace_at(f: F, path: tuple, new: F) -> F:
+    if not path:
+        return new
+    args = list(f.args)
+    args[path[0]] = replace_at(args[path[0]], path[1:], new)
+    return F(f.op, tuple(args), f.name)
+
+
+def formula_fields(g) -> list[str]:
+    return [k for k in ("condition", "response") if g.get(k, "true") != "true"]
+
+
+def t_swap_signal(spec, g, rng):
+    """One atom replaced by another atom of the same kind that occurs in B."""
+    fields = formula_fields(g)
+    if not fields:
+        return None
+    key = rng.choice(fields)
+    f = parse(g[key])
+    paths = atom_paths(f)
+    if not paths:
+        return None
+    path = rng.choice(paths)
+    name = node_at(f, path).name
+    ins, outs = set(spec["in_atoms"]), set(spec["out_atoms"])
+    pool = sorted((ins if name in ins else outs if name in outs else set()) - {name})
+    if not pool:
+        return None
+    new = replace_at(f, path, F("atom", name=rng.choice(pool)))
+    return {**g, key: show(new)}
+
+
+def t_flip_literal(spec, g, rng):
+    """One literal negated, or its negation removed."""
+    fields = formula_fields(g)
+    if not fields:
+        return None
+    key = rng.choice(fields)
+    f = parse(g[key])
+    paths = atom_paths(f)
+    if not paths:
+        return None
+    path = rng.choice(paths)
+    atom = node_at(f, path)
+    if path and node_at(f, path[:-1]).op == "not":
+        new = replace_at(f, path[:-1], atom)
+    else:
+        new = replace_at(f, path, F("not", (atom,)))
+    return {**g, key: show(new)}
+
+
+def t_reverse_implication(spec, g, rng):
+    """A response p -> q written as q -> p."""
+    f = parse(g["response"])
+    if f.op != "imp":
+        return None
+    return {**g, "response": show(F("imp", (f.args[1], f.args[0])))}
+
+
+SIDEWAYS_EDITS = {
+    "swap-signal": t_swap_signal,
+    "flip-literal": t_flip_literal,
+    "reverse-implication": t_reverse_implication,
+}
+
+
 EDITS: dict = {}
+ADMIT = {"strictly stronger than"}
 
 
 def editable(spec: dict) -> list[int]:
@@ -391,10 +477,12 @@ def relation(work: Path, mutant: Path, base: Path, timeout: int) -> str:
                "--timeout", "60"], timeout)
     if out is None:
         return "timeout"
-    m = re.search(r"o\.json\s*:\s*(.+?) b\.json", out.stdout)
+    # compare names the ideal after every relation but "incomparable".
+    m = re.search(r"o\.json\s*:\s*(?:(incomparable)\s*$|(.+?) b\.json)",
+                  out.stdout, re.M)
     if not m:
         return "error"
-    return m.group(1).strip()
+    return (m.group(1) or m.group(2)).strip()
 
 
 def satisfiable(path: Path, timeout: int) -> bool | None:
@@ -434,7 +522,7 @@ def check(task):
            "edits": "+".join(e["edit"] for e in log), "stage": ""}
     rel = relation(work, mp, base_path, timeout)
     row["relation"] = rel
-    if rel != "strictly stronger than":
+    if rel not in ADMIT:
         row["stage"] = "relation"
         return row, None
     v = realize(mp, timeout)
@@ -468,6 +556,9 @@ def main() -> int:
                     help="compound seed sizes to draw from")
     ap.add_argument("--extra-edits", default="",
                     help="comma list of EXTRA_EDITS to add to the mix")
+    ap.add_argument("--sideways", action="store_true",
+                    help="add SIDEWAYS_EDITS to the mix and admit mutants "
+                         "incomparable with the base")
     ap.add_argument("--tag", default="",
                     help="suffix for mutant ids and the CSV, for a second pass")
     ap.add_argument("--seed", type=int, default=20261113)
@@ -475,8 +566,11 @@ def main() -> int:
     ap.add_argument("--timeout", type=int, default=300)
     args = ap.parse_args()
 
-    global EDITS
+    global EDITS, ADMIT
     EDITS = dict(GUARANTEE_EDITS)
+    if args.sideways:
+        EDITS.update(SIDEWAYS_EDITS)
+        ADMIT = {"strictly stronger than", "incomparable"}
     for name in filter(None, args.extra_edits.split(",")):
         EDITS[name] = EXTRA_EDITS[name]
     sizes = [int(x) for x in args.edits.split(",")]

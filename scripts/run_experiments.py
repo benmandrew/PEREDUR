@@ -269,21 +269,29 @@ ARBITER_PROBE_SPECS: list[str] = [
 SEEDED_DIR = EXPERIMENTS_DIR / "2026-11-13-seeded-corpus"
 
 
-def _seeded_specs() -> dict[str, dict[str, Path]]:
-    listing = SEEDED_DIR / "selected.txt"
+def _seeded_specs(root: Path = SEEDED_DIR,
+                  prefix: str = "") -> dict[str, dict[str, Path]]:
+    listing = root / "selected.txt"
     if not listing.is_file():
         return {}
     names = [ln.strip() for ln in listing.read_text().splitlines()
              if ln.strip() and not ln.startswith("#")]
-    return {n: {"input": SEEDED_DIR / "subjects" / n / "spec.json",
-                "ideals_dir": SEEDED_DIR / "subjects" / n / "fixes"}
+    return {prefix + n: {"input": root / "subjects" / n / "spec.json",
+                "ideals_dir": root / "subjects" / n / "fixes"}
             for n in names}
 
 
 SEEDED_SPECS: dict[str, dict[str, Path]] = _seeded_specs()
 
+# The sideways seeded corpus (experiments/2026-11-18-seeded-corpus-sideways):
+# the same bases, with fault classes that include incomparable edits. Its
+# subject ids repeat the old corpus's, so its spec names carry the prefix
+# "sw-" (the directories under subjects/ do not) and it keeps its own results.
+SIDEWAYS_DIR = EXPERIMENTS_DIR / "2026-11-18-seeded-corpus-sideways"
+SIDEWAYS_SPECS: dict[str, dict[str, Path]] = _seeded_specs(SIDEWAYS_DIR, "sw-")
+
 SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **SEEDED_SPECS,
-                                     **TLSF_SPECS}
+                                     **SIDEWAYS_SPECS, **TLSF_SPECS}
 
 # compare runs n_repairs * n_ideals * 2 implication checks, each with compare's
 # own 20s black budget. fsm-timing (bounded-interval operators) is slow, and
@@ -785,6 +793,30 @@ PROFILES: dict[str, dict] = {
         "configs_dir": EXPERIMENTS_DIR / "configs-fretish-seeded-remove",
         "results_dir": EXPERIMENTS_DIR / "results-fretish-seeded-remove",
         "results_csv": EXPERIMENTS_DIR / "results-fretish-seeded-remove.csv",
+        "default_jobs": 8,
+    },
+    # The paper's seeded arms on the sideways corpus, at one commit: full
+    # (lean-remove), no-remove (lean), each remove-no-<f>, only-remove and
+    # base from sweep D, and each only-<f> from sweep O
+    # (experiments/2026-11-18-seeded-corpus-sideways/PLAN.md).
+    "fretish-seeded-sideways": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D", "O"],
+        "levels": {"D": ["lean-remove", "lean", "remove-no-climb",
+                         "remove-no-gate", "remove-no-blame", "only-remove",
+                         "base"],
+                   "O": ["only-climb", "only-gate", "only-blame"]},
+        "specs": list(SIDEWAYS_SPECS),
+        "seeds": list(range(5)),
+        "timeout_caps": {s: 7200 for s in SIDEWAYS_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-seeded-sideways",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-seeded-sideways",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-seeded-sideways.csv",
         "default_jobs": 8,
     },
     # The removal-based ablation on whole rad and lift-plus-cruise-full:

@@ -1,0 +1,31 @@
+name = "2026-11-18-seeded-corpus-sideways"
+branch = "campaign/seeded-corpus-sideways"
+profile = "fretish-seeded-sideways"
+description = "The paper's seeded arms (full, no-remove, each no-<f>, each only-<f>, base) on the regenerated seeded corpus, whose fault classes include incomparable edits (PLAN.md)."
+
+# Each phase names its own host and seeds. CPUs agreed with veribee-7a on
+# 18 Nov: av2 0-15 and av3 16-31, which leaves veribee's av2 16-31 and
+# av3 0-15 free. The corpus under subjects/ is untracked and is copied into
+# each host's checkout before enqueue.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release'"
+
+# --parallel 2 as in fretish-seeded-remove, so 8 jobs fill 16 CPUs.
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps D O --parallel 2 --out-dir experiments/configs-fretish-seeded-sideways"
+
+# 130 subjects x 10 arms. At fretish-seeded-remove's mean of 50 s a run,
+# av2's three seeds take about 6.8 h and av3's two about 4.5 h.
+[[phases]]
+name = "seeded-av2"
+profile = "fretish-seeded-sideways"
+hosts = { av2 = "0-2" }
+confine = { av2 = { cpus = "0-15", memory_max = "24G" } }
+jobs = 8
+
+[[phases]]
+name = "seeded-av3"
+profile = "fretish-seeded-sideways"
+hosts = { av3 = "3-4" }
+confine = { av3 = { cpus = "16-31", memory_max = "24G" } }
+jobs = 8

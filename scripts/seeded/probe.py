@@ -9,7 +9,8 @@ and implies B. ``compare`` decides the implication (forward direction only);
 a result that also implies O is unrealisable and skips ``realize``.
 
 ``p1`` and ``p2`` are the shares of the draws at depth 1 and depth 2 that are
-reversions. Writes ``<out>/probe<tag>.csv``; ``--config`` swaps the arm
+reversions. Writes ``<out>/probe<tag>.csv``. Each finished subject also
+leaves ``probe-work<tag>/<subject>/row.json``, and a rerun reuses it; ``--config`` swaps the arm
 whose mutation settings drive the chains (default ``base``).
 """
 
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
 import re
 import shutil
@@ -69,6 +71,9 @@ def realizable(paths: list[Path], timeout: int) -> set[str]:
 def probe(task):
     subject, root, draws, timeout, config, tag, parent = task
     work = root / f"probe-work{tag}" / subject.name
+    done = work / "row.json"
+    if done.exists():  # resume: a finished subject keeps its row
+        return json.loads(done.read_text())
     shutil.rmtree(work, ignore_errors=True)
     samples = work / "samples"
     subprocess.run([str(BIN / "sample-mutants"), str(subject / "spec.json"),
@@ -98,6 +103,7 @@ def probe(task):
                   if r["depth"] == d and r["file"] in real)
         row[f"p{d}"] = hit / total if total else 0.0
     shutil.rmtree(samples, ignore_errors=True)
+    done.write_text(json.dumps(row) + "\n")
     return row
 
 
