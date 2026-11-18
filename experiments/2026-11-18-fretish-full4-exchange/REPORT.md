@@ -47,3 +47,16 @@ Exchange reproduces at full seed counts and on the removal-based full. It widens
 **Signatures.** `scripts/f4x_sig.py` builds `data/f4x_small.csv` and `data/f4x_seeded.csv`. Run it under `systemd-run --user --scope -p MemoryMax=8G`. `sig.py`, `dirsig.py` and `allsig.py` are copies of `scripts/signatures` from commit `2b023e2d` on `campaign/fretish-gate-smoke`.
 
 **Compare.** `scripts/cmp_small.py <remove-no-f CSV>`, `scripts/cmp_seeded.py` and `scripts/f4x_cmp_sig.py` print the comparisons, saved untracked as `analysis/output.txt`. The merged arm results are in `data/results-fretish-*.csv`. Like other campaigns' data, `data/` is untracked. It is in the `full4-exchange` worktree of `~/projects/peredur` on the analysis machine, and the per-host originals are in `~/projects/peredur-full4-exchange/experiments` on av2 and av3.
+
+## Local diversity smoke, paper's measure
+
+On 18 November, from 13:11 to 13:30 UTC, the paper's diversity measure (net containment at K = 3, the pooled pass of `2026-11-17-fretish-order-remove-no-f-pooled`) was run locally on four small subjects: `remove-exchange` (a) against `remove-full` (b), 30 seeds each, 32,768 words, compare at 20 s. The pool, the fingerprints and the compare ran in a scratch worktree at `3ba397fe`, and every pair was decided. Design, per-subject table and report are in `analysis/divsmoke/`, untracked. Net is b-in-a minus a-in-b, positive when exchange spreads wider.
+
+| Subject | Nodes, exchange / full | Full in exchange (exchange halves) | Exchange in full (full halves) | Net |
+|---|---|---|---|---|
+| `fsm` | 314 / 402 | 0.831 (0.845) | 0.882 (0.887) | −0.051 |
+| `takeoff` | 631 / 733 | 0.899 (0.918) | 0.905 (0.915) | −0.006 |
+| `fsm-timing` | 834 / 936 | 0.732 (0.804) | 0.848 (0.806) | −0.116 |
+| `mode-arbiter` | 238 / 207 | 0.915 (0.913) | 0.918 (0.939) | −0.003 |
+
+Net is negative on all four subjects, so on the paper's measure exchange's repairs spread no wider than full's, and on `fsm-timing` narrower. Four subjects cannot give a significant signed-rank result (the smallest exact p is 0.125). The syntactic signature counts above point the other way: exchange varies more places, but its repairs cover less of the semantic space.
