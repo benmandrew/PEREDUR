@@ -180,80 +180,72 @@ const toml::table* find_section(const toml::table& root, const char* dotted) {
     return table;
 }
 
+/// A key removed rather than never recognised, and why it went.
+struct RetiredKey {
+    std::string_view path;
+    std::string_view why;
+};
+
+constexpr std::array<RetiredKey, 24> k_retired_keys{{
+    {"fitness.weight_halstead",
+     "removed: the Halstead objective no longer exists"},
+    {"mutation.strengthen_assumptions",
+     "removed: assumptions are always mutated in the strengthening direction"},
+    {"tlsf.mutation.p_union_assumption",
+     "removed: the union crossover no longer exists"},
+    {"tlsf.mutation.p_monotone",
+     "removed: set [mutation] p_monotone, which both paths read"},
+    {"tlsf.mutation.connective_implies",
+     "removed: the case (2d) graft always offers ->"},
+    {"tlsf.mutation.monotone_atom_rules",
+     "removed: the monotone rewrite always offers every rule"},
+    {"tlsf.mutation.monotone_extra_rules",
+     "removed: the monotone rewrite always offers every rule"},
+    {"filters.run_weakening",
+     "removed: the final weakening screen no longer exists"},
+    {"filters.run_well_separation",
+     "removed: the status score and the output gate enforce well-separation"},
+    {"filters.run_vacuity", "removed: vacuity now always runs per generation"},
+    {"mutation.allow_output_assumptions",
+     "removed: output assumptions are always allowed"},
+    {"tlsf.mutation.p_remove_assumption", "removed with its operator"},
+    {"tlsf.mutation.p_burst_continue", "removed with its operator"},
+    {"runtime.ganak_timeout_ms", "removed: ganak runs without a timeout"},
+    {"tlsf.mutation.max_assumption_width",
+     "removed: an appended assumption's body is one literal"},
+    {"tlsf.mutation.p_bare_assumption",
+     "removed: an appended fairness assumption is always G F"},
+    {"model_counting.metric",
+     "removed: trace counts always combine on the logarithmic metric"},
+    {"genetic.accumulate_repairs",
+     "removed: every run accumulates gate-passing repairs"},
+    {"fitness.keyword_similarity",
+     "removed: the keyword orders always join the semantic objective, at "
+     "weight 1/2"},
+    {"fitness.semantic_trace_weight",
+     "removed: the keyword orders always join the semantic objective, at "
+     "weight 1/2"},
+    {"tlsf.repair_mode",
+     "removed: TLSF repair always evolves the whole specification; the mucs "
+     "tool still extracts cores"},
+    {"tlsf.muc_max_iterations",
+     "removed: TLSF repair always evolves the whole specification; the mucs "
+     "tool still extracts cores"},
+    {"runtime.max_concurrent_realizability",
+     "removed: no concurrency cap; bound RAM with runtime.parallel"},
+    {"runtime.dashboard", "removed: the live dashboard no longer exists"},
+}};
+
 /// Says why a key a config still sets is no longer known, for the keys removed
 /// rather than never recognised. An archived campaign config is a partial
 /// record whose omitted keys take the binary's current default, so a removed
 /// key is the one case where the config cannot be reinterpreted at all; the
 /// bare "unknown key" reads as a typo instead.
 std::string retired_key_hint(const std::string& path) {
-    if (path == "fitness.weight_halstead") {
-        return " (removed: the Halstead objective no longer exists)";
-    }
-    if (path == "mutation.strengthen_assumptions") {
-        return " (removed: assumptions are always mutated in the strengthening"
-               " direction)";
-    }
-    if (path == "tlsf.mutation.p_union_assumption") {
-        return " (removed: the union crossover no longer exists)";
-    }
-    if (path == "tlsf.mutation.p_monotone") {
-        return " (removed: set [mutation] p_monotone, which both paths read)";
-    }
-    if (path == "tlsf.mutation.connective_implies") {
-        return " (removed: the case (2d) graft always offers ->)";
-    }
-    if (path == "tlsf.mutation.monotone_atom_rules" ||
-        path == "tlsf.mutation.monotone_extra_rules") {
-        return " (removed: the monotone rewrite always offers every rule)";
-    }
-    if (path == "filters.run_weakening") {
-        return " (removed: the final weakening screen no longer exists)";
-    }
-    if (path == "filters.run_well_separation") {
-        return " (removed: the status score and the output gate enforce"
-               " well-separation)";
-    }
-    if (path == "filters.run_vacuity") {
-        return " (removed: vacuity now always runs per generation)";
-    }
-    if (path == "mutation.allow_output_assumptions") {
-        return " (removed: output assumptions are always allowed)";
-    }
-    if (path == "tlsf.mutation.p_remove_assumption" ||
-        path == "tlsf.mutation.p_burst_continue") {
-        return " (removed with its operator)";
-    }
-    if (path == "runtime.ganak_timeout_ms") {
-        return " (removed: ganak runs without a timeout)";
-    }
-    if (path == "tlsf.mutation.max_assumption_width") {
-        return " (removed: an appended assumption's body is one literal)";
-    }
-    if (path == "tlsf.mutation.p_bare_assumption") {
-        return " (removed: an appended fairness assumption is always G F)";
-    }
-    if (path == "model_counting.metric") {
-        return " (removed: trace counts always combine on the logarithmic"
-               " metric)";
-    }
-    if (path == "genetic.accumulate_repairs") {
-        return " (removed: every run accumulates gate-passing repairs)";
-    }
-    if (path == "fitness.keyword_similarity" ||
-        path == "fitness.semantic_trace_weight") {
-        return " (removed: the keyword orders always join the semantic"
-               " objective, at weight 1/2)";
-    }
-    if (path == "tlsf.repair_mode" || path == "tlsf.muc_max_iterations") {
-        return " (removed: TLSF repair always evolves the whole specification;"
-               " the mucs tool still extracts cores)";
-    }
-    if (path == "runtime.max_concurrent_realizability") {
-        return " (removed: no concurrency cap; bound RAM with"
-               " runtime.parallel)";
-    }
-    if (path == "runtime.dashboard") {
-        return " (removed: the live dashboard no longer exists)";
+    for (const RetiredKey& retired : k_retired_keys) {
+        if (retired.path == path) {
+            return " (" + std::string(retired.why) + ")";
+        }
     }
     return "";
 }
