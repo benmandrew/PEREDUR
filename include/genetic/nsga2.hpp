@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <functional>
 #include <vector>
 
 #include "genetic/scored.hpp"
@@ -45,6 +46,35 @@ std::vector<double> crowding_distances(
     const std::vector<std::vector<double>>& objectives,
     const std::vector<std::size_t>& ranks);
 
+/// A distance between the individuals at two indices of a population.
+using PairDistance = std::function<double(std::size_t, std::size_t)>;
+
+/// A crowding score per individual from greedy farthest-point selection under
+/// @p distance, front by front in rank order. Each front starts from the
+/// members of every better front; while members remain, the one whose nearest
+/// already-picked individual is farthest is picked next, the earliest index
+/// winning a tie, and the first front's first pick is its earliest member.
+/// Each member scores the number of its front's members picked no earlier
+/// than it, so sorting a front by score descending gives the pick order, and
+/// truncating after the better fronts keeps the greedy fill of the last one.
+///
+/// @param ranks    Front index per individual, as from non_domination_ranks.
+/// @param distance Symmetric and non-negative; asked at most once per pair.
+std::vector<double> farthest_point_scores(const std::vector<std::size_t>& ranks,
+                                          const PairDistance& distance);
+
+/// Optional changes to how nsga2_sort ranks and spreads a population. The
+/// default changes nothing.
+struct Nsga2Options {
+    /// Where non-empty, one further objective per element (higher is better),
+    /// appended to each objective vector for ranking and objective crowding.
+    /// Nothing is stored on the elements.
+    std::vector<double> extra_objective;
+    /// Where set, crowding is farthest_point_scores under this distance in
+    /// place of crowding_distances.
+    PairDistance distance;
+};
+
 /// Each element's per-objective vector, in population order: the matrix the
 /// free functions above take.
 template <typename Spec>
@@ -68,22 +98,33 @@ std::vector<std::vector<double>> objectives_of(
 /// measured, so it competes for crowding distance within the front it lands
 /// in, and a 1 / (1 + rank) apportionment reads its demoted rank. An empty
 /// @p demoted demotes nothing; otherwise it is one flag per element.
+///
+/// @p options may add an objective and replace the crowding measure (see
+/// Nsga2Options); its default leaves the sort as above.
 template <typename Spec>
 void nsga2_sort(std::vector<Scored<Spec>>& population,
-                const std::vector<bool>& demoted = {}) {
+                const std::vector<bool>& demoted = {},
+                const Nsga2Options& options = {}) {
     if (population.empty()) {
         return;
     }
     assert(demoted.empty() || demoted.size() == population.size());
-    const std::vector<std::vector<double>> objectives =
-        objectives_of(population);
+    std::vector<std::vector<double>> objectives = objectives_of(population);
+    if (!options.extra_objective.empty()) {
+        assert(options.extra_objective.size() == population.size());
+        for (std::size_t i = 0; i < population.size(); ++i) {
+            objectives[i].push_back(options.extra_objective[i]);
+        }
+    }
     std::vector<std::size_t> ranks = non_domination_ranks(objectives);
     for (std::size_t i = 0; i < demoted.size(); ++i) {
         if (demoted[i]) {
             ++ranks[i];
         }
     }
-    const std::vector<double> distances = crowding_distances(objectives, ranks);
+    const std::vector<double> distances =
+        options.distance ? farthest_point_scores(ranks, options.distance)
+                         : crowding_distances(objectives, ranks);
     for (std::size_t i = 0; i < population.size(); ++i) {
         population[i].rank = ranks[i];
         population[i].crowding_distance = distances[i];

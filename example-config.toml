@@ -52,6 +52,9 @@ selection_scheme = "nsga2-apportion"
 # FRETISH only, under nsga2-apportion: demote a realizable candidate one front
 # when another realizable one is proved strictly stronger.
 maximality_demotion = false
+# FRETISH only, under nsga2-apportion: "objective" crowding distance, or
+# "specification" (farthest-point by slot Hamming distance). "objective" by default.
+crowding = "objective"
 
 [fitness]
 # AuRUS's weights (Settings.java): its lost- and won-model terms, 0.1 each, are

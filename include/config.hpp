@@ -66,6 +66,14 @@ enum class TerminationMode : std::uint8_t { Generations, Individuals };
 /// all three.
 enum class GateRealizable : std::uint8_t { Towards, Free, Exchange };
 
+/// How NSGA-II spreads the members of one front (@ref Config::crowding).
+/// Objective is Deb's crowding distance in objective space. Specification
+/// orders each front by greedy farthest-point selection under the slot
+/// Hamming distance between specifications (see diversity.hpp), seeded with
+/// every member of the better fronts, so truncation keeps the members of the
+/// last front most unlike what is already kept.
+enum class Crowding : std::uint8_t { Objective, Specification };
+
 struct Config {
     std::size_t generations = 10;
     /// Offspring budget for the whole run under
@@ -158,6 +166,9 @@ struct Config {
     /// down when a rule proves another realizable candidate in the pool
     /// strictly stronger (see "Maximality demotion" in docs/dev/algorithm.md).
     bool maximality_demotion = false;
+    /// Under NSGA-II on the FRETISH path, how a front is spread (see
+    /// Crowding). Objective by default. Draws nothing either way.
+    Crowding crowding = Crowding::Objective;
     double selection_rate = 0.5;
     /// The top elitism_rate fraction of the population carries over into the
     /// next generation verbatim, bypassing crossover, mutation and the

@@ -24,6 +24,7 @@ add_executable(peredur_tests
     genetic/parent_verdict_tests.cpp
     genetic/monotone_arm_tests.cpp
     genetic/nsga2_tests.cpp
+    genetic/diversity_tests.cpp
     genetic/order_crossover_tests.cpp
     genetic/climb_tests.cpp
     genetic/order_moves_tests.cpp
@@ -125,6 +126,7 @@ set(peredur_test_suites
     pipeline
     termination
     nsga2
+    diversity
     mutation
     blame_targeting
     direction_gate

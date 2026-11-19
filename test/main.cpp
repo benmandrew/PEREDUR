@@ -45,6 +45,7 @@ const std::vector<Suite>& suites() {
         suite_named("pipeline"),
         suite_named("termination"),
         suite_named("nsga2"),
+        suite_named("diversity"),
         suite_named("mutation"),
         suite_named("blame_targeting"),
         suite_named("direction_gate"),

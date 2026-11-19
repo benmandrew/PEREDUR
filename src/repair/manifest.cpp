@@ -28,6 +28,7 @@
 #include "genetic/accumulator.hpp"
 #include "genetic/climb.hpp"
 #include "genetic/demotion.hpp"
+#include "genetic/diversity.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/order_crossover.hpp"
@@ -54,7 +55,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 69;
+constexpr int k_schema_version = 70;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -483,6 +484,14 @@ void write_run_manifest(const std::string& output_dir,
                     {"realizable", DemotionStats::final_front->n_realizable},
                     {"gutted", DemotionStats::final_front->n_gutted}})
              : nlohmann::json(nullptr)},
+        // What genetic.crowding = "specification" did: sorts crowded by
+        // farthest-point order, survivor selections that cut a front, and the
+        // specification distances computed. Zero whenever the key is
+        // "objective".
+        {"specification_crowding",
+         {{"sorts", SpecificationCrowdingStats::n_sorts.load()},
+          {"cut_fronts", SpecificationCrowdingStats::n_cut_fronts.load()},
+          {"distances", SpecificationCrowdingStats::n_distances.load()}}},
         // The output climb, all zero unless filters.climb_output is on.
         {"climb",
          {{"climbed", ClimbStats::n_climbed.load()},

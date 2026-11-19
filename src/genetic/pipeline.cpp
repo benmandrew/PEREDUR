@@ -20,6 +20,7 @@
 #include "fitness/status.hpp"
 #include "genetic/crossover.hpp"
 #include "genetic/demotion.hpp"
+#include "genetic/diversity.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/nsga2.hpp"
 #include "genetic/order_crossover.hpp"
@@ -256,6 +257,28 @@ std::vector<bool> demotion_flags(
     return {};
 }
 
+/// The NSGA-II options the diversity keys ask for over @p population, which
+/// must outlive the sort: under `genetic.crowding = "specification"`, crowding
+/// by farthest-point order under specification_distance. Empty where every
+/// key is at its default or @p Spec is not FRETISH. Draws nothing.
+template <typename Spec>
+Nsga2Options selection_options(
+    [[maybe_unused]] const GenerationContext<Spec>& ctx,
+    [[maybe_unused]] const std::vector<Scored<Spec>>& population) {
+    Nsga2Options options;
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        if (ctx.m_cfg.crowding == Crowding::Specification) {
+            SpecificationCrowdingStats::n_sorts++;
+            options.distance = [&population](std::size_t lhs, std::size_t rhs) {
+                SpecificationCrowdingStats::n_distances++;
+                return specification_distance(population[lhs].specification,
+                                              population[rhs].specification);
+            };
+        }
+    }
+    return options;
+}
+
 template <typename Spec>
 void stage_order_parents(GenerationContext<Spec>& ctx) {
     // Parents are selected from the whole population, unfiltered: the filters
@@ -270,7 +293,8 @@ void stage_order_parents(GenerationContext<Spec>& ctx) {
     if (uses_nsga2_ranking(ctx.m_cfg)) {
         // The rule is applied again here, or a candidate demoted at the last
         // selection would breed and stand as an elite from its old front.
-        nsga2_sort(ctx.m_scored, demotion_flags(ctx, ctx.m_scored));
+        nsga2_sort(ctx.m_scored, demotion_flags(ctx, ctx.m_scored),
+                   selection_options(ctx, ctx.m_scored));
         return;
     }
     order_population(ctx.m_cfg, ctx.m_scored);
@@ -439,9 +463,15 @@ void stage_select(GenerationContext<Spec>& ctx) {
     const std::vector<bool> demoted = demotion_flags(ctx, pool);
     DemotionStats::n_demoted += static_cast<std::size_t>(
         std::count(demoted.begin(), demoted.end(), true));
-    nsga2_sort(pool, demoted);
+    nsga2_sort(pool, demoted, selection_options(ctx, pool));
 
     if (pool.size() > ctx.m_target_size) {
+        if (std::is_same_v<Spec, Specification> &&
+            ctx.m_cfg.crowding == Crowding::Specification &&
+            ctx.m_target_size > 0 &&
+            pool[ctx.m_target_size - 1].rank == pool[ctx.m_target_size].rank) {
+            SpecificationCrowdingStats::n_cut_fronts++;
+        }
         pool.resize(ctx.m_target_size);
     } else if (pool.size() < ctx.m_target_size) {
         // Deduplication alone would leave too few slots to breed from, so

@@ -149,6 +149,10 @@ Config golden_config() {
     // Off, its default: selection then runs no proof, so the goldens hold what
     // they held before the rule existed.
     cfg.maximality_demotion = false;
+    // Objective, its default: the diversity keys draw nothing, and this one
+    // changes only the order within a front. Pinned so that a move of the
+    // default fails here rather than re-recording.
+    cfg.crowding = Crowding::Objective;
     // At its default of 0 the order crossover returns before reading a verdict
     // or drawing. The golden fitness has no status objective, so no parent
     // here reads realizable at any value; pinned so that stays a decision.

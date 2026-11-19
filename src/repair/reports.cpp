@@ -15,6 +15,7 @@
 #include "genetic/accumulator.hpp"
 #include "genetic/climb.hpp"
 #include "genetic/demotion.hpp"
+#include "genetic/diversity.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/order_crossover.hpp"
@@ -253,6 +254,11 @@ void print_diagnostics_report() {
                   << DemotionStats::final_front->n_gutted
                   << " proved weaker than another realizable member\n";
     }
+    std::cout << "Specification crowding: "
+              << SpecificationCrowdingStats::n_sorts << " sorts, "
+              << SpecificationCrowdingStats::n_cut_fronts
+              << " cut fronts filled farthest-point, "
+              << SpecificationCrowdingStats::n_distances << " distances\n";
     if (ClimbStats::n_climbed > 0) {
         std::cout << "Output climb: " << ClimbStats::n_climbed
                   << " repairs climbed, " << ClimbStats::n_steps_tried

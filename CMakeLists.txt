@@ -166,6 +166,7 @@ target_sources(peredur_fitness PRIVATE
     src/genetic/accumulator.cpp
     src/genetic/crossover.cpp
     src/genetic/demotion.cpp
+    src/genetic/diversity.cpp
     src/genetic/generation.cpp
     src/genetic/monotone.cpp
     src/genetic/mutation.cpp

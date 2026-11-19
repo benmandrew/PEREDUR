@@ -26,7 +26,8 @@ using ConfigMember =
     std::variant<double Config::*, std::size_t Config::*, bool Config::*,
                  std::chrono::milliseconds Config::*, SelectionScheme Config::*,
                  TerminationMode Config::*, StatusGrading Config::*,
-                 MrsAdmissionOrder Config::*, GateRealizable Config::*>;
+                 MrsAdmissionOrder Config::*, GateRealizable Config::*,
+                 Crowding Config::*>;
 
 struct ConfigKey {
     const char* section;  // dotted, as in "tlsf.mutation"
@@ -43,7 +44,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 52> k_config_keys{{
+inline constexpr std::array<ConfigKey, 53> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -166,6 +167,19 @@ inline constexpr std::array<ConfigKey, 52> k_config_keys{{
      "FRETISH only, under nsga2-apportion: demote a realizable candidate one "
      "front\n"
      "when another realizable one is proved strictly stronger.\n"},
+    {"genetic", "crowding", &Config::crowding, KeyCheck::None,
+     KeyReader::Fretish,
+     "Under nsga2-apportion, how the members of one front are spread. "
+     "\"objective\" is the crowding distance in objective space. "
+     "\"specification\" orders each front by greedy farthest-point selection "
+     "under the share of assumption and guarantee slots whose requirements "
+     "differ, seeded with the members of every better front, so the last "
+     "front is filled with the members least like those already kept. "
+     "FRETISH only; draws nothing.",
+     "FRETISH only, under nsga2-apportion: \"objective\" crowding distance, "
+     "or\n"
+     "\"specification\" (farthest-point by slot Hamming distance). "
+     "\"objective\" by default.\n"},
     {"fitness", "weight_syntactic", &Config::fitness_weight_syntactic,
      KeyCheck::NonNegative, KeyReader::Both,
      "Syntactic similarity component weight. The defaults match AuRUS's "
