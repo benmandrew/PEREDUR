@@ -650,10 +650,31 @@ struct ImpliesSweep {
     std::vector<std::string> m_missed;
 };
 
+// ltl_implications over @p queries in batches across threads, since one
+// ltlfilt run is capped at a minute.
+std::vector<bool> ltl_implications_batched(
+    const std::vector<Implication>& queries) {
+    constexpr std::size_t k_batch = 4000;
+    std::vector<std::future<std::vector<bool>>> batches;
+    for (std::size_t start = 0; start < queries.size(); start += k_batch) {
+        const std::size_t end = std::min(start + k_batch, queries.size());
+        std::vector<Implication> batch(
+            queries.begin() + static_cast<std::ptrdiff_t>(start),
+            queries.begin() + static_cast<std::ptrdiff_t>(end));
+        batches.push_back(
+            std::async(std::launch::async, ltl_implications, std::move(batch)));
+    }
+    std::vector<bool> holds;
+    holds.reserve(queries.size());
+    for (auto& batch : batches) {
+        const std::vector<bool> part = batch.get();
+        holds.insert(holds.end(), part.begin(), part.end());
+    }
+    return holds;
+}
+
 // Every `stride`th requirement of the pools' product against every
-// requirement at most `max_apart` fields away, each pair sent to SPOT. The
-// queries go in batches across threads, since one ltlfilt run is capped at a
-// minute.
+// requirement at most `max_apart` fields away, each pair sent to SPOT.
 ImpliesSweep sweep_requirement_implies(const ImpliesPools& pools,
                                        std::size_t stride, int max_apart) {
     using Index = std::array<std::size_t, 5>;
@@ -692,23 +713,13 @@ ImpliesSweep sweep_requirement_implies(const ImpliesPools& pools,
             }
         }
     }
-    constexpr std::size_t k_batch = 4000;
-    std::vector<std::future<std::vector<bool>>> batches;
-    for (std::size_t start = 0; start < pairs.size(); start += k_batch) {
-        std::vector<Implication> queries;
-        for (std::size_t k = start; k < std::min(start + k_batch, pairs.size());
-             ++k) {
-            queries.push_back({requirements[pairs[k].first].m_ltl,
-                               requirements[pairs[k].second].m_ltl});
-        }
-        batches.push_back(std::async(std::launch::async, ltl_implications,
-                                     std::move(queries)));
+    std::vector<Implication> queries;
+    queries.reserve(pairs.size());
+    for (const auto& pair : pairs) {
+        queries.push_back(
+            {requirements[pair.first].m_ltl, requirements[pair.second].m_ltl});
     }
-    std::vector<bool> holds;
-    for (auto& batch : batches) {
-        const std::vector<bool> part = batch.get();
-        holds.insert(holds.end(), part.begin(), part.end());
-    }
+    const std::vector<bool> holds = ltl_implications_batched(queries);
     ImpliesSweep result;
     result.m_asked = pairs.size();
     for (std::size_t k = 0; k < pairs.size(); ++k) {
