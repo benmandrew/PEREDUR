@@ -113,7 +113,9 @@ def Search.timingStep (S : Search) (k : ScopeKind) : Bool :=
 /-- `step_holds` -/
 def Search.stepHolds (S : Search) (mv : Moved) : Field → Bool
   | .condition =>
-    if (S.state mv).ct == .continual then S.condBack else S.condFwd && S.condBack
+    if (S.state mv).ct == .continual ||
+        conditionTypeStep .trigger (S.state mv).scope (S.state mv).kind then S.condBack
+    else S.condFwd && S.condBack
   | .response =>
     if (S.state mv).kind.isAfter then S.respFwd && S.respBack
     else if isOnly (S.state mv).scope then S.respBack else S.respFwd
@@ -234,6 +236,27 @@ theorem condition_sound (hS : S.Sound) {k : ScopeKind} {ct : CondType} {T : Timi
       exact lower_trigger_tt _ _
     · exact fun _ => id
 
+/-- A condition step under a trigger where the trigger coincides with its
+continual form: through the continual form, where the condition is antitone. -/
+theorem condition_coincide_sound (hS : S.Sound) {k : ScopeKind} {ct : CondType} {K : Kind}
+    {s m r : Pred}
+    (h : (if (ct == .continual || conditionTypeStep .trigger k K) = true then S.condBack
+      else S.condFwd && S.condBack) = true) :
+    Entails (lower k ct S.src.ctrue (K.at s) m S.src.cond r)
+      (lower k ct S.dst.ctrue (K.at s) m S.dst.cond r) := by
+  cases ct
+  · exact condition_sound hS (by simpa using h)
+  · cases hco : conditionTypeStep .trigger k K
+    · exact condition_sound hS (by simpa [hco] using h)
+    · have hb : S.condBack = true := by simpa [hco] using h
+      have h1 := condition_type_step_sound (ct' := .continual) (s := s) (m := m) (r := r)
+        hS.src.2 (by decide) hco
+      have h2 := condition_sound hS (ct := .continual) (k := k) (T := K.at s) (m := m) (r := r)
+        (by simpa using hb)
+      have h3 := condition_type_step_sound (ct := .continual) (ct' := .trigger) (k := k) (K := K)
+        (s := s) (m := m) (r := r) hS.dst.2 (by decide) (by simp [conditionTypeStep])
+      exact fun t ht => h3 t (h2 t (h1 t ht))
+
 theorem response_sound (hS : S.Sound) {k : ScopeKind} {ct : CondType} {ctrue : Bool} {K : Kind}
     {s m c : Pred}
     (h : (if K.isAfter = true then S.respFwd && S.respBack
@@ -263,7 +286,7 @@ theorem step_sound (hS : S.Sound) (f : Field) (hf : mv f = false) (h : S.stepHol
   cases f <;>
     simp only [Search.stepHolds, Search.state, mix, Req.sem, Moved.set, hf, reduceCtorEq,
       ↓reduceIte, Bool.false_eq_true] at h hc ⊢
-  · exact condition_sound hS h
+  · exact condition_coincide_sound hS h
   · exact response_sound hS h
   · exact timing_sound hS h
   · by_cases he : S.src.ct = S.dst.ct

@@ -46,8 +46,10 @@ constexpr unsigned k_all_moved = (1U << k_field_count) - 1;
 // lowering reads its atoms only through those fields, so each step is a fact
 // about one field in the context the others give it. The polarities are those
 // the monotone arm reads (response_direction, condition_direction and
-// stop_direction in src/genetic/mutation.cpp), and the keyword steps those of
-// timing_implies, scope_implies and the condition-type order.
+// stop_direction in src/genetic/mutation.cpp), except that a trigger's
+// condition is antitone where the condition types coincide
+// (`condition_coincide_sound` in proofs/Fretish/Chain.lean), and the keyword
+// steps those of timing_implies, scope_implies and the condition-type order.
 // `reach_sound` in proofs/Fretish/Chain.lean proves the search sound.
 class RuleSearch {
    public:
@@ -100,9 +102,11 @@ class RuleSearch {
         const ScopeKind scope = at(moved, k_scope).m_scope.m_kind;
         switch (field) {
             case k_condition:
-                // An antecedent under continual; a trigger's rising edge holds
-                // the condition at both polarities.
-                return ctype == ConditionType::Continual
+                // An antecedent under continual, and under a trigger where it
+                // coincides with continual; elsewhere a trigger's rising edge
+                // holds the condition at both polarities.
+                return ctype == ConditionType::Continual ||
+                               condition_types_coincide(timing, scope)
                            ? back(m_condition, m_dest.m_condition,
                                   m_from.m_condition)
                            : equivalent(m_condition, m_from.m_condition,
@@ -149,16 +153,21 @@ class RuleSearch {
                    : onward(m_stop, *from_stop, *dest_stop);
     }
 
-    // Continual implies Trigger everywhere; the two coincide at Always under
-    // the plain scopes and at Eventually under the only ones.
-    [[nodiscard]] bool condition_type_step(const Timing& timing,
-                                           ScopeKind scope) const {
-        if (m_from.m_condition_type == ConditionType::Continual) {
-            return true;
-        }
+    // The two condition types coincide at Always under the plain scopes and at
+    // Eventually under the only ones.
+    static bool condition_types_coincide(const Timing& timing,
+                                         ScopeKind scope) {
         return is_only_scope(scope)
                    ? std::holds_alternative<timing::Eventually>(timing)
                    : std::holds_alternative<timing::Always>(timing);
+    }
+
+    // Continual implies Trigger everywhere, and Trigger implies Continual
+    // where they coincide.
+    [[nodiscard]] bool condition_type_step(const Timing& timing,
+                                           ScopeKind scope) const {
+        return m_from.m_condition_type == ConditionType::Continual ||
+               condition_types_coincide(timing, scope);
     }
 
     // Each propositional field has two values, so two answers cover every

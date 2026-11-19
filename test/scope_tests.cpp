@@ -5,6 +5,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -732,5 +733,39 @@ TEST(test_requirement_implies_chains_every_field) {
            "requirement_implies: the five-field chain must hold");
     expect(!requirement_implies(loose, tight),
            "requirement_implies: the converse must not be proved");
+}
+
+// Where a trigger coincides with its continual form, `always` under a plain
+// scope and `eventually` under an only one, its condition is antitone. Away
+// from those cells only an equivalent condition is proved.
+TEST(test_requirement_implies_trigger_condition_at_coincidence) {
+    const auto upon = [](const char* condition, Timing timing, Scope scope) {
+        return Requirement(Formula(condition), Formula("x"), std::move(timing),
+                           ConditionType::Trigger, /*weakenable=*/true,
+                           /*removed=*/false, std::move(scope));
+    };
+    const Scope in_m{ScopeKind::In, "m"};
+    const Scope only_after_m{ScopeKind::OnlyAfter, "m"};
+    const std::vector<std::pair<Requirement, Requirement>> proved = {
+        {upon("a", timing::always(), in_m),
+         upon("a & b", timing::always(), in_m)},
+        {upon("a", timing::eventually(), only_after_m),
+         upon("a & b", timing::eventually(), only_after_m)},
+        {upon("a", timing::eventually(), only_after_m),
+         upon("a & b", timing::immediately(), only_after_m)}};
+    std::vector<Implication> queries;
+    for (const auto& [stronger, weaker] : proved) {
+        expect(requirement_implies(stronger, weaker),
+               "requirement_implies: trigger condition at a coincidence: " +
+                   stronger.to_string() + " => " + weaker.to_string());
+        queries.push_back({stronger.m_ltl, weaker.m_ltl});
+    }
+    for (const bool holds : ltl_implications(queries)) {
+        expect(holds, "requirement_implies: a coincidence pair must hold");
+    }
+    expect(!requirement_implies(upon("a", timing::eventually(), in_m),
+                                upon("a & b", timing::eventually(), in_m)),
+           "requirement_implies: a trigger condition away from a "
+           "coincidence must stay unproved");
 }
 }  // namespace

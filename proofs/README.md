@@ -13,6 +13,7 @@ Each theorem is stated about a Lean *transcription* of a C++ function (`timingIm
 | `scope_implies_sound` (`Fretish/ScopeOrder.lean`) | `scope_implies`, `scope_edges` | Every pair `scope_implies` accepts also holds at the literal condition `true`. |
 | `condition_type_step_exact` (`Fretish/CondOrder.lean`) | `condition_type_step` | For a condition other than the literal `true`, a change of condition type holds exactly when `condition_type_step` accepts it. |
 | `condition_type_step_sound` (`Fretish/CondOrder.lean`) | `condition_type_step` | Every change `condition_type_step` accepts also holds at the literal condition `true`. |
+| `condition_coincide_sound` (`Fretish/Chain.lean`) | the condition step of `RuleSearch` | Under a trigger where the two condition types coincide (`always` under a plain scope, `eventually` under an only scope), the condition is antitone, as under continual. |
 | `reach_sound` (`Fretish/Chain.lean`) | `RuleSearch` in `requirement_implies` | Every pair the chain search accepts implies, given correct answers from `formula_implies` and a start that marks only fields the two requirements share. |
 | `eval_lowerSyn` (`Fretish/Syntax.lean`) | `requirement_to_ltl` | The formula built as LTL syntax, branch for branch like the C++, means what the model of the lowering says, so the theorems above hold of real formulas. |
 
@@ -32,7 +33,7 @@ Each file named below is `Fretish/<Name>.lean`, and its module header explains i
 2. **Edges.** An *edge* is a pair of timings that an order relates. Every edge of each order holds for all tick counts, and the scope wrappers are monotone in the body, so each edge lifts to whole requirements under any condition type and mode (`Timing`, `Only`, `Scope`).
 3. **Non-edges.** An explicit trace refutes every pair an order leaves out, which makes each order exact (`Exact`, `ExactOnly`, `Witness`).
 4. **Transcriptions.** The C++ functions are transcribed branch for branch, and each transcription is proved equal to the exact order (`Cpp`, `ScopeOrder`, `CondOrder`).
-5. **Chains.** `Search.reach` transcribes `RuleSearch`, which chains one-field steps. Each step is one of the theorems above, or a response, stop or condition polarity, read at the other fields of the current state. Soundness follows by induction on the chain (`Chain`).
+5. **Chains.** `Search.reach` transcribes `RuleSearch`, which chains one-field steps. Each step is one of the theorems above, or a response, stop or condition polarity, read at the other fields of the current state. A trigger's condition takes the continual polarity where the two condition types coincide, by a chain through the continual form. Soundness follows by induction on the chain (`Chain`).
 6. **Syntax.** `lowerSyn` builds the formula `requirement_to_ltl` builds as LTL syntax, expanding bounded operators into `X` chains as the C++ does. `eval_lowerSyn` proves that its meaning is the model from step 1 (`Syntax`).
 
 ## Building
