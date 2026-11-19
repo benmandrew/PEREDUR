@@ -1,0 +1,86 @@
+name = "2026-11-19-diversity-pooled"
+branch = "campaign/diversity-climb"
+description = "Pooled pass over 2026-11-19-diversity-screen-blame's climb arms (profile diversity-climb-blame): the paper's full at climb_orders 4 against 1 (full-k4 against full-k1, 30 seeds) over the small set less fsm-lmcps and rad's 10 cores, for accepted-trace share and net containment at K = 3 with seed-half controls (PLAN.md). Arms from diversity-screen-blame or a later profile join by lines in design.toml."
+
+# Each host fingerprints and compares its own subjects. The pool was built
+# locally, since av2 holds seeds 0-9 and av3 seeds 10-29 of every subject. The
+# pool, design and subject lists are ignored files, copied to each host's
+# checkout by rsync before enqueue (PLAN.md).
+hosts = { av2 = "", av3 = "" }
+
+# av3: CPUs 0-29 and 64G; CPUs 30-31 stay free for the Ollama server. av2:
+# CPUs 0-13 and 28G only, because another job holds av2's CPUs 14-31. Every
+# phase inherits this table.
+confine = { av2 = { cpus = "0-13", memory_max = "28G" }, av3 = { cpus = "0-29", memory_max = "64G" } }
+
+# fpdraw is EXCLUDE_FROM_ALL, so the build names it. `confine` does not reach
+# the build, so taskset holds it to CPUs both hosts allow.
+build = "sh -c 'taskset -c 0-13 sh -c \"cmake --build build-release -j 12 && cmake --build build-release -j 12 --target fpdraw\"'"
+
+# Every subject is in the copied pool, so this phase only copies it, after
+# checking each file against its index row.
+[[phases]]
+name = "pool"
+kind = "pool"
+design = "experiments/2026-11-19-diversity-pooled/design.toml"
+subjects = "experiments/2026-11-19-diversity-pooled/subjects-{host}.txt"
+copy_from = "experiments/2026-11-19-diversity-pooled/members"
+out = "experiments/diversity-pooled-members"
+
+# 32768 words a subject over the members (black, 30 s a draw), every node
+# evaluated on them, and the pairs the design plans. With two arms in one
+# contrast, every node pair no word refutes is kept. One phase a host, so that
+# each runs as many draws as its CPUs allow.
+[[phases]]
+name = "fingerprint-av2"
+kind = "fingerprint"
+hosts = ["av2"]
+subjects = "experiments/2026-11-19-diversity-pooled/subjects-{host}.txt"
+members = "experiments/diversity-pooled-members"
+design = "experiments/2026-11-19-diversity-pooled/design.toml"
+work = "experiments/diversity-pooled-work"
+out = "experiments/diversity-pooled/fp"
+pairs = "experiments/diversity-pooled-work/pairs-{host}.csv"
+words = 32768
+seed = 3
+workers = 4
+black_timeout = 30
+
+[[phases]]
+name = "fingerprint-av3"
+kind = "fingerprint"
+hosts = ["av3"]
+subjects = "experiments/2026-11-19-diversity-pooled/subjects-{host}.txt"
+members = "experiments/diversity-pooled-members"
+design = "experiments/2026-11-19-diversity-pooled/design.toml"
+work = "experiments/diversity-pooled-work"
+out = "experiments/diversity-pooled/fp"
+pairs = "experiments/diversity-pooled-work/pairs-{host}.csv"
+words = 32768
+seed = 3
+workers = 8
+black_timeout = 30
+
+# Every planned pair, each unrefuted direction at the archive's 20 s. Jobs at
+# the template's 12 on 30 CPUs, and in proportion on av2's 14.
+[[phases]]
+name = "compare-av2"
+kind = "compare"
+hosts = ["av2"]
+pairs = "experiments/diversity-pooled-work/pairs-{host}.csv"
+out = "experiments/diversity-pooled/subsumption-{host}.csv"
+jobs = 6
+black_timeout = 20
+wall_timeout = 180
+vmem_kb = 8388608
+
+[[phases]]
+name = "compare-av3"
+kind = "compare"
+hosts = ["av3"]
+pairs = "experiments/diversity-pooled-work/pairs-{host}.csv"
+out = "experiments/diversity-pooled/subsumption-{host}.csv"
+jobs = 12
+black_timeout = 20
+wall_timeout = 180
+vmem_kb = 8388608
