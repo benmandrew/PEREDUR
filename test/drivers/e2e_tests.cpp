@@ -1637,6 +1637,9 @@ TEST_IN("driver_compare", test_compare_rule_only_proves_without_a_solver) {
     const std::filesystem::path slots = dir.path() / "slots";
     write_text(slots / "original.json",
                fretish_two_guarantees("Immediately", true));
+    // Proved neither way: its assumption is uncovered one way and its second
+    // guarantee the other.
+    write_text(slots / "assumed.json", k_fretish_assumed);
     const std::filesystem::path removed = dir.path() / "removed";
     write_text(removed / "repair_0.json",
                fretish_two_guarantees("Eventually", false));
@@ -1649,7 +1652,28 @@ TEST_IN("driver_compare", test_compare_rule_only_proves_without_a_solver) {
         contains(shifted.m_output, "DIR\trepair_0.json\toriginal.json\t0\t1"),
         "compare --rule-only: a guarantee is covered from another slot, "
         "with its timing relaxed");
+    expect(!contains(shifted.m_output, "DIR\trepair_0.json\tassumed.json"),
+           "compare --rule-only: an unproved pair prints no DIR line");
 
+    // --pairs asks only what it lists: the original's own pair, one way.
+    const std::filesystem::path pairs = write_text(
+        dir.path() / "pairs.tsv", "repair_0.json\tassumed.json\tfwd\n");
+    const DriverRun listed = run_driver(
+        "compare", {"--repairs", repairs.string(), "--ideals", ideals.string(),
+                    "--rule-only", "--pairs", pairs.string()});
+    expect(listed.m_exit_code == 0 &&
+               contains(listed.m_output,
+                        "DIR\trepair_0.json\tassumed.json\t1\t0") &&
+               !contains(listed.m_output, "DIR\trepair_1.json"),
+           "compare --pairs: only the listed pair is asked");
+    const std::filesystem::path bad = write_text(
+        dir.path() / "bad.tsv", "repair_9.json\tassumed.json\tfwd\n");
+    const DriverRun unknown = run_driver(
+        "compare", {"--repairs", repairs.string(), "--ideals", ideals.string(),
+                    "--rule-only", "--pairs", bad.string()});
+    expect(unknown.m_exit_code == 1 &&
+               contains(unknown.m_output, "--pairs: unknown name"),
+           "compare --pairs: a name that is not loaded is refused");
     const std::filesystem::path tlsf = dir.path() / "tlsf";
     write_text(tlsf / "spec.tlsf", k_unrealizable);
     const DriverRun refused = run_driver(

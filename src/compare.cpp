@@ -10,6 +10,7 @@
 #include <iostream>
 #include <mutex>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -22,7 +23,6 @@
 #include "bounded_async.hpp"
 #include "driver_support.hpp"
 #include "filter/implication_check.hpp"
-#include "hash_combine.hpp"
 #include "repair/manifest.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
@@ -38,12 +38,14 @@ struct Args {
     std::string ideals_dir;
     std::int64_t timeout_s{20};
     bool rule_only{false};
+    std::string pairs_file;
 };
 
 void print_usage(const char* prog) {
     std::cerr
         << "Usage: " << prog
         << " --repairs <dir> --ideals <dir> [--timeout S] [--rule-only]\n"
+        << "       [--pairs FILE]\n"
         << "\n"
         << "Compares each repair in the repairs directory against every\n"
         << "ideal in the ideals directory and reports whether the found\n"
@@ -68,7 +70,12 @@ void print_usage(const char* prog) {
         << "               lowering or by the requirement rules the engine's\n"
         << "               filters use. Sound and incomplete: 0 means "
            "unproved,\n"
-        << "               never refuted, and no direction reads ?.\n"
+        << "               never refuted, and no direction reads ?. A pair\n"
+        << "               with neither direction proved prints no DIR line.\n"
+        << "  --pairs FILE With --rule-only, ask only the listed pairs, one\n"
+        << "               a line: repair name, ideal name and fwd, rev or\n"
+        << "               both, tab-separated. A direction not asked reads "
+           "0.\n"
         << "  --version    Print the git commit this binary was built from.\n";
 }
 
@@ -97,12 +104,18 @@ std::optional<Args> parse_args(int argc, const char* const* argv) {
             args.timeout_s = static_cast<std::int64_t>(*value);
         } else if (arg == "--rule-only") {
             args.rule_only = true;
+        } else if (arg == "--pairs" && i + 1 < argc && argv[i + 1] != nullptr) {
+            args.pairs_file = argv[++i];
         } else {
             std::cerr << "Unknown argument: " << arg << "\n";
             return std::nullopt;
         }
     }
     if (args.repairs_dir.empty() || args.ideals_dir.empty()) {
+        return std::nullopt;
+    }
+    if (!args.pairs_file.empty() && !args.rule_only) {
+        std::cerr << "--pairs needs --rule-only\n";
         return std::nullopt;
     }
     return args;
@@ -356,83 +369,171 @@ void run_and_report(const std::vector<Entry<Spec>>& repairs,
 // slot. JSON drops a removed requirement rather than tombstoning it, so the
 // slots of two loaded repairs no longer pair by index once either removed one.
 // Any cover is sound, since each step is an implication between two whole
-// requirements. requirement_implies is memoised per pair of lowerings, which
-// repeat across a pool of repairs of one original.
+// requirements. A grid over one pool asks millions of pairs of a few thousand
+// distinct requirements, so each lowering is interned once and
+// requirement_implies is memoised per pair of interned ids.
 class RuleImplication {
    public:
-    // Whether @p from is proved to imply @p dest.
-    bool operator()(const Specification& from, const Specification& dest) {
-        return covers(dest.m_assumptions, from.m_assumptions) &&
-               covers(from.m_guarantees, dest.m_guarantees);
+    explicit RuleImplication(const std::vector<const Specification*>& specs) {
+        for (const Specification* spec : specs) {
+            m_sides.push_back(
+                {intern(spec->m_assumptions), intern(spec->m_guarantees)});
+        }
+    }
+
+    // Whether spec @p from is proved to imply spec @p dest, both indices
+    // into the constructor's list.
+    bool operator()(std::size_t from, std::size_t dest) {
+        return covers(m_sides[dest].first, m_sides[from].first) &&
+               covers(m_sides[from].second, m_sides[dest].second);
     }
 
    private:
-    using Key = std::pair<std::string_view, std::string_view>;
-    struct KeyHash {
-        std::size_t operator()(const Key& key) const noexcept {
-            const std::hash<std::string_view> hash;
-            return hash_combine(hash(key.first), hash(key.second));
-        }
-    };
-
-    // Whether every live requirement of @p weaker is implied by a live one of
-    // @p stronger.
-    bool covers(const std::vector<Requirement>& stronger,
-                const std::vector<Requirement>& weaker) {
-        for (const Requirement& req : weaker) {
+    // The sorted, distinct ids of the live requirements of @p reqs.
+    std::vector<std::uint32_t> intern(const std::vector<Requirement>& reqs) {
+        std::vector<std::uint32_t> ids;
+        for (const Requirement& req : reqs) {
             if (req.m_removed) {
                 continue;
             }
-            bool covered = false;
-            for (const Requirement& cand : stronger) {
-                if (!cand.m_removed && implies(cand, req)) {
-                    covered = true;
-                    break;
-                }
+            const auto found = m_ids.find(req.m_ltl);
+            if (found != m_ids.end()) {
+                ids.push_back(found->second);
+                continue;
             }
-            if (!covered) {
+            const auto id = static_cast<std::uint32_t>(m_reqs.size());
+            m_reqs.push_back(&req);
+            m_ids.emplace(req.m_ltl, id);
+            ids.push_back(id);
+        }
+        std::sort(ids.begin(), ids.end());
+        ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+        return ids;
+    }
+
+    // Whether every requirement of @p weaker is implied by one of
+    // @p stronger.
+    bool covers(const std::vector<std::uint32_t>& stronger,
+                const std::vector<std::uint32_t>& weaker) {
+        for (const std::uint32_t req : weaker) {
+            if (std::binary_search(stronger.begin(), stronger.end(), req)) {
+                continue;
+            }
+            if (std::none_of(
+                    stronger.begin(), stronger.end(),
+                    [&](std::uint32_t cand) { return implies(cand, req); })) {
                 return false;
             }
         }
         return true;
     }
 
-    bool implies(const Requirement& stronger, const Requirement& weaker) {
-        if (stronger.m_ltl == weaker.m_ltl) {
-            return true;
-        }
-        const Key key{stronger.m_ltl, weaker.m_ltl};
+    bool implies(std::uint32_t stronger, std::uint32_t weaker) {
+        const std::uint64_t key =
+            (static_cast<std::uint64_t>(stronger) << 32U) | weaker;
         const auto found = m_memo.find(key);
         if (found != m_memo.end()) {
             return found->second;
         }
-        const bool proved = requirement_implies(stronger, weaker);
+        const bool proved =
+            requirement_implies(*m_reqs[stronger], *m_reqs[weaker]);
         m_memo.emplace(key, proved);
         return proved;
     }
 
-    // Keys view the loaded specifications' lowerings, which outlive the memo.
-    std::unordered_map<Key, bool, KeyHash> m_memo;
+    // The loaded specifications own the requirements and outlive this.
+    std::vector<const Requirement*> m_reqs;
+    std::unordered_map<std::string_view, std::uint32_t> m_ids;
+    std::vector<
+        std::pair<std::vector<std::uint32_t>, std::vector<std::uint32_t>>>
+        m_sides;
+    std::unordered_map<std::uint64_t, bool> m_memo;
 };
 
 // --rule-only: the grid run_and_report asks, each direction decided by rule
 // on this thread, with no solver started.
+// One asked pair of --rule-only: a repair, an ideal, and which directions.
+struct AskedPair {
+    std::size_t rep;
+    std::size_t ide;
+    bool fwd;
+    bool rev;
+};
+
+// Every pair of the grid both ways, or the pairs @p path lists; nullopt
+// with a message where a line names no loaded file.
+std::optional<std::vector<AskedPair>> asked_pairs(
+    const std::vector<Entry<Specification>>& repairs,
+    const std::vector<Entry<Specification>>& ideals, const std::string& path) {
+    std::vector<AskedPair> out;
+    if (path.empty()) {
+        for (std::size_t rep = 0; rep < repairs.size(); ++rep) {
+            for (std::size_t ide = 0; ide < ideals.size(); ++ide) {
+                out.push_back({rep, ide, true, true});
+            }
+        }
+        return out;
+    }
+    std::unordered_map<std::string, std::size_t> rep_at;
+    std::unordered_map<std::string, std::size_t> ide_at;
+    for (std::size_t idx = 0; idx < repairs.size(); ++idx) {
+        rep_at.emplace(repairs[idx].name, idx);
+    }
+    for (std::size_t idx = 0; idx < ideals.size(); ++idx) {
+        ide_at.emplace(ideals[idx].name, idx);
+    }
+    std::istringstream lines(read_file_or_throw(path, "cannot open pairs"));
+    for (std::string line; std::getline(lines, line);) {
+        if (line.empty()) {
+            continue;
+        }
+        const std::size_t tab1 = line.find('\t');
+        const std::size_t tab2 = line.find('\t', tab1 + 1);
+        if (tab1 == std::string::npos || tab2 == std::string::npos) {
+            std::cerr << "--pairs: malformed line: " << line << "\n";
+            return std::nullopt;
+        }
+        const auto rep = rep_at.find(line.substr(0, tab1));
+        const auto ide = ide_at.find(line.substr(tab1 + 1, tab2 - tab1 - 1));
+        const std::string dirs = line.substr(tab2 + 1);
+        if (rep == rep_at.end() || ide == ide_at.end() ||
+            (dirs != "fwd" && dirs != "rev" && dirs != "both")) {
+            std::cerr << "--pairs: unknown name or direction: " << line << "\n";
+            return std::nullopt;
+        }
+        out.push_back({rep->second, ide->second, dirs != "rev", dirs != "fwd"});
+    }
+    return out;
+}
+
 void run_rule_only(const std::vector<Entry<Specification>>& repairs,
-                   const std::vector<Entry<Specification>>& ideals) {
-    RuleImplication implies;
+                   const std::vector<Entry<Specification>>& ideals,
+                   const std::vector<AskedPair>& pairs) {
+    std::vector<const Specification*> specs;
+    for (const auto& entry : repairs) {
+        specs.push_back(&entry.spec);
+    }
+    for (const auto& entry : ideals) {
+        specs.push_back(&entry.spec);
+    }
+    RuleImplication implies(specs);
+    const std::size_t off = repairs.size();
     std::vector<std::pair<Relation, std::size_t>> best(repairs.size(),
                                                        {Relation::Timeout, 0});
-    for (std::size_t rep = 0; rep < repairs.size(); ++rep) {
-        for (std::size_t ide = 0; ide < ideals.size(); ++ide) {
-            const bool fwd = implies(repairs[rep].spec, ideals[ide].spec);
-            const bool rev = implies(ideals[ide].spec, repairs[rep].spec);
-            std::cerr << "DIR\t" << repairs[rep].name << "\t"
-                      << ideals[ide].name << "\t" << (fwd ? "1" : "0") << "\t"
-                      << (rev ? "1" : "0") << "\n";
-            const Relation rel = classify(fwd, rev);
-            if (rel > best[rep].first) {
-                best[rep] = {rel, ide};
-            }
+    for (const AskedPair& pair : pairs) {
+        const bool fwd = pair.fwd && implies(pair.rep, off + pair.ide);
+        const bool rev = pair.rev && implies(off + pair.ide, pair.rep);
+        if (!fwd && !rev) {
+            // A grid over one pool has millions of unproved pairs, and an
+            // absent line reads as unproved both ways.
+            continue;
+        }
+        std::cerr << "DIR\t" << repairs[pair.rep].name << "\t"
+                  << ideals[pair.ide].name << "\t" << (fwd ? "1" : "0") << "\t"
+                  << (rev ? "1" : "0") << "\n";
+        const Relation rel = classify(fwd, rev);
+        if (rel > best[pair.rep].first) {
+            best[pair.rep] = {rel, pair.ide};
         }
     }
     std::array<std::size_t, k_relation_info.size()> counts{};
@@ -499,7 +600,12 @@ int main(int argc, const char* const argv[]) {
             !load_or_report(args.ideals_dir, false, ideals)) {
             return 1;
         }
-        run_rule_only(repairs, ideals);
+        const std::optional<std::vector<AskedPair>> pairs =
+            asked_pairs(repairs, ideals, args.pairs_file);
+        if (!pairs.has_value()) {
+            return 1;
+        }
+        run_rule_only(repairs, ideals, *pairs);
         return 0;
     }
 
