@@ -1,0 +1,45 @@
+name = "2026-11-19-diversity-screen-runs"
+branch = "campaign/diversity-climb"
+profile = "diversity-climb"
+description = "Does the output climb under more step orders, or one of six diversity mechanisms, give a more diverse output? The paper's full (sweep D's remove-no-blame-exchange at e117a76) at climb_orders 1 and 4 (sweep K's full-k1 and full-k4, 30 seeds), and full-k1 plus one mechanism each (crowd-spec, novelty, slot-coverage, spread-init, flip-tabu, flip-sideways, seeds 0-9, paired with full-k1's), on the small set and rad's cores."
+
+# Seeds: full-k1 and full-k4 av2 0-14, av3 15-29, as the exchange rerun split
+# them; the six screen arms av2 0-4, av3 5-9.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+# The exchange rerun's settings at 2 threads a run; only the sweep and the
+# directory differ.
+configs = "sh -c 'python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps K --parallel 2 --out-dir experiments/configs-diversity-climb'"
+
+# 19 subjects x 2 arms x 15 seeds = 570 runs per host, 14 jobs x 2 threads.
+# CPUs 30-31 stay free for the Ollama server.
+[[phases]]
+name = "climb-av2"
+profile = "diversity-climb"
+hosts = { av2 = "0-14" }
+confine = { av2 = { cpus = "0-29", memory_max = "64G" } }
+jobs = 14
+
+[[phases]]
+name = "climb-av3"
+profile = "diversity-climb"
+hosts = { av3 = "15-29" }
+confine = { av3 = { cpus = "0-29", memory_max = "64G" } }
+jobs = 14
+
+# 19 subjects x 6 arms x 5 seeds = 570 runs per host.
+[[phases]]
+name = "screen-av2"
+profile = "diversity-screen"
+hosts = { av2 = "0-4" }
+confine = { av2 = { cpus = "0-29", memory_max = "64G" } }
+jobs = 14
+
+[[phases]]
+name = "screen-av3"
+profile = "diversity-screen"
+hosts = { av3 = "5-9" }
+confine = { av3 = { cpus = "0-29", memory_max = "64G" } }
+jobs = 14

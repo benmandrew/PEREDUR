@@ -600,6 +600,47 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order-cores.csv",
         "default_jobs": 16,
     },
+    # The paper's full (sweep D's remove-no-blame-exchange at e117a76) at one
+    # and four climb orders, on the small set and rad's cores at 2 threads a
+    # run, as fretish-exchange-rerun ran it. See
+    # experiments/2026-11-19-diversity-screen-runs.
+    "diversity-climb": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["full-k1", "full-k4"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-climb",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-climb.csv",
+        "default_jobs": 14,
+    },
+    # full-k1 plus one diversity mechanism per arm, on seeds 0-9 so that each
+    # pairs with diversity-climb's full-k1. Same config tree, its own results.
+    "diversity-screen": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["crowd-spec", "novelty", "slot-coverage",
+                         "spread-init", "flip-tabu", "flip-sideways"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(10)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-screen",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-screen.csv",
+        "default_jobs": 14,
+    },
 }
 
 
