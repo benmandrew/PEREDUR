@@ -139,12 +139,13 @@ name = "fretish-order-remove-no-f"
 location = "~/projects/peredur-wt-demote/experiments"
 paths = ["2026-11-17-fretish-order-remove-no-f", "results-fretish-order-remove-no-f", "results-fretish-order-remove-no-f.csv", "configs-fretish-order-remove-no-f"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ1, RQ2"
 campaign = "2026-11-17-fretish-order-remove-no-f"
 date = "2026-11-17"
 commits = ["580a6cc"]
 purpose = "`remove-full` (a rerun of lean-remove, the paper's `full`) and each `remove-no-<f>` on the small set."
+superseded_by = "fretish-exchange-rerun"
 
 [[set]]
 name = "fretish-order-only-remove"
@@ -186,12 +187,13 @@ name = "fretish-order-removal"
 location = "~/projects/peredur-removal-pooled/experiments"
 paths = ["results-fretish-order-removal", "results-fretish-order-removal.csv"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ2 removal against demotion"
 campaign = "2026-11-17-fretish-order-removal"
 date = "2026-11-17"
 commits = ["d815233", "56bfb69"]
 purpose = "`lean` (the paper's `no-remove`), `lean-demote` and `lean-remove` on the small set."
+superseded_by = "fretish-exchange-rerun"
 note = "The campaign directory is on the worktrees `peredur-wt-demote` and `peredur-ext-share`. `~/projects/peredur-ext-share/experiments/results-fretish-order-removal` holds a 452 MB run tree without a CSV."
 
 [[set]]
@@ -217,6 +219,19 @@ campaign = "2026-11-17-fretish-extension-share"
 date = "2026-11-18"
 commits = ["739edd4", "c1a35b6"]
 purpose = "`lean-remove`, `remove-no-<f>`, `lean`, `only-remove` and `only-<f>` on rad and lift-plus-cruise-full."
+
+[[set]]
+name = "fretish-exchange-rerun"
+location = "~/projects/peredur-exchange-rerun/experiments"
+paths = ["results-fretish-exchange-rerun", "results-fretish-exchange-rerun.csv", "results-fretish-exchange-rerun-large.csv", "results-fretish-exchange-rerun-vent.csv"]
+paper = "ext"
+status = "cited"
+question = "RQ1, RQ2, RQ3"
+campaign = "2026-11-18-fretish-exchange-rerun"
+date = "2026-11-18"
+commits = ["e117a76"]
+purpose = "Every gated arm under the gate's exchange mode (`remove-exchange` = `full`, `lean-exchange` = `no-remove`, `remove-no-climb-exchange`, `remove-no-blame-exchange`, `only-gate-exchange`), with `remove-no-gate` and `base` under the same load, on the small set and rad's cores; the same arms less `base` on rad and lift-plus-cruise-full; `full` alone on ventilator-controller."
+note = "Collected on 2026-11-19 into the campaign's worktree, run trees for the small set only; `import_data.py` reads that worktree. The large and ventilator-controller run trees stay on av2 and av3 under `~/projects/counter/experiments`. Every ventilator-controller run reached the 7200 s cap and wrote no run.json; the deadline rerun meant to record its counters (2026-11-19-fretish-exchange-vent-deadline) was cancelled, and the paper labels the older figure."
 
 [[set]]
 name = "fretish-order-only-remove-pooled"
