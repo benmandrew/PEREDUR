@@ -135,6 +135,8 @@ All three schemes still emit the weighted-average scalar in each repair's fitnes
 
 ``genetic.maximality_demotion`` (``false``) adds one rule to ``nsga2-apportion`` on FRETISH runs. A realizable candidate moves one front down when another realizable candidate in the pool is proved strictly stronger, slot by slot and by rule alone. A weaker timing or a removed guarantee costs nothing on similarity, so without the rule such a candidate can share the first front with the repair it weakens. It has not yet been campaigned; ``docs/dev/algorithm.md`` records the design.
 
+``genetic.maximality_removal`` (``false``) removes each candidate the rule flags from the survivor pool instead of demoting it, so it keeps no slot even when the pool is smaller than ``population_size``. The stronger candidate stays. It requires ``maximality_demotion = true``.
+
 Search size and operators
 -------------------------
 

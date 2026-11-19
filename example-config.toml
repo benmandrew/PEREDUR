@@ -61,6 +61,9 @@ novelty = false
 # FRETISH only: seed the population with one-step weakenings of the original
 # spread over its refused guarantees and its assumptions. Off by default.
 spread_init = false
+# With maximality_demotion: remove the flagged candidate at survivor selection
+# instead of demoting it. Requires maximality_demotion.
+maximality_removal = false
 
 [fitness]
 # AuRUS's weights (Settings.java): its lost- and won-model terms, 0.1 each, are

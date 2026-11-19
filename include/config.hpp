@@ -184,6 +184,12 @@ struct Config {
     /// and its weakenable assumptions, in place of population_size copies of
     /// the original. Off by default; off, it draws nothing.
     bool spread_init = false;
+    /// With maximality_demotion on, remove a flagged candidate from the
+    /// survivor pool instead of moving it one front down. The candidate proved
+    /// stronger stays, so the pool cannot empty. The parent ordering still
+    /// demotes (see "Maximality demotion" in docs/dev/algorithm.md). Requires
+    /// maximality_demotion.
+    bool maximality_removal = false;
     double selection_rate = 0.5;
     /// The top elitism_rate fraction of the population carries over into the
     /// next generation verbatim, bypassing crossover, mutation and the

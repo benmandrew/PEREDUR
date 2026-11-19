@@ -329,6 +329,11 @@ void stage_order_parents(GenerationContext<Spec>& ctx) {
     if (uses_nsga2_ranking(ctx.m_cfg)) {
         // The rule is applied again here, or a candidate demoted at the last
         // selection would breed and stand as an elite from its old front.
+        // Under maximality_removal it demotes here all the same: the
+        // population holds no candidate flagged at the survivor step, and one
+        // flagged only now (its stronger partner is new to the pool) still
+        // breeds from one front lower rather than being dropped from a
+        // population that must keep target_size slots.
         nsga2_sort(ctx.m_scored, demotion_flags(ctx, ctx.m_scored),
                    selection_options(ctx, ctx.m_scored));
         return;
@@ -502,12 +507,19 @@ void stage_select(GenerationContext<Spec>& ctx) {
     // holding them stops the truncation below from cutting arbitrarily through
     // the rank-0 front.
     pool = generation_detail::dedup_by_specification(std::move(pool));
-    const std::vector<bool> demoted = demotion_flags(ctx, pool);
-    DemotionStats::n_demoted += static_cast<std::size_t>(
-        std::count(demoted.begin(), demoted.end(), true));
+    std::vector<bool> demoted = demotion_flags(ctx, pool);
+    if (ctx.m_cfg.maximality_removal) {
+        generation_detail::remove_flagged(pool, demoted);
+    } else {
+        DemotionStats::n_demoted += static_cast<std::size_t>(
+            std::count(demoted.begin(), demoted.end(), true));
+    }
     nsga2_sort(pool, demoted, selection_options(ctx, pool));
 
+    SurvivorSelectionStats::n_selections++;
+    SurvivorSelectionStats::pool_size_sum += pool.size();
     if (pool.size() > ctx.m_target_size) {
+        SurvivorSelectionStats::n_truncated++;
         if (std::is_same_v<Spec, Specification> &&
             ctx.m_cfg.crowding == Crowding::Specification &&
             ctx.m_target_size > 0 &&
@@ -516,6 +528,7 @@ void stage_select(GenerationContext<Spec>& ctx) {
         }
         pool.resize(ctx.m_target_size);
     } else if (pool.size() < ctx.m_target_size) {
+        SurvivorSelectionStats::n_replicated++;
         // Deduplication alone would leave too few slots to breed from, so
         // selection pressure is re-expressed as replication multiplicity.
         pool = generation_detail::replicate_to_size(pool, ctx.m_target_size);

@@ -149,6 +149,25 @@ TEST(test_config_io_elitism_not_less_than_selection_throws) {
         "elitism_rate");
 }
 
+TEST(test_config_io_maximality_removal_parsed_with_demotion) {
+    expect(!Config{}.maximality_removal,
+           "config_io: maximality_removal should default to off");
+    const Config cfg = config_from_toml_string(
+        "[genetic]\nmaximality_demotion = true\nmaximality_removal = true\n");
+    expect(cfg.maximality_demotion && cfg.maximality_removal,
+           "config_io: maximality_removal should be parsed from TOML");
+}
+
+TEST(test_config_io_maximality_removal_without_demotion_throws) {
+    expect_throws(
+        [&] {
+            config_from_toml_string("[genetic]\nmaximality_removal = true\n");
+        },
+        "config_io: maximality_removal without maximality_demotion should "
+        "throw",
+        "maximality_removal");
+}
+
 // An enum-valued key: its default, every spelling it accepts, and one it
 // rejects. The default is read both from a bare Config and from a file that
 // omits the key, since an archived config inherits it either way.
