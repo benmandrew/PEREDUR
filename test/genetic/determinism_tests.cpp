@@ -155,6 +155,7 @@ Config golden_config() {
     cfg.crowding = Crowding::Objective;
     cfg.novelty = false;
     cfg.slot_coverage = false;
+    cfg.spread_init = false;
     // At its default of 0 the order crossover returns before reading a verdict
     // or drawing. The golden fitness has no status objective, so no parent
     // here reads realizable at any value; pinned so that stays a decision.

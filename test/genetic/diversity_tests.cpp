@@ -11,6 +11,7 @@
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/nsga2.hpp"
+#include "genetic/order_moves.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "requirement.hpp"
@@ -264,6 +265,52 @@ TEST(test_slot_coverage_counts_the_slots_accumulated_repairs_edit) {
            "assumption included");
     expect(coverage_of(coverage, 2, 1) == 2 && coverage_of(coverage, 5, 1) == 0,
            "coverage_of: reads a guarantee by global index, 0 past the end");
+}
+
+}  // namespace
+
+namespace {
+
+// --- spread seed population ---
+
+TEST(test_spread_init_weakens_the_targets_round_robin) {
+    const Specification original({assumption0()}, {guarantee0(), guarantee1()},
+                                 inputs(), outputs());
+    Config cfg;
+    const RandomSource source = make_random_source_from_seed(7);
+    // Guarantee 1 refused: the targets are guarantee 1 then assumption 0.
+    const std::vector<Specification> seeds =
+        spread_initial_population(original, {1}, 7, cfg, source);
+    expect(seeds.size() == 7 && seeds[0] == original,
+           "spread_init: the population is the original then the seeds");
+    expect(SpreadInitStats::n_targets == 2,
+           "spread_init: one refused guarantee and one assumption");
+    expect(SpreadInitStats::n_seeded + SpreadInitStats::n_failed == 6 &&
+               SpreadInitStats::n_seeded > 0,
+           "spread_init: every seed is counted, and some are weakenings");
+    for (std::size_t k = 1; k < seeds.size(); ++k) {
+        const Specification& seed = seeds[k];
+        if (seed == original) {
+            continue;
+        }
+        expect(classify_move(original, seed) == MoveOrder::Weaker,
+               "spread_init: every seed is proved weaker than the original");
+        const bool on_guarantee = (k - 1) % 2 == 0;
+        expect(seed.m_guarantees[0] == original.m_guarantees[0],
+               "spread_init: an unrefused guarantee is never moved");
+        expect(on_guarantee ? seed.m_assumptions == original.m_assumptions
+                            : seed.m_guarantees == original.m_guarantees,
+               "spread_init: each seed moves its own target slot alone");
+    }
+}
+
+TEST(test_spread_init_with_one_individual_is_the_original) {
+    const Specification original({}, {guarantee0()}, inputs(), outputs());
+    const RandomSource source = make_random_source_from_seed(1);
+    const std::vector<Specification> seeds =
+        spread_initial_population(original, {}, 1, Config{}, source);
+    expect(seeds.size() == 1 && seeds[0] == original,
+           "spread_init: a population of one is the original alone");
 }
 
 }  // namespace

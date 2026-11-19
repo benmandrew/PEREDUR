@@ -11,6 +11,8 @@
 
 #include "filter/implication_check.hpp"
 #include "fitness/status.hpp"
+#include "genetic/mutation.hpp"
+#include "genetic/order_moves.hpp"
 #include "profile.hpp"
 #include "requirement.hpp"
 
@@ -166,4 +168,114 @@ const SlotCoverage& DiversityState::slot_coverage(
                     m_coverage.guarantees);
     }
     return m_coverage;
+}
+
+namespace {
+
+// How many draws a slot gets before its individual is left as the original.
+constexpr std::size_t k_spread_attempts = 8;
+
+// The global slots (assumptions first, then guarantees) spread_init weakens.
+std::vector<std::size_t> spread_targets(
+    const Specification& original, const std::vector<std::size_t>& refused) {
+    const std::size_t n_assumptions = original.m_assumptions.size();
+    const auto usable = [](const Requirement& req) {
+        return req.m_weakenable && !req.m_removed;
+    };
+    std::vector<std::size_t> targets;
+    for (const std::size_t local : refused) {
+        if (local < original.m_guarantees.size() &&
+            usable(original.m_guarantees[local])) {
+            targets.push_back(n_assumptions + local);
+        }
+    }
+    if (targets.empty()) {
+        for (std::size_t local = 0; local < original.m_guarantees.size();
+             ++local) {
+            if (usable(original.m_guarantees[local])) {
+                targets.push_back(n_assumptions + local);
+            }
+        }
+    }
+    for (std::size_t local = 0; local < n_assumptions; ++local) {
+        if (usable(original.m_assumptions[local])) {
+            targets.push_back(local);
+        }
+    }
+    return targets;
+}
+
+// One proved weakening of @p original in global slot @p idx, or nothing.
+std::optional<Specification> weaken_slot(const Specification& original,
+                                         std::size_t idx, const Config& cfg,
+                                         const RandomSource& random_source) {
+    const std::size_t n_assumptions = original.m_assumptions.size();
+    const bool is_assumption = idx < n_assumptions;
+    const std::size_t local = is_assumption ? idx : idx - n_assumptions;
+    std::vector<std::string> atoms = original.m_in_atoms;
+    atoms.insert(atoms.end(), original.m_out_atoms.begin(),
+                 original.m_out_atoms.end());
+    if (atoms.empty()) {
+        return std::nullopt;
+    }
+    const std::vector<std::string>& condition_atoms =
+        original.m_in_atoms.empty() ? atoms : original.m_in_atoms;
+    const std::vector<Timing> timing_pool = collect_timing_pool(original);
+    Config directed = cfg;
+    directed.p_monotone = 1.0;
+    // Weakening the specification strengthens an assumption.
+    const Direction direction =
+        is_assumption ? Direction::Strengthen : Direction::Weaken;
+    for (std::size_t attempt = 0; attempt < k_spread_attempts; ++attempt) {
+        std::vector<Requirement> assumptions = original.m_assumptions;
+        std::vector<Requirement> guarantees = original.m_guarantees;
+        std::vector<Requirement>& side =
+            is_assumption ? assumptions : guarantees;
+        side[local] = mutate_requirement(
+            side[local], atoms, condition_atoms, direction, timing_pool,
+            original.m_modes, random_source, directed);
+        Specification candidate(std::move(assumptions), std::move(guarantees),
+                                original.m_in_atoms, original.m_out_atoms,
+                                original.m_modes);
+        // The constructor merges equal entries, which would shift the slots.
+        if (candidate.m_assumptions.size() != n_assumptions ||
+            candidate.m_guarantees.size() != original.m_guarantees.size()) {
+            continue;
+        }
+        if (classify_move(original, candidate) == MoveOrder::Weaker) {
+            return candidate;
+        }
+    }
+    return std::nullopt;
+}
+
+}  // namespace
+
+std::vector<Specification> spread_initial_population(
+    const Specification& original, const std::vector<std::size_t>& refused,
+    std::size_t population_size, const Config& cfg,
+    const RandomSource& random_source) {
+    std::vector<Specification> population;
+    population.reserve(population_size);
+    if (population_size == 0) {
+        return population;
+    }
+    population.push_back(original);
+    const std::vector<std::size_t> targets = spread_targets(original, refused);
+    SpreadInitStats::n_targets = targets.size();
+    for (std::size_t k = 1; k < population_size; ++k) {
+        std::optional<Specification> weakened =
+            targets.empty()
+                ? std::nullopt
+                : weaken_slot(original, targets[(k - 1) % targets.size()], cfg,
+                              random_source);
+        if (weakened.has_value()) {
+            SpreadInitStats::n_seeded++;
+            population.push_back(std::move(*weakened));
+        } else {
+            SpreadInitStats::n_failed++;
+            population.push_back(original);
+        }
+    }
+    return population;
 }

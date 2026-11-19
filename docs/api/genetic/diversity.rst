@@ -15,4 +15,7 @@ The FRETISH mechanisms that spread the search over unlike repairs, each behind a
 ``SlotCoverage``
   For ``mutation.slot_coverage``, how many members of M edit each slot of the original. ``DiversityState::slot_coverage`` brings it up to date once per generation, and mutation weights its slot draw by ``1 / (1 + c)``.
 
+``spread_initial_population``
+  The seed population of ``genetic.spread_init``: the original plus one-step weakenings spread round-robin over its refused guarantees and its weakenable assumptions, each proved Weaker by rule.
+
 .. doxygenfile:: diversity.hpp

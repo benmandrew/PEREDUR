@@ -268,6 +268,9 @@ void print_diagnostics_report() {
     std::cout << "Slot coverage: " << SlotCoverageStats::n_draws
               << " slot draws with coverage counts, "
               << SlotCoverageStats::n_weighted << " weighted\n";
+    std::cout << "Spread seed population: " << SpreadInitStats::n_seeded
+              << " weakenings over " << SpreadInitStats::n_targets << " slots, "
+              << SpreadInitStats::n_failed << " left as the original\n";
     if (ClimbStats::n_climbed > 0) {
         std::cout << "Output climb: " << ClimbStats::n_climbed
                   << " repairs climbed, " << ClimbStats::n_steps_tried

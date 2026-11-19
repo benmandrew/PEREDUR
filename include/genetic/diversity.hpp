@@ -16,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+#include "config.hpp"
+#include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "hash_combine.hpp"
 #include "requirement.hpp"
@@ -135,3 +137,34 @@ class DiversityState {
 std::vector<double> novelty_objective(
     DiversityState& state, const std::vector<Scored<Specification>>& population,
     std::optional<std::size_t> status_index);
+
+/// What `genetic.spread_init` did to a run's seed population. Reported under
+/// `--diagnostics` and in run.json; zero whenever the key is off.
+struct SpreadInitStats {
+    /// Slots the weakenings were spread over.
+    inline static std::size_t n_targets{0};
+    /// Seed individuals that are a proved weakening of the original.
+    inline static std::size_t n_seeded{0};
+    /// Seed individuals left as the original, their slot's draws having
+    /// found no weakening the rule proves.
+    inline static std::size_t n_failed{0};
+};
+
+/// The unscored seed population `genetic.spread_init` asks for, of
+/// @p population_size individuals: @p original, then one-step weakenings of
+/// it. Individual k (from 1) weakens target slot (k - 1) mod T, the targets
+/// being the guarantees in @p refused (local guarantee indices, from the
+/// original's MRS walk) that are live and weakenable, or every live
+/// weakenable guarantee where none is, followed by every live weakenable
+/// assumption.
+///
+/// A weakening is one mutate_requirement of the slot in the weakening
+/// direction (weaker guarantee, stronger assumption), with the propositional
+/// rewrites monotone (`p_monotone` at 1), kept only where classify_move
+/// proves the result Weaker than @p original. A slot gets up to a few draws;
+/// where none is proved, the individual is @p original. Draws from
+/// @p random_source.
+std::vector<Specification> spread_initial_population(
+    const Specification& original, const std::vector<std::size_t>& refused,
+    std::size_t population_size, const Config& cfg,
+    const RandomSource& random_source);

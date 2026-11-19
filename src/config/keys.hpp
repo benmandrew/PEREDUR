@@ -44,7 +44,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 55> k_config_keys{{
+inline constexpr std::array<ConfigKey, 56> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -190,6 +190,18 @@ inline constexpr std::array<ConfigKey, 55> k_config_keys{{
      "FRETISH only, under nsga2-apportion: minimise the number of accumulated "
      "repairs\n"
      "that rule-imply a realizable candidate. Off by default.\n"},
+    {"genetic", "spread_init", &Config::spread_init, KeyCheck::None,
+     KeyReader::Fretish,
+     "Seed the first generation with the original plus one-step weakenings "
+     "of it, spread round-robin over the guarantees the original's MRS walk "
+     "refused (every live weakenable guarantee where it refused none) and its "
+     "weakenable assumptions, each scored like any candidate, in place of "
+     "population_size copies of the original. A slot whose weakening is not "
+     "proved by rule after a few draws keeps the original. FRETISH only.",
+     "FRETISH only: seed the population with one-step weakenings of the "
+     "original\n"
+     "spread over its refused guarantees and its assumptions. Off by "
+     "default.\n"},
     {"fitness", "weight_syntactic", &Config::fitness_weight_syntactic,
      KeyCheck::NonNegative, KeyReader::Both,
      "Syntactic similarity component weight. The defaults match AuRUS's "

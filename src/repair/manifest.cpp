@@ -55,7 +55,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 72;
+constexpr int k_schema_version = 73;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -507,6 +507,14 @@ void write_run_manifest(const std::string& output_dir,
         {"slot_coverage",
          {{"draws", SlotCoverageStats::n_draws.load()},
           {"weighted", SlotCoverageStats::n_weighted.load()}}},
+        // What genetic.spread_init did to the seed population: the slots the
+        // weakenings were spread over, the seeds proved weaker than the
+        // original, and those left as the original. Zero whenever the key is
+        // off.
+        {"spread_init",
+         {{"targets", SpreadInitStats::n_targets},
+          {"seeded", SpreadInitStats::n_seeded},
+          {"failed", SpreadInitStats::n_failed}}},
         // The output climb, all zero unless filters.climb_output is on.
         {"climb",
          {{"climbed", ClimbStats::n_climbed.load()},

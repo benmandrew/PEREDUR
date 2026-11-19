@@ -174,6 +174,11 @@ struct Config {
     /// candidate, and 0 for an unrealizable one (see "Diversity mechanisms" in
     /// docs/dev/algorithm.md). Off by default. Draws nothing.
     bool novelty = false;
+    /// FRETISH only: seed the search with the original plus one-step
+    /// weakenings spread round-robin over the guarantees its MRS walk refused
+    /// and its weakenable assumptions, in place of population_size copies of
+    /// the original. Off by default; off, it draws nothing.
+    bool spread_init = false;
     double selection_rate = 0.5;
     /// The top elitism_rate fraction of the population carries over into the
     /// next generation verbatim, bypassing crossover, mutation and the

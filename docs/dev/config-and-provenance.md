@@ -58,6 +58,7 @@ Versions 2 to 62 are in "Run manifest schema versions" in `docs/dev/history.md`.
 - **70** records the new `[genetic] crowding` key in `config` and adds the `specification_crowding` block (`sorts`, `cut_fronts`, `distances`), all zero at the default `"objective"`, which behaves as at 69. See "Diversity mechanisms" in `docs/dev/algorithm.md`.
 - **71** records the new `[genetic] novelty` key in `config` and adds the `novelty` block (`evaluations`, `checks`, `implied`, `covered`), all zero at the default `false`, which behaves as at 70.
 - **72** records the new `[mutation] slot_coverage` key in `config` and adds the `slot_coverage` block (`draws`, `weighted`), both zero at the default `false`, which behaves as at 71.
+- **73** records the new `[genetic] spread_init` key in `config` and adds the `spread_init` block (`targets`, `seeded`, `failed`), all zero at the default `false`, which behaves as at 72.
 
 ## Where the campaign records are
 
