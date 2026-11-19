@@ -887,6 +887,27 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-fretish-exchange-rerun-vent.csv",
         "default_jobs": 4,
     },
+    # The same full on ventilator-controller under a 3000 s search deadline,
+    # so each run stops on its own and writes the run.json that the 7200 s
+    # harness kill above never lets it write
+    # (experiments/2026-11-19-fretish-exchange-vent-deadline).
+    "fretish-exchange-vent-deadline": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["D"],
+        "levels": {"D": ["remove-exchange"]},
+        "specs": ["ventilator-controller"],
+        "seeds": list(range(10)),
+        "timeout_caps": {"ventilator-controller": 7200},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-fretish-exchange-vent-deadline",
+        "results_dir": EXPERIMENTS_DIR / "results-fretish-exchange-vent-deadline",
+        "results_csv": EXPERIMENTS_DIR / "results-fretish-exchange-vent-deadline.csv",
+        "default_jobs": 4,
+    },
     # The removal-based ablation on whole rad and lift-plus-cruise-full:
     # lean-remove (the paper's full), its no-<f> (lean is no-remove), only-remove
     # and sweep O's only-<f>, against fretish-order-large's base

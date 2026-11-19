@@ -1,0 +1,22 @@
+name = "2026-11-19-fretish-exchange-vent-deadline"
+branch = "campaign/fretish-exchange-vent-deadline"
+profile = "fretish-exchange-vent-deadline"
+description = "The paper's full (remove-exchange) on ventilator-controller under a 3000 s search deadline, so each run writes the run.json that 2026-11-18-fretish-exchange-rerun's 7200 s kill never lets it write. It replaces the largeplus-ventilator-controller counters of 2026-11-13-fretish-order-large-counters, whose full predates removal. PLAN.md gives the questions."
+
+# Seeds 0-9 on av3, as the 2026-11-13 deadline runs had. Same commit as
+# 2026-11-18-fretish-exchange-rerun (e117a76) plus this declaration and its
+# profile, so the engine matches the other paper arms.
+hosts = { av3 = "0-9" }
+confine = { av3 = { cpus = "0-29", memory_max = "96G" } }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+configs = "python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps D --levels remove-exchange --max-wall-s 3000 --out-dir experiments/configs-fretish-exchange-vent-deadline"
+
+# 10 runs at 7 jobs over 30 CPUs, so 4 threads a run, as the exchange
+# rerun's ventilator phase and the 2026-11-13 deadline runs had. Each run
+# took 3294-3774 s of harness time at the 3000 s deadline, so two waves take
+# about 2 h. That phase peaked at 13.6 GB for 4 jobs.
+[[phases]]
+name = "vent"
+jobs = 7
