@@ -44,7 +44,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 54> k_config_keys{{
+inline constexpr std::array<ConfigKey, 55> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -365,6 +365,16 @@ inline constexpr std::array<ConfigKey, 54> k_config_keys{{
      "\"towards\" the original, \"free\" in any direction, or "
      "\"exchange\" (one step back\n"
      "and one weakening of an untouched slot). \"exchange\" by default.\n"},
+    {"mutation", "slot_coverage", &Config::slot_coverage, KeyCheck::None,
+     KeyReader::Fretish,
+     "FRETISH only: weight the slot a rewrite draws, including within the "
+     "blame-targeted list and the exchange gate's weakening, by 1 / (1 + c), "
+     "where c counts the repairs accumulated so far whose same slot differs "
+     "from the original. Steps towards the original keep their share of the "
+     "draw. While every weight is equal the draw is the unweighted one.",
+     "FRETISH only: favour slots the accumulated repairs have not edited when "
+     "drawing\n"
+     "a rewrite's slot. Off by default.\n"},
     {"mutation", "step_scaling", &Config::step_scaling, KeyCheck::Probability,
      KeyReader::Fretish,
      "FRETISH only: how far the parent's status scales the choice between a "

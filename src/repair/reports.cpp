@@ -265,6 +265,9 @@ void print_diagnostics_report() {
               << NoveltyStats::n_implied << " proved), "
               << NoveltyStats::n_covered
               << " realizable candidates implied by a repair\n";
+    std::cout << "Slot coverage: " << SlotCoverageStats::n_draws
+              << " slot draws with coverage counts, "
+              << SlotCoverageStats::n_weighted << " weighted\n";
     if (ClimbStats::n_climbed > 0) {
         std::cout << "Output climb: " << ClimbStats::n_climbed
                   << " repairs climbed, " << ClimbStats::n_steps_tried

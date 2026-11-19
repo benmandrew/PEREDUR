@@ -121,6 +121,9 @@ direction_gated = false
 # "towards" the original, "free" in any direction, or "exchange" (one step back
 # and one weakening of an untouched slot). "exchange" by default.
 gate_realizable = "exchange"
+# FRETISH only: favour slots the accumulated repairs have not edited when drawing
+# a rewrite's slot. Off by default.
+slot_coverage = false
 # FRETISH only: take more large moves from a parent far from realizable and
 # fewer from one near it, scaled by the parent's status. Off (0) by default.
 step_scaling = 0.0

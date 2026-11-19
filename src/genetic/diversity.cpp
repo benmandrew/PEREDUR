@@ -124,3 +124,46 @@ std::vector<double> novelty_objective(
     }
     return objective;
 }
+
+namespace {
+
+// Adds one to each slot of @p counts in which @p member differs from
+// @p original, growing @p counts to cover every slot @p member has.
+void count_edits(const std::vector<Requirement>& member,
+                 const std::vector<Requirement>& original,
+                 std::vector<std::size_t>& counts) {
+    if (counts.size() < member.size()) {
+        counts.resize(member.size(), 0);
+    }
+    for (std::size_t i = 0; i < member.size(); ++i) {
+        if (i >= original.size() || !(member[i] == original[i])) {
+            ++counts[i];
+        }
+    }
+}
+
+}  // namespace
+
+std::size_t coverage_of(const SlotCoverage& coverage, std::size_t idx,
+                        std::size_t n_assumptions) {
+    const bool is_assumption = idx < n_assumptions;
+    const std::vector<std::size_t>& counts =
+        is_assumption ? coverage.assumptions : coverage.guarantees;
+    const std::size_t local = is_assumption ? idx : idx - n_assumptions;
+    return local < counts.size() ? counts[local] : 0;
+}
+
+const SlotCoverage& DiversityState::slot_coverage(
+    const Specification& original) {
+    if (m_accumulated == nullptr) {
+        return m_coverage;
+    }
+    for (; m_covered < m_accumulated->size(); ++m_covered) {
+        const Specification& member = (*m_accumulated)[m_covered];
+        count_edits(member.m_assumptions, original.m_assumptions,
+                    m_coverage.assumptions);
+        count_edits(member.m_guarantees, original.m_guarantees,
+                    m_coverage.guarantees);
+    }
+    return m_coverage;
+}

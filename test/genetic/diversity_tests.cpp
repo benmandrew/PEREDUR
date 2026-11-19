@@ -9,6 +9,7 @@
 #include "fixtures.hpp"
 #include "genetic/diversity.hpp"
 #include "genetic/generation.hpp"
+#include "genetic/mutation.hpp"
 #include "genetic/nsga2.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
@@ -181,6 +182,88 @@ TEST(test_novelty_ranks_a_repair_below_an_incomparable_one) {
     expect(population[0].specification == other && population[0].rank == 0 &&
                population[1].rank == 1,
            "novelty: the candidate a found repair implies drops a front");
+}
+
+}  // namespace
+
+namespace {
+
+// --- slot coverage ---
+
+// Two guarantees and no input, so no structural action draws and the slot
+// draw is the first draw of the mutation.
+Specification two_guarantees() {
+    return Specification({}, {guarantee0(), guarantee1()}, {}, outputs());
+}
+
+Config coverage_config() {
+    Config cfg;
+    cfg.p_remove_guarantee = 0.0;
+    cfg.slot_coverage = true;
+    return cfg;
+}
+
+TEST(test_slot_coverage_weights_the_draw_away_from_edited_slots) {
+    const Specification spec = two_guarantees();
+    SlotCoverage coverage;
+    coverage.guarantees = {5, 0};
+    ParentContext parent;
+    parent.coverage = &coverage;
+    // 0.2 of the mass: the first slot's weight is 1/6 against 1, so its share
+    // is 1/7 and 0.2 lands in the second slot. A uniform draw of 200000
+    // modulo 2 lands in the first.
+    const RandomSource source = make_source({200000}, 0);
+    const std::size_t weighted = SlotCoverageStats::n_weighted;
+    const Specification mutated =
+        mutate_specification(spec, source, coverage_config(), &parent);
+    expect(SlotCoverageStats::n_weighted == weighted + 1,
+           "slot coverage: unequal weights take the weighted draw");
+    expect(mutated.m_guarantees[0] == spec.m_guarantees[0],
+           "slot coverage: the slot the repairs edited is not drawn");
+}
+
+TEST(test_slot_coverage_with_equal_weights_draws_uniformly) {
+    const Specification spec = two_guarantees();
+    SlotCoverage coverage;
+    coverage.guarantees = {2, 2};
+    ParentContext parent;
+    parent.coverage = &coverage;
+    const std::size_t weighted = SlotCoverageStats::n_weighted;
+    const std::size_t draws = SlotCoverageStats::n_draws;
+    const RandomSource with = make_source({7, 3, 1, 4}, 0);
+    const RandomSource without = make_source({7, 3, 1, 4}, 0);
+    Config off = coverage_config();
+    off.slot_coverage = false;
+    const Specification lhs =
+        mutate_specification(spec, with, coverage_config(), &parent);
+    const Specification rhs = mutate_specification(spec, without, off);
+    expect(SlotCoverageStats::n_draws == draws + 1 &&
+               SlotCoverageStats::n_weighted == weighted,
+           "slot coverage: equal weights are counted but not weighted");
+    expect(lhs == rhs, "slot coverage: equal weights draw as the key off");
+}
+
+TEST(test_slot_coverage_counts_the_slots_accumulated_repairs_edit) {
+    const Specification original({assumption0()}, {guarantee0(), guarantee1()},
+                                 inputs(), outputs());
+    std::vector<Specification> accumulated = {
+        Specification({assumption0()}, {guarantee0(), removed(guarantee1())},
+                      inputs(), outputs()),
+    };
+    DiversityState state(&accumulated);
+    expect(state.slot_coverage(original).guarantees ==
+               std::vector<std::size_t>{0, 1},
+           "slot coverage: a tombstoned guarantee counts as edited");
+    accumulated.push_back(Specification(
+        {assumption0(), make_req("a", "b", timing::next_timepoint())},
+        {make_req("b", "x"), removed(guarantee1())}, inputs(), outputs()));
+    const SlotCoverage& coverage = state.slot_coverage(original);
+    expect(coverage.guarantees == std::vector<std::size_t>{1, 2} &&
+               coverage.assumptions == std::vector<std::size_t>{0, 1},
+           "slot coverage: later repairs add to the counts, an appended "
+           "assumption included");
+    expect(coverage_of(coverage, 2, 1) == 2 && coverage_of(coverage, 5, 1) == 0,
+           "coverage_of: reads a guarantee by global index, 0 past the end");
 }
 
 }  // namespace

@@ -77,10 +77,10 @@ inline void record_origin(std::vector<OffspringOrigin>* origins,
 }
 
 /// What mutation is told about the FRETISH parent @p parent.
-inline ParentContext parent_context(
-    const Scored<Specification>& parent, bool crossed,
-    const Specification* original,
-    std::optional<std::size_t> status_objective) {
+inline ParentContext parent_context(const Scored<Specification>& parent,
+                                    bool crossed, const Specification* original,
+                                    std::optional<std::size_t> status_objective,
+                                    const SlotCoverage* coverage) {
     ParentContext context;
     if (status_objective.has_value() &&
         *status_objective < parent.objectives.size()) {
@@ -90,6 +90,7 @@ inline ParentContext parent_context(
     context.refused_guarantees = parent.refused_guarantees;
     context.crossed = crossed;
     context.original = original;
+    context.coverage = coverage;
     return context;
 }
 
@@ -176,12 +177,21 @@ std::vector<Spec> breed_offspring(const Config& cfg,
                                   const RandomSource& random_source,
                                   SearchBudget* budget, const Spec* original,
                                   std::optional<std::size_t> status_objective,
-                                  std::vector<OffspringOrigin>* origins) {
+                                  std::vector<OffspringOrigin>* origins,
+                                  [[maybe_unused]] DiversityState* diversity) {
     std::vector<Spec> offspring_pop;
     offspring_pop.reserve(offspring_n);
     // Read once: an inactive budget must not reach the loop body at all, or an
     // unbudgeted run pays a specification comparison and a clock read per slot.
     const bool budgeted = budget != nullptr && budget->active();
+    // Counted once per generation, before any draw, and only where the key
+    // asks for it.
+    [[maybe_unused]] const SlotCoverage* coverage = nullptr;
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        if (cfg.slot_coverage && diversity != nullptr && original != nullptr) {
+            coverage = &diversity->slot_coverage(*original);
+        }
+    }
     for (std::size_t i = 0; i < offspring_n; ++i) {
         // Tested between slots rather than after the whole generation, which is
         // where AuRUS tests it: its mutation and crossover loops both carry
@@ -211,8 +221,9 @@ std::vector<Spec> breed_offspring(const Config& cfg,
             if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
                 offspring = tlsf_mutate(offspring, random_source, cfg);
             } else {
-                const ParentContext parent = parent_context(
-                    sorted_pop[i], crossed, original, status_objective);
+                const ParentContext parent =
+                    parent_context(sorted_pop[i], crossed, original,
+                                   status_objective, coverage);
                 offspring = mutate_specification(offspring, random_source, cfg,
                                                  &parent, &stepped);
             }
@@ -317,7 +328,8 @@ void stage_breed(GenerationContext<Spec>& ctx) {
     ctx.m_candidates = generation_detail::breed_offspring(
         ctx.m_cfg, ctx.m_sorted_parents, ctx.m_offspring_n, ctx.m_top_n,
         ctx.m_random_source, ctx.m_budget, ctx.m_original,
-        ctx.m_status_objective, record_origins ? &ctx.m_origins : nullptr);
+        ctx.m_status_objective, record_origins ? &ctx.m_origins : nullptr,
+        ctx.m_diversity);
     // The filter chain is judged as a whole rather than filter by filter, so
     // the unfiltered offspring have to survive until every filter has run.
     ctx.m_pre_filter = ctx.m_candidates;
@@ -537,7 +549,7 @@ template void order_population(const Config&,
 template std::vector<Specification> generation_detail::breed_offspring(
     const Config&, const std::vector<Scored<Specification>>&, std::size_t,
     std::size_t, const RandomSource&, SearchBudget*, const Specification*,
-    std::optional<std::size_t>, std::vector<OffspringOrigin>*);
+    std::optional<std::size_t>, std::vector<OffspringOrigin>*, DiversityState*);
 template void pipeline_detail::stage_parent_verdict(
     GenerationContext<Specification>&,
     const ParentVerdictLookup<Specification>&);
@@ -551,7 +563,7 @@ template void order_population(const Config&,
 template std::vector<tlsf::Specification> generation_detail::breed_offspring(
     const Config&, const std::vector<Scored<tlsf::Specification>>&, std::size_t,
     std::size_t, const RandomSource&, SearchBudget*, const tlsf::Specification*,
-    std::optional<std::size_t>, std::vector<OffspringOrigin>*);
+    std::optional<std::size_t>, std::vector<OffspringOrigin>*, DiversityState*);
 template void pipeline_detail::stage_parent_verdict(
     GenerationContext<tlsf::Specification>&,
     const ParentVerdictLookup<tlsf::Specification>&);

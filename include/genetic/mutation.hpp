@@ -112,6 +112,8 @@ Requirement mutate_requirement(const Requirement& requirement,
                                const RandomSource& random_source,
                                const Config& cfg);
 
+struct SlotCoverage;
+
 /// What breeding knows about the parent an offspring descends from, handed to
 /// mutate_specification so that it can aim its move. Built per offspring by
 /// breed_offspring from the parent's Scored entry, on the FRETISH path only.
@@ -134,6 +136,20 @@ struct ParentContext {
     /// Borrowed for the generation, never copied; null when the caller has
     /// none to give.
     const Specification* original = nullptr;
+    /// Under Config::slot_coverage, how many accumulated repairs edited each
+    /// slot of the original (diversity.hpp); null otherwise, which leaves the
+    /// slot draw unweighted. Borrowed for the generation.
+    const SlotCoverage* coverage = nullptr;
+};
+
+/// What Config::slot_coverage did over a run. Reported under `--diagnostics`
+/// and in run.json.
+struct SlotCoverageStats {
+    /// Slot draws made with coverage counts at hand.
+    inline static std::atomic<std::size_t> n_draws{0};
+    /// Of those, the draws whose weights were unequal, so that the weighted
+    /// draw replaced the uniform one.
+    inline static std::atomic<std::size_t> n_weighted{0};
 };
 
 /// How often mutate_specification drew its slot from a targeted list under

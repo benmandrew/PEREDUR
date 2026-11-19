@@ -14,6 +14,7 @@
 
 #include "fitness/status.hpp"
 #include "genetic/binary_kind.hpp"
+#include "genetic/diversity.hpp"
 #include "genetic/monotone.hpp"
 #include "genetic/order_moves.hpp"
 #include "prop_formula.hpp"
@@ -1109,6 +1110,52 @@ BackSteps steps_back(const Specification& specification,
     return back;
 }
 
+// A position among @p n_steps steps followed by @p slots, global slot
+// indices of @p specification: one next_index over them all, or under
+// Config::slot_coverage, where @p parent lends coverage counts and the slot
+// weights 1 / (1 + c) are unequal, one next_real over the weights instead.
+// The slot weights are scaled to sum to the number of slots, so the steps
+// keep their share of the draw and only the choice among the slots moves.
+std::size_t draw_position(std::size_t n_steps,
+                          const std::vector<std::size_t>& slots,
+                          const Specification& specification,
+                          const ParentContext* parent,
+                          const RandomSource& random_source) {
+    const std::size_t total = n_steps + slots.size();
+    if (parent == nullptr || parent->coverage == nullptr || slots.empty()) {
+        return random_source.next_index(total);
+    }
+    SlotCoverageStats::n_draws++;
+    const std::size_t n_assumptions = specification.m_assumptions.size();
+    std::vector<double> weights(slots.size());
+    double slot_mass = 0.0;
+    bool equal = true;
+    for (std::size_t k = 0; k < slots.size(); ++k) {
+        const std::size_t count =
+            coverage_of(*parent->coverage, slots[k], n_assumptions);
+        weights[k] = 1.0 / (1.0 + static_cast<double>(count));
+        slot_mass += weights[k];
+        equal = equal && weights[k] == weights[0];
+    }
+    if (equal) {
+        return random_source.next_index(total);
+    }
+    SlotCoverageStats::n_weighted++;
+    const double scale = static_cast<double>(slots.size()) / slot_mass;
+    double remaining = random_source.next_real() * static_cast<double>(total);
+    if (remaining < static_cast<double>(n_steps)) {
+        return static_cast<std::size_t>(remaining);
+    }
+    remaining -= static_cast<double>(n_steps);
+    for (std::size_t k = 0; k < slots.size(); ++k) {
+        remaining -= weights[k] * scale;
+        if (remaining < 0.0) {
+            return n_steps + k;
+        }
+    }
+    return total - 1;
+}
+
 // Sets @p flag to @p value where the caller asked for it.
 void report(bool* flag, bool value) {
     if (flag != nullptr) {
@@ -1142,7 +1189,8 @@ Specification exchange(const Specification& specification, BackSteps& back,
                        const std::vector<std::string>& atoms,
                        const std::vector<Timing>& timing_pool,
                        const RandomSource& random_source, const Config& cfg,
-                       StepScale scale, bool* stepped) {
+                       StepScale scale, bool* stepped,
+                       const ParentContext* parent) {
     const std::size_t n_assumptions = specification.m_assumptions.size();
     std::vector<std::size_t> untouched;
     for (const std::size_t idx : weakenable) {
@@ -1167,8 +1215,8 @@ Specification exchange(const Specification& specification, BackSteps& back,
     if (untouched.empty() || atoms.empty()) {
         return current;
     }
-    const std::size_t idx =
-        untouched[random_source.next_index(untouched.size())];
+    const std::size_t idx = untouched[draw_position(0, untouched, specification,
+                                                    parent, random_source)];
     const bool is_assumption = idx < n_assumptions;
     const std::size_t local = is_assumption ? idx : idx - n_assumptions;
     std::vector<Requirement> assumptions = current.m_assumptions;
@@ -1324,7 +1372,7 @@ Specification mutate_specification(const Specification& specification,
     if (mode == GateRealizable::Exchange && parent->original != nullptr) {
         return exchange(specification, back, weakenable_indices,
                         *parent->original, atoms, timing_pool, random_source,
-                        cfg, scale, stepped);
+                        cfg, scale, stepped, parent);
     }
     narrow_by_blame(specification, parent, cfg, &weakenable_indices);
     // Under the gate a realizable parent draws once over its steps and its
@@ -1332,8 +1380,8 @@ Specification mutate_specification(const Specification& specification,
     // original mostly steps back and one at it mostly rewrites sideways.
     // Without the gate `steps` is empty and this is the slot draw alone.
     MutationStats::n_slot_draws++;
-    const std::size_t choice =
-        random_source.next_index(steps.size() + weakenable_indices.size());
+    const std::size_t choice = draw_position(
+        steps.size(), weakenable_indices, specification, parent, random_source);
     if (choice < steps.size()) {
         return take_step(back, choice, stepped);
     }

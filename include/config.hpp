@@ -279,6 +279,12 @@ struct Config {
     /// 2026-11-18; Towards is the behaviour before the key existed, and costs
     /// no draw beyond it.
     GateRealizable gate_realizable = GateRealizable::Exchange;
+    /// FRETISH only: weight a rewrite's slot draw by 1 / (1 + c), where c
+    /// counts the accumulated repairs whose same slot differs from the
+    /// original, so slots the found repairs have not edited are drawn more.
+    /// Off by default; off, and while every weight is equal, the draw is the
+    /// unweighted one.
+    bool slot_coverage = false;
     /// FRETISH only: how far the parent's status scales the choice between a
     /// large move and a single edge, in [0, 1]. Each large move's probability
     /// (removing a guarantee, moving a timing off Always or Eventually, and

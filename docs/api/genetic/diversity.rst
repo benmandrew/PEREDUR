@@ -12,4 +12,7 @@ The FRETISH mechanisms that spread the search over unlike repairs, each behind a
 ``novelty_objective``
   The extra objective ``genetic.novelty`` ranks by: minus that count for a realizable candidate, 0 for an unrealizable one.
 
+``SlotCoverage``
+  For ``mutation.slot_coverage``, how many members of M edit each slot of the original. ``DiversityState::slot_coverage`` brings it up to date once per generation, and mutation weights its slot draw by ``1 / (1 + c)``.
+
 .. doxygenfile:: diversity.hpp

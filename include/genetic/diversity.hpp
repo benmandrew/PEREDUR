@@ -60,6 +60,20 @@ struct NoveltyStats {
     inline static std::atomic<std::size_t> n_covered{0};
 };
 
+/// How many members of the accumulator M edit each slot of the original:
+/// differ from the original's requirement there, a tombstone included, or
+/// hold an assumption appended past the original's assumptions. Indexed by
+/// slot on each side; a slot past the end of a list has count 0.
+struct SlotCoverage {
+    std::vector<std::size_t> assumptions;
+    std::vector<std::size_t> guarantees;
+};
+
+/// The coverage count of global slot @p idx (assumptions first, then
+/// guarantees) of a specification with @p n_assumptions assumptions.
+std::size_t coverage_of(const SlotCoverage& coverage, std::size_t idx,
+                        std::size_t n_assumptions);
+
 /// The run-scoped state the FRETISH diversity mechanisms keep across
 /// generations. One per run, owned by the generation loop and lent to each
 /// generation; nothing in it draws from the RandomSource.
@@ -76,6 +90,11 @@ class DiversityState {
     /// Cached per specification and per requirement pair, so a candidate is
     /// tested against each member of M once.
     std::size_t implied_by(const Specification& candidate);
+
+    /// The slot coverage of M against @p original, brought up to date with
+    /// the members accumulated since the last call. @p original must be the
+    /// same specification on every call.
+    const SlotCoverage& slot_coverage(const Specification& original);
 
     /// Forgets what is cached about every specification not in @p keep, which
     /// bounds the caches by the population.
@@ -103,6 +122,9 @@ class DiversityState {
     std::unordered_map<Specification, Novelty> m_novelty;
     std::unordered_map<std::pair<std::string, std::string>, bool, PairHash>
         m_pair_memo;
+    SlotCoverage m_coverage;
+    /// Members of M already counted into m_coverage.
+    std::size_t m_covered = 0;
 };
 
 /// The extra objective `genetic.novelty` ranks by, one per element of

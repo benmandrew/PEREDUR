@@ -196,6 +196,9 @@ bool probability_check(double rate, const RandomSource& random_source);
 /// Where @p origins is given, each FRETISH offspring's OffspringOrigin is
 /// appended to it, in the order of the returned offspring. Classifying draws
 /// nothing either.
+///
+/// @p diversity, where given on the FRETISH path, lends the diversity keys'
+/// run state to mutation: the slot coverage under Config::slot_coverage.
 template <typename Spec>
 std::vector<Spec> breed_offspring(
     const Config& cfg, const std::vector<Scored<Spec>>& sorted_pop,
@@ -203,7 +206,8 @@ std::vector<Spec> breed_offspring(
     const RandomSource& random_source, SearchBudget* budget,
     const Spec* original = nullptr,
     std::optional<std::size_t> status_objective = std::nullopt,
-    std::vector<OffspringOrigin>* origins = nullptr);
+    std::vector<OffspringOrigin>* origins = nullptr,
+    DiversityState* diversity = nullptr);
 
 /// Cycles through the existing survivors to pad the population back up to
 /// @p target_size. Padding duplicates carry zero crowding distance, so later

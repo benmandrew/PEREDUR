@@ -55,7 +55,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 71;
+constexpr int k_schema_version = 72;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -501,6 +501,12 @@ void write_run_manifest(const std::string& output_dir,
           {"checks", NoveltyStats::n_checks.load()},
           {"implied", NoveltyStats::n_implied.load()},
           {"covered", NoveltyStats::n_covered.load()}}},
+        // What mutation.slot_coverage did: slot draws made with coverage
+        // counts, and those whose unequal weights replaced the uniform draw.
+        // Zero whenever the key is off.
+        {"slot_coverage",
+         {{"draws", SlotCoverageStats::n_draws.load()},
+          {"weighted", SlotCoverageStats::n_weighted.load()}}},
         // The output climb, all zero unless filters.climb_output is on.
         {"climb",
          {{"climbed", ClimbStats::n_climbed.load()},
