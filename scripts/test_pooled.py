@@ -384,6 +384,33 @@ contrasts = [
         except PD.DesignError as exc:
             got = str(exc)
         check_true(expect_in in got, f"{why} must be refused ({got!r})")
+    src = PD.parse_design({"groups": [{
+        "results": "r", "run_dir": "d", "seeds": "0-3", "members": "output",
+        "subjects": ["s"],
+        "contrasts": [{"name": "c", "a": "s/a", "b": "s/b"}],
+        "sources": {"s/b": {"results": "r2", "seeds": "0-1,5"}}}]})["subjects"]["s"]
+    check((src["sources"]["s/a"], src["sources"]["s/b"], src["seeds"]),
+          ({"results": "r", "run_dir": "d", "seeds": [0, 1, 2, 3],
+            "members": "output"},
+           {"results": "r2", "run_dir": "d", "seeds": [0, 1, 5],
+            "members": "output"}, [0, 1, 2, 3, 5]),
+          "a sources entry replaces only the keys it names, for its arm alone, "
+          "and the subject's seeds are the union over its arms")
+    for sources, expect_in, why in (
+        ({"s/z": {"results": "r2"}}, "which no contrast names",
+         "a source for an arm no contrast names"),
+        ({"s/b": {"subjects": ["s"]}}, "unknown key(s) subjects",
+         "a source key that is not results, run_dir, seeds or members"),
+    ):
+        try:
+            PD.parse_design({"groups": [{
+                "results": "r", "run_dir": "d", "seeds": "0", "subjects": ["s"],
+                "contrasts": [{"name": "c", "a": "s/a", "b": "s/b"}],
+                "sources": sources}]})
+            got = "accepted"
+        except PD.DesignError as exc:
+            got = str(exc)
+        check_true(expect_in in got, f"{why} must be refused ({got!r})")
     check(PD.draw_order("s", "x/a", 3, [5, 1, 9, 2]),
           PD.draw_order("s", "x/a", 3, [2, 9, 1, 5]),
           "a draw order depends on the node set, not the order it is given in")
@@ -460,6 +487,19 @@ contrasts = [
           [({"fp": "01", "i": 0}, "repair_0.json"),
            ({"fp": "03", "i": 1}, "repair_0.json")],
           "members = \"output\" pools repair files without their fitness")
+    # x/only read from another results tree at seed 0 alone.
+    shutil.copytree(pd_root / "res" / "only_x_fsm_seed00",
+                    pd_root / "res2" / "only_x_fsm_seed00")
+    write_design("0-1", '[groups.sources]\n'
+                        '"x/only" = { results = "res2", seeds = "0" }')
+    proc = run_pool("--subjects", "fsm")
+    with _gzip.open(pmembers / "fsm.jsonl.gz", "rt") as handle:
+        srcd = [json.loads(line) for line in handle]
+    check((proc.returncode, [n["node"] for n in srcd] == [n["node"] for n in pooled],
+           [r["runs"] for r in csv.DictReader(open(pmembers / "index.csv"))
+            if r["subject"] == "fsm" and r["arm"] == "x/only"]),
+          (0, True, ["1"]), f"an arm with a sources entry is pooled from its "
+                            f"own tree and seeds: {proc.stderr}")
     write_design("0-1")
     run_pool()
 

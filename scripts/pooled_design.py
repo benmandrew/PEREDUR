@@ -20,11 +20,20 @@ cannot disagree.
       { name = "only-climb", a = "nsga2-apportion/only-climb",
         b = "nsga2-apportion/base", family = "only" },
     ]
+    [groups.sources]                  # optional: arms whose runs sit elsewhere
+    "nsga2-apportion/screen" = { results = "experiments/results-screen",
+                                 seeds = "0-9" }
 
 An arm is `<scheme>/<level>`, the two fields run_dir names. A subject's arms
 are the arms its contrasts name, in order of first appearance; arms no contrast
 names are not pooled. A contrast's net is positive when arm `a` is the
 stronger. `family` groups contrasts for a Holm correction in the summary.
+
+By default every arm is read from the group's `results`, `run_dir`, `seeds`
+and `members`. A `sources` entry for an arm replaces any of those four for
+that arm alone, so arms from two campaigns, or with different seed counts,
+can share a subject's pool. A subject's `seeds` is then the union over its
+arms.
 
 Stdlib only: fingerprint_members.py imports this on the lab hosts from a cron
 tick. tomllib is Python 3.11's, which the hosts have; tomli stands in for it
@@ -41,7 +50,8 @@ except ModuleNotFoundError:  # Python 3.10
 DEFAULT_DRAWS = 100
 DESIGN_KEYS = {"draws", "groups"}
 GROUP_KEYS = {"results", "run_dir", "seeds", "members", "subjects", "sampled",
-              "contrasts", "draws"}
+              "contrasts", "draws", "sources"}
+SOURCE_KEYS = {"results", "run_dir", "seeds", "members"}
 CONTRAST_KEYS = {"name", "a", "b", "family"}
 MEMBER_SOURCES = ("maximal", "output")
 
@@ -79,8 +89,8 @@ def arm_slug(arm: str) -> str:
 
 def run_dir_name(subject: dict, arm: str, seed: int) -> str:
     scheme, level = split_arm(arm, "run_dir")
-    return subject["run_dir"].format(scheme=scheme, level=level,
-                                     subject=subject["name"], seed=seed)
+    return subject["sources"][arm]["run_dir"].format(
+        scheme=scheme, level=level, subject=subject["name"], seed=seed)
 
 
 def string_list(group: dict, key: str, where: str) -> list:
@@ -130,6 +140,25 @@ def parse_contrasts(group: dict, where: str) -> list:
     return out
 
 
+def parse_source(table: dict, where: str) -> dict:
+    """The results, run_dir, seeds and members one arm is read from."""
+    for key in ("results", "run_dir"):
+        if not isinstance(table.get(key), str) or not table[key]:
+            raise DesignError(f"{where} needs {key} = \"...\"")
+    try:
+        table["run_dir"].format(scheme="s", level="l", subject="x", seed=0)
+    except (KeyError, IndexError, ValueError):
+        raise DesignError(f"{where}: run_dir may use only {{scheme}}, "
+                          f"{{level}}, {{subject}} and {{seed}}") from None
+    members = table.get("members", "maximal")
+    if members not in MEMBER_SOURCES:
+        raise DesignError(f"{where}: members must be one of "
+                          f"{', '.join(MEMBER_SOURCES)}")
+    return {"results": table["results"], "run_dir": table["run_dir"],
+            "seeds": parse_seeds(table.get("seeds"), f"{where}.seeds"),
+            "members": members}
+
+
 def parse_design(raw: dict, where: str = "design") -> dict:
     """Validate a parsed design. Returns {"draws", "subjects": {name: rec}}."""
     unknown = sorted(set(raw) - DESIGN_KEYS)
@@ -147,19 +176,7 @@ def parse_design(raw: dict, where: str = "design") -> dict:
         unknown = sorted(set(group) - GROUP_KEYS)
         if unknown:
             raise DesignError(f"{at}: unknown key(s) {', '.join(unknown)}")
-        for key in ("results", "run_dir"):
-            if not isinstance(group.get(key), str) or not group[key]:
-                raise DesignError(f"{at} needs {key} = \"...\"")
-        try:
-            group["run_dir"].format(scheme="s", level="l", subject="x", seed=0)
-        except (KeyError, IndexError, ValueError):
-            raise DesignError(f"{at}: run_dir may use only {{scheme}}, "
-                              f"{{level}}, {{subject}} and {{seed}}") from None
-        seeds = parse_seeds(group.get("seeds"), f"{at}.seeds")
-        source = group.get("members", "maximal")
-        if source not in MEMBER_SOURCES:
-            raise DesignError(f"{at}: members must be one of "
-                              f"{', '.join(MEMBER_SOURCES)}")
+        default = parse_source(group, at)
         names = string_list(group, "subjects", at)
         if not names:
             raise DesignError(f"{at}: subjects must name at least one subject")
@@ -175,14 +192,33 @@ def parse_design(raw: dict, where: str = "design") -> dict:
             for arm in (c["a"], c["b"]):
                 if arm not in arms:
                     arms.append(arm)
+        raw_sources = group.get("sources", {})
+        if not isinstance(raw_sources, dict):
+            raise DesignError(f"{at}: sources must be a table keyed by arm")
+        stray = sorted(set(raw_sources) - set(arms))
+        if stray:
+            raise DesignError(f"{at}: sources names {', '.join(stray)}, "
+                              f"which no contrast names")
+        sources = {}
+        for arm in arms:
+            entry = raw_sources.get(arm, {})
+            where = f"{at}.sources.{arm}"
+            if not isinstance(entry, dict):
+                raise DesignError(f"{where} must be a table")
+            unknown = sorted(set(entry) - SOURCE_KEYS)
+            if unknown:
+                raise DesignError(f"{where}: unknown key(s) {', '.join(unknown)}")
+            sources[arm] = parse_source({**group, **entry}, where)
+        seeds = sorted(set().union(*(s["seeds"] for s in sources.values())))
         for name in names:
             if name in subjects:
                 raise DesignError(f"{at}: subject {name!r} is in two groups")
             subjects[name] = {
-                "name": name, "results": group["results"],
-                "run_dir": group["run_dir"], "seeds": seeds,
-                "members": source, "sampled": name in sampled,
-                "draws": group_draws, "contrasts": contrasts, "arms": arms}
+                "name": name, "results": default["results"],
+                "run_dir": default["run_dir"], "seeds": seeds,
+                "members": default["members"], "sampled": name in sampled,
+                "draws": group_draws, "contrasts": contrasts, "arms": arms,
+                "sources": sources}
     return {"draws": draws, "subjects": subjects}
 
 
