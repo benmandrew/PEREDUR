@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -1356,6 +1357,85 @@ TEST_IN("driver_peredur", test_peredur_lists_climbed_repairs) {
     expect(!repair_files(out).empty(),
            "peredur: the climb run writes a repair to list");
     expect_listing_matches_repairs(out);
+}
+
+// The repairs in @p dir as their specifications alone, without the fitness
+// block, which a replay rescores.
+std::set<std::string> repair_specifications(const std::filesystem::path& dir) {
+    std::set<std::string> specs;
+    for (const std::filesystem::path& path : repair_files(dir)) {
+        nlohmann::json repair = nlohmann::json::parse(read_text(path));
+        repair.erase("fitness");
+        specs.insert(repair.dump());
+    }
+    return specs;
+}
+
+// At one order the replay of a run's climb writes the run's own repairs, and
+// at three it climbs at least as often and writes a summary of the work.
+TEST_IN("driver_climb_replay", test_climb_replay_reproduces_a_run) {
+    const TempDir dir("e2e_climb_replay");
+    const std::string input =
+        write_text(dir.path() / "spec.json", k_fretish_climbable).string();
+    const std::string config =
+        write_text(dir.path() / "config.toml", k_config_climb).string();
+    const std::filesystem::path run_dir = dir.path() / "run";
+    std::filesystem::create_directories(run_dir);
+    const DriverRun run = run_driver(
+        "peredur", {"--input", input, "--output-dir", run_dir.string(),
+                    "--config", config, "--seed", "1"});
+    expect(run.m_exit_code == 0, "climb-replay: the run exits zero");
+    // The replay reads the config beside the run, as a campaign leaves it.
+    write_text(run_dir / "config.toml", k_config_climb);
+
+    const auto replay = [&run_dir](std::size_t orders,
+                                   const std::filesystem::path& out) {
+        const DriverRun replayed = run_driver(
+            "climb-replay", {"--run", run_dir.string(), "--orders",
+                             std::to_string(orders), "--out", out.string()});
+        expect(replayed.m_exit_code == 0,
+               "climb-replay: a replay exits zero:\n" + replayed.m_output);
+        return nlohmann::json::parse(read_text(out / "summary.json"));
+    };
+    const nlohmann::json one = replay(1, dir.path() / "one");
+    expect(!repair_files(run_dir).empty(),
+           "climb-replay: the run writes a repair to replay");
+    expect(repair_specifications(dir.path() / "one") ==
+               repair_specifications(run_dir),
+           "climb-replay: one order writes the run's repairs");
+    expect(one.at("members_in").get<std::size_t>() > 0 &&
+               one.at("climb_files_skipped").get<std::size_t>() > 0,
+           "climb-replay: the search's members are read and the climb's "
+           "left out");
+    expect(one.at("config_differences").empty(),
+           "climb-replay: the config reads as the run recorded it, got " +
+               one.at("config_differences").dump());
+
+    const nlohmann::json three = replay(3, dir.path() / "three");
+    expect(three.at("orders").get<std::size_t>() == 3,
+           "climb-replay: the summary records the orders");
+    expect(three.at("climb").at("queries").get<std::size_t>() >=
+               one.at("climb").at("queries").get<std::size_t>(),
+           "climb-replay: more orders ask at least as many queries");
+    expect(three.at("repairs_out").get<std::size_t>() > 0,
+           "climb-replay: three orders write repairs");
+}
+
+TEST_IN("driver_climb_replay", test_climb_replay_rejects_bad_arguments) {
+    const TempDir dir("e2e_climb_replay_args");
+    for (const std::vector<std::string>& args :
+         std::vector<std::vector<std::string>>{
+             {"--run", dir.path().string(), "--orders", "0", "--out",
+              (dir.path() / "out").string()},
+             {"--run", dir.path().string(), "--out",
+              (dir.path() / "out").string()},
+             {"--run", dir.path().string(), "--orders", "1", "--out",
+              (dir.path() / "out").string(), "--bogus"},
+             {"--run", (dir.path() / "missing").string(), "--orders", "1",
+              "--out", (dir.path() / "out").string()}}) {
+        expect(run_driver("climb-replay", args).m_exit_code == 1,
+               "climb-replay: bad arguments exit 1");
+    }
 }
 
 // The crash log lands in a `crashes/` directory under the working directory,

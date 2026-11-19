@@ -146,6 +146,7 @@ run_implication = true
 # The lattice climb at the output: each gated repair is strengthened towards
 # the original one proved step at a time, while it stays a repair.
 climb_output = false
+climb_orders = 1
 # FRETISH only: drop, before scoring, each offspring proved stronger than a parent
 # an unrealizable query already asked proves unrealizable. Off by default.
 parent_verdict = false

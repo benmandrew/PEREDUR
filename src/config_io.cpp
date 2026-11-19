@@ -186,7 +186,7 @@ struct RetiredKey {
     std::string_view why;
 };
 
-constexpr std::array<RetiredKey, 27> k_retired_keys{{
+constexpr std::array<RetiredKey, 26> k_retired_keys{{
     {"fitness.weight_halstead",
      "removed: the Halstead objective no longer exists"},
     {"mutation.strengthen_assumptions",
@@ -238,11 +238,8 @@ constexpr std::array<RetiredKey, 27> k_retired_keys{{
      "removed: under direction_gated an incomparable free rewrite is always "
      "kept"},
     {"filters.climb_order",
-     "removed: the output climb tries its steps in slot order, once per "
-     "repair"},
-    {"filters.climb_orders",
-     "removed: the output climb tries its steps in slot order, once per "
-     "repair"},
+     "removed: the first climb tries its steps in slot order; "
+     "filters.climb_orders adds pseudo-random orders"},
 }};
 
 /// Says why a key a config still sets is no longer known, for the keys removed

@@ -1,6 +1,6 @@
 # PEREDUR
 
-C++17 genetic algorithm for repairing unrealizable FRETISH and TLSF specifications, using bounded model counting (SPOT + Ganak) for semantic similarity. Binaries: `peredur`, `realize`, `compare`, `ltl`, `mucs`, `maximal`, `lint-ideals` (run each with `--help`). `sample-mutants` is a research tool for the seeded corpus: it is not installed, no test runs it, and it stays out of `BINARIES` in `scripts/coverage_badge.py`.
+C++17 genetic algorithm for repairing unrealizable FRETISH and TLSF specifications, using bounded model counting (SPOT + Ganak) for semantic similarity. Binaries: `peredur`, `realize`, `compare`, `ltl`, `mucs`, `maximal`, `lint-ideals` (run each with `--help`). `sample-mutants` is a research tool for the seeded corpus: it is not installed, no test runs it, and it stays out of `BINARIES` in `scripts/coverage_badge.py`. `climb-replay` is a research tool for the climb-diversity study, out of `all` and not installed; the `driver_climb_replay` suite builds and runs it ("Output climb replay" in `docs/dev/operators.md`).
 
 A run loads a spec, breeds offspring, filters them (dedup, bloat cap, vacuity), scores the survivors (syntactic + semantic + status), selects under NSGA-II, re-checks realizability at the output gate, applies final filters (dedup, implication), and writes `repair_N.json` plus `run.json`.
 
@@ -11,7 +11,7 @@ Detail lives in `docs/dev/`. Read the file covering an area before changing it. 
 | File | Sections |
 |---|---|
 | `docs/dev/algorithm.md` | Algorithm flow, Elitism, Maximality demotion, Diversity mechanisms, Termination modes, Run output, Generation pipeline, Parent-verdict stage, TLSF repair modes, Key types |
-| `docs/dev/operators.md` | Crossover, Order crossover, Grammar fixes, Implication in the TLSF grammar, Monotone rewrites, Cloned assumptions, Assumption construction, Timing donation, Scope-aware timing moves, Removable guarantees, Order moves, Blame-targeted slot choice, Output climb, Status-gated mutation direction, Distance-dependent step size, Measured feature interactions |
+| `docs/dev/operators.md` | Crossover, Order crossover, Grammar fixes, Implication in the TLSF grammar, Monotone rewrites, Cloned assumptions, Assumption construction, Timing donation, Scope-aware timing moves, Removable guarantees, Order moves, Blame-targeted slot choice, Output climb, Output climb replay, Status-gated mutation direction, Distance-dependent step size, Measured feature interactions |
 | `docs/dev/fretish-scopes.md` | FRETISH scopes |
 | `docs/dev/performance.md` | Cache keys, Scoring dispatch, Per-generation gate, Implication prefilter, Implication residual query, Implication model probe, Satisfiability route, Decomposition re-ask, Controller-store gate, Tool subprocesses, Spot fork server, Profiling |
 | `docs/dev/config-and-provenance.md` | Config keys, Commit provenance, Run manifest schema versions, Where the campaign records are, Config vintage (including retired keys) |
