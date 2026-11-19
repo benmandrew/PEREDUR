@@ -1,6 +1,6 @@
 # 2026-11-18-seeded-corpus-sideways
 
-Draft, not registered. The sideways classes are `swap-signal`, `flip-literal` and `reverse-implication`, approved and checked for reachability. `swap-timing-kind` was dropped.
+Done. The runs finished on 19 November and the results are in [REPORT.md](REPORT.md). The sideways classes are `swap-signal`, `flip-literal` and `reverse-implication`. `swap-timing-kind` was dropped.
 
 ## Question
 
@@ -17,7 +17,7 @@ Everything follows `2026-11-13-seeded-corpus` except the fault classes and the a
 - **Same-slot edits.** `seed_once` draws each edit's slot independently, so two edits can land on one guarantee. The rule is kept unchanged, so the only difference from the old corpus is the fault classes.
 - **Recovery.** Unchanged: B is O's only ideal, and `implies_ideal` counts repairs R with B ⊑ R.
 - **Probe and selection.** The trivial-reversion probe and the headline threshold (p1 and p2 both below 0.01) run unchanged, with the same cluster caps.
-- **Arms.** Profile `fretish-seeded-sideways`, at one commit (`campaign/fretish-extension-share` at `e664c376` plus this campaign's scripts). From sweep D: `lean-remove` (the paper's `full`), `lean` (`no-remove`), `remove-no-climb`, `remove-no-gate`, `remove-no-blame`, `only-remove` and `base`. From sweep O: `only-climb`, `only-gate` and `only-blame`. All under `nsga2-apportion` at `--parallel 2`, seeds 0-4, the old budget. There is no `random` arm, since the paper reports none on the seeded corpus. Spec names carry the prefix `sw-`, because 56 of the 130 subject ids repeat the old corpus's.
+- **Arms.** Profile `fretish-seeded-sideways`, at one commit (`e117a76`: `campaign/fretish-extension-share` at `e664c376`, the exchange mode of `4dfdb579`, and this campaign's scripts). Every arm with the gate on runs in exchange mode, the default since 18 November. From sweep D: `remove-exchange` (the paper's `full`), `lean-exchange` (`no-remove`), `remove-no-climb-exchange`, `remove-no-gate` (plain, since it has no gate), `remove-no-blame-exchange`, `only-gate-exchange`, `only-remove` and `base`. From sweep O: `only-climb` and `only-blame`. All under `nsga2-apportion` at `--parallel 2`, seeds 0-4, the old budget. There is no `random` arm, since the paper reports none on the seeded corpus. Spec names carry the prefix `sw-`, because 56 of the 130 subject ids repeat the old corpus's.
 
 ## Candidate operators
 
@@ -55,7 +55,7 @@ The user approved `swap-signal`, `flip-literal`, `reverse-implication` and `swap
 
 ## Cost
 
-The seeded results now in the paper, the removal controls and the 18 Nov exchange arm stay valid as results on the strengthening-only corpus. This campaign runs 130 subjects x 10 arms x 5 seeds = 6,500 runs. `fretish-seeded-remove`'s 3,000 runs averaged 50 s each at 2 threads. On 16 CPUs (8 jobs) per host, av2's seeds 0-2 take about 6.8 h and av3's seeds 3-4 about 4.5 h.
+The seeded results now in the paper, the removal controls and the 18 Nov exchange arm stay valid as results on the strengthening-only corpus. This campaign runs 130 subjects x 10 arms x 5 seeds = 6,500 runs. `fretish-seeded-remove`'s 3,000 runs averaged 50 s each at 2 threads. On 16 CPUs (8 jobs) per host, av2's seeds 0-2 take about 6.8 h and av3's seeds 3-4 about 4.5 h. Measured: 54.1 s per run, 7.3 h on av2 and 5.0 h on av3.
 
 ## Log
 
@@ -66,3 +66,7 @@ The seeded results now in the paper, the removal controls and the 18 Nov exchang
 - 2026-11-18 15:24–18:09. Probe (`probe.py`, `base` config, 5,000 draws, depth 2) on all 247, local, under a 16 GB scope. It ran at 6 jobs, then 12 (slower: 1.7 against 2.1 subjects a minute, from contention), then 6 again, on cores 0–9, and for the last part of the run on cores 0–3 at the user's request. `probe.py` now writes `probe-work/<subject>/row.json` and reuses it, so a restart keeps finished subjects. 233 subjects are headline (p1 and p2 below 0.01).
 - 2026-11-18 18:09. `choose.py` (cap 40, 10 trivial): 130 subjects, 120 headline and 10 trivial, in `selected.txt`. Headline by cluster: fsm 40, lmcps 40, liquid-mixer 16, rad 15, mode-arbiter 8, valu3s 1. Of the 130, 85 are incomparable with B and 45 strictly stronger, and 95 hold a sideways edit. The old corpus selected 120 (110 headline).
 - 2026-11-18 21:30. Reachability script moved to `scripts/reach.py`. `reach.csv` stays untracked, and its numbers are in the table above. The branch was rebuilt on `campaign/fretish-extension-share` (`e664c376`), which holds the removal arms, and the earlier commits are kept locally as `backup/seeded-corpus-sideways-77a12dc9`. `scripts/seeded/` is identical on the two bases. Hosts were agreed with the other sessions: veribee-7a holds av2 CPUs 16-31 and av3 CPUs 0-15 until about 23:30, so this campaign takes av2 0-15 and av3 16-31, each under 24G, for its whole run. peredur-22, peredur-extension-6b and peredur-extension-7b need nothing on either host tonight.
+- 2026-11-18 21:39. The gated arms switched to exchange mode at the user's decision (`b86d7827` cherry-picks `4dfdb579`; `57449a36` and `c5d3e364` add the `-exchange` levels, with `remove-no-gate` kept plain). A local smoke run of `remove-exchange` on one subject passed, with `gate_realizable = "exchange"` in its `run.json`. peredur-22 added its `2026-11-18-fretish-exchange-rerun` on top (`e117a764`), and both campaigns were enqueued at that commit: this one as av2 091 and av3 088, the rerun behind it as 092 and 089.
+- 2026-11-19 05:00. av3 088 finished at 02:44 and av2 091 at 05:00: 6,500 runs, no failures and no timeouts. veribee-7a freed its CPUs at 23:05, and the entries kept their own CPUs.
+- 2026-11-19 12:49. Collected into `experiments/results-fretish-seeded-sideways.csv`. At the user's decision this corpus replaces the 2026-11-13 corpus in the paper (peredur-extension `d0d23f6`).
+- 2026-11-19 16:19. Probe reruns on the 130 selected subjects at 6 jobs on cores 0-9, under `remove-exchange`'s configuration (`probe-full.csv`) and with a gated parent at 0.5 (`probe-gated.csv`). The run was paused at the user's request, killed, and resumed from the finished subjects' `row.json`. Imported into the paper with the findings fixed (peredur-extension `e725ae2`). Report written.
