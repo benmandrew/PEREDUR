@@ -43,7 +43,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 52> k_config_keys{{
+inline constexpr std::array<ConfigKey, 53> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -375,6 +375,13 @@ inline constexpr std::array<ConfigKey, 52> k_config_keys{{
      "The lattice climb at the output: each gated repair is strengthened "
      "towards\n"
      "the original one proved step at a time, while it stays a repair.\n"},
+    {"filters", "climb_orders", &Config::climb_orders, KeyCheck::Positive,
+     KeyReader::Fretish,
+     "Climbs per repair under climb_output. The first tries its steps in slot "
+     "order and each later one under a fixed pseudo-random step priority of "
+     "its own; every distinct result goes on to the final filters. Draws no "
+     "random number. Read only when climb_output is true.",
+     ""},
     {"filters", "parent_verdict", &Config::parent_verdict_filter,
      KeyCheck::None, KeyReader::Fretish,
      "FRETISH only: after deduplication, drop each offspring proved stronger "

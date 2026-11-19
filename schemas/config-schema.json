@@ -68,6 +68,7 @@
       "properties": {
         "run_implication": { "type": "boolean", "default": true, "description": "Enable final implication maximality filter." },
         "climb_output": { "type": "boolean", "default": false, "description": "Strengthen each repair that passes the output gate towards the original before deduplication and the implication filter. A step is a one-field move towards the original that is proved a strengthening by rule, a restored guarantee or a dropped appended assumption, and it is kept only where the result passes the output gate again. The climb stops when no step is kept, and draws no random number." },
+        "climb_orders": { "type": "integer", "minimum": 1, "default": 1, "description": "Climbs per repair under climb_output. The first tries its steps in slot order and each later one under a fixed pseudo-random step priority of its own; every distinct result goes on to the final filters. Draws no random number. Read only when climb_output is true." },
         "parent_verdict": { "type": "boolean", "default": false, "description": "FRETISH only: after deduplication, drop each offspring proved stronger than a parent that an unrealizable query already asked proves unrealizable. Launches no query." }
       }
     },

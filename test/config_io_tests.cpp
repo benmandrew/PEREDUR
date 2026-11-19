@@ -235,6 +235,21 @@ TEST(test_config_io_enum_keys) {
                                      false});
 }
 
+// Re-added on 2026-11-19 after its retirement on 2026-11-18. At 1, its
+// default, the climb runs once per repair in slot order, as it did while the
+// key was retired.
+TEST(test_config_io_climb_orders) {
+    expect(config_from_toml_string("").climb_orders == 1,
+           "config_io: climb_orders should default to 1");
+    expect(
+        config_from_toml_string("[filters]\nclimb_orders = 4\n").climb_orders ==
+            4,
+        "config_io: climb_orders should parse");
+    expect_throws(
+        [&] { config_from_toml_string("[filters]\nclimb_orders = 0\n"); },
+        "config_io: climb_orders = 0 should throw");
+}
+
 // Pinned because every archived config omits these keys and inherits whatever
 // they mean. Generations with no caps is what a run did before they existed, so
 // the defaults have to keep reproducing it.
@@ -437,7 +452,6 @@ TEST(test_config_io_removed_operator_keys_warn_and_are_ignored) {
         {"runtime", "dashboard = true"},
         {"mutation", "p_sideways = 0.5"},
         {"filters", "climb_order = \"similarity\""},
-        {"filters", "climb_orders = 4"},
     };
     for (const auto& [section, line] : removed) {
         const std::string key = line.substr(0, line.find(' '));
@@ -520,11 +534,8 @@ TEST(test_config_io_retired_key_hints_are_pinned) {
          "removed: under direction_gated an incomparable free rewrite is "
          "always kept"},
         {"filters.climb_order",
-         "removed: the output climb tries its steps in slot order, once per "
-         "repair"},
-        {"filters.climb_orders",
-         "removed: the output climb tries its steps in slot order, once per "
-         "repair"},
+         "removed: the first climb tries its steps in slot order; "
+         "filters.climb_orders adds pseudo-random orders"},
     };
     for (const auto& [path, hint] : expected) {
         const std::size_t dot = path.rfind('.');

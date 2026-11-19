@@ -106,6 +106,11 @@ struct Config {
     /// final filters, one proved step at a time, keeping a step only where the
     /// result still passes the output gate.
     bool climb_output = false;
+    /// Climbs per repair under climb_output. The first tries the steps in slot
+    /// order and each later one under a fixed pseudo-random step priority of
+    /// its own (order_steps in `genetic/climb.hpp`); every distinct result
+    /// goes on to the final filters. None draws a random number.
+    std::size_t climb_orders = 1;
     /// FRETISH only: after deduplication, drop each offspring proved stronger
     /// than a parent that an unrealizable query already asked proves
     /// unrealizable (RealizabilityChecker::proved_unrealizable). Off, nothing

@@ -5,6 +5,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <exception>
 #include <optional>
 #include <unordered_set>
@@ -21,6 +22,26 @@
 
 namespace {
 
+// SplitMix64's finaliser, spelt out rather than std::hash so that the step
+// priorities, and so the climbed repairs, agree across standard libraries.
+std::uint64_t mix(std::uint64_t value) {
+    value += 0x9e3779b97f4a7c15ULL;
+    value = (value ^ (value >> 30U)) * 0xbf58476d1ce4e5b9ULL;
+    value = (value ^ (value >> 27U)) * 0x94d049bb133111ebULL;
+    return value ^ (value >> 31U);
+}
+
+std::uint64_t step_priority(const Step& step, std::size_t permutation) {
+    const std::uint64_t field =
+        step.m_field.has_value() ? static_cast<std::uint64_t>(*step.m_field) + 1
+                                 : 0;
+    auto identity = static_cast<std::uint64_t>(step.m_slot);
+    identity = (identity << 2U) | static_cast<std::uint64_t>(step.m_kind);
+    identity = (identity << 1U) | static_cast<std::uint64_t>(step.m_side);
+    identity = (identity << 3U) | field;
+    return mix(mix(static_cast<std::uint64_t>(permutation)) ^ identity);
+}
+
 // The timing chain a timing step crosses, without its destination, or empty
 // where the step has no intermediate entries.
 std::vector<Timing> chain_before_destination(const Specification& current,
@@ -33,6 +54,24 @@ std::vector<Timing> chain_before_destination(const Specification& current,
 }
 
 }  // namespace
+
+void order_steps(std::vector<Step>& steps, std::size_t permutation) {
+    if (permutation == 0) {
+        return;
+    }
+    std::vector<std::pair<std::uint64_t, std::size_t>> keys;
+    keys.reserve(steps.size());
+    for (std::size_t i = 0; i < steps.size(); ++i) {
+        keys.emplace_back(step_priority(steps[i], permutation), i);
+    }
+    std::stable_sort(keys.begin(), keys.end());
+    std::vector<Step> ordered;
+    ordered.reserve(steps.size());
+    for (const auto& [priority, index] : keys) {
+        ordered.push_back(std::move(steps[index]));
+    }
+    steps = std::move(ordered);
+}
 
 std::optional<Specification> furthest_accepted(const Specification& current,
                                                const Step& step,
@@ -62,7 +101,7 @@ std::optional<Specification> furthest_accepted(const Specification& current,
 }
 
 Specification climb(const Specification& start, const Specification& original,
-                    const ClimbPredicate& accepts) {
+                    const ClimbPredicate& accepts, std::size_t permutation) {
     Specification current = start;
     std::unordered_set<Specification> visited{start};
     const ClimbPredicate unvisited = [&visited,
@@ -74,7 +113,8 @@ Specification climb(const Specification& start, const Specification& original,
         return accepts(spec);
     };
     for (;;) {
-        const std::vector<Step> steps = steps_towards(current, original);
+        std::vector<Step> steps = steps_towards(current, original);
+        order_steps(steps, permutation);
         std::optional<Specification> next;
         for (const Step& step : steps) {
             ++ClimbStats::n_steps_tried;
@@ -118,7 +158,7 @@ ClimbPredicate climb_gate(const Config& cfg, FitnessFunction status) {
 
 std::vector<Specification> climb_repairs(
     const std::vector<Specification>& repairs, const Specification& original,
-    const ClimbPredicate& accepts) {
+    const ClimbPredicate& accepts, std::size_t n_orders) {
     const auto started = std::chrono::steady_clock::now();
     std::vector<Specification> starts;
     std::unordered_set<Specification> seen;
@@ -141,10 +181,17 @@ std::vector<Specification> climb_repairs(
     };
     const std::array<std::size_t, 6> before = checker_counts();
 
-    const auto climb_one = [&starts, &original, &accepts](std::size_t idx) {
-        return climb(starts[idx], original, accepts);
+    n_orders = std::max<std::size_t>(n_orders, 1);
+    const auto climb_one = [&starts, &original, &accepts,
+                            n_orders](std::size_t idx) {
+        std::vector<Specification> climbed;
+        climbed.reserve(n_orders);
+        for (std::size_t order = 0; order < n_orders; ++order) {
+            climbed.push_back(climb(starts[idx], original, accepts, order));
+        }
+        return climbed;
     };
-    std::vector<Specification> results(starts.size());
+    std::vector<std::vector<Specification>> results(starts.size());
     // Serial at one worker, as gate_verdicts is: the gate's own status walk
     // dispatches to the pool, which a climb holding the only worker would
     // starve.
@@ -159,7 +206,7 @@ std::vector<Specification> climb_repairs(
             [&climb_one](std::size_t idx) {
                 return [&climb_one, idx] { return climb_one(idx); };
             },
-            [&results](std::size_t idx, Specification climbed) {
+            [&results](std::size_t idx, std::vector<Specification> climbed) {
                 results[idx] = std::move(climbed);
             });
     }
@@ -176,9 +223,11 @@ std::vector<Specification> climb_repairs(
                               .count();
     std::vector<Specification> distinct;
     std::unordered_set<Specification> emitted;
-    for (Specification& spec : results) {
-        if (emitted.insert(spec).second) {
-            distinct.push_back(std::move(spec));
+    for (std::vector<Specification>& climbed : results) {
+        for (Specification& spec : climbed) {
+            if (emitted.insert(spec).second) {
+                distinct.push_back(std::move(spec));
+            }
         }
     }
     return distinct;
