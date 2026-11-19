@@ -1,0 +1,58 @@
+name = "2026-11-19-fretish-exchange-pooled"
+branch = "campaign/fretish-exchange-pooled"
+description = "Pooled pass over 2026-11-18-fretish-exchange-rerun, the paper's arms once exchange became the gate's default: full, no-remove, no-climb, no-gate, no-blame, only-gate and base over the small set (less fsm-lmcps) and rad's 10 cores, every pair of arms planned, for accepted-trace share, net containment at K = 3 and joint-front reach (PLAN.md)."
+
+# Each host pools its own subjects. The pool, design and subject lists are
+# ignored files, copied to each host's checkout by rsync before enqueue
+# (PLAN.md).
+hosts = { av2 = "", av3 = "" }
+
+# CPUs 0-29 and 64G on both hosts, approved by the user on 19 Nov; CPUs 30-31
+# stay free for the Ollama server. It queues on av2 behind
+# 2026-11-18-fretish-exchange-rerun (av2 092). Every phase, and the build,
+# stays on these CPUs.
+confine = { av2 = { cpus = "0-29", memory_max = "64G" }, av3 = { cpus = "0-29", memory_max = "64G" } }
+
+# fpdraw is EXCLUDE_FROM_ALL, so the build names it. `confine` does not reach
+# the build, so taskset holds it to the agreed CPUs.
+build = "sh -c 'taskset -c 0-29 sh -c \"cmake --build build-release -j 16 && cmake --build build-release -j 16 --target fpdraw\"'"
+
+# Every subject is in the copied pool, so this phase only copies it, after
+# checking each file against its index row.
+[[phases]]
+name = "2026-11-19-fretish-exchange-pooled"
+kind = "pool"
+design = "experiments/2026-11-19-fretish-exchange-pooled/design.toml"
+subjects = "experiments/2026-11-19-fretish-exchange-pooled/subjects-{host}.txt"
+copy_from = "experiments/2026-11-19-fretish-exchange-pooled/members"
+out = "experiments/fretish-exchange-pooled-members"
+
+# 32768 words a subject over the members (black, 30 s a draw, 8 at a time),
+# every node evaluated on them, and the pairs the design plans: every pair of
+# the seven arms is a contrast, so every pair no word refutes is kept.
+[[phases]]
+name = "2026-11-19-fretish-exchange-pooled"
+kind = "fingerprint"
+subjects = "experiments/2026-11-19-fretish-exchange-pooled/subjects-{host}.txt"
+members = "experiments/fretish-exchange-pooled-members"
+design = "experiments/2026-11-19-fretish-exchange-pooled/design.toml"
+work = "experiments/fretish-exchange-pooled-work"
+out = "experiments/fretish-exchange-pooled/fp"
+pairs = "experiments/fretish-exchange-pooled-work/pairs-{host}.csv"
+words = 32768
+seed = 3
+workers = 8
+black_timeout = 30
+
+# Every planned pair, each unrefuted direction at the archive's 20 s.
+[[phases]]
+name = "2026-11-19-fretish-exchange-pooled"
+kind = "compare"
+pairs = "experiments/fretish-exchange-pooled-work/pairs-{host}.csv"
+out = "experiments/fretish-exchange-pooled/subsumption-{host}.csv"
+# 12, as the earlier pooled passes ran, so a 20 s comparison is not timed out
+# by contention.
+jobs = 12
+black_timeout = 20
+wall_timeout = 180
+vmem_kb = 8388608
