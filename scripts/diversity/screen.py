@@ -230,10 +230,13 @@ def fingerprints(nodes: list, paths: list, bank: str, wdir: str,
     return [int(cache[d], 16) for d in digests]
 
 
-def rule_verdicts(ids: list, paths: list, wdir: str, label: str,
+def rule_verdicts(ids: list, paths: list, bits: list, wdir: str, label: str,
                   compare: str) -> dict:
     """V for pooled_reduce.frontier over one arm's nodes: both directions of
-    every pair with a proved direction, '1' or '0'."""
+    every pair with a proved direction, '1' or '0'. Only the directions no
+    bank word refutes are asked (x => y needs bits[x] a subset of bits[y]),
+    as fingerprint_members.plan narrows a pooled pass's pairs; a refuted
+    direction cannot be proved, so the answer is the full grid's."""
     if len(ids) < 2:
         return {}
     adir = os.path.join(wdir, f"arm-{label}")
@@ -242,11 +245,21 @@ def rule_verdicts(ids: list, paths: list, wdir: str, label: str,
         os.unlink(os.path.join(adir, f))
     for i in ids:
         os.symlink(os.path.abspath(paths[i]), os.path.join(adir, f"{i:05d}.json"))
-    # Every ordered pair has a DIR line, so read them as they come rather
-    # than holding millions of lines.
+    plan = os.path.join(wdir, f"pairs-{label}.tsv")
+    with open(plan + ".part", "w") as h:
+        for k, x in enumerate(ids):
+            fx = bits[x]
+            for y in ids[k + 1:]:
+                union = fx | bits[y]
+                fwd, rev = union == bits[y], union == fx
+                if fwd or rev:
+                    h.write(f"{x:05d}.json\t{y:05d}.json\t"
+                            f"{'both' if fwd and rev else 'fwd' if fwd else 'rev'}\n")
+    os.replace(plan + ".part", plan)
     V = {}
     with subprocess.Popen([compare, "--rule-only", "--repairs", adir,
-                           "--ideals", adir], stdout=subprocess.DEVNULL,
+                           "--ideals", adir, "--pairs", plan],
+                          stdout=subprocess.DEVNULL,
                           stderr=subprocess.PIPE, text=True) as proc:
         tail = []
         for line in proc.stderr:
@@ -300,7 +313,7 @@ def screen_subject(subject: str, arm: str, ref: str, arms: dict, args) -> dict:
     fronts = {}
     for name in (arm, ref):
         ids = [n["node"] for n in nodes if name in n["arms"]]
-        V = rule_verdicts(ids, paths, wdir, name, args.compare)
+        V = rule_verdicts(ids, paths, bits, wdir, name, args.compare)
         fronts[name] = R.frontier(nodes, V, name)
         f = fronts[name]
         row[name] = {

@@ -55,8 +55,10 @@ def cmd_frontier(args) -> int:
         for arm in args.arms or rec["arms"]:
             ids = [n["node"] for n in nodes if arm in n["arms"]]
             black = R.frontier(nodes, V, arm)
+            bits = R.load_bits(R.subject_dir(args.collected, subject),
+                               len(nodes))
             rule = R.frontier(nodes, S.rule_verdicts(
-                ids, paths, wdir, D.arm_slug(arm), args.compare), arm)
+                ids, paths, bits, wdir, D.arm_slug(arm), args.compare), arm)
             cb, cr = {tuple(c) for c in black}, {tuple(c) for c in rule}
             nb = {i for c in black for i in c}
             nr = {i for c in rule for i in c}
