@@ -680,6 +680,28 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-diversity-screen-blame.csv",
         "default_jobs": 14,
     },
+    # Seeds 10-29 of the four screen arms that passed or were promising
+    # (2026-11-19-diversity-screen PLAN.md). They write into
+    # diversity-screen-blame's tree and CSV, so each arm has seeds 0-29 in one
+    # place for the pooled pass.
+    "diversity-followup-blame": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["novelty", "slot-coverage", "flip-tabu",
+                         "flip-sideways"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(10, 30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb-blame",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-screen-blame",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-screen-blame.csv",
+        "default_jobs": 14,
+    },
 }
 
 
