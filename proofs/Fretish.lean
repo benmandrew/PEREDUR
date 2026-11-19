@@ -9,4 +9,5 @@ import Fretish.Cpp
 import Fretish.Witness
 import Fretish.ScopeOrder
 import Fretish.CondOrder
+import Fretish.Cross
 import Fretish.Chain

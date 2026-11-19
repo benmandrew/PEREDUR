@@ -735,6 +735,47 @@ TEST(test_requirement_implies_chains_every_field) {
            "requirement_implies: the converse must not be proved");
 }
 
+// A plain timing whose pattern clashes with an only timing's implies it,
+// though neither one-field middle state does: `immediately` against `after 1`
+// from global into only in, and `after 1` against `always` from not in into
+// only in at one mode. Global into only in under a trigger is refused, since
+// only in reads the body at later entries the trigger does not reach.
+TEST(test_requirement_implies_crosses_into_an_only_scope) {
+    const auto make = [](Timing timing, ConditionType ctype, Scope scope) {
+        return Requirement(Formula("a"), Formula("x"), std::move(timing), ctype,
+                           /*weakenable=*/true, /*removed=*/false,
+                           std::move(scope));
+    };
+    const Scope only_in_m{ScopeKind::OnlyIn, "m"};
+    const std::vector<std::pair<Requirement, Requirement>> proved = {
+        {make(timing::immediately(), ConditionType::Continual, Scope{}),
+         make(timing::after_ticks(1), ConditionType::Continual, only_in_m)},
+        {make(timing::after_ticks(1), ConditionType::Trigger, Scope{}),
+         make(timing::always(), ConditionType::Trigger,
+              Scope{ScopeKind::OnlyAfter, "m"})},
+        {make(timing::after_ticks(1), ConditionType::Trigger,
+              Scope{ScopeKind::NotIn, "m"}),
+         make(timing::always(), ConditionType::Trigger, only_in_m)}};
+    std::vector<Implication> queries;
+    for (const auto& [stronger, weaker] : proved) {
+        expect(requirement_implies(stronger, weaker),
+               "requirement_implies: a clash into an only scope: " +
+                   stronger.to_string() + " => " + weaker.to_string());
+        queries.push_back({stronger.m_ltl, weaker.m_ltl});
+    }
+    for (const bool holds : ltl_implications(queries)) {
+        expect(holds, "requirement_implies: a clash pair must hold");
+    }
+    const Requirement trigger =
+        make(timing::immediately(), ConditionType::Trigger, Scope{});
+    const Requirement only =
+        make(timing::after_ticks(1), ConditionType::Trigger, only_in_m);
+    expect(!requirement_implies(trigger, only),
+           "requirement_implies: a global trigger must not cross into only in");
+    expect(!ltl_implications({{trigger.m_ltl, only.m_ltl}}).front(),
+           "requirement_implies: a global trigger into only in must fail");
+}
+
 // Where a trigger coincides with its continual form, `always` under a plain
 // scope and `eventually` under an only one, its condition is antitone. Away
 // from those cells only an equivalent condition is proved.
