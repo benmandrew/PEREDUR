@@ -1,0 +1,61 @@
+# 2026-11-19-diversity-screen
+
+In progress. Branch `feat/diversity-study`, worktree `~/projects/peredur-diversity`. Hosts are av2 and av3 only, since av1 is not available to this study.
+
+## Question
+
+Four mechanisms direct the search in `full`: the climb, two-way mutation, blame and removal. All four act on the *strength* of repairs, and the climb most of all. The study asks which cheap changes to the search raise the *diversity* of `full`'s repairs without lowering their strength. Diversity is the containment measure of `peredur2027`: each repair's ball reaches its third-nearest neighbour, and a side's region is the union of its balls. Order crossover, cut on 2026-11-17, only recombined parents already in the population, so it is not a candidate here.
+
+## Candidates
+
+| Key | Mechanism | Acts at | Needs new GA runs |
+|---|---|---|---|
+| `climb-orders` | Climb each member of M under several step orders and keep the maximal elements of the union | output | no: replay over `accumulated/` |
+| `crowd-spec` | NSGA-II crowding distance between specifications (slots changed from O) in place of distance between objective vectors | selection | yes |
+| `novelty` | An objective that counts the members of M that imply a realisable candidate, lower being better | selection | yes |
+| `slot-coverage` | Slot draws weighted towards slots that no member of M changes | mutation | yes |
+| `spread-init` | P starts as one-step weakenings spread over the refused guarantees of each core, in place of N copies of O | initialisation | yes |
+| `flip-sideways` | After a lineage flips realisability twice on one slot, that slot is tabu for k generations, or takes sideways rewrites only | mutation | yes |
+
+MAP-Elites over (slots changed, kind of change), a core-directed assumption move and restarts with frozen slots wait for the first report.
+
+## Screen
+
+The screen replaces the pooled pass for every candidate. Only the candidates that pass it go through a full campaign and pooled pass.
+
+- **Word bank.** One set of 32,768 lasso words per subject, drawn once and saved. It mixes words from models of every arm's pooled repairs so far with uniform random lassos. A new arm's repairs are scored on the saved words, so every arm shares one sample and needs no satisfiability call.
+- **Frontier.** Rule implication only, with no BLACK. On sampled pairs at most three fields apart, the rule misses 6 of 2,625 implications, and an unproved pair reads as incomparable.
+- **Descriptor count.** `run.json` records the number of distinct (slots changed from O, kind of change) cells among M's repairs. Its rank correlation with containment is checked once on the existing pooled data. If the correlation is weak, the count is reported and does not decide anything.
+- **Subjects and seeds.** The specifications whose `full` maximal set holds more than three repairs, 10 seeds each, at the budget of the specifications. Even and odd seeds form the two halves for the containment control.
+- **Pass rule.** A candidate passes when its net containment share against `full` is positive on the screen subjects, beyond `full`'s own odd-against-even control, and its accepted-trace share is no more than 0.02 above `full`'s. A higher share is a weaker arm. Its found-repair rate must not fall on any subject. The thresholds are this study's choice and were fixed before any screen ran.
+
+## Budget
+
+At most 300 CPU-hours across av2 and av3. On the exchange rerun, one arm of 570 runs cost 7.0 to 14.9 CPU-hours, and the large set about 4 per arm. The last pooled pass spent 25.1 CPU-hours in BLACK. A screened arm costs about 2 CPU-hours, and each candidate that passes about 40 more. The study stops and reports before any run would take the total over 300.
+
+## Log
+
+- 2026-11-19: branch cut from `origin/main` at `5a7a2fc8`.
+- 2026-11-19: `filters.climb_orders` existed until #258 (`04d00eb7`, 18 November), which retired it because no config set it. No campaign measured it, so `climb-orders` reinstates the hash-priority permutations from `04d00eb7^`.
+- 2026-11-19: work split over three branches off this one, each in its own worktree. `feat/diversity-climb` (`~/projects/peredur-div-climb`) holds `climb_orders` and the offline `climb-replay` driver. `feat/diversity-screen` (`~/projects/peredur-div-screen`) holds the word bank, the rule-only frontier, the reducer and the descriptor count. `feat/diversity-mech` (`~/projects/peredur-div-mech`) holds the five search mechanisms, each a key that is off by default. They merge back into `feat/diversity-study` before any campaign.
+- 2026-11-19: `feat/diversity-climb` done (`66884b9e`, `a6de1c04`); debug ctest passes 68 of 68 and the goldens are untouched. At one order, `climb-replay` matches the run's own output on 44 of 54 remove-exchange runs (18 subjects, seeds 00 to 02). Of the other 10, 8 match once #263 (`07015ddc`) is reverted, since main proves more climb steps, and 2 differ because the repair JSON omits removed guarantees and the replay reconstructs them. Both arms of the climb screen are therefore replayed on one binary: one order against four, never the run's own output against a replay. On fsm-combined seed 00, one order took 6.8 s for 13 repairs and four orders took 8.1 s for 15. On takeoff seed 00 the figures were 17.2 s for 40 and 22.5 s for 42.
+- 2026-11-19: replay of all 570 remove-exchange runs at one and four orders started locally (`scripts/replay.sh`, 4 jobs, MemoryMax 10G). Outputs go to `replay/k1` and `replay/k4`, untracked.
+- 2026-11-19: the paper drops blame from `full`, so `full` is now `remove-no-blame-exchange` (climb, twoway and removal) and the old `full` (`remove-exchange`) is `plus-blame`. Every screen is against `remove-no-blame-exchange` from here on. Its climb replay (`scripts/replay-arm.sh`, output under `replay/remove-no-blame-exchange/`) follows the `remove-exchange` replay, which is kept as a second arm.
+- 2026-11-19: both local replays stopped. They had finished 138 and 134 of 570 runs in about 35 minutes at a load of 24 on 20 cores, so they would have taken about 11 hours together. The replacement is campaign `2026-11-19-diversity-climb` on av3 and av2: `remove-no-blame-exchange` rerun at `climb_orders` 1 and 4, 19 subjects × 30 seeds each, about 20 CPU-hours. The search draws the same numbers at both settings, and the climb runs only after it, so the two arms share every search and differ in the climb alone. The replays' partial outputs under `replay/` are kept but not used.
+- 2026-11-19: `feat/diversity-mech` done: `2d38245a` `genetic.crowding`, `160d6c41` `genetic.novelty`, `bb393cfd` `mutation.slot_coverage`, `e66b9eaf` `genetic.spread_init` and `32bb5b6b` `mutation.flip_tabu` / `mutation.flip_sideways`. Debug ctest passes 69 of 69, with the goldens untouched. Deviations from this plan:
+  - novelty counts a candidate already in M as implying itself;
+  - slot coverage leaves the remove-guarantee draw unweighted;
+  - each spread-init seed is one directed `mutate_requirement` proved weaker, which can change more than one field of a slot;
+  - `flip_sideways` acts only when `flip_tabu` is above 0, with the same span;
+  - lineage records are stored per specification and skip crossed offspring.
+
+  No mechanism has yet made a real repair run.
+- 2026-11-19: `02dbd64d` merges `feat/diversity-climb` into `feat/diversity-mech`. `climb_orders` keeps schema 70 and the five blocks take 71 to 75. Debug ctest passes 70 of 70. Each new key is off by default, so the one campaign runs from this commit. It holds `full-k1` and `full-k4` (19 subjects × 30 seeds), plus six screen arms, each `full-k1` with one key on (19 subjects × seeds 0 to 9, which pair with `full-k1`'s seeds 0 to 9): `crowd-spec`, `novelty`, `slot-coverage`, `spread-init`, `flip-tabu` (5 generations) and `flip-sideways`.
+- 2026-11-19: `genetic.maximality_removal` was never merged to main. It lives on `feat/demotion-removal` (`5e94f6b5`) and the campaign branches cut from it, and main ignores it with a warning, so on main `full` would demote and not remove. `campaign/diversity-climb` (`48884d5b`) ports `5e94f6b5` onto `02dbd64d` with schema 76. `1c8e34f9` declares campaign `2026-11-19-diversity-screen-runs` with sweep K. `full-k1`'s config differs from all 570 of the rerun's `remove-no-blame-exchange` configs by the line `climb_orders = 1` only, and each screen arm differs from `full-k1` by its own keys only. Release ctest passes 70 of 70. Smoke runs on fsm seed 0: every arm removed 61 to 107 candidates with no fallback, the climb tried 87 steps at one order and 345 at four, and every mechanism's counter block was non-zero.
+- 2026-11-19: enqueued at `1c8e34f` as av2 entry 094 and av3 entry 092, with 2,280 runs (1,140 per host) at 14 jobs × 2 threads on CPUs 0 to 29 under 64G. The estimate is about 75 CPU-hours, at the rerun's mean of 58 s a run over 2 threads. The budget had 0 CPU-hours spent before this.
+- 2026-11-19: `feat/diversity-screen` done: `64f086ef` (`compare --rule-only`), `2667e13a` (`--pairs FILE`), `ba8e2730` (`scripts/diversity/`) and `6649c219`. The word banks are under `wordbank/`, untracked. Each subject has 24,576 aimed words taken from the 2026-11-19-fretish-exchange-pooled draws, plus 8,192 uniform words (stem 0 to 8, loop 1 to 8, seed 3). fsm-lmcps was not in that pass, so its aimed words were drawn fresh. One screen of one arm takes 7.3 minutes over 19 subjects once the reference is fingerprinted, and 21 minutes with nothing cached. Validation:
+  - Rule-only frontier against BLACK's. BLACK confirmed every implication the rules proved, but the rules prove only 39% of BLACK's on fsm and 37% on mode-arbiter. `full`'s frontier has 164 classes against BLACK's 57 on fsm, and 104 against 42 on mode-arbiter. The main miss is a trigger `true` with response `always r` implying a narrower trigger with a weaker response. The screen's accepted-trace share is therefore taken over a frontier inflated with weaker repairs, and its strength half of the pass rule is a weak check. A passing candidate still goes through the BLACK pooled pass before any claim.
+  - Net containment against `base`, screen against pooled pass. For `remove-exchange`: signs agree on 18 of 18 subjects, Spearman 0.93, Hodges–Lehmann +0.007 [−0.070, 0.099] against +0.060 [−0.025, 0.184]. For `remove-no-blame-exchange`: 16 of 18, Spearman 0.94, +0.008 [−0.059, 0.130] against +0.072 [−0.028, 0.200]. The screen ranks arms as the pooled pass does, but it shrinks the shift, so it reads direction and order only. Neither shift is significant in either measure.
+  - Descriptor count against per-run containment: median Spearman ρ −0.23 (range −0.75 to 0.46). It decides nothing.
+  - Screen subjects: the 18 subjects other than fsm-lmcps, where `remove-no-blame-exchange` returns no repair.
+- 2026-11-19: power. The 95% intervals above are about ±0.1 wide at 30 seeds a side, and a screen arm has 10. Before seeing any screen result, the pass rule's containment half is read as follows. A candidate passes if its shift against `full-k1` is positive and its two directions beat the controls, as the rule states. A positive shift with a non-significant interval counts as *promising*, and those candidates go on to a 30-seed campaign and the pooled pass, budget permitting.
