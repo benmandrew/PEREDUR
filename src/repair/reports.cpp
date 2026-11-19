@@ -259,6 +259,12 @@ void print_diagnostics_report() {
               << SpecificationCrowdingStats::n_cut_fronts
               << " cut fronts filled farthest-point, "
               << SpecificationCrowdingStats::n_distances << " distances\n";
+    std::cout << "Novelty: " << NoveltyStats::n_evaluations << " evaluations, "
+              << NoveltyStats::n_checks
+              << " rule checks against accumulated repairs ("
+              << NoveltyStats::n_implied << " proved), "
+              << NoveltyStats::n_covered
+              << " realizable candidates implied by a repair\n";
     if (ClimbStats::n_climbed > 0) {
         std::cout << "Output climb: " << ClimbStats::n_climbed
                   << " repairs climbed, " << ClimbStats::n_steps_tried

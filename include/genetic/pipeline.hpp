@@ -26,6 +26,8 @@
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 
+class DiversityState;
+
 /// Which representation of the population is live. A generation begins and ends
 /// scored; between breeding and scoring the individuals have no fitness yet, so
 /// the stages either side of that boundary cannot share one element type.
@@ -361,6 +363,9 @@ struct GenerationContext {
     /// Where the status sits in each candidate's objective vector, or nothing
     /// when the run scores none. Read by breeding to build a ParentContext.
     std::optional<std::size_t> m_status_objective;
+    /// The run's diversity state (diversity.hpp), lent to every generation of
+    /// a FRETISH run; null on the TLSF path and where the caller gives none.
+    DiversityState* m_diversity = nullptr;
 
     std::size_t m_target_size;
     std::size_t m_top_n;

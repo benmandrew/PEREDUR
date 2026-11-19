@@ -56,6 +56,7 @@ Versions 2 to 62 are in "Run manifest schema versions" in `docs/dev/history.md`.
 - **68** removed `config.mutation.p_sideways`, `config.filters.climb_order` and `config.filters.climb_orders`, retired at their defaults, and `direction_gate.sideways_refused`, which was 0 at the default share of 1.
 - **69** records the new `[mutation] blame_realizable` and `gate_realizable` keys in `config`. `blame_realizable` defaults to true, which behaves as at 68. `gate_realizable` defaults to `"exchange"`, which changes how a realisable parent strengthens under `direction_gated`; `"towards"` behaves as at 68. A run with `direction_gated` off behaves as at 68 at any value.
 - **70** records the new `[genetic] crowding` key in `config` and adds the `specification_crowding` block (`sorts`, `cut_fronts`, `distances`), all zero at the default `"objective"`, which behaves as at 69. See "Diversity mechanisms" in `docs/dev/algorithm.md`.
+- **71** records the new `[genetic] novelty` key in `config` and adds the `novelty` block (`evaluations`, `checks`, `implied`, `covered`), all zero at the default `false`, which behaves as at 70.
 
 ## Where the campaign records are
 

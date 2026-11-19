@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "config.hpp"
@@ -118,6 +119,68 @@ TEST(test_specification_crowding_keeps_the_unlike_members) {
     expect(kept_unlike,
            "specification crowding: the specification sharing no slot "
            "survives the cut");
+}
+
+}  // namespace
+
+namespace {
+
+// --- novelty ---
+
+Scored<Specification> scored_with_status(Specification spec, double status) {
+    Scored<Specification> scored;
+    scored.specification = std::move(spec);
+    scored.objectives = {status};
+    return scored;
+}
+
+TEST(test_novelty_counts_the_accumulated_repairs_implying_a_candidate) {
+    const Specification strong({}, {guarantee0(), guarantee1()}, inputs(),
+                               outputs());
+    const Specification gutted({}, {guarantee0(), removed(guarantee1())},
+                               inputs(), outputs());
+    const Specification other({}, {make_req("b", "x"), guarantee1()}, inputs(),
+                              outputs());
+    std::vector<Specification> accumulated = {strong};
+    DiversityState state(&accumulated);
+    const std::vector<Scored<Specification>> population = {
+        scored_with_status(gutted, 1.0), scored_with_status(other, 1.0),
+        scored_with_status(gutted, 0.5)};
+    std::vector<double> objective = novelty_objective(state, population, 0);
+    expect(objective == std::vector<double>{-1.0, 0.0, 0.0},
+           "novelty: a repair implying a realizable candidate counts, an "
+           "incomparable one does not, and an unrealizable one scores 0");
+    // M only grows, and a measured candidate catches up on the new members.
+    const std::size_t checks = NoveltyStats::n_checks;
+    accumulated.push_back(gutted);
+    objective = novelty_objective(state, population, 0);
+    expect(objective[0] == -2.0,
+           "novelty: the candidate counts the repair accumulated since, "
+           "itself included");
+    expect(NoveltyStats::n_checks - checks == 2,
+           "novelty: each candidate is checked against the new member alone");
+    expect(novelty_objective(state, population, std::nullopt) ==
+               std::vector<double>(3, 0.0),
+           "novelty: without a status objective every value is 0");
+}
+
+TEST(test_novelty_ranks_a_repair_below_an_incomparable_one) {
+    const Specification strong({}, {guarantee0(), guarantee1()}, inputs(),
+                               outputs());
+    const Specification gutted({}, {guarantee0(), removed(guarantee1())},
+                               inputs(), outputs());
+    const Specification other({}, {make_req("b", "x"), guarantee1()}, inputs(),
+                              outputs());
+    const std::vector<Specification> accumulated = {strong};
+    DiversityState state(&accumulated);
+    std::vector<Scored<Specification>> population = {
+        scored_with_status(gutted, 1.0), scored_with_status(other, 1.0)};
+    Nsga2Options options;
+    options.extra_objective = novelty_objective(state, population, 0);
+    nsga2_sort(population, {}, options);
+    expect(population[0].specification == other && population[0].rank == 0 &&
+               population[1].rank == 1,
+           "novelty: the candidate a found repair implies drops a front");
 }
 
 }  // namespace

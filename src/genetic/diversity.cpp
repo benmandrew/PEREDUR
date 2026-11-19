@@ -2,8 +2,16 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
+#include <optional>
+#include <string>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
+#include "filter/implication_check.hpp"
+#include "fitness/status.hpp"
+#include "profile.hpp"
 #include "requirement.hpp"
 
 namespace {
@@ -35,4 +43,84 @@ double specification_distance(const Specification& lhs,
         differing_slots(lhs.m_assumptions, rhs.m_assumptions) +
         differing_slots(lhs.m_guarantees, rhs.m_guarantees);
     return static_cast<double>(differing) / static_cast<double>(slots);
+}
+
+DiversityState::DiversityState(const std::vector<Specification>* accumulated)
+    : m_accumulated(accumulated) {}
+
+bool DiversityState::memoised_implies(const Requirement& stronger,
+                                      const Requirement& weaker) {
+    std::pair<std::string, std::string> key{stronger.m_ltl, weaker.m_ltl};
+    const auto found = m_pair_memo.find(key);
+    if (found != m_pair_memo.end()) {
+        return found->second;
+    }
+    const bool proved = requirement_implies(stronger, weaker);
+    m_pair_memo.emplace(std::move(key), proved);
+    return proved;
+}
+
+std::size_t DiversityState::implied_by(const Specification& candidate) {
+    if (m_accumulated == nullptr) {
+        return 0;
+    }
+    const std::vector<Specification>& accumulated = *m_accumulated;
+    while (m_guarantee_lowerings.size() < accumulated.size()) {
+        m_guarantee_lowerings.push_back(live_lowerings(
+            accumulated[m_guarantee_lowerings.size()].m_guarantees));
+    }
+    Novelty& novelty = m_novelty[candidate];
+    if (novelty.checked == accumulated.size()) {
+        return novelty.count;
+    }
+    const std::unordered_set<std::string> assumptions =
+        live_lowerings(candidate.m_assumptions);
+    const RequirementImplication implies = [this](const Requirement& stronger,
+                                                  const Requirement& weaker) {
+        return memoised_implies(stronger, weaker);
+    };
+    for (; novelty.checked < accumulated.size(); ++novelty.checked) {
+        NoveltyStats::n_checks++;
+        if (spec_implies_by_rule(accumulated[novelty.checked], candidate,
+                                 m_guarantee_lowerings[novelty.checked],
+                                 assumptions, implies)) {
+            NoveltyStats::n_implied++;
+            ++novelty.count;
+        }
+    }
+    return novelty.count;
+}
+
+void DiversityState::retain(const std::vector<Scored<Specification>>& keep) {
+    std::unordered_set<Specification> live;
+    for (const Scored<Specification>& scored : keep) {
+        live.insert(scored.specification);
+    }
+    for (auto it = m_novelty.begin(); it != m_novelty.end();) {
+        it = live.count(it->first) != 0 ? std::next(it) : m_novelty.erase(it);
+    }
+}
+
+std::vector<double> novelty_objective(
+    DiversityState& state, const std::vector<Scored<Specification>>& population,
+    std::optional<std::size_t> status_index) {
+    PEREDUR_PROFILE_SCOPE("select/novelty");
+    std::vector<double> objective(population.size(), 0.0);
+    if (!status_index.has_value()) {
+        return objective;
+    }
+    for (std::size_t i = 0; i < population.size(); ++i) {
+        const Scored<Specification>& scored = population[i];
+        NoveltyStats::n_evaluations++;
+        if (*status_index >= scored.objectives.size() ||
+            scored.objectives[*status_index] < k_status_realizable) {
+            continue;
+        }
+        const std::size_t count = state.implied_by(scored.specification);
+        if (count > 0) {
+            NoveltyStats::n_covered++;
+        }
+        objective[i] = -static_cast<double>(count);
+    }
+    return objective;
 }

@@ -169,6 +169,11 @@ struct Config {
     /// Under NSGA-II on the FRETISH path, how a front is spread (see
     /// Crowding). Objective by default. Draws nothing either way.
     Crowding crowding = Crowding::Objective;
+    /// Under NSGA-II on the FRETISH path, rank by one more objective: minus
+    /// the number of accumulated repairs that rule-imply a realizable
+    /// candidate, and 0 for an unrealizable one (see "Diversity mechanisms" in
+    /// docs/dev/algorithm.md). Off by default. Draws nothing.
+    bool novelty = false;
     double selection_rate = 0.5;
     /// The top elitism_rate fraction of the population carries over into the
     /// next generation verbatim, bypassing crossover, mutation and the

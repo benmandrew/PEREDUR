@@ -716,6 +716,8 @@ void insert_parent_verdict_stage(
 ///                          result can then be smaller than target_size
 /// @param original          Optional specification the run repairs, lent to
 ///                          mutation through its ParentContext
+/// @param diversity         Optional run-scoped diversity state, read by the
+///                          FRETISH diversity keys (diversity.hpp)
 /// @return                  Next generation of target_size specifications
 template <typename Spec, typename Fitness>
 std::vector<Scored<Spec>> evolve_generation(
@@ -726,7 +728,7 @@ std::vector<Scored<Spec>> evolve_generation(
     const RandomSource& random_source,
     const GenerationProgressCallback& on_progress = nullptr,
     const StageObserver& on_stage = nullptr, SearchBudget* budget = nullptr,
-    const Spec* original = nullptr) {
+    const Spec* original = nullptr, DiversityState* diversity = nullptr) {
     assert(random_source);
     assert(!fitness_functions.empty());
     assert(cfg.crossover_rate >= 0.0 && cfg.crossover_rate <= 1.0);
@@ -742,6 +744,7 @@ std::vector<Scored<Spec>> evolve_generation(
         },
         budget);
     ctx.m_original = original;
+    ctx.m_diversity = diversity;
     ctx.m_status_objective = fitness_functions.objective_index("status");
     if (cfg.maximality_demotion) {
         ctx.m_status_index = status_objective_index(fitness_functions);

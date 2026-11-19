@@ -153,6 +153,7 @@ Config golden_config() {
     // changes only the order within a front. Pinned so that a move of the
     // default fails here rather than re-recording.
     cfg.crowding = Crowding::Objective;
+    cfg.novelty = false;
     // At its default of 0 the order crossover returns before reading a verdict
     // or drawing. The golden fitness has no status objective, so no parent
     // here reads realizable at any value; pinned so that stays a decision.

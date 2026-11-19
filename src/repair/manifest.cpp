@@ -55,7 +55,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 70;
+constexpr int k_schema_version = 71;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -492,6 +492,15 @@ void write_run_manifest(const std::string& output_dir,
          {{"sorts", SpecificationCrowdingStats::n_sorts.load()},
           {"cut_fronts", SpecificationCrowdingStats::n_cut_fronts.load()},
           {"distances", SpecificationCrowdingStats::n_distances.load()}}},
+        // What genetic.novelty did: novelty values read at a sort, rule
+        // checks of an accumulated repair against a candidate and those
+        // proved, and evaluations of a realizable candidate some repair
+        // implied. Zero whenever the key is off.
+        {"novelty",
+         {{"evaluations", NoveltyStats::n_evaluations.load()},
+          {"checks", NoveltyStats::n_checks.load()},
+          {"implied", NoveltyStats::n_implied.load()},
+          {"covered", NoveltyStats::n_covered.load()}}},
         // The output climb, all zero unless filters.climb_output is on.
         {"climb",
          {{"climbed", ClimbStats::n_climbed.load()},

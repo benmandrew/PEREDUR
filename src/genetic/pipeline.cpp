@@ -259,8 +259,9 @@ std::vector<bool> demotion_flags(
 
 /// The NSGA-II options the diversity keys ask for over @p population, which
 /// must outlive the sort: under `genetic.crowding = "specification"`, crowding
-/// by farthest-point order under specification_distance. Empty where every
-/// key is at its default or @p Spec is not FRETISH. Draws nothing.
+/// by farthest-point order under specification_distance, and under
+/// `genetic.novelty` the novelty objective. Empty where every key is at its
+/// default or @p Spec is not FRETISH. Draws nothing.
 template <typename Spec>
 Nsga2Options selection_options(
     [[maybe_unused]] const GenerationContext<Spec>& ctx,
@@ -274,6 +275,10 @@ Nsga2Options selection_options(
                 return specification_distance(population[lhs].specification,
                                               population[rhs].specification);
             };
+        }
+        if (ctx.m_cfg.novelty && ctx.m_diversity != nullptr) {
+            options.extra_objective = novelty_objective(
+                *ctx.m_diversity, population, ctx.m_status_objective);
         }
     }
     return options;
@@ -477,6 +482,11 @@ void stage_select(GenerationContext<Spec>& ctx) {
         // Deduplication alone would leave too few slots to breed from, so
         // selection pressure is re-expressed as replication multiplicity.
         pool = generation_detail::replicate_to_size(pool, ctx.m_target_size);
+    }
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        if (ctx.m_diversity != nullptr) {
+            ctx.m_diversity->retain(pool);
+        }
     }
     ctx.m_scored = std::move(pool);
 }

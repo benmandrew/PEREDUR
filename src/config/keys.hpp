@@ -44,7 +44,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 53> k_config_keys{{
+inline constexpr std::array<ConfigKey, 54> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -180,6 +180,16 @@ inline constexpr std::array<ConfigKey, 53> k_config_keys{{
      "or\n"
      "\"specification\" (farthest-point by slot Hamming distance). "
      "\"objective\" by default.\n"},
+    {"genetic", "novelty", &Config::novelty, KeyCheck::None, KeyReader::Fretish,
+     "Under nsga2-apportion, rank by one more minimised objective: the number "
+     "of repairs accumulated so far that the implication rule proves imply a "
+     "realizable candidate, so a repair below one already found ranks lower. "
+     "An unrealizable candidate scores 0, since no realizable repair implies "
+     "it. Rule implication only, cached per candidate; launches no process "
+     "and draws nothing. FRETISH only.",
+     "FRETISH only, under nsga2-apportion: minimise the number of accumulated "
+     "repairs\n"
+     "that rule-imply a realizable candidate. Off by default.\n"},
     {"fitness", "weight_syntactic", &Config::fitness_weight_syntactic,
      KeyCheck::NonNegative, KeyReader::Both,
      "Syntactic similarity component weight. The defaults match AuRUS's "

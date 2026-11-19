@@ -10,12 +10,14 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "config.hpp"
 #include "fitness/function.hpp"
 #include "genetic/accumulator.hpp"
+#include "genetic/diversity.hpp"
 #include "genetic/filter_report.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/output_gate.hpp"
@@ -104,6 +106,14 @@ SearchResult<Spec> run_generations(
     const GenerationSizes sizes = generation_sizes(cfg, cfg.population_size);
     const std::string total_str = std::to_string(cfg.generations);
     const FitnessFunctionT<Spec> gate_status = status_objective_of(fitness);
+    // Read by the FRETISH diversity keys alone, and inert with each of them
+    // off.
+    DiversityState diversity_state(nullptr);
+    DiversityState* diversity = nullptr;
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        diversity_state = DiversityState(&accumulator.specifications());
+        diversity = &diversity_state;
+    }
     for (std::size_t gen = 1; gen <= cfg.generations; ++gen) {
         // Checked before the generation as well as between offspring, matching
         // checkTermination() at the head of AuRUS's evolve(count) loop. Without
@@ -121,7 +131,7 @@ SearchResult<Spec> run_generations(
         };
         population = evolve_generation(
             cfg, population, sizes.selection, sizes.elitism, fitness, filters,
-            random_source, on_progress, observe, &budget, original);
+            random_source, on_progress, observe, &budget, original, diversity);
         budget.count_generation();
         for (std::size_t k = 0; k < filters.size(); ++k) {
             filter_stats[k].total_in += filters[k].n_in();
