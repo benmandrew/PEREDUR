@@ -8,6 +8,7 @@
 #include <exception>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <unordered_set>
 #include <variant>
 #include <vector>
@@ -46,9 +47,14 @@ constexpr unsigned k_all_moved = (1U << k_field_count) - 1;
 // lowering reads its atoms only through those fields, so each step is a fact
 // about one field in the context the others give it. The polarities are those
 // the monotone arm reads (response_direction, condition_direction and
-// stop_direction in src/genetic/mutation.cpp), and the keyword steps those of
-// timing_implies, scope_implies and the condition-type order.
-// `reach_sound` in proofs/Fretish/Chain.lean proves the search sound.
+// stop_direction in src/genetic/mutation.cpp), except that a trigger's
+// condition is antitone where the condition types coincide
+// (`condition_coincide_sound` in proofs/Fretish/Chain.lean), and the keyword
+// steps those of timing_implies, scope_implies and the condition-type order.
+// One step moves two fields: the timing and the scope together, from a plain
+// scope into an only one whose timing's pattern the plain one rules out
+// (cross_step_holds). `reach_sound` in proofs/Fretish/Chain.lean proves the
+// search sound.
 class RuleSearch {
    public:
     RuleSearch(const Requirement& from, const Requirement& dest)
@@ -89,7 +95,72 @@ class RuleSearch {
                 return true;
             }
         }
-        return false;
+        const unsigned both = (1U << k_timing) | (1U << k_scope);
+        return (moved & both) == 0 && cross_step_holds(moved) &&
+               reach(moved | both);
+    }
+
+    // Whether the timing and the scope may move together, from a plain scope
+    // into an only one, where neither one-field middle state implies: the
+    // plain timing's pattern rules out the only timing's at the same point.
+    // `cross_sound` in proofs/Fretish/Cross.lean.
+    [[nodiscard]] bool cross_step_holds(unsigned moved) const {
+        if (!timings_clash(m_from.m_timing, m_dest.m_timing)) {
+            return false;
+        }
+        const ScopeKind from = m_from.m_scope.m_kind;
+        const ScopeKind dest = m_dest.m_scope.m_kind;
+        if (from == ScopeKind::NotIn) {
+            return dest == ScopeKind::OnlyIn &&
+                   m_from.m_scope.m_mode == m_dest.m_scope.m_mode;
+        }
+        if (from != ScopeKind::Global) {
+            return false;
+        }
+        if (dest == ScopeKind::OnlyAfter) {
+            return true;
+        }
+        // Only in and only before read the body at later entries too, which a
+        // global trigger reaches only through `always`.
+        return (dest == ScopeKind::OnlyIn || dest == ScopeKind::OnlyBefore) &&
+               (at(moved, k_condition_type).m_condition_type ==
+                    ConditionType::Continual ||
+                std::holds_alternative<timing::Always>(m_from.m_timing));
+    }
+
+    // `after n` keeps the response false for n + 1 ticks and then makes it
+    // true, which clashes with a timing that needs it at the first tick
+    // (immediately, for k, always), within n ticks (next for n >= 1, within
+    // k <= n) or at another tick (after k != n).
+    static bool timings_clash(const Timing& lhs, const Timing& rhs) {
+        const auto* after = std::get_if<timing::AfterTicks>(&lhs);
+        const Timing* other = &rhs;
+        if (after == nullptr) {
+            after = std::get_if<timing::AfterTicks>(&rhs);
+            other = &lhs;
+        }
+        if (after == nullptr) {
+            return false;
+        }
+        const std::size_t ticks = after->m_ticks;
+        return std::visit(
+            [ticks](const auto& timing) {
+                using T = std::decay_t<decltype(timing)>;
+                if constexpr (std::is_same_v<T, timing::Immediately> ||
+                              std::is_same_v<T, timing::ForTicks> ||
+                              std::is_same_v<T, timing::Always>) {
+                    return true;
+                } else if constexpr (std::is_same_v<T, timing::NextTimepoint>) {
+                    return ticks >= 1;
+                } else if constexpr (std::is_same_v<T, timing::WithinTicks>) {
+                    return timing.m_ticks <= ticks;
+                } else if constexpr (std::is_same_v<T, timing::AfterTicks>) {
+                    return timing.m_ticks != ticks;
+                } else {
+                    return false;
+                }
+            },
+            *other);
     }
 
     // Whether the state @p moved implies itself with @p field moved too.
@@ -100,9 +171,11 @@ class RuleSearch {
         const ScopeKind scope = at(moved, k_scope).m_scope.m_kind;
         switch (field) {
             case k_condition:
-                // An antecedent under continual; a trigger's rising edge holds
-                // the condition at both polarities.
-                return ctype == ConditionType::Continual
+                // An antecedent under continual, and under a trigger where it
+                // coincides with continual; elsewhere a trigger's rising edge
+                // holds the condition at both polarities.
+                return ctype == ConditionType::Continual ||
+                               condition_types_coincide(timing, scope)
                            ? back(m_condition, m_dest.m_condition,
                                   m_from.m_condition)
                            : equivalent(m_condition, m_from.m_condition,
@@ -149,16 +222,21 @@ class RuleSearch {
                    : onward(m_stop, *from_stop, *dest_stop);
     }
 
-    // Continual implies Trigger everywhere; the two coincide at Always under
-    // the plain scopes and at Eventually under the only ones.
-    [[nodiscard]] bool condition_type_step(const Timing& timing,
-                                           ScopeKind scope) const {
-        if (m_from.m_condition_type == ConditionType::Continual) {
-            return true;
-        }
+    // The two condition types coincide at Always under the plain scopes and at
+    // Eventually under the only ones.
+    static bool condition_types_coincide(const Timing& timing,
+                                         ScopeKind scope) {
         return is_only_scope(scope)
                    ? std::holds_alternative<timing::Eventually>(timing)
                    : std::holds_alternative<timing::Always>(timing);
+    }
+
+    // Continual implies Trigger everywhere, and Trigger implies Continual
+    // where they coincide.
+    [[nodiscard]] bool condition_type_step(const Timing& timing,
+                                           ScopeKind scope) const {
+        return m_from.m_condition_type == ConditionType::Continual ||
+               condition_types_coincide(timing, scope);
     }
 
     // Each propositional field has two values, so two answers cover every

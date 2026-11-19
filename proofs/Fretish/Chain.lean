@@ -1,4 +1,4 @@
-import Fretish.CondOrder
+import Fretish.Cross
 
 /-!
 # The chain search
@@ -6,13 +6,16 @@ import Fretish.CondOrder
 `Search.reach` transcribes `RuleSearch` in `src/filter/implication_check.cpp`,
 which `requirement_implies` runs when two lowerings differ. A state is the set
 of fields already moved from `src`'s value to `dst`'s, and a step moves one
-more field if `stepHolds` accepts it in the context of the current state.
+more field if `stepHolds` accepts it in the context of the current state. One
+step, `crossHolds`, moves the timing and the scope together, from a plain scope
+into an only one, where `Fretish.Cross` proves the clash of the two timings
+implies.
 
 The propositional checks are not transcribed. `formula_implies` decides them
 by model counting, and here they are six answers that `Search.Sound` assumes
 correct. Each scope's mode is reduced to `sameMode`, as in `scopeImplies`.
 
-`RuleSearch` memoises failed states. Each step moves a new field, so a search
+`RuleSearch` memoises failed states. Each step moves at least one new field, so a search
 of depth five reaches every state, and the memo can only cut a branch that
 already failed. `reach` leaves it out.
 
@@ -113,7 +116,9 @@ def Search.timingStep (S : Search) (k : ScopeKind) : Bool :=
 /-- `step_holds` -/
 def Search.stepHolds (S : Search) (mv : Moved) : Field → Bool
   | .condition =>
-    if (S.state mv).ct == .continual then S.condBack else S.condFwd && S.condBack
+    if (S.state mv).ct == .continual ||
+        conditionTypeStep .trigger (S.state mv).scope (S.state mv).kind then S.condBack
+    else S.condFwd && S.condBack
   | .response =>
     if (S.state mv).kind.isAfter then S.respFwd && S.respBack
     else if isOnly (S.state mv).scope then S.respBack else S.respFwd
@@ -121,12 +126,19 @@ def Search.stepHolds (S : Search) (mv : Moved) : Field → Bool
   | .conditionType => conditionTypeStep S.src.ct (S.state mv).scope (S.state mv).kind
   | .scope => scopeImplies S.src.scope S.dst.scope S.sameMode (S.state mv).kind (S.state mv).ct
 
+/-- `cross_step_holds`: the timing and the scope moved together, from a plain
+scope to an only one, when the two timings' patterns clash. -/
+def Search.crossHolds (S : Search) (mv : Moved) : Bool :=
+  !mv .timing && !mv .scope && crossTiming S.src.kind S.dst.kind &&
+    crossScope S.src.scope S.dst.scope S.sameMode S.src.kind (S.state mv).ct
+
 /-- `reach`, to depth `n`. -/
 def Search.reachN (S : Search) : Nat → Moved → Bool
   | 0, mv => Field.all.all mv
   | n + 1, mv =>
     Field.all.all mv ||
-      Field.all.any (fun f => !mv f && S.stepHolds mv f && S.reachN n (mv.set f))
+      Field.all.any (fun f => !mv f && S.stepHolds mv f && S.reachN n (mv.set f)) ||
+      (S.crossHolds mv && S.reachN n ((mv.set .timing).set .scope))
 
 /-- `reaches_dest`, from the fields `src` and `dst` already share. -/
 def Search.reach (S : Search) (start : Moved) : Bool := S.reachN 5 start
@@ -234,6 +246,27 @@ theorem condition_sound (hS : S.Sound) {k : ScopeKind} {ct : CondType} {T : Timi
       exact lower_trigger_tt _ _
     · exact fun _ => id
 
+/-- A condition step under a trigger where the trigger coincides with its
+continual form: through the continual form, where the condition is antitone. -/
+theorem condition_coincide_sound (hS : S.Sound) {k : ScopeKind} {ct : CondType} {K : Kind}
+    {s m r : Pred}
+    (h : (if (ct == .continual || conditionTypeStep .trigger k K) = true then S.condBack
+      else S.condFwd && S.condBack) = true) :
+    Entails (lower k ct S.src.ctrue (K.at s) m S.src.cond r)
+      (lower k ct S.dst.ctrue (K.at s) m S.dst.cond r) := by
+  cases ct
+  · exact condition_sound hS (by simpa using h)
+  · cases hco : conditionTypeStep .trigger k K
+    · exact condition_sound hS (by simpa [hco] using h)
+    · have hb : S.condBack = true := by simpa [hco] using h
+      have h1 := condition_type_step_sound (ct' := .continual) (s := s) (m := m) (r := r)
+        hS.src.2 (by decide) hco
+      have h2 := condition_sound hS (ct := .continual) (k := k) (T := K.at s) (m := m) (r := r)
+        (by simpa using hb)
+      have h3 := condition_type_step_sound (ct := .continual) (ct' := .trigger) (k := k) (K := K)
+        (s := s) (m := m) (r := r) hS.dst.2 (by decide) (by simp [conditionTypeStep])
+      exact fun t ht => h3 t (h2 t (h1 t ht))
+
 theorem response_sound (hS : S.Sound) {k : ScopeKind} {ct : CondType} {ctrue : Bool} {K : Kind}
     {s m c : Pred}
     (h : (if K.isAfter = true then S.respFwd && S.respBack
@@ -263,13 +296,22 @@ theorem step_sound (hS : S.Sound) (f : Field) (hf : mv f = false) (h : S.stepHol
   cases f <;>
     simp only [Search.stepHolds, Search.state, mix, Req.sem, Moved.set, hf, reduceCtorEq,
       ↓reduceIte, Bool.false_eq_true] at h hc ⊢
-  · exact condition_sound hS h
+  · exact condition_coincide_sound hS h
   · exact response_sound hS h
   · exact timing_sound hS h
   · by_cases he : S.src.ct = S.dst.ct
     · rw [he]; exact fun _ => id
     · exact condition_type_step_sound hc he h
   · exact scope_implies_sound hc hS.mode h
+
+theorem cross_step_sound (hS : S.Sound) (h : S.crossHolds mv = true) :
+    Entails (S.state mv).sem (S.state ((mv.set .timing).set .scope)).sem := by
+  have hc := (state_valid hS mv).2
+  simp only [Search.crossHolds, Bool.and_eq_true, Bool.not_eq_true'] at h
+  obtain ⟨⟨⟨ht, hsc⟩, hx⟩, hk⟩ := h
+  simp only [Search.state, mix, Req.sem, Moved.set, ht, hsc, reduceCtorEq, ↓reduceIte,
+    Bool.false_eq_true] at hk hc ⊢
+  exact cross_sound hS.mode hc hx hk
 
 theorem state_all (h : Field.all.all mv = true) : S.state mv = S.dst := by
   simp only [Field.all, List.all_cons, List.all_nil, Bool.and_true, Bool.and_eq_true] at h
@@ -281,9 +323,10 @@ theorem reachN_sound (hS : S.Sound) : ∀ n mv, S.reachN n mv = true →
   | n + 1, mv, h => by
     simp only [Search.reachN, Bool.or_eq_true, List.any_eq_true, Bool.and_eq_true,
       Bool.not_eq_true'] at h
-    rcases h with h | ⟨f, -, ⟨hf, hs⟩, hr⟩
+    rcases h with (h | ⟨f, -, ⟨hf, hs⟩, hr⟩) | ⟨hx, hr⟩
     · rw [state_all h]; exact fun _ => id
     · exact fun t ht => reachN_sound hS n _ hr t (step_sound hS f hf hs t ht)
+    · exact fun t ht => reachN_sound hS n _ hr t (cross_step_sound hS hx t ht)
 
 /-- Every pair `reach` accepts implies, from a start that marks only fields
 the two requirements share. -/

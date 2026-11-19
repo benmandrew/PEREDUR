@@ -1,10 +1,15 @@
 #include <algorithm>
+#include <array>
 #include <cstddef>
+#include <cstdlib>
 #include <functional>
+#include <future>
+#include <iostream>
 #include <optional>
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -627,93 +632,190 @@ TEST(test_timing_mutation_moves_in_direction_under_every_scope) {
 
 // --- Structural requirement implication -----------------------------------
 
-// Every pair requirement_implies proves must hold under SPOT. The pools give
-// each field an implication chain and an incomparable value, and a second mode
-// so that scope edges must keep theirs. A sample of requirements is paired
-// with every requirement one or two fields away, which is where a rule chain
-// has the most room to go wrong while staying short.
-TEST(test_requirement_implies_is_sound) {
-    const std::vector<Formula> conditions = {Formula("a"), Formula("a & b"),
-                                             Formula("a | b")};
-    const std::vector<Formula> responses = {Formula("x"), Formula("x | y"),
-                                            Formula("x & y")};
-    const std::vector<Timing> timings = {
-        timing::immediately(),        timing::next_timepoint(),
-        timing::within_ticks(2),      timing::within_ticks(3),
-        timing::for_ticks(2),         timing::after_ticks(1),
-        timing::eventually(),         timing::always(),
-        timing::until(Formula("s")),  timing::until(Formula("s | t")),
-        timing::before(Formula("s")), timing::before(Formula("s | t"))};
-    const std::vector<Scope> scopes = {Scope{},
-                                       Scope{ScopeKind::In, "m"},
-                                       Scope{ScopeKind::NotIn, "m"},
-                                       Scope{ScopeKind::Before, "m"},
-                                       Scope{ScopeKind::After, "m"},
-                                       Scope{ScopeKind::OnlyIn, "m"},
-                                       Scope{ScopeKind::OnlyAfter, "m"},
-                                       Scope{ScopeKind::In, "n"}};
-    struct Index {
-        std::size_t m_condition, m_response, m_timing, m_ctype, m_scope;
-    };
-    const auto build = [&](const Index& idx) {
-        return Requirement(conditions[idx.m_condition],
-                           responses[idx.m_response], timings[idx.m_timing],
-                           idx.m_ctype == 0 ? ConditionType::Continual
-                                            : ConditionType::Trigger,
-                           /*weakenable=*/true, /*removed=*/false,
-                           scopes[idx.m_scope]);
-    };
-    // Every combination, decoded from one counter in mixed radix.
-    const std::size_t n_combinations = conditions.size() * responses.size() *
-                                       timings.size() * 2 * scopes.size();
+// The pools a requirement_implies sweep combines, one per field.
+struct ImpliesPools {
+    std::vector<Formula> m_conditions;
+    std::vector<Formula> m_responses;
+    std::vector<Timing> m_timings;
+    std::vector<Scope> m_scopes;
+};
+
+// What a sweep found: the pairs asked, the implications SPOT finds among
+// them, the pairs the rules prove, and each pair on which the two disagree.
+struct ImpliesSweep {
+    std::size_t m_asked = 0;
+    std::size_t m_spot = 0;
+    std::size_t m_proved = 0;
+    std::vector<std::string> m_unsound;
+    std::vector<std::string> m_missed;
+};
+
+// ltl_implications over @p queries in batches across threads, since one
+// ltlfilt run is capped at a minute.
+std::vector<bool> ltl_implications_batched(
+    const std::vector<Implication>& queries) {
+    constexpr std::size_t k_batch = 4000;
+    std::vector<std::future<std::vector<bool>>> batches;
+    for (std::size_t start = 0; start < queries.size(); start += k_batch) {
+        const std::size_t end = std::min(start + k_batch, queries.size());
+        std::vector<Implication> batch(
+            queries.begin() + static_cast<std::ptrdiff_t>(start),
+            queries.begin() + static_cast<std::ptrdiff_t>(end));
+        batches.push_back(
+            std::async(std::launch::async, ltl_implications, std::move(batch)));
+    }
+    std::vector<bool> holds;
+    holds.reserve(queries.size());
+    for (auto& batch : batches) {
+        const std::vector<bool> part = batch.get();
+        holds.insert(holds.end(), part.begin(), part.end());
+    }
+    return holds;
+}
+
+// Every `stride`th requirement of the pools' product against every
+// requirement at most `max_apart` fields away, each pair sent to SPOT.
+ImpliesSweep sweep_requirement_implies(const ImpliesPools& pools,
+                                       std::size_t stride, int max_apart) {
+    using Index = std::array<std::size_t, 5>;
+    const std::array<std::size_t, 5> radix = {
+        pools.m_conditions.size(), pools.m_responses.size(),
+        pools.m_timings.size(), 2, pools.m_scopes.size()};
+    std::size_t n_combinations = 1;
+    for (const std::size_t size : radix) {
+        n_combinations *= size;
+    }
     std::vector<Index> all;
+    std::vector<Requirement> requirements;
     for (std::size_t code = 0; code < n_combinations; ++code) {
         std::size_t rest = code;
         Index idx{};
-        idx.m_scope = rest % scopes.size();
-        rest /= scopes.size();
-        idx.m_ctype = rest % 2;
-        rest /= 2;
-        idx.m_timing = rest % timings.size();
-        rest /= timings.size();
-        idx.m_response = rest % responses.size();
-        idx.m_condition = rest / responses.size();
+        for (std::size_t field = radix.size(); field-- > 0;) {
+            idx[field] = rest % radix[field];
+            rest /= radix[field];
+        }
         all.push_back(idx);
+        requirements.emplace_back(
+            pools.m_conditions[idx[0]], pools.m_responses[idx[1]],
+            pools.m_timings[idx[2]],
+            idx[3] == 0 ? ConditionType::Continual : ConditionType::Trigger,
+            /*weakenable=*/true, /*removed=*/false, pools.m_scopes[idx[4]]);
     }
-    const auto distance = [](const Index& lhs, const Index& rhs) {
-        return static_cast<int>(lhs.m_condition != rhs.m_condition) +
-               static_cast<int>(lhs.m_response != rhs.m_response) +
-               static_cast<int>(lhs.m_timing != rhs.m_timing) +
-               static_cast<int>(lhs.m_ctype != rhs.m_ctype) +
-               static_cast<int>(lhs.m_scope != rhs.m_scope);
-    };
-    std::vector<Implication> implications;
-    std::vector<std::string> wheres;
-    std::size_t asked = 0;
-    for (std::size_t i = 0; i < all.size(); i += 11) {
-        const Requirement stronger = build(all[i]);
-        for (const Index& other : all) {
-            const int apart = distance(all[i], other);
-            if (apart == 0 || apart > 2) {
-                continue;
+    std::vector<std::pair<std::size_t, std::size_t>> pairs;
+    for (std::size_t i = 0; i < all.size(); i += stride) {
+        for (std::size_t j = 0; j < all.size(); ++j) {
+            int apart = 0;
+            for (std::size_t field = 0; field < radix.size(); ++field) {
+                apart += static_cast<int>(all[i][field] != all[j][field]);
             }
-            ++asked;
-            const Requirement weaker = build(other);
-            if (!requirement_implies(stronger, weaker)) {
-                continue;
+            if (apart != 0 && apart <= max_apart) {
+                pairs.emplace_back(i, j);
             }
-            implications.push_back({stronger.m_ltl, weaker.m_ltl});
-            wheres.push_back(stronger.to_string() + " => " +
-                             weaker.to_string());
         }
     }
-    const std::vector<bool> holds = ltl_implications(implications);
-    for (std::size_t idx = 0; idx < wheres.size(); ++idx) {
-        expect(holds[idx],
-               "requirement_implies proved a non-implication: " + wheres[idx]);
+    std::vector<Implication> queries;
+    queries.reserve(pairs.size());
+    for (const auto& pair : pairs) {
+        queries.push_back(
+            {requirements[pair.first].m_ltl, requirements[pair.second].m_ltl});
     }
-    expect(!wheres.empty() && wheres.size() < asked,
+    const std::vector<bool> holds = ltl_implications_batched(queries);
+    ImpliesSweep result;
+    result.m_asked = pairs.size();
+    for (std::size_t k = 0; k < pairs.size(); ++k) {
+        const Requirement& stronger = requirements[pairs[k].first];
+        const Requirement& weaker = requirements[pairs[k].second];
+        const bool proved = requirement_implies(stronger, weaker);
+        result.m_spot += static_cast<std::size_t>(holds[k]);
+        result.m_proved += static_cast<std::size_t>(proved);
+        if (proved != holds[k]) {
+            (proved ? result.m_unsound : result.m_missed)
+                .push_back(stronger.to_string() + " => " + weaker.to_string());
+        }
+    }
+    return result;
+}
+
+std::string first_of(const std::vector<std::string>& pairs) {
+    return pairs.empty() ? std::string("none") : pairs.front();
+}
+
+// Every pair requirement_implies proves must hold under SPOT, and every
+// implication SPOT finds the rules must prove. The pools give each field an
+// implication chain and an incomparable value, and a second mode so that
+// scope edges must keep theirs. A sample of requirements is paired with every
+// requirement one or two fields away, which is where a rule chain has the
+// most room to go wrong while staying short.
+TEST(test_requirement_implies_is_sound) {
+    const ImpliesPools pools = {
+        {Formula("a"), Formula("a & b"), Formula("a | b")},
+        {Formula("x"), Formula("x | y"), Formula("x & y")},
+        {timing::immediately(), timing::next_timepoint(),
+         timing::within_ticks(2), timing::within_ticks(3), timing::for_ticks(2),
+         timing::after_ticks(1), timing::eventually(), timing::always(),
+         timing::until(Formula("s")), timing::until(Formula("s | t")),
+         timing::before(Formula("s")), timing::before(Formula("s | t"))},
+        {Scope{}, Scope{ScopeKind::In, "m"}, Scope{ScopeKind::NotIn, "m"},
+         Scope{ScopeKind::Before, "m"}, Scope{ScopeKind::After, "m"},
+         Scope{ScopeKind::OnlyIn, "m"}, Scope{ScopeKind::OnlyAfter, "m"},
+         Scope{ScopeKind::In, "n"}}};
+    const ImpliesSweep result = sweep_requirement_implies(pools, 11, 2);
+    expect(result.m_unsound.empty(),
+           "requirement_implies proved " +
+               std::to_string(result.m_unsound.size()) +
+               " non-implications, first " + first_of(result.m_unsound));
+    expect(result.m_missed.empty(), "requirement_implies missed " +
+                                        std::to_string(result.m_missed.size()) +
+                                        " implications, first " +
+                                        first_of(result.m_missed));
+    expect(result.m_proved > 0 && result.m_proved < result.m_asked,
            "requirement_implies: the sample must prove some pairs, not all");
+}
+
+// Opt-in, since it takes minutes: `peredur_tests requirement_implies_sweep`.
+// Wider pools than the test above, with an unrelated atom in each
+// propositional field, every timing kind at several tick counts, every scope
+// kind at two modes, and pairs up to three fields apart. The misses it
+// records are the rules' known incompleteness.
+TEST_IN("requirement_implies_sweep", test_requirement_implies_wide_sweep) {
+    ImpliesPools pools = {
+        {Formula("a"), Formula("a & b"), Formula("a | b"), Formula("c")},
+        {Formula("x"), Formula("x | y"), Formula("x & y"), Formula("z")},
+        {timing::immediately(), timing::next_timepoint(),
+         timing::within_ticks(1), timing::within_ticks(2),
+         timing::within_ticks(3), timing::for_ticks(1), timing::for_ticks(2),
+         timing::for_ticks(3), timing::after_ticks(0), timing::after_ticks(1),
+         timing::after_ticks(2), timing::eventually(), timing::always(),
+         timing::until(Formula("s")), timing::until(Formula("s | t")),
+         timing::before(Formula("s")), timing::before(Formula("s | t"))},
+        {Scope{}}};
+    for (const ScopeKind kind :
+         {ScopeKind::In, ScopeKind::NotIn, ScopeKind::Before, ScopeKind::After,
+          ScopeKind::OnlyIn, ScopeKind::OnlyBefore, ScopeKind::OnlyAfter}) {
+        pools.m_scopes.push_back(Scope{kind, "m"});
+        pools.m_scopes.push_back(Scope{kind, "n"});
+    }
+    const ImpliesSweep result = sweep_requirement_implies(pools, 97, 3);
+    std::cerr << "requirement_implies sweep: " << result.m_asked << " asked, "
+              << result.m_spot << " SPOT implications, " << result.m_proved
+              << " proved, " << result.m_missed.size() << " missed\n";
+    if (std::getenv("PEREDUR_SWEEP_MISSES") != nullptr) {
+        for (const std::string& miss : result.m_missed) {
+            std::cerr << "missed: " << miss << '\n';
+        }
+    }
+    expect(result.m_unsound.empty(),
+           "requirement_implies proved " +
+               std::to_string(result.m_unsound.size()) +
+               " non-implications, first " + first_of(result.m_unsound));
+    // Each known miss moves the response with a cross step between two
+    // `after` timings, where the response alone moves at neither end. A change
+    // in the count means the rules changed: update it and the figures in
+    // docs/dev/performance.md.
+    expect(result.m_missed.size() == 6,
+           "requirement_implies sweep: expected 6 misses, found " +
+               std::to_string(result.m_missed.size()) + ", first " +
+               first_of(result.m_missed));
 }
 
 // One pair that moves every field at once, and needs its scope moved before
@@ -732,5 +834,80 @@ TEST(test_requirement_implies_chains_every_field) {
            "requirement_implies: the five-field chain must hold");
     expect(!requirement_implies(loose, tight),
            "requirement_implies: the converse must not be proved");
+}
+
+// A plain timing whose pattern clashes with an only timing's implies it,
+// though neither one-field middle state does: `immediately` against `after 1`
+// from global into only in, and `after 1` against `always` from not in into
+// only in at one mode. Global into only in under a trigger is refused, since
+// only in reads the body at later entries the trigger does not reach.
+TEST(test_requirement_implies_crosses_into_an_only_scope) {
+    const auto make = [](Timing timing, ConditionType ctype, Scope scope) {
+        return Requirement(Formula("a"), Formula("x"), std::move(timing), ctype,
+                           /*weakenable=*/true, /*removed=*/false,
+                           std::move(scope));
+    };
+    const Scope only_in_m{ScopeKind::OnlyIn, "m"};
+    const std::vector<std::pair<Requirement, Requirement>> proved = {
+        {make(timing::immediately(), ConditionType::Continual, Scope{}),
+         make(timing::after_ticks(1), ConditionType::Continual, only_in_m)},
+        {make(timing::after_ticks(1), ConditionType::Trigger, Scope{}),
+         make(timing::always(), ConditionType::Trigger,
+              Scope{ScopeKind::OnlyAfter, "m"})},
+        {make(timing::after_ticks(1), ConditionType::Trigger,
+              Scope{ScopeKind::NotIn, "m"}),
+         make(timing::always(), ConditionType::Trigger, only_in_m)}};
+    std::vector<Implication> queries;
+    for (const auto& [stronger, weaker] : proved) {
+        expect(requirement_implies(stronger, weaker),
+               "requirement_implies: a clash into an only scope: " +
+                   stronger.to_string() + " => " + weaker.to_string());
+        queries.push_back({stronger.m_ltl, weaker.m_ltl});
+    }
+    for (const bool holds : ltl_implications(queries)) {
+        expect(holds, "requirement_implies: a clash pair must hold");
+    }
+    const Requirement trigger =
+        make(timing::immediately(), ConditionType::Trigger, Scope{});
+    const Requirement only =
+        make(timing::after_ticks(1), ConditionType::Trigger, only_in_m);
+    expect(!requirement_implies(trigger, only),
+           "requirement_implies: a global trigger must not cross into only in");
+    expect(!ltl_implications({{trigger.m_ltl, only.m_ltl}}).front(),
+           "requirement_implies: a global trigger into only in must fail");
+}
+
+// Where a trigger coincides with its continual form, `always` under a plain
+// scope and `eventually` under an only one, its condition is antitone. Away
+// from those cells only an equivalent condition is proved.
+TEST(test_requirement_implies_trigger_condition_at_coincidence) {
+    const auto upon = [](const char* condition, Timing timing, Scope scope) {
+        return Requirement(Formula(condition), Formula("x"), std::move(timing),
+                           ConditionType::Trigger, /*weakenable=*/true,
+                           /*removed=*/false, std::move(scope));
+    };
+    const Scope in_m{ScopeKind::In, "m"};
+    const Scope only_after_m{ScopeKind::OnlyAfter, "m"};
+    const std::vector<std::pair<Requirement, Requirement>> proved = {
+        {upon("a", timing::always(), in_m),
+         upon("a & b", timing::always(), in_m)},
+        {upon("a", timing::eventually(), only_after_m),
+         upon("a & b", timing::eventually(), only_after_m)},
+        {upon("a", timing::eventually(), only_after_m),
+         upon("a & b", timing::immediately(), only_after_m)}};
+    std::vector<Implication> queries;
+    for (const auto& [stronger, weaker] : proved) {
+        expect(requirement_implies(stronger, weaker),
+               "requirement_implies: trigger condition at a coincidence: " +
+                   stronger.to_string() + " => " + weaker.to_string());
+        queries.push_back({stronger.m_ltl, weaker.m_ltl});
+    }
+    for (const bool holds : ltl_implications(queries)) {
+        expect(holds, "requirement_implies: a coincidence pair must hold");
+    }
+    expect(!requirement_implies(upon("a", timing::eventually(), in_m),
+                                upon("a & b", timing::eventually(), in_m)),
+           "requirement_implies: a trigger condition away from a "
+           "coincidence must stay unproved");
 }
 }  // namespace
