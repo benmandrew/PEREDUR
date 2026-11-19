@@ -19,7 +19,7 @@ python3 scripts/diversity/wordbank.py SUBJECT experiments/2026-11-19-diversity-s
     --aimed-from experiments/fretish-exchange-pooled/av2/fp/SUBJECT/words
 ```
 
-The aimed words are the first 24,576 of a fingerprint phase's `words` file. That phase drew each word from a member chosen uniformly (black, `draw_black.py`), so a prefix is a uniform subsample. The banks under `experiments/2026-11-19-diversity-screen/wordbank/` take theirs from `2026-11-19-fretish-exchange-pooled`, whose pool is the union of the seven arms of `2026-11-18-fretish-exchange-rerun`, fetched with `campaign.py collect --outputs fretish-exchange-pooled`. A subject that pass left out (`fsm-lmcps`) is drawn here with `--members POOL.jsonl.gz` over a pool from `pool_members.py`, with black at `$BLACK`. The other 8,192 words are uniform lassos with a stem of 0 to 8 positions and a loop of 1 to 8, the paper's bound, every signal a fair coin. `words.meta.json` records the mix, the line ranges, the seed, the source file and its SHA-256, and the bank's SHA-256. The banks are large and stay untracked.
+The aimed words are the first 24,576 of a fingerprint phase's `words` file. That phase drew each word from a member chosen uniformly (black, `draw_black.py`), so a prefix is a uniform subsample. The banks are not in the repository: each user draws them locally. The 2026-11-19 study drew its banks into `experiments/2026-11-19-diversity-screen/wordbank/`, untracked, with the aimed words from `2026-11-19-fretish-exchange-pooled`, whose pool is the union of the seven arms of `2026-11-18-fretish-exchange-rerun`, fetched with `campaign.py collect --outputs fretish-exchange-pooled`. A subject that pass left out (`fsm-lmcps`) is drawn here with `--members POOL.jsonl.gz` over a pool from `pool_members.py`, with black at `$BLACK`. The other 8,192 words are uniform lassos with a stem of 0 to 8 positions and a loop of 1 to 8, the paper's bound, every signal a fair coin. `words.meta.json` records the mix, the line ranges, the seed, the source file and its SHA-256, and the bank's SHA-256. The banks are large, so they stay untracked.
 
 Aimed words can be up to 64 positions long, as black's models are; only the uniform part keeps the paper's bound.
 
@@ -32,6 +32,8 @@ python3 scripts/diversity/screen.py experiments/2026-11-19-diversity-screen/scre
     --ref "base=$R/sweep_D_base_nsga2-apportion_wkoff_log_{subject}_seed*" \
     --subjects fsm mode-arbiter ...
 ```
+
+`screen.py` reads the banks from `experiments/2026-11-19-diversity-screen/wordbank/` unless `--bank` names another directory, so draw them there with `wordbank.py` first.
 
 Per subject, the runs' `repair_N.json` files are pooled into nodes over both arms and every seed (identical sorted JSON is one node), and every node is evaluated on the bank with `fpdraw eval`. Fingerprints are cached per node and bank under the work directory, so a second screen against the same reference evaluates only the new arm's nodes.
 
@@ -49,7 +51,11 @@ A repair's cell is the set of (slot, kind) pairs it changed from the original O:
 
 ## What the rule-only frontier misses
 
-`compare --rule-only` is sound and incomplete. On `fsm` and `mode-arbiter` every implication it proved within an arm was also proved by BLACK in the pooled pass, but it proved only about 38% of BLACK's, so its frontiers hold 2 to 3 times as many classes. Most misses are not between two requirements in the paper's "at most three fields apart" sense: `trigger true, always r` implies `trigger c, always r'` for r ⇒ r', which the rules do not take, since a trigger's condition moves only to an equivalent one. A missing converse also turns an equivalence into a strict domination, so some nodes on BLACK's frontier are off the rule frontier. Strength from the screen is therefore a different measure from the pooled pass's, and comparable only between screens.
+`compare --rule-only` is sound and incomplete. On `fsm` and `mode-arbiter` every implication it proved within an arm was also proved by BLACK in the pooled pass, but it proved only 39% of BLACK's on `fsm` and 37% on `mode-arbiter`. So the rule-only frontier is 2 to 3 times larger than BLACK's: for `full`, 164 classes against 57 on `fsm`, and 104 against 42 on `mode-arbiter`. Most misses are not between two requirements in the paper's "at most three fields apart" sense: `trigger true, always r` implies `trigger c, always r'` for r ⇒ r', which the rules do not take, since a trigger's condition moves only to an equivalent one. A missing converse also turns an equivalence into a strict domination, so some nodes on BLACK's frontier are off the rule frontier. Strength from the screen is therefore a different measure from the pooled pass's, and comparable only between screens. The frontier holds weaker repairs that BLACK would dominate, so the screen's strength is a weak check, and a candidate that passes the screen still needs the pooled pass before any claim.
+
+## What the screen's containment shows
+
+Net containment against `base` from the screen follows the pooled pass's. Over the 18 subjects other than `fsm-lmcps`, the Spearman correlation between the two, over the per-subject values, is 0.93 for `remove-exchange` and 0.94 for `remove-no-blame-exchange`, and the signs agree on 18 and 16 of the 18 subjects. But the screen shrinks the shift: the Hodges-Lehmann shift is +0.007 [−0.070, 0.099] from the screen against +0.060 [−0.025, 0.184] from the pooled pass for `remove-exchange`, and +0.008 [−0.059, 0.130] against +0.072 [−0.028, 0.200] for `remove-no-blame-exchange`. Use the screen to read the direction and the order of arms, not the size of a shift. Neither shift is significant in either measure.
 
 ## Validation
 
