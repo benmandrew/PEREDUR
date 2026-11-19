@@ -623,7 +623,7 @@ jobs:
       - name: Run the script tests
         run: |
           status=0
-          for test in scripts/test_*.py; do
+          for test in scripts/test_*.py scripts/diversity/test_*.py; do
             echo "::group::$test"
             python "$test" || { echo "::error file=$test::$test failed"; status=1; }
             echo "::endgroup::"
