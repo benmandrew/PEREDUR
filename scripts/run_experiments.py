@@ -641,6 +641,45 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-diversity-screen.csv",
         "default_jobs": 14,
     },
+    # The same two profiles after the user kept blame on (19 Nov): sweep K's
+    # full is now remove-exchange, so its configs and results get their own
+    # directories and never mix with the cancelled no-blame runs above. See
+    # experiments/2026-11-19-diversity-screen-blame.
+    "diversity-climb-blame": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["full-k1", "full-k4"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb-blame",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-climb-blame",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-climb-blame.csv",
+        "default_jobs": 14,
+    },
+    "diversity-screen-blame": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["crowd-spec", "novelty", "slot-coverage",
+                         "spread-init", "flip-tabu", "flip-sideways"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(10)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb-blame",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-screen-blame",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-screen-blame.csv",
+        "default_jobs": 14,
+    },
 }
 
 

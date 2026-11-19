@@ -1,0 +1,47 @@
+name = "2026-11-19-diversity-screen-blame"
+branch = "campaign/diversity-climb"
+profile = "diversity-climb-blame"
+description = "Does the output climb under more step orders, or one of six diversity mechanisms, give a more diverse output? The paper's full (sweep D's remove-exchange at e117a76, blame on) at climb_orders 1 and 4 (sweep K's full-k1 and full-k4, 30 seeds), and full-k1 plus one mechanism each (crowd-spec, novelty, slot-coverage, spread-init, flip-tabu, flip-sideways, seeds 0-9, paired with full-k1's), on the small set and rad's cores. Replaces 2026-11-19-diversity-screen-runs, cancelled on 19 Nov because its full had blame off and the user kept blame on."
+
+# av2 runs at about a third of av3's width, because veribee-d3's bug hunt holds
+# av2 CPUs 14-29. Seeds: full-k1 and full-k4 av2 0-9, av3 10-29; the six
+# screen arms av2 0-3, av3 4-9.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+# The exchange rerun's settings at 2 threads a run; only the sweep and the
+# directory differ.
+configs = "sh -c 'python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps K --parallel 2 --out-dir experiments/configs-diversity-climb-blame'"
+
+# 19 subjects x 2 arms: 380 runs on av2 (7 jobs x 2 threads on CPUs 0-13) and
+# 760 on av3 (14 jobs x 2 threads on CPUs 0-29). CPUs 30-31 stay free for the
+# Ollama server on both.
+[[phases]]
+name = "climb-av2"
+profile = "diversity-climb-blame"
+hosts = { av2 = "0-9" }
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
+
+[[phases]]
+name = "climb-av3"
+profile = "diversity-climb-blame"
+hosts = { av3 = "10-29" }
+confine = { av3 = { cpus = "0-29", memory_max = "64G" } }
+jobs = 14
+
+# 19 subjects x 6 arms: 456 runs on av2, 684 on av3.
+[[phases]]
+name = "screen-av2"
+profile = "diversity-screen-blame"
+hosts = { av2 = "0-3" }
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
+
+[[phases]]
+name = "screen-av3"
+profile = "diversity-screen-blame"
+hosts = { av3 = "4-9" }
+confine = { av3 = { cpus = "0-29", memory_max = "64G" } }
+jobs = 14

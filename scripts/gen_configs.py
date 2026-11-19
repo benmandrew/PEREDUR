@@ -503,13 +503,14 @@ SWEEP_P: list[tuple[str, dict]] = _pruned_sweep()
 def _climb_orders_sweep() -> list[tuple[str, dict]]:
     """The paper's full at one and four climb orders, and six screen arms.
 
-    The paper's full is peredur's remove-no-blame-exchange of sweep D at
-    e117a76 (experiments/2026-11-18-fretish-exchange-rerun): sweep P's lean
-    with maximality demotion and removal on, blame off, and the gate's
-    exchange mode for realisable parents. "full-k1" climbs each repair in slot
+    The paper's full is peredur's remove-exchange of sweep D at e117a76
+    (experiments/2026-11-18-fretish-exchange-rerun): sweep P's lean with
+    maximality demotion and removal on, blame-targeted slots on, and the
+    gate's exchange mode for realisable parents. Blame stays on as an engine
+    optimisation (user, 19 Nov), so the arm is not remove-no-blame-exchange. "full-k1" climbs each repair in slot
     order alone, as that run did; "full-k4" also climbs it under three
     pseudo-random step orders. The other six arms are full-k1 plus one
-    diversity mechanism each (experiments/2026-11-19-diversity-screen-runs).
+    diversity mechanism each (experiments/2026-11-19-diversity-screen-blame).
     Every arm states climb_orders, maximality_removal and gate_realizable, so
     none inherits a default.
     """
@@ -517,10 +518,10 @@ def _climb_orders_sweep() -> list[tuple[str, dict]]:
     full = {**dict(SWEEP_P)["lean"],
             "maximality_demotion": True,
             "maximality_removal": True,
-            **{k: DEFAULTS[k] for k in feats["blame"]},
+            **feats["blame"],
             "gate_realizable": "exchange"}
     k1 = {**full, "climb_orders": 1}
-    # The diversity screen (experiments/2026-11-19-diversity-screen-runs):
+    # The diversity screen (experiments/2026-11-19-diversity-screen-blame):
     # full-k1 plus one mechanism of feat/diversity-mech each.
     screen = [
         ("crowd-spec", {"crowding": "specification"}),
