@@ -8,7 +8,9 @@ Each theorem is stated about a Lean *transcription* of a C++ function (`timingIm
 
 | Theorem | C++ it covers | What it says |
 |---|---|---|
-| `timing_implies_exact` (`Fretish/Cpp.lean`) | `timing_implies` | Under every scope, for every pair of timings the C++ accepts (neither is `within 0` or `for 0`), one timing implies the other exactly when `timing_implies` returns true. |
+| `timing_implies_exact` (`Fretish/Cpp.lean`) | `timing_implies` | Under every scope, for every pair of timings the C++ accepts (neither is `within 0` or `for 0`), one timing *body* implies the other at every boundary exactly when `timing_implies` returns true. |
+| `timing_implies_exact_req` (`Fretish/TimingLift.lean`) | `timing_implies` | The same between whole requirements. Under every scope and condition type, for a condition other than the literal `true` and with the other fields equal, the requirement with one timing implies the requirement with the other at every stop, mode, condition and response exactly when `timing_implies` returns true. |
+| `timing_implies_sound_req` (`Fretish/TimingLift.lean`) | `timing_implies` | Every pair `timing_implies` accepts also holds between whole requirements at the literal condition `true`. It is not exact there: under a continual condition and the global scope, `for 1` and `always` both lower to `G r`. |
 | `scope_implies_exact` (`Fretish/ScopeOrder.lean`) | `scope_implies`, `scope_edges` | For a condition other than the literal `true`, one scope implies another at every stop, mode, condition and response exactly when `scope_implies` returns true. |
 | `scope_implies_sound` (`Fretish/ScopeOrder.lean`) | `scope_implies`, `scope_edges` | Every pair `scope_implies` accepts also holds at the literal condition `true`. |
 | `condition_type_step_exact` (`Fretish/CondOrder.lean`) | `condition_type_step` | For a condition other than the literal `true`, a change of condition type holds exactly when `condition_type_step` accepts it. |
@@ -24,7 +26,7 @@ The proofs also establish five facts that a reader of the C++ needs.
 - Until 2026-11-04, `timing_implies` missed `after 0 ⇒ next`, and `next ⇒ after 0` under the only scopes. The first version of `timing_implies_exact` had to carry both as an exception, which is how they were found.
 - A continual requirement implies its trigger form under every scope and timing. A trigger implies its continual form only where the body is a release: `always` under a plain scope, and `eventually` under an only scope.
 - At tick count 0, `within 0`, `for 0` and `immediately` coincide. Distinct timings then imply each other, so the orders are *preorders*.
-- At the literal condition `true`, the scope and condition-type theorems give *soundness* only, because the tables reject some implications that hold there.
+- At the literal condition `true`, the timing, scope and condition-type theorems on whole requirements give *soundness* only, because the tables reject some implications that hold there.
 
 ## How the proof goes
 
@@ -32,7 +34,7 @@ Each file named below is `Fretish/<Name>.lean`, and its module header explains i
 
 1. **Model.** The lowering becomes a function on infinite *traces*, with the condition, response, mode and stop as arbitrary predicates on positions (`Trace`, `Timing`, `Only`, `Scope`).
 2. **Edges.** An *edge* is a pair of timings that an order relates. Every edge of each order holds for all tick counts, and the scope wrappers are monotone in the body, so each edge lifts to whole requirements under any condition type and mode (`Timing`, `Only`, `Scope`).
-3. **Non-edges.** An explicit trace refutes every pair an order leaves out, which makes each order exact (`Exact`, `ExactOnly`, `Witness`).
+3. **Non-edges.** An explicit trace refutes every pair an order leaves out, which makes each order exact (`Exact`, `ExactOnly`, `Witness`). The timing refutations are traces on the body, and they need only two boundaries: none, and one at the point of evaluation. Each moves to position 0, and a condition true there alone, with a mode that puts that point in the scope and sets the boundary, turns it into a refutation between whole requirements. After enters its scope one point late, so its refutation moves to position 1 (`TimingLift`).
 4. **Transcriptions.** The C++ functions are transcribed branch for branch, and each transcription is proved equal to the exact order (`Cpp`, `ScopeOrder`, `CondOrder`).
 5. **Chains.** `Search.reach` transcribes `RuleSearch`, which chains one-field steps. Each step is one of the theorems above, or a response, stop or condition polarity, read at the other fields of the current state. A trigger's condition takes the continual polarity where the two condition types coincide, by a chain through the continual form. One step moves two fields at once, the timing and the scope into an only scope, by `cross_sound` (`Cross`). Soundness follows by induction on the chain (`Chain`).
 6. **Syntax.** `lowerSyn` builds the formula `requirement_to_ltl` builds as LTL syntax, expanding bounded operators into `X` chains as the C++ does. `eval_lowerSyn` proves that its meaning is the model from step 1 (`Syntax`).
