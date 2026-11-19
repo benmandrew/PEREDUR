@@ -11,7 +11,9 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -19,6 +21,8 @@
 
 #include "bounded_async.hpp"
 #include "driver_support.hpp"
+#include "filter/implication_check.hpp"
+#include "hash_combine.hpp"
 #include "repair/manifest.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
@@ -33,12 +37,13 @@ struct Args {
     std::string repairs_dir;
     std::string ideals_dir;
     std::int64_t timeout_s{20};
+    bool rule_only{false};
 };
 
 void print_usage(const char* prog) {
     std::cerr
         << "Usage: " << prog
-        << " --repairs <dir> --ideals <dir> [--timeout S]\n"
+        << " --repairs <dir> --ideals <dir> [--timeout S] [--rule-only]\n"
         << "\n"
         << "Compares each repair in the repairs directory against every\n"
         << "ideal in the ideals directory and reports whether the found\n"
@@ -53,6 +58,17 @@ void print_usage(const char* prog) {
         << "reports 0.\n"
         << "\n"
         << "  --timeout S  Per-black-call budget in seconds (default: 20).\n"
+        << "  --rule-only  FRETISH only: decide each direction by rule alone,\n"
+        << "               launching no solver. A direction holds when every\n"
+        << "               assumption of the stronger side is implied by one "
+           "of\n"
+        << "               the weaker side's, and every guarantee of the "
+           "weaker\n"
+        << "               side by one of the stronger side's, each by equal\n"
+        << "               lowering or by the requirement rules the engine's\n"
+        << "               filters use. Sound and incomplete: 0 means "
+           "unproved,\n"
+        << "               never refuted, and no direction reads ?.\n"
         << "  --version    Print the git commit this binary was built from.\n";
 }
 
@@ -79,6 +95,8 @@ std::optional<Args> parse_args(int argc, const char* const* argv) {
                 return std::nullopt;
             }
             args.timeout_s = static_cast<std::int64_t>(*value);
+        } else if (arg == "--rule-only") {
+            args.rule_only = true;
         } else {
             std::cerr << "Unknown argument: " << arg << "\n";
             return std::nullopt;
@@ -332,6 +350,113 @@ void run_and_report(const std::vector<Entry<Spec>>& repairs,
     std::cout << "\n";
 }
 
+// Whole-specification implication by rule alone, for --rule-only. It asks
+// spec_implies_by_rule's question without its slot pairing: a requirement may
+// be covered by any live entry on the other side, not only the one in its own
+// slot. JSON drops a removed requirement rather than tombstoning it, so the
+// slots of two loaded repairs no longer pair by index once either removed one.
+// Any cover is sound, since each step is an implication between two whole
+// requirements. requirement_implies is memoised per pair of lowerings, which
+// repeat across a pool of repairs of one original.
+class RuleImplication {
+   public:
+    // Whether @p from is proved to imply @p dest.
+    bool operator()(const Specification& from, const Specification& dest) {
+        return covers(dest.m_assumptions, from.m_assumptions) &&
+               covers(from.m_guarantees, dest.m_guarantees);
+    }
+
+   private:
+    using Key = std::pair<std::string_view, std::string_view>;
+    struct KeyHash {
+        std::size_t operator()(const Key& key) const noexcept {
+            const std::hash<std::string_view> hash;
+            return hash_combine(hash(key.first), hash(key.second));
+        }
+    };
+
+    // Whether every live requirement of @p weaker is implied by a live one of
+    // @p stronger.
+    bool covers(const std::vector<Requirement>& stronger,
+                const std::vector<Requirement>& weaker) {
+        for (const Requirement& req : weaker) {
+            if (req.m_removed) {
+                continue;
+            }
+            bool covered = false;
+            for (const Requirement& cand : stronger) {
+                if (!cand.m_removed && implies(cand, req)) {
+                    covered = true;
+                    break;
+                }
+            }
+            if (!covered) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool implies(const Requirement& stronger, const Requirement& weaker) {
+        if (stronger.m_ltl == weaker.m_ltl) {
+            return true;
+        }
+        const Key key{stronger.m_ltl, weaker.m_ltl};
+        const auto found = m_memo.find(key);
+        if (found != m_memo.end()) {
+            return found->second;
+        }
+        const bool proved = requirement_implies(stronger, weaker);
+        m_memo.emplace(key, proved);
+        return proved;
+    }
+
+    // Keys view the loaded specifications' lowerings, which outlive the memo.
+    std::unordered_map<Key, bool, KeyHash> m_memo;
+};
+
+// --rule-only: the grid run_and_report asks, each direction decided by rule
+// on this thread, with no solver started.
+void run_rule_only(const std::vector<Entry<Specification>>& repairs,
+                   const std::vector<Entry<Specification>>& ideals) {
+    RuleImplication implies;
+    std::vector<std::pair<Relation, std::size_t>> best(repairs.size(),
+                                                       {Relation::Timeout, 0});
+    for (std::size_t rep = 0; rep < repairs.size(); ++rep) {
+        for (std::size_t ide = 0; ide < ideals.size(); ++ide) {
+            const bool fwd = implies(repairs[rep].spec, ideals[ide].spec);
+            const bool rev = implies(ideals[ide].spec, repairs[rep].spec);
+            std::cerr << "DIR\t" << repairs[rep].name << "\t"
+                      << ideals[ide].name << "\t" << (fwd ? "1" : "0") << "\t"
+                      << (rev ? "1" : "0") << "\n";
+            const Relation rel = classify(fwd, rev);
+            if (rel > best[rep].first) {
+                best[rep] = {rel, ide};
+            }
+        }
+    }
+    std::array<std::size_t, k_relation_info.size()> counts{};
+    for (std::size_t idx = 0; idx < repairs.size(); ++idx) {
+        const RelationInfo& info = relation_info(best[idx].first);
+        std::cout << std::left << std::setw(24) << repairs[idx].name << " : "
+                  << info.detail;
+        if (info.names_ideal) {
+            std::cout << ideals[best[idx].second].name;
+        }
+        std::cout << "\n";
+        ++counts[static_cast<std::size_t>(best[idx].first)];
+    }
+    std::cout << "\nSummary: "
+              << counts[static_cast<std::size_t>(Relation::Equivalent)]
+              << " equivalent, "
+              << counts[static_cast<std::size_t>(Relation::Stronger)]
+              << " strictly stronger, "
+              << counts[static_cast<std::size_t>(Relation::Weaker)]
+              << " strictly weaker, "
+              << counts[static_cast<std::size_t>(Relation::Incomparable)]
+              << " unproved (by rule)\n";
+}
+
 template <typename Spec>
 int run(const Args& args, SatisfiabilityChecker& checker) {
     std::vector<Entry<Spec>> repairs;
@@ -362,6 +487,21 @@ int main(int argc, const char* const argv[]) {
         return 1;
     }
     const Args& args = *maybe_args;
+
+    if (args.rule_only) {
+        if (selects_tlsf({args.repairs_dir, args.ideals_dir})) {
+            std::cerr << "--rule-only reads FRETISH repairs only\n";
+            return 1;
+        }
+        std::vector<Entry<Specification>> repairs;
+        std::vector<Entry<Specification>> ideals;
+        if (!load_or_report(args.repairs_dir, true, repairs) ||
+            !load_or_report(args.ideals_dir, false, ideals)) {
+            return 1;
+        }
+        run_rule_only(repairs, ideals);
+        return 0;
+    }
 
     SatisfiabilityChecker& checker = configure_offline_checkers(
         std::chrono::milliseconds{args.timeout_s * 1000}, true);

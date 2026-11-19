@@ -1576,6 +1576,90 @@ TEST_IN("driver_compare", test_compare_orders_fretish_repairs) {
            "compare: the summary counts each relation once");
 }
 
+// A guarantee `req -> grant` at the given timing, then `!grant` while `stop`
+// holds: the second is the slot a removal drops in the rule-only test below.
+std::string fretish_two_guarantees(const std::string& timing, bool keep_first) {
+    const std::string first = R"({
+      "condition": "true",
+      "condition-type": "trigger",
+      "response": "stop -> !grant",
+      "timing": { "type": "Always" }
+    })";
+    const std::string second = R"({
+      "condition": "req",
+      "condition-type": "trigger",
+      "response": "grant",
+      "timing": { "type": ")" + timing +
+                               R"(" }
+    })";
+    return R"({
+  "assumptions": [],
+  "guarantees": [)" +
+           (keep_first ? first + ",\n" : std::string()) + second +
+           R"(],
+  "in_atoms": ["req", "stop"],
+  "out_atoms": ["grant"]
+}
+)";
+}
+
+TEST_IN("driver_compare", test_compare_rule_only_proves_without_a_solver) {
+    const TempDir dir("e2e_compare_rule_only");
+    const std::filesystem::path ideals = dir.path() / "ideals";
+    write_text(ideals / "assumed.json", k_fretish_assumed);
+    const std::filesystem::path repairs = dir.path() / "repairs";
+    write_text(repairs / "repair_0.json", k_fretish_unrealizable);
+    write_text(repairs / "repair_1.json", k_fretish_assumed_weaker);
+    write_text(repairs / "run.json", "{\"schema_version\": 25}\n");
+
+    // black and SPOT point at nothing, so any solver call would fail and
+    // every verdict below comes from the rules alone.
+    const ProcessResult result = execute_and_capture(
+        {"/usr/bin/env", "PEREDUR_BLACK_PATH=/nonexistent",
+         "PEREDUR_SPOT_BIN_DIR=/nonexistent",
+         std::string(PEREDUR_DRIVER_DIR) + "/compare", "--repairs",
+         repairs.string(), "--ideals", ideals.string(), "--rule-only"},
+        k_deadline);
+    const DriverRun run{result.m_exit_code, result.m_output};
+    expect(run.m_exit_code == 0, "compare --rule-only: the run exits zero");
+    expect(contains(run.m_output, "DIR\trepair_0.json\tassumed.json\t1\t0"),
+           "compare --rule-only: dropping an assumption is proved stronger, "
+           "and its converse unproved");
+    expect(contains(run.m_output, "DIR\trepair_1.json\tassumed.json\t0\t1"),
+           "compare --rule-only: a dropped guarantee is proved weaker");
+    expect(contains(run.m_output,
+                    "Summary: 0 equivalent, 1 strictly stronger, 1 strictly "
+                    "weaker, 0 unproved (by rule)"),
+           "compare --rule-only: the summary counts each relation once");
+
+    // A repair that removed the first guarantee and relaxed the second's
+    // timing: its one guarantee sits in slot 0, the original's in slot 1.
+    const std::filesystem::path slots = dir.path() / "slots";
+    write_text(slots / "original.json",
+               fretish_two_guarantees("Immediately", true));
+    const std::filesystem::path removed = dir.path() / "removed";
+    write_text(removed / "repair_0.json",
+               fretish_two_guarantees("Eventually", false));
+    const DriverRun shifted =
+        run_driver("compare", {"--repairs", removed.string(), "--ideals",
+                               slots.string(), "--rule-only"});
+    expect(shifted.m_exit_code == 0,
+           "compare --rule-only: the shifted-slot run exits zero");
+    expect(
+        contains(shifted.m_output, "DIR\trepair_0.json\toriginal.json\t0\t1"),
+        "compare --rule-only: a guarantee is covered from another slot, "
+        "with its timing relaxed");
+
+    const std::filesystem::path tlsf = dir.path() / "tlsf";
+    write_text(tlsf / "spec.tlsf", k_unrealizable);
+    const DriverRun refused = run_driver(
+        "compare",
+        {"--repairs", tlsf.string(), "--ideals", tlsf.string(), "--rule-only"});
+    expect(refused.m_exit_code == 1 &&
+               contains(refused.m_output, "--rule-only reads FRETISH"),
+           "compare --rule-only: TLSF inputs are refused");
+}
+
 TEST_IN("driver_compare", test_compare_rejects_bad_arguments) {
     const TempDir dir("e2e_compare_args");
     const std::filesystem::path ideals = dir.path() / "ideals";
