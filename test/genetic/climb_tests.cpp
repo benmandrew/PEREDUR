@@ -6,6 +6,7 @@
 #include <variant>
 #include <vector>
 
+#include "climb_replay_slots.hpp"
 #include "config.hpp"
 #include "fixtures.hpp"
 #include "genetic/climb.hpp"
@@ -172,6 +173,37 @@ TEST(test_extra_orders_reach_other_maximal_elements) {
         expect(count_live(climbed.m_guarantees) == 1,
                "climb: each result restores exactly one guarantee");
     }
+}
+
+// --- climb-replay's removed slots
+// ---------------------------------------------
+
+// A repair read back from JSON has lost its removed guarantees. Each live one
+// goes back to the slot it shares most fields with, and the slots left over
+// hold the original's requirement, removed.
+TEST(test_replay_restores_removed_slots) {
+    const Requirement first = make_req("req", "grant", timing::within_ticks(2));
+    const Requirement second = never_grant();
+    const Requirement third = make_req("true", "!req", timing::always());
+    const std::vector<Requirement> original{first, second, third};
+    // The third slot edited in its timing, the second removed.
+    const Requirement edited =
+        make_req("true", "!req", timing::within_ticks(4));
+    const std::vector<Requirement> slots =
+        climb_replay::restore_removed_slots({first, edited}, original);
+    expect(slots.size() == 3, "replay: three slots");
+    expect(slots[0] == first && !slots[0].m_removed,
+           "replay: the first slot keeps its requirement");
+    expect(slots[1].m_removed, "replay: the second slot is removed");
+    expect(slots[2] == edited, "replay: the edited requirement takes its slot");
+
+    // Only the second left: it shares every field with slot 1 alone.
+    const std::vector<Requirement> only =
+        climb_replay::restore_removed_slots({second}, original);
+    expect(only[0].m_removed && !only[1].m_removed && only[2].m_removed,
+           "replay: a lone survivor takes its own slot");
+    expect(climb_replay::restore_removed_slots(original, original) == original,
+           "replay: a full set is unchanged");
 }
 
 // --- against ltlsynt ---------------------------------------------------------

@@ -98,7 +98,7 @@ target_link_libraries(scope_order_table PRIVATE peredur_fitness)
 # generator expression covers all of them.
 add_dependencies(peredur_tests
     peredur compare lint-ideals ltl maximal mucs realize
-    signal_tracer tool_health)
+    signal_tracer climb-replay tool_health)
 target_compile_definitions(peredur_tests PRIVATE
     PEREDUR_DRIVER_DIR="$<TARGET_FILE_DIR:peredur>"
     PEREDUR_CONTAINED_CHILD_HELPER="$<TARGET_FILE:contained_child_helper>"
@@ -171,6 +171,7 @@ set(peredur_test_suites
     driver_maximal
     driver_lint_ideals
     driver_signal_tracer
+    driver_climb_replay
 )
 foreach(suite IN LISTS peredur_test_suites)
     add_test(NAME peredur_tests.${suite} COMMAND peredur_tests ${suite})
