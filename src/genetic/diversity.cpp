@@ -5,6 +5,7 @@
 #include <iterator>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -100,6 +101,9 @@ void DiversityState::retain(const std::vector<Scored<Specification>>& keep) {
     }
     for (auto it = m_novelty.begin(); it != m_novelty.end();) {
         it = live.count(it->first) != 0 ? std::next(it) : m_novelty.erase(it);
+    }
+    for (auto it = m_lineage.begin(); it != m_lineage.end();) {
+        it = live.count(it->first) != 0 ? std::next(it) : m_lineage.erase(it);
     }
 }
 
@@ -278,4 +282,95 @@ std::vector<Specification> spread_initial_population(
         }
     }
     return population;
+}
+
+namespace {
+
+// The slots of one side in which @p edited differs from @p parent.
+void edited_slots(const std::vector<Requirement>& parent,
+                  const std::vector<Requirement>& edited, bool guarantee,
+                  std::vector<SlotKey>& slots) {
+    const std::size_t longest = std::max(parent.size(), edited.size());
+    for (std::size_t i = 0; i < longest; ++i) {
+        if (i >= parent.size() || i >= edited.size() ||
+            !(parent[i] == edited[i])) {
+            slots.push_back({guarantee, i});
+        }
+    }
+}
+
+}  // namespace
+
+std::vector<std::size_t> DiversityState::flipped_slots(
+    const Specification& parent) const {
+    std::vector<std::size_t> slots;
+    const auto found = m_lineage.find(parent);
+    if (found == m_lineage.end()) {
+        return slots;
+    }
+    const std::size_t n_assumptions = parent.m_assumptions.size();
+    for (const auto& [slot, flips] : found->second) {
+        if (flips.tabu_until > m_generation) {
+            slots.push_back(slot.guarantee ? n_assumptions + slot.local
+                                           : slot.local);
+        }
+    }
+    std::sort(slots.begin(), slots.end());
+    return slots;
+}
+
+void DiversityState::note_offspring(const Specification& parent,
+                                    bool parent_realizable,
+                                    const Specification& edited,
+                                    const Specification& bred) {
+    HeldOffspring held;
+    edited_slots(parent.m_assumptions, edited.m_assumptions, false,
+                 held.edited);
+    edited_slots(parent.m_guarantees, edited.m_guarantees, true, held.edited);
+    if (held.edited.empty()) {
+        return;
+    }
+    const auto found = m_lineage.find(parent);
+    if (found != m_lineage.end()) {
+        held.lineage = found->second;
+    }
+    held.bred = bred;
+    held.parent_realizable = parent_realizable;
+    m_held.push_back(std::move(held));
+}
+
+void DiversityState::settle_offspring(
+    const std::vector<Scored<Specification>>& scored, std::size_t status_index,
+    std::size_t span) {
+    std::unordered_map<Specification, bool> realizable;
+    for (const Scored<Specification>& entry : scored) {
+        if (status_index < entry.objectives.size()) {
+            realizable.emplace(
+                entry.specification,
+                entry.objectives[status_index] >= k_status_realizable);
+        }
+    }
+    for (HeldOffspring& held : m_held) {
+        const auto found = realizable.find(held.bred);
+        if (found == realizable.end() || m_lineage.count(held.bred) != 0) {
+            continue;
+        }
+        if (found->second != held.parent_realizable) {
+            for (const SlotKey& slot : held.edited) {
+                FlipLineageStats::n_flips++;
+                SlotFlips& flips = held.lineage[slot];
+                (found->second ? flips.weakened : flips.strengthened) = true;
+                if (flips.weakened && flips.strengthened) {
+                    FlipLineageStats::n_tabu++;
+                    flips.weakened = false;
+                    flips.strengthened = false;
+                    // Tabu from the next generation's breeding on, for span
+                    // generations.
+                    flips.tabu_until = m_generation + span + 1;
+                }
+            }
+        }
+        m_lineage.emplace(held.bred, std::move(held.lineage));
+    }
+    m_held.clear();
 }

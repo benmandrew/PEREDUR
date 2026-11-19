@@ -9,6 +9,7 @@
 #include <atomic>
 #include <cstddef>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -76,6 +77,34 @@ struct SlotCoverage {
 std::size_t coverage_of(const SlotCoverage& coverage, std::size_t idx,
                         std::size_t n_assumptions);
 
+/// One slot of a specification, by side and index within the side, as the
+/// flip lineage keys its record: global indices shift when an assumption is
+/// appended, and a side and local index do not.
+struct SlotKey {
+    bool guarantee = false;
+    std::size_t local = 0;
+
+    friend bool operator<(const SlotKey& lhs, const SlotKey& rhs) {
+        return lhs.guarantee != rhs.guarantee ? !lhs.guarantee
+                                              : lhs.local < rhs.local;
+    }
+};
+
+/// What a lineage has seen of one slot under `mutation.flip_tabu`.
+struct SlotFlips {
+    /// An edit of the slot turned an unrealizable parent into a realizable
+    /// offspring.
+    bool weakened = false;
+    /// An edit of the slot turned a realizable parent into an unrealizable
+    /// offspring.
+    bool strengthened = false;
+    /// The slot is tabu while the generation is below this.
+    std::size_t tabu_until = 0;
+};
+
+/// A lineage's flips per slot, carried from parent to offspring.
+using Lineage = std::map<SlotKey, SlotFlips>;
+
 /// The run-scoped state the FRETISH diversity mechanisms keep across
 /// generations. One per run, owned by the generation loop and lent to each
 /// generation; nothing in it draws from the RandomSource.
@@ -98,8 +127,34 @@ class DiversityState {
     /// same specification on every call.
     const SlotCoverage& slot_coverage(const Specification& original);
 
-    /// Forgets what is cached about every specification not in @p keep, which
-    /// bounds the caches by the population.
+    /// Starts a generation, which the flip lineage counts its tabu spans in.
+    void begin_generation() { ++m_generation; }
+
+    /// The global slots (assumptions first, then guarantees) of @p parent
+    /// that its lineage holds tabu this generation, ascending.
+    [[nodiscard]] std::vector<std::size_t> flipped_slots(
+        const Specification& parent) const;
+
+    /// Holds the offspring @p bred of @p parent, realizable or not as
+    /// @p parent_realizable says, until the generation is scored. @p edited
+    /// is the offspring before simplification, which is compared slot by slot
+    /// with @p parent to find the slots the mutation edited. Does nothing
+    /// where it edited none.
+    void note_offspring(const Specification& parent, bool parent_realizable,
+                        const Specification& edited, const Specification& bred);
+
+    /// Gives each held offspring that @p scored holds its lineage: its
+    /// parent's, with a flip recorded on each edited slot where the
+    /// offspring's realizability, read at @p status_index, differs from the
+    /// parent's. A slot flipped both ways goes tabu for @p span generations
+    /// and starts afresh. An offspring that already has a lineage keeps it,
+    /// and the first offspring held for a specification wins. Then forgets
+    /// what it held.
+    void settle_offspring(const std::vector<Scored<Specification>>& scored,
+                          std::size_t status_index, std::size_t span);
+
+    /// Forgets what is cached about every specification not in @p keep, and
+    /// the lineage of every one, which bounds both by the population.
     void retain(const std::vector<Scored<Specification>>& keep);
 
    private:
@@ -124,6 +179,16 @@ class DiversityState {
     std::unordered_map<Specification, Novelty> m_novelty;
     std::unordered_map<std::pair<std::string, std::string>, bool, PairHash>
         m_pair_memo;
+    struct HeldOffspring {
+        Specification bred;
+        Lineage lineage;
+        std::vector<SlotKey> edited;
+        bool parent_realizable = false;
+    };
+
+    std::size_t m_generation = 0;
+    std::unordered_map<Specification, Lineage> m_lineage;
+    std::vector<HeldOffspring> m_held;
     SlotCoverage m_coverage;
     /// Members of M already counted into m_coverage.
     std::size_t m_covered = 0;

@@ -80,7 +80,9 @@ inline void record_origin(std::vector<OffspringOrigin>* origins,
 inline ParentContext parent_context(const Scored<Specification>& parent,
                                     bool crossed, const Specification* original,
                                     std::optional<std::size_t> status_objective,
-                                    const SlotCoverage* coverage) {
+                                    const SlotCoverage* coverage,
+                                    DiversityState* diversity,
+                                    const Config& cfg) {
     ParentContext context;
     if (status_objective.has_value() &&
         *status_objective < parent.objectives.size()) {
@@ -91,6 +93,9 @@ inline ParentContext parent_context(const Scored<Specification>& parent,
     context.crossed = crossed;
     context.original = original;
     context.coverage = coverage;
+    if (cfg.flip_tabu > 0 && diversity != nullptr) {
+        context.flipped_slots = diversity->flipped_slots(parent.specification);
+    }
     return context;
 }
 
@@ -223,7 +228,7 @@ std::vector<Spec> breed_offspring(const Config& cfg,
             } else {
                 const ParentContext parent =
                     parent_context(sorted_pop[i], crossed, original,
-                                   status_objective, coverage);
+                                   status_objective, coverage, diversity, cfg);
                 offspring = mutate_specification(offspring, random_source, cfg,
                                                  &parent, &stepped);
             }
@@ -238,7 +243,22 @@ std::vector<Spec> breed_offspring(const Config& cfg,
         if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
             offspring_pop.push_back(tlsf_simplify(std::move(offspring)));
         } else {
+            // The lineage reads the edit before simplification, which would
+            // otherwise show slots the mutation never touched.
+            const bool lineage = cfg.flip_tabu > 0 && diversity != nullptr &&
+                                 !crossed && status_objective.has_value() &&
+                                 !(offspring == sorted_pop[i].specification);
+            std::optional<Spec> edited;
+            if (lineage) {
+                edited = offspring;
+            }
             offspring_pop.push_back(simplify_offspring(std::move(offspring)));
+            if (lineage) {
+                diversity->note_offspring(
+                    sorted_pop[i].specification,
+                    status_proves_realizable(sorted_pop[i], status_objective),
+                    *edited, offspring_pop.back());
+            }
             OrderCrossoverStats::note_offspring(order_kind,
                                                 offspring_pop.back());
             DirectionGateStats::note_offspring(stepped, offspring_pop.back());
@@ -434,6 +454,11 @@ void stage_score(GenerationContext<Spec>& ctx) {
                                     status_objective_index(ctx.m_cfg));
         DirectionGateStats::settle(ctx.m_scored,
                                    status_objective_index(ctx.m_cfg));
+        if (ctx.m_cfg.flip_tabu > 0 && ctx.m_diversity != nullptr &&
+            ctx.m_status_objective.has_value()) {
+            ctx.m_diversity->settle_offspring(
+                ctx.m_scored, *ctx.m_status_objective, ctx.m_cfg.flip_tabu);
+        }
     }
 }
 

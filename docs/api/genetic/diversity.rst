@@ -18,4 +18,7 @@ The FRETISH mechanisms that spread the search over unlike repairs, each behind a
 ``spread_initial_population``
   The seed population of ``genetic.spread_init``: the original plus one-step weakenings spread round-robin over its refused guarantees and its weakenable assumptions, each proved Weaker by rule.
 
+``Lineage``
+  For ``mutation.flip_tabu``, the realizability flips a lineage has seen per slot (``SlotKey``, ``SlotFlips``). ``DiversityState`` holds each bred offspring until the generation is scored, then records its flips and reports each parent's tabu slots to mutation.
+
 .. doxygenfile:: diversity.hpp

@@ -55,7 +55,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 73;
+constexpr int k_schema_version = 74;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -515,6 +515,18 @@ void write_run_manifest(const std::string& output_dir,
          {{"targets", SpreadInitStats::n_targets},
           {"seeded", SpreadInitStats::n_seeded},
           {"failed", SpreadInitStats::n_failed}}},
+        // What mutation.flip_tabu and flip_sideways did: realizability flips
+        // recorded against a lineage's slots, slots gone tabu, slot draws that
+        // skipped a tabu slot or kept the full list for want of another, and
+        // sideways rewrites of a flipped slot and those kept. Zero whenever
+        // flip_tabu is 0.
+        {"flip_lineage",
+         {{"flips", FlipLineageStats::n_flips.load()},
+          {"tabu", FlipLineageStats::n_tabu.load()},
+          {"skipped", FlipLineageStats::n_skipped.load()},
+          {"fallbacks", FlipLineageStats::n_fallbacks.load()},
+          {"sideways", FlipLineageStats::n_sideways.load()},
+          {"sideways_kept", FlipLineageStats::n_sideways_kept.load()}}},
         // The output climb, all zero unless filters.climb_output is on.
         {"climb",
          {{"climbed", ClimbStats::n_climbed.load()},

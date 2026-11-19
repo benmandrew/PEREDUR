@@ -44,7 +44,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 56> k_config_keys{{
+inline constexpr std::array<ConfigKey, 58> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -387,6 +387,26 @@ inline constexpr std::array<ConfigKey, 56> k_config_keys{{
      "FRETISH only: favour slots the accumulated repairs have not edited when "
      "drawing\n"
      "a rewrite's slot. Off by default.\n"},
+    {"mutation", "flip_tabu", &Config::flip_tabu, KeyCheck::None,
+     KeyReader::Fretish,
+     "FRETISH only: generations a slot stays tabu for a lineage that has "
+     "flipped realizability on it both ways, a weakening to realizable and a "
+     "strengthening to unrealizable in either order. Each individual carries "
+     "its lineage's flips per slot, filled in as its offspring are scored. A "
+     "tabu slot is skipped by the slot draw, which falls back to the full "
+     "list when nothing else is left. 0 keeps no lineage.",
+     "FRETISH only: generations a slot is tabu for a lineage that flipped "
+     "realizability\n"
+     "on it both ways. 0 (off) by default.\n"},
+    {"mutation", "flip_sideways", &Config::flip_sideways, KeyCheck::None,
+     KeyReader::Fretish,
+     "FRETISH only, under flip_tabu above 0: in place of skipping a flipped "
+     "slot, rewrite it with the direction-free moves alone and keep the "
+     "result only where the implication rule finds it incomparable with the "
+     "parent.",
+     "FRETISH only, under flip_tabu: rewrite a flipped slot sideways instead "
+     "of\n"
+     "skipping it. Off by default.\n"},
     {"mutation", "step_scaling", &Config::step_scaling, KeyCheck::Probability,
      KeyReader::Fretish,
      "FRETISH only: how far the parent's status scales the choice between a "

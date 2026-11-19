@@ -24,6 +24,7 @@
 #include "config.hpp"
 #include "fitness/function.hpp"
 #include "genetic/crossover.hpp"
+#include "genetic/diversity.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/nsga2.hpp"
 #include "genetic/pipeline.hpp"
@@ -745,6 +746,9 @@ std::vector<Scored<Spec>> evolve_generation(
         budget);
     ctx.m_original = original;
     ctx.m_diversity = diversity;
+    if (diversity != nullptr) {
+        diversity->begin_generation();
+    }
     ctx.m_status_objective = fitness_functions.objective_index("status");
     if (cfg.maximality_demotion) {
         ctx.m_status_index = status_objective_index(fitness_functions);

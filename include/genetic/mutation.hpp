@@ -140,6 +140,28 @@ struct ParentContext {
     /// slot of the original (diversity.hpp); null otherwise, which leaves the
     /// slot draw unweighted. Borrowed for the generation.
     const SlotCoverage* coverage = nullptr;
+    /// Under Config::flip_tabu, the global slots (assumptions first, then
+    /// guarantees) the parent's lineage holds tabu, ascending. Under
+    /// Config::flip_sideways they are rewritten sideways instead of skipped.
+    std::vector<std::size_t> flipped_slots;
+};
+
+/// What Config::flip_tabu and Config::flip_sideways did over a run. Reported
+/// under `--diagnostics` and in run.json.
+struct FlipLineageStats {
+    /// Realizability flips recorded against a slot of a lineage: an offspring
+    /// whose realizability differs from its parent's, once per slot it edited.
+    inline static std::atomic<std::size_t> n_flips{0};
+    /// Times a slot of a lineage flipped both ways and went tabu.
+    inline static std::atomic<std::size_t> n_tabu{0};
+    /// Slot draws whose list lost a tabu slot.
+    inline static std::atomic<std::size_t> n_skipped{0};
+    /// Slot draws whose every slot was tabu, so the full list was kept.
+    inline static std::atomic<std::size_t> n_fallbacks{0};
+    /// Rewrites of a flipped slot under Config::flip_sideways.
+    inline static std::atomic<std::size_t> n_sideways{0};
+    /// Of those, the results kept as incomparable with the parent.
+    inline static std::atomic<std::size_t> n_sideways_kept{0};
 };
 
 /// What Config::slot_coverage did over a run. Reported under `--diagnostics`

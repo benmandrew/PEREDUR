@@ -1156,6 +1156,41 @@ std::size_t draw_position(std::size_t n_steps,
     return total - 1;
 }
 
+// Under Config::flip_tabu without Config::flip_sideways, drops from @p slots
+// the slots @p parent's lineage holds tabu, unless that would leave none.
+// Draws nothing.
+void skip_flipped(const ParentContext* parent, const Config& cfg,
+                  std::vector<std::size_t>* slots) {
+    if (cfg.flip_tabu == 0 || cfg.flip_sideways || parent == nullptr ||
+        parent->flipped_slots.empty()) {
+        return;
+    }
+    std::vector<std::size_t> allowed;
+    for (const std::size_t idx : *slots) {
+        if (!std::binary_search(parent->flipped_slots.begin(),
+                                parent->flipped_slots.end(), idx)) {
+            allowed.push_back(idx);
+        }
+    }
+    if (allowed.size() == slots->size()) {
+        return;
+    }
+    if (allowed.empty()) {
+        FlipLineageStats::n_fallbacks++;
+        return;
+    }
+    FlipLineageStats::n_skipped++;
+    *slots = std::move(allowed);
+}
+
+// True where Config::flip_sideways rewrites slot @p idx sideways.
+bool sideways_slot(const ParentContext* parent, const Config& cfg,
+                   std::size_t idx) {
+    return cfg.flip_tabu > 0 && cfg.flip_sideways && parent != nullptr &&
+           std::binary_search(parent->flipped_slots.begin(),
+                              parent->flipped_slots.end(), idx);
+}
+
 // Sets @p flag to @p value where the caller asked for it.
 void report(bool* flag, bool value) {
     if (flag != nullptr) {
@@ -1172,6 +1207,19 @@ Specification take_step(BackSteps& back, std::size_t choice, bool* stepped) {
         DirectionGateStats::n_bisected++;
     }
     return std::move(back.m_steps[choice].m_result);
+}
+
+Config free_rewrite_rates(const Config& cfg);
+
+// Whether a sideways rewrite @p child of @p parent stands: the rule must find
+// the two incomparable. Counts the rewrite and, where it stands, the keep.
+bool sideways_kept(const Specification& parent, const Specification& child) {
+    FlipLineageStats::n_sideways++;
+    if (classify_move(parent, child) != MoveOrder::Incomparable) {
+        return false;
+    }
+    FlipLineageStats::n_sideways_kept++;
+    return true;
 }
 
 // GateRealizable::Exchange for a realizable parent: one of @p back's steps
@@ -1205,6 +1253,7 @@ Specification exchange(const Specification& specification, BackSteps& back,
             untouched.push_back(idx);
         }
     }
+    skip_flipped(parent, cfg, &untouched);
     MutationStats::n_slot_draws++;
     Specification current = specification;
     if (!back.m_steps.empty()) {
@@ -1229,15 +1278,20 @@ Specification exchange(const Specification& specification, BackSteps& back,
     const Direction direction =
         is_assumption ? Direction::Strengthen : Direction::Weaken;
     bool free_rewrite = false;
+    const bool sideways = sideways_slot(parent, cfg, idx);
     target[local] = mutate_requirement_tracked(
         target[local], atoms, condition_atoms, direction, timing_pool,
-        current.m_modes, random_source, cfg, &free_rewrite, scale);
+        current.m_modes, random_source,
+        sideways ? free_rewrite_rates(cfg) : cfg, &free_rewrite, scale);
     if (creates_duplicate(target, local)) {
         return current;
     }
     Specification weakened(std::move(assumptions), std::move(guarantees),
                            current.m_in_atoms, current.m_out_atoms,
                            current.m_modes);
+    if (sideways && !sideways_kept(current, weakened)) {
+        return current;
+    }
     if (free_rewrite && !admitted_by_gate(Gate::Weaken, current, weakened)) {
         return current;
     }
@@ -1375,6 +1429,7 @@ Specification mutate_specification(const Specification& specification,
                         cfg, scale, stepped, parent);
     }
     narrow_by_blame(specification, parent, cfg, &weakenable_indices);
+    skip_flipped(parent, cfg, &weakenable_indices);
     // Under the gate a realizable parent draws once over its steps and its
     // rewritable slots together, each counted once, so a parent far from the
     // original mostly steps back and one at it mostly rewrites sideways.
@@ -1424,10 +1479,11 @@ Specification mutate_specification(const Specification& specification,
     std::vector<Requirement>& target = is_assumption ? assumptions : guarantees;
     const std::size_t local_idx = is_assumption ? idx : idx - n_assumptions;
     bool free_rewrite = false;
+    const bool sideways = sideways_slot(parent, cfg, idx);
     target[local_idx] = mutate_requirement_tracked(
         target[local_idx], mutation_atoms, condition_atoms, direction,
         timing_pool, specification.m_modes, random_source,
-        strengthening && mode == GateRealizable::Towards
+        sideways || (strengthening && mode == GateRealizable::Towards)
             ? free_rewrite_rates(cfg)
             : cfg,
         &free_rewrite, scale);
@@ -1437,6 +1493,9 @@ Specification mutate_specification(const Specification& specification,
     Specification mutated(std::move(assumptions), std::move(guarantees),
                           specification.m_in_atoms, specification.m_out_atoms,
                           specification.m_modes);
+    if (sideways && !sideways_kept(specification, mutated)) {
+        return specification;
+    }
     // The directed arms move the way the gate allows by construction, so only
     // a free rewrite needs sorting. Returning the parent leaves an offspring
     // equal to it, which deduplication removes.

@@ -271,6 +271,13 @@ void print_diagnostics_report() {
     std::cout << "Spread seed population: " << SpreadInitStats::n_seeded
               << " weakenings over " << SpreadInitStats::n_targets << " slots, "
               << SpreadInitStats::n_failed << " left as the original\n";
+    std::cout << "Flip lineage: " << FlipLineageStats::n_flips
+              << " flips recorded, " << FlipLineageStats::n_tabu
+              << " slots gone tabu, " << FlipLineageStats::n_skipped
+              << " draws skipping a tabu slot, "
+              << FlipLineageStats::n_fallbacks << " with every slot tabu, "
+              << FlipLineageStats::n_sideways << " sideways rewrites ("
+              << FlipLineageStats::n_sideways_kept << " kept)\n";
     if (ClimbStats::n_climbed > 0) {
         std::cout << "Output climb: " << ClimbStats::n_climbed
                   << " repairs climbed, " << ClimbStats::n_steps_tried

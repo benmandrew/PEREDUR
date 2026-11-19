@@ -59,6 +59,7 @@ Versions 2 to 62 are in "Run manifest schema versions" in `docs/dev/history.md`.
 - **71** records the new `[genetic] novelty` key in `config` and adds the `novelty` block (`evaluations`, `checks`, `implied`, `covered`), all zero at the default `false`, which behaves as at 70.
 - **72** records the new `[mutation] slot_coverage` key in `config` and adds the `slot_coverage` block (`draws`, `weighted`), both zero at the default `false`, which behaves as at 71.
 - **73** records the new `[genetic] spread_init` key in `config` and adds the `spread_init` block (`targets`, `seeded`, `failed`), all zero at the default `false`, which behaves as at 72.
+- **74** records the new `[mutation] flip_tabu` and `flip_sideways` keys in `config` and adds the `flip_lineage` block (`flips`, `tabu`, `skipped`, `fallbacks`, `sideways`, `sideways_kept`), all zero at the default `flip_tabu = 0`, which behaves as at 73.
 
 ## Where the campaign records are
 

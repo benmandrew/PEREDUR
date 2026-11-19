@@ -127,6 +127,12 @@ gate_realizable = "exchange"
 # FRETISH only: favour slots the accumulated repairs have not edited when drawing
 # a rewrite's slot. Off by default.
 slot_coverage = false
+# FRETISH only: generations a slot is tabu for a lineage that flipped realizability
+# on it both ways. 0 (off) by default.
+flip_tabu = 0
+# FRETISH only, under flip_tabu: rewrite a flipped slot sideways instead of
+# skipping it. Off by default.
+flip_sideways = false
 # FRETISH only: take more large moves from a parent far from realizable and
 # fewer from one near it, scaled by the parent's status. Off (0) by default.
 step_scaling = 0.0

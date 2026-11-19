@@ -314,3 +314,117 @@ TEST(test_spread_init_with_one_individual_is_the_original) {
 }
 
 }  // namespace
+
+namespace {
+
+// --- flip lineage ---
+
+Scored<Specification> with_status(const Specification& spec, double status) {
+    Scored<Specification> scored;
+    scored.specification = spec;
+    scored.objectives = {status};
+    return scored;
+}
+
+TEST(test_flip_lineage_makes_a_slot_flipped_both_ways_tabu) {
+    const Specification parent = two_guarantees();
+    const Specification weakened({}, {guarantee0(), removed(guarantee1())}, {},
+                                 outputs());
+    const Specification restored(
+        {}, {guarantee0(), make_req("b", "y", timing::next_timepoint())}, {},
+        outputs());
+    DiversityState state(nullptr);
+    state.begin_generation();
+    state.note_offspring(parent, false, weakened, weakened);
+    state.settle_offspring({with_status(weakened, 1.0)}, 0, 2);
+    expect(state.flipped_slots(weakened).empty(),
+           "flip lineage: one flip makes nothing tabu");
+    state.begin_generation();
+    state.note_offspring(weakened, true, restored, restored);
+    const std::size_t tabu = FlipLineageStats::n_tabu;
+    state.settle_offspring({with_status(restored, 0.5)}, 0, 2);
+    expect(FlipLineageStats::n_tabu == tabu + 1,
+           "flip lineage: the second flip on the slot is counted as tabu");
+    state.begin_generation();
+    expect(state.flipped_slots(restored) == std::vector<std::size_t>{1},
+           "flip lineage: guarantee 1 is tabu in the next generation");
+    state.begin_generation();
+    expect(state.flipped_slots(restored).size() == 1,
+           "flip lineage: and in the one after");
+    state.begin_generation();
+    expect(state.flipped_slots(restored).empty(),
+           "flip lineage: and not after flip_tabu generations");
+}
+
+TEST(test_flip_lineage_skips_an_unflipped_parent_and_an_unscored_child) {
+    const Specification parent = two_guarantees();
+    const Specification child({}, {guarantee0(), removed(guarantee1())}, {},
+                              outputs());
+    DiversityState state(nullptr);
+    state.begin_generation();
+    state.note_offspring(parent, false, parent, parent);
+    state.note_offspring(parent, false, child, child);
+    const std::size_t flips = FlipLineageStats::n_flips;
+    state.settle_offspring({}, 0, 2);
+    expect(FlipLineageStats::n_flips == flips,
+           "flip lineage: an offspring a filter dropped records nothing");
+}
+
+Config flip_config(bool sideways) {
+    Config cfg;
+    cfg.p_remove_guarantee = 0.0;
+    cfg.flip_tabu = 3;
+    cfg.flip_sideways = sideways;
+    return cfg;
+}
+
+TEST(test_flip_tabu_skips_the_tabu_slot) {
+    const Specification spec = two_guarantees();
+    ParentContext parent;
+    parent.flipped_slots = {0};
+    const std::size_t skipped = FlipLineageStats::n_skipped;
+    // A draw of 0 lands on guarantee 0 without the tabu.
+    const RandomSource source = make_source({0}, 0);
+    const Specification mutated =
+        mutate_specification(spec, source, flip_config(false), &parent);
+    expect(FlipLineageStats::n_skipped == skipped + 1,
+           "flip tabu: the draw that lost a slot is counted");
+    expect(mutated.m_guarantees[0] == spec.m_guarantees[0],
+           "flip tabu: the tabu slot is not rewritten");
+}
+
+TEST(test_flip_tabu_falls_back_when_every_slot_is_tabu) {
+    const Specification spec = two_guarantees();
+    ParentContext parent;
+    parent.flipped_slots = {0, 1};
+    const std::size_t fallbacks = FlipLineageStats::n_fallbacks;
+    const RandomSource with = make_source({0, 5, 9}, 1);
+    const RandomSource without = make_source({0, 5, 9}, 1);
+    const Specification lhs =
+        mutate_specification(spec, with, flip_config(false), &parent);
+    Config off = flip_config(false);
+    off.flip_tabu = 0;
+    const Specification rhs = mutate_specification(spec, without, off, &parent);
+    expect(FlipLineageStats::n_fallbacks == fallbacks + 1,
+           "flip tabu: an all-tabu list is counted as a fallback");
+    expect(lhs == rhs, "flip tabu: the fallback draws over the full list");
+}
+
+TEST(test_flip_sideways_keeps_only_incomparable_rewrites) {
+    const Specification spec = two_guarantees();
+    ParentContext parent;
+    parent.flipped_slots = {0, 1};
+    const RandomSource source = make_random_source_from_seed(3);
+    const std::size_t sideways = FlipLineageStats::n_sideways;
+    for (int round = 0; round < 20; ++round) {
+        const Specification mutated =
+            mutate_specification(spec, source, flip_config(true), &parent);
+        expect(mutated == spec ||
+                   classify_move(spec, mutated) == MoveOrder::Incomparable,
+               "flip sideways: a kept rewrite is incomparable with the parent");
+    }
+    expect(FlipLineageStats::n_sideways > sideways,
+           "flip sideways: the sideways rewrites are counted");
+}
+
+}  // namespace

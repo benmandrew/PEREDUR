@@ -198,7 +198,9 @@ bool probability_check(double rate, const RandomSource& random_source);
 /// nothing either.
 ///
 /// @p diversity, where given on the FRETISH path, lends the diversity keys'
-/// run state to mutation: the slot coverage under Config::slot_coverage.
+/// run state to mutation: the slot coverage under Config::slot_coverage, and
+/// under Config::flip_tabu each parent's flipped slots, with each mutated
+/// offspring held for its lineage until the generation is scored.
 template <typename Spec>
 std::vector<Spec> breed_offspring(
     const Config& cfg, const std::vector<Scored<Spec>>& sorted_pop,

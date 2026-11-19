@@ -290,6 +290,18 @@ struct Config {
     /// Off by default; off, and while every weight is equal, the draw is the
     /// unweighted one.
     bool slot_coverage = false;
+    /// FRETISH only: generations a slot stays tabu for a lineage once that
+    /// lineage has flipped realizability on it both ways (a weakening that
+    /// made it realizable and a strengthening that made it unrealizable, in
+    /// either order). A tabu slot is skipped by the slot draw, which falls
+    /// back to the full list where nothing else is left. 0, the default,
+    /// keeps no lineage and draws nothing.
+    std::size_t flip_tabu = 0;
+    /// FRETISH only, under flip_tabu above 0: a flipped slot takes only a
+    /// direction-free rewrite, kept where the rule finds the result
+    /// incomparable with the parent, in place of being skipped. Off by
+    /// default.
+    bool flip_sideways = false;
     /// FRETISH only: how far the parent's status scales the choice between a
     /// large move and a single edge, in [0, 1]. Each large move's probability
     /// (removing a guarantee, moving a timing off Always or Eventually, and
