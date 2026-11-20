@@ -56,6 +56,7 @@ add_executable(peredur_tests
     tlsf/genetic_tests.cpp
     tlsf/monotone_tests.cpp
     tlsf/pipeline_tests.cpp
+    psp/lowering_tests.cpp
     fingerprint/lasso_tests.cpp
     fingerprint/prefilter_tests.cpp
     drivers/e2e_tests.cpp
@@ -103,7 +104,8 @@ add_dependencies(peredur_tests
 target_compile_definitions(peredur_tests PRIVATE
     PEREDUR_DRIVER_DIR="$<TARGET_FILE_DIR:peredur>"
     PEREDUR_CONTAINED_CHILD_HELPER="$<TARGET_FILE:contained_child_helper>"
-    PEREDUR_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/runner/data")
+    PEREDUR_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/runner/data"
+    PEREDUR_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 # One entry per suite in the table in main.cpp, which also fixes which tests
 # each runs. The drivers' end-to-end suites are separate entries so a failure
@@ -165,6 +167,7 @@ set(peredur_test_suites
     tlsf_genetic
     tlsf_monotone
     tlsf_pipeline
+    psp_lowering
     driver_peredur
     driver_realize
     driver_ltl

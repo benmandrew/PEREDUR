@@ -41,6 +41,7 @@
 
 #include "driver_support.hpp"
 #include "filter/well_separation.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
@@ -54,7 +55,8 @@ void print_usage(const char* prog) {
         << "Usage: " << prog << " <subject-dir> [<subject-dir> ...]\n"
         << "\n"
         << "Lints the ideal repairs of one or more subjects. A subject\n"
-        << "directory holds a spec.tlsf or spec.json alongside a fixes/\n"
+        << "directory holds a spec.tlsf, spec.psp or spec.json alongside a\n"
+        << "fixes/\n"
         << "directory of ideals, which is the layout under examples/.\n"
         << "\n"
         << "Each ideal is checked for five properties:\n"
@@ -161,6 +163,36 @@ void check_reachable(const tlsf::Specification& spec,
 // check here.
 void check_reachable(const Specification& spec, const Specification& ideal,
                      Verdict& verdict) {
+    if (ideal.m_guarantees.size() > spec.m_guarantees.size()) {
+        verdict.reachable = false;
+        verdict.unreachable_reason =
+            "guarantee requirements " +
+            std::to_string(spec.m_guarantees.size()) + " -> " +
+            std::to_string(ideal.m_guarantees.size()) +
+            ", but no operator adds to the guarantee list";
+        return;
+    }
+    if (ideal.m_guarantees.empty() && !spec.m_guarantees.empty()) {
+        verdict.reachable = false;
+        verdict.unreachable_reason =
+            "every guarantee requirement deleted, but removal keeps the last "
+            "one";
+        return;
+    }
+    if (ideal.m_assumptions.size() < spec.m_assumptions.size()) {
+        verdict.reachable = false;
+        verdict.unreachable_reason =
+            "assumption requirements " +
+            std::to_string(spec.m_assumptions.size()) + " -> " +
+            std::to_string(ideal.m_assumptions.size()) +
+            ", but no operator removes one";
+    }
+}
+
+// The PSP operators, like the FRETISH ones, never add a guarantee, remove
+// the last one, or remove an assumption.
+void check_reachable(const psp::Specification& spec,
+                     const psp::Specification& ideal, Verdict& verdict) {
     if (ideal.m_guarantees.size() > spec.m_guarantees.size()) {
         verdict.reachable = false;
         verdict.unreachable_reason =
@@ -336,14 +368,19 @@ int main(int argc, char** argv) {
         try {
             const std::filesystem::path tlsf_spec = dir / "spec.tlsf";
             const std::filesystem::path json_spec = dir / "spec.json";
+            const std::filesystem::path psp_spec = dir / "spec.psp";
             if (std::filesystem::exists(tlsf_spec)) {
                 failures += lint_subject<tlsf::Specification>(dir, tlsf_spec,
                                                               sat, real);
+            } else if (std::filesystem::exists(psp_spec)) {
+                failures +=
+                    lint_subject<psp::Specification>(dir, psp_spec, sat, real);
             } else if (std::filesystem::exists(json_spec)) {
                 failures +=
                     lint_subject<Specification>(dir, json_spec, sat, real);
             } else {
-                std::cerr << name << ": no spec.tlsf or spec.json\n";
+                std::cerr << name
+                          << ": no spec.tlsf or spec.json (or spec.psp)\n";
                 return 2;
             }
         } catch (const std::exception& exc) {

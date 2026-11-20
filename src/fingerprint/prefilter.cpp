@@ -202,6 +202,19 @@ std::vector<PackedFingerprint> fingerprints_of(
         [](const Specification& spec) { return spec.to_ltl(); }, priority);
 }
 
+std::vector<PackedFingerprint> fingerprints_of(
+    const std::vector<psp::Specification>& specs, TaskPriority priority) {
+    return fingerprints_over(
+        specs,
+        [](const psp::Specification& spec) {
+            std::vector<std::string> signals = spec.m_in_atoms;
+            signals.insert(signals.end(), spec.m_out_atoms.begin(),
+                           spec.m_out_atoms.end());
+            return signals;
+        },
+        [](const psp::Specification& spec) { return spec.to_ltl(); }, priority);
+}
+
 bool refuted_by_model_alone(const PackedFingerprint& lhs,
                             const PackedFingerprint& rhs) {
     assert(lhs.size() == rhs.size());

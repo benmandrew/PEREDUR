@@ -10,6 +10,8 @@
 #include "driver_support.hpp"
 #include "filter/implication_check.hpp"
 #include "filter/vacuity.hpp"
+#include "psp/filter.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
@@ -101,6 +103,71 @@ struct SpecFormat<tlsf::Specification> {
         return tlsf_has_valid_guarantee(spec, checker);
     }
 };
+
+template <>
+struct SpecFormat<psp::Specification> {
+    static constexpr const char* k_extension = ".psp";
+    static constexpr const char* k_alphabet = "atom alphabets";
+
+    static psp::Specification parse(const std::string& text) {
+        return psp::parse_specification(text);
+    }
+
+    // psp::load_specification names the path in its own failures.
+    static psp::Specification load(const std::string& path,
+                                   const char* /*unreadable*/) {
+        return psp::load_specification(path);
+    }
+
+    static bool same_alphabet(const psp::Specification& lhs,
+                              const psp::Specification& rhs) {
+        return lhs.m_in_atoms == rhs.m_in_atoms &&
+               lhs.m_out_atoms == rhs.m_out_atoms;
+    }
+
+    static std::optional<bool> implies(const psp::Specification& from,
+                                       const psp::Specification& dest,
+                                       SatisfiabilityChecker& checker) {
+        return psp::spec_implies(from, dest, checker);
+    }
+
+    static std::optional<bool> realisable(const psp::Specification& spec,
+                                          RealizabilityChecker& real) {
+        return real.check_realizability_ltl(spec.to_ltl(), spec.m_in_atoms,
+                                            spec.m_out_atoms);
+    }
+
+    static bool has_valid_guarantee(const psp::Specification& spec,
+                                    SatisfiabilityChecker& checker) {
+        return psp::has_valid_guarantee(spec, checker);
+    }
+};
+
+// True when any path, or any file in a directory path, has the extension
+// @p extension.
+inline bool selects_extension(const std::vector<std::string>& paths,
+                              const char* extension) {
+    return std::any_of(
+        paths.begin(), paths.end(), [extension](const std::string& path) {
+            if (std::filesystem::path(path).extension() == extension) {
+                return true;
+            }
+            std::error_code err_code;
+            const std::filesystem::directory_iterator iter(path, err_code);
+            return std::any_of(std::filesystem::begin(iter),
+                               std::filesystem::end(iter),
+                               [extension](const auto& entry) {
+                                   return entry.path().extension() == extension;
+                               });
+        });
+}
+
+// A .psp extension on any path, or any .psp file in any directory path,
+// selects the PSP front end, as selects_tlsf below does for TLSF. The drivers
+// ask this before selects_tlsf.
+inline bool selects_psp(const std::vector<std::string>& paths) {
+    return selects_extension(paths, ".psp");
+}
 
 // Route by input format. A .tlsf extension on any path, or any .tlsf file in
 // any directory path, selects TLSF; otherwise FRETISH JSON. Mixing the formats
