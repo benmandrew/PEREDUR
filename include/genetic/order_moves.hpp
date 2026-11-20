@@ -10,20 +10,8 @@
 #include <optional>
 #include <vector>
 
+#include "genetic/order_step.hpp"
 #include "requirement.hpp"
-
-/// How a child specification relates to its parent under implication of the
-/// whole assume-guarantee formula `A -> G`.
-enum class MoveOrder : std::uint8_t {
-    /// Each implies the other.
-    Equal,
-    /// The child implies the parent, and the converse is not proved.
-    Stronger,
-    /// The parent implies the child, and the converse is not proved.
-    Weaker,
-    /// Neither direction is proved.
-    Incomparable,
-};
 
 /// Whether @p stronger implies @p weaker as specifications, proved by rule
 /// with no solver. True only where it is proven, so false means unproven.
@@ -120,19 +108,6 @@ SlotwiseBound specification_meet(const Specification& lhs,
 std::optional<Specification> assemble(const SlotwiseBound& bound,
                                       const Specification& shape);
 
-/// The side of a specification a step edits.
-enum class StepSide : std::uint8_t { Assumption, Guarantee };
-
-/// What a step changes.
-enum class StepKind : std::uint8_t {
-    /// One field of one slot moves to its target's value.
-    Field,
-    /// A tombstoned guarantee comes back with the fields it was removed with.
-    Restore,
-    /// An appended assumption is dropped.
-    DropAssumption,
-};
-
 /// One field of a requirement.
 enum class RequirementField : std::uint8_t {
     Condition,
@@ -142,18 +117,8 @@ enum class RequirementField : std::uint8_t {
     Scope,
 };
 
-/// One proved strengthening of a specification.
-struct Step {
-    StepKind m_kind = StepKind::Field;
-    StepSide m_side = StepSide::Guarantee;
-    /// The slot edited, indexing `m_assumptions` or `m_guarantees` of the
-    /// specification the step was taken from.
-    std::size_t m_slot = 0;
-    /// The field moved, for a Field step.
-    std::optional<RequirementField> m_field;
-    /// The specification after the step.
-    Specification m_result;
-};
+/// One proved strengthening of a FRETISH specification.
+using Step = OrderStep<Specification, RequirementField>;
 
 /// The strengthenings of @p current that move it towards @p original, each
 /// proved Stronger by classify_move. @p current descends from @p original, so

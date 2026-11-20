@@ -73,6 +73,7 @@ The overview pages describe the algorithm, the tuning knobs, and the TLSF path. 
    api/genetic/nsga2
    api/genetic/order_crossover
    api/genetic/order_moves
+   api/genetic/order_step
    api/genetic/pipeline
    api/genetic/random_source
    api/genetic/scored
