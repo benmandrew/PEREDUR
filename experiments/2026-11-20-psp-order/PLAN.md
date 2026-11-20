@@ -33,7 +33,7 @@ The probe runs locally, not through the queue, after `feat/psp-front-end` is mer
 systemd-run --user --scope -q -p MemoryMax=7G -p MemorySwapMax=0 nice -n 10 nix develop -c python3 experiments/2026-11-20-psp-order/scripts/probe.py --jobs 4
 ```
 
-It writes `experiments/2026-11-20-psp-order/probe.csv` (columns subject, distinct, implies_base, implies_mutant, reversions, p1, p2) and resumes from `probe-work/`. A smoke run at 500 draws on two subjects gave p1 = 0.002 and p2 = 0 on `psp-arbiter__m0`, and p1 = p2 = 0.002 on `psp-crossing__m10`.
+It writes `experiments/2026-11-20-psp-order/probe.csv` (columns subject, distinct, implies_base, implies_mutant, reversions, p1, p2) and resumes from `probe-work/`. A smoke run at 500 draws on two subjects gave p1 = 0.002 and p2 = 0 on `psp-arbiter__m0`, and p1 = p2 = 0.002 on `psp-crossing__m10`. The full probe ran locally on 2026-11-20 at 7f356f56's binaries (5,000 draws, 4 jobs): 66 of the 70 subjects are headline (35 of the 39 from hand-written bases, all 31 from SYNTECH17 bases). The trivial ones are `psp-arbiter__m24` (p1 = 0.0106), `psp-minepump__m33` (0.0308), `psp-patrol__m57` (0.0124) and `psp-patrol__m64` (p1 = 0.0100). `probe.csv` is untracked, as all experiment data is, so it lives in `~/projects/peredur-psp`.
 
 ## Launch
 
