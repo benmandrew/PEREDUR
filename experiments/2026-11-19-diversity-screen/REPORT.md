@@ -1,27 +1,28 @@
 # 2026-11-19-diversity-screen: findings
 
-*Provisional.* The BLACK pooled pass `2026-11-19-diversity-pooled` has not run, and it is the decisive measure. Every verdict below rests on the rule-only screen, which the pooled pass can still overturn.
+The BLACK pooled pass `2026-11-19-diversity-pooled` ran on 2026-11-20, over `full-k1`, `full-k4`, novelty, slot-coverage, flip-tabu and flip-sideways at 30 seeds on 18 subjects. Its verdicts are final. The screen results below it are kept as the record of how each arm was chosen.
 
-The pooled pass is committed at `e5fff7e3` on `campaign/diversity-climb`. It is blocked because the permission system refused the drafting agent's `git push` and its copy of the pass's untracked files to the hosts, and neither refusal was worked around. Its estimate is 12 to 16 CPU-hours. Three steps unblock it, all from `~/projects/peredur-div-climb-campaign`.
+## Pooled pass (BLACK)
 
-**Push.** `git push origin campaign/diversity-climb`.
+Each row is against `full-k1`, and a positive value favours the arm. Containment is at K = 3 over 17 subjects, because rad-core-10's half-pools hold 4 nodes. It gives the median difference over subjects, with Holm-corrected exact signed-rank p. Net subsumption is the median over 18 subjects. Accepted-trace share and joint-front reach give Hodges–Lehmann shifts with 95% intervals, Holm over the 15 arm pairs.
 
-**Copy.** Send design.toml, both subject lists and `members/` to each host:
+| Arm | Net containment | full-k1 in arm − control | arm in full-k1 − control | Net subsumption | Accepted-trace share | Joint-front reach |
+|---|---|---|---|---|---|---|
+| novelty | +0.047, Holm 0.001 | +0.026, Holm 0.002 | −0.042, Holm 0.010 | +0.185, 17 up / 0 down, Holm 6×10⁻⁵ | +0.0225 [+0.0038, +0.0592], Holm 0.05 | +0.137 [+0.056, +0.198], Holm 0.039 |
+| full-k4 | +0.001, Holm 0.36 | +0.001, Holm 0.034 | −0.001, Holm 0.005 | 0.000, 5 up / 13 tied, p 0.063 | 0.0000 [−0.0003, +0.0015], Holm 1 | +0.002 [0.000, +0.012], Holm 0.031 |
+| flip-sideways | +0.006, Holm 0.36 | +0.004, Holm 0.48 | −0.000, Holm 1 | 0.000, Holm 0.69 | +0.0046 [+0.0008, +0.0159], Holm 0.15 | +0.001 [−0.013, +0.010], Holm 0.98 |
+| flip-tabu | +0.000, Holm 1 | +0.003, Holm 1 | −0.001, Holm 1 | −0.003, Holm 0.69 | −0.0009 [−0.0050, +0.0029], Holm 1 | −0.007 [−0.024, +0.002], Holm 0.52 |
+| slot-coverage | −0.011, Holm 1 | +0.001, Holm 1 | −0.010, Holm 1 | −0.019, Holm 0.69 | +0.0003 [−0.0154, +0.0105], Holm 1 | −0.042 [−0.066, −0.021], Holm 0.017 |
 
-```
-rsync -aR experiments/2026-11-19-diversity-pooled/design.toml experiments/2026-11-19-diversity-pooled/subjects-av2.txt experiments/2026-11-19-diversity-pooled/subjects-av3.txt experiments/2026-11-19-diversity-pooled/members/ av2:/home/benandrew/projects/counter/
-rsync -aR experiments/2026-11-19-diversity-pooled/design.toml experiments/2026-11-19-diversity-pooled/subjects-av2.txt experiments/2026-11-19-diversity-pooled/subjects-av3.txt experiments/2026-11-19-diversity-pooled/members/ av3:/home/benandrew/projects/counter/
-```
-
-**Enqueue.** `python3 scripts/campaign.py enqueue 2026-11-19-diversity-pooled`.
+The reduced tables are in `experiments/diversity-pooled-v2-reduced/` of `~/projects/peredur-div-climb-campaign` (untracked): `ball-radii-pooled/report-k3.txt`, `balls.log` (net subsumption) and `joint.log` (share and reach).
 
 ## The answer
 
-Novelty against the *accumulator* M (`genetic.novelty`) is the only mechanism that raises diversity, and it raises strength as well. At 30 seeds against `full-k1`'s 30 on 18 subjects, its *net containment* shift is +0.0564 [+0.0303, +0.0779] (p < 0.001, positive on 16 subjects and negative on 2), and its strength shift is +0.0288 [+0.0017, +0.0487] (p = 0.006). Both directions beat the *seed-half controls*: `full-k1`'s nodes inside novelty's region gain +0.0249 [+0.0127, +0.0376], and novelty's nodes inside `full-k1`'s region fall by 0.0311 [−0.0451, −0.0163]. No subject loses a found repair. Each figure here is a *Hodges–Lehmann shift* with its 95% Wilcoxon signed-rank interval.
+Novelty against the *accumulator* M (`genetic.novelty`) raises diversity and strength together, and the pooled pass confirms it on every measure. Its region covers `full-k1`'s nodes beyond the seed-half control, and its own nodes fall outside `full-k1`'s, for a net containment shift of +0.047 (16 of 17 subjects). Its frontier classes subsume `full-k1`'s on 17 of 18 subjects, a median net of +0.185. Its accepted-trace share is 0.0225 lower, and it reaches 13.7 points more of the joint front of the six arms. No subject loses a found repair. The screen's 30-seed shift (+0.056) was close to the pooled one, so the 9× shrinkage seen when validating against `base` did not recur.
 
-The multi-order climb (`climb_orders = 4`, arm `full-k4`) gives a small but significant gain of +0.0035 [+0.0003, +0.0077] (p = 0.031, 12 subjects up and 6 down). Strength does not move (+0.0000 [−0.0004, +0.0003]), and wall time rises 13%, from a mean of 54 s a run to 61 s. The other mechanisms give nothing or do harm. flip-tabu, slot-coverage and flip-sideways looked promising at 10 seeds and fell to noise at 30. crowd-spec trades diversity for strength, and spread-init harms both. Under each of those two, rad-core-10 loses found repairs, from 4 of 10 seeds to 3 and to 1.
+The multi-order climb (`climb_orders = 4`, arm `full-k4`) does not hold on diversity. Both directions beat their controls by 0.001, but the net shift is not significant (Holm 0.36), no strength measure moves, and reach gains 0.2 points (Holm 0.031). For 13% more wall time, that is too small to adopt. flip-tabu and flip-sideways are indistinguishable from `full-k1` after Holm. slot-coverage loses 4.2 points of reach (Holm 0.017). crowd-spec trades diversity for strength, and spread-init harms both. Under each of those two, rad-core-10 loses found repairs, from 4 of 10 seeds to 3 and to 1. Neither went to the pooled pass.
 
-## Results
+## Screen results
 
 Net is net containment against `full-k1`. Strength is `full-k1`'s *accepted-trace share* less the arm's, so a positive value means the arm is stronger. Cells give the shift, its interval and p, then subjects positive / negative where recorded.
 
@@ -39,7 +40,7 @@ The screens are under `screens/<arm>-vs-full-k1.json` (10 seeds) and `screens/<a
 
 ## What the screen can and cannot say
 
-The screen reads direction and rank, and it shrinks shifts. It was validated against the BLACK pooled pass on net containment against `base`. For `remove-exchange` the signs agreed on 18 of 18 subjects with Spearman 0.93, and for `remove-no-blame-exchange` on 16 of 18 with Spearman 0.94. The screen's shifts were +0.007 and +0.008 against the pooled pass's +0.060 and +0.072, so it shrank them by about 9×. Novelty's +0.0564 is the largest screen shift in the study, and only the pooled pass can size it. That validation used the exchange rerun's `base`, which has blame off, so it tested the tooling and judged no candidate.
+The screen reads direction and rank, and it shrinks shifts. It was validated against the BLACK pooled pass on net containment against `base`. For `remove-exchange` the signs agreed on 18 of 18 subjects with Spearman 0.93, and for `remove-no-blame-exchange` on 16 of 18 with Spearman 0.94. The screen's shifts were +0.007 and +0.008 against the pooled pass's +0.060 and +0.072, so it shrank them by about 9×. Novelty's +0.0564 was the largest screen shift in the study, and the pooled pass gave +0.047, so on this contrast the screen did not shrink the shift. That validation used the exchange rerun's `base`, which has blame off, so it tested the tooling and judged no candidate.
 
 Its strength measure is weak. The *rule-only frontier* proves only 39% of BLACK's implications on fsm and 37% on mode-arbiter, and BLACK confirmed every implication the rules did prove. On fsm, `full`'s frontier has 164 classes against BLACK's 57, so the accepted-trace share is taken over a frontier inflated with weaker repairs. The descriptor count correlated with containment at a median Spearman ρ of −0.23, and it decides nothing.
 
@@ -61,17 +62,17 @@ Every new key is off by default, and the goldens are unchanged on every branch.
 
 ## Paper
 
-Two `\bennote`s are in the draft (`peredur-extension`, `paper/repair/directed.tex`, commit `927e7a4`, local and not pushed): one on the multi-order climb and one on novelty as a candidate fourth mechanism. The evaluation bullets are unchanged.
+Two `\bennote`s are in the draft (`peredur-extension`, `paper/repair/directed.tex`, local and not pushed), updated with the pooled numbers: one says the multi-order climb does not hold, and one gives novelty as a candidate fourth mechanism. The evaluation bullets are unchanged.
 
 ## Budget
 
-About 145 CPU-hours are spent or committed out of 300, including the 15 wasted when the no-blame entries were dequeued. The pending pooled pass adds 12 to 16.
+About 145 CPU-hours are spent or committed out of 300, including the 15 wasted when the no-blame entries were dequeued. The pooled pass took 12 to 16 by estimate. Its reductions took 56 CPU-minutes on av3. The total is about 160 CPU-hours.
 
 ## Next steps
 
-**Run the pooled pass.** It decides whether novelty's shift holds under BLACK and sizes `full-k4`'s gain.
+**Separate the cause.** A fourth NSGA-II objective weakens dominance pressure by itself. A control arm with a random fourth objective tells whether novelty's gain comes from M or from weaker selection. A second arm, with novelty as the tie-breaker within a front in place of crowding distance, keeps three objectives.
 
-**Combine and time.** If novelty holds, test it with `climb_orders = 4` in one arm, and measure novelty's wall time on one host at one width, since every ratio so far is confounded.
+**Time it.** Measure novelty's wall time against `full-k1` on one host at one width, since every ratio so far is confounded by host.
 
 **Decide on the deferred ideas.** MAP-Elites over (slots changed, kind of change), the core-directed assumption move and restarts with frozen slots wait for your decision.
 
