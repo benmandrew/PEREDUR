@@ -674,6 +674,48 @@ pann = dict(prec, rows_done=4, log_mtime=1786459940)
 C.annotate(pann, {"epoch": 1786460000, "processes": pprocs})
 check(pann["state"], "running", "and the pool pass naming it claims it")
 
+# A reduce pass reports steps done (gather, reduce, joint) from its progress
+# CSV. Neither reduction takes a manifest, so a live one is matched by the
+# output directory it writes, and the gather's rsync by its destination.
+rprocs = C.live_processes([
+    "python3 python3 scripts/pooled_reduce.py d.toml m "
+    "experiments/x-collected /home/u/c/experiments/x-reduced --jobs 4 "
+    "--pooled-balls",
+    "rsync rsync -a --delete -e ssh av3:/c/experiments/x/ "
+    "/home/u/c/experiments/x-collected/av3/",
+    "python3 python3 scripts/joint_measures.py d.toml m experiments/x-collected "
+    "experiments/other/joint"])
+check([(p.get("kind"), p.get("out")) for p in rprocs],
+      [("reduce", "/home/u/c/experiments/x-reduced"), ("gather", None),
+       ("reduce", "experiments/other/joint")],
+      "pooled_reduce.py and joint_measures.py are reductions naming OUT_DIR, "
+      "and rsync a gather")
+rrec = C.campaigns_from_compare_manifests([{
+    "kind": "reduce", "file": "experiments/compare-manifests/pooled.reduce.json",
+    "hostname": "av2", "started": "2026-11-20T10:00:00+0000",
+    "out": "experiments/x-reduced/done.csv", "planned": 3,
+    "reduce_out": "experiments/x-reduced",
+    "collected": "experiments/x-collected",
+    "log": "experiments/queue/004-pooled.log",
+    "git": {"branch": "b", "head": "abc1234def"}}])[0]
+check((rrec["kind"], rrec["label"], rrec["out"], rrec["rows_planned"]),
+      ("reduce", "reduce:pooled.reduce", "experiments/x-reduced/done.csv", 3),
+      "a reduce manifest is one record, planned from its step count")
+rdetail = C.detail_script("/r", [rrec])
+check_true("wc -l < experiments/x-reduced/done.csv" in rdetail
+           and "stat -c %Y experiments/queue/004-pooled.log" in rdetail,
+           f"its probe counts finished steps and reads the log's age: {rdetail}")
+for procs, want, why in (
+        ([rprocs[0]], "running", "the reduction writing its out claims it"),
+        ([rprocs[1]], "running", "so does the gather into its tree"),
+        ([rprocs[2]], "stalled", "a reduction writing elsewhere does not")):
+    rann = dict(rrec, rows_done=1, log_mtime=1786459940)
+    C.annotate(rann, {"epoch": 1786460000, "processes": procs})
+    check(rann["state"], want, why)
+rann = dict(rrec, rows_done=3, log_mtime=1786459940)
+C.annotate(rann, {"epoch": 1786460000, "processes": []})
+check(rann["state"], "done", "every step recorded is done")
+
 
 # ── collect: merge and verification against local fixtures ────────────────────
 
@@ -1565,6 +1607,149 @@ phases = [ { kind = "fingerprint", subjects = "s-{host}.txt", members = "m", wor
               "which its inputs in place satisfy")
     finally:
         shutil.rmtree(pool_root, ignore_errors=True)
+
+    # A reduce phase runs on the one host it names, over every host's outputs.
+    write_declaration(decl_root, "reducing", """
+    name = "reducing"
+    branch = "b"
+    hosts = { av2 = "", av3 = "" }
+    confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+
+    [[phases]]
+    kind = "compare"
+    pairs = "p-{host}.csv"
+    out = "experiments/x/sub-{host}.csv"
+
+    [[phases]]
+    kind = "reduce"
+    host = "av2"
+    design = "x/design.toml"
+    members = "x/members"
+    outputs = "experiments/x"
+    collected = "experiments/x-collected"
+    out = "experiments/x-reduced-{host}/"
+    jobs = 4
+    pooled_balls = true
+    ball_k = [3]
+    joint = true
+    """)
+    reducing = C.load_campaign("reducing", decl_root)
+    red = reducing["phases"][1]
+    check((red["kind"], red["name"], red["host"], red["hosts"], red["sources"],
+           red["out"], red["jobs"], red["pooled_draws"]),
+          ("reduce", "reduce", "av2", ["av2"], ["av2", "av3"],
+           "experiments/x-reduced-av2", 4, None),
+          "a reduce phase parses: one host, every campaign host as a source, "
+          "{host} expanded to its host and a trailing slash dropped")
+    check((C.phase_runs_on(red, "av2", []), C.phase_runs_on(red, "av3", []),
+           C.phase_seeds(red, "av2", [0])), (True, False, []),
+          "it runs on its host alone and takes no seeds")
+    check([(step, launcher, args) for step, launcher, args in C.reduce_steps(red)],
+          [("reduce", C.REDUCE_CMD,
+            ["x/design.toml", "x/members", "experiments/x-collected",
+             "experiments/x-reduced-av2", "--jobs", "4", "--pooled-balls",
+             "--ball-k", "3"]),
+           ("joint", C.JOINT_CMD,
+            ["x/design.toml", "x/members", "experiments/x-collected",
+             "experiments/x-reduced-av2/joint"])],
+          "pooled_reduce.py then joint_measures.py, on one gathered tree, the "
+          "joint tables in a directory of their own")
+    check_true(C.phase_command(red, [], "av2").startswith(C.REDUCE_CMD + " "),
+               "and its command is pooled_reduce.py's")
+    check(C.confine_prefix(red, "av2", "u"),
+          ["systemd-run", "--user", "--scope", "-q", "--collect", "--unit", "u",
+           "-p", "MemoryMax=28G", "-p", "MemorySwapMax=0", "taskset", "-c",
+           "0-13"], "it inherits the campaign's confine")
+    check(C.gather_command(red, "av3", "av2", Path("/r")),
+          ["rsync", "-a", "--delete", "-e", " ".join(["ssh", *C.SSH_OPTS]),
+           f"{C.source_root('av3')}/experiments/x/",
+           "/r/experiments/x-collected/av3/"],
+          "another host's outputs come over the route collect --outputs uses")
+    check(C.gather_command(red, "av2", "av2", Path("/r"))[-2:],
+          ["/r/experiments/x/", "/r/experiments/x-collected/av2/"],
+          "and its own host's are copied locally")
+    for body, expect_in, why in (
+        ('design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r"',
+         "needs host", "a missing host"),
+        ('host = "av1", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r"',
+         "host av1 is not declared", "a host the campaign lacks"),
+        ('host = "av2", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r"',
+         "needs design", "a missing design"),
+        ('host = "av2", design = "d", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r"',
+         "needs members", "missing members"),
+        ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r", hosts = ["av2"]',
+         "unknown key(s) hosts", "a hosts array, where host names the one"),
+        ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r", words = 3',
+         "unknown key(s) words", "a fingerprint budget"),
+        ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r", sources = ["av1"]',
+         "sources av1 are not declared", "a source the campaign lacks"),
+        ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/o/all", out = "experiments/r"',
+         "lies in outputs", "a gathered tree inside the output set"),
+        ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "r"',
+         "must lie under experiments/", "an out collect cannot reach"),
+        ('host = "av2", design = "d", members = "m", outputs = "/abs/o", '
+         'collected = "experiments/c", out = "experiments/r"',
+         "must be relative", "an absolute outputs"),
+        ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r", '
+         'pooled_balls = true, pooled_only = true',
+         "exclusive", "pooled_balls with pooled_only"),
+        ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r", share_only = true',
+         "joint is false", "share_only without joint"),
+        ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r", jobs = 0',
+         "jobs must be a positive integer", "zero jobs"),
+        ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r", jobs = 8, '
+         'confine = { av2 = { cpus = "0-3" } }',
+         "more than the 4 CPU(s)", "more jobs than confined CPUs"),
+    ):
+        write_declaration(decl_root, "reducebad", f"""
+    name = "reducebad"
+    branch = "b"
+    hosts = {{ av2 = "", av3 = "" }}
+    phases = [ {{ kind = "reduce", {body} }} ]
+    """)
+        try:
+            C.load_campaign("reducebad", decl_root)
+            got = "accepted"
+        except C.CampaignError as exc:
+            got = str(exc)
+        check_true(expect_in in got, f"{why} must be refused ({got!r})")
+    red_root = Path(tempfile.mkdtemp(prefix="reduce-inputs-"))
+    try:
+        check_true("no design at" in (C.reduce_inputs_missing(
+            red_root, red, "av2") or ""),
+                   "a reduce phase without its design is refused before an "
+                   "attempt")
+        (red_root / "x").mkdir()
+        (red_root / "x" / "design.toml").write_text("draws = 1\n")
+        check_true("no members directory" in (C.reduce_inputs_missing(
+            red_root, red, "av2") or ""), "as is one without its members")
+        (red_root / "x" / "members").mkdir()
+        check_true("no output set at" in (C.reduce_inputs_missing(
+            red_root, red, "av2") or ""),
+                   "and one whose own host never wrote its output set")
+        (red_root / "experiments" / "x").mkdir(parents=True)
+        check_true("has no scripts/joint_measures.py" in (
+            C.phase_inputs_missing(red_root, red, "av2") or ""),
+                   "joint = true needs joint_measures.py in the checkout")
+        (red_root / "scripts").mkdir()
+        (red_root / "scripts" / "joint_measures.py").write_text("")
+        check(C.phase_inputs_missing(red_root, red, "av2"), None,
+              "which its inputs in place satisfy")
+    finally:
+        shutil.rmtree(red_root, ignore_errors=True)
 
     write_declaration(decl_root, "scorespecs", """
     name = "scorespecs"
@@ -3349,6 +3534,178 @@ out = "experiments/pooled-members"
           "--copy-from experiments/pooled/members "
           "--manifest experiments/compare-manifests/pooled.pool.json",
           "the driver got the host's paths and the manifest")
+
+    # A reduce phase: waits for the other host, gathers both output sets into
+    # <collected>/<host>/, runs both reductions, and repeats nothing on rerun.
+    # The peer is a second local tree: its queue is read through run_shell and
+    # its outputs pulled through source_root, the two seams to a lab host.
+    red_dir = queue_root / "reducer"
+    red_dir.mkdir()
+    (red_dir / "stub_reduce.py").write_text(STUB_RUNNER)
+    joint_dir = queue_root / "jointer"
+    joint_dir.mkdir()
+    (joint_dir / "stub_joint.py").write_text(STUB_RUNNER)
+    red_calls, joint_calls = red_dir / "calls.txt", joint_dir / "calls.txt"
+    C.REDUCE_CMD = f"{sys.executable} {red_dir / 'stub_reduce.py'}"
+    C.JOINT_CMD = f"{sys.executable} {joint_dir / 'stub_joint.py'}"
+    peer = queue_root / "peer"
+    (peer / "experiments" / "rx" / "fp" / "s2").mkdir(parents=True)
+    (peer / "experiments" / "rx" / "fp" / "s2" / "fp.tsv").write_text("1\n")
+    saved_seams = (C.source_path, C.source_root)
+    C.source_path = lambda host: str(peer if host == "av2" else repo)
+    C.source_root = lambda host: str(peer if host == "av2" else repo)
+    try:
+        entry = last_entry()
+        entry.update({"state": "done"})
+        C.write_entry(entry["path"], entry)
+        git(repo, "checkout", "-q", "-b", "feat/reduced")
+        write_declaration(repo, "reduced", """
+name = "reduced"
+branch = "feat/reduced"
+build = "true"
+hosts = { local = "", av2 = "" }
+
+[[phases]]
+kind = "pool"
+design = "experiments/reduced/design.toml"
+subjects = "experiments/reduced/subjects-{host}.txt"
+out = "experiments/rx-members"
+hosts = ["av2"]
+
+[[phases]]
+kind = "reduce"
+host = "local"
+design = "experiments/reduced/design.toml"
+members = "experiments/reduced/members"
+outputs = "experiments/rx"
+collected = "experiments/rx-collected"
+out = "experiments/rx-reduced"
+jobs = 2
+pooled_balls = true
+joint = true
+""")
+        git(repo, "add", "experiments/reduced/campaign.toml")
+        git(repo, "commit", "-q", "--no-verify", "-m", "reduced campaign")
+        enqueued = io.StringIO()
+        with contextlib.redirect_stdout(enqueued):
+            code = C.cmd_enqueue(argparse.Namespace(
+                campaign="reduced", host=["local"], max_attempts=3,
+                again=False, dry_run=False))
+        check(code, 0, f"a reduce campaign is enqueued: {enqueued.getvalue()}")
+        (repo / "experiments" / "reduced" / "members").mkdir(parents=True)
+        (repo / "experiments" / "reduced" / "design.toml").write_text(
+            "draws = 1\n")
+        (repo / "experiments" / "rx" / "fp" / "s1").mkdir(parents=True)
+        (repo / "experiments" / "rx" / "fp" / "s1" / "fp.tsv").write_text("1\n")
+        (repo / "scripts" / "joint_measures.py").parent.mkdir(exist_ok=True)
+        code, printed = tick()
+        check((code, last_entry()["phase"]), (0, 1),
+              f"the pool phase, narrowed to the peer, is skipped here: {printed}")
+
+        code, printed = tick()
+        entry = last_entry()
+        check((code, entry["state"], entry["attempts"]), (0, "queued", 0),
+              f"with no peer entry the reduce waits, spending nothing: {printed}")
+        check_true(entry["last_error"].startswith("waiting: av2 has no entry"),
+                   f"and says what it waits for: {entry['last_error']!r}")
+        check_true(not red_calls.exists(), "with no reduction run")
+        code, printed = tick(dry_run=True)
+        check_true(code == 0 and "not ready: av2 has no entry" in printed
+                   and "would gather: rsync -a --delete" in printed
+                   and "would run: " + C.JOINT_CMD in printed
+                   and not red_calls.exists(),
+                   f"a dry run names the wait, the gathers and both steps, "
+                   f"and runs none: {printed}")
+
+        peer_entry = C.new_entry(C.load_campaign("reduced", repo), "av2", 3,
+                                 entry["commit"])
+        peer_queue = peer / C.QUEUE_DIR
+        peer_queue.mkdir(parents=True)
+        peer_path = peer_queue / "001-reduced.toml"
+        C.write_entry(peer_path, peer_entry)
+        code, printed = tick()
+        check_true("av2 001-reduced.toml is queued at phase 0/2"
+                   in last_entry()["last_error"],
+                   f"a peer short of the reduce is waited on: "
+                   f"{last_entry()['last_error']!r}")
+        waits = [line for line in last_entry()["log"] if "waiting" in line]
+        code, printed = tick()
+        check(len([line for line in last_entry()["log"] if "waiting" in line]),
+              len(waits), "and a repeated wait adds no log line")
+
+        peer_entry.update({"state": "done", "phase": 2})
+        C.write_entry(peer_path, peer_entry)
+        code, printed = tick()
+        entry = last_entry()
+        check((code, entry["state"], entry["last_error"]), (0, "done", ""),
+              f"once the peer is past it the reduce runs to the end: {printed}")
+        collected = repo / "experiments" / "rx-collected"
+        check(sorted(str(f.relative_to(collected))
+                     for f in collected.rglob("*") if f.is_file()),
+              ["av2/fp/s2/fp.tsv", "local/fp/s1/fp.tsv"],
+              "both output sets land under <collected>/<host>/")
+        check(red_calls.read_text().strip(),
+              "experiments/reduced/design.toml experiments/reduced/members "
+              "experiments/rx-collected experiments/rx-reduced --jobs 2 "
+              "--pooled-balls",
+              "pooled_reduce.py reads the gathered tree")
+        check(joint_calls.read_text().strip(),
+              "experiments/reduced/design.toml experiments/reduced/members "
+              "experiments/rx-collected experiments/rx-reduced/joint",
+              "and joint_measures.py runs after it")
+        progress = C.read_reduce_progress(
+            repo / "experiments" / "rx-reduced" / "done.csv")
+        check(sorted(progress), ["gather", "joint", "reduce"],
+              "each finished step has a progress row")
+        manifest = json.loads((repo / C.COMPARE_MANIFEST_DIR
+                               / "reduced.reduce.json").read_text())
+        check((manifest["kind"], manifest["planned"], manifest["out"],
+               bool(manifest["finished"])),
+              ("reduce", 3, "experiments/rx-reduced/done.csv", True),
+              "and the manifest status reads plans three steps")
+
+        def rerun() -> tuple:
+            again = last_entry()
+            again.update({"state": "queued", "phase": 1})
+            C.write_entry(again["path"], again)
+            return tick()
+
+        code, printed = rerun()
+        check((code, last_entry()["state"],
+               len(red_calls.read_text().splitlines()),
+               len(joint_calls.read_text().splitlines())), (0, "done", 1, 1),
+              f"a rerun over unchanged inputs repeats no reduction: {printed}")
+
+        (peer / "experiments" / "rx" / "fp" / "s2" / "more.tsv").write_text("2\n")
+        (red_dir / "exit-code").write_text("3")
+        code, printed = rerun()
+        entry = last_entry()
+        check((code, entry["state"], entry["attempts"]), (1, "queued", 1),
+              f"a failing reduction spends an attempt: {printed}")
+        check_true("reduce exited 3" in entry["last_error"],
+                   f"naming the step: {entry['last_error']!r}")
+        check((len(red_calls.read_text().splitlines()),
+               len(joint_calls.read_text().splitlines())), (2, 1),
+              "new peer output reran the reduction, and the joint step waited")
+        (red_dir / "exit-code").unlink()
+        code, printed = tick()
+        check((code, last_entry()["state"],
+               len(red_calls.read_text().splitlines()),
+               len(joint_calls.read_text().splitlines())), (0, "done", 3, 2),
+              f"the retry runs both steps over the new inputs: {printed}")
+        check_true((collected / "av2" / "fp" / "s2" / "more.tsv").is_file(),
+                   "with the peer's new file gathered")
+
+        C.source_path = lambda host: str(queue_root / "absent"
+                                         if host == "av2" else repo)
+        code, printed = rerun()
+        entry = last_entry()
+        check((code, entry["attempts"]), (1, 1),
+              f"an unreadable peer spends an attempt: {printed}")
+        check_true("cannot read av2's queue" in entry["last_error"],
+                   f"and says so: {entry['last_error']!r}")
+    finally:
+        C.source_path, C.source_root = saved_seams
 
     check_true("tick --host av1" in C.cron_line("av1", "/x"),
                "av1 gets a crontab line like the others")
