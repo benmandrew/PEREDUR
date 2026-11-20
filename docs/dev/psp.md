@@ -183,7 +183,7 @@ The `psp` block counts the PSP arms: in `full`, 112 pattern moves, 93 scope move
 
 ## Corpus
 
-The PSP subjects come from three sources, and `scripts/run_experiments.py` registers each in its own table: `PSP_SPECS` (hand-written), `PSP_SYNTECH_SPECS` (SYNTECH17) and `PSP_SEEDED_SPECS` (seeded). All three join `SPECS`. The 5 hand-written, 9 SYNTECH17 and 70 seeded subjects make 84 unrealisable subjects. An *event-delimited* slot below is one under before, after, between or after-until, the scopes FRETISH lacks.
+The PSP subjects come from three sources, and `scripts/run_experiments.py` registers each in its own table: `PSP_SPECS` (hand-written), `PSP_SYNTECH_SPECS` (SYNTECH17) and `PSP_SEEDED_SPECS` (seeded). All three join `SPECS`. The 5 hand-written, 9 SYNTECH17 and 70 seeded subjects make 84 unrealisable subjects. The campaign runs only the SYNTECH17 imports with 2 or more weakenable guarantee slots (`PSP_SYNTECH_EVAL`, from the `eval_candidate` column of `manifest.csv`), which is 1 of the 9, so it runs 76 subjects. An *event-delimited* slot below is one under before, after, between or after-until, the scopes FRETISH lacks.
 
 ### Hand-written subjects
 
