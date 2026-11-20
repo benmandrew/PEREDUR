@@ -702,6 +702,27 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-diversity-screen-blame.csv",
         "default_jobs": 14,
     },
+    # The novelty count as a within-front tie-breaker in place of crowding
+    # (experiments/2026-11-20-diversity-tiebreak): full-k1 plus
+    # novelty_tiebreak, seeds 0-29, in sweep K's config tree. Its own results
+    # tree and CSV, so the arm pools with the diversity-screen-blame arms.
+    "diversity-tiebreak-blame": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["novelty-tiebreak"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(0, 30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb-blame",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-tiebreak-blame",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-tiebreak-blame.csv",
+        "default_jobs": 15,
+    },
 }
 
 

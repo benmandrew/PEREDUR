@@ -110,11 +110,12 @@ DEFAULTS: dict = {
     # like maximality_demotion.
     "maximality_removal": False,
     # FRETISH only, under nsga2-apportion: the diversity mechanisms of
-    # feat/diversity-mech (front spreading, a novelty objective and a spread
-    # first generation). Emitted into [genetic] only when a sweep overrides
+    # feat/diversity-mech (front spreading, a novelty objective or the novelty
+    # count as a within-front tie-breaker, and a spread first generation). Emitted into [genetic] only when a sweep overrides
     # them (see make_toml).
     "crowding": "objective",
     "novelty": False,
+    "novelty_tiebreak": False,
     "spread_init": False,
     "weight_syntactic": 0.33,
     "weight_semantic": 0.33,
@@ -286,6 +287,8 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         if "crowding" in overrides else []) + (
         [f"novelty = {_fmt(d['novelty'])}"]
         if "novelty" in overrides else []) + (
+        [f"novelty_tiebreak = {_fmt(d['novelty_tiebreak'])}"]
+        if "novelty_tiebreak" in overrides else []) + (
         [f"spread_init = {_fmt(d['spread_init'])}"]
         if "spread_init" in overrides else []) + (
         [f"max_wall_s      = {d['max_wall_s']}"]
@@ -509,8 +512,9 @@ def _climb_orders_sweep() -> list[tuple[str, dict]]:
     gate's exchange mode for realisable parents. Blame stays on as an engine
     optimisation (user, 19 Nov), so the arm is not remove-no-blame-exchange. "full-k1" climbs each repair in slot
     order alone, as that run did; "full-k4" also climbs it under three
-    pseudo-random step orders. The other six arms are full-k1 plus one
-    diversity mechanism each (experiments/2026-11-19-diversity-screen-blame).
+    pseudo-random step orders. The other seven arms are full-k1 plus one
+    diversity mechanism each: six from experiments/2026-11-19-diversity-screen-blame
+    and novelty-tiebreak (experiments/2026-11-20-diversity-tiebreak).
     Every arm states climb_orders, maximality_removal and gate_realizable, so
     none inherits a default.
     """
@@ -531,6 +535,9 @@ def _climb_orders_sweep() -> list[tuple[str, dict]]:
         ("flip-tabu", {"flip_tabu": 5}),
         ("flip-sideways", {"flip_tabu": 5, "flip_sideways": True}),
     ]
+    # The novelty count as a within-front tie-breaker in place of crowding,
+    # keeping three objectives (experiments/2026-11-20-diversity-tiebreak).
+    screen.append(("novelty-tiebreak", {"novelty_tiebreak": True}))
     return [("full-k1", k1), ("full-k4", {**full, "climb_orders": 4})] + [
         (name, {**k1, **on}) for name, on in screen]
 
