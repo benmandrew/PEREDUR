@@ -6,6 +6,11 @@
 // estimate how likely one or two undirected mutations of a seeded mutant are
 // to land on a repair at least as strong as its base, which would make the
 // subject a trivial reversion.
+//
+// With --psp-seeded it instead writes every single-slot fault of a realisable
+// PSP specification (psp::seeded_edits): the candidates of the PSP seeded
+// corpus, which experiments/2026-11-20-psp-seeded-corpus/scripts/seed.py
+// filters.
 
 #include <cstddef>
 #include <exception>
@@ -16,11 +21,15 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "config_io.hpp"
 #include "driver_support.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/random_source.hpp"
+#include "psp/requirement.hpp"
+#include "psp/seeding.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "serialisation.hpp"
 
@@ -31,6 +40,7 @@ void print_usage(const char* prog) {
         << "Usage: " << prog << " <spec.json> --config <cfg.toml> --out <dir>\n"
         << "       [--draws N] [--depth D] [--seed S] [--unrealizable-parent "
            "S]\n"
+        << "       " << prog << " <base.psp> --psp-seeded --out <dir>\n"
         << "\n"
         << "Draws N chains of D mutations (defaults 20000 and 2) from the\n"
         << "specification with mutate_specification under the config's\n"
@@ -47,6 +57,14 @@ void print_usage(const char* prog) {
         << "             they would on the specification's own offspring. The\n"
         << "             second mutation of a chain sees the same context.\n"
         << "\n"
+        << "  --psp-seeded  Write every single-slot fault of the PSP\n"
+        << "             specification that the implication rule does not "
+           "prove\n"
+        << "             weaker (psp::seeded_edits) as <dir>/m<k>.psp, and\n"
+        << "             <dir>/index.tsv with columns file, slot, edit, "
+           "field,\n"
+        << "             rule (stronger or sideways), before and after.\n"
+        << "\n"
         << "  --version  Print the git commit this binary was built from.\n";
 }
 
@@ -59,6 +77,7 @@ struct Options {
     std::size_t depth = 2;
     std::size_t seed = 1;
     std::optional<double> parent_status;
+    bool psp_seeded = false;
 };
 
 // Parses argv into @p opts, false on an unknown flag, a missing value or a
@@ -79,11 +98,16 @@ bool parse_options(int argc, const char* const* argv, Options& opts) {
             opts.seed = std::stoul(argv[++i]);
         } else if (arg == "--unrealizable-parent" && has_value) {
             opts.parent_status = std::stod(argv[++i]);
+        } else if (arg == "--psp-seeded") {
+            opts.psp_seeded = true;
         } else if (opts.spec_path.empty() && arg.rfind("--", 0) != 0) {
             opts.spec_path = arg;
         } else {
             return false;
         }
+    }
+    if (opts.psp_seeded) {
+        return !opts.spec_path.empty() && !opts.out_dir.empty();
     }
     return !opts.spec_path.empty() && !opts.config_path.empty() &&
            !opts.out_dir.empty() && opts.depth != 0;
@@ -138,6 +162,28 @@ void write_samples(const std::string& out_dir, const Samples& samples) {
     }
 }
 
+// Writes each fault of psp::seeded_edits as <dir>/m<k>.psp, with index.tsv.
+std::size_t write_psp_seeded(const std::string& spec_path,
+                             const std::string& out_dir) {
+    const psp::Specification base = psp::load_specification(spec_path);
+    const std::vector<psp::SeededEdit> edits = psp::seeded_edits(base);
+    std::filesystem::create_directories(out_dir);
+    std::ofstream index_out(std::filesystem::path(out_dir) / "index.tsv");
+    index_out << "file\tslot\tedit\tfield\trule\tbefore\tafter\n";
+    for (std::size_t k = 0; k < edits.size(); ++k) {
+        const psp::SeededEdit& edit = edits[k];
+        const std::string name = "m" + std::to_string(k) + ".psp";
+        std::ofstream out(std::filesystem::path(out_dir) / name);
+        out << psp::write_specification(psp::apply_seeded_edit(base, edit));
+        index_out << name << "\t" << edit.m_slot << "\t" << edit.m_edit << "\t"
+                  << edit.m_field << "\t"
+                  << psp::seed_relation_name(edit.m_relation) << "\t"
+                  << base.m_guarantees[edit.m_slot].to_string() << "\t"
+                  << edit.m_requirement.to_string() << "\n";
+    }
+    return edits.size();
+}
+
 }  // namespace
 
 int main(int argc, const char* const argv[]) {
@@ -153,6 +199,12 @@ int main(int argc, const char* const argv[]) {
         return 1;
     }
     try {
+        if (opts.psp_seeded) {
+            const std::size_t written =
+                write_psp_seeded(opts.spec_path, opts.out_dir);
+            std::cout << written << " seeded faults\n";
+            return 0;
+        }
         const Specification original = load_specification(opts.spec_path);
         const Config cfg = config_from_toml(opts.config_path);
         const Samples samples = draw_samples(opts, original, cfg);
