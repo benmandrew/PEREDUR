@@ -33,6 +33,8 @@ The same checks run from the tracked `.githooks/pre-commit`. Its format check ru
 
 Every header in `include/` needs a `.rst` page under `docs/api/` and an entry in `docs/index.rst` before committing. `src/` is deliberately not published.
 
+Breathe matches a `doxygenfile::` name with no slash against the file's basename, and one with a slash against the end of its path. A basename that two headers share gives the warning "Found multiple matches for file", so each such page names its directory: `filter/implication.hpp`, `tlsf/specification.hpp`, and `include/requirement.hpp` for the top-level header that `psp/requirement.hpp` repeats. The warning comes from Sphinx, not Doxygen, so `WARN_AS_ERROR` does not catch it and the docs build still succeeds.
+
 Only `///` reaches Doxygen. Its text goes through Doxygen's comment parser, so a bare `<input>` parses as an HTML tag and `WARN_AS_ERROR` fails the build; wrap it in backticks.
 
 `-DPEREDUR_DOCS_ONLY=ON` configures the `docs` target alone, then returns before the third-party tools, the FetchContent dependencies and every compiled target. The site that embeds these docs configures this way, because a full configure builds Spot from cold on each new commit, and its CI measured 785–880 s for that step against about 20 s without it. `nix build .#docs` runs the same configure in the sandbox and leaves the HTML in `result/`. Its source is a `lib.fileset` of the files that configure reads, so a commit that touches neither `include/` nor the Sphinx sources under `docs/` keeps the same store path. A file the docs start to read has to join `docsSrc` in `flake.nix`, or the sandbox build cannot see it.

@@ -1,6 +1,6 @@
 # PEREDUR
 
-C++17 genetic algorithm for repairing unrealizable FRETISH and TLSF specifications, using bounded model counting (SPOT + Ganak) for semantic similarity. Binaries: `peredur`, `realize`, `compare`, `ltl`, `mucs`, `maximal`, `lint-ideals` (run each with `--help`). `sample-mutants` is a research tool for the seeded corpus: it is not installed, no test runs it, and it stays out of `BINARIES` in `scripts/coverage_badge.py`. `climb-replay` is a research tool for the climb-diversity study, out of `all` and not installed; the `driver_climb_replay` suite builds and runs it ("Output climb replay" in `docs/dev/operators.md`).
+C++17 genetic algorithm for repairing unrealizable FRETISH, TLSF and PSP specifications, using bounded model counting (SPOT + Ganak) for semantic similarity. Binaries: `peredur`, `realize`, `compare`, `ltl`, `mucs`, `maximal`, `lint-ideals` (run each with `--help`). `sample-mutants` is a research tool for the seeded corpus: it is not installed, no test runs it, and it stays out of `BINARIES` in `scripts/coverage_badge.py`. `climb-replay` is a research tool for the climb-diversity study, out of `all` and not installed; the `driver_climb_replay` suite builds and runs it ("Output climb replay" in `docs/dev/operators.md`).
 
 A run loads a spec, breeds offspring, filters them (dedup, bloat cap, vacuity), scores the survivors (syntactic + semantic + status), selects under NSGA-II, re-checks realizability at the output gate, applies final filters (dedup, implication), and writes `repair_N.json` plus `run.json`.
 
@@ -11,8 +11,9 @@ Detail lives in `docs/dev/`. Read the file covering an area before changing it. 
 | File | Sections |
 |---|---|
 | `docs/dev/algorithm.md` | Algorithm flow, Elitism, Maximality demotion, Diversity mechanisms, Termination modes, Run output, Generation pipeline, Parent-verdict stage, TLSF repair modes, Key types |
-| `docs/dev/operators.md` | Crossover, Order crossover, Grammar fixes, Implication in the TLSF grammar, Monotone rewrites, Cloned assumptions, Assumption construction, Timing donation, Scope-aware timing moves, Removable guarantees, Order moves, Blame-targeted slot choice, Output climb, Output climb replay, Ordered-language traits, Status-gated mutation direction, Distance-dependent step size, Measured feature interactions |
+| `docs/dev/operators.md` | Crossover, Order crossover, Grammar fixes, Implication in the TLSF grammar, Monotone rewrites, Cloned assumptions, Assumption construction, Timing donation, Scope-aware timing moves, Removable guarantees, Order moves, Blame-targeted slot choice, Output climb, Output climb replay, Ordered-language traits (Operators per language), Status-gated mutation direction, Distance-dependent step size, Measured feature interactions |
 | `docs/dev/fretish-scopes.md` | FRETISH scopes |
+| `docs/dev/psp.md` | Language, What the language leaves out, Lowering, Against the Dwyer table, Precedence after Q, File format, Measured orders, Implication rule, Operators, Gutting, Mechanisms on PSP, Corpus (Hand-written subjects, SYNTECH17, Seeded corpus), Lean proofs, Out of scope |
 | `docs/dev/performance.md` | Cache keys, Scoring dispatch, Per-generation gate, Implication prefilter, Implication residual query, Implication model probe, Satisfiability route, Decomposition re-ask, Controller-store gate, Tool subprocesses, Spot fork server, Profiling |
 | `docs/dev/config-and-provenance.md` | Config keys, Commit provenance, Run manifest schema versions, Where the campaign records are, Config vintage (including retired keys) |
 | `docs/dev/campaigns.md` | Campaigns (the operating manual for `scripts/campaign.py`), The declaration, Staging a host, Launching, Scoring phases, Compare phases, Fingerprint phases, Reduce phases, Reading a run, The binary freshness gate, The queue, A tick stages its own branch, Collecting and closing, Large outputs, Testing this |
@@ -54,6 +55,7 @@ Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves w
 - Breeding stays one pipeline stage. Splitting crossover from mutation reorders every draw after the first.
 - A new probability arm reads its probability before touching the `RandomSource`, so at 0 it costs no draw. `golden_config()` in `test/genetic/determinism_tests.cpp` pins every such key explicitly.
 - The Global-scope FRETISH lowering stays byte-identical; `test_global_scope_lowering_is_unchanged` pins it.
+- PSP work leaves every FRETISH and TLSF output byte-identical: a PSP change that moves a FRETISH or TLSF golden has a bug.
 
 ### Config and output
 
@@ -73,6 +75,7 @@ Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves w
 - Pipes are created with `make_cloexec_pipe` (`src/posix/descriptors.hpp`), which is `pipe2(..., O_CLOEXEC)` where it exists and `pipe` plus `FD_CLOEXEC` on macOS. Nothing forks outside `src/runner/process.cpp`, with two exceptions: `tools/spot-forkserver/`, a separate single-threaded binary that `process.cpp` spawns, and `handler_fork()` in `src/crash/crash_handler.cpp`, which forks the tracer from a signal handler through the async-signal-safe `_Fork`.
 - Tool paths come from `tool_path_from_env`, held in a function-local `static`.
 - Formulas reach tools on stdin (`execute_and_capture_with_input`, `-F -`), never as a `-f` argument: one argv string over 128 KiB fails the exec with `E2BIG`.
+- `src/psp/lowering.cpp` ports the lowering in `scripts/psp_field_orders.py`, and the tables in `src/psp/implication.cpp` transcribe that script's `docs/dev/psp-orders.json`. Changing a PSP body or wrapper means changing the script, regenerating the JSON, and rerunning `scripts/check_lean_psp_lowering.py` and `scripts/check_lean_psp_orders.py`; the `psp_lowering` and `psp_implication` suites fail while the C++ and the JSON disagree.
 - Atom names are screened at load (`src/runner/atom_names.hpp`), and an unsafe one exits 1 on every driver: `ltlsynt --ins` never matches a name containing an uppercase letter, and since only `--ins` is passed, such an *input* silently becomes an output and the verdict errs towards realizable; separately, a name starting with `F`, `G` or `X` followed by a letter or `_` loses that letter to the operator (`Fail` reads as `F(ail)`). Uppercase outputs are safe, and the FRETISH path's `k_atom_prefix` (`iap_`) already blocks the second case.
 - Always run `black` with a timeout (`-t <seconds>`).
 - Wall-time A/B comparisons on the shared box interleave the arms per case and read a median.
@@ -80,6 +83,7 @@ Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves w
 ### Docs and tests
 
 - Every header in `include/` needs a `docs/api/` `.rst` page and a `docs/index.rst` toctree entry.
+- A `doxygenfile::` name whose basename another header shares (`implication.hpp`, `requirement.hpp`, `specification.hpp`, `mutation.hpp`, ...) names its directory, or Sphinx warns "Found multiple matches" without failing the build ("Docs" in `docs/dev/tooling.md`).
 - Only `///` reaches Doxygen. Wrap text like `<input>` in backticks, or `WARN_AS_ERROR` fails the docs build.
 - A new suite needs its name in the table in `test/main.cpp` and in `peredur_test_suites` in `test/CMakeLists.txt`; a test registered under a suite the table lacks stops the binary, but one missing from the CMake list silently never runs under ctest. A new driver's end-to-end suite registers its tests with `TEST_IN` in `test/drivers/e2e_tests.cpp` and also needs an `add_dependencies` entry.
 - Tests in one suite run in definition order, so reordering a file's `TEST`s reorders the run.
@@ -87,6 +91,7 @@ Tests use `expect`/`fail` from `test/test_support.hpp` and register themselves w
 
 ### Campaigns and provenance
 
+- A PSP subject is registered in `scripts/run_experiments.py` in one of three tables, which all join `SPECS`: `PSP_SPECS` (hand-written, `examples/psp-*`), `PSP_SYNTECH_SPECS` (the unrealisable names in `PSP_SYNTECH_UNREALISABLE`, under `examples/psp-syntech/specs/`) and `PSP_SEEDED_SPECS` (read from `examples/psp-seeded/selected.txt`). It also gets a line in `experiments/CATALOGUE.md`. Unlike the FRETISH seeded corpora, the PSP seeded corpus is tracked under `examples/`.
 - Everything that acts on a campaign goes through `scripts/campaign.py`, reading `experiments/<name>/campaign.toml`. Never hand-roll an ssh launch or choose a seed range at the prompt.
 - `campaign.py status` is the source of truth. Re-run it instead of recalling state, never poll in a loop, and never spawn an agent to watch a run: `enqueue` and let the tick drive it.
 - `KEY_FIELDS` in `merge_experiments.py` and the resume key in `run_experiments.py` are off limits, and `commit`/`dirty` never join either. Renaming a factor directory means extending `canonical_scheme()` in both scripts.

@@ -18,4 +18,4 @@ Defines the core domain types used throughout the tool:
 ``State``
   An automaton state for the transfer-matrix model counter, encoding the condition/response/countdown flags used when building ``TransferSystem`` objects.
 
-.. doxygenfile:: requirement.hpp
+.. doxygenfile:: include/requirement.hpp

@@ -171,7 +171,9 @@ The JSON drops removed guarantees, so a member read back has fewer guarantees th
 
 ## Ordered-language traits
 
-The order-directed mechanisms read a specification language only through `OrderedLanguage<Spec>` (`include/genetic/ordered_language.hpp`), so a second language implements the traits and reuses the mechanisms rather than copying them. The templated mechanisms are the output climb (`climb`, `furthest_accepted`, `order_steps`, `climb_gate`, `climb_repairs`), two-way mutation in exchange mode (`exchange` and the step and slot helpers it calls in `src/genetic/mutation.cpp`), the blame narrowing (`targeted_mutation_slots`, `narrow_by_blame`), maximality removal and demotion (`proved_weaker_realizable`, `final_front_gutting`), and novelty with the rest of the run's diversity state (`BasicDiversityState<Spec>`, `novelty_objective`). `ParentContextT<Spec>` carries the parent's status to them. The rest of `mutate_specification` (the structural actions and the towards-mode rewrite), crossover, scoring and the pipeline stay per language.
+The order-directed mechanisms read a specification language only through `OrderedLanguage<Spec>` (`include/genetic/ordered_language.hpp`), so a second language implements the traits and reuses the mechanisms rather than copying them. FRETISH (`OrderedLanguage<Specification>`, in the same header) and PSP (`OrderedLanguage<psp::Specification>`, `include/psp/ordered_language.hpp`) are the two instances. TLSF has none, because it has no implication rule and no steps, so every order-directed mechanism is off on a TLSF run. The templated mechanisms are the output climb (`climb`, `furthest_accepted`, `order_steps`, `climb_gate`, `climb_repairs`), two-way mutation in exchange mode (`exchange` and the step and slot helpers it calls in `src/genetic/mutation.cpp`), the blame narrowing (`targeted_mutation_slots`, `narrow_by_blame`), maximality removal and demotion (`proved_weaker_realizable`, `final_front_gutting`), and novelty with the rest of the run's diversity state (`BasicDiversityState<Spec>`, `novelty_objective`). `ParentContextT<Spec>` carries the parent's status to them. When PSP arrived, the whole-specification mutation joined them as `mutate_specification_impl`, with the structural actions written once over `Spec` and `add_assumption` overloaded per language. Crossover, the per-slot mutator, scoring and the seed population stay per language ("Operators per language").
+
+`order_step.hpp` holds the vocabulary that needs no language at all: `MoveOrder` (how a child relates to its parent: equal, stronger, weaker or incomparable), `StepSide`, `StepKind` (a field step, the restore of a tombstoned guarantee, or the drop of an appended assumption) and `OrderStep<Spec, Field>`, one proved strengthening with its slot, its field and the resulting specification. Each instance's `Step` is an `OrderStep` over its own `Field` enumeration: `RequirementField` on FRETISH, and `psp::RequirementField` (pattern with count, scope, P, S, Q, R) on PSP.
 
 A specialisation provides these, as static members:
 
@@ -182,9 +184,39 @@ A specialisation provides these, as static members:
 | Order by rule | `requirement_implies`, `spec_implies_by_rule` (alone, and over precomputed `live_lowerings` with a memoised `Implication`), `classify_move`, `requirement_join`, `requirement_meet`, `keyword_similarity` |
 | Steps | `steps_towards`, `step_chain`, `with_slot_value` |
 | Realisability | `check_realizability` |
-| Directed mutation | `can_rewrite`, `mutate_slot`, `free_rewrite_rates` |
+| Directed mutation | `PoolData`, `pool_data` and `pools_of` (the pools, computed once per mutation), `can_rewrite`, `mutate_slot`, `free_rewrite_rates` |
 
 The surface names no FRETISH type. Timing, scope and condition type appear only behind `Field` and `ChainValue`, and the config keys a free rewrite zeroes only behind `free_rewrite_rates`. `OrderedLanguage<Specification>` forwards each member to the function the mechanisms called before they were templated (`ChainValue` is `Timing`, `step_chain` is `timing_step_chain`, `with_slot_value` is `with_slot_timing`, `mutate_slot` is `mutate_requirement_tracked`), and every template is instantiated explicitly for `Specification` in its own source file. The extraction moved no draw and no golden. Under the final-engine `full` config at seed 7, a release build of `ffcb2a15` and one of the extraction wrote byte-identical `repair_*.json` on `fsm`, `mode-arbiter` and `rad`. Their `run.json` files differed only in the streaming implication filter's counters (`model_words`, `fingerprint_refuted`, `skipped`) and in the realizability cache's hit, miss and exec counts, which move with the timing of speculative checks; two runs of the `ffcb2a15` build differ in the implication counters too.
+
+`OrderedLanguage<psp::Specification>` forwards each member to the `psp::` function of the same role (`docs/dev/psp.md`). Its `ChainValue` is a count (`std::size_t`), `step_chain` is `count_step_chain`, `with_slot_value` is `with_slot_count`, `mutate_slot` is `psp::mutate_requirement`, and `free_rewrite_rates` zeroes `psp.p_pattern`, `psp.p_scope_kind`, `psp.p_count` and `mutation.p_monotone`. `is_weakenable` is false on a fixed raw-LTL requirement, so no mechanism edits one. Every template is instantiated explicitly for `psp::Specification` beside the FRETISH instantiation.
+
+### Operators per language
+
+The table lists where each operator and mechanism lives. *Generic* means one template over `Spec`, instantiated for the languages named. *Per language* means each language has its own function, and a dash means the language has no such operator.
+
+| Operator | Generic over `Spec` | FRETISH | TLSF | PSP |
+|---|---|---|---|---|
+| Output climb | `climb`, `climb_repairs` (`src/genetic/climb.cpp`) | yes | — | yes |
+| Two-way mutation (exchange), status gate, step size | `exchange`, `gate_of`, `step_scale` (`src/genetic/mutation.cpp`) | yes | — | yes |
+| Blame narrowing | `targeted_mutation_slots`, `narrow_by_blame` | yes | — | yes |
+| Maximality removal and demotion | `proved_weaker_realizable`, `final_front_gutting` (`src/genetic/demotion.cpp`) | yes | — | yes |
+| Novelty | `BasicDiversityState<Spec>`, `novelty_objective` (`src/genetic/diversity.cpp`) | yes | — | yes |
+| Whole-specification mutation and structural actions | `mutate_specification_impl`, `remove_guarantee` | yes | per language: `tlsf_mutate`, `tlsf_remove_guarantee` | yes |
+| Added assumption | per language | `add_assumption` | `tlsf_add_assumption` | `add_assumption` overload: a globally response over the inputs |
+| Per-slot mutator | per language, reached through `mutate_slot` | `mutate_requirement_tracked`: timing, condition type, scope, response and trigger | section rewrites in `src/tlsf/mutation.cpp` | `psp::mutate_requirement`: pattern, scope, count, P, S, Q, R |
+| Monotone rewrites | `monotone_rewrite` (`src/genetic/monotone.cpp`), shared formula code | inside `p_response` and `p_trigger`, by the lowering's polarity | own arm, direction a fair coin | inside `p_p` to `p_r`, by the measured polarity |
+| Free formula rewrite | `mutate_formula` (`src/genetic/mutation.cpp`), shared formula code | yes | on propositional subtrees | yes |
+| Donation | per language | timing donation | — | counts and newly read fields |
+| Crossover | per language | `crossover_specifications`, with the order crossover | `tlsf_crossover` | `psp::crossover_specifications`: one field of one slot pair |
+| Order crossover | — | `order_crossover` | — | — |
+| Implication rule | per language, behind `requirement_implies` and `spec_implies_by_rule` | `src/filter/implication_check.cpp` | — | `src/psp/implication.cpp` |
+| Steps and join/meet | per language, behind `steps_towards`, `requirement_join`, `requirement_meet` | `src/genetic/order_moves.cpp` | — | `src/psp/order_moves.cpp` |
+| Dedup, bloat cap, implication filter, well-separation | `src/filter/` templates | yes | yes | yes |
+| Correctness filters | `correctness_checks<Spec>`, one table per language | yes | yes | yes |
+| Objectives | per language | `src/fitness/` | `include/tlsf/fitness.hpp` | `include/psp/fitness.hpp` |
+| Specification crowding, slot coverage, flip tabu, parent-verdict stage | — | FRETISH only, by `if constexpr` in `src/genetic/pipeline.cpp` | — | — |
+
+A new language that implements the traits gets every row marked generic. It still writes its own per-slot mutator, crossover, implication rule, steps and objectives, and an `add_assumption` overload.
 
 ## Status-gated mutation direction
 
