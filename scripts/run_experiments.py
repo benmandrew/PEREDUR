@@ -239,14 +239,14 @@ H2H_TLSF_READY: list[str] = [
 SEEDED_DIR = EXPERIMENTS_DIR / "2026-11-13-seeded-corpus"
 
 
-def _seeded_specs(root: Path = SEEDED_DIR,
-                  prefix: str = "") -> dict[str, dict[str, Path]]:
+def _seeded_specs(root: Path = SEEDED_DIR, prefix: str = "",
+                  ext: str = "json") -> dict[str, dict[str, Path]]:
     listing = root / "selected.txt"
     if not listing.is_file():
         return {}
     names = [ln.strip() for ln in listing.read_text().splitlines()
              if ln.strip() and not ln.startswith("#")]
-    return {prefix + n: {"input": root / "subjects" / n / "spec.json",
+    return {prefix + n: {"input": root / "subjects" / n / f"spec.{ext}",
                          "ideals_dir": root / "subjects" / n / "fixes"}
             for n in names}
 
@@ -261,8 +261,59 @@ SEEDED_SPECS: dict[str, dict[str, Path]] = _seeded_specs()
 SIDEWAYS_DIR = EXPERIMENTS_DIR / "2026-11-18-seeded-corpus-sideways"
 SIDEWAYS_SPECS: dict[str, dict[str, Path]] = _seeded_specs(SIDEWAYS_DIR, "sw-")
 
+# PSP specifications (.psp; PLAN.md P7 on feat/psp-front-end). The
+# hand-written subjects come from the PSP case-study literature and use the
+# event-delimited scopes on purpose; each is unrealisable with a known repair
+# under fixes/. The count is of guarantee slots under before, after, between
+# or after-until:
+#   psp-arbiter   two bounded responses that conflict      2 of 2
+#   psp-cruise    cruise control (Konrad and Cheng)        3 of 4
+#   psp-crossing  railway level crossing                   3 of 4
+#   psp-patrol    robot mission (Menghi et al.)            2 of 4
+#   psp-minepump  mine pump                                2 of 3
+# psp-arbiter's and psp-minepump's fixes are incomparable with the
+# specification rather than weaker, so lint-ideals fails their weakening
+# column by design.
+PSP_SPECS: dict[str, dict[str, Path]] = {
+    name: _spec(name, "psp") for name in (
+        "psp-arbiter", "psp-cruise", "psp-crossing", "psp-patrol",
+        "psp-minepump",
+    )
+}
+
+# The unrealisable SYNTECH17 imports (examples/psp-syntech, written by
+# scripts/import_spectra.py; manifest.csv). None has an ideal, and none uses
+# an event-delimited scope.
+SYNTECH_DIR = EXAMPLES_DIR / "psp-syntech"
+PSP_SYNTECH_UNREALISABLE: tuple[str, ...] = (
+    "SimpleVehicle_VehicleSpec_79",
+    "AirportShuttleProject_AirportShuttle1_AirportShuttle_177",
+    "SimpleVehicle_VehicleSpec_31",
+    "SimpleVehicle_VehicleSpec_78",
+    "AirportShuttleProject_AirportShuttle1_AirportShuttle_182",
+    "Elevator_cmp_Elevator_88",
+    "SimpleVehicle_VehicleSpec_134",
+    "AirportShuttleProject_AirportShuttle1_AirportShuttle_183",
+    "AirportShuttleProject_AirportShuttle1_AirportShuttle_176",
+)
+PSP_SYNTECH_SPECS: dict[str, dict[str, Path]] = {
+    "syntech-" + name: {"input": SYNTECH_DIR / "specs" / f"{name}.psp",
+                        "ideals_dir": SYNTECH_DIR / "fixes" / name}
+    for name in PSP_SYNTECH_UNREALISABLE
+}
+
+# The PSP seeded corpus (experiments/2026-11-20-psp-seeded-corpus): each
+# subject is a realisable base with one guarantee strengthened or moved
+# sideways (sample-mutants --psp-seeded), with the base as its one ideal. The
+# subjects are tracked; selected.txt names the ones a campaign runs.
+PSP_SEEDED_DIR = EXPERIMENTS_DIR / "2026-11-20-psp-seeded-corpus"
+PSP_SEEDED_SPECS: dict[str, dict[str, Path]] = _seeded_specs(
+    PSP_SEEDED_DIR, ext="psp")
+
 SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **SEEDED_SPECS,
-                                     **SIDEWAYS_SPECS, **TLSF_SPECS}
+                                     **SIDEWAYS_SPECS, **TLSF_SPECS,
+                                     **PSP_SPECS, **PSP_SYNTECH_SPECS,
+                                     **PSP_SEEDED_SPECS}
 
 # compare runs n_repairs * n_ideals * 2 implication checks, each with compare's
 # own 20s black budget. fsm-timing (bounded-interval operators) is slow, and
