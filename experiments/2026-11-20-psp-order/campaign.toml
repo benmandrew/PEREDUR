@@ -23,8 +23,12 @@ configs = "python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 
 # final engine's once its campaigns have left the hosts; set them against
 # whatever else is running at enqueue.
 
-# The specifications: at their 14 subjects of 20 Nov, x 6 arms x 15 seeds = 1,260 runs a host,
-# 15 jobs x 2 threads. Smoke runs on psp-crossing took 40-60 s a run, so at
+# Subject counts are read from the registries at plan time
+# (`run_experiments.py --profile psp-order[-seeded] --dry-run`), so the counts
+# below are those of this branch on 20 Nov and grow with the registries.
+#
+# The specifications: PSP_SPECS and PSP_SYNTECH_SPECS (14 subjects here) x 6
+# arms x 15 seeds = 1,260 runs a host, 15 jobs x 2 threads. Smoke runs on psp-crossing took 40-60 s a run, so at
 # about 60 s a run this is about 42 slot-h, 1.5 h a host (+-50%; the SYNTECH17
 # imports are unmeasured beyond realize, PLAN.md).
 [[phases]]
@@ -41,8 +45,10 @@ hosts = { av3 = "15-29" }
 confine = { av3 = { cpus = "0-29", memory_max = "48G" } }
 jobs = 15
 
-# The seeded corpus: at its 39 subjects of 20 Nov, x 6 arms, 3 seeds on av2 (702 runs) and 2 on
-# av3 (468). About 12 and 8 slot-h, under an hour a host.
+# The seeded corpus: PSP_SEEDED_SPECS (39 subjects here, 70 once
+# feat/psp-front-end's SYNTECH-based mutants of 6edc75e8 are merged) x 6 arms,
+# 3 seeds on av2 and 2 on av3: 702 and 468 runs at 39 subjects (about 12 and 8
+# slot-h), 1,260 and 840 at 70 (about 21 and 14 slot-h, 1.5 h and 1 h a host).
 [[phases]]
 name = "seeded-av2"
 profile = "psp-order-seeded"

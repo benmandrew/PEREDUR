@@ -19,7 +19,8 @@ confine = { av2 = { cpus = "0-29", memory_max = "64G" }, av3 = { cpus = "0-29", 
 # the build, so taskset holds it to the same CPUs.
 build = "sh -c 'taskset -c 0-29 sh -c \"cmake --build build-release -j 16 && cmake --build build-release -j 16 --target fpdraw\"'"
 
-# Estimate: about 50 subjects with six arms each, most a few hundred nodes
+# Estimate: 53 subjects here (84 once the SYNTECH-based mutants are merged; read
+# from the registries by make_design.py) with six arms each, most a few hundred nodes
 # after pooling, so compare is small (5-10 call-h) and the fingerprint draws
 # dominate (10-30 CPU-h): 1-2 h a host (+-50%; no earlier PSP pass).
 
