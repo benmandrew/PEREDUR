@@ -478,6 +478,10 @@ DROPPED_RE = re.compile(r"^(\d+) individual\(s\) dropped", re.MULTILINE)
 # 2026-10-30. Every campaign that ran them vendors the run_experiments.py that
 # defines them, so reproduce one from its archive at the revision it names.
 # Never reuse those names for a new profile.
+# The arms of the PSP campaign: sweep F's base, full and every no-<f>.
+PSP_ORDER_ARMS: tuple[str, ...] = (
+    "base", "full", "no-climb", "no-gate", "no-remove", "no-novelty")
+
 PROFILES: dict[str, dict] = {
     # The head-to-head at AuRUS's own budget. Separate from the retired
     # `h2h-tlsf` profile in every path it writes, because it differs from that
@@ -861,6 +865,45 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-final-engine-seeded.csv",
         "default_jobs": 15,
     },
+    # The PSP evaluation (experiments/2026-11-20-psp-order): sweep F's base,
+    # full and every no-<f> under nsga2-apportion, with the final engine's
+    # budget, seeds and caps. Subjects come from the registries, so a subject
+    # added to one joins the campaign: the hand-written subjects and the
+    # unrealisable SYNTECH17 imports at 30 seeds, the seeded corpus at 5.
+    "psp-order": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {"F": list(PSP_ORDER_ARMS)},
+        "specs": list(PSP_SPECS) + list(PSP_SYNTECH_SPECS),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in [*PSP_SPECS, *PSP_SYNTECH_SPECS]},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-psp-order",
+        "results_dir": EXPERIMENTS_DIR / "results-psp-order",
+        "results_csv": EXPERIMENTS_DIR / "results-psp-order.csv",
+        "default_jobs": 15,
+    },
+    "psp-order-seeded": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {"F": list(PSP_ORDER_ARMS)},
+        "specs": list(PSP_SEEDED_SPECS),
+        "seeds": list(range(5)),
+        "timeout_caps": {s: 7200 for s in PSP_SEEDED_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-psp-order",
+        "results_dir": EXPERIMENTS_DIR / "results-psp-order-seeded",
+        "results_csv": EXPERIMENTS_DIR / "results-psp-order-seeded.csv",
+        "default_jobs": 15,
+    },
 }
 
 
@@ -953,12 +996,14 @@ def parse_repair_files(output_dir: Path) -> tuple[int, float]:
     """Return (n_repairs, best_fitness) from a run's repair files.
 
     FRETISH runs write repair_N.json with the weighted total nested under a
-    "fitness" object. TLSF runs write repair_N.tlsf beside a repair_N.fitness.json
-    sidecar carrying the total at top level. The sidecar also matches
-    repair_*.json, so TLSF is detected first (by its .tlsf files) to avoid
-    counting sidecars as repairs and reading a missing nested "fitness".
+    "fitness" object. TLSF and PSP runs write repair_N.tlsf or repair_N.psp
+    beside a repair_N.fitness.json sidecar carrying the total at top level.
+    The sidecar also matches repair_*.json, so TLSF and PSP are detected first
+    (by their .tlsf or .psp files) to avoid counting sidecars as repairs and
+    reading a missing nested "fitness".
     """
-    tlsf_files = list(output_dir.glob("repair_*.tlsf"))
+    tlsf_files = (list(output_dir.glob("repair_*.tlsf"))
+                  or list(output_dir.glob("repair_*.psp")))
     if tlsf_files:
         best = float("-inf")
         for f in tlsf_files:
