@@ -8,8 +8,8 @@ The order-directed mechanisms on PSP, as `2026-11-20-final-engine` measures them
 
 The subjects come from the registries in `scripts/run_experiments.py`, not from a list here:
 
-- Profile `psp-order`: `PSP_SPECS` (the 5 hand-written subjects, which have fixes, so a known repair) and `PSP_SYNTECH_SPECS` (the 9 unrealisable SYNTECH17 imports, which have none), at seeds 0-29. On this branch that is 14 subjects, 2,520 runs.
-- Profile `psp-order-seeded`: `PSP_SEEDED_SPECS` (every entry of `examples/psp-seeded/selected.txt`, with its base as the one ideal), at seeds 0-4. On this branch that is 39 subjects, 1,170 runs. `feat/psp-front-end` at 6edc75e8 adds 31 SYNTECH-based mutants, so after the merge it is 70 subjects, 2,100 runs.
+- Profile `psp-order`: `PSP_SPECS` (the 5 hand-written subjects, which have fixes, so a known repair) and `PSP_SYNTECH_EVAL` (the unrealisable SYNTECH17 imports with 2 or more weakenable guarantee slots, which have no fix; PSP plan P7 drops the rest, and `PSP_SYNTECH_SPECS` keeps all 9), at seeds 0-29. On `feat/psp-front-end` that is 6 subjects (5 hand-written, 1 SYNTECH17), 1,080 runs.
+- Profile `psp-order-seeded`: `PSP_SEEDED_SPECS` (every entry of `examples/psp-seeded/selected.txt`, with its base as the one ideal), at seeds 0-4. On `feat/psp-front-end` that is 70 subjects (39 from the hand-written bases, 31 from the SYNTECH17 bases), 2,100 runs.
 
 The counts are read from the registries whenever the runner plans, so a subject added to a registry before enqueue joins the campaign. Check them with `python3 scripts/run_experiments.py --profile psp-order --dry-run` and `--profile psp-order-seeded --dry-run`.
 
@@ -17,11 +17,11 @@ Seeds are split over the hosts as the final engine splits them, so every arm of 
 
 ## Smoke runs (2026-11-20, local, at b5e93006)
 
-`realize` on every subject of both profiles (53 on this branch), one at a time under the 7,200 s cap: all 53 are unrealisable. The slowest took 18.3 s (`syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_176`), and 51 took under 2 s.
+`realize` on every subject of both profiles (53 on this branch), one at a time under the 7,200 s cap: all 53 are unrealisable. The slowest took 18.3 s (`syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_176`), and 51 took under 2 s. The 31 SYNTECH-based seeded mutants merged later were each checked unrealisable by `seed.py` under its 300 s timeout.
 
 One run of each arm on `psp-crossing` at seed 0, through `run_experiments.py --profile psp-order --specs psp-crossing --seeds 0 --jobs 2`: every arm found repairs (21 to 73), in 33-44 s of wall time, and only `no-gate` found one that implies a fix. The output is in `experiments/results-psp-order.csv` and `experiments/results-psp-order/` of the P8 worktree, where the paper's `scripts/import_data.py --psp` reads it. One run of each arm on the seeded subjects `psp-crossing__m10` and `psp-arbiter__m0` at seed 0 (`--profile psp-order-seeded`) is in `results-psp-order-seeded*` there: all 12 runs found repairs, in 34-69 s, and `full` and `no-climb` found the base on `psp-arbiter__m0`.
 
-At about 60 s a run, each host's specifications phase is about 42 slot-hours, which is about 1.5 h at 15 jobs. The SYNTECH17 imports have not run beyond `realize`, so this estimate is uncertain by about 50%.
+At about 60 s a run, each host's specifications phase is about 9 slot-hours, which is about 0.6 h at 15 jobs. The SYNTECH17 import has not run beyond `realize`, so this estimate is uncertain by about 50%.
 
 ## Trivial-reversion probe
 

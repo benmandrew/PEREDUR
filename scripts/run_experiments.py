@@ -301,6 +301,13 @@ PSP_SYNTECH_SPECS: dict[str, dict[str, Path]] = {
                         "ideals_dir": SYNTECH_DIR / "fixes" / name}
     for name in PSP_SYNTECH_UNREALISABLE
 }
+# PLAN.md P7 drops an import with fewer than 2 weakenable guarantee slots from
+# the evaluation set; import_spectra.py marks the rest eval_candidate.
+with (SYNTECH_DIR / "manifest.csv").open(newline="") as _f:
+    PSP_SYNTECH_EVAL: tuple[str, ...] = tuple(
+        "syntech-" + r["spec"] for r in csv.DictReader(_f)
+        if r["eval_candidate"] == "True"
+        and "syntech-" + r["spec"] in PSP_SYNTECH_SPECS)
 
 # The PSP seeded corpus (examples/psp-seeded, written by
 # experiments/2026-11-20-psp-seeded-corpus/scripts/seed.py): each subject is a
@@ -877,9 +884,9 @@ PROFILES: dict[str, dict] = {
         "repair_modes": None,
         "sweeps": ["F"],
         "levels": {"F": list(PSP_ORDER_ARMS)},
-        "specs": list(PSP_SPECS) + list(PSP_SYNTECH_SPECS),
+        "specs": list(PSP_SPECS) + list(PSP_SYNTECH_EVAL),
         "seeds": list(range(30)),
-        "timeout_caps": {s: 7200 for s in [*PSP_SPECS, *PSP_SYNTECH_SPECS]},
+        "timeout_caps": {s: 7200 for s in [*PSP_SPECS, *PSP_SYNTECH_EVAL]},
         "compare_timeout": 1800,
         "baseline_aliases": {},
         "configs_dir": EXPERIMENTS_DIR / "configs-psp-order",
