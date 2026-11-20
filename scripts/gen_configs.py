@@ -244,6 +244,13 @@ DEFAULTS: dict = {
     # at GA_POPULATION_SIZE = 100, so the cap alone at a different population
     # buys a different number of generations for the same number of individuals.
     "max_individuals": 0,
+    # The fewest guarantees a FRETISH realizability query needs before the
+    # controller store is tried on it; 0 turns the store off. Mirrors
+    # config.hpp. Emitted into [runtime] only when a sweep overrides it (see
+    # make_toml). Sweep F pins it at 0: the store's gate reads the startup
+    # screen's ltlsynt time, so host load, not the seed, decided whether a run
+    # used it.
+    "controller_reuse_min_guarantees": 10,
     # Scoring thread pool size. 0 is make_toml's "emit nothing" sentinel rather
     # than a mirror of config.hpp, whose default is available_parallelism() and
     # so has no literal to track. Emitted into [runtime] only when positive, so
@@ -359,6 +366,9 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         f"black_timeout_ms = {d['black_timeout_ms']}",
     ] + ([f"parallel = {d['parallel']}"]
          if d.get("parallel") else []) + (
+        [f"controller_reuse_min_guarantees = "
+         f"{d['controller_reuse_min_guarantees']}"]
+        if "controller_reuse_min_guarantees" in overrides else []) + (
         [f"ltlsynt_timeout_ms = {d['ltlsynt_timeout_ms']}"]
         if d.get("ltlsynt_timeout_ms") else []) + (
         [f"ltl2tgba_timeout_ms = {d['ltl2tgba_timeout_ms']}"]
@@ -544,6 +554,52 @@ def _climb_orders_sweep() -> list[tuple[str, dict]]:
 
 SWEEP_K: list[tuple[str, dict]] = _climb_orders_sweep()
 
+# Sweep F: the final engine of the FRETISH order-directed search (user, 20
+# Nov), ablated over its four features. "full" is sweep K's full-k1 plus the
+# novelty objective; "base" has the four off. The gate runs in exchange mode
+# and remove is maximality removal under demotion, as in full-k1.
+FINAL_FEATURES: list[tuple[str, dict]] = [
+    ("climb",   {"climb_output": True}),
+    ("gate",    {"direction_gated": True, "bisect_steps": True}),
+    ("remove",  {"maximality_demotion": True, "maximality_removal": True}),
+    ("novelty", {"novelty": True}),
+]
+
+
+def _final_sweep() -> list[tuple[str, dict]]:
+    """The final engine's arms: base, full, every no-<f> and every only-<f>.
+
+    Every arm states every mechanism key, on or off, so none inherits a
+    default a later commit may move. Two keys are the same in every arm:
+    blame-targeted slots are on, as an engine optimisation the ablation does
+    not vary, and the controller store is off, so that every run is fixed by
+    its seed. The random selection scheme runs base (random) and only-climb
+    (random+climb) of this sweep.
+    """
+    feats = dict(FINAL_FEATURES)
+    k1 = dict(SWEEP_K)["full-k1"]
+    full = {**k1, **feats["novelty"]}
+    # The mechanisms the ablation does not vary, stated at their values in
+    # full-k1 or, where full-k1 is silent, at DEFAULTS.
+    fixed = {k: DEFAULTS[k] for k in (
+        "crowding", "novelty_tiebreak", "spread_init", "slot_coverage",
+        "flip_tabu", "flip_sideways", "blame_realizable", "elitism_rate",
+        "p_stop", "p_add_assumption", "p_remove_guarantee")}
+    fixed.update({"blame_targeted_slots": True,
+                  "controller_reuse_min_guarantees": 0})
+    full = {**fixed, **full, **fixed}
+    on = {k: v for f in feats.values() for k, v in f.items()}
+    base = {**full, **{k: DEFAULTS[k] for k in on}}
+    levels: list[tuple[str, dict]] = [("base", dict(base)), ("full", dict(full))]
+    for name, keys in FINAL_FEATURES:
+        levels.append((f"no-{name}", {**full, **{k: base[k] for k in keys}}))
+    for name, keys in FINAL_FEATURES:
+        levels.append((f"only-{name}", {**base, **keys}))
+    return levels
+
+
+SWEEP_F: list[tuple[str, dict]] = _final_sweep()
+
 # Keys whose built-in default has changed at least once since campaigns began
 # being archived. A generated config states a key only where a sweep overrides
 # it, so everything else is inherited from the binary at run time — which means
@@ -567,9 +623,10 @@ SWEEPS: list[tuple[str, list]] = [
     ("O", SWEEP_O),
     ("P", SWEEP_P),
     ("K", SWEEP_K),
+    ("F", SWEEP_F),
 ]
 
-# Sweeps emitted when --sweeps is omitted. O, P and K are held back, so a grid
+# Sweeps emitted when --sweeps is omitted. O, P, K and F are held back, so a grid
 # generated without --sweeps stays byte-identical to the one before they
 # existed.
 DEFAULT_SWEEPS: list[str] = ["A", "B", "C", "R"]
