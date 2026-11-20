@@ -1,0 +1,62 @@
+{
+ "assumptions": [
+  {
+   "fixed": "G(!e_color0__b2 | !e_color0__b1 & !e_color0__b0)"
+  },
+  {
+   "fixed": "G(!e_color1__b2 | !e_color1__b1 & !e_color1__b0)"
+  },
+  {
+   "fixed": "G(!e_color2__b2 | !e_color2__b1 & !e_color2__b0)"
+  },
+  {
+   "fixed": "G((!s_a__b0 & !s_a__b1 -> !X(e_color0__b0) & !X(e_color0__b1) & !X(e_color0__b2) & !a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 | X(e_color0__b0) & !X(e_color0__b1) & !X(e_color0__b2) & a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 | !X(e_color0__b0) & X(e_color0__b1) & !X(e_color0__b2) & !a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 | X(e_color0__b0) & X(e_color0__b1) & !X(e_color0__b2) & a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 | !X(e_color0__b0) & !X(e_color0__b1) & X(e_color0__b2) & !a_a_color__b0 & !a_a_color__b1 & a_a_color__b2) & (s_a__b0 & !s_a__b1 -> !X(e_color1__b0) & !X(e_color1__b1) & !X(e_color1__b2) & !a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 | X(e_color1__b0) & !X(e_color1__b1) & !X(e_color1__b2) & a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 | !X(e_color1__b0) & X(e_color1__b1) & !X(e_color1__b2) & !a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 | X(e_color1__b0) & X(e_color1__b1) & !X(e_color1__b2) & a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 | !X(e_color1__b0) & !X(e_color1__b1) & X(e_color1__b2) & !a_a_color__b0 & !a_a_color__b1 & a_a_color__b2) & (!s_a__b0 & s_a__b1 -> !X(e_color2__b0) & !X(e_color2__b1) & !X(e_color2__b2) & !a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 | X(e_color2__b0) & !X(e_color2__b1) & !X(e_color2__b2) & a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 | !X(e_color2__b0) & X(e_color2__b1) & !X(e_color2__b2) & !a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 | X(e_color2__b0) & X(e_color2__b1) & !X(e_color2__b2) & a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 | !X(e_color2__b0) & !X(e_color2__b1) & X(e_color2__b2) & !a_a_color__b0 & !a_a_color__b1 & a_a_color__b2) & (!s_b__b0 & !s_b__b1 -> !X(e_color0__b0) & !X(e_color0__b1) & !X(e_color0__b2) & !a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 | X(e_color0__b0) & !X(e_color0__b1) & !X(e_color0__b2) & a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 | !X(e_color0__b0) & X(e_color0__b1) & !X(e_color0__b2) & !a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 | X(e_color0__b0) & X(e_color0__b1) & !X(e_color0__b2) & a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 | !X(e_color0__b0) & !X(e_color0__b1) & X(e_color0__b2) & !a_b_color__b0 & !a_b_color__b1 & a_b_color__b2) & (s_b__b0 & !s_b__b1 -> !X(e_color1__b0) & !X(e_color1__b1) & !X(e_color1__b2) & !a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 | X(e_color1__b0) & !X(e_color1__b1) & !X(e_color1__b2) & a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 | !X(e_color1__b0) & X(e_color1__b1) & !X(e_color1__b2) & !a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 | X(e_color1__b0) & X(e_color1__b1) & !X(e_color1__b2) & a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 | !X(e_color1__b0) & !X(e_color1__b1) & X(e_color1__b2) & !a_b_color__b0 & !a_b_color__b1 & a_b_color__b2) & (!s_b__b0 & s_b__b1 -> !X(e_color2__b0) & !X(e_color2__b1) & !X(e_color2__b2) & !a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 | X(e_color2__b0) & !X(e_color2__b1) & !X(e_color2__b2) & a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 | !X(e_color2__b0) & X(e_color2__b1) & !X(e_color2__b2) & !a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 | X(e_color2__b0) & X(e_color2__b1) & !X(e_color2__b2) & a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 | !X(e_color2__b0) & !X(e_color2__b1) & X(e_color2__b2) & !a_b_color__b0 & !a_b_color__b1 & a_b_color__b2))"
+  }
+ ],
+ "guarantees": [
+  {
+   "fixed": "G(!s_a__b1 | !s_a__b0)"
+  },
+  {
+   "fixed": "G(!s_b__b1 | !s_b__b0)"
+  },
+  {
+   "fixed": "G(!a_a_color__b2 | !a_a_color__b1 & !a_a_color__b0)"
+  },
+  {
+   "fixed": "G(!a_b_color__b2 | !a_b_color__b1 & !a_b_color__b0)"
+  },
+  {
+   "fixed": "G((!s_a__b0 & !s_a__b1 -> !a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 & !e_color0__b0 & !e_color0__b1 & !e_color0__b2 | a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 & e_color0__b0 & !e_color0__b1 & !e_color0__b2 | !a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 & !e_color0__b0 & e_color0__b1 & !e_color0__b2 | a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 & e_color0__b0 & e_color0__b1 & !e_color0__b2 | !a_a_color__b0 & !a_a_color__b1 & a_a_color__b2 & !e_color0__b0 & !e_color0__b1 & e_color0__b2) & (s_a__b0 & !s_a__b1 -> !a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 & !e_color1__b0 & !e_color1__b1 & !e_color1__b2 | a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 & e_color1__b0 & !e_color1__b1 & !e_color1__b2 | !a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 & !e_color1__b0 & e_color1__b1 & !e_color1__b2 | a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 & e_color1__b0 & e_color1__b1 & !e_color1__b2 | !a_a_color__b0 & !a_a_color__b1 & a_a_color__b2 & !e_color1__b0 & !e_color1__b1 & e_color1__b2) & (!s_a__b0 & s_a__b1 -> !a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 & !e_color2__b0 & !e_color2__b1 & !e_color2__b2 | a_a_color__b0 & !a_a_color__b1 & !a_a_color__b2 & e_color2__b0 & !e_color2__b1 & !e_color2__b2 | !a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 & !e_color2__b0 & e_color2__b1 & !e_color2__b2 | a_a_color__b0 & a_a_color__b1 & !a_a_color__b2 & e_color2__b0 & e_color2__b1 & !e_color2__b2 | !a_a_color__b0 & !a_a_color__b1 & a_a_color__b2 & !e_color2__b0 & !e_color2__b1 & e_color2__b2) & (!s_b__b0 & !s_b__b1 -> !a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 & !e_color0__b0 & !e_color0__b1 & !e_color0__b2 | a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 & e_color0__b0 & !e_color0__b1 & !e_color0__b2 | !a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 & !e_color0__b0 & e_color0__b1 & !e_color0__b2 | a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 & e_color0__b0 & e_color0__b1 & !e_color0__b2 | !a_b_color__b0 & !a_b_color__b1 & a_b_color__b2 & !e_color0__b0 & !e_color0__b1 & e_color0__b2) & (s_b__b0 & !s_b__b1 -> !a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 & !e_color1__b0 & !e_color1__b1 & !e_color1__b2 | a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 & e_color1__b0 & !e_color1__b1 & !e_color1__b2 | !a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 & !e_color1__b0 & e_color1__b1 & !e_color1__b2 | a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 & e_color1__b0 & e_color1__b1 & !e_color1__b2 | !a_b_color__b0 & !a_b_color__b1 & a_b_color__b2 & !e_color1__b0 & !e_color1__b1 & e_color1__b2) & (!s_b__b0 & s_b__b1 -> !a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 & !e_color2__b0 & !e_color2__b1 & !e_color2__b2 | a_b_color__b0 & !a_b_color__b1 & !a_b_color__b2 & e_color2__b0 & !e_color2__b1 & !e_color2__b2 | !a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 & !e_color2__b0 & e_color2__b1 & !e_color2__b2 | a_b_color__b0 & a_b_color__b1 & !a_b_color__b2 & e_color2__b0 & e_color2__b1 & !e_color2__b2 | !a_b_color__b0 & !a_b_color__b1 & a_b_color__b2 & !e_color2__b0 & !e_color2__b1 & e_color2__b2))"
+  },
+  {
+   "fixed": "!((s_a__b0 <-> s_b__b0) & (s_a__b1 <-> s_b__b1))"
+  },
+  {
+   "fixed": "G(!((X(s_a__b0) <-> X(s_b__b0)) & (X(s_a__b1) <-> X(s_b__b1))))"
+  }
+ ],
+ "in_atoms": [
+  "e_color0__b0",
+  "e_color0__b1",
+  "e_color0__b2",
+  "e_color1__b0",
+  "e_color1__b1",
+  "e_color1__b2",
+  "e_color2__b0",
+  "e_color2__b1",
+  "e_color2__b2"
+ ],
+ "out_atoms": [
+  "s_a__b0",
+  "s_a__b1",
+  "s_b__b0",
+  "s_b__b1",
+  "a_a_color__b0",
+  "a_a_color__b1",
+  "a_a_color__b2",
+  "a_b_color__b0",
+  "a_b_color__b1",
+  "a_b_color__b2"
+ ]
+}

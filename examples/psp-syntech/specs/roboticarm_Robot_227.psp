@@ -1,0 +1,93 @@
+{
+ "assumptions": [
+  {
+   "fixed": "G(!e_s0__b2 | !e_s0__b1 & !e_s0__b0)"
+  },
+  {
+   "fixed": "G(!e_s1__b2 | !e_s1__b1 & !e_s1__b0)"
+  },
+  {
+   "fixed": "G(!e_s2__b2 | !e_s2__b1 & !e_s2__b0)"
+  },
+  {
+   "fixed": "G(!s_is_moving & e_task__b0 -> (!X(e_s0__b0) & !X(e_s0__b1) & !X(e_s0__b2) & !e_s0__b0 & !e_s0__b1 & !e_s0__b2 | X(e_s0__b0) & !X(e_s0__b1) & !X(e_s0__b2) & e_s0__b0 & !e_s0__b1 & !e_s0__b2 | !X(e_s0__b0) & X(e_s0__b1) & !X(e_s0__b2) & !e_s0__b0 & e_s0__b1 & !e_s0__b2 | X(e_s0__b0) & X(e_s0__b1) & !X(e_s0__b2) & e_s0__b0 & e_s0__b1 & !e_s0__b2 | !X(e_s0__b0) & !X(e_s0__b1) & X(e_s0__b2) & !e_s0__b0 & !e_s0__b1 & e_s0__b2) & (!X(e_s1__b0) & !X(e_s1__b1) & !X(e_s1__b2) & !e_s1__b0 & !e_s1__b1 & !e_s1__b2 | X(e_s1__b0) & !X(e_s1__b1) & !X(e_s1__b2) & e_s1__b0 & !e_s1__b1 & !e_s1__b2 | !X(e_s1__b0) & X(e_s1__b1) & !X(e_s1__b2) & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | X(e_s1__b0) & X(e_s1__b1) & !X(e_s1__b2) & e_s1__b0 & e_s1__b1 & !e_s1__b2 | !X(e_s1__b0) & !X(e_s1__b1) & X(e_s1__b2) & !e_s1__b0 & !e_s1__b1 & e_s1__b2) & (!X(e_s2__b0) & !X(e_s2__b1) & !X(e_s2__b2) & !e_s2__b0 & !e_s2__b1 & !e_s2__b2 | X(e_s2__b0) & !X(e_s2__b1) & !X(e_s2__b2) & e_s2__b0 & !e_s2__b1 & !e_s2__b2 | !X(e_s2__b0) & X(e_s2__b1) & !X(e_s2__b2) & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | X(e_s2__b0) & X(e_s2__b1) & !X(e_s2__b2) & e_s2__b0 & e_s2__b1 & !e_s2__b2 | !X(e_s2__b0) & !X(e_s2__b1) & X(e_s2__b2) & !e_s2__b0 & !e_s2__b1 & e_s2__b2))"
+  },
+  {
+   "fixed": "G(s_is_moving & e_task__b0 -> (!(!s_from__b0 & !s_from__b1 & !s_from__b2) & !(!s_to__b0 & !s_to__b1 & !s_to__b2) -> !X(e_s0__b0) & !X(e_s0__b1) & !X(e_s0__b2) & !e_s0__b0 & !e_s0__b1 & !e_s0__b2 | X(e_s0__b0) & !X(e_s0__b1) & !X(e_s0__b2) & e_s0__b0 & !e_s0__b1 & !e_s0__b2 | !X(e_s0__b0) & X(e_s0__b1) & !X(e_s0__b2) & !e_s0__b0 & e_s0__b1 & !e_s0__b2 | X(e_s0__b0) & X(e_s0__b1) & !X(e_s0__b2) & e_s0__b0 & e_s0__b1 & !e_s0__b2 | !X(e_s0__b0) & !X(e_s0__b1) & X(e_s0__b2) & !e_s0__b0 & !e_s0__b1 & e_s0__b2) & (!(s_from__b0 & !s_from__b1 & !s_from__b2) & !(s_to__b0 & !s_to__b1 & !s_to__b2) -> !X(e_s1__b0) & !X(e_s1__b1) & !X(e_s1__b2) & !e_s1__b0 & !e_s1__b1 & !e_s1__b2 | X(e_s1__b0) & !X(e_s1__b1) & !X(e_s1__b2) & e_s1__b0 & !e_s1__b1 & !e_s1__b2 | !X(e_s1__b0) & X(e_s1__b1) & !X(e_s1__b2) & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | X(e_s1__b0) & X(e_s1__b1) & !X(e_s1__b2) & e_s1__b0 & e_s1__b1 & !e_s1__b2 | !X(e_s1__b0) & !X(e_s1__b1) & X(e_s1__b2) & !e_s1__b0 & !e_s1__b1 & e_s1__b2) & (!(!s_from__b0 & s_from__b1 & !s_from__b2) & !(!s_to__b0 & s_to__b1 & !s_to__b2) -> !X(e_s2__b0) & !X(e_s2__b1) & !X(e_s2__b2) & !e_s2__b0 & !e_s2__b1 & !e_s2__b2 | X(e_s2__b0) & !X(e_s2__b1) & !X(e_s2__b2) & e_s2__b0 & !e_s2__b1 & !e_s2__b2 | !X(e_s2__b0) & X(e_s2__b1) & !X(e_s2__b2) & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | X(e_s2__b0) & X(e_s2__b1) & !X(e_s2__b2) & e_s2__b0 & e_s2__b1 & !e_s2__b2 | !X(e_s2__b0) & !X(e_s2__b1) & X(e_s2__b2) & !e_s2__b0 & !e_s2__b1 & e_s2__b2) & (!s_from__b0 & !s_from__b1 & !s_from__b2 -> !X(e_s0__b0) & !X(e_s0__b1) & !X(e_s0__b2) & !a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 | X(e_s0__b0) & !X(e_s0__b1) & !X(e_s0__b2) & a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 | !X(e_s0__b0) & X(e_s0__b1) & !X(e_s0__b2) & !a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 | X(e_s0__b0) & X(e_s0__b1) & !X(e_s0__b2) & a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 | !X(e_s0__b0) & !X(e_s0__b1) & X(e_s0__b2) & !a_to_color__b0 & !a_to_color__b1 & a_to_color__b2) & (s_from__b0 & !s_from__b1 & !s_from__b2 -> !X(e_s1__b0) & !X(e_s1__b1) & !X(e_s1__b2) & !a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 | X(e_s1__b0) & !X(e_s1__b1) & !X(e_s1__b2) & a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 | !X(e_s1__b0) & X(e_s1__b1) & !X(e_s1__b2) & !a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 | X(e_s1__b0) & X(e_s1__b1) & !X(e_s1__b2) & a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 | !X(e_s1__b0) & !X(e_s1__b1) & X(e_s1__b2) & !a_to_color__b0 & !a_to_color__b1 & a_to_color__b2) & (!s_from__b0 & s_from__b1 & !s_from__b2 -> !X(e_s2__b0) & !X(e_s2__b1) & !X(e_s2__b2) & !a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 | X(e_s2__b0) & !X(e_s2__b1) & !X(e_s2__b2) & a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 | !X(e_s2__b0) & X(e_s2__b1) & !X(e_s2__b2) & !a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 | X(e_s2__b0) & X(e_s2__b1) & !X(e_s2__b2) & a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 | !X(e_s2__b0) & !X(e_s2__b1) & X(e_s2__b2) & !a_to_color__b0 & !a_to_color__b1 & a_to_color__b2) & (!s_to__b0 & !s_to__b1 & !s_to__b2 -> !X(e_s0__b0) & !X(e_s0__b1) & !X(e_s0__b2) & !a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 | X(e_s0__b0) & !X(e_s0__b1) & !X(e_s0__b2) & a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 | !X(e_s0__b0) & X(e_s0__b1) & !X(e_s0__b2) & !a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 | X(e_s0__b0) & X(e_s0__b1) & !X(e_s0__b2) & a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 | !X(e_s0__b0) & !X(e_s0__b1) & X(e_s0__b2) & !a_from_color__b0 & !a_from_color__b1 & a_from_color__b2) & (s_to__b0 & !s_to__b1 & !s_to__b2 -> !X(e_s1__b0) & !X(e_s1__b1) & !X(e_s1__b2) & !a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 | X(e_s1__b0) & !X(e_s1__b1) & !X(e_s1__b2) & a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 | !X(e_s1__b0) & X(e_s1__b1) & !X(e_s1__b2) & !a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 | X(e_s1__b0) & X(e_s1__b1) & !X(e_s1__b2) & a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 | !X(e_s1__b0) & !X(e_s1__b1) & X(e_s1__b2) & !a_from_color__b0 & !a_from_color__b1 & a_from_color__b2) & (!s_to__b0 & s_to__b1 & !s_to__b2 -> !X(e_s2__b0) & !X(e_s2__b1) & !X(e_s2__b2) & !a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 | X(e_s2__b0) & !X(e_s2__b1) & !X(e_s2__b2) & a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 | !X(e_s2__b0) & X(e_s2__b1) & !X(e_s2__b2) & !a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 | X(e_s2__b0) & X(e_s2__b1) & !X(e_s2__b2) & a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 | !X(e_s2__b0) & !X(e_s2__b1) & X(e_s2__b2) & !a_from_color__b0 & !a_from_color__b1 & a_from_color__b2))"
+  },
+  {
+   "fixed": "!e_task__b0"
+  },
+  {
+   "fixed": "G(e_task__b0 & !((!e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & !e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & !e_s1__b1 & !e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | !e_s0__b0 & e_s0__b1 & !e_s0__b2 & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | e_s0__b0 & e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | e_s0__b0 & e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | !e_s0__b0 & !e_s0__b1 & e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2) & (!e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & !e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & !e_s2__b1 & !e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | !e_s1__b0 & e_s1__b1 & !e_s1__b2 & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | e_s1__b0 & e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | e_s1__b0 & e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | !e_s1__b0 & !e_s1__b1 & e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2)) -> X(e_task__b0))"
+  },
+  {
+   "fixed": "G(X(e_s0__b0) & X(e_s0__b1) & !X(e_s0__b2) & !X(e_s1__b0) & !X(e_s1__b1) & !X(e_s1__b2) & !X(e_s2__b0) & !X(e_s2__b1) & X(e_s2__b2))"
+  },
+  {
+   "fixed": "G(!e_task__b0 -> e_s0__b0 & e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2)"
+  }
+ ],
+ "guarantees": [
+  {
+   "fixed": "G(!s_from__b2 | !s_from__b1)"
+  },
+  {
+   "fixed": "G(!s_to__b2 | !s_to__b1)"
+  },
+  {
+   "fixed": "G(!a_from_color__b2 | !a_from_color__b1 & !a_from_color__b0)"
+  },
+  {
+   "fixed": "G(!a_to_color__b2 | !a_to_color__b1 & !a_to_color__b0)"
+  },
+  {
+   "fixed": "G(s_is_moving -> (!a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 | a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 | !a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 | a_from_color__b0 & a_from_color__b1 & !a_from_color__b2) & a_to_color__b0 & a_to_color__b1 & !a_to_color__b2)"
+  },
+  {
+   "fixed": "G((!s_from__b0 & !s_from__b1 & !s_from__b2 -> !a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 & !e_s0__b0 & !e_s0__b1 & !e_s0__b2 | a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 & e_s0__b0 & !e_s0__b1 & !e_s0__b2 | !a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 & !e_s0__b0 & e_s0__b1 & !e_s0__b2 | a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 & e_s0__b0 & e_s0__b1 & !e_s0__b2 | !a_from_color__b0 & !a_from_color__b1 & a_from_color__b2 & !e_s0__b0 & !e_s0__b1 & e_s0__b2) & (s_from__b0 & !s_from__b1 & !s_from__b2 -> !a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 & !e_s1__b0 & !e_s1__b1 & !e_s1__b2 | a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 & e_s1__b0 & !e_s1__b1 & !e_s1__b2 | !a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | !a_from_color__b0 & !a_from_color__b1 & a_from_color__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2) & (!s_from__b0 & s_from__b1 & !s_from__b2 -> !a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 & !e_s2__b0 & !e_s2__b1 & !e_s2__b2 | a_from_color__b0 & !a_from_color__b1 & !a_from_color__b2 & e_s2__b0 & !e_s2__b1 & !e_s2__b2 | !a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | a_from_color__b0 & a_from_color__b1 & !a_from_color__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | !a_from_color__b0 & !a_from_color__b1 & a_from_color__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2))"
+  },
+  {
+   "fixed": "G((!s_to__b0 & !s_to__b1 & !s_to__b2 -> !a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 & !e_s0__b0 & !e_s0__b1 & !e_s0__b2 | a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 & e_s0__b0 & !e_s0__b1 & !e_s0__b2 | !a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 & !e_s0__b0 & e_s0__b1 & !e_s0__b2 | a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 & e_s0__b0 & e_s0__b1 & !e_s0__b2 | !a_to_color__b0 & !a_to_color__b1 & a_to_color__b2 & !e_s0__b0 & !e_s0__b1 & e_s0__b2) & (s_to__b0 & !s_to__b1 & !s_to__b2 -> !a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 & !e_s1__b0 & !e_s1__b1 & !e_s1__b2 | a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 & e_s1__b0 & !e_s1__b1 & !e_s1__b2 | !a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | !a_to_color__b0 & !a_to_color__b1 & a_to_color__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2) & (!s_to__b0 & s_to__b1 & !s_to__b2 -> !a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 & !e_s2__b0 & !e_s2__b1 & !e_s2__b2 | a_to_color__b0 & !a_to_color__b1 & !a_to_color__b2 & e_s2__b0 & !e_s2__b1 & !e_s2__b2 | !a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | a_to_color__b0 & a_to_color__b1 & !a_to_color__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | !a_to_color__b0 & !a_to_color__b1 & a_to_color__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2))"
+  },
+  {
+   "fixed": "!((s_from__b0 <-> s_to__b0) & (s_from__b1 <-> s_to__b1) & (s_from__b2 <-> s_to__b2))"
+  },
+  {
+   "fixed": "G(!((X(s_from__b0) <-> X(s_to__b0)) & (X(s_from__b1) <-> X(s_to__b1)) & (X(s_from__b2) <-> X(s_to__b2))))"
+  },
+  {
+   "fixed": "G(F(e_task__b0 & (e_s0__b0 & e_s0__b1 & !e_s0__b2 | e_s1__b0 & e_s1__b1 & !e_s1__b2 | e_s2__b0 & e_s2__b1 & !e_s2__b2) & (!e_s0__b0 & !e_s0__b1 & e_s0__b2 -> !e_s1__b0 & !e_s1__b1 & e_s1__b2) & (!e_s1__b0 & !e_s1__b1 & e_s1__b2 -> !e_s2__b0 & !e_s2__b1 & e_s2__b2) -> (!e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & !e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & !e_s1__b1 & !e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | !e_s0__b0 & e_s0__b1 & !e_s0__b2 & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | e_s0__b0 & e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | e_s0__b0 & e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | !e_s0__b0 & !e_s0__b1 & e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2) & (!e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & !e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & !e_s2__b1 & !e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | !e_s1__b0 & e_s1__b1 & !e_s1__b2 & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | e_s1__b0 & e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | e_s1__b0 & e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | !e_s1__b0 & !e_s1__b1 & e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2)))"
+  },
+  {
+   "fixed": "G(e_task__b0 & (!e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & !e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & !e_s1__b1 & !e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | e_s0__b0 & !e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | !e_s0__b0 & e_s0__b1 & !e_s0__b2 & !e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | !e_s0__b0 & e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | e_s0__b0 & e_s0__b1 & !e_s0__b2 & e_s1__b0 & e_s1__b1 & !e_s1__b2 | e_s0__b0 & e_s0__b1 & !e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2 | !e_s0__b0 & !e_s0__b1 & e_s0__b2 & !e_s1__b0 & !e_s1__b1 & e_s1__b2) & (!e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & !e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & !e_s2__b1 & !e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | e_s1__b0 & !e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | !e_s1__b0 & e_s1__b1 & !e_s1__b2 & !e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | !e_s1__b0 & e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | e_s1__b0 & e_s1__b1 & !e_s1__b2 & e_s2__b0 & e_s2__b1 & !e_s2__b2 | e_s1__b0 & e_s1__b1 & !e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2 | !e_s1__b0 & !e_s1__b1 & e_s1__b2 & !e_s2__b0 & !e_s2__b1 & e_s2__b2) -> !s_is_moving)"
+  }
+ ],
+ "in_atoms": [
+  "e_s0__b0",
+  "e_s0__b1",
+  "e_s0__b2",
+  "e_s1__b0",
+  "e_s1__b1",
+  "e_s1__b2",
+  "e_s2__b0",
+  "e_s2__b1",
+  "e_s2__b2",
+  "e_task__b0"
+ ],
+ "out_atoms": [
+  "s_is_moving",
+  "s_from__b0",
+  "s_from__b1",
+  "s_from__b2",
+  "s_to__b0",
+  "s_to__b1",
+  "s_to__b2",
+  "a_from_color__b0",
+  "a_from_color__b1",
+  "a_from_color__b2",
+  "a_to_color__b0",
+  "a_to_color__b1",
+  "a_to_color__b2"
+ ]
+}

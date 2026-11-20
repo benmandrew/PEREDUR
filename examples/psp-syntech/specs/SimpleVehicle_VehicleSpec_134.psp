@@ -1,0 +1,124 @@
+{
+ "assumptions": [
+  {
+   "fixed": "G(!e_front_sense__b2 | !e_front_sense__b1)"
+  },
+  {
+   "fixed": "G(!e_back_sense__b2 | !e_back_sense__b1)"
+  },
+  {
+   "fixed": "G(!e_side_sense__b2 | !e_side_sense__b1)"
+  },
+  {
+   "fixed": "G(s_drive_motor__b0 & !s_drive_motor__b1 & (!(!e_front_sense__b0 & !e_front_sense__b1 & !e_front_sense__b2) | !(!e_back_sense__b0 & !e_back_sense__b1 & !e_back_sense__b2)) -> (e_side_sense__b0 <-> X(e_side_sense__b0)) & (e_side_sense__b1 <-> X(e_side_sense__b1)) & (e_side_sense__b2 <-> X(e_side_sense__b2)) & (e_back_sense__b0 <-> X(e_back_sense__b0)) & (e_back_sense__b1 <-> X(e_back_sense__b1)) & (e_back_sense__b2 <-> X(e_back_sense__b2)) & (e_front_sense__b0 <-> X(e_front_sense__b0)) & (e_front_sense__b1 <-> X(e_front_sense__b1)) & (e_front_sense__b2 <-> X(e_front_sense__b2)))"
+  },
+  {
+   "fixed": "G(F(!(!e_front_sense__b0 & !e_front_sense__b1 & !e_front_sense__b2) | !(!e_back_sense__b0 & !e_back_sense__b1 & !e_back_sense__b2)))"
+  },
+  {
+   "fixed": "e_status__b0 & !(!e_front_sense__b2 & (!e_front_sense__b1 | !e_front_sense__b0))"
+  },
+  {
+   "fixed": "G(!e_status__b0 -> !X(e_status__b0))"
+  },
+  {
+   "fixed": "G(F(s_mode__b0 & !s_mode__b1 -> !e_status__b0))"
+  }
+ ],
+ "guarantees": [
+  {
+   "fixed": "G(!s_drive_motor__b1 | !s_drive_motor__b0)"
+  },
+  {
+   "fixed": "G(!s_steering_motor__b2 | !s_steering_motor__b1 & !s_steering_motor__b0)"
+  },
+  {
+   "fixed": "G(!s_velocity__b2 | !s_velocity__b1 & !s_velocity__b0)"
+  },
+  {
+   "fixed": "!s_mode__b0 & !s_mode__b1 & !s_sense_motor__b0 & !s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2"
+  },
+  {
+   "fixed": "G(!s_mode__b0 & !s_mode__b1 | s_mode__b0 & !s_mode__b1 -> !s_sense_motor__b0)"
+  },
+  {
+   "fixed": "G(s_mode__b0 & !s_mode__b1 & !(!e_side_sense__b2 & (!e_side_sense__b1 | !e_side_sense__b0)) -> X(s_mode__b0) & !X(s_mode__b1) & !s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & !s_drive_motor__b1)"
+  },
+  {
+   "fixed": "G(s_mode__b0 & !s_mode__b1 & !e_side_sense__b2 & (!e_side_sense__b1 | !e_side_sense__b0) & e_status__b0 -> !X(s_mode__b0) & !X(s_mode__b1))"
+  },
+  {
+   "fixed": "G(!s_mode__b0 & !s_mode__b1 & !e_side_sense__b2 & (!e_side_sense__b1 | !e_side_sense__b0) -> !X(s_mode__b0) & !X(s_mode__b1))"
+  },
+  {
+   "fixed": "G(!s_mode__b0 & !s_mode__b1 & !(!e_front_sense__b2 & (!e_front_sense__b1 | !e_front_sense__b0)) & !(!e_side_sense__b2 & (!e_side_sense__b1 | !e_side_sense__b0)) & e_status__b0 -> X(s_mode__b0) & !X(s_mode__b1))"
+  },
+  {
+   "fixed": "G(!e_status__b0 & s_mode__b0 & !s_mode__b1 -> !X(s_mode__b0) & X(s_mode__b1))"
+  },
+  {
+   "fixed": "G(!s_mode__b0 & s_mode__b1 & !e_side_sense__b2 & !e_side_sense__b1 & !s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 & s_drive_motor__b0 & !s_drive_motor__b1 -> X(s_mode__b0) & X(s_mode__b1))"
+  },
+  {
+   "fixed": "G(F(s_mode__b0 & s_mode__b1))"
+  },
+  {
+   "fixed": "G(!s_mode__b0 & s_mode__b1 -> !X(s_mode__b0) & X(s_mode__b1) | X(s_mode__b0) & X(s_mode__b1))"
+  },
+  {
+   "fixed": "G(!s_drive_motor__b0 & s_drive_motor__b1 & (!s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2) -> !X(s_drive_motor__b0) & X(s_drive_motor__b1) | e_side_sense__b0 & !e_side_sense__b1 & !e_side_sense__b2 & !X(e_side_sense__b0) & !X(e_side_sense__b1) & !X(e_side_sense__b2) | !e_side_sense__b0 & e_side_sense__b1 & !e_side_sense__b2 & X(e_side_sense__b0) & !X(e_side_sense__b1) & !X(e_side_sense__b2) | e_side_sense__b0 & e_side_sense__b1 & !e_side_sense__b2 & !X(e_side_sense__b0) & X(e_side_sense__b1) & !X(e_side_sense__b2) | !e_side_sense__b0 & !e_side_sense__b1 & e_side_sense__b2 & X(e_side_sense__b0) & X(e_side_sense__b1) & !X(e_side_sense__b2) | e_side_sense__b0 & !e_side_sense__b1 & e_side_sense__b2 & !X(e_side_sense__b0) & !X(e_side_sense__b1) & X(e_side_sense__b2))"
+  },
+  {
+   "fixed": "G(!s_drive_motor__b0 & !s_drive_motor__b1 & (s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | !s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2) -> !X(s_drive_motor__b0) & !X(s_drive_motor__b1) | !e_side_sense__b0 & !e_side_sense__b1 & !e_side_sense__b2 & X(e_side_sense__b0) & !X(e_side_sense__b1) & !X(e_side_sense__b2) | e_side_sense__b0 & !e_side_sense__b1 & !e_side_sense__b2 & !X(e_side_sense__b0) & X(e_side_sense__b1) & !X(e_side_sense__b2) | !e_side_sense__b0 & e_side_sense__b1 & !e_side_sense__b2 & X(e_side_sense__b0) & X(e_side_sense__b1) & !X(e_side_sense__b2) | e_side_sense__b0 & e_side_sense__b1 & !e_side_sense__b2 & !X(e_side_sense__b0) & !X(e_side_sense__b1) & X(e_side_sense__b2) | !e_side_sense__b0 & !e_side_sense__b1 & e_side_sense__b2 & X(e_side_sense__b0) & !X(e_side_sense__b1) & X(e_side_sense__b2) | e_side_sense__b0 & !e_side_sense__b1 & e_side_sense__b2 & !X(e_side_sense__b0) & X(e_side_sense__b1) & X(e_side_sense__b2))"
+  },
+  {
+   "fixed": "G(!e_front_sense__b2 & (!e_front_sense__b1 | !e_front_sense__b0) & (s_mode__b0 & !s_mode__b1 | !s_mode__b0 & !s_mode__b1) -> !X(s_mode__b0) & !X(s_mode__b1) & s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2)"
+  },
+  {
+   "fixed": "(!(!s_drive_motor__b0 & s_drive_motor__b1)) & (G(!X(s_drive_motor__b0) & X(s_drive_motor__b1) -> !(!X(e_back_sense__b2) & !X(e_back_sense__b1) & !X(e_back_sense__b0)) & s_sense_motor__b0))"
+  },
+  {
+   "fixed": "(!(!s_drive_motor__b0 & s_drive_motor__b1)) & (G(!X(s_drive_motor__b0) & X(s_drive_motor__b1) -> s_sense_motor__b0 & !X(s_velocity__b0) & !X(s_velocity__b1) & !X(s_velocity__b2)))"
+  },
+  {
+   "fixed": "G(e_front_sense__b0 & !e_front_sense__b1 & e_front_sense__b2 & !s_mode__b0 & !s_mode__b1 -> !s_velocity__b0 & !s_velocity__b1 & s_velocity__b2)"
+  },
+  {
+   "fixed": "G(!e_front_sense__b0 & !e_front_sense__b1 & e_front_sense__b2 & !s_mode__b0 & !s_mode__b1 -> s_velocity__b0 & s_velocity__b1 & !s_velocity__b2)"
+  },
+  {
+   "fixed": "G(e_front_sense__b0 & e_front_sense__b1 & !e_front_sense__b2 & !s_mode__b0 & !s_mode__b1 -> !s_velocity__b0 & s_velocity__b1 & !s_velocity__b2)"
+  },
+  {
+   "fixed": "G(!e_front_sense__b0 & e_front_sense__b1 & !e_front_sense__b2 & !s_mode__b0 & !s_mode__b1 -> s_velocity__b0 & !s_velocity__b1 & !s_velocity__b2)"
+  },
+  {
+   "fixed": "G(e_front_sense__b0 & !e_front_sense__b1 & !e_front_sense__b2 | !s_mode__b0 & s_mode__b1 | s_mode__b0 & !s_mode__b1 -> !s_velocity__b0 & !s_velocity__b1 & !s_velocity__b2)"
+  }
+ ],
+ "in_atoms": [
+  "e_front_sense__b0",
+  "e_front_sense__b1",
+  "e_front_sense__b2",
+  "e_back_sense__b0",
+  "e_back_sense__b1",
+  "e_back_sense__b2",
+  "e_side_sense__b0",
+  "e_side_sense__b1",
+  "e_side_sense__b2",
+  "e_status__b0"
+ ],
+ "out_atoms": [
+  "s_drive_motor__b0",
+  "s_drive_motor__b1",
+  "s_sense_motor__b0",
+  "s_steering_motor__b0",
+  "s_steering_motor__b1",
+  "s_steering_motor__b2",
+  "s_velocity__b0",
+  "s_velocity__b1",
+  "s_velocity__b2",
+  "s_mode__b0",
+  "s_mode__b1"
+ ]
+}

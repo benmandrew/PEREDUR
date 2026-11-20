@@ -82,6 +82,14 @@ Spectra decides GR(1) under its own semantics, and the LTL implication can
 differ from it in edge cases (the system may violate a guarantee once the
 environment can no longer meet an assumption), so a specification whose
 verdict differs from its folder is excluded, as is one that times out.
+On SYNTECH17 at aa9ddb4, 6 differ. Four unrealisable ones come out
+realisable, and each has an assumption that reads a monitor
+(`monitor_in_assumptions` in the manifest): the system can break the
+monitor's guarantees and so falsify the assumption. One realisable
+Elevator comes out unrealisable: its monitor constraints contradict each
+other between floors, which this lowering reads as a guarantee the system
+must keep and Spectra evidently does not. The sixth, an unrealisable
+SimpleVehicle, comes out realisable for a reason not found.
 """
 
 import argparse

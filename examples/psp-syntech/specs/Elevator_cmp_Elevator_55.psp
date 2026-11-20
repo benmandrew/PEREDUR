@@ -1,0 +1,174 @@
+{
+ "assumptions": [
+  {
+   "fixed": "G(!s_count_time_c -> !(X(e_seconds20) | X(e_seconds3)))"
+  },
+  {
+   "fixed": "G(!e_seconds3 -> !e_seconds20)"
+  },
+  {
+   "pattern": "existence",
+   "scope": "between",
+   "s": "e_seconds3",
+   "q": "(!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & a_mem_calls__i0 | m_above_the_ground__b0 & m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & a_mem_calls__i1 | !m_above_the_ground__b0 & m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & a_mem_calls__i2 | m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 & a_mem_calls__i3) & !(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1)",
+   "r": "!(!m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3)"
+  }
+ ],
+ "guarantees": [
+  {
+   "fixed": "G(!s_lift_m_c__b1 | !s_lift_m_c__b0)"
+  },
+  {
+   "fixed": "G(!s_door_m_c__b1 | !s_door_m_c__b0)"
+  },
+  {
+   "fixed": "G(!m_above_the_ground__b3 | !m_above_the_ground__b2 & !m_above_the_ground__b1)"
+  },
+  {
+   "fixed": "G(!m_distance_between_doors__b3 | !m_distance_between_doors__b2 & !m_distance_between_doors__b1)"
+  },
+  {
+   "fixed": "!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3"
+  },
+  {
+   "fixed": "G(!s_lift_m_c__b0 & !s_lift_m_c__b1 <-> !m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & !X(m_above_the_ground__b0) & X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | !m_above_the_ground__b0 & m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & X(m_above_the_ground__b0) & X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | m_above_the_ground__b0 & m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & !X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | !m_above_the_ground__b0 & !m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | m_above_the_ground__b0 & !m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & !X(m_above_the_ground__b0) & X(m_above_the_ground__b1) & X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | !m_above_the_ground__b0 & m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & X(m_above_the_ground__b0) & X(m_above_the_ground__b1) & X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | m_above_the_ground__b0 & m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & !X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & X(m_above_the_ground__b3) | !m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 & X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & X(m_above_the_ground__b3) | m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 & !X(m_above_the_ground__b0) & X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & X(m_above_the_ground__b3))"
+  },
+  {
+   "fixed": "G(!s_lift_m_c__b0 & s_lift_m_c__b1 <-> m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & !X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | !m_above_the_ground__b0 & m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | m_above_the_ground__b0 & m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & !X(m_above_the_ground__b0) & X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | !m_above_the_ground__b0 & !m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & X(m_above_the_ground__b0) & X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | m_above_the_ground__b0 & !m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & !X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | !m_above_the_ground__b0 & m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | m_above_the_ground__b0 & m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & !X(m_above_the_ground__b0) & X(m_above_the_ground__b1) & X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | !m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 & X(m_above_the_ground__b0) & X(m_above_the_ground__b1) & X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 & !X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & X(m_above_the_ground__b3))"
+  },
+  {
+   "fixed": "G(!(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1) <-> (X(m_above_the_ground__b0) <-> m_above_the_ground__b0) & (X(m_above_the_ground__b1) <-> m_above_the_ground__b1) & (X(m_above_the_ground__b2) <-> m_above_the_ground__b2) & (X(m_above_the_ground__b3) <-> m_above_the_ground__b3))"
+  },
+  {
+   "fixed": "!m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3"
+  },
+  {
+   "fixed": "G(!s_door_m_c__b0 & s_door_m_c__b1 <-> !m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3 & X(m_distance_between_doors__b0) & !X(m_distance_between_doors__b1) & !X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3 & !X(m_distance_between_doors__b0) & X(m_distance_between_doors__b1) & !X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | !m_distance_between_doors__b0 & m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3 & X(m_distance_between_doors__b0) & X(m_distance_between_doors__b1) & !X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | m_distance_between_doors__b0 & m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3 & !X(m_distance_between_doors__b0) & !X(m_distance_between_doors__b1) & X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | !m_distance_between_doors__b0 & !m_distance_between_doors__b1 & m_distance_between_doors__b2 & !m_distance_between_doors__b3 & X(m_distance_between_doors__b0) & !X(m_distance_between_doors__b1) & X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | m_distance_between_doors__b0 & !m_distance_between_doors__b1 & m_distance_between_doors__b2 & !m_distance_between_doors__b3 & !X(m_distance_between_doors__b0) & X(m_distance_between_doors__b1) & X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | !m_distance_between_doors__b0 & m_distance_between_doors__b1 & m_distance_between_doors__b2 & !m_distance_between_doors__b3 & X(m_distance_between_doors__b0) & X(m_distance_between_doors__b1) & X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | m_distance_between_doors__b0 & m_distance_between_doors__b1 & m_distance_between_doors__b2 & !m_distance_between_doors__b3 & !X(m_distance_between_doors__b0) & !X(m_distance_between_doors__b1) & !X(m_distance_between_doors__b2) & X(m_distance_between_doors__b3) | !m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & m_distance_between_doors__b3 & X(m_distance_between_doors__b0) & !X(m_distance_between_doors__b1) & !X(m_distance_between_doors__b2) & X(m_distance_between_doors__b3) | m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & m_distance_between_doors__b3 & !X(m_distance_between_doors__b0) & X(m_distance_between_doors__b1) & !X(m_distance_between_doors__b2) & X(m_distance_between_doors__b3))"
+  },
+  {
+   "fixed": "G(!s_door_m_c__b0 & !s_door_m_c__b1 <-> m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3 & !X(m_distance_between_doors__b0) & !X(m_distance_between_doors__b1) & !X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | !m_distance_between_doors__b0 & m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3 & X(m_distance_between_doors__b0) & !X(m_distance_between_doors__b1) & !X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | m_distance_between_doors__b0 & m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3 & !X(m_distance_between_doors__b0) & X(m_distance_between_doors__b1) & !X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | !m_distance_between_doors__b0 & !m_distance_between_doors__b1 & m_distance_between_doors__b2 & !m_distance_between_doors__b3 & X(m_distance_between_doors__b0) & X(m_distance_between_doors__b1) & !X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | m_distance_between_doors__b0 & !m_distance_between_doors__b1 & m_distance_between_doors__b2 & !m_distance_between_doors__b3 & !X(m_distance_between_doors__b0) & !X(m_distance_between_doors__b1) & X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | !m_distance_between_doors__b0 & m_distance_between_doors__b1 & m_distance_between_doors__b2 & !m_distance_between_doors__b3 & X(m_distance_between_doors__b0) & !X(m_distance_between_doors__b1) & X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | m_distance_between_doors__b0 & m_distance_between_doors__b1 & m_distance_between_doors__b2 & !m_distance_between_doors__b3 & !X(m_distance_between_doors__b0) & X(m_distance_between_doors__b1) & X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | !m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & m_distance_between_doors__b3 & X(m_distance_between_doors__b0) & X(m_distance_between_doors__b1) & X(m_distance_between_doors__b2) & !X(m_distance_between_doors__b3) | m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & m_distance_between_doors__b3 & !X(m_distance_between_doors__b0) & !X(m_distance_between_doors__b1) & !X(m_distance_between_doors__b2) & X(m_distance_between_doors__b3))"
+  },
+  {
+   "fixed": "G(s_door_m_c__b0 & !s_door_m_c__b1 <-> (X(m_distance_between_doors__b0) <-> m_distance_between_doors__b0) & (X(m_distance_between_doors__b1) <-> m_distance_between_doors__b1) & (X(m_distance_between_doors__b2) <-> m_distance_between_doors__b2) & (X(m_distance_between_doors__b3) <-> m_distance_between_doors__b3))"
+  },
+  {
+   "fixed": "!m_return_to0"
+  },
+  {
+   "fixed": "G(!(!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3) & (!(a_mem_calls__i0 | a_mem_calls__i1 | a_mem_calls__i2 | a_mem_calls__i3) & e_seconds20 | m_return_to0) <-> X(m_return_to0))"
+  },
+  {
+   "fixed": "G((!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & a_mem_calls__i0 | m_above_the_ground__b0 & m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & a_mem_calls__i1 | !m_above_the_ground__b0 & m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & a_mem_calls__i2 | m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 & a_mem_calls__i3) & !(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1) -> m_take_care_of_floor)"
+  },
+  {
+   "fixed": "G(m_take_care_of_floor & m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3 & !s_door_m_c__b0 & !s_door_m_c__b1 <-> !(X(m_take_care_of_floor) <-> m_take_care_of_floor))"
+  },
+  {
+   "fixed": "!(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1) & s_door_m_c__b0 & !s_door_m_c__b1 & s_lamp_c__b0"
+  },
+  {
+   "fixed": "!a_mem_calls__i0 & !a_mem_calls__i1 & !a_mem_calls__i2 & !a_mem_calls__i3"
+  },
+  {
+   "fixed": "G(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1 -> !m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3 & s_door_m_c__b0 & !s_door_m_c__b1)"
+  },
+  {
+   "fixed": "G(!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 -> !(!s_lift_m_c__b0 & s_lift_m_c__b1))"
+  },
+  {
+   "fixed": "G(m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 -> !(!s_lift_m_c__b0 & !s_lift_m_c__b1))"
+  },
+  {
+   "fixed": "G(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1 -> !(!X(s_lamp_c__b0) <-> !s_lamp_c__b0))"
+  },
+  {
+   "fixed": "G(!(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1) -> X(s_lamp_c__b0))"
+  },
+  {
+   "pattern": "response",
+   "scope": "globally",
+   "p": "e_calls_c__i0",
+   "s": "!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3"
+  },
+  {
+   "pattern": "response",
+   "scope": "globally",
+   "p": "e_calls_c__i1",
+   "s": "m_above_the_ground__b0 & m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3"
+  },
+  {
+   "pattern": "response",
+   "scope": "globally",
+   "p": "e_calls_c__i2",
+   "s": "!m_above_the_ground__b0 & m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3"
+  },
+  {
+   "pattern": "response",
+   "scope": "globally",
+   "p": "e_calls_c__i3",
+   "s": "m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3"
+  },
+  {
+   "fixed": "G((!s_lift_m_c__b0 & !s_lift_m_c__b1 -> !(!X(s_lift_m_c__b0) & X(s_lift_m_c__b1))) & (!s_lift_m_c__b0 & s_lift_m_c__b1 -> !(!X(s_lift_m_c__b0) & !X(s_lift_m_c__b1))))"
+  },
+  {
+   "fixed": "G((e_calls_c__i0 -> X(a_mem_calls__i0)) & (e_calls_c__i1 -> X(a_mem_calls__i1)) & (e_calls_c__i2 -> X(a_mem_calls__i2)) & (e_calls_c__i3 -> X(a_mem_calls__i3)))"
+  },
+  {
+   "fixed": "G(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1 -> (!(!X(s_lift_m_c__b0) & !X(s_lift_m_c__b1) | !X(s_lift_m_c__b0) & X(s_lift_m_c__b1)) <-> !X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) & X(a_mem_calls__i0) | X(m_above_the_ground__b0) & X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) & X(a_mem_calls__i1) | !X(m_above_the_ground__b0) & X(m_above_the_ground__b1) & X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) & X(a_mem_calls__i2) | X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & X(m_above_the_ground__b3) & X(a_mem_calls__i3) | !X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & !X(m_above_the_ground__b3) | X(m_above_the_ground__b0) & !X(m_above_the_ground__b1) & !X(m_above_the_ground__b2) & X(m_above_the_ground__b3)))"
+  },
+  {
+   "fixed": "G((!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & !e_calls_c__i0 -> !X(a_mem_calls__i0)) & (m_above_the_ground__b0 & m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & !e_calls_c__i1 -> !X(a_mem_calls__i1)) & (!m_above_the_ground__b0 & m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & !e_calls_c__i2 -> !X(a_mem_calls__i2)) & (m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 & !e_calls_c__i3 -> !X(a_mem_calls__i3)))"
+  },
+  {
+   "fixed": "G(!(a_mem_calls__i0 | a_mem_calls__i1 | a_mem_calls__i2 | a_mem_calls__i3) & !m_return_to0 -> !(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1))"
+  },
+  {
+   "fixed": "G(!(a_mem_calls__i0 | a_mem_calls__i1 | a_mem_calls__i2 | a_mem_calls__i3 | !m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3) | m_take_care_of_floor & !(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1) <-> s_count_time_c)"
+  },
+  {
+   "pattern": "existence",
+   "scope": "between",
+   "s": "!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3",
+   "q": "m_return_to0",
+   "r": "!s_lift_m_c__b0 & !s_lift_m_c__b1 | !(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1)"
+  },
+  {
+   "pattern": "existence",
+   "scope": "between",
+   "s": "m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & m_distance_between_doors__b3",
+   "q": "(!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & a_mem_calls__i0 | m_above_the_ground__b0 & m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & a_mem_calls__i1 | !m_above_the_ground__b0 & m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & a_mem_calls__i2 | m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 & a_mem_calls__i3) & !(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1)",
+   "r": "!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1 | s_door_m_c__b0 & !s_door_m_c__b1 | !s_door_m_c__b0 & !s_door_m_c__b1"
+  }
+ ],
+ "in_atoms": [
+  "e_calls_c__i0",
+  "e_calls_c__i1",
+  "e_calls_c__i2",
+  "e_calls_c__i3",
+  "e_seconds3",
+  "e_seconds20"
+ ],
+ "out_atoms": [
+  "s_lift_m_c__b0",
+  "s_lift_m_c__b1",
+  "s_door_m_c__b0",
+  "s_door_m_c__b1",
+  "s_lamp_c__b0",
+  "s_count_time_c",
+  "a_mem_calls__i0",
+  "a_mem_calls__i1",
+  "a_mem_calls__i2",
+  "a_mem_calls__i3",
+  "m_above_the_ground__b0",
+  "m_above_the_ground__b1",
+  "m_above_the_ground__b2",
+  "m_above_the_ground__b3",
+  "m_distance_between_doors__b0",
+  "m_distance_between_doors__b1",
+  "m_distance_between_doors__b2",
+  "m_distance_between_doors__b3",
+  "m_return_to0",
+  "m_take_care_of_floor"
+ ]
+}

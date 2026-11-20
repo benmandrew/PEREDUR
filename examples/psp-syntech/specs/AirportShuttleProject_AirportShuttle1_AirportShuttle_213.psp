@@ -1,0 +1,184 @@
+{
+ "assumptions": [
+  {
+   "fixed": "!e_station__b0 & !e_station__b1 & e_at_station & !e_pressed_station_zero & !e_pressed_station_one & !e_pressed_station_two & !e_pressed_station_three & e_emg_button__b0"
+  },
+  {
+   "fixed": "G((!s_motors__b0 & !s_motors__b1 & !(e_at_station & e_station__b0 & e_station__b1)) -> F(!e_station__b0 & !e_station__b1 & X(e_station__b0) & !X(e_station__b1) | e_station__b0 & !e_station__b1 & !X(e_station__b0) & X(e_station__b1) | !e_station__b0 & e_station__b1 & X(e_station__b0) & X(e_station__b1) | !(!s_motors__b0 & !s_motors__b1)))"
+  },
+  {
+   "fixed": "G((!s_motors__b0 & s_motors__b1 & !(e_at_station & !e_station__b0 & !e_station__b1)) -> F(e_station__b0 & !e_station__b1 & !X(e_station__b0) & !X(e_station__b1) | !e_station__b0 & e_station__b1 & X(e_station__b0) & !X(e_station__b1) | e_station__b0 & e_station__b1 & !X(e_station__b0) & X(e_station__b1) | !(!s_motors__b0 & s_motors__b1)))"
+  },
+  {
+   "fixed": "G(!(!e_at_station & X(e_at_station)) -> (X(e_station__b0) <-> e_station__b0) & (X(e_station__b1) <-> e_station__b1))"
+  },
+  {
+   "fixed": "G(!e_at_station & X(e_at_station) & !s_motors__b0 & !s_motors__b1 -> !e_station__b0 & !e_station__b1 & X(e_station__b0) & !X(e_station__b1) | e_station__b0 & !e_station__b1 & !X(e_station__b0) & X(e_station__b1) | !e_station__b0 & e_station__b1 & X(e_station__b0) & X(e_station__b1))"
+  },
+  {
+   "fixed": "G(!e_at_station & X(e_at_station) & !s_motors__b0 & s_motors__b1 -> e_station__b0 & !e_station__b1 & !X(e_station__b0) & !X(e_station__b1) | !e_station__b0 & e_station__b1 & X(e_station__b0) & !X(e_station__b1) | e_station__b0 & e_station__b1 & !X(e_station__b0) & X(e_station__b1))"
+  },
+  {
+   "fixed": "G((X(e_station__b0) <-> e_station__b0) & (X(e_station__b1) <-> e_station__b1) | !e_station__b0 & !e_station__b1 & X(e_station__b0) & !X(e_station__b1) | e_station__b0 & !e_station__b1 & !X(e_station__b0) & X(e_station__b1) | !e_station__b0 & e_station__b1 & X(e_station__b0) & X(e_station__b1) | e_station__b0 & !e_station__b1 & !X(e_station__b0) & !X(e_station__b1) | !e_station__b0 & e_station__b1 & X(e_station__b0) & !X(e_station__b1) | e_station__b0 & e_station__b1 & !X(e_station__b0) & X(e_station__b1))"
+  },
+  {
+   "fixed": "G(s_motors__b0 & !s_motors__b1 -> (e_at_station <-> X(e_at_station)) & (e_station__b0 <-> X(e_station__b0)) & (e_station__b1 <-> X(e_station__b1)))"
+  },
+  {
+   "fixed": "G((X(e_at_station) & !X(e_station__b0) & !X(e_station__b1) -> !X(e_pressed_station_zero)) & (X(e_at_station) & X(e_station__b0) & !X(e_station__b1) -> !X(e_pressed_station_one)) & (X(e_at_station) & !X(e_station__b0) & X(e_station__b1) -> !X(e_pressed_station_two)) & (X(e_at_station) & X(e_station__b0) & X(e_station__b1) -> !X(e_pressed_station_three)))"
+  },
+  {
+   "fixed": "G(F(!m_at_emg_state))"
+  }
+ ],
+ "guarantees": [
+  {
+   "fixed": "G(!s_motors__b1 | !s_motors__b0)"
+  },
+  {
+   "fixed": "!m_at_emg_state"
+  },
+  {
+   "fixed": "G(!e_at_station & m_at_emg_state -> X(m_at_emg_state))"
+  },
+  {
+   "fixed": "G(e_at_station | !e_at_station & !m_at_emg_state -> (!e_emg_button__b0 <-> (X(m_at_emg_state) <-> !m_at_emg_state)))"
+  },
+  {
+   "fixed": "!m_task_at_station_zero"
+  },
+  {
+   "fixed": "G(e_pressed_station_zero & !X(m_at_emg_state) -> X(m_task_at_station_zero))"
+  },
+  {
+   "fixed": "G(e_at_station & !e_station__b0 & !e_station__b1 & m_task_at_station_zero & !e_pressed_station_zero & !X(m_at_emg_state) -> !X(m_task_at_station_zero))"
+  },
+  {
+   "fixed": "G(X(m_at_emg_state) -> !X(m_task_at_station_zero))"
+  },
+  {
+   "fixed": "G(e_at_station & !e_station__b0 & !e_station__b1 & !m_task_at_station_zero & !e_pressed_station_zero & !X(m_at_emg_state) -> (X(m_task_at_station_zero) <-> m_task_at_station_zero))"
+  },
+  {
+   "fixed": "G(!(e_at_station & !e_station__b0 & !e_station__b1) & !e_pressed_station_zero & !X(m_at_emg_state) -> (X(m_task_at_station_zero) <-> m_task_at_station_zero))"
+  },
+  {
+   "fixed": "!m_task_at_station_one"
+  },
+  {
+   "fixed": "G(e_pressed_station_one & !X(m_at_emg_state) -> X(m_task_at_station_one))"
+  },
+  {
+   "fixed": "G(e_at_station & e_station__b0 & !e_station__b1 & m_task_at_station_one & !e_pressed_station_one & !X(m_at_emg_state) -> !X(m_task_at_station_one))"
+  },
+  {
+   "fixed": "G(X(m_at_emg_state) -> !X(m_task_at_station_one))"
+  },
+  {
+   "fixed": "G(e_at_station & e_station__b0 & !e_station__b1 & !m_task_at_station_one & !e_pressed_station_one & !X(m_at_emg_state) -> (X(m_task_at_station_one) <-> m_task_at_station_one))"
+  },
+  {
+   "fixed": "G(!(e_at_station & e_station__b0 & !e_station__b1) & !e_pressed_station_one & !X(m_at_emg_state) -> (X(m_task_at_station_one) <-> m_task_at_station_one))"
+  },
+  {
+   "fixed": "!m_task_at_station_two"
+  },
+  {
+   "fixed": "G(e_pressed_station_two & !X(m_at_emg_state) -> X(m_task_at_station_two))"
+  },
+  {
+   "fixed": "G(e_at_station & !e_station__b0 & e_station__b1 & m_task_at_station_two & !e_pressed_station_two & !X(m_at_emg_state) -> !X(m_task_at_station_two))"
+  },
+  {
+   "fixed": "G(X(m_at_emg_state) -> !X(m_task_at_station_two))"
+  },
+  {
+   "fixed": "G(e_at_station & !e_station__b0 & e_station__b1 & !m_task_at_station_two & !e_pressed_station_two & !X(m_at_emg_state) -> (X(m_task_at_station_two) <-> m_task_at_station_two))"
+  },
+  {
+   "fixed": "G(!(e_at_station & !e_station__b0 & e_station__b1) & !e_pressed_station_two & !X(m_at_emg_state) -> (X(m_task_at_station_two) <-> m_task_at_station_two))"
+  },
+  {
+   "fixed": "!m_task_at_station_three"
+  },
+  {
+   "fixed": "G(e_pressed_station_three & !X(m_at_emg_state) -> X(m_task_at_station_three))"
+  },
+  {
+   "fixed": "G(e_at_station & e_station__b0 & e_station__b1 & m_task_at_station_three & !e_pressed_station_three & !X(m_at_emg_state) -> !X(m_task_at_station_three))"
+  },
+  {
+   "fixed": "G(X(m_at_emg_state) -> !X(m_task_at_station_three))"
+  },
+  {
+   "fixed": "G(e_at_station & e_station__b0 & e_station__b1 & !m_task_at_station_three & !e_pressed_station_three & !X(m_at_emg_state) -> (X(m_task_at_station_three) <-> m_task_at_station_three))"
+  },
+  {
+   "fixed": "G(!(e_at_station & e_station__b0 & e_station__b1) & !e_pressed_station_three & !X(m_at_emg_state) -> (X(m_task_at_station_three) <-> m_task_at_station_three))"
+  },
+  {
+   "fixed": "s_motors__b0 & !s_motors__b1"
+  },
+  {
+   "fixed": "G(e_at_station & m_at_emg_state -> s_motors__b0 & !s_motors__b1)"
+  },
+  {
+   "fixed": "G(e_at_station & (!e_station__b0 & !e_station__b1 & m_task_at_station_zero | e_station__b0 & !e_station__b1 & m_task_at_station_one | !e_station__b0 & e_station__b1 & m_task_at_station_two | e_station__b0 & e_station__b1 & m_task_at_station_three) -> s_motors__b0 & !s_motors__b1)"
+  },
+  {
+   "fixed": "G(e_at_station & !e_station__b0 & !e_station__b1 -> !(!s_motors__b0 & s_motors__b1))"
+  },
+  {
+   "fixed": "G(e_at_station & e_station__b0 & e_station__b1 -> !(!s_motors__b0 & !s_motors__b1))"
+  },
+  {
+   "fixed": "G(!m_task_at_station_zero & !m_task_at_station_one & !m_task_at_station_two & !m_task_at_station_three & e_at_station -> s_motors__b0 & !s_motors__b1)"
+  },
+  {
+   "fixed": "G(e_at_station & !e_station__b0 & !e_station__b1 & !m_task_at_station_one & !m_task_at_station_two & !m_task_at_station_three | e_at_station & e_station__b0 & !e_station__b1 & !m_task_at_station_two & !m_task_at_station_three | e_at_station & !e_station__b0 & e_station__b1 & !m_task_at_station_three -> !(!s_motors__b0 & !s_motors__b1))"
+  },
+  {
+   "fixed": "G(e_at_station & e_station__b0 & e_station__b1 & !m_task_at_station_two & !m_task_at_station_one & !m_task_at_station_zero | e_at_station & !e_station__b0 & e_station__b1 & !m_task_at_station_one & !m_task_at_station_zero | e_at_station & e_station__b0 & !e_station__b1 & !m_task_at_station_zero -> !(!s_motors__b0 & s_motors__b1))"
+  },
+  {
+   "fixed": "G(e_at_station & !(e_at_station & (!e_station__b0 & !e_station__b1 & m_task_at_station_zero | e_station__b0 & !e_station__b1 & m_task_at_station_one | !e_station__b0 & e_station__b1 & m_task_at_station_two | e_station__b0 & e_station__b1 & m_task_at_station_three)) & !(!m_task_at_station_zero & !m_task_at_station_one & !m_task_at_station_two & !m_task_at_station_three) -> !(s_motors__b0 & !s_motors__b1))"
+  },
+  {
+   "fixed": "G(!e_at_station -> !(s_motors__b0 & !s_motors__b1))"
+  },
+  {
+   "fixed": "G(!(s_motors__b0 & !s_motors__b1) -> !X(s_motors__b0) & !X(s_motors__b1) & !s_motors__b0 & !s_motors__b1 | X(s_motors__b0) & !X(s_motors__b1) & s_motors__b0 & !s_motors__b1 | !X(s_motors__b0) & X(s_motors__b1) & !s_motors__b0 & s_motors__b1 | X(s_motors__b0) & !X(s_motors__b1))"
+  },
+  {
+   "fixed": "G(F(!m_task_at_station_zero))"
+  },
+  {
+   "fixed": "G(F(!m_task_at_station_one))"
+  },
+  {
+   "fixed": "G(F(!m_task_at_station_two))"
+  },
+  {
+   "fixed": "G(F(!m_task_at_station_three))"
+  }
+ ],
+ "in_atoms": [
+  "e_station__b0",
+  "e_station__b1",
+  "e_at_station",
+  "e_emg_button__b0",
+  "e_pressed_station_zero",
+  "e_pressed_station_one",
+  "e_pressed_station_two",
+  "e_pressed_station_three"
+ ],
+ "out_atoms": [
+  "s_motors__b0",
+  "s_motors__b1",
+  "m_at_emg_state",
+  "m_task_at_station_zero",
+  "m_task_at_station_one",
+  "m_task_at_station_two",
+  "m_task_at_station_three"
+ ]
+}

@@ -1,0 +1,50 @@
+{
+ "assumptions": [
+  {
+   "pattern": "response",
+   "scope": "globally",
+   "p": "!s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1 | !s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & s_m_right__b1 | s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1 | s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & s_m_right__b1 | !s_m_left__b0 & s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1 | !s_m_left__b0 & s_m_left__b1 & s_m_right__b0 & !s_m_right__b1",
+   "s": "!e_sense__b0"
+  },
+  {
+   "fixed": "G(F(!m_clapped & !e_sense__b0))"
+  }
+ ],
+ "guarantees": [
+  {
+   "fixed": "G(!s_m_left__b1 | !s_m_left__b0)"
+  },
+  {
+   "fixed": "G(!s_m_right__b1 | !s_m_right__b0)"
+  },
+  {
+   "fixed": "!m_clapped"
+  },
+  {
+   "fixed": "G(e_sound <-> (X(m_clapped) <-> !m_clapped))"
+  },
+  {
+   "fixed": "s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1"
+  },
+  {
+   "fixed": "G(e_sense__b0 -> !(!s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1))"
+  },
+  {
+   "fixed": "G(F(!s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1))"
+  },
+  {
+   "fixed": "G(m_clapped -> !s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1 | !s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & s_m_right__b1 | s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1 | s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & s_m_right__b1 | !s_m_left__b0 & s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1 | !s_m_left__b0 & s_m_left__b1 & s_m_right__b0 & !s_m_right__b1)"
+  }
+ ],
+ "in_atoms": [
+  "e_sense__b0",
+  "e_sound"
+ ],
+ "out_atoms": [
+  "s_m_left__b0",
+  "s_m_left__b1",
+  "s_m_right__b0",
+  "s_m_right__b1",
+  "m_clapped"
+ ]
+}
