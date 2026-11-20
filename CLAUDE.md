@@ -15,7 +15,7 @@ Detail lives in `docs/dev/`. Read the file covering an area before changing it. 
 | `docs/dev/fretish-scopes.md` | FRETISH scopes |
 | `docs/dev/performance.md` | Cache keys, Scoring dispatch, Per-generation gate, Implication prefilter, Implication residual query, Implication model probe, Satisfiability route, Decomposition re-ask, Controller-store gate, Tool subprocesses, Spot fork server, Profiling |
 | `docs/dev/config-and-provenance.md` | Config keys, Commit provenance, Run manifest schema versions, Where the campaign records are, Config vintage (including retired keys) |
-| `docs/dev/campaigns.md` | Campaigns (the operating manual for `scripts/campaign.py`), The declaration, Staging a host, Launching, Scoring phases, Compare phases, Fingerprint phases, Reading a run, The binary freshness gate, The queue, A tick stages its own branch, Collecting and closing, Large outputs, Testing this |
+| `docs/dev/campaigns.md` | Campaigns (the operating manual for `scripts/campaign.py`), The declaration, Staging a host, Launching, Scoring phases, Compare phases, Fingerprint phases, Reduce phases, Reading a run, The binary freshness gate, The queue, A tick stages its own branch, Collecting and closing, Large outputs, Testing this |
 | `docs/dev/testing.md` | Tests, Python tests, Coverage |
 | `docs/dev/tooling.md` | Build, Lint & Format, Docs |
 | `docs/dev/packaging.md` | External tools, Packaging |
