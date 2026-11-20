@@ -89,6 +89,29 @@ void add_unique(std::vector<Formula>& pool, const Formula& formula) {
     }
 }
 
+// Adds the formulas and the count of @p req, where it is live and not fixed.
+void collect(const Requirement& req, Pools& pools) {
+    if (req.m_removed || req.is_fixed()) {
+        return;
+    }
+    const Fields values = fields_of(req);
+    for (std::size_t idx = 0; idx < values.size(); ++idx) {
+        if (const std::optional<Formula>& value = values.at(idx)) {
+            add_unique(pools.by_field.at(idx), *value);
+        }
+    }
+    if (const std::optional<std::size_t> count = pattern_count(req.m_pattern)) {
+        pools.counts.push_back(*count);
+    }
+}
+
+void add_atoms(std::vector<Formula>& pool,
+               const std::vector<std::string>& atoms) {
+    for (const std::string& atom : atoms) {
+        add_unique(pool, Formula::make_atom(atom));
+    }
+}
+
 Pools pools_of(const Specification& spec) {
     Pools pools;
     pools.inputs = spec.m_in_atoms;
@@ -96,19 +119,7 @@ Pools pools_of(const Specification& spec) {
     for (const std::vector<Requirement>* list :
          {&spec.m_assumptions, &spec.m_guarantees}) {
         for (const Requirement& req : *list) {
-            if (req.m_removed || req.is_fixed()) {
-                continue;
-            }
-            const Fields values = fields_of(req);
-            for (std::size_t idx = 0; idx < values.size(); ++idx) {
-                if (values[idx].has_value()) {
-                    add_unique(pools.by_field[idx], *values[idx]);
-                }
-            }
-            if (const std::optional<std::size_t> count =
-                    pattern_count(req.m_pattern)) {
-                pools.counts.push_back(*count);
-            }
+            collect(req, pools);
         }
     }
     // Q and R are both scope delimiters: either may take the other's
@@ -117,19 +128,13 @@ Pools pools_of(const Specification& spec) {
     for (const Formula& formula : pools.by_field[3]) {
         add_unique(delimiters, formula);
     }
-    for (const std::string& atom : pools.inputs) {
-        add_unique(delimiters, Formula::make_atom(atom));
-    }
+    add_atoms(delimiters, pools.inputs);
     pools.by_field[2] = delimiters;
     pools.by_field[3] = delimiters;
     for (const std::size_t idx : {std::size_t{0}, std::size_t{1}}) {
-        if (pools.by_field[idx].empty()) {
-            for (const std::string& atom : pools.inputs) {
-                add_unique(pools.by_field[idx], Formula::make_atom(atom));
-            }
-            for (const std::string& atom : pools.outputs) {
-                add_unique(pools.by_field[idx], Formula::make_atom(atom));
-            }
+        if (pools.by_field.at(idx).empty()) {
+            add_atoms(pools.by_field.at(idx), pools.inputs);
+            add_atoms(pools.by_field.at(idx), pools.outputs);
         }
     }
     std::sort(pools.counts.begin(), pools.counts.end());
@@ -145,9 +150,9 @@ std::set<std::string> atoms_at(const Fields& values,
                                std::initializer_list<std::size_t> indices) {
     std::set<std::string> out;
     for (const std::size_t idx : indices) {
-        if (values[idx].has_value()) {
+        if (const std::optional<Formula>& value = values.at(idx)) {
             std::vector<std::string> names;
-            atom_occurrences(*values[idx], names);
+            atom_occurrences(*value, names);
             out.insert(names.begin(), names.end());
         }
     }
@@ -167,8 +172,8 @@ std::vector<Fields> fitted(const Fields& values, const Pattern& pattern,
             continue;
         }
         std::vector<Formula> options;
-        if (values[idx].has_value()) {
-            options.push_back(*values[idx]);
+        if (const std::optional<Formula>& value = values.at(idx)) {
+            options.push_back(*value);
         } else {
             for (const Formula& option : pools.by_field[idx]) {
                 std::vector<std::string> names;
@@ -441,82 +446,109 @@ void count_edits(const Requirement& req, std::vector<Candidate>& out) {
     }
 }
 
+// One field of a requirement, and how to rebuild the requirement with it
+// replaced.
+struct FieldSite {
+    FieldSite(const Requirement& requirement, const Fields& fields,
+              std::size_t index)
+        : req(requirement),
+          values(fields),
+          idx(index),
+          field(*fields.at(index)) {
+        atom_occurrences(field, occurrences);
+    }
+
+    const Requirement& req;
+    const Fields& values;
+    std::size_t idx;
+    const Formula& field;
+    std::vector<std::string> occurrences;
+
+    [[nodiscard]] Requirement with(const Formula& replaced) const {
+        Fields edited = values;
+        edited[idx] = replaced;
+        return build(req.m_pattern, req.m_scope, edited);
+    }
+};
+
+// narrow-field: a literal conjoined where the field is monotone and
+// disjoined where it is antitone. A literal over a delimiter's atom is often
+// absorbed by the scope (`cruise & !brake` where brake closes it), so the
+// literals avoid them, and the field's own atoms.
+void narrow_edits(const FieldSite& site, const Pools& pools,
+                  std::vector<Candidate>& out) {
+    const std::optional<Polarity> polarity = field_polarity(
+        k_fields[site.idx], site.req.m_pattern, site.req.m_scope);
+    if (!polarity.has_value() || *polarity == Polarity::None) {
+        return;
+    }
+    const Formula::Kind join = *polarity == Polarity::Monotone
+                                   ? Formula::Kind::And
+                                   : Formula::Kind::Or;
+    std::set<std::string> avoid = atoms_at(site.values, {2, 3});
+    avoid.insert(site.occurrences.begin(), site.occurrences.end());
+    for (const std::string& atom :
+         literal_atoms(k_fields[site.idx], site.req.m_pattern, pools)) {
+        if (avoid.count(atom) != 0) {
+            continue;
+        }
+        const Formula positive = Formula::make_atom(atom);
+        for (const Formula& literal :
+             {positive, Formula::make_unary(Formula::Kind::Not, positive)}) {
+            out.push_back(
+                {"narrow-field", k_field_names[site.idx],
+                 site.with(Formula::make_binary(join, site.field, literal))});
+        }
+    }
+}
+
+Formula flipped(const Formula& node) {
+    if (const std::optional<Formula> child = node.unary_child()) {
+        return *child;
+    }
+    return Formula::make_unary(Formula::Kind::Not, node);
+}
+
+// flip-literal and swap-signal, at each atom occurrence.
+void literal_edits(const FieldSite& site, const Pools& pools,
+                   std::vector<Candidate>& out) {
+    const char* name_of_field = k_field_names[site.idx];
+    for (std::size_t occ = 0; occ < site.occurrences.size(); ++occ) {
+        out.push_back({"flip-literal", name_of_field,
+                       site.with(at_occurrence(site.field, occ, flipped))});
+    }
+    for (std::size_t occ = 0; occ < site.occurrences.size(); ++occ) {
+        const std::string& name = site.occurrences[occ];
+        const bool is_input =
+            std::find(pools.inputs.begin(), pools.inputs.end(), name) !=
+            pools.inputs.end();
+        for (const std::string& other :
+             is_input ? pools.inputs : pools.outputs) {
+            if (other == name) {
+                continue;
+            }
+            const auto renamed = [&other](const Formula& node) {
+                const Formula atom = Formula::make_atom(other);
+                return node.kind() == Formula::Kind::Not
+                           ? Formula::make_unary(Formula::Kind::Not, atom)
+                           : atom;
+            };
+            out.push_back({"swap-signal", name_of_field,
+                           site.with(at_occurrence(site.field, occ, renamed))});
+        }
+    }
+}
+
 void formula_edits(const Requirement& req, const Pools& pools,
                    std::vector<Candidate>& out) {
     const Fields values = fields_of(req);
     for (std::size_t idx = 0; idx < k_fields.size(); ++idx) {
-        if (!values[idx].has_value()) {
+        if (!values.at(idx).has_value()) {
             continue;
         }
-        const Formula& field = *values[idx];
-        std::vector<std::string> occurrences;
-        atom_occurrences(field, occurrences);
-        const auto with_field = [&](const Formula& replaced) {
-            Fields edited = values;
-            edited[idx] = replaced;
-            return build(req.m_pattern, req.m_scope, edited);
-        };
-        const std::optional<Polarity> polarity =
-            field_polarity(k_fields[idx], req.m_pattern, req.m_scope);
-        // A literal over a delimiter's atom is often absorbed by the scope
-        // (`cruise & !brake` where brake closes it), so the literals avoid
-        // them.
-        const std::set<std::string> delimiters = atoms_at(values, {2, 3});
-        if (polarity.has_value() && *polarity != Polarity::None) {
-            const Formula::Kind join = *polarity == Polarity::Monotone
-                                           ? Formula::Kind::And
-                                           : Formula::Kind::Or;
-            for (const std::string& atom :
-                 literal_atoms(k_fields[idx], req.m_pattern, pools)) {
-                if (std::find(occurrences.begin(), occurrences.end(), atom) !=
-                        occurrences.end() ||
-                    delimiters.count(atom) != 0) {
-                    continue;
-                }
-                const Formula positive = Formula::make_atom(atom);
-                for (const Formula& literal :
-                     {positive,
-                      Formula::make_unary(Formula::Kind::Not, positive)}) {
-                    out.push_back({"narrow-field", k_field_names[idx],
-                                   with_field(Formula::make_binary(join, field,
-                                                                   literal))});
-                }
-            }
-        }
-        for (std::size_t occ = 0; occ < occurrences.size(); ++occ) {
-            out.push_back(
-                {"flip-literal", k_field_names[idx],
-                 with_field(at_occurrence(field, occ, [](const Formula& node) {
-                     if (const std::optional<Formula> child =
-                             node.unary_child()) {
-                         return *child;
-                     }
-                     return Formula::make_unary(Formula::Kind::Not, node);
-                 }))});
-        }
-        for (std::size_t occ = 0; occ < occurrences.size(); ++occ) {
-            const std::string& name = occurrences[occ];
-            const bool is_input =
-                std::find(pools.inputs.begin(), pools.inputs.end(), name) !=
-                pools.inputs.end();
-            const std::vector<std::string>& kind =
-                is_input ? pools.inputs : pools.outputs;
-            for (const std::string& other : kind) {
-                if (other == name) {
-                    continue;
-                }
-                out.push_back(
-                    {"swap-signal", k_field_names[idx],
-                     with_field(at_occurrence(
-                         field, occ, [&other](const Formula& node) {
-                             const Formula atom = Formula::make_atom(other);
-                             return node.kind() == Formula::Kind::Not
-                                        ? Formula::make_unary(
-                                              Formula::Kind::Not, atom)
-                                        : atom;
-                         }))});
-            }
-        }
+        const FieldSite site(req, values, idx);
+        narrow_edits(site, pools, out);
+        literal_edits(site, pools, out);
     }
 }
 
