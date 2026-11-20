@@ -6,6 +6,7 @@
 
 #include "driver_support.hpp"
 #include "prop_formula.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "serialisation.hpp"
 #include "tlsf/parser.hpp"
@@ -14,13 +15,14 @@
 namespace {
 
 void print_usage(const char* prog) {
-    std::cerr << "Usage: " << prog << " <spec.json|spec.tlsf> [...]\n"
+    std::cerr << "Usage: " << prog << " <spec.json|spec.tlsf|spec.psp> [...]\n"
               << "\n"
               << "Prints the LTL formulae for each requirement in a "
                  "specification.\n"
               << "FRETISH JSON prints each requirement's LTL; a basic-TLSF\n"
               << "(.tlsf) input prints each non-empty section's formulae and\n"
-              << "the combined lowering.\n"
+              << "the combined lowering. A PSP (.psp) input prints each\n"
+              << "requirement in structured English and its LTL.\n"
               << "\n"
               << "  --version  Print the git commit this binary was built "
                  "from.\n";
@@ -78,6 +80,28 @@ void print_spec_ltl(const std::string& path, const Specification& prefixed_spec,
     }
 }
 
+void print_psp_ltl(const std::string& path, bool show_path) {
+    // Stripped once, as on the FRETISH path, so both lines show the names the
+    // file uses.
+    const psp::Specification spec =
+        psp::strip_atom_prefix(psp::load_specification(path));
+    if (show_path) {
+        std::cout << path << ":\n";
+    }
+    const auto print = [](const char* label,
+                          const std::vector<psp::Requirement>& reqs) {
+        for (const psp::Requirement& req : reqs) {
+            std::cout << "  [" << label << "] " << req.to_string() << "\n";
+            std::cout << "    LTL: " << req.m_ltl << "\n";
+        }
+    };
+    print("assumption", spec.m_assumptions);
+    print("guarantee", spec.m_guarantees);
+    if (show_path) {
+        std::cout << "\n";
+    }
+}
+
 }  // namespace
 
 int main(int argc, const char* const argv[]) {
@@ -98,8 +122,12 @@ int main(int argc, const char* const argv[]) {
 
     for (const std::string& path : paths) {
         try {
-            if (std::filesystem::path(path).extension() == ".tlsf") {
+            const std::filesystem::path extension =
+                std::filesystem::path(path).extension();
+            if (extension == ".tlsf") {
                 print_tlsf_ltl(path, multi);
+            } else if (extension == ".psp") {
+                print_psp_ltl(path, multi);
             } else {
                 print_spec_ltl(path, load_specification(path), multi);
             }

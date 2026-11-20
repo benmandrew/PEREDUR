@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "psp-specification.schema.json",
+  "title": "PSP specification",
+  "description": "A specification in Dwyer's Property Specification Patterns (the .psp format of the PEREDUR PSP front end). The loader in src/psp/serialisation.cpp enforces this schema, and also rejects an atom declared in neither atom list and an input name with an uppercase letter.",
+  "type": "object",
+  "required": ["assumptions", "guarantees", "in_atoms", "out_atoms"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "assumptions": {
+      "description": "Assumptions on the environment.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/Requirement" }
+    },
+    "guarantees": {
+      "description": "Guarantees of the system.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/Requirement" }
+    },
+    "in_atoms": {
+      "description": "Input (uncontrollable) atomic propositions.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "out_atoms": {
+      "description": "Output (controllable) atomic propositions.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "Requirement": {
+      "oneOf": [
+        { "$ref": "#/$defs/PatternRequirement" },
+        { "$ref": "#/$defs/FixedRequirement" }
+      ]
+    },
+    "Formula": {
+      "description": "A propositional formula over the declared atoms: ! & | -> <-> and parentheses.",
+      "type": "string"
+    },
+    "FixedRequirement": {
+      "description": "A raw LTL formula (X F G U R W over the propositional connectives), carried unchanged and never weakened.",
+      "type": "object",
+      "required": ["fixed"],
+      "additionalProperties": false,
+      "properties": {
+        "fixed": { "type": "string" }
+      }
+    },
+    "PatternRequirement": {
+      "description": "A pattern under a scope. p and s are present exactly where the pattern reads them, and q and r exactly where the scope reads them.",
+      "type": "object",
+      "required": ["pattern"],
+      "additionalProperties": false,
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "enum": [
+            "absence",
+            "universality",
+            "existence",
+            "precedence",
+            "response",
+            "bounded-response",
+            "bounded-invariance",
+            "bounded-existence",
+            "bounded-recurrence"
+          ]
+        },
+        "count": {
+          "description": "The count of a bounded pattern: c ticks for bounded response, bounded invariance and bounded recurrence, and k stretches for bounded existence. Present exactly on the bounded patterns.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "scope": {
+          "description": "The interval the pattern holds over, closed on the left and open on the right. Absent means globally.",
+          "type": "string",
+          "enum": ["globally", "before", "after", "between", "afteruntil"],
+          "default": "globally"
+        },
+        "p": {
+          "description": "The trigger or forbidden proposition: read by absence, precedence, response, bounded response, bounded invariance and bounded existence.",
+          "$ref": "#/$defs/Formula"
+        },
+        "s": {
+          "description": "The target proposition: read by every pattern but absence and bounded existence.",
+          "$ref": "#/$defs/Formula"
+        },
+        "q": {
+          "description": "The scope's opener: read by after, between and afteruntil.",
+          "$ref": "#/$defs/Formula"
+        },
+        "r": {
+          "description": "The scope's closer: read by before, between and afteruntil.",
+          "$ref": "#/$defs/Formula"
+        },
+        "weakenable": {
+          "description": "When false the search never changes this requirement. Absent means true.",
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "pattern": { "enum": ["bounded-response", "bounded-invariance", "bounded-existence", "bounded-recurrence"] } } },
+          "then": { "required": ["count"] },
+          "else": { "not": { "required": ["count"] } }
+        },
+        {
+          "if": { "properties": { "pattern": { "enum": ["universality", "existence", "bounded-recurrence"] } } },
+          "then": { "not": { "required": ["p"] } },
+          "else": { "required": ["p"] }
+        },
+        {
+          "if": { "properties": { "pattern": { "enum": ["absence", "bounded-existence"] } } },
+          "then": { "not": { "required": ["s"] } },
+          "else": { "required": ["s"] }
+        },
+        {
+          "if": { "required": ["scope"], "properties": { "scope": { "enum": ["after", "between", "afteruntil"] } } },
+          "then": { "required": ["q"] },
+          "else": { "not": { "required": ["q"] } }
+        },
+        {
+          "if": { "required": ["scope"], "properties": { "scope": { "enum": ["before", "between", "afteruntil"] } } },
+          "then": { "required": ["r"] },
+          "else": { "not": { "required": ["r"] } }
+        }
+      ]
+    }
+  }
+}

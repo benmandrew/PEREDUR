@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -1790,6 +1791,83 @@ TEST_IN("driver_lint_ideals", test_lint_ideals_rejects_bad_subjects) {
     expect(broken.m_exit_code == 2 &&
                contains(broken.m_output, "JSON parse error"),
            "lint-ideals: a specification that does not parse is a load error");
+}
+
+// Two PSP specifications over one alphabet: "grant always holds" implies
+// "every req is answered by a grant", and not the reverse.
+const char* const k_psp_strong = R"({
+  "assumptions": [],
+  "guarantees": [{ "pattern": "universality", "s": "grant" }],
+  "in_atoms": ["req"],
+  "out_atoms": ["grant"]
+}
+)";
+
+const char* const k_psp_weak = R"({
+  "assumptions": [],
+  "guarantees": [{ "pattern": "response", "p": "req", "s": "grant" }],
+  "in_atoms": ["req"],
+  "out_atoms": ["grant"]
+}
+)";
+
+TEST_IN("driver_ltl", test_ltl_lowers_a_psp_specification) {
+    const TempDir dir("e2e_ltl_psp");
+    const std::string spec =
+        write_text(dir.path() / "spec.psp", k_psp_weak).string();
+    const DriverRun run = run_driver("ltl", {spec});
+    expect(run.m_exit_code == 0, "ltl: a PSP input exits zero");
+    expect(contains(run.m_output,
+                    "[guarantee] Globally, it is always the case that if req "
+                    "holds, then grant eventually holds."),
+           "ltl: each PSP requirement prints in structured English");
+    expect(contains(run.m_output, "LTL: G(req -> F(grant))"),
+           "ltl: each PSP requirement carries its lowering, unprefixed");
+
+    const std::string upper =
+        write_text(dir.path() / "upper.psp",
+                   std::regex_replace(std::string(k_psp_weak),
+                                      std::regex("\\breq\\b"), "Req"))
+            .string();
+    const DriverRun refused = run_driver("ltl", {upper});
+    expect(refused.m_exit_code == 1 && contains(refused.m_output, "uppercase"),
+           "ltl: a PSP input with an uppercase input name is refused");
+}
+
+TEST_IN("driver_compare", test_compare_orders_psp_repairs) {
+    const TempDir dir("e2e_compare_psp");
+    const std::filesystem::path repairs = dir.path() / "repairs";
+    const std::filesystem::path ideals = dir.path() / "ideals";
+    write_text(repairs / "repair_0.psp", k_psp_strong);
+    write_text(ideals / "weak.psp", k_psp_weak);
+    const DriverRun run = run_driver("compare", {"--repairs", repairs.string(),
+                                                 "--ideals", ideals.string()});
+    expect(run.m_exit_code == 0, "compare: a PSP pair exits zero");
+    expect(contains(run.m_output, "strictly stronger than weak.psp"),
+           "compare: a PSP repair is ordered against its ideal");
+}
+
+TEST_IN("driver_maximal", test_maximal_reports_psp) {
+    const TempDir dir("e2e_maximal_psp");
+    write_text(dir.path() / "strong.psp", k_psp_strong);
+    write_text(dir.path() / "weak.psp", k_psp_weak);
+    const DriverRun run = run_driver("maximal", {dir.path().string()});
+    expect(run.m_exit_code == 0, "maximal: a PSP directory exits zero");
+    expect(contains(run.m_output, "files      2") &&
+               contains(run.m_output, "maximal    1") &&
+               contains(run.m_output, "strong.psp"),
+           "maximal: the weaker PSP specification is dominated");
+}
+
+TEST_IN("driver_lint_ideals", test_lint_ideals_checks_a_psp_subject) {
+    const TempDir dir("e2e_lint_ideals_psp");
+    const std::filesystem::path subject = dir.path() / "subject";
+    write_text(subject / "spec.psp", k_psp_strong);
+    write_text(subject / "fixes" / "weak.psp", k_psp_weak);
+    const DriverRun run = run_driver("lint-ideals", {subject.string()});
+    expect(run.m_exit_code == 0 && contains(run.m_output, "weak.psp") &&
+               contains(run.m_output, "0 ideal(s) failed at least one check"),
+           "lint-ideals: a PSP subject whose ideal passes exits zero");
 }
 
 // Registered after each driver's own tests, so each suite checks --version

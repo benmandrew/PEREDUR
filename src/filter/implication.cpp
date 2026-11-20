@@ -10,6 +10,8 @@
 #include "filter/antichain.hpp"
 #include "filter/implication_check.hpp"
 #include "fitness/syntactic_similarity.hpp"
+#include "psp/filter.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "tlsf/filter.hpp"
 #include "tlsf/fitness.hpp"
@@ -29,6 +31,12 @@ std::optional<bool> implies(const tlsf::Specification& from,
                             const tlsf::Specification& dest,
                             SatisfiabilityChecker& checker) {
     return tlsf_spec_implies(from, dest, checker);
+}
+
+std::optional<bool> implies(const psp::Specification& from,
+                            const psp::Specification& dest,
+                            SatisfiabilityChecker& checker) {
+    return psp::spec_implies(from, dest, checker);
 }
 
 double similarity_to(const Specification& spec, const Specification& original,
@@ -112,6 +120,10 @@ template FilterFunctionT<tlsf::Specification>
 make_implication_filter<tlsf::Specification>(
     SatisfiabilityChecker&, SimilarityKeyT<tlsf::Specification>,
     const GenerationProgressCallback&);
+template FilterFunctionT<psp::Specification>
+make_implication_filter<psp::Specification>(SatisfiabilityChecker&,
+                                            SimilarityKeyT<psp::Specification>,
+                                            const GenerationProgressCallback&);
 template SimilarityKeyT<Specification> syntactic_similarity_key<Specification>(
     Specification, const Config&);
 template SimilarityKeyT<tlsf::Specification>

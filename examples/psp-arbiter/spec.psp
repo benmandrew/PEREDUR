@@ -1,0 +1,32 @@
+{
+  "assumptions": [
+    { "fixed": "G(!(start & stop))" },
+    {
+      "pattern": "bounded-recurrence",
+      "count": 3,
+      "scope": "globally",
+      "s": "stop",
+      "weakenable": false
+    }
+  ],
+  "guarantees": [
+    {
+      "pattern": "bounded-response",
+      "count": 2,
+      "scope": "afteruntil",
+      "p": "req",
+      "s": "grant",
+      "q": "start",
+      "r": "stop"
+    },
+    {
+      "pattern": "absence",
+      "scope": "afteruntil",
+      "p": "grant",
+      "q": "start",
+      "r": "stop"
+    }
+  ],
+  "in_atoms": ["req", "start", "stop"],
+  "out_atoms": ["grant"]
+}

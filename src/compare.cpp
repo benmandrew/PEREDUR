@@ -19,6 +19,7 @@
 
 #include "bounded_async.hpp"
 #include "driver_support.hpp"
+#include "psp/specification.hpp"
 #include "repair/manifest.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
@@ -45,7 +46,8 @@ void print_usage(const char* prog) {
         << "repair is equivalent to, strictly stronger than, strictly\n"
         << "weaker than, or incomparable with the ideal, under the\n"
         << "assume-guarantee implication order. Both directories must hold\n"
-        << "the same format: FRETISH JSON (.json) or basic-TLSF (.tlsf).\n"
+        << "the same format: FRETISH JSON (.json), basic-TLSF (.tlsf) or\n"
+        << "PSP (.psp).\n"
         << "\n"
         << "Each pair's per-direction verdicts go to stderr as\n"
         << "DIR<TAB>repair<TAB>ideal<TAB>fwd<TAB>rev, with ? for undecided.\n"
@@ -366,6 +368,9 @@ int main(int argc, const char* const argv[]) {
     SatisfiabilityChecker& checker = configure_offline_checkers(
         std::chrono::milliseconds{args.timeout_s * 1000}, true);
 
+    if (selects_psp({args.repairs_dir, args.ideals_dir})) {
+        return run<psp::Specification>(args, checker);
+    }
     return selects_tlsf({args.repairs_dir, args.ideals_dir})
                ? run<tlsf::Specification>(args, checker)
                : run<Specification>(args, checker);

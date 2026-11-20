@@ -4,7 +4,7 @@ The PSP (Dwyer's Property Specification Patterns) front end. `PLAN.md` on `feat/
 
 ## Measured orders
 
-`scripts/psp_field_orders.py` measures every order below from the lowering and Spot 2.15.1, with black as a second solver, at counts 1 to 4. It writes `docs/dev/psp-orders.json` and exits 1 when a check fails. The lowering lives in the script until P1 ports it to `src/psp/lowering.cpp`. Atoms: P is the trigger or forbidden proposition, S the target, Q the scope opener and R the scope closer. Dwyer's single proposition is S in universality, existence and bounded recurrence, and P in absence and bounded existence.
+`scripts/psp_field_orders.py` measures every order below from the lowering and Spot 2.15.1, with black as a second solver, at counts 1 to 4. It writes `docs/dev/psp-orders.json` and exits 1 when a check fails. `src/psp/lowering.cpp` ports the script's lowering, and the `psp_lowering` suite checks the two equivalent at every pattern, scope and count from 1 to 4, reading the `lowering` table of `docs/dev/psp-orders.json` as its fixture; `scripts/test_psp_field_orders.py` checks that table still equals what the script lowers. Atoms: P is the trigger or forbidden proposition, S the target, Q the scope opener and R the scope closer. Dwyer's single proposition is S in universality, existence and bounded recurrence, and P in absence and bounded existence.
 
 | Pattern | No boundary | Boundary B |
 |---|---|---|
