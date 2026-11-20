@@ -17,6 +17,7 @@
 #include "genetic/diversity.hpp"
 #include "genetic/monotone.hpp"
 #include "genetic/order_moves.hpp"
+#include "genetic/ordered_language.hpp"
 #include "prop_formula.hpp"
 
 namespace {
@@ -193,37 +194,6 @@ Formula mutate_formula(const Formula& formula,
 }
 
 namespace {
-
-// The factor Config::step_scaling multiplies each large move's probability by,
-// or nothing where the key is off or the parent gave no status. Nothing keeps
-// every arm on the draws it took before the key existed.
-//
-// An unscaled mutation that a scale would have applied to, had the key been
-// above 0, is marked tallied: its large moves and single edges are counted
-// for the baseline rate, read off the draws it takes anyway.
-struct StepScale {
-    std::optional<double> m_factor;
-    bool m_tallied = false;
-
-    // Counts an unscaled move as @p large or as a single edge, where tallied.
-    void tally(bool large) const {
-        if (!m_tallied) {
-            return;
-        }
-        if (large) {
-            StepScalingStats::n_unscaled_large++;
-        } else {
-            StepScalingStats::n_unscaled_small++;
-        }
-    }
-
-    // Counts an unscaled large move with no single edge beside it.
-    void tally_large() const {
-        if (m_tallied) {
-            StepScalingStats::n_unscaled_large++;
-        }
-    }
-};
 
 // The share of a scaled draw that a large move takes: its unscaled share
 // @p base times @p scale, capped at 1.
@@ -729,9 +699,8 @@ bool moves_off_extreme(const Requirement& requirement, Direction direction) {
                : std::holds_alternative<timing::Always>(requirement.m_timing);
 }
 
-// mutate_requirement, reporting through @p free_rewrite whether any field took
-// the general rewrite rather than a move along its order, under the step scale
-// @p scale.
+}  // namespace
+
 Requirement mutate_requirement_tracked(
     const Requirement& requirement, const std::vector<std::string>& atoms,
     const std::vector<std::string>& condition_atoms, Direction direction,
@@ -804,8 +773,6 @@ Requirement mutate_requirement_tracked(
     return mutated;
 }
 
-}  // namespace
-
 Requirement mutate_requirement(const Requirement& requirement,
                                const std::vector<std::string>& atoms,
                                const std::vector<std::string>& condition_atoms,
@@ -847,8 +814,8 @@ std::vector<std::size_t> collect_weakenable_indices(
 
 // True if the requirement at @p idx is equal to any other requirement in the
 // list, using the same ordering-based equality as the rest of the algorithm.
-bool creates_duplicate(const std::vector<Requirement>& requirements,
-                       std::size_t idx) {
+template <typename Req>
+bool creates_duplicate(const std::vector<Req>& requirements, std::size_t idx) {
     for (std::size_t i = 0; i < requirements.size(); ++i) {
         if (i == idx) {
             continue;
@@ -1024,7 +991,8 @@ enum class Gate : std::uint8_t {
     Strengthen,
 };
 
-Gate gate_of(const Config& cfg, const ParentContext* parent) {
+template <typename Spec>
+Gate gate_of(const Config& cfg, const ParentContextT<Spec>* parent) {
     if (!cfg.direction_gated_mutation || parent == nullptr || parent->crossed ||
         !parent->status.has_value()) {
         return Gate::None;
@@ -1035,9 +1003,9 @@ Gate gate_of(const Config& cfg, const ParentContext* parent) {
 // True when @p child, a free rewrite of @p parent, may stand under @p gate.
 // A result proved to move the forbidden way is refused. One the rules cannot
 // order either way is kept. Nothing here draws.
-bool admitted_by_gate(Gate gate, const Specification& parent,
-                      const Specification& child) {
-    const MoveOrder order = classify_move(parent, child);
+template <typename Spec>
+bool admitted_by_gate(Gate gate, const Spec& parent, const Spec& child) {
+    const MoveOrder order = OrderedLanguage<Spec>::classify_move(parent, child);
     const MoveOrder forbidden =
         gate == Gate::Weaken ? MoveOrder::Stronger : MoveOrder::Weaker;
     if (order == forbidden) {
@@ -1053,7 +1021,8 @@ bool admitted_by_gate(Gate gate, const Specification& parent,
 // status is only an estimate of it, is unscaled like a parent without a
 // status. With the key at 0 a mutation it would otherwise scale is tallied
 // instead. Nothing here draws, so at 0 the stream is the unscaled one.
-StepScale step_scale(const Config& cfg, const ParentContext* parent) {
+template <typename Spec>
+StepScale step_scale(const Config& cfg, const ParentContextT<Spec>* parent) {
     if (parent == nullptr || parent->crossed || !parent->status.has_value()) {
         return {};
     }
@@ -1068,21 +1037,27 @@ StepScale step_scale(const Config& cfg, const ParentContext* parent) {
 
 // A realizable parent's steps back towards its original, each marked where
 // Config::bisect_steps moved it to the midpoint of its timing chain.
+template <typename Spec>
 struct BackSteps {
-    std::vector<Step> m_steps;
+    std::vector<typename OrderedLanguage<Spec>::Step> m_steps;
     std::vector<bool> m_bisected;
 };
 
-// Moves a timing step from @p current to the midpoint of the `within n` or
-// `for n` chain it crosses, rounding towards the destination, and returns
-// whether it moved. A chain with no intermediate entry, or a midpoint that
-// would merge two entries, leaves the step going all the way.
-bool bisect_step(const Specification& current, Step& step) {
-    const std::vector<Timing> chain = timing_step_chain(current, step);
+// Moves a step from @p current to the midpoint of the chain it crosses (on
+// FRETISH, a `within n` or `for n` timing chain), rounding towards the
+// destination, and returns whether it moved. A chain with no intermediate
+// entry, or a midpoint that would merge two entries, leaves the step going all
+// the way.
+template <typename Spec>
+bool bisect_step(const Spec& current,
+                 typename OrderedLanguage<Spec>::Step& step) {
+    using Language = OrderedLanguage<Spec>;
+    const std::vector<typename Language::ChainValue> chain =
+        Language::step_chain(current, step);
     if (chain.size() < 2) {
         return false;
     }
-    std::optional<Specification> midpoint = with_slot_timing(
+    std::optional<Spec> midpoint = Language::with_slot_value(
         current, step.m_side, step.m_slot, chain[(chain.size() - 1) / 2]);
     if (!midpoint.has_value()) {
         return false;
@@ -1094,13 +1069,16 @@ bool bisect_step(const Specification& current, Step& step) {
 // The steps a realizable parent may take back towards its original, or none
 // where it lent no original. Bisection replaces a step's result and draws
 // nothing, so the list keeps its length.
-BackSteps steps_back(const Specification& specification,
-                     const ParentContext* parent, const Config& cfg) {
-    BackSteps back;
+template <typename Spec>
+BackSteps<Spec> steps_back(const Spec& specification,
+                           const ParentContextT<Spec>* parent,
+                           const Config& cfg) {
+    BackSteps<Spec> back;
     if (parent == nullptr || parent->original == nullptr) {
         return back;
     }
-    back.m_steps = steps_towards(specification, *parent->original);
+    back.m_steps =
+        OrderedLanguage<Spec>::steps_towards(specification, *parent->original);
     back.m_bisected.assign(back.m_steps.size(), false);
     if (cfg.bisect_steps) {
         for (std::size_t i = 0; i < back.m_steps.size(); ++i) {
@@ -1116,17 +1094,19 @@ BackSteps steps_back(const Specification& specification,
 // weights 1 / (1 + c) are unequal, one next_real over the weights instead.
 // The slot weights are scaled to sum to the number of slots, so the steps
 // keep their share of the draw and only the choice among the slots moves.
+template <typename Spec>
 std::size_t draw_position(std::size_t n_steps,
                           const std::vector<std::size_t>& slots,
-                          const Specification& specification,
-                          const ParentContext* parent,
+                          const Spec& specification,
+                          const ParentContextT<Spec>* parent,
                           const RandomSource& random_source) {
     const std::size_t total = n_steps + slots.size();
     if (parent == nullptr || parent->coverage == nullptr || slots.empty()) {
         return random_source.next_index(total);
     }
     SlotCoverageStats::n_draws++;
-    const std::size_t n_assumptions = specification.m_assumptions.size();
+    const std::size_t n_assumptions =
+        OrderedLanguage<Spec>::assumptions(specification).size();
     std::vector<double> weights(slots.size());
     double slot_mass = 0.0;
     bool equal = true;
@@ -1159,7 +1139,8 @@ std::size_t draw_position(std::size_t n_steps,
 // Under Config::flip_tabu without Config::flip_sideways, drops from @p slots
 // the slots @p parent's lineage holds tabu, unless that would leave none.
 // Draws nothing.
-void skip_flipped(const ParentContext* parent, const Config& cfg,
+template <typename Spec>
+void skip_flipped(const ParentContextT<Spec>* parent, const Config& cfg,
                   std::vector<std::size_t>* slots) {
     if (cfg.flip_tabu == 0 || cfg.flip_sideways || parent == nullptr ||
         parent->flipped_slots.empty()) {
@@ -1184,7 +1165,8 @@ void skip_flipped(const ParentContext* parent, const Config& cfg,
 }
 
 // True where Config::flip_sideways rewrites slot @p idx sideways.
-bool sideways_slot(const ParentContext* parent, const Config& cfg,
+template <typename Spec>
+bool sideways_slot(const ParentContextT<Spec>* parent, const Config& cfg,
                    std::size_t idx) {
     return cfg.flip_tabu > 0 && cfg.flip_sideways && parent != nullptr &&
            std::binary_search(parent->flipped_slots.begin(),
@@ -1200,7 +1182,8 @@ void report(bool* flag, bool value) {
 
 // Takes step @p choice of @p back, counting it and reporting it through
 // @p stepped.
-Specification take_step(BackSteps& back, std::size_t choice, bool* stepped) {
+template <typename Spec>
+Spec take_step(BackSteps<Spec>& back, std::size_t choice, bool* stepped) {
     DirectionGateStats::n_steps++;
     report(stepped, true);
     if (back.m_bisected[choice]) {
@@ -1209,13 +1192,13 @@ Specification take_step(BackSteps& back, std::size_t choice, bool* stepped) {
     return std::move(back.m_steps[choice].m_result);
 }
 
-Config free_rewrite_rates(const Config& cfg);
-
 // Whether a sideways rewrite @p child of @p parent stands: the rule must find
 // the two incomparable. Counts the rewrite and, where it stands, the keep.
-bool sideways_kept(const Specification& parent, const Specification& child) {
+template <typename Spec>
+bool sideways_kept(const Spec& parent, const Spec& child) {
     FlipLineageStats::n_sideways++;
-    if (classify_move(parent, child) != MoveOrder::Incomparable) {
+    if (OrderedLanguage<Spec>::classify_move(parent, child) !=
+        MoveOrder::Incomparable) {
         return false;
     }
     FlipLineageStats::n_sideways_kept++;
@@ -1231,64 +1214,64 @@ bool sideways_kept(const Specification& parent, const Specification& child) {
 // stronger by construction; a free rewrite in the weakening is sorted against
 // the stepped specification as an unrealizable parent's would be, and where
 // it is refused the step stands alone.
-Specification exchange(const Specification& specification, BackSteps& back,
-                       const std::vector<std::size_t>& weakenable,
-                       const Specification& original,
-                       const std::vector<std::string>& atoms,
-                       const std::vector<Timing>& timing_pool,
-                       const RandomSource& random_source, const Config& cfg,
-                       StepScale scale, bool* stepped,
-                       const ParentContext* parent) {
-    const std::size_t n_assumptions = specification.m_assumptions.size();
+template <typename Spec>
+Spec exchange(const Spec& specification, BackSteps<Spec>& back,
+              const std::vector<std::size_t>& weakenable, const Spec& original,
+              const typename OrderedLanguage<Spec>::MutationPools& pools,
+              const RandomSource& random_source, const Config& cfg,
+              StepScale scale, bool* stepped,
+              const ParentContextT<Spec>* parent) {
+    using Language = OrderedLanguage<Spec>;
+    using Req = typename Language::Requirement;
+    const std::size_t n_assumptions =
+        Language::assumptions(specification).size();
     std::vector<std::size_t> untouched;
     for (const std::size_t idx : weakenable) {
         const bool is_assumption = idx < n_assumptions;
         const std::size_t local = is_assumption ? idx : idx - n_assumptions;
-        const std::vector<Requirement>& own = is_assumption
-                                                  ? specification.m_assumptions
-                                                  : specification.m_guarantees;
-        const std::vector<Requirement>& theirs =
-            is_assumption ? original.m_assumptions : original.m_guarantees;
+        const std::vector<Req>& own = is_assumption
+                                          ? Language::assumptions(specification)
+                                          : Language::guarantees(specification);
+        const std::vector<Req>& theirs = is_assumption
+                                             ? Language::assumptions(original)
+                                             : Language::guarantees(original);
         if (local < theirs.size() && own[local] == theirs[local]) {
             untouched.push_back(idx);
         }
     }
     skip_flipped(parent, cfg, &untouched);
     MutationStats::n_slot_draws++;
-    Specification current = specification;
+    Spec current = specification;
     if (!back.m_steps.empty()) {
         const std::size_t choice =
             random_source.next_index(back.m_steps.size());
         current = take_step(back, choice, stepped);
     }
-    if (untouched.empty() || atoms.empty()) {
+    if (untouched.empty() || !Language::can_rewrite(pools)) {
         return current;
     }
     const std::size_t idx = untouched[draw_position(0, untouched, specification,
                                                     parent, random_source)];
     const bool is_assumption = idx < n_assumptions;
     const std::size_t local = is_assumption ? idx : idx - n_assumptions;
-    std::vector<Requirement> assumptions = current.m_assumptions;
-    std::vector<Requirement> guarantees = current.m_guarantees;
-    std::vector<Requirement>& target = is_assumption ? assumptions : guarantees;
+    std::vector<Req> assumptions = Language::assumptions(current);
+    std::vector<Req> guarantees = Language::guarantees(current);
+    std::vector<Req>& target = is_assumption ? assumptions : guarantees;
     assert(local < target.size());
-    const std::vector<std::string>& condition_atoms =
-        current.m_in_atoms.empty() ? atoms : current.m_in_atoms;
     // Weakening the specification strengthens an assumption.
     const Direction direction =
         is_assumption ? Direction::Strengthen : Direction::Weaken;
     bool free_rewrite = false;
     const bool sideways = sideways_slot(parent, cfg, idx);
-    target[local] = mutate_requirement_tracked(
-        target[local], atoms, condition_atoms, direction, timing_pool,
-        current.m_modes, random_source,
-        sideways ? free_rewrite_rates(cfg) : cfg, &free_rewrite, scale);
+    target[local] = Language::mutate_slot(
+        target[local], current, pools, direction, random_source,
+        sideways ? Language::free_rewrite_rates(cfg) : cfg, &free_rewrite,
+        scale);
     if (creates_duplicate(target, local)) {
         return current;
     }
-    Specification weakened(std::move(assumptions), std::move(guarantees),
-                           current.m_in_atoms, current.m_out_atoms,
-                           current.m_modes);
+    Spec weakened = Language::with_slots(current, std::move(assumptions),
+                                         std::move(guarantees));
     if (sideways && !sideways_kept(current, weakened)) {
         return current;
     }
@@ -1298,29 +1281,19 @@ Specification exchange(const Specification& specification, BackSteps& back,
     return weakened;
 }
 
-// The rates a realizable parent's rewrite runs at: every arm that moves along
-// an order is off, since its strengthenings come from steps_towards instead,
-// and only the free rewrites remain. An arm at 0 that still draws its
-// next_real draws it, so the rewrite keeps the shape of its stream.
-Config free_rewrite_rates(const Config& cfg) {
-    Config free = cfg;
-    free.p_timing = 0.0;
-    free.p_condition_type = 0.0;
-    free.p_scope = 0.0;
-    free.p_monotone = 0.0;
-    return free;
-}
-
 }  // namespace
 
+template <typename Spec>
 std::vector<std::size_t> targeted_mutation_slots(
-    const Specification& specification,
-    const std::vector<std::size_t>& weakenable, const ParentContext& parent,
-    const Config& cfg) {
+    const Spec& specification, const std::vector<std::size_t>& weakenable,
+    const ParentContextT<Spec>& parent, const Config& cfg) {
+    using Language = OrderedLanguage<Spec>;
+    using Req = typename Language::Requirement;
     if (!parent.status.has_value() || parent.crossed) {
         return {};
     }
-    const std::size_t n_assumptions = specification.m_assumptions.size();
+    const std::size_t n_assumptions =
+        Language::assumptions(specification).size();
     std::vector<std::size_t> targeted;
     if (!parent.realizable) {
         // An empty refused set on an unrealizable parent means the walk never
@@ -1341,15 +1314,16 @@ std::vector<std::size_t> targeted_mutation_slots(
     if (!cfg.blame_realizable || parent.original == nullptr) {
         return {};
     }
-    const Specification& original = *parent.original;
+    const Spec& original = *parent.original;
     for (const std::size_t idx : weakenable) {
         const bool is_assumption = idx < n_assumptions;
         const std::size_t local = is_assumption ? idx : idx - n_assumptions;
-        const std::vector<Requirement>& own = is_assumption
-                                                  ? specification.m_assumptions
-                                                  : specification.m_guarantees;
-        const std::vector<Requirement>& theirs =
-            is_assumption ? original.m_assumptions : original.m_guarantees;
+        const std::vector<Req>& own = is_assumption
+                                          ? Language::assumptions(specification)
+                                          : Language::guarantees(specification);
+        const std::vector<Req>& theirs = is_assumption
+                                             ? Language::assumptions(original)
+                                             : Language::guarantees(original);
         if (local >= theirs.size() || !(own[local] == theirs[local])) {
             targeted.push_back(idx);
         }
@@ -1357,12 +1331,17 @@ std::vector<std::size_t> targeted_mutation_slots(
     return targeted;
 }
 
+template std::vector<std::size_t> targeted_mutation_slots(
+    const Specification&, const std::vector<std::size_t>&, const ParentContext&,
+    const Config&);
+
 namespace {
 
 // Under blame_targeted_slots, replaces @p weakenable with the slots
 // targeted_mutation_slots aims at, where it aims at any. Draws nothing.
-void narrow_by_blame(const Specification& specification,
-                     const ParentContext* parent, const Config& cfg,
+template <typename Spec>
+void narrow_by_blame(const Spec& specification,
+                     const ParentContextT<Spec>* parent, const Config& cfg,
                      std::vector<std::size_t>* weakenable) {
     if (!cfg.blame_targeted_slots || parent == nullptr) {
         return;
@@ -1416,17 +1395,20 @@ Specification mutate_specification(const Specification& specification,
     // A realizable parent's strengthenings, each proved by classify_move and
     // moving one field, tombstone or appended assumption back towards the
     // original. Empty without the gate, and under Free, which takes none.
-    BackSteps back = strengthening && mode != GateRealizable::Free
-                         ? steps_back(specification, parent, cfg)
-                         : BackSteps{};
+    BackSteps<Specification> back =
+        strengthening && mode != GateRealizable::Free
+            ? steps_back(specification, parent, cfg)
+            : BackSteps<Specification>{};
     const std::vector<Step>& steps = back.m_steps;
     if (weakenable_indices.empty() && steps.empty()) {
         return specification;
     }
     if (mode == GateRealizable::Exchange && parent->original != nullptr) {
+        const OrderedLanguage<Specification>::MutationPools pools{atoms,
+                                                                  timing_pool};
         return exchange(specification, back, weakenable_indices,
-                        *parent->original, atoms, timing_pool, random_source,
-                        cfg, scale, stepped, parent);
+                        *parent->original, pools, random_source, cfg, scale,
+                        stepped, parent);
     }
     narrow_by_blame(specification, parent, cfg, &weakenable_indices);
     skip_flipped(parent, cfg, &weakenable_indices);
@@ -1484,7 +1466,7 @@ Specification mutate_specification(const Specification& specification,
         target[local_idx], mutation_atoms, condition_atoms, direction,
         timing_pool, specification.m_modes, random_source,
         sideways || (strengthening && mode == GateRealizable::Towards)
-            ? free_rewrite_rates(cfg)
+            ? OrderedLanguage<Specification>::free_rewrite_rates(cfg)
             : cfg,
         &free_rewrite, scale);
     if (creates_duplicate(target, local_idx)) {

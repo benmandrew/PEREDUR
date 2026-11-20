@@ -27,7 +27,9 @@
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 
-class DiversityState;
+template <typename Spec>
+class BasicDiversityState;
+using DiversityState = BasicDiversityState<Specification>;
 
 /// Which representation of the population is live. A generation begins and ends
 /// scored; between breeding and scoring the individuals have no fitness yet, so

@@ -14,7 +14,7 @@
 
 #include "bounded_async.hpp"
 #include "config.hpp"
-#include "genetic/order_moves.hpp"
+#include "genetic/ordered_language.hpp"
 #include "genetic/output_gate.hpp"
 #include "requirement.hpp"
 #include "runner/spot.hpp"
@@ -31,7 +31,9 @@ std::uint64_t mix(std::uint64_t value) {
     return value ^ (value >> 31U);
 }
 
-std::uint64_t step_priority(const Step& step, std::size_t permutation) {
+template <typename Spec, typename Field>
+std::uint64_t step_priority(const OrderStep<Spec, Field>& step,
+                            std::size_t permutation) {
     const std::uint64_t field =
         step.m_field.has_value() ? static_cast<std::uint64_t>(*step.m_field) + 1
                                  : 0;
@@ -42,20 +44,34 @@ std::uint64_t step_priority(const Step& step, std::size_t permutation) {
     return mix(mix(static_cast<std::uint64_t>(permutation)) ^ identity);
 }
 
-// The timing chain a timing step crosses, without its destination, or empty
-// where the step has no intermediate entries.
-std::vector<Timing> chain_before_destination(const Specification& current,
-                                             const Step& step) {
-    std::vector<Timing> chain = timing_step_chain(current, step);
+// The chain a step crosses, without its destination, or empty where the step
+// has no intermediate entries.
+template <typename Spec>
+std::vector<typename OrderedLanguage<Spec>::ChainValue>
+chain_before_destination(const Spec& current,
+                         const typename OrderedLanguage<Spec>::Step& step) {
+    std::vector<typename OrderedLanguage<Spec>::ChainValue> chain =
+        OrderedLanguage<Spec>::step_chain(current, step);
     if (!chain.empty()) {
         chain.pop_back();
     }
     return chain;
 }
 
+// Whether @p spec has a live guarantee.
+template <typename Spec>
+bool has_live_guarantee(const Spec& spec) {
+    using Language = OrderedLanguage<Spec>;
+    const auto& guarantees = Language::guarantees(spec);
+    return std::any_of(guarantees.begin(), guarantees.end(),
+                       [](const auto& req) { return Language::is_live(req); });
+}
+
 }  // namespace
 
-void order_steps(std::vector<Step>& steps, std::size_t permutation) {
+template <typename Spec, typename Field>
+void order_steps(std::vector<OrderStep<Spec, Field>>& steps,
+                 std::size_t permutation) {
     if (permutation == 0) {
         return;
     }
@@ -65,7 +81,7 @@ void order_steps(std::vector<Step>& steps, std::size_t permutation) {
         keys.emplace_back(step_priority(steps[i], permutation), i);
     }
     std::stable_sort(keys.begin(), keys.end());
-    std::vector<Step> ordered;
+    std::vector<OrderStep<Spec, Field>> ordered;
     ordered.reserve(steps.size());
     for (const auto& [priority, index] : keys) {
         ordered.push_back(std::move(steps[index]));
@@ -73,23 +89,25 @@ void order_steps(std::vector<Step>& steps, std::size_t permutation) {
     steps = std::move(ordered);
 }
 
-std::optional<Specification> furthest_accepted(const Specification& current,
-                                               const Step& step,
-                                               const ClimbPredicate& accepts) {
+template <typename Spec>
+std::optional<Spec> furthest_accepted(
+    const Spec& current, const typename OrderedLanguage<Spec>::Step& step,
+    const typename ClimbNonDeduced<ClimbPredicateT<Spec>>::type& accepts) {
     if (accepts(step.m_result)) {
         return step.m_result;
     }
-    const std::vector<Timing> chain = chain_before_destination(current, step);
+    const std::vector<typename OrderedLanguage<Spec>::ChainValue> chain =
+        chain_before_destination(current, step);
     // Invariant: entry `low` is accepted (-1 standing for current itself) and
     // entry `high` is not (the destination, just refused, at chain.size()).
     std::ptrdiff_t low = -1;
     auto high = static_cast<std::ptrdiff_t>(chain.size());
-    std::optional<Specification> best;
+    std::optional<Spec> best;
     while (high - low > 1) {
         const std::ptrdiff_t mid = low + ((high - low) / 2);
-        std::optional<Specification> candidate =
-            with_slot_timing(current, step.m_side, step.m_slot,
-                             chain[static_cast<std::size_t>(mid)]);
+        std::optional<Spec> candidate = OrderedLanguage<Spec>::with_slot_value(
+            current, step.m_side, step.m_slot,
+            chain[static_cast<std::size_t>(mid)]);
         if (candidate.has_value() && accepts(*candidate)) {
             low = mid;
             best = std::move(candidate);
@@ -100,12 +118,14 @@ std::optional<Specification> furthest_accepted(const Specification& current,
     return best;
 }
 
-Specification climb(const Specification& start, const Specification& original,
-                    const ClimbPredicate& accepts, std::size_t permutation) {
-    Specification current = start;
-    std::unordered_set<Specification> visited{start};
-    const ClimbPredicate unvisited = [&visited,
-                                      &accepts](const Specification& spec) {
+template <typename Spec>
+Spec climb(const Spec& start, const Spec& original,
+           const typename ClimbNonDeduced<ClimbPredicateT<Spec>>::type& accepts,
+           std::size_t permutation) {
+    Spec current = start;
+    std::unordered_set<Spec> visited{start};
+    const ClimbPredicateT<Spec> unvisited = [&visited,
+                                             &accepts](const Spec& spec) {
         if (visited.count(spec) != 0) {
             return false;
         }
@@ -113,10 +133,11 @@ Specification climb(const Specification& start, const Specification& original,
         return accepts(spec);
     };
     for (;;) {
-        std::vector<Step> steps = steps_towards(current, original);
+        std::vector<typename OrderedLanguage<Spec>::Step> steps =
+            OrderedLanguage<Spec>::steps_towards(current, original);
         order_steps(steps, permutation);
-        std::optional<Specification> next;
-        for (const Step& step : steps) {
+        std::optional<Spec> next;
+        for (const auto& step : steps) {
             ++ClimbStats::n_steps_tried;
             next = furthest_accepted(current, step, unvisited);
             if (next.has_value()) {
@@ -132,8 +153,11 @@ Specification climb(const Specification& start, const Specification& original,
     }
 }
 
-ClimbPredicate climb_gate(const Config& cfg, FitnessFunction status) {
-    return [&cfg, status = std::move(status)](const Specification& spec) {
+template <typename Spec>
+ClimbPredicateT<Spec> climb_gate(
+    const Config& cfg,
+    typename ClimbNonDeduced<FitnessFunctionT<Spec>>::type status) {
+    return [&cfg, status = std::move(status)](const Spec& spec) {
         // A check that raises refuses the step. The climb then stays on the
         // repair it stood on, which has already passed the gate, so a tool
         // failure here costs one step and never writes an unchecked repair.
@@ -143,8 +167,8 @@ ClimbPredicate climb_gate(const Config& cfg, FitnessFunction status) {
             // part a step touched, where one query on the whole settles most
             // refusals, and its verdict is the decided entry the memo's rules
             // read.
-            if (count_live(spec.m_guarantees) > 0 &&
-                global_real_checker().check_realizability(spec) ==
+            if (has_live_guarantee(spec) &&
+                OrderedLanguage<Spec>::check_realizability(spec) ==
                     std::optional<bool>(false)) {
                 return false;
             }
@@ -156,13 +180,15 @@ ClimbPredicate climb_gate(const Config& cfg, FitnessFunction status) {
     };
 }
 
-std::vector<Specification> climb_repairs(
-    const std::vector<Specification>& repairs, const Specification& original,
-    const ClimbPredicate& accepts, std::size_t n_orders) {
+template <typename Spec>
+std::vector<Spec> climb_repairs(
+    const std::vector<Spec>& repairs, const Spec& original,
+    const typename ClimbNonDeduced<ClimbPredicateT<Spec>>::type& accepts,
+    std::size_t n_orders) {
     const auto started = std::chrono::steady_clock::now();
-    std::vector<Specification> starts;
-    std::unordered_set<Specification> seen;
-    for (const Specification& spec : repairs) {
+    std::vector<Spec> starts;
+    std::unordered_set<Spec> seen;
+    for (const Spec& spec : repairs) {
         if (seen.insert(spec).second) {
             starts.push_back(spec);
         }
@@ -184,14 +210,14 @@ std::vector<Specification> climb_repairs(
     n_orders = std::max<std::size_t>(n_orders, 1);
     const auto climb_one = [&starts, &original, &accepts,
                             n_orders](std::size_t idx) {
-        std::vector<Specification> climbed;
+        std::vector<Spec> climbed;
         climbed.reserve(n_orders);
         for (std::size_t order = 0; order < n_orders; ++order) {
             climbed.push_back(climb(starts[idx], original, accepts, order));
         }
         return climbed;
     };
-    std::vector<std::vector<Specification>> results(starts.size());
+    std::vector<std::vector<Spec>> results(starts.size());
     // Serial at one worker, as gate_verdicts is: the gate's own status walk
     // dispatches to the pool, which a climb holding the only worker would
     // starve.
@@ -206,7 +232,7 @@ std::vector<Specification> climb_repairs(
             [&climb_one](std::size_t idx) {
                 return [&climb_one, idx] { return climb_one(idx); };
             },
-            [&results](std::size_t idx, std::vector<Specification> climbed) {
+            [&results](std::size_t idx, std::vector<Spec> climbed) {
                 results[idx] = std::move(climbed);
             });
     }
@@ -221,10 +247,10 @@ std::vector<Specification> climb_repairs(
     ClimbStats::wall_s += std::chrono::duration<double>(
                               std::chrono::steady_clock::now() - started)
                               .count();
-    std::vector<Specification> distinct;
-    std::unordered_set<Specification> emitted;
-    for (std::vector<Specification>& climbed : results) {
-        for (Specification& spec : climbed) {
+    std::vector<Spec> distinct;
+    std::unordered_set<Spec> emitted;
+    for (std::vector<Spec>& climbed : results) {
+        for (Spec& spec : climbed) {
             if (emitted.insert(spec).second) {
                 distinct.push_back(std::move(spec));
             }
@@ -232,3 +258,14 @@ std::vector<Specification> climb_repairs(
     }
     return distinct;
 }
+
+template void order_steps(std::vector<Step>&, std::size_t);
+template std::optional<Specification> furthest_accepted(const Specification&,
+                                                        const Step&,
+                                                        const ClimbPredicate&);
+template Specification climb(const Specification&, const Specification&,
+                             const ClimbPredicate&, std::size_t);
+template ClimbPredicate climb_gate(const Config&, FitnessFunction);
+template std::vector<Specification> climb_repairs(
+    const std::vector<Specification>&, const Specification&,
+    const ClimbPredicate&, std::size_t);

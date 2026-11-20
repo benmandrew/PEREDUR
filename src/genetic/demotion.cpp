@@ -13,6 +13,7 @@
 #include "filter/implication_check.hpp"
 #include "fitness/status.hpp"
 #include "genetic/nsga2.hpp"
+#include "genetic/ordered_language.hpp"
 #include "hash_combine.hpp"
 #include "profile.hpp"
 #include "requirement.hpp"
@@ -31,22 +32,27 @@ struct LoweringPairHash {
 
 // The realizable members of one population, with the lowering pools
 // spec_implies_by_rule reads, and a memo of every requirement pair it proved.
+template <typename Spec>
 class RuleOrder {
+    using Language = OrderedLanguage<Spec>;
+    using Req = typename Language::Requirement;
+
    public:
-    RuleOrder(const std::vector<Scored<Specification>>& population,
+    RuleOrder(const std::vector<Scored<Spec>>& population,
               std::size_t status_index)
         : m_population(population),
-          m_implies(
-              [this](const Requirement& stronger, const Requirement& weaker) {
-                  return memoised_implies(stronger, weaker);
-              }) {
+          m_implies([this](const Req& stronger, const Req& weaker) {
+              return memoised_implies(stronger, weaker);
+          }) {
         for (std::size_t i = 0; i < population.size(); ++i) {
             assert(status_index < population[i].objectives.size());
             if (population[i].objectives[status_index] == k_status_realizable) {
-                const Specification& spec = population[i].specification;
+                const Spec& spec = population[i].specification;
                 m_members.push_back(i);
-                m_guarantees.push_back(live_lowerings(spec.m_guarantees));
-                m_assumptions.push_back(live_lowerings(spec.m_assumptions));
+                m_guarantees.push_back(
+                    Language::live_lowerings(Language::guarantees(spec)));
+                m_assumptions.push_back(
+                    Language::live_lowerings(Language::assumptions(spec)));
             }
         }
     }
@@ -60,10 +66,10 @@ class RuleOrder {
 
     // Whether member @p from is proved to imply member @p dest.
     bool implies(std::size_t from, std::size_t dest) {
-        return spec_implies_by_rule(m_population[m_members[from]].specification,
-                                    m_population[m_members[dest]].specification,
-                                    m_guarantees[from], m_assumptions[dest],
-                                    m_implies);
+        return Language::spec_implies_by_rule(
+            m_population[m_members[from]].specification,
+            m_population[m_members[dest]].specification, m_guarantees[from],
+            m_assumptions[dest], m_implies);
     }
 
     // Whether member @p stronger is proved strictly stronger than member
@@ -73,30 +79,31 @@ class RuleOrder {
     }
 
    private:
-    bool memoised_implies(const Requirement& stronger,
-                          const Requirement& weaker) {
-        const LoweringPair key{stronger.m_ltl, weaker.m_ltl};
+    bool memoised_implies(const Req& stronger, const Req& weaker) {
+        const LoweringPair key{Language::lowering(stronger),
+                               Language::lowering(weaker)};
         const auto found = m_memo.find(key);
         if (found != m_memo.end()) {
             return found->second;
         }
-        const bool proved = requirement_implies(stronger, weaker);
+        const bool proved = Language::requirement_implies(stronger, weaker);
         m_memo.emplace(key, proved);
         return proved;
     }
 
-    const std::vector<Scored<Specification>>& m_population;
+    const std::vector<Scored<Spec>>& m_population;
     std::vector<std::size_t> m_members;
     std::vector<std::unordered_set<std::string>> m_guarantees;
     std::vector<std::unordered_set<std::string>> m_assumptions;
     std::unordered_map<LoweringPair, bool, LoweringPairHash> m_memo;
-    RequirementImplication m_implies;
+    typename Language::Implication m_implies;
 };
 
 // Settles one unordered pair of members, demoting whichever is strictly
 // weaker. A set flag stays set, so a pair with one side already demoted needs
 // only the direction that could demote the other.
-void settle_pair(RuleOrder& order, std::size_t first, std::size_t second,
+template <typename Spec>
+void settle_pair(RuleOrder<Spec>& order, std::size_t first, std::size_t second,
                  std::vector<bool>& demoted) {
     const bool first_done = demoted[order.index(first)];
     const bool second_done = demoted[order.index(second)];
@@ -120,12 +127,12 @@ void settle_pair(RuleOrder& order, std::size_t first, std::size_t second,
 
 }  // namespace
 
+template <typename Spec>
 std::vector<bool> proved_weaker_realizable(
-    const std::vector<Scored<Specification>>& population,
-    std::size_t status_index) {
+    const std::vector<Scored<Spec>>& population, std::size_t status_index) {
     PEREDUR_PROFILE_SCOPE("select/demotion");
     std::vector<bool> demoted(population.size(), false);
-    RuleOrder order(population, status_index);
+    RuleOrder<Spec> order(population, status_index);
     for (std::size_t first = 0; first < order.size(); ++first) {
         for (std::size_t second = first + 1; second < order.size(); ++second) {
             settle_pair(order, first, second, demoted);
@@ -134,12 +141,12 @@ std::vector<bool> proved_weaker_realizable(
     return demoted;
 }
 
-FrontGutting final_front_gutting(
-    const std::vector<Scored<Specification>>& population,
-    std::size_t status_index) {
-    std::vector<Scored<Specification>> distinct;
-    std::unordered_set<Specification> seen;
-    for (const Scored<Specification>& scored : population) {
+template <typename Spec>
+FrontGutting final_front_gutting(const std::vector<Scored<Spec>>& population,
+                                 std::size_t status_index) {
+    std::vector<Scored<Spec>> distinct;
+    std::unordered_set<Spec> seen;
+    for (const Scored<Spec>& scored : population) {
         if (seen.insert(scored.specification).second) {
             distinct.push_back(scored);
         }
@@ -166,3 +173,8 @@ FrontGutting final_front_gutting(
     }
     return front;
 }
+
+template std::vector<bool> proved_weaker_realizable(
+    const std::vector<Scored<Specification>>&, std::size_t);
+template FrontGutting final_front_gutting(
+    const std::vector<Scored<Specification>>&, std::size_t);

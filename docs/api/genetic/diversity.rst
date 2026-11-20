@@ -1,7 +1,7 @@
 genetic/diversity.hpp
 =====================
 
-The FRETISH mechanisms that spread the search over unlike repairs, each behind a key that is off by default (see "Diversity mechanisms" in ``docs/dev/algorithm.md``), and the counters each writes to ``run.json``.
+The FRETISH mechanisms that spread the search over unlike repairs, each behind a key that is off by default (see "Diversity mechanisms" in ``docs/dev/algorithm.md``), and the counters each writes to ``run.json``. ``BasicDiversityState`` and ``novelty_objective`` are templated over the specification type and read the language through ``OrderedLanguage`` (``genetic/ordered_language.hpp``); ``DiversityState`` is the FRETISH instance.
 
 ``specification_distance``
   The share of assumption and guarantee slots in which two specifications hold different requirements, pairing slots by index. ``genetic.crowding = "specification"`` orders each NSGA-II front by farthest-point selection under it (``farthest_point_scores`` in ``nsga2.hpp``).

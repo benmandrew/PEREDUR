@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "genetic/ordered_language.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "hash_combine.hpp"
@@ -119,27 +120,34 @@ struct NoveltyTiebreakStats {
     inline static std::atomic<std::size_t> n_survivors_changed{0};
 };
 
-/// The run-scoped state the FRETISH diversity mechanisms keep across
-/// generations. One per run, owned by the generation loop and lent to each
-/// generation; nothing in it draws from the RandomSource.
-class DiversityState {
+/// The run-scoped state the diversity mechanisms keep across generations,
+/// over specifications of type @p Spec read through OrderedLanguage. One per
+/// run, owned by the generation loop and lent to each generation; nothing in
+/// it draws from the RandomSource.
+template <typename Spec>
+class BasicDiversityState {
+    using Language = OrderedLanguage<Spec>;
+    // C++17 needs the typename that C++20 makes optional here.
+    // NOLINTNEXTLINE(readability-redundant-typename)
+    using Req = typename Language::Requirement;
+
    public:
     /// @p accumulated is the run's repair accumulator M, read in its
     /// first-seen order. It only ever grows, which is what lets a measured
     /// candidate catch up on the new members alone. May be null, for a caller
     /// with no accumulator: M is then empty.
-    explicit DiversityState(const std::vector<Specification>* accumulated);
+    explicit BasicDiversityState(const std::vector<Spec>* accumulated);
 
     /// The number of members of M that spec_implies_by_rule proves imply
     /// @p candidate: the repairs already found that are at least as strong.
     /// Cached per specification and per requirement pair, so a candidate is
     /// tested against each member of M once.
-    std::size_t implied_by(const Specification& candidate);
+    std::size_t implied_by(const Spec& candidate);
 
     /// The slot coverage of M against @p original, brought up to date with
     /// the members accumulated since the last call. @p original must be the
     /// same specification on every call.
-    const SlotCoverage& slot_coverage(const Specification& original);
+    const SlotCoverage& slot_coverage(const Spec& original);
 
     /// Starts a generation, which the flip lineage counts its tabu spans in.
     void begin_generation() { ++m_generation; }
@@ -147,15 +155,15 @@ class DiversityState {
     /// The global slots (assumptions first, then guarantees) of @p parent
     /// that its lineage holds tabu this generation, ascending.
     [[nodiscard]] std::vector<std::size_t> flipped_slots(
-        const Specification& parent) const;
+        const Spec& parent) const;
 
     /// Holds the offspring @p bred of @p parent, realizable or not as
     /// @p parent_realizable says, until the generation is scored. @p edited
     /// is the offspring before simplification, which is compared slot by slot
     /// with @p parent to find the slots the mutation edited. Does nothing
     /// where it edited none.
-    void note_offspring(const Specification& parent, bool parent_realizable,
-                        const Specification& edited, const Specification& bred);
+    void note_offspring(const Spec& parent, bool parent_realizable,
+                        const Spec& edited, const Spec& bred);
 
     /// Gives each held offspring that @p scored holds its lineage: its
     /// parent's, with a flip recorded on each edited slot where the
@@ -164,12 +172,12 @@ class DiversityState {
     /// and starts afresh. An offspring that already has a lineage keeps it,
     /// and the first offspring held for a specification wins. Then forgets
     /// what it held.
-    void settle_offspring(const std::vector<Scored<Specification>>& scored,
+    void settle_offspring(const std::vector<Scored<Spec>>& scored,
                           std::size_t status_index, std::size_t span);
 
     /// Forgets what is cached about every specification not in @p keep, and
     /// the lineage of every one, which bounds both by the population.
-    void retain(const std::vector<Scored<Specification>>& keep);
+    void retain(const std::vector<Scored<Spec>>& keep);
 
    private:
     struct Novelty {
@@ -184,37 +192,41 @@ class DiversityState {
         }
     };
 
-    bool memoised_implies(const Requirement& stronger,
-                          const Requirement& weaker);
+    bool memoised_implies(const Req& stronger, const Req& weaker);
 
-    const std::vector<Specification>* m_accumulated;
+    const std::vector<Spec>* m_accumulated;
     /// live_lowerings of each member of M's guarantees, in M's order.
     std::vector<std::unordered_set<std::string>> m_guarantee_lowerings;
-    std::unordered_map<Specification, Novelty> m_novelty;
+    std::unordered_map<Spec, Novelty> m_novelty;
     std::unordered_map<std::pair<std::string, std::string>, bool, PairHash>
         m_pair_memo;
     struct HeldOffspring {
-        Specification bred;
+        Spec bred;
         Lineage lineage;
         std::vector<SlotKey> edited;
         bool parent_realizable = false;
     };
 
     std::size_t m_generation = 0;
-    std::unordered_map<Specification, Lineage> m_lineage;
+    std::unordered_map<Spec, Lineage> m_lineage;
     std::vector<HeldOffspring> m_held;
     SlotCoverage m_coverage;
     /// Members of M already counted into m_coverage.
     std::size_t m_covered = 0;
 };
 
+/// The FRETISH diversity state.
+using DiversityState = BasicDiversityState<Specification>;
+
 /// The extra objective `genetic.novelty` ranks by, one per element of
 /// @p population: minus the number of members of M implying the element where
 /// its status, at @p status_index, reads realizable, and 0 otherwise. No
 /// realizable repair implies an unrealizable candidate, since realizability is
 /// closed under weakening. All 0 where @p status_index is nothing.
+template <typename Spec>
 std::vector<double> novelty_objective(
-    DiversityState& state, const std::vector<Scored<Specification>>& population,
+    BasicDiversityState<Spec>& state,
+    const std::vector<Scored<Spec>>& population,
     std::optional<std::size_t> status_index);
 
 /// What `genetic.spread_init` did to a run's seed population. Reported under
