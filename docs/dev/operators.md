@@ -169,6 +169,23 @@ On the eight small FRETISH examples (`fsm`, `fsm-timing`, `fsm-combined`, `mode-
 
 The JSON drops removed guarantees, so a member read back has fewer guarantees than the original. `restore_removed_slots` (`src/climb_replay_slots.hpp`) puts each live guarantee back in the slot it shares most fields with and fills the rest with the original's requirement, removed. The run kept the requirement as it stood when removed, which the JSON does not hold, so a restore step in the replay restores the original's requirement where the run's restored the removed one. At one order the replay reproduces the run's repair set only where neither that guess nor a change in the code since the run's commit moves a climb.
 
+## Ordered-language traits
+
+The order-directed mechanisms read a specification language only through `OrderedLanguage<Spec>` (`include/genetic/ordered_language.hpp`), so a second language implements the traits and reuses the mechanisms rather than copying them. The templated mechanisms are the output climb (`climb`, `furthest_accepted`, `order_steps`, `climb_gate`, `climb_repairs`), two-way mutation in exchange mode (`exchange` and the step and slot helpers it calls in `src/genetic/mutation.cpp`), the blame narrowing (`targeted_mutation_slots`, `narrow_by_blame`), maximality removal and demotion (`proved_weaker_realizable`, `final_front_gutting`), and novelty with the rest of the run's diversity state (`BasicDiversityState<Spec>`, `novelty_objective`). `ParentContextT<Spec>` carries the parent's status to them. The rest of `mutate_specification` (the structural actions and the towards-mode rewrite), crossover, scoring and the pipeline stay per language.
+
+A specialisation provides these, as static members:
+
+| Group | Members |
+|---|---|
+| Types | `Requirement` (one slot), `Field` (an enumeration of a requirement's fields, as a step records it), `ChainValue` (a value on the chain a bisected step crosses), `Step` (`OrderStep<Spec, Field>`, `genetic/order_step.hpp`), `Implication`, `MutationPools` |
+| Slots | `assumptions`, `guarantees`, `is_live`, `is_weakenable`, `lowering` (the key of the requirement-pair memos), `with_slots` |
+| Order by rule | `requirement_implies`, `spec_implies_by_rule` (alone, and over precomputed `live_lowerings` with a memoised `Implication`), `classify_move`, `requirement_join`, `requirement_meet`, `keyword_similarity` |
+| Steps | `steps_towards`, `step_chain`, `with_slot_value` |
+| Realisability | `check_realizability` |
+| Directed mutation | `can_rewrite`, `mutate_slot`, `free_rewrite_rates` |
+
+The surface names no FRETISH type. Timing, scope and condition type appear only behind `Field` and `ChainValue`, and the config keys a free rewrite zeroes only behind `free_rewrite_rates`. `OrderedLanguage<Specification>` forwards each member to the function the mechanisms called before they were templated (`ChainValue` is `Timing`, `step_chain` is `timing_step_chain`, `with_slot_value` is `with_slot_timing`, `mutate_slot` is `mutate_requirement_tracked`), and every template is instantiated explicitly for `Specification` in its own source file. The extraction moved no draw and no golden. Under the final-engine `full` config at seed 7, a release build of `ffcb2a15` and one of the extraction wrote byte-identical `repair_*.json` on `fsm`, `mode-arbiter` and `rad`. Their `run.json` files differed only in the streaming implication filter's counters (`model_words`, `fingerprint_refuted`, `skipped`) and in the realizability cache's hit, miss and exec counts, which move with the timing of speculative checks; two runs of the `ffcb2a15` build differ in the implication counters too.
+
 ## Status-gated mutation direction
 
 Every directed move weakens the specification: a guarantee weakens and an assumption strengthens. A search that only weakens cannot step back from an ancestor that went past the ideal. `[mutation] direction_gated` (`Config::direction_gated_mutation`, default off, FRETISH only) aims the move by the parent's status instead. The gate opens only where the `ParentContext` carries a status and crossover did not fire, since the first parent's status says little about a crossed offspring. Realisability is closed under weakening, so an unrealisable parent should weaken and a realisable one should strengthen, which keeps the population near the realisability boundary where the maximal repairs lie. The gate reads the status score: 1.0 counts as realisable and anything lower as unrealisable.

@@ -121,7 +121,8 @@ struct SlotCoverage;
 /// After a crossover the offspring is no longer the parent it was copied from,
 /// so every field but @c original describes the first parent and is only an
 /// estimate of the offspring.
-struct ParentContext {
+template <typename Spec>
+struct ParentContextT {
     /// The parent's status objective, or nothing when the run scores none.
     std::optional<double> status;
     /// The status reached k_status_realizable: realizable and, under MRS
@@ -135,7 +136,7 @@ struct ParentContext {
     /// The specification the run repairs, which every slot descends from.
     /// Borrowed for the generation, never copied; null when the caller has
     /// none to give.
-    const Specification* original = nullptr;
+    const Spec* original = nullptr;
     /// Under Config::slot_coverage, how many accumulated repairs edited each
     /// slot of the original (diversity.hpp); null otherwise, which leaves the
     /// slot draw unweighted. Borrowed for the generation.
@@ -145,6 +146,9 @@ struct ParentContext {
     /// Config::flip_sideways they are rewritten sideways instead of skipped.
     std::vector<std::size_t> flipped_slots;
 };
+
+/// The FRETISH parent context.
+using ParentContext = ParentContextT<Specification>;
 
 /// What Config::flip_tabu and Config::flip_sideways did over a run. Reported
 /// under `--diagnostics` and in run.json.
@@ -245,6 +249,48 @@ struct StepScalingStats {
     inline static std::atomic<std::size_t> n_unscaled_small{0};
 };
 
+/// The factor Config::step_scaling multiplies each large move's probability by,
+/// or nothing where the key is off or the parent gave no status. Nothing keeps
+/// every arm on the draws it took before the key existed.
+///
+/// An unscaled mutation that a scale would have applied to, had the key been
+/// above 0, is marked tallied: its large moves and single edges are counted
+/// for the baseline rate, read off the draws it takes anyway.
+struct StepScale {
+    std::optional<double> m_factor;
+    bool m_tallied = false;
+
+    /// Counts an unscaled move as @p large or as a single edge, where tallied.
+    void tally(bool large) const {
+        if (!m_tallied) {
+            return;
+        }
+        if (large) {
+            StepScalingStats::n_unscaled_large++;
+        } else {
+            StepScalingStats::n_unscaled_small++;
+        }
+    }
+
+    /// Counts an unscaled large move with no single edge beside it.
+    void tally_large() const {
+        if (m_tallied) {
+            StepScalingStats::n_unscaled_large++;
+        }
+    }
+};
+
+/// mutate_requirement, reporting through @p free_rewrite (where non-null)
+/// whether any field took the general rewrite rather than a move along its
+/// order, under the step scale @p scale.
+Requirement mutate_requirement_tracked(
+    const Requirement& requirement, const std::vector<std::string>& atoms,
+    const std::vector<std::string>& condition_atoms, Direction direction,
+    const std::vector<Timing>& timing_pool,
+    const std::vector<std::string>& mode_pool,
+    const RandomSource& random_source, const Config& cfg, bool* free_rewrite,
+    StepScale scale);
+
 /// The slots Config::blame_targeted_slots narrows a rewrite to, as global
 /// indices (assumptions first, then guarantees) drawn from @p weakenable, in
 /// its order. Empty means no narrowing: no context, no status, a crossover
@@ -263,10 +309,10 @@ struct StepScalingStats {
 ///                      collects them
 /// @param parent        What breeding knows about the parent
 /// @param cfg           Read for Config::blame_realizable alone
+template <typename Spec>
 std::vector<std::size_t> targeted_mutation_slots(
-    const Specification& specification,
-    const std::vector<std::size_t>& weakenable, const ParentContext& parent,
-    const Config& cfg);
+    const Spec& specification, const std::vector<std::size_t>& weakenable,
+    const ParentContextT<Spec>& parent, const Config& cfg);
 
 /// Mutates a specification by picking one requirement at random and replacing
 /// it with a mutated version. The pool of atom names is taken from the

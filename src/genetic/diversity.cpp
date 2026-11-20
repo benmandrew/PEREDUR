@@ -14,6 +14,7 @@
 #include "fitness/status.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/order_moves.hpp"
+#include "genetic/ordered_language.hpp"
 #include "profile.hpp"
 #include "requirement.hpp"
 
@@ -48,45 +49,50 @@ double specification_distance(const Specification& lhs,
     return static_cast<double>(differing) / static_cast<double>(slots);
 }
 
-DiversityState::DiversityState(const std::vector<Specification>* accumulated)
+template <typename Spec>
+BasicDiversityState<Spec>::BasicDiversityState(
+    const std::vector<Spec>* accumulated)
     : m_accumulated(accumulated) {}
 
-bool DiversityState::memoised_implies(const Requirement& stronger,
-                                      const Requirement& weaker) {
-    std::pair<std::string, std::string> key{stronger.m_ltl, weaker.m_ltl};
+template <typename Spec>
+bool BasicDiversityState<Spec>::memoised_implies(const Req& stronger,
+                                                 const Req& weaker) {
+    std::pair<std::string, std::string> key{Language::lowering(stronger),
+                                            Language::lowering(weaker)};
     const auto found = m_pair_memo.find(key);
     if (found != m_pair_memo.end()) {
         return found->second;
     }
-    const bool proved = requirement_implies(stronger, weaker);
+    const bool proved = Language::requirement_implies(stronger, weaker);
     m_pair_memo.emplace(std::move(key), proved);
     return proved;
 }
 
-std::size_t DiversityState::implied_by(const Specification& candidate) {
+template <typename Spec>
+std::size_t BasicDiversityState<Spec>::implied_by(const Spec& candidate) {
     if (m_accumulated == nullptr) {
         return 0;
     }
-    const std::vector<Specification>& accumulated = *m_accumulated;
+    const std::vector<Spec>& accumulated = *m_accumulated;
     while (m_guarantee_lowerings.size() < accumulated.size()) {
-        m_guarantee_lowerings.push_back(live_lowerings(
-            accumulated[m_guarantee_lowerings.size()].m_guarantees));
+        m_guarantee_lowerings.push_back(Language::live_lowerings(
+            Language::guarantees(accumulated[m_guarantee_lowerings.size()])));
     }
     Novelty& novelty = m_novelty[candidate];
     if (novelty.checked == accumulated.size()) {
         return novelty.count;
     }
     const std::unordered_set<std::string> assumptions =
-        live_lowerings(candidate.m_assumptions);
-    const RequirementImplication implies = [this](const Requirement& stronger,
-                                                  const Requirement& weaker) {
+        Language::live_lowerings(Language::assumptions(candidate));
+    const typename Language::Implication implies = [this](const Req& stronger,
+                                                          const Req& weaker) {
         return memoised_implies(stronger, weaker);
     };
     for (; novelty.checked < accumulated.size(); ++novelty.checked) {
         NoveltyStats::n_checks++;
-        if (spec_implies_by_rule(accumulated[novelty.checked], candidate,
-                                 m_guarantee_lowerings[novelty.checked],
-                                 assumptions, implies)) {
+        if (Language::spec_implies_by_rule(
+                accumulated[novelty.checked], candidate,
+                m_guarantee_lowerings[novelty.checked], assumptions, implies)) {
             NoveltyStats::n_implied++;
             ++novelty.count;
         }
@@ -94,9 +100,10 @@ std::size_t DiversityState::implied_by(const Specification& candidate) {
     return novelty.count;
 }
 
-void DiversityState::retain(const std::vector<Scored<Specification>>& keep) {
-    std::unordered_set<Specification> live;
-    for (const Scored<Specification>& scored : keep) {
+template <typename Spec>
+void BasicDiversityState<Spec>::retain(const std::vector<Scored<Spec>>& keep) {
+    std::unordered_set<Spec> live;
+    for (const Scored<Spec>& scored : keep) {
         live.insert(scored.specification);
     }
     for (auto it = m_novelty.begin(); it != m_novelty.end();) {
@@ -107,8 +114,10 @@ void DiversityState::retain(const std::vector<Scored<Specification>>& keep) {
     }
 }
 
+template <typename Spec>
 std::vector<double> novelty_objective(
-    DiversityState& state, const std::vector<Scored<Specification>>& population,
+    BasicDiversityState<Spec>& state,
+    const std::vector<Scored<Spec>>& population,
     std::optional<std::size_t> status_index) {
     PEREDUR_PROFILE_SCOPE("select/novelty");
     std::vector<double> objective(population.size(), 0.0);
@@ -116,7 +125,7 @@ std::vector<double> novelty_objective(
         return objective;
     }
     for (std::size_t i = 0; i < population.size(); ++i) {
-        const Scored<Specification>& scored = population[i];
+        const Scored<Spec>& scored = population[i];
         NoveltyStats::n_evaluations++;
         if (*status_index >= scored.objectives.size() ||
             scored.objectives[*status_index] < k_status_realizable) {
@@ -135,8 +144,9 @@ namespace {
 
 // Adds one to each slot of @p counts in which @p member differs from
 // @p original, growing @p counts to cover every slot @p member has.
-void count_edits(const std::vector<Requirement>& member,
-                 const std::vector<Requirement>& original,
+template <typename Req>
+void count_edits(const std::vector<Req>& member,
+                 const std::vector<Req>& original,
                  std::vector<std::size_t>& counts) {
     if (counts.size() < member.size()) {
         counts.resize(member.size(), 0);
@@ -159,17 +169,18 @@ std::size_t coverage_of(const SlotCoverage& coverage, std::size_t idx,
     return local < counts.size() ? counts[local] : 0;
 }
 
-const SlotCoverage& DiversityState::slot_coverage(
-    const Specification& original) {
+template <typename Spec>
+const SlotCoverage& BasicDiversityState<Spec>::slot_coverage(
+    const Spec& original) {
     if (m_accumulated == nullptr) {
         return m_coverage;
     }
     for (; m_covered < m_accumulated->size(); ++m_covered) {
-        const Specification& member = (*m_accumulated)[m_covered];
-        count_edits(member.m_assumptions, original.m_assumptions,
-                    m_coverage.assumptions);
-        count_edits(member.m_guarantees, original.m_guarantees,
-                    m_coverage.guarantees);
+        const Spec& member = (*m_accumulated)[m_covered];
+        count_edits(Language::assumptions(member),
+                    Language::assumptions(original), m_coverage.assumptions);
+        count_edits(Language::guarantees(member),
+                    Language::guarantees(original), m_coverage.guarantees);
     }
     return m_coverage;
 }
@@ -287,8 +298,9 @@ std::vector<Specification> spread_initial_population(
 namespace {
 
 // The slots of one side in which @p edited differs from @p parent.
-void edited_slots(const std::vector<Requirement>& parent,
-                  const std::vector<Requirement>& edited, bool guarantee,
+template <typename Req>
+void edited_slots(const std::vector<Req>& parent,
+                  const std::vector<Req>& edited, bool guarantee,
                   std::vector<SlotKey>& slots) {
     const std::size_t longest = std::max(parent.size(), edited.size());
     for (std::size_t i = 0; i < longest; ++i) {
@@ -301,14 +313,15 @@ void edited_slots(const std::vector<Requirement>& parent,
 
 }  // namespace
 
-std::vector<std::size_t> DiversityState::flipped_slots(
-    const Specification& parent) const {
+template <typename Spec>
+std::vector<std::size_t> BasicDiversityState<Spec>::flipped_slots(
+    const Spec& parent) const {
     std::vector<std::size_t> slots;
     const auto found = m_lineage.find(parent);
     if (found == m_lineage.end()) {
         return slots;
     }
-    const std::size_t n_assumptions = parent.m_assumptions.size();
+    const std::size_t n_assumptions = Language::assumptions(parent).size();
     for (const auto& [slot, flips] : found->second) {
         if (flips.tabu_until > m_generation) {
             slots.push_back(slot.guarantee ? n_assumptions + slot.local
@@ -319,14 +332,16 @@ std::vector<std::size_t> DiversityState::flipped_slots(
     return slots;
 }
 
-void DiversityState::note_offspring(const Specification& parent,
-                                    bool parent_realizable,
-                                    const Specification& edited,
-                                    const Specification& bred) {
+template <typename Spec>
+void BasicDiversityState<Spec>::note_offspring(const Spec& parent,
+                                               bool parent_realizable,
+                                               const Spec& edited,
+                                               const Spec& bred) {
     HeldOffspring held;
-    edited_slots(parent.m_assumptions, edited.m_assumptions, false,
-                 held.edited);
-    edited_slots(parent.m_guarantees, edited.m_guarantees, true, held.edited);
+    edited_slots(Language::assumptions(parent), Language::assumptions(edited),
+                 false, held.edited);
+    edited_slots(Language::guarantees(parent), Language::guarantees(edited),
+                 true, held.edited);
     if (held.edited.empty()) {
         return;
     }
@@ -339,11 +354,12 @@ void DiversityState::note_offspring(const Specification& parent,
     m_held.push_back(std::move(held));
 }
 
-void DiversityState::settle_offspring(
-    const std::vector<Scored<Specification>>& scored, std::size_t status_index,
+template <typename Spec>
+void BasicDiversityState<Spec>::settle_offspring(
+    const std::vector<Scored<Spec>>& scored, std::size_t status_index,
     std::size_t span) {
-    std::unordered_map<Specification, bool> realizable;
-    for (const Scored<Specification>& entry : scored) {
+    std::unordered_map<Spec, bool> realizable;
+    for (const Scored<Spec>& entry : scored) {
         if (status_index < entry.objectives.size()) {
             realizable.emplace(
                 entry.specification,
@@ -374,3 +390,8 @@ void DiversityState::settle_offspring(
     }
     m_held.clear();
 }
+
+template class BasicDiversityState<Specification>;
+template std::vector<double> novelty_objective(
+    DiversityState&, const std::vector<Scored<Specification>>&,
+    std::optional<std::size_t>);

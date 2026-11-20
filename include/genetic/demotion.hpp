@@ -1,9 +1,10 @@
 #pragma once
 
 /// @file demotion.hpp
-/// @brief Maximality demotion: the FRETISH selection rule that moves a
-///        realizable candidate one front down when another realizable
-///        candidate is proved strictly stronger.
+/// @brief Maximality demotion: the selection rule that moves a realizable
+///        candidate one front down when another realizable candidate is
+///        proved strictly stronger. Templated over the specification type and
+///        read through OrderedLanguage; FRETISH is the one instantiation.
 
 #include <cstddef>
 #include <optional>
@@ -56,9 +57,9 @@ struct DemotionStats {
 ///
 /// The flags depend on the set of elements alone, not their order. Each
 /// distinct requirement pair is proved at most once per call.
+template <typename Spec = Specification>
 std::vector<bool> proved_weaker_realizable(
-    const std::vector<Scored<Specification>>& population,
-    std::size_t status_index);
+    const std::vector<Scored<Spec>>& population, std::size_t status_index);
 
 /// The first front of the distinct members of @p population, ranked by
 /// non_domination_ranks on the objectives alone, with the members of it that
@@ -66,6 +67,6 @@ std::vector<bool> proved_weaker_realizable(
 /// candidate counts on the front its objectives give it, so the count does not
 /// read zero merely because demotion moved it. Launches no process and draws
 /// nothing.
-FrontGutting final_front_gutting(
-    const std::vector<Scored<Specification>>& population,
-    std::size_t status_index);
+template <typename Spec = Specification>
+FrontGutting final_front_gutting(const std::vector<Scored<Spec>>& population,
+                                 std::size_t status_index);
