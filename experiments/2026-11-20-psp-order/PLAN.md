@@ -27,7 +27,7 @@ At about 60 s a run, each host's specifications phase is about 9 slot-hours, whi
 
 `scripts/probe.py` (a port of the FRETISH corpus's probe) estimates, for each seeded mutant O with base B, the share of chains of one (p1) and two (p2) undirected mutations from O that give a realisable specification that implies B. Such a draw is a trivial reversion: blind mutation repairs O without the search. A subject is headline when p1 and p2 are both below 0.01; the others are trivial. The paper reports the ideal rate over the headline subjects beside the rate over all of them.
 
-The probe runs locally, not through the queue, after `feat/psp-front-end` is merged (so it sees every mutant in `selected.txt`) and before the analysis. It uses `sample-mutants`, `compare` and `realize` from `build-release` at the campaign's commit, under the `base` arm's config:
+The probe runs locally, not through the queue, after `feat/psp-front-end` is merged (so it sees every mutant in `selected.txt`) and before the analysis. It uses `sample-mutants`, `compare` and `realize` from `build-release` at the campaign's commit, under the `base` arm's config, so first generate the configs with the `configs` command of `campaign.toml` (they are untracked):
 
 ```
 systemd-run --user --scope -q -p MemoryMax=7G -p MemorySwapMax=0 nice -n 10 nix develop -c python3 experiments/2026-11-20-psp-order/scripts/probe.py --jobs 4
