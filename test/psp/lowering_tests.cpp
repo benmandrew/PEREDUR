@@ -25,6 +25,7 @@
 
 #include "ltl_oracle.hpp"
 #include "prop_formula.hpp"
+#include "psp/psp_fixtures.hpp"
 #include "psp/requirement.hpp"
 #include "psp/specification.hpp"
 #include "requirement.hpp"
@@ -38,68 +39,11 @@ namespace {
 constexpr std::string_view k_test_suite = "psp_lowering";
 
 using psp::PspScopeKind;
-
-constexpr std::array<PspScopeKind, 5> k_scopes = {
-    PspScopeKind::Globally, PspScopeKind::Before, PspScopeKind::After,
-    PspScopeKind::Between, PspScopeKind::AfterUntil};
-
-// Every pattern the script measures, in its order: the five base patterns,
-// then each bounded one at counts 1 to 4.
-std::vector<psp::Pattern> measured_patterns() {
-    std::vector<psp::Pattern> out = {
-        psp::pattern::Absence{}, psp::pattern::Universality{},
-        psp::pattern::Existence{}, psp::pattern::Precedence{},
-        psp::pattern::Response{}};
-    for (std::size_t count = 1; count <= 4; ++count) {
-        out.emplace_back(psp::pattern::BoundedResponse{count});
-    }
-    for (std::size_t count = 1; count <= 4; ++count) {
-        out.emplace_back(psp::pattern::BoundedInvariance{count});
-    }
-    for (std::size_t count = 1; count <= 4; ++count) {
-        out.emplace_back(psp::pattern::BoundedExistence{count});
-    }
-    for (std::size_t count = 1; count <= 4; ++count) {
-        out.emplace_back(psp::pattern::BoundedRecurrence{count});
-    }
-    return out;
-}
-
-// The requirement over the given field formulas, each present where the
-// pattern or scope reads it.
-psp::Requirement over(const psp::Pattern& pattern, PspScopeKind scope,
-                      const std::string& field_p = "p",
-                      const std::string& field_s = "s",
-                      const std::string& field_q = "q",
-                      const std::string& field_r = "r") {
-    const auto field = [](bool used, const std::string& text) {
-        return used ? std::optional<Formula>(Formula(text)) : std::nullopt;
-    };
-    return {pattern,
-            scope,
-            field(psp::pattern_uses_p(pattern), field_p),
-            field(psp::pattern_uses_s(pattern), field_s),
-            field(psp::scope_uses_q(scope), field_q),
-            field(psp::scope_uses_r(scope), field_r)};
-}
-
-// The node's name as docs/dev/psp-orders.json keys it: "bounded-response
-// 2/between".
-std::string node_name(const psp::Pattern& pattern, PspScopeKind scope) {
-    std::string out = psp::pattern_name(pattern);
-    if (const std::optional<std::size_t> count = psp::pattern_count(pattern)) {
-        out += " " + std::to_string(*count);
-    }
-    return out + "/" + psp::scope_name(scope);
-}
-
-nlohmann::json orders_json() {
-    const std::string path =
-        std::string(PEREDUR_SOURCE_DIR) + "/docs/dev/psp-orders.json";
-    std::ifstream file(path);
-    expect(static_cast<bool>(file), "psp: cannot read " + path);
-    return nlohmann::json::parse(file);
-}
+using psp_fixtures::k_scopes;
+using psp_fixtures::measured_patterns;
+using psp_fixtures::node_name;
+using psp_fixtures::orders_json;
+using psp_fixtures::over;
 
 // Both directions in one ltlfilt run, which fails the test when it cannot
 // decide, where ltl_equivalent would read a failure as a match.

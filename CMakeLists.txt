@@ -194,6 +194,7 @@ target_sources(peredur_fitness PRIVATE
     src/driver_support.cpp
     src/repair_steps.cpp
     src/psp/filter.cpp
+    src/psp/implication.cpp
     src/psp/serialisation.cpp
 )
 target_include_directories(peredur_fitness PUBLIC include)

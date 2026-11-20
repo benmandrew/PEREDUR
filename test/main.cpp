@@ -86,6 +86,7 @@ const std::vector<Suite>& suites() {
         suite_named("tlsf_monotone"),
         suite_named("tlsf_pipeline"),
         suite_named("psp_lowering"),
+        suite_named("psp_implication"),
         suite_named("driver_peredur"),
         suite_named("driver_realize"),
         suite_named("driver_ltl"),
@@ -99,6 +100,9 @@ const std::vector<Suite>& suites() {
         // Opt-in: sends 213,605 requirement pairs to SPOT, and no ctest entry
         // runs it.
         Suite{"requirement_implies_sweep", false, {}},
+        // Opt-in: sends the PSP rule's sampled pairs to SPOT, and no ctest
+        // entry runs it.
+        Suite{"psp_requirement_implies_sweep", false, {}},
     };
     return table;
 }

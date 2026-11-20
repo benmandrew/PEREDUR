@@ -57,6 +57,7 @@ add_executable(peredur_tests
     tlsf/monotone_tests.cpp
     tlsf/pipeline_tests.cpp
     psp/lowering_tests.cpp
+    psp/implication_tests.cpp
     fingerprint/lasso_tests.cpp
     fingerprint/prefilter_tests.cpp
     drivers/e2e_tests.cpp
@@ -93,6 +94,13 @@ target_link_libraries(timing_order_table PRIVATE peredur_fitness)
 # scope_implies with its Lean transcription in proofs/Fretish/ScopeOrder.lean.
 add_executable(scope_order_table scope_order_table.cpp)
 target_link_libraries(scope_order_table PRIVATE peredur_fitness)
+
+# Not tests: they print psp::pattern_implies and psp::scope_implies for the
+# Lean cross-check of the PSP orders (phase P6 of the PSP plan).
+add_executable(psp_pattern_order_table psp_pattern_order_table.cpp)
+target_link_libraries(psp_pattern_order_table PRIVATE peredur_fitness)
+add_executable(psp_scope_order_table psp_scope_order_table.cpp)
+target_link_libraries(psp_scope_order_table PRIVATE peredur_fitness)
 
 # The end-to-end suites spawn the drivers rather than calling into the library,
 # so the binaries have to exist before ctest runs and the suite has to know
@@ -168,6 +176,7 @@ set(peredur_test_suites
     tlsf_monotone
     tlsf_pipeline
     psp_lowering
+    psp_implication
     driver_peredur
     driver_realize
     driver_ltl
