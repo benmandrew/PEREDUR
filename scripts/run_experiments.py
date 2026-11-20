@@ -302,11 +302,12 @@ PSP_SYNTECH_SPECS: dict[str, dict[str, Path]] = {
     for name in PSP_SYNTECH_UNREALISABLE
 }
 
-# The PSP seeded corpus (experiments/2026-11-20-psp-seeded-corpus): each
-# subject is a realisable base with one guarantee strengthened or moved
-# sideways (sample-mutants --psp-seeded), with the base as its one ideal. The
-# subjects are tracked; selected.txt names the ones a campaign runs.
-PSP_SEEDED_DIR = EXPERIMENTS_DIR / "2026-11-20-psp-seeded-corpus"
+# The PSP seeded corpus (examples/psp-seeded, written by
+# experiments/2026-11-20-psp-seeded-corpus/scripts/seed.py): each subject is a
+# realisable base with one guarantee strengthened or moved sideways
+# (sample-mutants --psp-seeded), with the base as its one ideal. Unlike the
+# FRETISH corpora it is tracked; selected.txt names the ones a campaign runs.
+PSP_SEEDED_DIR = EXAMPLES_DIR / "psp-seeded"
 PSP_SEEDED_SPECS: dict[str, dict[str, Path]] = _seeded_specs(
     PSP_SEEDED_DIR, ext="psp")
 

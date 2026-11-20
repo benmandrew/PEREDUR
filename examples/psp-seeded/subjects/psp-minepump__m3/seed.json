@@ -1,0 +1,12 @@
+{
+  "base": "psp-minepump",
+  "source": "hand-written",
+  "edit": "scope-swap",
+  "field": "scope",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "Before methane, it is always the case that if high holds, then pump eventually holds.",
+  "after": "After methane, it is always the case that if high holds, then pump eventually holds.",
+  "slot": 0,
+  "base_path": "examples/psp-minepump/fixes/respond-before-methane.psp"
+}

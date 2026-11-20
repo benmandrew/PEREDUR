@@ -1,0 +1,12 @@
+{
+  "base": "psp-crossing",
+  "source": "hand-written",
+  "edit": "scope-swap",
+  "field": "scope",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "After fault, it is always the case that alarm holds.",
+  "after": "Before fault, it is always the case that alarm holds.",
+  "slot": 2,
+  "base_path": "examples/psp-crossing/fixes/exclusion-before-fault.psp"
+}

@@ -1,0 +1,12 @@
+{
+  "base": "psp-cruise",
+  "source": "hand-written",
+  "edit": "narrow-field",
+  "field": "s",
+  "rule": "stronger",
+  "relation": "strictly stronger than",
+  "before": "Between set and brake, it is always the case that if slow holds, then throttle holds after at most 2 time units.",
+  "after": "Between set and brake, it is always the case that if slow holds, then ((throttle) & (cruise)) holds after at most 2 time units.",
+  "slot": 3,
+  "base_path": "examples/psp-cruise/fixes/close-on-fault.psp"
+}

@@ -1,0 +1,10 @@
+# The realisable bases of the PSP seeded corpus, one per line: id, path from
+# the repository root, source, and optionally max_candidates (how many
+# candidates seed.py draws). A SYNTECH17 import that realize finds
+# realisable joins as one more line.
+id	path	source	max_candidates
+psp-arbiter	examples/psp-arbiter/fixes/grant-follows-request.psp	hand-written
+psp-cruise	examples/psp-cruise/fixes/close-on-fault.psp	hand-written
+psp-crossing	examples/psp-crossing/fixes/exclusion-before-fault.psp	hand-written
+psp-patrol	examples/psp-patrol/fixes/base-until-next-mission.psp	hand-written
+psp-minepump	examples/psp-minepump/fixes/respond-before-methane.psp	hand-written

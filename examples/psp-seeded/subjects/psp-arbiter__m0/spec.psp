@@ -1,0 +1,37 @@
+{
+  "assumptions": [
+    {
+      "pattern": "universality",
+      "s": "!((start) & (stop))",
+      "scope": "globally"
+    }
+  ],
+  "guarantees": [
+    {
+      "count": 1,
+      "p": "req",
+      "pattern": "bounded-invariance",
+      "q": "start",
+      "r": "stop",
+      "s": "grant",
+      "scope": "afteruntil"
+    },
+    {
+      "count": 1,
+      "p": "!(req)",
+      "pattern": "bounded-response",
+      "q": "start",
+      "r": "stop",
+      "s": "!(grant)",
+      "scope": "afteruntil"
+    }
+  ],
+  "in_atoms": [
+    "req",
+    "start",
+    "stop"
+  ],
+  "out_atoms": [
+    "grant"
+  ]
+}

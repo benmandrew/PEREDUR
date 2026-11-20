@@ -1,0 +1,12 @@
+{
+  "base": "psp-crossing",
+  "source": "hand-written",
+  "edit": "swap-signal",
+  "field": "r",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "Before fault, it is never the case that ((alarm) & (down)) holds.",
+  "after": "Before gone, it is never the case that ((alarm) & (down)) holds.",
+  "slot": 3,
+  "base_path": "examples/psp-crossing/fixes/exclusion-before-fault.psp"
+}

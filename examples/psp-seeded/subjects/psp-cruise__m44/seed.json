@@ -1,0 +1,12 @@
+{
+  "base": "psp-cruise",
+  "source": "hand-written",
+  "edit": "flip-literal",
+  "field": "p",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "Globally, it is always the case that if fault holds, then (!(cruise)) eventually holds.",
+  "after": "Globally, it is always the case that if (!(fault)) holds, then (!(cruise)) eventually holds.",
+  "slot": 1,
+  "base_path": "examples/psp-cruise/fixes/close-on-fault.psp"
+}

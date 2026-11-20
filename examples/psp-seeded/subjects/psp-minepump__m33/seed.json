@@ -1,0 +1,12 @@
+{
+  "base": "psp-minepump",
+  "source": "hand-written",
+  "edit": "pattern-step",
+  "field": "pattern",
+  "rule": "stronger",
+  "relation": "strictly stronger than",
+  "before": "Between reset and methane, transitions to states in which pump holds occur at most 2 times.",
+  "after": "Between reset and methane, it is never the case that pump holds.",
+  "slot": 2,
+  "base_path": "examples/psp-minepump/fixes/respond-before-methane.psp"
+}

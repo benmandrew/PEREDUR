@@ -19,7 +19,8 @@ so a realisable SYNTECH17 import joins the corpus as one more line. Where
 whole-specification ``realize``. A base with no weakenable guarantee gives no
 candidate.
 
-Writes ``<out>/subjects/<id>/{spec.psp,fixes/base.psp,seed.json}``,
+Writes, under ``<out>`` (``examples/psp-seeded``),
+``subjects/<id>/{spec.psp,fixes/base.psp,seed.json}``,
 ``<out>/mutants.csv`` (every candidate and the stage that dropped it) and
 ``<out>/selected.txt`` (at most ``--cap`` kept mutants per base, drawn with
 ``--seed``).
@@ -38,8 +39,10 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parents[1]
 REPO = Path(__file__).resolve().parents[3]
+# The corpus is tracked under examples/, since experiments/ tracks no data.
+CORPUS = REPO / "examples" / "psp-seeded"
+WORK = Path(__file__).resolve().parents[1] / "work"
 
 ADMIT = {"strictly stronger than", "incomparable"}
 
@@ -159,8 +162,8 @@ def check(task):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
-    ap.add_argument("--bases", type=Path, default=HERE / "bases.tsv")
-    ap.add_argument("--out", type=Path, default=HERE)
+    ap.add_argument("--bases", type=Path, default=CORPUS / "bases.tsv")
+    ap.add_argument("--out", type=Path, default=CORPUS)
     ap.add_argument("--bin", type=Path, default=REPO / "build-release",
                     help="directory holding realize, compare, ltl and "
                          "sample-mutants")
@@ -171,7 +174,7 @@ def main() -> int:
     ap.add_argument("--timeout", type=int, default=300)
     args = ap.parse_args()
 
-    work_root = args.out / "work"
+    work_root = WORK
     tasks = []
     bases = read_bases(args.bases)
     for b in bases:
@@ -201,8 +204,10 @@ def main() -> int:
             mid = f"{b['id']}__{Path(r['file']).stem}"
             row = {"id": mid, "base": b["id"], "source": b["source"],
                    "slot": r["slot"], "edit": r["edit"], "field": r["field"],
-                   "rule": r["rule"], "before": r["before"],
-                   "after": r["after"], "stage": ""}
+                   "rule": r["rule"],
+                   # The loader prefixes every atom; the corpus shows them bare.
+                   "before": r["before"].replace("iap_", ""),
+                   "after": r["after"].replace("iap_", ""), "stage": ""}
             tasks.append((args.bin, row, cand / r["file"], base_path,
                           work_root / b["id"] / mid, args.timeout))
         print(f"{b['id']}: {len(rows)} of {n_all} candidates", file=sys.stderr)

@@ -1,0 +1,12 @@
+{
+  "base": "psp-cruise",
+  "source": "hand-written",
+  "edit": "scope-swap",
+  "field": "scope",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "Before set, it is never the case that cruise holds.",
+  "after": "Between slow and set, it is never the case that cruise holds.",
+  "slot": 2,
+  "base_path": "examples/psp-cruise/fixes/close-on-fault.psp"
+}

@@ -1,0 +1,12 @@
+{
+  "base": "psp-crossing",
+  "source": "hand-written",
+  "edit": "scope-step",
+  "field": "scope",
+  "rule": "stronger",
+  "relation": "strictly stronger than",
+  "before": "Before near, it is never the case that down holds.",
+  "after": "Globally, it is never the case that down holds.",
+  "slot": 1,
+  "base_path": "examples/psp-crossing/fixes/exclusion-before-fault.psp"
+}

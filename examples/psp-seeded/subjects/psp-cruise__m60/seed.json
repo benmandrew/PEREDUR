@@ -1,0 +1,12 @@
+{
+  "base": "psp-cruise",
+  "source": "hand-written",
+  "edit": "scope-step",
+  "field": "scope",
+  "rule": "stronger",
+  "relation": "strictly stronger than",
+  "before": "Before set, it is never the case that cruise holds.",
+  "after": "Globally, it is never the case that cruise holds.",
+  "slot": 2,
+  "base_path": "examples/psp-cruise/fixes/close-on-fault.psp"
+}
