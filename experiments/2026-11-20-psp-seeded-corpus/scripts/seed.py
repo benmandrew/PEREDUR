@@ -179,6 +179,11 @@ def main() -> int:
     bases = read_bases(args.bases)
     for b in bases:
         base_path = REPO / b["path"]
+        if not base_path.is_file():
+            # The SYNTECH17 imports reach a branch by merging
+            # feat/psp-front-end; until then their lines are skipped.
+            print(f"{b['id']}: {b['path']} absent, skipped", file=sys.stderr)
+            continue
         cand = work_root / b["id"] / "candidates"
         shutil.rmtree(cand, ignore_errors=True)
         out = run([str(args.bin / "sample-mutants"), str(base_path),

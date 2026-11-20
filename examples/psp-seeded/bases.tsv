@@ -1,10 +1,63 @@
 # The realisable bases of the PSP seeded corpus, one per line: id, path from
 # the repository root, source, and optionally max_candidates (how many
-# candidates seed.py draws). A SYNTECH17 import that realize finds
-# realisable joins as one more line.
+# candidates seed.py draws; set on the SYNTECH17 lines, where each check
+# costs a whole-specification realize). The SYNTECH17 lines are the
+# realisable imports, the five with event-delimited slots first; three of
+# those have no weakenable guarantee and give no candidate.
 id	path	source	max_candidates
 psp-arbiter	examples/psp-arbiter/fixes/grant-follows-request.psp	hand-written
 psp-cruise	examples/psp-cruise/fixes/close-on-fault.psp	hand-written
 psp-crossing	examples/psp-crossing/fixes/exclusion-before-fault.psp	hand-written
 psp-patrol	examples/psp-patrol/fixes/base-until-next-mission.psp	hand-written
 psp-minepump	examples/psp-minepump/fixes/respond-before-methane.psp	hand-written
+syntech-Elevator_cmp_Elevator_55	examples/psp-syntech/specs/Elevator_cmp_Elevator_55.psp	SYNTECH17	40
+syntech-Elevator_cmp_Elevator_94	examples/psp-syntech/specs/Elevator_cmp_Elevator_94.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_163	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_163.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_169	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_169.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_174	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_174.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_24	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_24.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_33	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_33.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_39	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_39.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_52	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_52.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_144	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_144.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_145	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_145.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_153	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_153.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_188	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_188.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_196	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_196.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_199	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_199.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_200	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_200.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_201	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_201.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_203	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_203.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_204	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_204.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_213	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_213.psp	SYNTECH17	40
+syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_214	examples/psp-syntech/specs/AirportShuttleProject_AirportShuttle1_AirportShuttle_214.psp	SYNTECH17	40
+syntech-AirportShuttle_AirportShuttle_49	examples/psp-syntech/specs/AirportShuttle_AirportShuttle_49.psp	SYNTECH17	40
+syntech-ConvoyCar_ConvoyCarSpec_121	examples/psp-syntech/specs/ConvoyCar_ConvoyCarSpec_121.psp	SYNTECH17	40
+syntech-ConvoyCar_ConvoyCarSpec_85	examples/psp-syntech/specs/ConvoyCar_ConvoyCarSpec_85.psp	SYNTECH17	40
+syntech-ConvoyCar_ConvoyCarSpec_86	examples/psp-syntech/specs/ConvoyCar_ConvoyCarSpec_86.psp	SYNTECH17	40
+syntech-ParkingModule_ParkingSpec_168	examples/psp-syntech/specs/ParkingModule_ParkingSpec_168.psp	SYNTECH17	40
+syntech-ParkingModule_ParkingSpec_173	examples/psp-syntech/specs/ParkingModule_ParkingSpec_173.psp	SYNTECH17	40
+syntech-SimpleVehicle2_VehicleSpec_103	examples/psp-syntech/specs/SimpleVehicle2_VehicleSpec_103.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_101	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_101.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_125	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_125.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_21	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_21.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_22	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_22.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_56	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_56.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_6	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_6.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_63	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_63.psp	SYNTECH17	40
+syntech-SimpleVehicle_VehicleSpec_70	examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_70.psp	SYNTECH17	40
+syntech-V0_ConvoyCar_ConvoyCarSpec_293	examples/psp-syntech/specs/V0_ConvoyCar_ConvoyCarSpec_293.psp	SYNTECH17	40
+syntech-V2_ConvoyCar_ConvoyCarSpec_296	examples/psp-syntech/specs/V2_ConvoyCar_ConvoyCarSpec_296.psp	SYNTECH17	40
+syntech-roboticarm_Robot_223	examples/psp-syntech/specs/roboticarm_Robot_223.psp	SYNTECH17	40
+syntech-roboticarm_Robot_225	examples/psp-syntech/specs/roboticarm_Robot_225.psp	SYNTECH17	40
+syntech-roboticarm_Robot_227	examples/psp-syntech/specs/roboticarm_Robot_227.psp	SYNTECH17	40
+syntech-roboticarm_Robot_229	examples/psp-syntech/specs/roboticarm_Robot_229.psp	SYNTECH17	40
+syntech-roboticarm_Robot_231	examples/psp-syntech/specs/roboticarm_Robot_231.psp	SYNTECH17	40
+syntech-roboticarm_Robot_232	examples/psp-syntech/specs/roboticarm_Robot_232.psp	SYNTECH17	40
+syntech-roboticarm_Robot_234	examples/psp-syntech/specs/roboticarm_Robot_234.psp	SYNTECH17	40
+syntech-roboticarm_Robot_236	examples/psp-syntech/specs/roboticarm_Robot_236.psp	SYNTECH17	40
+syntech-roboticarm_Robot_74	examples/psp-syntech/specs/roboticarm_Robot_74.psp	SYNTECH17	40
+syntech-roboticarm_Robot_76	examples/psp-syntech/specs/roboticarm_Robot_76.psp	SYNTECH17	40
+syntech-roboticarm_Robot_82	examples/psp-syntech/specs/roboticarm_Robot_82.psp	SYNTECH17	40
+syntech-roboticarm_Robot_87	examples/psp-syntech/specs/roboticarm_Robot_87.psp	SYNTECH17	40
+syntech-v1_ConvoyCar_ConvoyCarSpec_294	examples/psp-syntech/specs/v1_ConvoyCar_ConvoyCarSpec_294.psp	SYNTECH17	40
