@@ -70,7 +70,7 @@ About 145 CPU-hours are spent or committed out of 300, including the 15 wasted w
 
 ## Next steps
 
-**Separate the cause.** A fourth NSGA-II objective weakens dominance pressure by itself. A control arm with a random fourth objective tells whether novelty's gain comes from M or from weaker selection. A second arm, with novelty as the tie-breaker within a front in place of crowding distance, keeps three objectives.
+**Separate the cause.** The user accepted novelty as the fourth objective on 2026-11-20, so neither control (a random fourth objective, or novelty as the tie-breaker within a front) was run. The tie-break arm was implemented (`02fa8c65`) and dequeued before finishing.
 
 **Time it.** Measure novelty's wall time against `full-k1` on one host at one width, since every ratio so far is confounded by host.
 
