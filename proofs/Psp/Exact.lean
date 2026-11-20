@@ -112,14 +112,14 @@ theorem sepU_binv {m : Nat} (hm : 0 < m) (ha : a.Valid) (hna : ¬ patLe .unbound
 
 theorem sepU_bexist {m : Nat} (ha : a.Valid) (hna : ¬ patLe .unbounded a (.bexist m)) :
     SepU a (.bexist m) := by
-  have hU : body .universality ff (alt (m + 1)) tt 0 := W_all (fun _ => trivial)
-  have hB : body (.bexist (m + 1)) ff (alt (m + 1)) tt 0 := by
-    have := atMost_alt (B := ff) (N := m + 1) (m + 1) 0 (by omega) (by omega)
-    rwa [Nat.mul_zero] at this
-  refine ⟨alt (m + 1), tt, ?_, ?_⟩
+  have hU : body .universality ff (alt 0 (m + 1)) tt 0 := W_all (fun _ => trivial)
+  have hB : body (.bexist (m + 1)) ff (alt 0 (m + 1)) tt 0 := by
+    have := atMost_alt (B := ff) (o := 0) (N := m + 1) (m + 1) 0 (by omega) (by omega)
+    rwa [Nat.mul_zero, Nat.add_zero] at this
+  refine ⟨alt 0 (m + 1), tt, ?_, ?_⟩
   · cases a <;> (try simp [patLe] at hna) <;> (try simp [Pat.Valid] at ha) <;> first | srcU hU | srcU hB
-  · have := not_atMost_alt (B := ff) (N := m + 1) (fun _ _ h => h) m 0 (by omega)
-    rwa [Nat.mul_zero] at this
+  · have := not_atMost_alt (B := ff) (o := 0) (N := m + 1) (fun _ _ _ h => h) m 0 (by omega)
+    rwa [Nat.mul_zero, Nat.add_zero] at this
 
 theorem sepU_brec {m : Nat} (ha : a.Valid) (hna : ¬ patLe .unbounded a (.brec m)) :
     SepU a (.brec m) := by
@@ -256,18 +256,18 @@ theorem sepB_binv {m : Nat} (hm : 0 < m) (ha : a.Valid) (hna : ¬ patLe .bounded
 theorem sepB_bexist {m : Nat} (ha : a.Valid) (hna : ¬ patLe .bounded a (.bexist m)) :
     SepB a (.bexist m) := by
   have hB0 : ¬ pt (2 * m + 3) 0 := by ar
-  have hU : body .universality (pt (2 * m + 3)) (alt (m + 1)) tt 0 := W_all (fun _ => trivial)
-  have hE : body .existence (pt (2 * m + 3)) (alt (m + 1)) tt 0 :=
+  have hU : body .universality (pt (2 * m + 3)) (alt 0 (m + 1)) tt 0 := W_all (fun _ => trivial)
+  have hE : body .existence (pt (2 * m + 3)) (alt 0 (m + 1)) tt 0 :=
     ⟨0, ⟨trivial, by ar⟩, fun _ _ h => by ar⟩
-  have hB : body (.bexist (m + 1)) (pt (2 * m + 3)) (alt (m + 1)) tt 0 := by
-    have := atMost_alt (B := pt (2 * m + 3)) (N := m + 1) (m + 1) 0 (by omega) (by omega)
-    rwa [Nat.mul_zero] at this
-  refine ⟨pt (2 * m + 3), alt (m + 1), tt, hB0, ⟨2 * m + 3, by ar⟩, ?_, ?_⟩
+  have hB : body (.bexist (m + 1)) (pt (2 * m + 3)) (alt 0 (m + 1)) tt 0 := by
+    have := atMost_alt (B := pt (2 * m + 3)) (o := 0) (N := m + 1) (m + 1) 0 (by omega) (by omega)
+    rwa [Nat.mul_zero, Nat.add_zero] at this
+  refine ⟨pt (2 * m + 3), alt 0 (m + 1), tt, hB0, ⟨2 * m + 3, by ar⟩, ?_, ?_⟩
   · cases a <;> (try simp [patLe] at hna) <;> (try simp [Pat.Valid] at ha) <;>
       first | exact hE | srcB hB0 hU | srcB hB0 hB
-  · have := not_atMost_alt (B := pt (2 * m + 3)) (N := m + 1) (fun _ _ h => by ar) m 0
+  · have := not_atMost_alt (B := pt (2 * m + 3)) (o := 0) (N := m + 1) (fun _ _ _ h => by ar) m 0
       (by omega)
-    rwa [Nat.mul_zero] at this
+    rwa [Nat.mul_zero, Nat.add_zero] at this
 
 theorem sepB_brec {m : Nat} (ha : a.Valid) (hna : ¬ patLe .bounded a (.brec m)) :
     SepB a (.brec m) := by
