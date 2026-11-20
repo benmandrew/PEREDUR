@@ -186,7 +186,7 @@ struct RetiredKey {
     std::string_view why;
 };
 
-constexpr std::array<RetiredKey, 27> k_retired_keys{{
+constexpr std::array<RetiredKey, 26> k_retired_keys{{
     {"fitness.weight_halstead",
      "removed: the Halstead objective no longer exists"},
     {"mutation.strengthen_assumptions",
@@ -238,11 +238,8 @@ constexpr std::array<RetiredKey, 27> k_retired_keys{{
      "removed: under direction_gated an incomparable free rewrite is always "
      "kept"},
     {"filters.climb_order",
-     "removed: the output climb tries its steps in slot order, once per "
-     "repair"},
-    {"filters.climb_orders",
-     "removed: the output climb tries its steps in slot order, once per "
-     "repair"},
+     "removed: the first climb tries its steps in slot order; "
+     "filters.climb_orders adds pseudo-random orders"},
 }};
 
 /// Says why a key a config still sets is no longer known, for the keys removed
@@ -303,6 +300,28 @@ void require_elitism_below_selection(const Config& cfg) {
     }
 }
 
+// Removal is a mode of maximality demotion, which computes the flags it
+// reads, so on its own it would do nothing. Rejected rather than ignored, so a
+// sweep that sets it alone does not silently run the base search.
+void require_demotion_for_removal(const Config& cfg) {
+    if (cfg.maximality_removal && !cfg.maximality_demotion) {
+        throw std::runtime_error(
+            "config: genetic.maximality_removal requires "
+            "genetic.maximality_demotion = true");
+    }
+}
+
+// The tie-breaker is the novelty count used within a front alone; with the
+// novelty objective also on, the count would both rank and break ties, which
+// is neither arm. Rejected rather than one silently winning.
+void require_one_novelty_mode(const Config& cfg) {
+    if (cfg.novelty && cfg.novelty_tiebreak) {
+        throw std::runtime_error(
+            "config: genetic.novelty and genetic.novelty_tiebreak cannot both "
+            "be true");
+    }
+}
+
 Config apply_toml(const toml::table& tbl) {
     warn_unknown_keys(tbl, config_key_spec(), "");
     Config cfg;
@@ -316,6 +335,10 @@ Config apply_toml(const toml::table& tbl) {
             require_termination_budget(cfg);
         } else if (entry.member == ConfigMember{&Config::selection_scheme}) {
             require_elitism_below_selection(cfg);
+        } else if (entry.member == ConfigMember{&Config::maximality_removal}) {
+            require_demotion_for_removal(cfg);
+        } else if (entry.member == ConfigMember{&Config::novelty_tiebreak}) {
+            require_one_novelty_mode(cfg);
         }
     }
     return cfg;

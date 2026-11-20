@@ -747,11 +747,12 @@ struct DemotionCase {
     }
 };
 
-Config demotion_config(bool demote) {
+Config demotion_config(bool demote, bool remove = false) {
     Config cfg = nsga2_apportion_config();
     cfg.crossover_rate = 0.0;
     cfg.mutation_rate = 0.0;
     cfg.maximality_demotion = demote;
+    cfg.maximality_removal = remove;
     return cfg;
 }
 
@@ -782,6 +783,111 @@ TEST(test_maximality_demotion_moves_the_weaker_candidate_down) {
     expect(DemotionStats::n_demoted == before + 1,
            "maximality demotion: one demotion at survivor selection is "
            "counted once");
+}
+
+TEST(test_maximality_removal_drops_the_weaker_candidate) {
+    expect(!Config{}.maximality_removal,
+           "maximality removal: the key defaults to off");
+    const DemotionCase demotion;
+    const std::size_t demoted_before = DemotionStats::n_demoted;
+    const std::size_t removed_before = DemotionStats::n_removed;
+    const std::vector<ScoredSpecification> next =
+        demotion.next(demotion_config(true, true));
+    // Two slots and one distinct survivor: replication fills both with the
+    // stronger candidate, where demotion would have kept one slot for each.
+    expect(next.size() == 2, "maximality removal: the population keeps size");
+    for (const ScoredSpecification& scored : next) {
+        expect(scored.specification == demotion.tight,
+               "maximality removal: only the stronger candidate survives");
+        expect(scored.rank == 0,
+               "maximality removal: the stronger candidate stays on front 0");
+    }
+    expect(DemotionStats::n_removed == removed_before + 1,
+           "maximality removal: one removal is counted once");
+    expect(DemotionStats::n_demoted == demoted_before,
+           "maximality removal: a removed candidate is not counted demoted");
+}
+
+// A cycle the rule proves in one direction only can flag every realizable
+// candidate; no such pair is known among real requirements, so the flags are
+// set by hand. Removal must then keep the whole pool and demote instead.
+TEST(test_maximality_removal_falls_back_when_every_candidate_is_flagged) {
+    const DemotionCase demotion;
+    const Config cfg = demotion_config(true, true);
+    std::vector<ScoredSpecification> pool =
+        score_population(cfg, {demotion.tight, demotion.loose}, demotion.fns);
+    std::vector<bool> flags = {true, true};
+    const std::size_t removed = DemotionStats::n_removed;
+    const std::size_t demoted = DemotionStats::n_demoted;
+    const std::size_t fallbacks = DemotionStats::n_removal_fallbacks;
+    generation_detail::remove_flagged(pool, flags);
+    expect(pool.size() == 2 && pool[0].specification == demotion.tight &&
+               pool[1].specification == demotion.loose,
+           "maximality removal: a fully flagged pool keeps every candidate");
+    expect(flags == std::vector<bool>{true, true},
+           "maximality removal: the fallback leaves the flags to demote");
+    expect(DemotionStats::n_removal_fallbacks == fallbacks + 1,
+           "maximality removal: the fallback is counted once");
+    expect(DemotionStats::n_removed == removed,
+           "maximality removal: the fallback removes nothing");
+    expect(DemotionStats::n_demoted == demoted + 2,
+           "maximality removal: the fallback counts its demotions");
+
+    // One flag of two: the flagged candidate goes and no fallback is counted.
+    std::vector<bool> one = {false, true};
+    generation_detail::remove_flagged(pool, one);
+    expect(pool.size() == 1 && pool[0].specification == demotion.tight &&
+               one.empty(),
+           "maximality removal: a partly flagged pool loses the flagged one");
+    expect(DemotionStats::n_removal_fallbacks == fallbacks + 1 &&
+               DemotionStats::n_removed == removed + 1,
+           "maximality removal: a partial removal is no fallback");
+}
+
+TEST(test_maximality_removal_off_keeps_demotion) {
+    const DemotionCase demotion;
+    const std::size_t removed_before = DemotionStats::n_removed;
+    const std::vector<ScoredSpecification> off =
+        demotion.next(demotion_config(true, false));
+    const std::vector<ScoredSpecification> demote =
+        demotion.next(demotion_config(true));
+    expect(off.size() == demote.size(),
+           "maximality removal: off, the population matches demotion");
+    for (std::size_t i = 0; i < off.size(); ++i) {
+        expect(off[i].specification == demote[i].specification &&
+                   off[i].rank == demote[i].rank,
+               "maximality removal: off, each slot matches demotion");
+    }
+    expect(DemotionCase::rank_of(off, demotion.loose) == 1,
+           "maximality removal: off, the weaker candidate is demoted, not "
+           "removed");
+    expect(DemotionStats::n_removed == removed_before,
+           "maximality removal: off, nothing is counted");
+}
+
+TEST(test_survivor_selection_is_counted_with_demotion_off) {
+    const DemotionCase demotion;
+    const std::size_t selections = SurvivorSelectionStats::n_selections;
+    const std::size_t truncated = SurvivorSelectionStats::n_truncated;
+    const std::size_t replicated = SurvivorSelectionStats::n_replicated;
+    const std::size_t pool_sum = SurvivorSelectionStats::pool_size_sum;
+    // Two parents and two identical offspring pool to two distinct
+    // candidates, which fill the two slots exactly.
+    (void)demotion.next(demotion_config(false));
+    expect(SurvivorSelectionStats::n_selections == selections + 1,
+           "survivor selection: one selection is counted");
+    expect(SurvivorSelectionStats::pool_size_sum == pool_sum + 2,
+           "survivor selection: the distinct pool of two is summed");
+    expect(SurvivorSelectionStats::n_truncated == truncated &&
+               SurvivorSelectionStats::n_replicated == replicated,
+           "survivor selection: a pool of exactly target_size is neither "
+           "truncated nor replicated");
+    // Removal leaves one distinct candidate for two slots: replicated.
+    (void)demotion.next(demotion_config(true, true));
+    expect(SurvivorSelectionStats::n_replicated == replicated + 1,
+           "survivor selection: a pool below target_size is replicated");
+    expect(SurvivorSelectionStats::pool_size_sum == pool_sum + 3,
+           "survivor selection: the pool is measured after removal");
 }
 
 // --- evolve_generation under the random scheme ---

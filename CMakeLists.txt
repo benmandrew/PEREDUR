@@ -166,6 +166,7 @@ target_sources(peredur_fitness PRIVATE
     src/genetic/accumulator.cpp
     src/genetic/crossover.cpp
     src/genetic/demotion.cpp
+    src/genetic/diversity.cpp
     src/genetic/generation.cpp
     src/genetic/monotone.cpp
     src/genetic/mutation.cpp
@@ -293,6 +294,18 @@ target_link_libraries(mucs PRIVATE peredur_fitness)
 
 add_executable(maximal src/maximal.cpp)
 target_link_libraries(maximal PRIVATE peredur_fitness)
+
+# Replays a finished FRETISH run's output climb under a chosen number of step
+# orders (filters.climb_orders), for the climb-diversity study. Out of `all`;
+# the end-to-end tests build it.
+add_executable(climb-replay EXCLUDE_FROM_ALL
+    src/climb_replay.cpp
+    src/repair/manifest.cpp
+)
+target_include_directories(climb-replay PRIVATE src)
+target_link_libraries(climb-replay PRIVATE peredur_fitness)
+target_compile_definitions(climb-replay PRIVATE
+    PEREDUR_EXAMPLES_DIR="${CMAKE_SOURCE_DIR}/examples")
 
 add_executable(sample-mutants src/sample_mutants.cpp)
 target_link_libraries(sample-mutants PRIVATE peredur_fitness)

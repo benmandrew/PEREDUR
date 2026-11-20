@@ -112,6 +112,8 @@ Requirement mutate_requirement(const Requirement& requirement,
                                const RandomSource& random_source,
                                const Config& cfg);
 
+struct SlotCoverage;
+
 /// What breeding knows about the parent an offspring descends from, handed to
 /// mutate_specification so that it can aim its move. Built per offspring by
 /// breed_offspring from the parent's Scored entry, on the FRETISH path only.
@@ -134,6 +136,42 @@ struct ParentContext {
     /// Borrowed for the generation, never copied; null when the caller has
     /// none to give.
     const Specification* original = nullptr;
+    /// Under Config::slot_coverage, how many accumulated repairs edited each
+    /// slot of the original (diversity.hpp); null otherwise, which leaves the
+    /// slot draw unweighted. Borrowed for the generation.
+    const SlotCoverage* coverage = nullptr;
+    /// Under Config::flip_tabu, the global slots (assumptions first, then
+    /// guarantees) the parent's lineage holds tabu, ascending. Under
+    /// Config::flip_sideways they are rewritten sideways instead of skipped.
+    std::vector<std::size_t> flipped_slots;
+};
+
+/// What Config::flip_tabu and Config::flip_sideways did over a run. Reported
+/// under `--diagnostics` and in run.json.
+struct FlipLineageStats {
+    /// Realizability flips recorded against a slot of a lineage: an offspring
+    /// whose realizability differs from its parent's, once per slot it edited.
+    inline static std::atomic<std::size_t> n_flips{0};
+    /// Times a slot of a lineage flipped both ways and went tabu.
+    inline static std::atomic<std::size_t> n_tabu{0};
+    /// Slot draws whose list lost a tabu slot.
+    inline static std::atomic<std::size_t> n_skipped{0};
+    /// Slot draws whose every slot was tabu, so the full list was kept.
+    inline static std::atomic<std::size_t> n_fallbacks{0};
+    /// Rewrites of a flipped slot under Config::flip_sideways.
+    inline static std::atomic<std::size_t> n_sideways{0};
+    /// Of those, the results kept as incomparable with the parent.
+    inline static std::atomic<std::size_t> n_sideways_kept{0};
+};
+
+/// What Config::slot_coverage did over a run. Reported under `--diagnostics`
+/// and in run.json.
+struct SlotCoverageStats {
+    /// Slot draws made with coverage counts at hand.
+    inline static std::atomic<std::size_t> n_draws{0};
+    /// Of those, the draws whose weights were unequal, so that the weighted
+    /// draw replaced the uniform one.
+    inline static std::atomic<std::size_t> n_weighted{0};
 };
 
 /// How often mutate_specification drew its slot from a targeted list under

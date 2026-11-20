@@ -22,9 +22,12 @@
 #include <vector>
 
 #include "config.hpp"
+#include "genetic/demotion.hpp"
 #include "genetic/order_moves.hpp"
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
+
+class DiversityState;
 
 /// Which representation of the population is live. A generation begins and ends
 /// scored; between breeding and scoring the individuals have no fitness yet, so
@@ -161,11 +164,64 @@ struct ParentVerdictStats {
     inline static std::atomic<std::size_t> n_unproved{0};
 };
 
+/// What Nsga2Apportion survivor selection did with its distinct (mu + lambda)
+/// pool over a run, counted whether or not maximality demotion is on. The
+/// pool is measured after deduplication and after any maximality removal, as
+/// the size the truncate-or-replicate step compares with target_size. Counting
+/// draws nothing. Reported under `--diagnostics` and in run.json.
+struct SurvivorSelectionStats {
+    /// Survivor selections run under Nsga2Apportion.
+    inline static std::atomic<std::size_t> n_selections{0};
+    /// Of those, the ones whose distinct pool exceeded target_size and was
+    /// truncated, so a low-ranked candidate could be cut.
+    inline static std::atomic<std::size_t> n_truncated{0};
+    /// Of those, the ones whose distinct pool fell short of target_size and
+    /// was replicated, so every distinct candidate kept at least one slot.
+    inline static std::atomic<std::size_t> n_replicated{0};
+    /// The distinct pool sizes summed over every selection, so that
+    /// pool_size_sum / n_selections is the mean.
+    inline static std::atomic<std::size_t> pool_size_sum{0};
+};
+
 /// The name the parent-verdict stage reports under, in the stage list and in
 /// the filter report.
 inline constexpr const char* k_parent_verdict_stage = "parent-verdict";
 
 namespace generation_detail {
+
+/// Maximality removal over @p pool: erase every element @p flags marks, keep
+/// the rest in order and clear @p flags, counting the removals in
+/// DemotionStats::n_removed. The flags are computed over the whole pool
+/// before any is erased. A strict order proved by rule leaves its maximal
+/// candidates unflagged, but the rule proves implication one direction at a
+/// time, so a cycle among equivalent candidates can flag every element. Where
+/// removal would empty the pool, nothing is erased, @p flags is left to demote
+/// them all, and the selection counts in DemotionStats::n_removal_fallbacks
+/// and its demotions in n_demoted. Draws nothing.
+template <typename T>
+void remove_flagged(std::vector<T>& pool, std::vector<bool>& flags) {
+    assert(flags.empty() || flags.size() == pool.size());
+    const auto n_flagged =
+        static_cast<std::size_t>(std::count(flags.begin(), flags.end(), true));
+    if (n_flagged == 0) {
+        return;
+    }
+    if (n_flagged == pool.size()) {
+        DemotionStats::n_removal_fallbacks++;
+        DemotionStats::n_demoted += n_flagged;
+        return;
+    }
+    std::vector<T> kept;
+    kept.reserve(pool.size() - n_flagged);
+    for (std::size_t i = 0; i < pool.size(); ++i) {
+        if (!flags[i]) {
+            kept.push_back(std::move(pool[i]));
+        }
+    }
+    pool = std::move(kept);
+    flags.clear();
+    DemotionStats::n_removed += n_flagged;
+}
 
 /// True with probability @p rate. Draws only for a rate strictly between 0
 /// and 1.
@@ -194,6 +250,11 @@ bool probability_check(double rate, const RandomSource& random_source);
 /// Where @p origins is given, each FRETISH offspring's OffspringOrigin is
 /// appended to it, in the order of the returned offspring. Classifying draws
 /// nothing either.
+///
+/// @p diversity, where given on the FRETISH path, lends the diversity keys'
+/// run state to mutation: the slot coverage under Config::slot_coverage, and
+/// under Config::flip_tabu each parent's flipped slots, with each mutated
+/// offspring held for its lineage until the generation is scored.
 template <typename Spec>
 std::vector<Spec> breed_offspring(
     const Config& cfg, const std::vector<Scored<Spec>>& sorted_pop,
@@ -201,7 +262,8 @@ std::vector<Spec> breed_offspring(
     const RandomSource& random_source, SearchBudget* budget,
     const Spec* original = nullptr,
     std::optional<std::size_t> status_objective = std::nullopt,
-    std::vector<OffspringOrigin>* origins = nullptr);
+    std::vector<OffspringOrigin>* origins = nullptr,
+    DiversityState* diversity = nullptr);
 
 /// Cycles through the existing survivors to pad the population back up to
 /// @p target_size. Padding duplicates carry zero crowding distance, so later
@@ -361,6 +423,9 @@ struct GenerationContext {
     /// Where the status sits in each candidate's objective vector, or nothing
     /// when the run scores none. Read by breeding to build a ParentContext.
     std::optional<std::size_t> m_status_objective;
+    /// The run's diversity state (diversity.hpp), lent to every generation of
+    /// a FRETISH run; null on the TLSF path and where the caller gives none.
+    DiversityState* m_diversity = nullptr;
 
     std::size_t m_target_size;
     std::size_t m_top_n;

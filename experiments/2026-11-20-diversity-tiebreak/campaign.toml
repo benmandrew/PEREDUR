@@ -1,0 +1,29 @@
+name = "2026-11-20-diversity-tiebreak"
+branch = "campaign/diversity-climb"
+profile = "diversity-tiebreak-blame"
+description = "The novelty count as a within-front tie-breaker in place of crowding distance (genetic.novelty_tiebreak), keeping three objectives: full-k1 plus novelty_tiebreak = true, seeds 0-29, to compare with the novelty objective of 2026-11-19-diversity-screen-blame and 2026-11-19-diversity-followup in the pooled pass. Same sweep K, config tree and settings."
+
+# Another job holds CPUs 14-29 on av2 until about 16:30Z, so av2 runs 7 jobs
+# x 2 threads on CPUs 0-13. On av3 that job is paused for this window, so av3
+# runs 15 jobs x 2 threads on CPUs 0-29. CPUs 30-31 stay free on both hosts.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+configs = "sh -c 'python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps K --parallel 2 --out-dir experiments/configs-diversity-climb-blame'"
+
+# 19 subjects x 1 arm x 30 seeds = 570 runs: 380 on av3 (seeds 0-19) and 190
+# on av2 (seeds 20-29), so both hosts finish at about the same time.
+[[phases]]
+name = "tiebreak-av3"
+profile = "diversity-tiebreak-blame"
+hosts = { av3 = "0-19" }
+confine = { av3 = { cpus = "0-29", memory_max = "60G" } }
+jobs = 15
+
+[[phases]]
+name = "tiebreak-av2"
+profile = "diversity-tiebreak-blame"
+hosts = { av2 = "20-29" }
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7

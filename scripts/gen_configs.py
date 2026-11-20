@@ -105,6 +105,18 @@ DEFAULTS: dict = {
     # byte-identical.
     "p_order_crossover": 0.0,
     "maximality_demotion": False,
+    # With maximality_demotion: remove the flagged candidate at survivor
+    # selection instead of demoting it. Emitted only when a sweep overrides it,
+    # like maximality_demotion.
+    "maximality_removal": False,
+    # FRETISH only, under nsga2-apportion: the diversity mechanisms of
+    # feat/diversity-mech (front spreading, a novelty objective or the novelty
+    # count as a within-front tie-breaker, and a spread first generation). Emitted into [genetic] only when a sweep overrides
+    # them (see make_toml).
+    "crowding": "objective",
+    "novelty": False,
+    "novelty_tiebreak": False,
+    "spread_init": False,
     "weight_syntactic": 0.33,
     "weight_semantic": 0.33,
     "weight_status": 0.33,
@@ -148,15 +160,24 @@ DEFAULTS: dict = {
     # into [mutation] only when a sweep overrides them (see make_toml).
     "step_scaling": 0.0,
     "bisect_steps": False,
+    # FRETISH only: weight the rewrite slot draw by coverage, and skip (or,
+    # with flip_sideways, rewrite sideways) a slot that flipped realizability
+    # within the last flip_tabu generations. Emitted into [mutation] only when
+    # a sweep overrides them (see make_toml).
+    "slot_coverage": False,
+    "flip_tabu": 0,
+    "flip_sideways": False,
     "default_bound": 20,
     "run_implication": True,
     # FRETISH only: drop proved strengthenings of parents the realizability
     # memo shows unrealizable. Emitted into [filters] only when a sweep
     # overrides it (see make_toml).
     "parent_verdict": False,
-    # FRETISH only: climb each gated repair towards the original. Emitted into
-    # [filters] only when a sweep overrides it (see make_toml).
+    # FRETISH only: climb each gated repair towards the original, under how
+    # many step orders. Emitted into [filters] only when a sweep overrides
+    # them (see make_toml).
     "climb_output": False,
+    "climb_orders": 1,
     # Keys in VINTAGE_KEYS must follow the binary rather than be pinned, because
     # VINTAGE_KEYS sources its written-out values from this table -- a stale
     # entry here is a wrong value written into every config generated with
@@ -223,6 +244,14 @@ DEFAULTS: dict = {
     # at GA_POPULATION_SIZE = 100, so the cap alone at a different population
     # buys a different number of generations for the same number of individuals.
     "max_individuals": 0,
+    # The controller store's two gates, mirroring config.hpp: the fewest
+    # guarantees a FRETISH realizability query needs before stored
+    # controllers are tried on it (0 turns the store off), and how long the
+    # startup screen's input query must take, in ms. Emitted into [runtime]
+    # only when a sweep overrides them (see make_toml). Sweep F pins the
+    # screen gate at 150 ms (see _final_sweep).
+    "controller_reuse_min_guarantees": 10,
+    "controller_reuse_min_screen_ms": 40,
     # Scoring thread pool size. 0 is make_toml's "emit nothing" sentinel rather
     # than a mirror of config.hpp, whose default is available_parallelism() and
     # so has no literal to track. Emitted into [runtime] only when positive, so
@@ -260,6 +289,16 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         if "p_order_crossover" in overrides else []) + (
         [f"maximality_demotion = {_fmt(d['maximality_demotion'])}"]
         if "maximality_demotion" in overrides else []) + (
+        [f"maximality_removal = {_fmt(d['maximality_removal'])}"]
+        if "maximality_removal" in overrides else []) + (
+        [f'crowding = "{d["crowding"]}"']
+        if "crowding" in overrides else []) + (
+        [f"novelty = {_fmt(d['novelty'])}"]
+        if "novelty" in overrides else []) + (
+        [f"novelty_tiebreak = {_fmt(d['novelty_tiebreak'])}"]
+        if "novelty_tiebreak" in overrides else []) + (
+        [f"spread_init = {_fmt(d['spread_init'])}"]
+        if "spread_init" in overrides else []) + (
         [f"max_wall_s      = {d['max_wall_s']}"]
         if d.get("max_wall_s") else []) + (
         [f'termination     = "{d["termination"]}"']
@@ -304,7 +343,13 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         [f"step_scaling = {_fmt(d['step_scaling'])}"]
         if "step_scaling" in overrides else []) + (
         [f"bisect_steps = {_fmt(d['bisect_steps'])}"]
-        if "bisect_steps" in overrides else []) + [
+        if "bisect_steps" in overrides else []) + (
+        [f"slot_coverage = {_fmt(d['slot_coverage'])}"]
+        if "slot_coverage" in overrides else []) + (
+        [f"flip_tabu = {d['flip_tabu']}"]
+        if "flip_tabu" in overrides else []) + (
+        [f"flip_sideways = {_fmt(d['flip_sideways'])}"]
+        if "flip_sideways" in overrides else []) + [
         "",
         "[model_counting]",
         f"default_bound = {d['default_bound']}",
@@ -314,12 +359,20 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
     ] + ([f"parent_verdict = {_fmt(d['parent_verdict'])}"]
          if "parent_verdict" in overrides else []) + (
         [f"climb_output = {_fmt(d['climb_output'])}"]
-        if "climb_output" in overrides else []) + [
+        if "climb_output" in overrides else []) + (
+        [f"climb_orders = {d['climb_orders']}"]
+        if "climb_orders" in overrides else []) + [
         "",
         "[runtime]",
         f"black_timeout_ms = {d['black_timeout_ms']}",
     ] + ([f"parallel = {d['parallel']}"]
          if d.get("parallel") else []) + (
+        [f"controller_reuse_min_guarantees = "
+         f"{d['controller_reuse_min_guarantees']}"]
+        if "controller_reuse_min_guarantees" in overrides else []) + (
+        [f"controller_reuse_min_screen_ms = "
+         f"{d['controller_reuse_min_screen_ms']}"]
+        if "controller_reuse_min_screen_ms" in overrides else []) + (
         [f"ltlsynt_timeout_ms = {d['ltlsynt_timeout_ms']}"]
         if d.get("ltlsynt_timeout_ms") else []) + (
         [f"ltl2tgba_timeout_ms = {d['ltl2tgba_timeout_ms']}"]
@@ -463,6 +516,100 @@ def _pruned_sweep() -> list[tuple[str, dict]]:
 
 SWEEP_P: list[tuple[str, dict]] = _pruned_sweep()
 
+
+def _climb_orders_sweep() -> list[tuple[str, dict]]:
+    """The paper's full at one and four climb orders, and six screen arms.
+
+    The paper's full is peredur's remove-exchange of sweep D at e117a76
+    (experiments/2026-11-18-fretish-exchange-rerun): sweep P's lean with
+    maximality demotion and removal on, blame-targeted slots on, and the
+    gate's exchange mode for realisable parents. Blame stays on as an engine
+    optimisation (user, 19 Nov), so the arm is not remove-no-blame-exchange. "full-k1" climbs each repair in slot
+    order alone, as that run did; "full-k4" also climbs it under three
+    pseudo-random step orders. The other seven arms are full-k1 plus one
+    diversity mechanism each: six from experiments/2026-11-19-diversity-screen-blame
+    and novelty-tiebreak (experiments/2026-11-20-diversity-tiebreak).
+    Every arm states climb_orders, maximality_removal and gate_realizable, so
+    none inherits a default.
+    """
+    feats = dict(ORDER_FEATURES)
+    full = {**dict(SWEEP_P)["lean"],
+            "maximality_demotion": True,
+            "maximality_removal": True,
+            **feats["blame"],
+            "gate_realizable": "exchange"}
+    k1 = {**full, "climb_orders": 1}
+    # The diversity screen (experiments/2026-11-19-diversity-screen-blame):
+    # full-k1 plus one mechanism of feat/diversity-mech each.
+    screen = [
+        ("crowd-spec", {"crowding": "specification"}),
+        ("novelty", {"novelty": True}),
+        ("slot-coverage", {"slot_coverage": True}),
+        ("spread-init", {"spread_init": True}),
+        ("flip-tabu", {"flip_tabu": 5}),
+        ("flip-sideways", {"flip_tabu": 5, "flip_sideways": True}),
+    ]
+    # The novelty count as a within-front tie-breaker in place of crowding,
+    # keeping three objectives (experiments/2026-11-20-diversity-tiebreak).
+    screen.append(("novelty-tiebreak", {"novelty_tiebreak": True}))
+    return [("full-k1", k1), ("full-k4", {**full, "climb_orders": 4})] + [
+        (name, {**k1, **on}) for name, on in screen]
+
+
+SWEEP_K: list[tuple[str, dict]] = _climb_orders_sweep()
+
+# Sweep F: the final engine of the FRETISH order-directed search (user, 20
+# Nov), ablated over its four features. "full" is sweep K's full-k1 plus the
+# novelty objective; "base" has the four off. The gate runs in exchange mode
+# and remove is maximality removal under demotion, as in full-k1.
+FINAL_FEATURES: list[tuple[str, dict]] = [
+    ("climb",   {"climb_output": True}),
+    ("gate",    {"direction_gated": True, "bisect_steps": True}),
+    ("remove",  {"maximality_demotion": True, "maximality_removal": True}),
+    ("novelty", {"novelty": True}),
+]
+
+
+def _final_sweep() -> list[tuple[str, dict]]:
+    """The final engine's arms: base, full, every no-<f> and every only-<f>.
+
+    Every arm states every mechanism key, on or off, so none inherits a
+    default a later commit may move. Blame-targeted slots are on in every
+    arm, as an engine optimisation the ablation does not vary. The controller
+    store's screen gate is 150 ms in every arm, against the default 40: its
+    gate reads the startup screen's ltlsynt time, which in
+    experiments/2026-11-18-fretish-exchange-rerun was 441-942 ms on
+    lift-plus-cruise-full (store on in every run, 69% of tries answered) and
+    at most 47 ms on every other subject, so at 150 ms host load moves no
+    subject across the gate. The random selection scheme runs base (random)
+    and only-climb (random+climb) of this sweep.
+    """
+    feats = dict(FINAL_FEATURES)
+    k1 = dict(SWEEP_K)["full-k1"]
+    full = {**k1, **feats["novelty"]}
+    # The mechanisms the ablation does not vary, stated at their values in
+    # full-k1 or, where full-k1 is silent, at DEFAULTS.
+    fixed = {k: DEFAULTS[k] for k in (
+        "crowding", "novelty_tiebreak", "spread_init", "slot_coverage",
+        "flip_tabu", "flip_sideways", "blame_realizable", "elitism_rate",
+        "p_stop", "p_add_assumption", "p_remove_guarantee")}
+    fixed.update({"blame_targeted_slots": True,
+                  "controller_reuse_min_guarantees":
+                      DEFAULTS["controller_reuse_min_guarantees"],
+                  "controller_reuse_min_screen_ms": 150})
+    full = {**fixed, **full, **fixed}
+    on = {k: v for f in feats.values() for k, v in f.items()}
+    base = {**full, **{k: DEFAULTS[k] for k in on}}
+    levels: list[tuple[str, dict]] = [("base", dict(base)), ("full", dict(full))]
+    for name, keys in FINAL_FEATURES:
+        levels.append((f"no-{name}", {**full, **{k: base[k] for k in keys}}))
+    for name, keys in FINAL_FEATURES:
+        levels.append((f"only-{name}", {**base, **keys}))
+    return levels
+
+
+SWEEP_F: list[tuple[str, dict]] = _final_sweep()
+
 # Keys whose built-in default has changed at least once since campaigns began
 # being archived. A generated config states a key only where a sweep overrides
 # it, so everything else is inherited from the binary at run time — which means
@@ -485,10 +632,13 @@ SWEEPS: list[tuple[str, list]] = [
     ("R", SWEEP_R),
     ("O", SWEEP_O),
     ("P", SWEEP_P),
+    ("K", SWEEP_K),
+    ("F", SWEEP_F),
 ]
 
-# Sweeps emitted when --sweeps is omitted. O is held back, so a grid generated
-# without --sweeps stays byte-identical to the one before it existed.
+# Sweeps emitted when --sweeps is omitted. O, P, K and F are held back, so a grid
+# generated without --sweeps stays byte-identical to the one before they
+# existed.
 DEFAULT_SWEEPS: list[str] = ["A", "B", "C", "R"]
 
 def parse_args() -> argparse.Namespace:

@@ -26,7 +26,8 @@ using ConfigMember =
     std::variant<double Config::*, std::size_t Config::*, bool Config::*,
                  std::chrono::milliseconds Config::*, SelectionScheme Config::*,
                  TerminationMode Config::*, StatusGrading Config::*,
-                 MrsAdmissionOrder Config::*, GateRealizable Config::*>;
+                 MrsAdmissionOrder Config::*, GateRealizable Config::*,
+                 Crowding Config::*>;
 
 struct ConfigKey {
     const char* section;  // dotted, as in "tlsf.mutation"
@@ -43,7 +44,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 52> k_config_keys{{
+inline constexpr std::array<ConfigKey, 61> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -166,6 +167,62 @@ inline constexpr std::array<ConfigKey, 52> k_config_keys{{
      "FRETISH only, under nsga2-apportion: demote a realizable candidate one "
      "front\n"
      "when another realizable one is proved strictly stronger.\n"},
+    {"genetic", "crowding", &Config::crowding, KeyCheck::None,
+     KeyReader::Fretish,
+     "Under nsga2-apportion, how the members of one front are spread. "
+     "\"objective\" is the crowding distance in objective space. "
+     "\"specification\" orders each front by greedy farthest-point selection "
+     "under the share of assumption and guarantee slots whose requirements "
+     "differ, seeded with the members of every better front, so the last "
+     "front is filled with the members least like those already kept. "
+     "FRETISH only; draws nothing.",
+     "FRETISH only, under nsga2-apportion: \"objective\" crowding distance, "
+     "or\n"
+     "\"specification\" (farthest-point by slot Hamming distance). "
+     "\"objective\" by default.\n"},
+    {"genetic", "novelty", &Config::novelty, KeyCheck::None, KeyReader::Fretish,
+     "Under nsga2-apportion, rank by one more minimised objective: the number "
+     "of repairs accumulated so far that the implication rule proves imply a "
+     "realizable candidate, so a repair below one already found ranks lower. "
+     "An unrealizable candidate scores 0, since no realizable repair implies "
+     "it. Rule implication only, cached per candidate; launches no process "
+     "and draws nothing. FRETISH only.",
+     "FRETISH only, under nsga2-apportion: minimise the number of accumulated "
+     "repairs\n"
+     "that rule-imply a realizable candidate. Off by default.\n"},
+    {"genetic", "novelty_tiebreak", &Config::novelty_tiebreak, KeyCheck::None,
+     KeyReader::Fretish,
+     "Under nsga2-apportion, order the members of each non-domination front "
+     "by the novelty count first (fewer accumulated repairs that the "
+     "implication rule proves imply a realizable candidate ranks better) and "
+     "by crowding second. Ranking across fronts and the objectives are "
+     "unchanged. Cannot be combined with genetic.novelty. Draws nothing. "
+     "FRETISH only.",
+     "FRETISH only, under nsga2-apportion: order each front by the novelty "
+     "count,\n"
+     "then by crowding. Not with novelty. Off by default.\n"},
+    {"genetic", "spread_init", &Config::spread_init, KeyCheck::None,
+     KeyReader::Fretish,
+     "Seed the first generation with the original plus one-step weakenings "
+     "of it, spread round-robin over the guarantees the original's MRS walk "
+     "refused (every live weakenable guarantee where it refused none) and its "
+     "weakenable assumptions, each scored like any candidate, in place of "
+     "population_size copies of the original. A slot whose weakening is not "
+     "proved by rule after a few draws keeps the original. FRETISH only.",
+     "FRETISH only: seed the population with one-step weakenings of the "
+     "original\n"
+     "spread over its refused guarantees and its assumptions. Off by "
+     "default.\n"},
+    {"genetic", "maximality_removal", &Config::maximality_removal,
+     KeyCheck::None, KeyReader::Fretish,
+     "With maximality_demotion on, remove a candidate the rule flags from the "
+     "(mu + lambda) pool at survivor selection instead of moving it one front "
+     "down, so a gutted repair keeps no slot even when the pool is smaller "
+     "than population_size. The candidate proved stronger stays. The parent "
+     "ordering still demotes. Requires maximality_demotion.",
+     "With maximality_demotion: remove the flagged candidate at survivor "
+     "selection\n"
+     "instead of demoting it. Requires maximality_demotion.\n"},
     {"fitness", "weight_syntactic", &Config::fitness_weight_syntactic,
      KeyCheck::NonNegative, KeyReader::Both,
      "Syntactic similarity component weight. The defaults match AuRUS's "
@@ -341,6 +398,36 @@ inline constexpr std::array<ConfigKey, 52> k_config_keys{{
      "\"towards\" the original, \"free\" in any direction, or "
      "\"exchange\" (one step back\n"
      "and one weakening of an untouched slot). \"exchange\" by default.\n"},
+    {"mutation", "slot_coverage", &Config::slot_coverage, KeyCheck::None,
+     KeyReader::Fretish,
+     "FRETISH only: weight the slot a rewrite draws, including within the "
+     "blame-targeted list and the exchange gate's weakening, by 1 / (1 + c), "
+     "where c counts the repairs accumulated so far whose same slot differs "
+     "from the original. Steps towards the original keep their share of the "
+     "draw. While every weight is equal the draw is the unweighted one.",
+     "FRETISH only: favour slots the accumulated repairs have not edited when "
+     "drawing\n"
+     "a rewrite's slot. Off by default.\n"},
+    {"mutation", "flip_tabu", &Config::flip_tabu, KeyCheck::None,
+     KeyReader::Fretish,
+     "FRETISH only: generations a slot stays tabu for a lineage that has "
+     "flipped realizability on it both ways, a weakening to realizable and a "
+     "strengthening to unrealizable in either order. Each individual carries "
+     "its lineage's flips per slot, filled in as its offspring are scored. A "
+     "tabu slot is skipped by the slot draw, which falls back to the full "
+     "list when nothing else is left. 0 keeps no lineage.",
+     "FRETISH only: generations a slot is tabu for a lineage that flipped "
+     "realizability\n"
+     "on it both ways. 0 (off) by default.\n"},
+    {"mutation", "flip_sideways", &Config::flip_sideways, KeyCheck::None,
+     KeyReader::Fretish,
+     "FRETISH only, under flip_tabu above 0: in place of skipping a flipped "
+     "slot, rewrite it with the direction-free moves alone and keep the "
+     "result only where the implication rule finds it incomparable with the "
+     "parent.",
+     "FRETISH only, under flip_tabu: rewrite a flipped slot sideways instead "
+     "of\n"
+     "skipping it. Off by default.\n"},
     {"mutation", "step_scaling", &Config::step_scaling, KeyCheck::Probability,
      KeyReader::Fretish,
      "FRETISH only: how far the parent's status scales the choice between a "
@@ -375,6 +462,13 @@ inline constexpr std::array<ConfigKey, 52> k_config_keys{{
      "The lattice climb at the output: each gated repair is strengthened "
      "towards\n"
      "the original one proved step at a time, while it stays a repair.\n"},
+    {"filters", "climb_orders", &Config::climb_orders, KeyCheck::Positive,
+     KeyReader::Fretish,
+     "Climbs per repair under climb_output. The first tries its steps in slot "
+     "order and each later one under a fixed pseudo-random step priority of "
+     "its own; every distinct result goes on to the final filters. Draws no "
+     "random number. Read only when climb_output is true.",
+     ""},
     {"filters", "parent_verdict", &Config::parent_verdict_filter,
      KeyCheck::None, KeyReader::Fretish,
      "FRETISH only: after deduplication, drop each offspring proved stronger "

@@ -19,7 +19,8 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `fpdraw.cpp` | Source of the `fpdraw` tool that `fingerprint_members.py` calls to write and evaluate words. It is outside the default build: `cmake --build build-release --target fpdraw`. |
 | `catalogue.py` | Checks and renders `experiments/catalogue.toml`, which records what each result set under `experiments/` is: the paper it serves, the question, whether it is cited or superseded, and where it lives. `check` fails on an uncatalogued entry; `render` writes `experiments/CATALOGUE.md`. |
 | `pooled_design.py` | Reads the TOML design of a pooled pass (arms, seeds, contrasts) that `pool_members.py`, `fingerprint_members.py` and `pooled_reduce.py` share. |
-| `pooled_reduce.py` | Reduces a pooled pass's collected fingerprints and verdicts to strength and ball-radii tables, with Holm-corrected signed-rank tests. Run locally. |
+| `pooled_reduce.py` | Reduces a pooled pass's collected fingerprints and verdicts to strength and ball-radii tables, with Holm-corrected signed-rank tests. Run locally, or on a host by a `kind = "reduce"` phase. |
+| `joint_measures.py` | Computes accepted-trace share and joint-front reach from the same inputs as `pooled_reduce.py`, with signed-rank tests and Hodges–Lehmann shifts, and with `--half-control` each arm's odd-against-even seed-half reach control. Run locally, or on a host by a `kind = "reduce"` phase with `joint = true`. |
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
 | `merge_experiments.py` | Joins per-host CSVs on `KEY_FIELDS`, keeping one row per key. Vendored likewise. |
 | `common.py` | Helpers several scripts share: `write_manifest`, `git_field`, `load_nodes` and `lean_output`. A script vendored into a campaign archive takes it along. |
@@ -339,13 +340,13 @@ A phase takes `profile`, `jobs`, and optionally `name`, `sweeps`, `specs` and
 inclusive and may be comma-separated (`"0-9,20-29"`). Phases run in order and
 stop at the first failure.
 
-A campaign that shares a host with other users' jobs confines its run phases there with `confine`, a table keyed by host:
+A campaign that shares a host with other users' jobs confines its phases there with `confine`, a table keyed by host:
 
 ```toml
 confine = { av2 = { cpus = "0-15", memory_max = "24G" } }
 ```
 
-`cpus` is a `taskset -c` list (`"0-15"`, `"0-7,16-23"`; no strides) and `memory_max` a systemd size (a whole number with an optional `K`, `M`, `G`, `T`, `P` or `E` suffix, or a percentage such as `"50%"`). Either may be given alone. The tick then launches the runner as `systemd-run --user --scope -q --collect --unit peredur-<entry>-p<phase> -p MemoryMax=24G -p MemorySwapMax=0 taskset -c 0-15 python3 scripts/run_experiments.py …`, with only the parts whose key is set, so the cap covers the runner and every engine process under it with no swap. A host without the key launches exactly as before. A run phase may carry its own `confine` table, which replaces the campaign's entry for each host it names; `av2 = {}` there runs that phase unconfined. Score, compare, fingerprint and pool phases refuse the key. The load refuses an unknown key, a host not in `hosts`, and a malformed or zero value.
+`cpus` is a `taskset -c` list (`"0-15"`, `"0-7,16-23"`; no strides) and `memory_max` a systemd size (a whole number with an optional `K`, `M`, `G`, `T`, `P` or `E` suffix, or a percentage such as `"50%"`). Either may be given alone. The tick then launches the runner as `systemd-run --user --scope -q --collect --unit peredur-<entry>-p<phase> -p MemoryMax=24G -p MemorySwapMax=0 taskset -c 0-15 python3 scripts/run_experiments.py …`, with only the parts whose key is set, so the cap covers the runner and every engine process under it with no swap. A host without the key launches exactly as before. Compare, fingerprint, pool and reduce phases are confined the same way, so a compare pass can share a host; their `compare_pairs.py`, `fingerprint_members.py`, `pool_members.py` or, for a reduce phase, its rsync, `pooled_reduce.py` and `joint_measures.py` take the runner's place in the command. Any of these phases may carry its own `confine` table, which replaces the campaign's entry for each host it names; `av2 = {}` there runs that phase unconfined. A score phase refuses the key. The load refuses an unknown key, a host not in `hosts`, and a malformed or zero value.
 
 The CPU set goes through `taskset`, not `-p AllowedCPUs=`, because the lab hosts' user systemd managers have no cpuset controller: `AllowedCPUs` is accepted and silently ignored there, and the runner still sees every CPU.
 
@@ -560,7 +561,8 @@ python3 scripts/pool_members.py experiments/x/design.toml experiments/x-members 
     --copy-from experiments/x/members \
     --manifest experiments/compare-manifests/<campaign>.pool.json
 
-# Locally, after `collect --outputs x-out`
+# Locally, after `collect --outputs x-out`; a `kind = "reduce"` phase runs the
+# same on one host over every host's gathered outputs (docs/dev/campaigns.md)
 python3 scripts/pooled_reduce.py experiments/x/design.toml experiments/x/members \
     experiments/x-out experiments/x/reduced [--subjects ...] \
     [--ball-k 1 3 5] [--no-balls] [--match 0|none] \

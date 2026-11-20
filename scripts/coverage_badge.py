@@ -49,6 +49,7 @@ BINARIES = (
     "mucs",
     "realize",
     "signal_tracer",
+    "climb-replay",
     "test/peredur_tests",
     "test/contained_child_helper",
 )

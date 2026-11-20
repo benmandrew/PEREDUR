@@ -6,6 +6,7 @@
 #include <variant>
 #include <vector>
 
+#include "climb_replay_slots.hpp"
 #include "config.hpp"
 #include "fixtures.hpp"
 #include "genetic/climb.hpp"
@@ -105,6 +106,106 @@ TEST(test_bisection_matches_a_linear_walk) {
     }
 }
 
+// --- step orders -------------------------------------------------------------
+
+TEST(test_orders_are_permutations_of_the_steps) {
+    const Specification original = spec(
+        {}, {make_req("req", "grant", timing::within_ticks(1)), never_grant()});
+    const Specification start = spec(
+        {never_request()}, {make_req("req", "grant", timing::within_ticks(4)),
+                            removed(never_grant())});
+    const std::vector<Step> slot = steps_towards(start, original);
+    expect(slot.size() == 3,
+           "climb: a timing step, a restore and a drop, got " +
+               std::to_string(slot.size()));
+    bool any_reordered = false;
+    for (std::size_t permutation = 0; permutation < 8; ++permutation) {
+        std::vector<Step> ordered = slot;
+        order_steps(ordered, permutation);
+        std::vector<Step> again = slot;
+        order_steps(again, permutation);
+        expect(ordered.size() == slot.size(),
+               "climb: ordering keeps every step");
+        bool same_as_slot = true;
+        for (std::size_t i = 0; i < slot.size(); ++i) {
+            std::size_t found = 0;
+            for (const Step& other : ordered) {
+                found += other.m_result == slot[i].m_result ? 1 : 0;
+            }
+            expect(found == 1, "climb: ordering keeps each step once");
+            expect(ordered[i].m_result == again[i].m_result,
+                   "climb: a permutation is the same on every call");
+            same_as_slot =
+                same_as_slot && ordered[i].m_result == slot[i].m_result;
+        }
+        expect(permutation != 0 || same_as_slot,
+               "climb: permutation 0 is steps_towards' order");
+        any_reordered = any_reordered || !same_as_slot;
+    }
+    expect(any_reordered, "climb: some permutation reorders the steps");
+}
+
+// Two removed guarantees, of which the predicate admits either but not both:
+// each order restores the one it tries first, so the maximal elements differ
+// by order, and only extra orders find the second.
+TEST(test_extra_orders_reach_other_maximal_elements) {
+    const Requirement first = make_req("true", "grant", timing::always());
+    const Requirement second = never_grant();
+    const Specification original = spec({}, {first, second});
+    const Specification start = spec({}, {removed(first), removed(second)});
+    const ClimbPredicate accepts = [](const Specification& candidate) {
+        return count_live(candidate.m_guarantees) < 2;
+    };
+    const std::vector<Specification> one =
+        climb_repairs({start}, original, accepts);
+    expect(one.size() == 1, "climb: one order gives one result, got " +
+                                std::to_string(one.size()));
+    expect(one.size() == 1 && !one[0].m_guarantees[0].m_removed &&
+               one[0].m_guarantees[1].m_removed,
+           "climb: the slot order restores the first guarantee");
+    const std::vector<Specification> many =
+        climb_repairs({start}, original, accepts, 8);
+    expect(many.size() == 2, "climb: eight orders reach both maxima, got " +
+                                 std::to_string(many.size()));
+    expect(!many.empty() && many[0] == one[0],
+           "climb: the first order's result comes first");
+    for (const Specification& climbed : many) {
+        expect(count_live(climbed.m_guarantees) == 1,
+               "climb: each result restores exactly one guarantee");
+    }
+}
+
+// --- climb-replay's removed slots
+// ---------------------------------------------
+
+// A repair read back from JSON has lost its removed guarantees. Each live one
+// goes back to the slot it shares most fields with, and the slots left over
+// hold the original's requirement, removed.
+TEST(test_replay_restores_removed_slots) {
+    const Requirement first = make_req("req", "grant", timing::within_ticks(2));
+    const Requirement second = never_grant();
+    const Requirement third = make_req("true", "!req", timing::always());
+    const std::vector<Requirement> original{first, second, third};
+    // The third slot edited in its timing, the second removed.
+    const Requirement edited =
+        make_req("true", "!req", timing::within_ticks(4));
+    const std::vector<Requirement> slots =
+        climb_replay::restore_removed_slots({first, edited}, original);
+    expect(slots.size() == 3, "replay: three slots");
+    expect(slots[0] == first && !slots[0].m_removed,
+           "replay: the first slot keeps its requirement");
+    expect(slots[1].m_removed, "replay: the second slot is removed");
+    expect(slots[2] == edited, "replay: the edited requirement takes its slot");
+
+    // Only the second left: it shares every field with slot 1 alone.
+    const std::vector<Requirement> only =
+        climb_replay::restore_removed_slots({second}, original);
+    expect(only[0].m_removed && !only[1].m_removed && only[2].m_removed,
+           "replay: a lone survivor takes its own slot");
+    expect(climb_replay::restore_removed_slots(original, original) == original,
+           "replay: a full set is unchanged");
+}
+
 // --- against ltlsynt ---------------------------------------------------------
 
 // The repair S assumes requests never come and grants within 3 ticks. Dropping
@@ -159,6 +260,31 @@ TEST(test_climb_restores_only_what_stays_realizable) {
            "climb: the conflicting guarantee stays removed");
     expect(passes_output_gate(climbed[0], cfg),
            "climb: the result passes the gate");
+}
+
+// Every extra order gives a maximal result, and the results are distinct.
+TEST(test_extra_orders_give_distinct_results) {
+    const Specification original = conflict();
+    const Specification start = spec(
+        {never_request()}, {make_req("req", "grant", timing::within_ticks(3),
+                                     ConditionType::Trigger),
+                            removed(never_grant())});
+    Config cfg;
+    const ClimbPredicate gate = climb_gate(cfg, nullptr);
+    const std::vector<Specification> climbed =
+        climb_repairs({start}, original, gate, 4);
+    expect(!climbed.empty() && climbed.size() <= 4,
+           "climb: between one and four results, got " +
+               std::to_string(climbed.size()));
+    for (std::size_t i = 0; i < climbed.size(); ++i) {
+        expect(passes_output_gate(climbed[i], cfg),
+               "climb: each result passes the gate");
+        expect(specification_implies_by_rule(climbed[i], start),
+               "climb: each result implies the start by rule");
+        for (std::size_t j = 0; j < i; ++j) {
+            expect(!(climbed[i] == climbed[j]), "climb: results are distinct");
+        }
+    }
 }
 
 }  // namespace
