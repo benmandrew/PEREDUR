@@ -1,10 +1,10 @@
 name = "2026-11-20-final-engine-large"
 branch = "campaign/final-engine"
 profile = "final-engine-large"
-description = "The final engine's twelve arms on lift-plus-cruise-full (seeds 0-2 and 15-17). Same commit, configs and arms as 2026-11-20-final-engine; its own entry so it can be dropped, resized or queued after the pooled passes (2026-11-20-final-engine PLAN.md)."
+description = "The final engine on lift-plus-cruise-full (full, base and random, seeds 0-4 and 15-19), rad (12 arms, 10 seeds) and the sideways seeded corpus (10 arms, 5 seeds), on CPUs 0-29 once veribee's re-run ends. Same commit, configs and arms as 2026-11-20-final-engine; its own entry because it starts later (2026-11-20-final-engine PLAN.md)."
 
 # Seeds as 2026-11-18-fretish-exchange-rerun split them: lift-plus-cruise-full
-# av2 0-2, av3 15-17. ventilator-controller is not run: no realisability
+# and rad av2 0-4, av3 15-19. ventilator-controller is not run: no realisability
 # query on it finishes, so it is taken as a timeout (user, 20 Nov). Not
 # launched: prepared on 20 Nov for the user to enqueue.
 hosts = { av2 = "", av3 = "" }
@@ -23,21 +23,60 @@ configs = "sh -c 'G=\"python3 scripts/gen_configs.py --weakening off --weights 0
 # and `jobs` must then shrink with it (CPUs over threads a run). CPUs 30-31
 # stay free for the Ollama server on both hosts.
 
-# lift-plus-cruise-full: 12 arms x 3 seeds = 36 runs a host, 3 jobs x 10
-# threads, as its earlier runs had. 45-90 min a run: about 300 slot-h, 9-10 h
-# a host. The controller store stays on here (screen 441-942 ms > 150 ms).
+# Enqueue only after veribee's re-run has left CPUs 14-29: about Sat 01:00Z
+# on av3 and Sat 04:00Z on av2 (mailbox, 20 Nov 13:42Z). campaign.py has no
+# start time, so this is a separate entry.
+
+# lift-plus-cruise-full, first, as the longest phase: full, base and random x 5
+# seeds = 15 runs a host, 3 jobs x 10 threads, as its earlier runs had. About
+# 8.4 slot-h a run: 125 slot-h, about 5 h a host. The controller store stays on
+# here (screen 441-942 ms > 150 ms). The ablation arms are not run here
+# (user, 20 Nov: option B).
 [[phases]]
 name = "lpc-av2"
-profile = "final-engine-large"
-specs = ["lift-plus-cruise-full"]
-hosts = { av2 = "0-2" }
+profile = "final-engine-lpc"
+hosts = { av2 = "0-4" }
 confine = { av2 = { cpus = "0-29", memory_max = "110G" } }
 jobs = 3
 
 [[phases]]
 name = "lpc-av3"
-profile = "final-engine-large"
-specs = ["lift-plus-cruise-full"]
-hosts = { av3 = "15-17" }
+profile = "final-engine-lpc"
+hosts = { av3 = "15-19" }
 confine = { av3 = { cpus = "0-29", memory_max = "110G" } }
 jobs = 3
+
+# rad: 12 arms x 5 seeds = 60 runs a host; 7 jobs over 30 CPUs give 4
+# threads a run, as rad's earlier runs had. About 27 slot-h, 1-2 h a host.
+[[phases]]
+name = "rad-av2"
+profile = "final-engine-large"
+specs = ["rad"]
+hosts = { av2 = "0-4" }
+confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 7
+
+[[phases]]
+name = "rad-av3"
+profile = "final-engine-large"
+specs = ["rad"]
+hosts = { av3 = "15-19" }
+confine = { av3 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 7
+
+# The sideways seeded corpus: 130 subjects x 10 arms, 3 seeds on av3 (3,900
+# runs) and 2 on av2 (2,600), since av3 frees three hours sooner. 15 jobs x 2
+# threads. About 136 and 91 slot-h, 4.5 h and 3.0 h.
+[[phases]]
+name = "seeded-av3"
+profile = "final-engine-seeded"
+hosts = { av3 = "0-2" }
+confine = { av3 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15
+
+[[phases]]
+name = "seeded-av2"
+profile = "final-engine-seeded"
+hosts = { av2 = "3-4" }
+confine = { av2 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15

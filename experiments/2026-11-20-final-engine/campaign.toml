@@ -1,11 +1,10 @@
 name = "2026-11-20-final-engine"
 branch = "campaign/final-engine"
 profile = "final-engine"
-description = "Every paper arm on the final engine at one commit (sweep F: climb, twoway in exchange mode, maximality removal, novelty; blame on in every arm; the controller store gated at a 150 ms screen): base, random, random+climb, full, the four no-<f> and the four only-<f> on the small set and rad's cores, the ten nsga2-apportion arms on the sideways seeded corpus, and all twelve on rad (PLAN.md)."
+description = "Every paper arm on the final engine at one commit (sweep F: climb, twoway in exchange mode, maximality removal, novelty; blame on in every arm; the controller store gated at a 150 ms screen): base, random, random+climb, full, the four no-<f> and the four only-<f> on the small set and rad's cores, on CPUs 0-13 beside veribee's re-run. rad, lift-plus-cruise-full and the seeded corpus are 2026-11-20-final-engine-large (PLAN.md)."
 
 # Seeds pair every arm of a (spec, seed) on one host: the small set and the
-# cores av2 0-14, av3 15-29; the seeded corpus av2 0-2, av3 3-4; rad av2 0-4,
-# av3 15-19, as 2026-11-18-fretish-exchange-rerun split them. Not launched:
+# cores av2 0-14, av3 15-29, as 2026-11-18-fretish-exchange-rerun split them. Not launched:
 # prepared on 20 Nov for the user to enqueue.
 hosts = { av2 = "", av3 = "" }
 
@@ -24,52 +23,18 @@ configs = "sh -c 'G=\"python3 scripts/gen_configs.py --weakening off --weights 0
 # stay free for the Ollama server on both hosts.
 
 # Small set and rad's cores: 19 subjects x 12 arms x 15 seeds = 3,420 runs a
-# host, 15 jobs x 2 threads. About 155 slot-h, 5.2 h a host (PLAN.md).
+# host, 7 jobs x 2 threads on CPUs 0-13, beside veribee's re-run on 14-29
+# (mailbox, 20 Nov 13:42Z). About 155 slot-h, 11 h a host (PLAN.md).
 [[phases]]
 name = "small-av2"
 profile = "final-engine"
 hosts = { av2 = "0-14" }
-confine = { av2 = { cpus = "0-29", memory_max = "64G" } }
-jobs = 15
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
 
 [[phases]]
 name = "small-av3"
 profile = "final-engine"
 hosts = { av3 = "15-29" }
-confine = { av3 = { cpus = "0-29", memory_max = "64G" } }
-jobs = 15
-
-# The sideways seeded corpus: 130 subjects x 10 arms, 3 seeds on av2 (3,900
-# runs) and 2 on av3 (2,600), 15 jobs x 2 threads. About 136 and 91 slot-h,
-# 4.5 h and 3.0 h.
-[[phases]]
-name = "seeded-av2"
-profile = "final-engine-seeded"
-hosts = { av2 = "0-2" }
-confine = { av2 = { cpus = "0-29", memory_max = "48G" } }
-jobs = 15
-
-[[phases]]
-name = "seeded-av3"
-profile = "final-engine-seeded"
-hosts = { av3 = "3-4" }
-confine = { av3 = { cpus = "0-29", memory_max = "48G" } }
-jobs = 15
-
-# rad: 12 arms x 5 seeds = 60 runs a host; 7 jobs over 30 CPUs give 4
-# threads a run, as rad's earlier runs had. About 27 slot-h, 1-2 h a host.
-[[phases]]
-name = "rad-av2"
-profile = "final-engine-large"
-specs = ["rad"]
-hosts = { av2 = "0-4" }
-confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
-jobs = 7
-
-[[phases]]
-name = "rad-av3"
-profile = "final-engine-large"
-specs = ["rad"]
-hosts = { av3 = "15-19" }
-confine = { av3 = { cpus = "0-29", memory_max = "96G" } }
+confine = { av3 = { cpus = "0-13", memory_max = "28G" } }
 jobs = 7

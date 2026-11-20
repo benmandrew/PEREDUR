@@ -1,6 +1,6 @@
 # 2026-11-20-final-engine
 
-Prepared 2026-11-20, not launched. Every arm of the peredur-extension paper is rerun on the final engine at one commit of `campaign/final-engine`, so that the paper's `\tbd` values come from one engine. Four campaigns share the branch, the commit and the config trees: `2026-11-20-final-engine` (small set, rad's cores, seeded corpus, rad), `2026-11-20-final-engine-large` (lift-plus-cruise-full), and the pooled passes `2026-11-20-final-engine-pooled` (specifications) and `2026-11-20-final-engine-seeded-pooled` (seeded corpus).
+Prepared 2026-11-20, not launched. Every arm of the peredur-extension paper is rerun on the final engine at one commit of `campaign/final-engine`, so that the paper's `\tbd` values come from one engine. Four campaigns share the branch, the commit and the config trees: `2026-11-20-final-engine` (small set and rad's cores, on CPUs 0-13 beside veribee's re-run), `2026-11-20-final-engine-large` (lift-plus-cruise-full, rad and the seeded corpus, on CPUs 0-29 once veribee's re-run ends), and the pooled passes `2026-11-20-final-engine-pooled` (specifications) and `2026-11-20-final-engine-seeded-pooled` (seeded corpus).
 
 ## Engine
 
@@ -18,7 +18,7 @@ Against `full-k1`, `full` adds `novelty = true`, `controller_reuse_min_screen_ms
 
 `only-<f>` is base plus f's keys; `no-<f>` is full with f's keys at base's values. The gate feature prints as twoway in the paper.
 
-ventilator-controller is not run. No realisability query on it finishes, so it is taken as a timeout for every arm (user, 2026-11-20).
+lift-plus-cruise-full runs full, base and random alone, at 10 seeds (user, 2026-11-20: option B). A run costs about 8.4 slot-h, so the twelve arms at 10 seeds would cost about 1,010; the ablation leaves it out, as it adds about 3% of each contrast's pairs. ventilator-controller is not run. No realisability query on it finishes, so it is taken as a timeout for every arm (user, 2026-11-20).
 
 ## Phases, seeds and estimates
 
@@ -26,10 +26,10 @@ Every arm of a (spec, seed) runs on one host. Slot-hours are wall time × thread
 
 | Campaign | Phase | Subjects | Arms | Seeds av2 / av3 | Jobs × threads | Slot-h (both hosts) | Wall a host |
 |---|---|---|---|---|---|---|---|
-| final-engine | small | 9 specs + 10 rad cores | 12 | 0–14 / 15–29 | 15 × 2 | 310 | 5.2 h |
-| final-engine | seeded | 130 sideways mutants | 10 (no random) | 0–2 / 3–4 | 15 × 2 | 227 | 4.5 h / 3.0 h |
-| final-engine | rad | rad | 12 | 0–4 / 15–19 | 7 × 4 | 53 | 1–2 h |
-| final-engine-large | lpc | lift-plus-cruise-full | 12 | 0–2 / 15–17 | 3 × 10 | 605 | 9–10 h |
+| final-engine | small | 9 specs + 10 rad cores | 12 | 0–14 / 15–29 | 7 × 2 on CPUs 0–13 | 310 | 11 h |
+| final-engine-large | lpc | lift-plus-cruise-full | full, base, random | 0–4 / 15–19 | 3 × 10 | 250 | about 5 h |
+| final-engine-large | rad | rad | 12 | 0–4 / 15–19 | 7 × 4 | 53 | 1–2 h |
+| final-engine-large | seeded | 130 sideways mutants | 10 (no random) | 3–4 / 0–2 | 15 × 2 | 227 | 3.0 h / 4.5 h |
 | final-engine-pooled | pool, fingerprint, compare, reduce | 18 | 10 nsga2 arms | all 30 | 8 draws, 12 compares | about 35 CPU-h | 2–4 h |
 | final-engine-seeded-pooled | the same | 130, less any with an arm of ≤ 3 members | 10 nsga2 arms | all 5 | the same | 25–70 CPU-h | 1–2 h |
 
@@ -43,8 +43,9 @@ The reduce phase runs on av2 alone (av3 cannot ssh to av2) once av3's entry has 
 
 ## Order of work
 
-1. Copy nothing for the runs: the sideways corpus (`selected.txt`, `subjects/`) is already in both hosts' checkouts (checked 2026-11-20). Enqueue `2026-11-20-final-engine` on av2 and av3, then `2026-11-20-final-engine-large`.
-2. When both hosts finish `2026-11-20-final-engine`: `campaign.py collect --profile final-engine` and `--profile final-engine-seeded`, and add both sets to `experiments/catalogue.toml`.
-3. Locally, one at a time: `make_design.py specs` and `make_design.py seeded`, then `scripts/pool_members.py <design> <campaign>/members --root .` for each pooled campaign, and record the SHA-256 sums of the inputs in that campaign's directory.
-4. `rsync -a` each pooled campaign's `design.toml`, `subjects-*.txt` and `members/` to both hosts' checkouts, then enqueue both pooled campaigns on both hosts. A host runs its entries in queue order, so a pooled entry enqueued after `2026-11-20-final-engine-large` waits for it; enqueue the pooled passes first, or dequeue and re-enqueue the large entry, to run them sooner.
-5. `campaign.py collect --outputs final-engine-pooled-reduced --host av2`, and likewise for the seeded pass, then `collect --profile final-engine-large`.
+1. Copy nothing for the runs: the sideways corpus (`selected.txt`, `subjects/`) is already in both hosts' checkouts (checked 2026-11-20). Enqueue `2026-11-20-final-engine` on av2 and av3 (CPUs 0-13).
+2. Enqueue `2026-11-20-final-engine-large` on each host only once veribee has posted in the mailbox that it has released CPUs 14-29 there (expected Sat 01:00Z on av3, Sat 04:00Z on av2). campaign.py has no start time, and the queue would start the entry as soon as the first ends.
+3. When both entries finish on both hosts: `campaign.py collect --profile final-engine`, `--profile final-engine-seeded`, `--profile final-engine-large` and `--profile final-engine-lpc`, each with `--host av2` then `--host av3`, and add the sets to `experiments/catalogue.toml`.
+4. Locally, one at a time under a memory cap: `make_design.py specs` and `make_design.py seeded`, then `scripts/pool_members.py <design> <campaign>/members --root .` for each pooled campaign, and record the SHA-256 sums of the inputs in that campaign's directory.
+5. `rsync -a` each pooled campaign's `design.toml`, `subjects-*.txt` and `members/` to both hosts' checkouts, then enqueue both pooled campaigns on both hosts.
+6. `campaign.py collect --outputs final-engine-pooled-reduced --host av2`, and likewise for the seeded pass.

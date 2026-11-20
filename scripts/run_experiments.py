@@ -753,7 +753,7 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-final-engine.csv",
         "default_jobs": 15,
     },
-    # The same arms on whole rad and lift-plus-cruise-full, from a tree with
+    # The same arms on whole rad, from a tree with
     # no parallel line, so threads are CPUs over jobs.
     "final-engine-large": {
         "schemes": ["nsga2-apportion", "random"],
@@ -762,9 +762,9 @@ PROFILES: dict[str, dict] = {
         "repair_modes": None,
         "sweeps": ["F"],
         "levels": {},
-        "specs": ["rad", "lift-plus-cruise-full"],
+        "specs": ["rad"],
         "seeds": list(range(30)),
-        "timeout_caps": {s: 7200 for s in ("rad", "lift-plus-cruise-full")},
+        "timeout_caps": {"rad": 7200},
         "compare_timeout": 1800,
         "baseline_aliases": {},
         "configs_dir": EXPERIMENTS_DIR / "configs-final-engine-large",
@@ -772,27 +772,26 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-final-engine-large.csv",
         "default_jobs": 4,
     },
-    # ventilator-controller under full, base and random alone, since every
-    # run reaches the cap; its own tree holds only those three configs.
-    "final-engine-vent": {
+    # lift-plus-cruise-full under full, base and random alone, at seeds 0-4
+    # and 15-19 (user, 20 Nov: option B). A run costs about 8.4 slot-h, so the
+    # ablation arms are not run here and the ablation leaves it out.
+    "final-engine-lpc": {
         "schemes": ["nsga2-apportion", "random"],
         "weakenings": ["wkoff"],
         "metrics": ["log"],
         "repair_modes": None,
         "sweeps": ["F"],
         "levels": {"F": ["base", "full"]},
-        "specs": ["ventilator-controller"],
+        "specs": ["lift-plus-cruise-full"],
         "seeds": list(range(30)),
-        "timeout_caps": {"ventilator-controller": 7200},
+        "timeout_caps": {"lift-plus-cruise-full": 7200},
         "compare_timeout": 1800,
         "baseline_aliases": {},
-        "configs_dir": EXPERIMENTS_DIR / "configs-final-engine-vent",
-        "results_dir": EXPERIMENTS_DIR / "results-final-engine-vent",
-        "results_csv": EXPERIMENTS_DIR / "results-final-engine-vent.csv",
-        "default_jobs": 4,
+        "configs_dir": EXPERIMENTS_DIR / "configs-final-engine-large",
+        "results_dir": EXPERIMENTS_DIR / "results-final-engine-lpc",
+        "results_csv": EXPERIMENTS_DIR / "results-final-engine-lpc.csv",
+        "default_jobs": 3,
     },
-    # The sideways seeded corpus under base, full and every no-<f> and
-    # only-<f> of sweep F, no random arm, at 2 threads a run.
     "final-engine-seeded": {
         "schemes": ["nsga2-apportion"],
         "weakenings": ["wkoff"],
