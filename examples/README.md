@@ -51,3 +51,11 @@ Some ideals in `fixes/` are the reference repairs from the AuRUS repository, and
 | `ventilator-controller` | The Controller component of the FRET project "Ventilator v0.6.1", from Farrell, Luckcuck, Monahan, Reynolds and Sheridan, "FRETting and Formal Modelling: A Mechanical Lung Ventilator" (ABZ 2024). |
 
 The FRET exports were converted with `scripts/import_fret.py`, whose docstring lists every conversion rule.
+
+## PSP specifications
+
+| Example | Origin |
+|---|---|
+| `psp-syntech` | SYNTECH17, the 149 Spectra specifications of Lego-robot projects in [SpectraSynthesizer/spectra-specs](https://github.com/SpectraSynthesizer/spectra-specs) (commit `aa9ddb4`, folders `all_realizable` and `all_unrealizable`). `specs/` holds the 60 imported as `.psp`, and `manifest.csv` lists all 149 with each one's verdict, slot counts and exclusion reason. |
+
+The Spectra files were converted with `scripts/import_spectra.py`, whose docstring lists every conversion rule. A specification is imported only when ltlsynt, within 300 s, gives the verdict of the folder it came from; 78 timed out, 6 gave the other verdict, and 5 use a construct the importer does not lower (`SINCE`, or an undefined predicate).
