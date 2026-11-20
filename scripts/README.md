@@ -31,6 +31,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `check_lean_scope_order.py` | Checks the Lean `scopeImplies` table against the C++ `scope_implies`, cell by cell. |
 | `check_lean_timing_order.py` | Checks the Lean `timingImplies` table against the C++ `timing_implies`, cell by cell. |
 | `field_orders.py` | Measures the FRETISH timing, scope and condition-type orders and field polarities from the engine's lowering and Spot. |
+| `psp_field_orders.py` | Measures the PSP pattern and scope orders, the polarities of P, S, Q and R, the joint steps and the count chains from the body-and-wrapper lowering and Spot, checks it against the Dwyer table, and writes `docs/dev/psp-orders.json`. `docs/dev/psp.md` gives the results. |
 | `docker_build.sh` | Builds the PEREDUR Docker image, stamped with the commit and whether the tree is dirty. |
 | `docker_smoke.sh` | Runs a built image through one short call per tool it carries. CI's Docker job runs it. |
 | `build_vm_image.sh` | Builds a VirtualBox appliance (`.ova`) from a PEREDUR Docker image. |

@@ -1,0 +1,4090 @@
+{
+ "spot": "ltlfilt (spot) 2.15.1",
+ "max_count": 4,
+ "patterns": [
+  "absence",
+  "universality",
+  "existence",
+  "precedence",
+  "response",
+  "bounded-response 1",
+  "bounded-response 2",
+  "bounded-response 3",
+  "bounded-response 4",
+  "bounded-invariance 1",
+  "bounded-invariance 2",
+  "bounded-invariance 3",
+  "bounded-invariance 4",
+  "bounded-existence 1",
+  "bounded-existence 2",
+  "bounded-existence 3",
+  "bounded-existence 4",
+  "bounded-recurrence 1",
+  "bounded-recurrence 2",
+  "bounded-recurrence 3",
+  "bounded-recurrence 4"
+ ],
+ "scopes": [
+  "globally",
+  "before",
+  "after",
+  "between",
+  "afteruntil"
+ ],
+ "lowering": {
+  "absence/globally": "G(!p)",
+  "absence/before": "(F(r) -> (!p W r))",
+  "absence/after": "(!q W (q & G(!p)))",
+  "absence/between": "G((q & !r & F(r)) -> (!p W r))",
+  "absence/afteruntil": "G((q & !r) -> (!p W r))",
+  "universality/globally": "G(s)",
+  "universality/before": "(F(r) -> (s W r))",
+  "universality/after": "(!q W (q & G(s)))",
+  "universality/between": "G((q & !r & F(r)) -> (s W r))",
+  "universality/afteruntil": "G((q & !r) -> (s W r))",
+  "existence/globally": "F(s)",
+  "existence/before": "(F(r) -> (!r U (s & !r)))",
+  "existence/after": "(!q W (q & F(s)))",
+  "existence/between": "G((q & !r & F(r)) -> (!r U (s & !r)))",
+  "existence/afteruntil": "G((q & !r) -> (!r U (s & !r)))",
+  "precedence/globally": "(!p W s)",
+  "precedence/before": "(F(r) -> (!p W (s | r)))",
+  "precedence/after": "(!q W (q & (!p W s)))",
+  "precedence/between": "G((q & !r & F(r)) -> (!p W (s | r)))",
+  "precedence/afteruntil": "G((q & !r) -> (!p W (s | r)))",
+  "response/globally": "G(p -> F(s))",
+  "response/before": "(F(r) -> ((p -> (!r U (s & !r))) W r))",
+  "response/after": "(!q W (q & G(p -> F(s))))",
+  "response/between": "G((q & !r & F(r)) -> ((p -> (!r U (s & !r))) W r))",
+  "response/afteruntil": "G((q & !r) -> ((p -> (!r U (s & !r))) W r))",
+  "bounded-response 1/globally": "G(p -> (s | X(s)))",
+  "bounded-response 1/before": "(F(r) -> ((p -> ((s & !r) | (X(s & !r) & !r))) W r))",
+  "bounded-response 1/after": "(!q W (q & G(p -> (s | X(s)))))",
+  "bounded-response 1/between": "G((q & !r & F(r)) -> ((p -> ((s & !r) | (X(s & !r) & !r))) W r))",
+  "bounded-response 1/afteruntil": "G((q & !r) -> ((p -> ((s & !r) | (X(s & !r) & !r))) W r))",
+  "bounded-response 2/globally": "G(p -> (s | X(s) | X(X(s))))",
+  "bounded-response 2/before": "(F(r) -> ((p -> ((s & !r) | (X(s & !r) & !r) | (X(X(s & !r)) & !r & X(!r)))) W r))",
+  "bounded-response 2/after": "(!q W (q & G(p -> (s | X(s) | X(X(s))))))",
+  "bounded-response 2/between": "G((q & !r & F(r)) -> ((p -> ((s & !r) | (X(s & !r) & !r) | (X(X(s & !r)) & !r & X(!r)))) W r))",
+  "bounded-response 2/afteruntil": "G((q & !r) -> ((p -> ((s & !r) | (X(s & !r) & !r) | (X(X(s & !r)) & !r & X(!r)))) W r))",
+  "bounded-response 3/globally": "G(p -> (s | X(s) | X(X(s)) | X(X(X(s)))))",
+  "bounded-response 3/before": "(F(r) -> ((p -> ((s & !r) | (X(s & !r) & !r) | (X(X(s & !r)) & !r & X(!r)) | (X(X(X(s & !r))) & !r & X(!r) & X(X(!r))))) W r))",
+  "bounded-response 3/after": "(!q W (q & G(p -> (s | X(s) | X(X(s)) | X(X(X(s)))))))",
+  "bounded-response 3/between": "G((q & !r & F(r)) -> ((p -> ((s & !r) | (X(s & !r) & !r) | (X(X(s & !r)) & !r & X(!r)) | (X(X(X(s & !r))) & !r & X(!r) & X(X(!r))))) W r))",
+  "bounded-response 3/afteruntil": "G((q & !r) -> ((p -> ((s & !r) | (X(s & !r) & !r) | (X(X(s & !r)) & !r & X(!r)) | (X(X(X(s & !r))) & !r & X(!r) & X(X(!r))))) W r))",
+  "bounded-response 4/globally": "G(p -> (s | X(s) | X(X(s)) | X(X(X(s))) | X(X(X(X(s))))))",
+  "bounded-response 4/before": "(F(r) -> ((p -> ((s & !r) | (X(s & !r) & !r) | (X(X(s & !r)) & !r & X(!r)) | (X(X(X(s & !r))) & !r & X(!r) & X(X(!r))) | (X(X(X(X(s & !r)))) & !r & X(!r) & X(X(!r)) & X(X(X(!r)))))) W r))",
+  "bounded-response 4/after": "(!q W (q & G(p -> (s | X(s) | X(X(s)) | X(X(X(s))) | X(X(X(X(s))))))))",
+  "bounded-response 4/between": "G((q & !r & F(r)) -> ((p -> ((s & !r) | (X(s & !r) & !r) | (X(X(s & !r)) & !r & X(!r)) | (X(X(X(s & !r))) & !r & X(!r) & X(X(!r))) | (X(X(X(X(s & !r)))) & !r & X(!r) & X(X(!r)) & X(X(X(!r)))))) W r))",
+  "bounded-response 4/afteruntil": "G((q & !r) -> ((p -> ((s & !r) | (X(s & !r) & !r) | (X(X(s & !r)) & !r & X(!r)) | (X(X(X(s & !r))) & !r & X(!r) & X(X(!r))) | (X(X(X(X(s & !r)))) & !r & X(!r) & X(X(!r)) & X(X(X(!r)))))) W r))",
+  "bounded-invariance 1/globally": "G(p -> (s & X(s)))",
+  "bounded-invariance 1/before": "(F(r) -> ((p -> ((s | r) & (X(s) | r | X(r)))) W r))",
+  "bounded-invariance 1/after": "(!q W (q & G(p -> (s & X(s)))))",
+  "bounded-invariance 1/between": "G((q & !r & F(r)) -> ((p -> ((s | r) & (X(s) | r | X(r)))) W r))",
+  "bounded-invariance 1/afteruntil": "G((q & !r) -> ((p -> ((s | r) & (X(s) | r | X(r)))) W r))",
+  "bounded-invariance 2/globally": "G(p -> (s & X(s) & X(X(s))))",
+  "bounded-invariance 2/before": "(F(r) -> ((p -> ((s | r) & (X(s) | r | X(r)) & (X(X(s)) | r | X(r) | X(X(r))))) W r))",
+  "bounded-invariance 2/after": "(!q W (q & G(p -> (s & X(s) & X(X(s))))))",
+  "bounded-invariance 2/between": "G((q & !r & F(r)) -> ((p -> ((s | r) & (X(s) | r | X(r)) & (X(X(s)) | r | X(r) | X(X(r))))) W r))",
+  "bounded-invariance 2/afteruntil": "G((q & !r) -> ((p -> ((s | r) & (X(s) | r | X(r)) & (X(X(s)) | r | X(r) | X(X(r))))) W r))",
+  "bounded-invariance 3/globally": "G(p -> (s & X(s) & X(X(s)) & X(X(X(s)))))",
+  "bounded-invariance 3/before": "(F(r) -> ((p -> ((s | r) & (X(s) | r | X(r)) & (X(X(s)) | r | X(r) | X(X(r))) & (X(X(X(s))) | r | X(r) | X(X(r)) | X(X(X(r)))))) W r))",
+  "bounded-invariance 3/after": "(!q W (q & G(p -> (s & X(s) & X(X(s)) & X(X(X(s)))))))",
+  "bounded-invariance 3/between": "G((q & !r & F(r)) -> ((p -> ((s | r) & (X(s) | r | X(r)) & (X(X(s)) | r | X(r) | X(X(r))) & (X(X(X(s))) | r | X(r) | X(X(r)) | X(X(X(r)))))) W r))",
+  "bounded-invariance 3/afteruntil": "G((q & !r) -> ((p -> ((s | r) & (X(s) | r | X(r)) & (X(X(s)) | r | X(r) | X(X(r))) & (X(X(X(s))) | r | X(r) | X(X(r)) | X(X(X(r)))))) W r))",
+  "bounded-invariance 4/globally": "G(p -> (s & X(s) & X(X(s)) & X(X(X(s))) & X(X(X(X(s))))))",
+  "bounded-invariance 4/before": "(F(r) -> ((p -> ((s | r) & (X(s) | r | X(r)) & (X(X(s)) | r | X(r) | X(X(r))) & (X(X(X(s))) | r | X(r) | X(X(r)) | X(X(X(r)))) & (X(X(X(X(s)))) | r | X(r) | X(X(r)) | X(X(X(r))) | X(X(X(X(r))))))) W r))",
+  "bounded-invariance 4/after": "(!q W (q & G(p -> (s & X(s) & X(X(s)) & X(X(X(s))) & X(X(X(X(s))))))))",
+  "bounded-invariance 4/between": "G((q & !r & F(r)) -> ((p -> ((s | r) & (X(s) | r | X(r)) & (X(X(s)) | r | X(r) | X(X(r))) & (X(X(X(s))) | r | X(r) | X(X(r)) | X(X(X(r)))) & (X(X(X(X(s)))) | r | X(r) | X(X(r)) | X(X(X(r))) | X(X(X(X(r))))))) W r))",
+  "bounded-invariance 4/afteruntil": "G((q & !r) -> ((p -> ((s | r) & (X(s) | r | X(r)) & (X(X(s)) | r | X(r) | X(X(r))) & (X(X(X(s))) | r | X(r) | X(X(r)) | X(X(X(r)))) & (X(X(X(X(s)))) | r | X(r) | X(X(r)) | X(X(X(r))) | X(X(X(X(r))))))) W r))",
+  "bounded-existence 1/globally": "(!p W (p W G(!p)))",
+  "bounded-existence 1/before": "(F(r) -> (!p W (r | (p W (r | (!p W r))))))",
+  "bounded-existence 1/after": "(!q W (q & (!p W (p W G(!p)))))",
+  "bounded-existence 1/between": "G((q & !r & F(r)) -> (!p W (r | (p W (r | (!p W r))))))",
+  "bounded-existence 1/afteruntil": "G((q & !r) -> (!p W (r | (p W (r | (!p W r))))))",
+  "bounded-existence 2/globally": "(!p W (p W (!p W (p W G(!p)))))",
+  "bounded-existence 2/before": "(F(r) -> (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W r))))))))))",
+  "bounded-existence 2/after": "(!q W (q & (!p W (p W (!p W (p W G(!p)))))))",
+  "bounded-existence 2/between": "G((q & !r & F(r)) -> (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W r))))))))))",
+  "bounded-existence 2/afteruntil": "G((q & !r) -> (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W r))))))))))",
+  "bounded-existence 3/globally": "(!p W (p W (!p W (p W (!p W (p W G(!p)))))))",
+  "bounded-existence 3/before": "(F(r) -> (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W r))))))))))))))",
+  "bounded-existence 3/after": "(!q W (q & (!p W (p W (!p W (p W (!p W (p W G(!p)))))))))",
+  "bounded-existence 3/between": "G((q & !r & F(r)) -> (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W r))))))))))))))",
+  "bounded-existence 3/afteruntil": "G((q & !r) -> (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W r))))))))))))))",
+  "bounded-existence 4/globally": "(!p W (p W (!p W (p W (!p W (p W (!p W (p W G(!p)))))))))",
+  "bounded-existence 4/before": "(F(r) -> (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W r))))))))))))))))))",
+  "bounded-existence 4/after": "(!q W (q & (!p W (p W (!p W (p W (!p W (p W (!p W (p W G(!p)))))))))))",
+  "bounded-existence 4/between": "G((q & !r & F(r)) -> (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W r))))))))))))))))))",
+  "bounded-existence 4/afteruntil": "G((q & !r) -> (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W (r | (p W (r | (!p W r))))))))))))))))))",
+  "bounded-recurrence 1/globally": "G(s | X(s))",
+  "bounded-recurrence 1/before": "(F(r) -> ((s | r | X(s | r)) W r))",
+  "bounded-recurrence 1/after": "(!q W (q & G(s | X(s))))",
+  "bounded-recurrence 1/between": "G((q & !r & F(r)) -> ((s | r | X(s | r)) W r))",
+  "bounded-recurrence 1/afteruntil": "G((q & !r) -> ((s | r | X(s | r)) W r))",
+  "bounded-recurrence 2/globally": "G(s | X(s) | X(X(s)))",
+  "bounded-recurrence 2/before": "(F(r) -> ((s | r | X(s | r) | X(X(s | r))) W r))",
+  "bounded-recurrence 2/after": "(!q W (q & G(s | X(s) | X(X(s)))))",
+  "bounded-recurrence 2/between": "G((q & !r & F(r)) -> ((s | r | X(s | r) | X(X(s | r))) W r))",
+  "bounded-recurrence 2/afteruntil": "G((q & !r) -> ((s | r | X(s | r) | X(X(s | r))) W r))",
+  "bounded-recurrence 3/globally": "G(s | X(s) | X(X(s)) | X(X(X(s))))",
+  "bounded-recurrence 3/before": "(F(r) -> ((s | r | X(s | r) | X(X(s | r)) | X(X(X(s | r)))) W r))",
+  "bounded-recurrence 3/after": "(!q W (q & G(s | X(s) | X(X(s)) | X(X(X(s))))))",
+  "bounded-recurrence 3/between": "G((q & !r & F(r)) -> ((s | r | X(s | r) | X(X(s | r)) | X(X(X(s | r)))) W r))",
+  "bounded-recurrence 3/afteruntil": "G((q & !r) -> ((s | r | X(s | r) | X(X(s | r)) | X(X(X(s | r)))) W r))",
+  "bounded-recurrence 4/globally": "G(s | X(s) | X(X(s)) | X(X(X(s))) | X(X(X(X(s)))))",
+  "bounded-recurrence 4/before": "(F(r) -> ((s | r | X(s | r) | X(X(s | r)) | X(X(X(s | r))) | X(X(X(X(s | r))))) W r))",
+  "bounded-recurrence 4/after": "(!q W (q & G(s | X(s) | X(X(s)) | X(X(X(s))) | X(X(X(X(s)))))))",
+  "bounded-recurrence 4/between": "G((q & !r & F(r)) -> ((s | r | X(s | r) | X(X(s | r)) | X(X(X(s | r))) | X(X(X(X(s | r))))) W r))",
+  "bounded-recurrence 4/afteruntil": "G((q & !r) -> ((s | r | X(s | r) | X(X(s | r)) | X(X(X(s | r))) | X(X(X(X(s | r))))) W r))"
+ },
+ "dwyer": {
+  "absence/globally": {
+   "published": "G(!p)",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "absence/before": {
+   "published": "F r -> (!p U r)",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "absence/after": {
+   "published": "G(q -> G(!p))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "absence/between": {
+   "published": "G((q & !r & F r) -> (!p U r))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "absence/afteruntil": {
+   "published": "G((q & !r) -> (!p W r))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "existence/globally": {
+   "published": "F(s)",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "existence/before": {
+   "published": "!r W (s & !r)",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "existence/after": {
+   "published": "G(!q) | F(q & F(s))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "existence/between": {
+   "published": "G((q & !r) -> (!r W (s & !r)))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "existence/afteruntil": {
+   "published": "G((q & !r) -> (!r U (s & !r)))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "universality/globally": {
+   "published": "G(s)",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "universality/before": {
+   "published": "F r -> (s U r)",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "universality/after": {
+   "published": "G(q -> G(s))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "universality/between": {
+   "published": "G((q & !r & F r) -> (s U r))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "universality/afteruntil": {
+   "published": "G((q & !r) -> (s W r))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "precedence/globally": {
+   "published": "!p W s",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "precedence/before": {
+   "published": "F r -> (!p U (s | r))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "precedence/after": {
+   "published": "G(!q) | F(q & (!p W s))",
+   "count": null,
+   "lowering": "stronger"
+  },
+  "precedence/between": {
+   "published": "G((q & !r & F r) -> (!p U (s | r)))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "precedence/afteruntil": {
+   "published": "G((q & !r) -> (!p W (s | r)))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "response/globally": {
+   "published": "G(p -> F s)",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "response/before": {
+   "published": "F r -> ((p -> (!r U (s & !r))) U r)",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "response/after": {
+   "published": "G(q -> G(p -> F s))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "response/between": {
+   "published": "G((q & !r & F r) -> ((p -> (!r U (s & !r))) U r))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "response/afteruntil": {
+   "published": "G((q & !r) -> ((p -> (!r U (s & !r))) W r))",
+   "count": null,
+   "lowering": "equivalent"
+  },
+  "bounded-existence/globally": {
+   "published": "!p W (p W (!p W (p W G(!p))))",
+   "count": 2,
+   "lowering": "equivalent"
+  },
+  "bounded-existence/before": {
+   "published": "F r -> ((!p & !r) U (r | ((p & !r) U (r | ((!p & !r) U (r | ((p & !r) U (r | (!p U r)))))))))",
+   "count": 2,
+   "lowering": "equivalent"
+  },
+  "bounded-existence/after": {
+   "published": "F q -> (!q U (q & (!p W (p W (!p W (p W G(!p)))))))",
+   "count": 2,
+   "lowering": "equivalent"
+  },
+  "bounded-existence/between": {
+   "published": "G((q & F r) -> ((!p & !r) U (r | ((p & !r) U (r | ((!p & !r) U (r | ((p & !r) U (r | (!p U r))))))))))",
+   "count": 2,
+   "lowering": "equivalent"
+  },
+  "bounded-existence/afteruntil": {
+   "published": "G(q -> ((!p & !r) U (r | ((p & !r) U (r | ((!p & !r) U (r | ((p & !r) U (r | (!p W r) | G(p))))))))))",
+   "count": 2,
+   "lowering": "equivalent"
+  }
+ },
+ "counter_trace": {
+  "word": "q&!p&!r&!s; p&!q&!r&!s; q&!p&!r&!s; cycle{!p&!q&!r&!s}",
+  "published_accepts": true,
+  "lowering_accepts": false
+ },
+ "pattern_order": {
+  "globally": [
+   [
+    "absence",
+    "bounded-existence 1"
+   ],
+   [
+    "absence",
+    "bounded-existence 2"
+   ],
+   [
+    "absence",
+    "bounded-existence 3"
+   ],
+   [
+    "absence",
+    "bounded-existence 4"
+   ],
+   [
+    "absence",
+    "bounded-invariance 1"
+   ],
+   [
+    "absence",
+    "bounded-invariance 2"
+   ],
+   [
+    "absence",
+    "bounded-invariance 3"
+   ],
+   [
+    "absence",
+    "bounded-invariance 4"
+   ],
+   [
+    "absence",
+    "bounded-response 1"
+   ],
+   [
+    "absence",
+    "bounded-response 2"
+   ],
+   [
+    "absence",
+    "bounded-response 3"
+   ],
+   [
+    "absence",
+    "bounded-response 4"
+   ],
+   [
+    "absence",
+    "precedence"
+   ],
+   [
+    "absence",
+    "response"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 2"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-existence 3",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 1",
+    "response"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 2",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 2",
+    "response"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 3",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 3",
+    "response"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 3"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 4",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 4",
+    "response"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 2"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-recurrence 1",
+    "existence"
+   ],
+   [
+    "bounded-recurrence 1",
+    "response"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-recurrence 2",
+    "existence"
+   ],
+   [
+    "bounded-recurrence 2",
+    "response"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-recurrence 3",
+    "existence"
+   ],
+   [
+    "bounded-recurrence 3",
+    "response"
+   ],
+   [
+    "bounded-recurrence 4",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-recurrence 4",
+    "existence"
+   ],
+   [
+    "bounded-recurrence 4",
+    "response"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 1",
+    "response"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 2",
+    "response"
+   ],
+   [
+    "bounded-response 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 3",
+    "response"
+   ],
+   [
+    "bounded-response 4",
+    "response"
+   ],
+   [
+    "universality",
+    "bounded-invariance 1"
+   ],
+   [
+    "universality",
+    "bounded-invariance 2"
+   ],
+   [
+    "universality",
+    "bounded-invariance 3"
+   ],
+   [
+    "universality",
+    "bounded-invariance 4"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 1"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 2"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 3"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 4"
+   ],
+   [
+    "universality",
+    "bounded-response 1"
+   ],
+   [
+    "universality",
+    "bounded-response 2"
+   ],
+   [
+    "universality",
+    "bounded-response 3"
+   ],
+   [
+    "universality",
+    "bounded-response 4"
+   ],
+   [
+    "universality",
+    "existence"
+   ],
+   [
+    "universality",
+    "precedence"
+   ],
+   [
+    "universality",
+    "response"
+   ]
+  ],
+  "before": [
+   [
+    "absence",
+    "bounded-existence 1"
+   ],
+   [
+    "absence",
+    "bounded-existence 2"
+   ],
+   [
+    "absence",
+    "bounded-existence 3"
+   ],
+   [
+    "absence",
+    "bounded-existence 4"
+   ],
+   [
+    "absence",
+    "bounded-invariance 1"
+   ],
+   [
+    "absence",
+    "bounded-invariance 2"
+   ],
+   [
+    "absence",
+    "bounded-invariance 3"
+   ],
+   [
+    "absence",
+    "bounded-invariance 4"
+   ],
+   [
+    "absence",
+    "bounded-response 1"
+   ],
+   [
+    "absence",
+    "bounded-response 2"
+   ],
+   [
+    "absence",
+    "bounded-response 3"
+   ],
+   [
+    "absence",
+    "bounded-response 4"
+   ],
+   [
+    "absence",
+    "precedence"
+   ],
+   [
+    "absence",
+    "response"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 2"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-existence 3",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 1",
+    "response"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 2",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 2",
+    "response"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 3",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 3",
+    "response"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 3"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 4",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 4",
+    "response"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 2"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 1",
+    "response"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 2",
+    "response"
+   ],
+   [
+    "bounded-response 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 3",
+    "response"
+   ],
+   [
+    "bounded-response 4",
+    "response"
+   ],
+   [
+    "universality",
+    "bounded-invariance 1"
+   ],
+   [
+    "universality",
+    "bounded-invariance 2"
+   ],
+   [
+    "universality",
+    "bounded-invariance 3"
+   ],
+   [
+    "universality",
+    "bounded-invariance 4"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 1"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 2"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 3"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 4"
+   ],
+   [
+    "universality",
+    "bounded-response 1"
+   ],
+   [
+    "universality",
+    "bounded-response 2"
+   ],
+   [
+    "universality",
+    "bounded-response 3"
+   ],
+   [
+    "universality",
+    "bounded-response 4"
+   ],
+   [
+    "universality",
+    "precedence"
+   ],
+   [
+    "universality",
+    "response"
+   ]
+  ],
+  "after": [
+   [
+    "absence",
+    "bounded-existence 1"
+   ],
+   [
+    "absence",
+    "bounded-existence 2"
+   ],
+   [
+    "absence",
+    "bounded-existence 3"
+   ],
+   [
+    "absence",
+    "bounded-existence 4"
+   ],
+   [
+    "absence",
+    "bounded-invariance 1"
+   ],
+   [
+    "absence",
+    "bounded-invariance 2"
+   ],
+   [
+    "absence",
+    "bounded-invariance 3"
+   ],
+   [
+    "absence",
+    "bounded-invariance 4"
+   ],
+   [
+    "absence",
+    "bounded-response 1"
+   ],
+   [
+    "absence",
+    "bounded-response 2"
+   ],
+   [
+    "absence",
+    "bounded-response 3"
+   ],
+   [
+    "absence",
+    "bounded-response 4"
+   ],
+   [
+    "absence",
+    "precedence"
+   ],
+   [
+    "absence",
+    "response"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 2"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-existence 3",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 1",
+    "response"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 2",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 2",
+    "response"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 3",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 3",
+    "response"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 3"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 4",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 4",
+    "response"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 2"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-recurrence 1",
+    "existence"
+   ],
+   [
+    "bounded-recurrence 1",
+    "response"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-recurrence 2",
+    "existence"
+   ],
+   [
+    "bounded-recurrence 2",
+    "response"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-recurrence 3",
+    "existence"
+   ],
+   [
+    "bounded-recurrence 3",
+    "response"
+   ],
+   [
+    "bounded-recurrence 4",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-recurrence 4",
+    "existence"
+   ],
+   [
+    "bounded-recurrence 4",
+    "response"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 1",
+    "response"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 2",
+    "response"
+   ],
+   [
+    "bounded-response 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 3",
+    "response"
+   ],
+   [
+    "bounded-response 4",
+    "response"
+   ],
+   [
+    "universality",
+    "bounded-invariance 1"
+   ],
+   [
+    "universality",
+    "bounded-invariance 2"
+   ],
+   [
+    "universality",
+    "bounded-invariance 3"
+   ],
+   [
+    "universality",
+    "bounded-invariance 4"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 1"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 2"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 3"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 4"
+   ],
+   [
+    "universality",
+    "bounded-response 1"
+   ],
+   [
+    "universality",
+    "bounded-response 2"
+   ],
+   [
+    "universality",
+    "bounded-response 3"
+   ],
+   [
+    "universality",
+    "bounded-response 4"
+   ],
+   [
+    "universality",
+    "existence"
+   ],
+   [
+    "universality",
+    "precedence"
+   ],
+   [
+    "universality",
+    "response"
+   ]
+  ],
+  "between": [
+   [
+    "absence",
+    "bounded-existence 1"
+   ],
+   [
+    "absence",
+    "bounded-existence 2"
+   ],
+   [
+    "absence",
+    "bounded-existence 3"
+   ],
+   [
+    "absence",
+    "bounded-existence 4"
+   ],
+   [
+    "absence",
+    "bounded-invariance 1"
+   ],
+   [
+    "absence",
+    "bounded-invariance 2"
+   ],
+   [
+    "absence",
+    "bounded-invariance 3"
+   ],
+   [
+    "absence",
+    "bounded-invariance 4"
+   ],
+   [
+    "absence",
+    "bounded-response 1"
+   ],
+   [
+    "absence",
+    "bounded-response 2"
+   ],
+   [
+    "absence",
+    "bounded-response 3"
+   ],
+   [
+    "absence",
+    "bounded-response 4"
+   ],
+   [
+    "absence",
+    "precedence"
+   ],
+   [
+    "absence",
+    "response"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 2"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-existence 3",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 1",
+    "response"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 2",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 2",
+    "response"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 3",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 3",
+    "response"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 3"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 4",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 4",
+    "response"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 2"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 1",
+    "response"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 2",
+    "response"
+   ],
+   [
+    "bounded-response 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 3",
+    "response"
+   ],
+   [
+    "bounded-response 4",
+    "response"
+   ],
+   [
+    "universality",
+    "bounded-invariance 1"
+   ],
+   [
+    "universality",
+    "bounded-invariance 2"
+   ],
+   [
+    "universality",
+    "bounded-invariance 3"
+   ],
+   [
+    "universality",
+    "bounded-invariance 4"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 1"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 2"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 3"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 4"
+   ],
+   [
+    "universality",
+    "bounded-response 1"
+   ],
+   [
+    "universality",
+    "bounded-response 2"
+   ],
+   [
+    "universality",
+    "bounded-response 3"
+   ],
+   [
+    "universality",
+    "bounded-response 4"
+   ],
+   [
+    "universality",
+    "existence"
+   ],
+   [
+    "universality",
+    "precedence"
+   ],
+   [
+    "universality",
+    "response"
+   ]
+  ],
+  "afteruntil": [
+   [
+    "absence",
+    "bounded-existence 1"
+   ],
+   [
+    "absence",
+    "bounded-existence 2"
+   ],
+   [
+    "absence",
+    "bounded-existence 3"
+   ],
+   [
+    "absence",
+    "bounded-existence 4"
+   ],
+   [
+    "absence",
+    "bounded-invariance 1"
+   ],
+   [
+    "absence",
+    "bounded-invariance 2"
+   ],
+   [
+    "absence",
+    "bounded-invariance 3"
+   ],
+   [
+    "absence",
+    "bounded-invariance 4"
+   ],
+   [
+    "absence",
+    "bounded-response 1"
+   ],
+   [
+    "absence",
+    "bounded-response 2"
+   ],
+   [
+    "absence",
+    "bounded-response 3"
+   ],
+   [
+    "absence",
+    "bounded-response 4"
+   ],
+   [
+    "absence",
+    "precedence"
+   ],
+   [
+    "absence",
+    "response"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 2"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-existence 3",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 1",
+    "response"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 2",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 2",
+    "response"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 3",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 3",
+    "response"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 3"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-invariance 4",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 4",
+    "response"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 2"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 1",
+    "response"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 2",
+    "response"
+   ],
+   [
+    "bounded-response 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 3",
+    "response"
+   ],
+   [
+    "bounded-response 4",
+    "response"
+   ],
+   [
+    "universality",
+    "bounded-invariance 1"
+   ],
+   [
+    "universality",
+    "bounded-invariance 2"
+   ],
+   [
+    "universality",
+    "bounded-invariance 3"
+   ],
+   [
+    "universality",
+    "bounded-invariance 4"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 1"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 2"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 3"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 4"
+   ],
+   [
+    "universality",
+    "bounded-response 1"
+   ],
+   [
+    "universality",
+    "bounded-response 2"
+   ],
+   [
+    "universality",
+    "bounded-response 3"
+   ],
+   [
+    "universality",
+    "bounded-response 4"
+   ],
+   [
+    "universality",
+    "existence"
+   ],
+   [
+    "universality",
+    "precedence"
+   ],
+   [
+    "universality",
+    "response"
+   ]
+  ]
+ },
+ "pattern_order_covers": {
+  "globally": [
+   [
+    "absence",
+    "bounded-existence 1"
+   ],
+   [
+    "absence",
+    "bounded-invariance 4"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 2"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 3",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 1",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 2"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-recurrence 4",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-recurrence 4",
+    "existence"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 4",
+    "response"
+   ],
+   [
+    "universality",
+    "bounded-invariance 4"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 1"
+   ]
+  ],
+  "before": [
+   [
+    "absence",
+    "bounded-existence 1"
+   ],
+   [
+    "absence",
+    "bounded-invariance 4"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 2"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 3",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 1",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 2"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 4",
+    "response"
+   ],
+   [
+    "universality",
+    "bounded-invariance 4"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 1"
+   ]
+  ],
+  "after": [
+   [
+    "absence",
+    "bounded-existence 1"
+   ],
+   [
+    "absence",
+    "bounded-invariance 4"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 2"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 3",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 1",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 2"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-recurrence 4",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-recurrence 4",
+    "existence"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 4",
+    "response"
+   ],
+   [
+    "universality",
+    "bounded-invariance 4"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 1"
+   ]
+  ],
+  "between": [
+   [
+    "absence",
+    "bounded-existence 1"
+   ],
+   [
+    "absence",
+    "bounded-invariance 4"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 2"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 3",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 1",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 2"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 4",
+    "response"
+   ],
+   [
+    "universality",
+    "bounded-invariance 4"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 1"
+   ],
+   [
+    "universality",
+    "existence"
+   ]
+  ],
+  "afteruntil": [
+   [
+    "absence",
+    "bounded-existence 1"
+   ],
+   [
+    "absence",
+    "bounded-invariance 4"
+   ],
+   [
+    "bounded-existence 1",
+    "bounded-existence 2"
+   ],
+   [
+    "bounded-existence 2",
+    "bounded-existence 3"
+   ],
+   [
+    "bounded-existence 3",
+    "bounded-existence 4"
+   ],
+   [
+    "bounded-invariance 1",
+    "bounded-response 1"
+   ],
+   [
+    "bounded-invariance 1",
+    "precedence"
+   ],
+   [
+    "bounded-invariance 2",
+    "bounded-invariance 1"
+   ],
+   [
+    "bounded-invariance 3",
+    "bounded-invariance 2"
+   ],
+   [
+    "bounded-invariance 4",
+    "bounded-invariance 3"
+   ],
+   [
+    "bounded-recurrence 1",
+    "bounded-recurrence 2"
+   ],
+   [
+    "bounded-recurrence 2",
+    "bounded-recurrence 3"
+   ],
+   [
+    "bounded-recurrence 3",
+    "bounded-recurrence 4"
+   ],
+   [
+    "bounded-response 1",
+    "bounded-response 2"
+   ],
+   [
+    "bounded-response 2",
+    "bounded-response 3"
+   ],
+   [
+    "bounded-response 3",
+    "bounded-response 4"
+   ],
+   [
+    "bounded-response 4",
+    "response"
+   ],
+   [
+    "universality",
+    "bounded-invariance 4"
+   ],
+   [
+    "universality",
+    "bounded-recurrence 1"
+   ],
+   [
+    "universality",
+    "existence"
+   ]
+  ]
+ },
+ "pattern_order_classes": [
+  [
+   "after",
+   "globally"
+  ],
+  [
+   "afteruntil",
+   "between"
+  ],
+  [
+   "before"
+  ]
+ ],
+ "pattern_order_classes_report_patterns": [
+  [
+   "after",
+   "afteruntil",
+   "between",
+   "globally"
+  ],
+  [
+   "before"
+  ]
+ ],
+ "scope_order": {
+  "absence": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "universality": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "existence": [
+   [
+    "afteruntil",
+    "between"
+   ]
+  ],
+  "precedence": [
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "before"
+   ]
+  ],
+  "response": [
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ]
+  ],
+  "bounded-response 1": [
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ]
+  ],
+  "bounded-response 2": [
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ]
+  ],
+  "bounded-response 3": [
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ]
+  ],
+  "bounded-response 4": [
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ]
+  ],
+  "bounded-invariance 1": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "bounded-invariance 2": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "bounded-invariance 3": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "bounded-invariance 4": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "bounded-existence 1": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "bounded-existence 2": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "bounded-existence 3": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "bounded-existence 4": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "bounded-recurrence 1": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "bounded-recurrence 2": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "bounded-recurrence 3": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ],
+  "bounded-recurrence 4": [
+   [
+    "after",
+    "afteruntil"
+   ],
+   [
+    "after",
+    "between"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "globally",
+    "after"
+   ],
+   [
+    "globally",
+    "afteruntil"
+   ],
+   [
+    "globally",
+    "before"
+   ],
+   [
+    "globally",
+    "between"
+   ]
+  ]
+ },
+ "scope_order_cells": [
+  {
+   "patterns": [
+    "absence",
+    "universality",
+    "bounded-invariance 1",
+    "bounded-invariance 2",
+    "bounded-invariance 3",
+    "bounded-invariance 4",
+    "bounded-existence 1",
+    "bounded-existence 2",
+    "bounded-existence 3",
+    "bounded-existence 4",
+    "bounded-recurrence 1",
+    "bounded-recurrence 2",
+    "bounded-recurrence 3",
+    "bounded-recurrence 4"
+   ],
+   "order": [
+    [
+     "after",
+     "afteruntil"
+    ],
+    [
+     "after",
+     "between"
+    ],
+    [
+     "afteruntil",
+     "between"
+    ],
+    [
+     "globally",
+     "after"
+    ],
+    [
+     "globally",
+     "afteruntil"
+    ],
+    [
+     "globally",
+     "before"
+    ],
+    [
+     "globally",
+     "between"
+    ]
+   ],
+   "covers": [
+    [
+     "after",
+     "afteruntil"
+    ],
+    [
+     "afteruntil",
+     "between"
+    ],
+    [
+     "globally",
+     "after"
+    ],
+    [
+     "globally",
+     "before"
+    ]
+   ]
+  },
+  {
+   "patterns": [
+    "existence"
+   ],
+   "order": [
+    [
+     "afteruntil",
+     "between"
+    ]
+   ],
+   "covers": [
+    [
+     "afteruntil",
+     "between"
+    ]
+   ]
+  },
+  {
+   "patterns": [
+    "precedence"
+   ],
+   "order": [
+    [
+     "afteruntil",
+     "between"
+    ],
+    [
+     "globally",
+     "before"
+    ]
+   ],
+   "covers": [
+    [
+     "afteruntil",
+     "between"
+    ],
+    [
+     "globally",
+     "before"
+    ]
+   ]
+  },
+  {
+   "patterns": [
+    "response",
+    "bounded-response 1",
+    "bounded-response 2",
+    "bounded-response 3",
+    "bounded-response 4"
+   ],
+   "order": [
+    [
+     "afteruntil",
+     "between"
+    ],
+    [
+     "globally",
+     "after"
+    ]
+   ],
+   "covers": [
+    [
+     "afteruntil",
+     "between"
+    ],
+    [
+     "globally",
+     "after"
+    ]
+   ]
+  }
+ ],
+ "polarity": {
+  "absence/globally": {
+   "P": "-"
+  },
+  "absence/before": {
+   "P": "-",
+   "R": "none"
+  },
+  "absence/after": {
+   "P": "-",
+   "Q": "-"
+  },
+  "absence/between": {
+   "P": "-",
+   "Q": "-",
+   "R": "none"
+  },
+  "absence/afteruntil": {
+   "P": "-",
+   "Q": "-",
+   "R": "+"
+  },
+  "universality/globally": {
+   "S": "+"
+  },
+  "universality/before": {
+   "S": "+",
+   "R": "none"
+  },
+  "universality/after": {
+   "S": "+",
+   "Q": "-"
+  },
+  "universality/between": {
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "universality/afteruntil": {
+   "S": "+",
+   "Q": "-",
+   "R": "+"
+  },
+  "existence/globally": {
+   "S": "+"
+  },
+  "existence/before": {
+   "S": "+",
+   "R": "-"
+  },
+  "existence/after": {
+   "S": "+",
+   "Q": "none"
+  },
+  "existence/between": {
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "existence/afteruntil": {
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "precedence/globally": {
+   "P": "-",
+   "S": "+"
+  },
+  "precedence/before": {
+   "P": "-",
+   "S": "+",
+   "R": "none"
+  },
+  "precedence/after": {
+   "P": "-",
+   "S": "+",
+   "Q": "none"
+  },
+  "precedence/between": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "precedence/afteruntil": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "+"
+  },
+  "response/globally": {
+   "P": "-",
+   "S": "+"
+  },
+  "response/before": {
+   "P": "-",
+   "S": "+",
+   "R": "none"
+  },
+  "response/after": {
+   "P": "-",
+   "S": "+",
+   "Q": "-"
+  },
+  "response/between": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "response/afteruntil": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-response 1/globally": {
+   "P": "-",
+   "S": "+"
+  },
+  "bounded-response 1/before": {
+   "P": "-",
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-response 1/after": {
+   "P": "-",
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-response 1/between": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-response 1/afteruntil": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-response 2/globally": {
+   "P": "-",
+   "S": "+"
+  },
+  "bounded-response 2/before": {
+   "P": "-",
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-response 2/after": {
+   "P": "-",
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-response 2/between": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-response 2/afteruntil": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-response 3/globally": {
+   "P": "-",
+   "S": "+"
+  },
+  "bounded-response 3/before": {
+   "P": "-",
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-response 3/after": {
+   "P": "-",
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-response 3/between": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-response 3/afteruntil": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-response 4/globally": {
+   "P": "-",
+   "S": "+"
+  },
+  "bounded-response 4/before": {
+   "P": "-",
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-response 4/after": {
+   "P": "-",
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-response 4/between": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-response 4/afteruntil": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-invariance 1/globally": {
+   "P": "-",
+   "S": "+"
+  },
+  "bounded-invariance 1/before": {
+   "P": "-",
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-invariance 1/after": {
+   "P": "-",
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-invariance 1/between": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-invariance 1/afteruntil": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "+"
+  },
+  "bounded-invariance 2/globally": {
+   "P": "-",
+   "S": "+"
+  },
+  "bounded-invariance 2/before": {
+   "P": "-",
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-invariance 2/after": {
+   "P": "-",
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-invariance 2/between": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-invariance 2/afteruntil": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "+"
+  },
+  "bounded-invariance 3/globally": {
+   "P": "-",
+   "S": "+"
+  },
+  "bounded-invariance 3/before": {
+   "P": "-",
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-invariance 3/after": {
+   "P": "-",
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-invariance 3/between": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-invariance 3/afteruntil": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "+"
+  },
+  "bounded-invariance 4/globally": {
+   "P": "-",
+   "S": "+"
+  },
+  "bounded-invariance 4/before": {
+   "P": "-",
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-invariance 4/after": {
+   "P": "-",
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-invariance 4/between": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-invariance 4/afteruntil": {
+   "P": "-",
+   "S": "+",
+   "Q": "-",
+   "R": "+"
+  },
+  "bounded-existence 1/globally": {
+   "P": "none"
+  },
+  "bounded-existence 1/before": {
+   "P": "none",
+   "R": "none"
+  },
+  "bounded-existence 1/after": {
+   "P": "none",
+   "Q": "-"
+  },
+  "bounded-existence 1/between": {
+   "P": "none",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-existence 1/afteruntil": {
+   "P": "none",
+   "Q": "-",
+   "R": "+"
+  },
+  "bounded-existence 2/globally": {
+   "P": "none"
+  },
+  "bounded-existence 2/before": {
+   "P": "none",
+   "R": "none"
+  },
+  "bounded-existence 2/after": {
+   "P": "none",
+   "Q": "-"
+  },
+  "bounded-existence 2/between": {
+   "P": "none",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-existence 2/afteruntil": {
+   "P": "none",
+   "Q": "-",
+   "R": "+"
+  },
+  "bounded-existence 3/globally": {
+   "P": "none"
+  },
+  "bounded-existence 3/before": {
+   "P": "none",
+   "R": "none"
+  },
+  "bounded-existence 3/after": {
+   "P": "none",
+   "Q": "-"
+  },
+  "bounded-existence 3/between": {
+   "P": "none",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-existence 3/afteruntil": {
+   "P": "none",
+   "Q": "-",
+   "R": "+"
+  },
+  "bounded-existence 4/globally": {
+   "P": "none"
+  },
+  "bounded-existence 4/before": {
+   "P": "none",
+   "R": "none"
+  },
+  "bounded-existence 4/after": {
+   "P": "none",
+   "Q": "-"
+  },
+  "bounded-existence 4/between": {
+   "P": "none",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-existence 4/afteruntil": {
+   "P": "none",
+   "Q": "-",
+   "R": "+"
+  },
+  "bounded-recurrence 1/globally": {
+   "S": "+"
+  },
+  "bounded-recurrence 1/before": {
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-recurrence 1/after": {
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-recurrence 1/between": {
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-recurrence 1/afteruntil": {
+   "S": "+",
+   "Q": "-",
+   "R": "+"
+  },
+  "bounded-recurrence 2/globally": {
+   "S": "+"
+  },
+  "bounded-recurrence 2/before": {
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-recurrence 2/after": {
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-recurrence 2/between": {
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-recurrence 2/afteruntil": {
+   "S": "+",
+   "Q": "-",
+   "R": "+"
+  },
+  "bounded-recurrence 3/globally": {
+   "S": "+"
+  },
+  "bounded-recurrence 3/before": {
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-recurrence 3/after": {
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-recurrence 3/between": {
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-recurrence 3/afteruntil": {
+   "S": "+",
+   "Q": "-",
+   "R": "+"
+  },
+  "bounded-recurrence 4/globally": {
+   "S": "+"
+  },
+  "bounded-recurrence 4/before": {
+   "S": "+",
+   "R": "none"
+  },
+  "bounded-recurrence 4/after": {
+   "S": "+",
+   "Q": "-"
+  },
+  "bounded-recurrence 4/between": {
+   "S": "+",
+   "Q": "-",
+   "R": "none"
+  },
+  "bounded-recurrence 4/afteruntil": {
+   "S": "+",
+   "Q": "-",
+   "R": "+"
+  }
+ },
+ "polarity_differences_from_report": [],
+ "joint_steps": {
+  "cross_implications": 534,
+  "through_one_intermediate": 534,
+  "joint": []
+ },
+ "count_chains": {
+  "globally": {
+   "bounded-response": {
+    "steps": {
+     "bounded-response 1 => bounded-response 2": true,
+     "bounded-response 2 => bounded-response 3": true,
+     "bounded-response 3 => bounded-response 4": true
+    },
+    "reverse": {
+     "bounded-response 2 => bounded-response 1": false,
+     "bounded-response 3 => bounded-response 2": false,
+     "bounded-response 4 => bounded-response 3": false
+    },
+    "unbounded": {
+     "bounded-response 1 => response": true,
+     "bounded-response 2 => response": true,
+     "bounded-response 3 => response": true,
+     "bounded-response 4 => response": true
+    }
+   },
+   "bounded-invariance": {
+    "steps": {
+     "bounded-invariance 4 => bounded-invariance 3": true,
+     "bounded-invariance 3 => bounded-invariance 2": true,
+     "bounded-invariance 2 => bounded-invariance 1": true
+    },
+    "reverse": {
+     "bounded-invariance 3 => bounded-invariance 4": false,
+     "bounded-invariance 2 => bounded-invariance 3": false,
+     "bounded-invariance 1 => bounded-invariance 2": false
+    },
+    "unbounded": {
+     "universality => bounded-invariance 1": true,
+     "universality => bounded-invariance 2": true,
+     "universality => bounded-invariance 3": true,
+     "universality => bounded-invariance 4": true
+    }
+   },
+   "bounded-existence": {
+    "steps": {
+     "bounded-existence 1 => bounded-existence 2": true,
+     "bounded-existence 2 => bounded-existence 3": true,
+     "bounded-existence 3 => bounded-existence 4": true
+    },
+    "reverse": {
+     "bounded-existence 2 => bounded-existence 1": false,
+     "bounded-existence 3 => bounded-existence 2": false,
+     "bounded-existence 4 => bounded-existence 3": false
+    },
+    "unbounded": {
+     "absence => bounded-existence 1": true,
+     "absence => bounded-existence 2": true,
+     "absence => bounded-existence 3": true,
+     "absence => bounded-existence 4": true
+    }
+   },
+   "bounded-recurrence": {
+    "steps": {
+     "bounded-recurrence 1 => bounded-recurrence 2": true,
+     "bounded-recurrence 2 => bounded-recurrence 3": true,
+     "bounded-recurrence 3 => bounded-recurrence 4": true
+    },
+    "reverse": {
+     "bounded-recurrence 2 => bounded-recurrence 1": false,
+     "bounded-recurrence 3 => bounded-recurrence 2": false,
+     "bounded-recurrence 4 => bounded-recurrence 3": false
+    },
+    "unbounded": {
+     "universality => bounded-recurrence 1": true,
+     "universality => bounded-recurrence 2": true,
+     "universality => bounded-recurrence 3": true,
+     "universality => bounded-recurrence 4": true,
+     "bounded-recurrence 1 => existence": true,
+     "bounded-recurrence 2 => existence": true,
+     "bounded-recurrence 3 => existence": true,
+     "bounded-recurrence 4 => existence": true
+    }
+   }
+  },
+  "before": {
+   "bounded-response": {
+    "steps": {
+     "bounded-response 1 => bounded-response 2": true,
+     "bounded-response 2 => bounded-response 3": true,
+     "bounded-response 3 => bounded-response 4": true
+    },
+    "reverse": {
+     "bounded-response 2 => bounded-response 1": false,
+     "bounded-response 3 => bounded-response 2": false,
+     "bounded-response 4 => bounded-response 3": false
+    },
+    "unbounded": {
+     "bounded-response 1 => response": true,
+     "bounded-response 2 => response": true,
+     "bounded-response 3 => response": true,
+     "bounded-response 4 => response": true
+    }
+   },
+   "bounded-invariance": {
+    "steps": {
+     "bounded-invariance 4 => bounded-invariance 3": true,
+     "bounded-invariance 3 => bounded-invariance 2": true,
+     "bounded-invariance 2 => bounded-invariance 1": true
+    },
+    "reverse": {
+     "bounded-invariance 3 => bounded-invariance 4": false,
+     "bounded-invariance 2 => bounded-invariance 3": false,
+     "bounded-invariance 1 => bounded-invariance 2": false
+    },
+    "unbounded": {
+     "universality => bounded-invariance 1": true,
+     "universality => bounded-invariance 2": true,
+     "universality => bounded-invariance 3": true,
+     "universality => bounded-invariance 4": true
+    }
+   },
+   "bounded-existence": {
+    "steps": {
+     "bounded-existence 1 => bounded-existence 2": true,
+     "bounded-existence 2 => bounded-existence 3": true,
+     "bounded-existence 3 => bounded-existence 4": true
+    },
+    "reverse": {
+     "bounded-existence 2 => bounded-existence 1": false,
+     "bounded-existence 3 => bounded-existence 2": false,
+     "bounded-existence 4 => bounded-existence 3": false
+    },
+    "unbounded": {
+     "absence => bounded-existence 1": true,
+     "absence => bounded-existence 2": true,
+     "absence => bounded-existence 3": true,
+     "absence => bounded-existence 4": true
+    }
+   },
+   "bounded-recurrence": {
+    "steps": {
+     "bounded-recurrence 1 => bounded-recurrence 2": true,
+     "bounded-recurrence 2 => bounded-recurrence 3": true,
+     "bounded-recurrence 3 => bounded-recurrence 4": true
+    },
+    "reverse": {
+     "bounded-recurrence 2 => bounded-recurrence 1": false,
+     "bounded-recurrence 3 => bounded-recurrence 2": false,
+     "bounded-recurrence 4 => bounded-recurrence 3": false
+    },
+    "unbounded": {
+     "universality => bounded-recurrence 1": true,
+     "universality => bounded-recurrence 2": true,
+     "universality => bounded-recurrence 3": true,
+     "universality => bounded-recurrence 4": true,
+     "bounded-recurrence 1 => existence": false,
+     "bounded-recurrence 2 => existence": false,
+     "bounded-recurrence 3 => existence": false,
+     "bounded-recurrence 4 => existence": false
+    }
+   }
+  },
+  "after": {
+   "bounded-response": {
+    "steps": {
+     "bounded-response 1 => bounded-response 2": true,
+     "bounded-response 2 => bounded-response 3": true,
+     "bounded-response 3 => bounded-response 4": true
+    },
+    "reverse": {
+     "bounded-response 2 => bounded-response 1": false,
+     "bounded-response 3 => bounded-response 2": false,
+     "bounded-response 4 => bounded-response 3": false
+    },
+    "unbounded": {
+     "bounded-response 1 => response": true,
+     "bounded-response 2 => response": true,
+     "bounded-response 3 => response": true,
+     "bounded-response 4 => response": true
+    }
+   },
+   "bounded-invariance": {
+    "steps": {
+     "bounded-invariance 4 => bounded-invariance 3": true,
+     "bounded-invariance 3 => bounded-invariance 2": true,
+     "bounded-invariance 2 => bounded-invariance 1": true
+    },
+    "reverse": {
+     "bounded-invariance 3 => bounded-invariance 4": false,
+     "bounded-invariance 2 => bounded-invariance 3": false,
+     "bounded-invariance 1 => bounded-invariance 2": false
+    },
+    "unbounded": {
+     "universality => bounded-invariance 1": true,
+     "universality => bounded-invariance 2": true,
+     "universality => bounded-invariance 3": true,
+     "universality => bounded-invariance 4": true
+    }
+   },
+   "bounded-existence": {
+    "steps": {
+     "bounded-existence 1 => bounded-existence 2": true,
+     "bounded-existence 2 => bounded-existence 3": true,
+     "bounded-existence 3 => bounded-existence 4": true
+    },
+    "reverse": {
+     "bounded-existence 2 => bounded-existence 1": false,
+     "bounded-existence 3 => bounded-existence 2": false,
+     "bounded-existence 4 => bounded-existence 3": false
+    },
+    "unbounded": {
+     "absence => bounded-existence 1": true,
+     "absence => bounded-existence 2": true,
+     "absence => bounded-existence 3": true,
+     "absence => bounded-existence 4": true
+    }
+   },
+   "bounded-recurrence": {
+    "steps": {
+     "bounded-recurrence 1 => bounded-recurrence 2": true,
+     "bounded-recurrence 2 => bounded-recurrence 3": true,
+     "bounded-recurrence 3 => bounded-recurrence 4": true
+    },
+    "reverse": {
+     "bounded-recurrence 2 => bounded-recurrence 1": false,
+     "bounded-recurrence 3 => bounded-recurrence 2": false,
+     "bounded-recurrence 4 => bounded-recurrence 3": false
+    },
+    "unbounded": {
+     "universality => bounded-recurrence 1": true,
+     "universality => bounded-recurrence 2": true,
+     "universality => bounded-recurrence 3": true,
+     "universality => bounded-recurrence 4": true,
+     "bounded-recurrence 1 => existence": true,
+     "bounded-recurrence 2 => existence": true,
+     "bounded-recurrence 3 => existence": true,
+     "bounded-recurrence 4 => existence": true
+    }
+   }
+  },
+  "between": {
+   "bounded-response": {
+    "steps": {
+     "bounded-response 1 => bounded-response 2": true,
+     "bounded-response 2 => bounded-response 3": true,
+     "bounded-response 3 => bounded-response 4": true
+    },
+    "reverse": {
+     "bounded-response 2 => bounded-response 1": false,
+     "bounded-response 3 => bounded-response 2": false,
+     "bounded-response 4 => bounded-response 3": false
+    },
+    "unbounded": {
+     "bounded-response 1 => response": true,
+     "bounded-response 2 => response": true,
+     "bounded-response 3 => response": true,
+     "bounded-response 4 => response": true
+    }
+   },
+   "bounded-invariance": {
+    "steps": {
+     "bounded-invariance 4 => bounded-invariance 3": true,
+     "bounded-invariance 3 => bounded-invariance 2": true,
+     "bounded-invariance 2 => bounded-invariance 1": true
+    },
+    "reverse": {
+     "bounded-invariance 3 => bounded-invariance 4": false,
+     "bounded-invariance 2 => bounded-invariance 3": false,
+     "bounded-invariance 1 => bounded-invariance 2": false
+    },
+    "unbounded": {
+     "universality => bounded-invariance 1": true,
+     "universality => bounded-invariance 2": true,
+     "universality => bounded-invariance 3": true,
+     "universality => bounded-invariance 4": true
+    }
+   },
+   "bounded-existence": {
+    "steps": {
+     "bounded-existence 1 => bounded-existence 2": true,
+     "bounded-existence 2 => bounded-existence 3": true,
+     "bounded-existence 3 => bounded-existence 4": true
+    },
+    "reverse": {
+     "bounded-existence 2 => bounded-existence 1": false,
+     "bounded-existence 3 => bounded-existence 2": false,
+     "bounded-existence 4 => bounded-existence 3": false
+    },
+    "unbounded": {
+     "absence => bounded-existence 1": true,
+     "absence => bounded-existence 2": true,
+     "absence => bounded-existence 3": true,
+     "absence => bounded-existence 4": true
+    }
+   },
+   "bounded-recurrence": {
+    "steps": {
+     "bounded-recurrence 1 => bounded-recurrence 2": true,
+     "bounded-recurrence 2 => bounded-recurrence 3": true,
+     "bounded-recurrence 3 => bounded-recurrence 4": true
+    },
+    "reverse": {
+     "bounded-recurrence 2 => bounded-recurrence 1": false,
+     "bounded-recurrence 3 => bounded-recurrence 2": false,
+     "bounded-recurrence 4 => bounded-recurrence 3": false
+    },
+    "unbounded": {
+     "universality => bounded-recurrence 1": true,
+     "universality => bounded-recurrence 2": true,
+     "universality => bounded-recurrence 3": true,
+     "universality => bounded-recurrence 4": true,
+     "bounded-recurrence 1 => existence": false,
+     "bounded-recurrence 2 => existence": false,
+     "bounded-recurrence 3 => existence": false,
+     "bounded-recurrence 4 => existence": false
+    }
+   }
+  },
+  "afteruntil": {
+   "bounded-response": {
+    "steps": {
+     "bounded-response 1 => bounded-response 2": true,
+     "bounded-response 2 => bounded-response 3": true,
+     "bounded-response 3 => bounded-response 4": true
+    },
+    "reverse": {
+     "bounded-response 2 => bounded-response 1": false,
+     "bounded-response 3 => bounded-response 2": false,
+     "bounded-response 4 => bounded-response 3": false
+    },
+    "unbounded": {
+     "bounded-response 1 => response": true,
+     "bounded-response 2 => response": true,
+     "bounded-response 3 => response": true,
+     "bounded-response 4 => response": true
+    }
+   },
+   "bounded-invariance": {
+    "steps": {
+     "bounded-invariance 4 => bounded-invariance 3": true,
+     "bounded-invariance 3 => bounded-invariance 2": true,
+     "bounded-invariance 2 => bounded-invariance 1": true
+    },
+    "reverse": {
+     "bounded-invariance 3 => bounded-invariance 4": false,
+     "bounded-invariance 2 => bounded-invariance 3": false,
+     "bounded-invariance 1 => bounded-invariance 2": false
+    },
+    "unbounded": {
+     "universality => bounded-invariance 1": true,
+     "universality => bounded-invariance 2": true,
+     "universality => bounded-invariance 3": true,
+     "universality => bounded-invariance 4": true
+    }
+   },
+   "bounded-existence": {
+    "steps": {
+     "bounded-existence 1 => bounded-existence 2": true,
+     "bounded-existence 2 => bounded-existence 3": true,
+     "bounded-existence 3 => bounded-existence 4": true
+    },
+    "reverse": {
+     "bounded-existence 2 => bounded-existence 1": false,
+     "bounded-existence 3 => bounded-existence 2": false,
+     "bounded-existence 4 => bounded-existence 3": false
+    },
+    "unbounded": {
+     "absence => bounded-existence 1": true,
+     "absence => bounded-existence 2": true,
+     "absence => bounded-existence 3": true,
+     "absence => bounded-existence 4": true
+    }
+   },
+   "bounded-recurrence": {
+    "steps": {
+     "bounded-recurrence 1 => bounded-recurrence 2": true,
+     "bounded-recurrence 2 => bounded-recurrence 3": true,
+     "bounded-recurrence 3 => bounded-recurrence 4": true
+    },
+    "reverse": {
+     "bounded-recurrence 2 => bounded-recurrence 1": false,
+     "bounded-recurrence 3 => bounded-recurrence 2": false,
+     "bounded-recurrence 4 => bounded-recurrence 3": false
+    },
+    "unbounded": {
+     "universality => bounded-recurrence 1": true,
+     "universality => bounded-recurrence 2": true,
+     "universality => bounded-recurrence 3": true,
+     "universality => bounded-recurrence 4": true,
+     "bounded-recurrence 1 => existence": false,
+     "bounded-recurrence 2 => existence": false,
+     "bounded-recurrence 3 => existence": false,
+     "bounded-recurrence 4 => existence": false
+    }
+   }
+  }
+ },
+ "report_prototype": {
+  "pattern_order_classes": [
+   [
+    "after",
+    "globally"
+   ],
+   [
+    "afteruntil",
+    "between"
+   ],
+   [
+    "before"
+   ]
+  ],
+  "edges": {
+   "globally": 41,
+   "before": 35,
+   "after": 41,
+   "between": 36,
+   "afteruntil": 36
+  },
+  "cross_implications": 251,
+  "joint": 0
+ },
+ "strict_bounded_recurrence": {
+  "pattern_order_classes": [
+   [
+    "after",
+    "afteruntil",
+    "between",
+    "globally"
+   ],
+   [
+    "before"
+   ]
+  ],
+  "joint": 0
+ }
+}
