@@ -81,3 +81,58 @@ Before the proofs were written, a script checked the four relations against the 
 - The chain search is incomplete, and nothing here bounds what it misses. An implication that needs a field to pass through a third value, or more than one field to move at once outside the cross step, reads as incomparable. `before m ⇒ only after m` is not a cross step: where `m` holds the before scope holds vacuously and the only-after body need not.
 - `lowerSyn` is tied to the C++ by the differential check above, which covers tick counts up to 3. Above that, the link rests on `lowerSyn` expanding bounded operators with the same recursion as the C++ loops.
 - `eval_lowerSyn`, `reach_sound` and the exact and sound theorems depend on `propext`, `Classical.choice` and `Quot.sound`. The edge theorems depend on `propext` alone.
+
+# PSP order proofs
+
+PEREDUR decides implication between PSP requirements by rule too (`psp::requirement_implies` in `src/psp/implication.cpp`, described in `docs/dev/psp.md`). Its tables are `pattern_implies`, `scope_implies` and `field_polarity`, measured with SPOT at counts 1 to 4 (`docs/dev/psp-orders.json`). The proofs in `Psp/` ask the same question as for FRETISH: does each table return true exactly when the lowering (PLAN.md D4: a body per pattern over an optional boundary, inside a wrapper per scope) of one requirement implies the other's, at every count? The answer is yes for the pattern and scope orders, at every count from 1 up, and the polarities are sound. P, S, Q and R are arbitrary predicates on positions and counts are natural numbers. The proofs use core Lean 4 with `omega` and no Mathlib.
+
+## Main results
+
+| Theorem | C++ it covers | What it says |
+|---|---|---|
+| `pattern_sound` (`Psp/PatternOrder.lean`) | `pattern_implies` | Every edge of the pattern order of a scope's class holds between whole requirements under that scope, at every count. |
+| `pattern_exact` (`Psp/Exact.lean`) | `pattern_implies` | Under every scope, for counts of at least 1, one pattern implies another over every P, S, Q and R exactly when the order of the scope's class relates them. |
+| `scope_sound` (`Psp/ScopeOrder.lean`) | `scope_implies` | Every edge of a pattern's cell holds between whole requirements, at every count. |
+| `scope_exact` (`Psp/ScopeExact.lean`) | `scope_implies` | For counts of at least 1, one scope implies another for a pattern exactly when the order of the pattern's cell relates them. |
+| `pattern_implies_exact`, `scope_implies_exact` (`Psp/Cpp.lean`) | `pattern_implies`, `scope_implies`, `scope_class`, `pattern_cell` | The transcribed C++ functions return true exactly when the implication holds, at every count the C++ accepts. |
+| `polarity_sound` (`Psp/Polarity.lean`) | `field_polarity` | Every answer holds at every count: a field the requirement does not read changes nothing, and a monotone or antitone field moves the requirement the way the table says. |
+| `reach_sound` (`Psp/Chain.lean`) | `RuleSearch` in `requirement_implies` | Every pair the six-field chain search accepts implies, given correct answers from `formula_implies` and a start that marks only fields the two requirements share. |
+| `eval_lowerSyn` (`Psp/Syntax.lean`) | `requirement_to_ltl` | The formula built as LTL syntax, branch for branch like the C++, means what the model of the lowering says. |
+
+The proofs also establish three facts that a reader of the C++ needs.
+
+- The pattern order has three scope classes: unbounded (globally, after), bounded (between, after-until) and before. Universality implies existence except under before, and bounded recurrence implies existence, response and bounded response at a count no lower only in the unbounded class, where no boundary can cut the recurrence short.
+- At count 0 distinct patterns coincide (bounded response 0 and bounded invariance 0 both say G(P → S), and bounded recurrence 0 is universality), so exactness needs counts of at least 1. The C++ loader rejects count 0.
+- The exactness theorems hold at every count, so the rule's extension of each count relation from the measured counts 1 to 4 to every count is proved, not assumed.
+
+## How the proof goes
+
+Each file named below is `Psp/<Name>.lean`.
+
+1. **Model.** `body` gives each pattern's body over a boundary B, with the unbounded body at B = false, and `lower` wraps it per scope (`Bodies`, `Scopes`).
+2. **Edges.** Each edge holds point by point before the first boundary, and bounded existence by induction over its count of alternations (`PatternOrder`). Scope edges rest on two facts: invariant and response bodies with no boundary hold again on every suffix, and invariant and precedence bodies are monotone in their boundary (`ScopeOrder`).
+3. **Non-edges.** An explicit trace refutes every pair an order leaves out, at every count (`Witness`, `Exact`, `ScopeExact`). Bounded existence uses an alternating trace with N stretches of P; the others use points and gaps placed relative to the count.
+4. **Transcriptions.** `pattern_implies`, `scope_implies` and `field_polarity` are transcribed branch for branch, and the first two are proved equal to the exact orders (`Cpp`). The polarities are proved sound (`Polarity`).
+5. **Chains.** `Search.reach` transcribes `RuleSearch` over pattern, scope, P, S, Q and R. Each step is one of the theorems above at the other fields of the current state, and soundness follows by induction (`Chain`).
+6. **Syntax.** `lowerSyn` builds the C++ formula, with the unbounded bodies in `G` and `F` and the bounded operators as `X` chains, and `eval_lowerSyn` proves it means the model (`Syntax`).
+
+## Checking the transcription against the C++
+
+| Script | What it compares | Grid | Control | Result |
+|---|---|---|---|---|
+| `check_lean_psp_lowering.py` | `lowerSyn`, printed by `PspLowering.lean`, against `build/ltl` on a `.psp` file, with `ltlfilt` deciding equivalence | 21 patterns (the bounded ones at counts 1 to 4) × 5 scopes: 105 requirements | Each Lean formula against the next requirement's C++ formula | 105 of 105 agree; 105 of 105 shifted pairs differ |
+| `check_lean_psp_orders.py` | `patternImplies`, `scopeImplies` and `fieldPolarity`, printed by `PspOrders.lean`, against `psp_pattern_order_table`, `psp_scope_order_table` and the SPOT measurements in `docs/dev/psp-orders.json` | 5 scopes × 21 × 21 patterns; 21 patterns × 5 × 5 scopes; 105 polarity cells | Each table read with stronger and weaker swapped; the polarities with P and S swapped | Patterns: 2,205 cells agree with both, 545 of them edges; 880 swapped cells differ. Scopes: 525 cells agree with both, 216 edges; 222 swapped cells differ. Polarities: 105 of 105 cells agree with SPOT; all 105 differ with P and S swapped |
+
+```sh
+cmake --build build --target ltl psp_pattern_order_table psp_scope_order_table
+nix develop '.#proofs' --command python3 scripts/check_lean_psp_lowering.py
+nix develop '.#proofs' --command python3 scripts/check_lean_psp_orders.py
+```
+
+## What is not proved for PSP
+
+- **No joint step.** The C++ search moves one field at a time because SPOT found that each of the 534 implications between requirements that differ in both pattern and scope, at counts 1 to 4, passes through one of its two middle requirements (`joint_steps` in `psp-orders.json`). This is not proved. It needs a refutation of every such pair whose two middle steps both fail, a joint exactness theorem over every pattern pair and every scope pair at every count, and the one-field witnesses of `Exact` and `ScopeExact` do not compose into those. A joint step would cost only completeness: `reach_sound` holds whatever the search misses.
+- **Polarity is sound, not exact.** Where `field_polarity` answers `None`, the proofs do not show that the field has no polarity. `check_lean_psp_orders.py` checks the table against SPOT at counts 1 to 4.
+- `Search.reach` is tied to `RuleSearch` by reading, and leaves out its memo of visited states, which can only cut a branch that already failed. `reach_sound` assumes `formula_implies` answers correctly.
+- `lowerSyn` is tied to the C++ by the differential check above at counts 1 to 4. Above that, the link rests on `lowerSyn` expanding bounded operators with the same recursion as the C++ loops.
+- `eval_lowerSyn` depends on `propext` and `Quot.sound`; the other theorems also on `Classical.choice`.
