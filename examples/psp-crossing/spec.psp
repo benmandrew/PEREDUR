@@ -1,0 +1,37 @@
+{
+  "assumptions": [
+    {
+      "pattern": "universality",
+      "scope": "globally",
+      "s": "!(near & gone)"
+    }
+  ],
+  "guarantees": [
+    {
+      "pattern": "universality",
+      "scope": "between",
+      "s": "down",
+      "q": "near",
+      "r": "gone"
+    },
+    {
+      "pattern": "absence",
+      "scope": "before",
+      "p": "down",
+      "r": "near"
+    },
+    {
+      "pattern": "universality",
+      "scope": "after",
+      "s": "alarm",
+      "q": "fault"
+    },
+    {
+      "pattern": "absence",
+      "scope": "globally",
+      "p": "alarm & down"
+    }
+  ],
+  "in_atoms": ["near", "gone", "fault"],
+  "out_atoms": ["down", "alarm"]
+}

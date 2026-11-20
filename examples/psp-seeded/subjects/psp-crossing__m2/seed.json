@@ -1,0 +1,12 @@
+{
+  "base": "psp-crossing",
+  "source": "hand-written",
+  "edit": "swap-delimiters",
+  "field": "q,r",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "Between near and gone, it is always the case that down holds.",
+  "after": "Between gone and near, it is always the case that down holds.",
+  "slot": 0,
+  "base_path": "examples/psp-crossing/fixes/exclusion-before-fault.psp"
+}

@@ -1,0 +1,12 @@
+{
+  "base": "psp-patrol",
+  "source": "hand-written",
+  "edit": "swap-signal",
+  "field": "s",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "After low until ((stop) | (start)), it is always the case that at_base holds.",
+  "after": "After low until ((stop) | (start)), it is always the case that at_goal holds.",
+  "slot": 1,
+  "base_path": "examples/psp-patrol/fixes/base-until-next-mission.psp"
+}

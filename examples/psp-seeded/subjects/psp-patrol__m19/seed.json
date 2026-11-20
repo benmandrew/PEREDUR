@@ -1,0 +1,12 @@
+{
+  "base": "psp-patrol",
+  "source": "hand-written",
+  "edit": "scope-step",
+  "field": "scope",
+  "rule": "stronger",
+  "relation": "strictly stronger than",
+  "before": "After low until ((stop) | (start)), it is always the case that at_base holds.",
+  "after": "After low, it is always the case that at_base holds.",
+  "slot": 1,
+  "base_path": "examples/psp-patrol/fixes/base-until-next-mission.psp"
+}

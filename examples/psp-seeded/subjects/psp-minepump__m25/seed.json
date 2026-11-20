@@ -1,0 +1,12 @@
+{
+  "base": "psp-minepump",
+  "source": "hand-written",
+  "edit": "narrow-field",
+  "field": "q",
+  "rule": "stronger",
+  "relation": "strictly stronger than",
+  "before": "After methane until reset, it is always the case that (!(pump)) holds.",
+  "after": "After ((methane) | (high)) until reset, it is always the case that (!(pump)) holds.",
+  "slot": 1,
+  "base_path": "examples/psp-minepump/fixes/respond-before-methane.psp"
+}

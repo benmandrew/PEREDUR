@@ -1,0 +1,12 @@
+{
+  "base": "psp-arbiter",
+  "source": "hand-written",
+  "edit": "flip-literal",
+  "field": "p",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "After start until stop, it is always the case that if (!(req)) holds, then (!(grant)) holds after at most 1 time units.",
+  "after": "After start until stop, it is always the case that if req holds, then (!(grant)) holds after at most 1 time units.",
+  "slot": 1,
+  "base_path": "examples/psp-arbiter/fixes/grant-follows-request.psp"
+}

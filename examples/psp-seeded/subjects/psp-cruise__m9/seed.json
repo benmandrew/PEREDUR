@@ -1,0 +1,12 @@
+{
+  "base": "psp-cruise",
+  "source": "hand-written",
+  "edit": "narrow-field",
+  "field": "q",
+  "rule": "stronger",
+  "relation": "strictly stronger than",
+  "before": "After set until ((brake) | (fault)), it is always the case that cruise holds.",
+  "after": "After ((set) | (slow)) until ((brake) | (fault)), it is always the case that cruise holds.",
+  "slot": 0,
+  "base_path": "examples/psp-cruise/fixes/close-on-fault.psp"
+}

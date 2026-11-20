@@ -1,0 +1,12 @@
+{
+  "base": "psp-cruise",
+  "source": "hand-written",
+  "edit": "scope-swap",
+  "field": "scope",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "After set until ((brake) | (fault)), it is always the case that cruise holds.",
+  "after": "Before ((brake) | (fault)), it is always the case that cruise holds.",
+  "slot": 0,
+  "base_path": "examples/psp-cruise/fixes/close-on-fault.psp"
+}

@@ -1,0 +1,12 @@
+{
+  "base": "psp-patrol",
+  "source": "hand-written",
+  "edit": "narrow-field",
+  "field": "s",
+  "rule": "stronger",
+  "relation": "strictly stronger than",
+  "before": "Globally, it is always the case that if at_goal holds, then start previously held.",
+  "after": "Globally, it is always the case that if at_goal holds, then ((start) & (at_base)) previously held.",
+  "slot": 3,
+  "base_path": "examples/psp-patrol/fixes/base-until-next-mission.psp"
+}

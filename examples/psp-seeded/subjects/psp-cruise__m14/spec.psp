@@ -1,0 +1,49 @@
+{
+  "assumptions": [
+    {
+      "pattern": "universality",
+      "s": "!((set) & (brake))",
+      "scope": "globally"
+    }
+  ],
+  "guarantees": [
+    {
+      "pattern": "universality",
+      "q": "set",
+      "r": "((brake) | (fault)) & (!(slow))",
+      "s": "cruise",
+      "scope": "afteruntil"
+    },
+    {
+      "p": "fault",
+      "pattern": "response",
+      "s": "!(cruise)",
+      "scope": "globally"
+    },
+    {
+      "p": "cruise",
+      "pattern": "absence",
+      "r": "set",
+      "scope": "before"
+    },
+    {
+      "count": 2,
+      "p": "slow",
+      "pattern": "bounded-response",
+      "q": "set",
+      "r": "brake",
+      "s": "throttle",
+      "scope": "between"
+    }
+  ],
+  "in_atoms": [
+    "set",
+    "brake",
+    "fault",
+    "slow"
+  ],
+  "out_atoms": [
+    "cruise",
+    "throttle"
+  ]
+}

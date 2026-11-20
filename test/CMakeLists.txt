@@ -59,6 +59,7 @@ add_executable(peredur_tests
     psp/lowering_tests.cpp
     psp/implication_tests.cpp
     psp/operators_tests.cpp
+    psp/seeding_tests.cpp
     fingerprint/lasso_tests.cpp
     fingerprint/prefilter_tests.cpp
     drivers/e2e_tests.cpp
@@ -179,6 +180,7 @@ set(peredur_test_suites
     psp_lowering
     psp_implication
     psp_operators
+    psp_seeding
     driver_peredur
     driver_realize
     driver_ltl

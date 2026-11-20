@@ -1,0 +1,45 @@
+{
+  "assumptions": [
+    {
+      "pattern": "universality",
+      "s": "!((start) & (stop))",
+      "scope": "globally"
+    }
+  ],
+  "guarantees": [
+    {
+      "pattern": "existence",
+      "q": "!(start)",
+      "r": "stop",
+      "s": "at_goal",
+      "scope": "between"
+    },
+    {
+      "pattern": "universality",
+      "q": "low",
+      "r": "(stop) | (start)",
+      "s": "at_base",
+      "scope": "afteruntil"
+    },
+    {
+      "p": "(at_goal) & (at_base)",
+      "pattern": "absence",
+      "scope": "globally"
+    },
+    {
+      "p": "at_goal",
+      "pattern": "precedence",
+      "s": "start",
+      "scope": "globally"
+    }
+  ],
+  "in_atoms": [
+    "start",
+    "stop",
+    "low"
+  ],
+  "out_atoms": [
+    "at_goal",
+    "at_base"
+  ]
+}

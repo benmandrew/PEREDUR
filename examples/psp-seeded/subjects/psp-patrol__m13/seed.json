@@ -1,0 +1,12 @@
+{
+  "base": "psp-patrol",
+  "source": "hand-written",
+  "edit": "narrow-field",
+  "field": "q",
+  "rule": "stronger",
+  "relation": "strictly stronger than",
+  "before": "Between start and stop, at_goal eventually holds.",
+  "after": "Between ((start) | (low)) and stop, at_goal eventually holds.",
+  "slot": 0,
+  "base_path": "examples/psp-patrol/fixes/base-until-next-mission.psp"
+}

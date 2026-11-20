@@ -1,0 +1,12 @@
+{
+  "base": "psp-patrol",
+  "source": "hand-written",
+  "edit": "swap-signal",
+  "field": "p",
+  "rule": "stronger",
+  "relation": "strictly stronger than",
+  "before": "Globally, it is never the case that ((at_goal) & (at_base)) holds.",
+  "after": "Globally, it is never the case that ((at_base) & (at_base)) holds.",
+  "slot": 2,
+  "base_path": "examples/psp-patrol/fixes/base-until-next-mission.psp"
+}
