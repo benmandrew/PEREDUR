@@ -1,0 +1,64 @@
+name = "2026-11-20-psp-order"
+branch = "campaign/psp-order"
+profile = "psp-order"
+description = "The order-directed mechanisms on PSP (PLAN.md P8 on feat/psp-front-end): sweep F's base, full and every no-<f> (climb, twoway in exchange mode, maximality removal, novelty; blame on in every arm) under nsga2-apportion, at the final engine's budget, on the PSP subjects of scripts/run_experiments.py (PSP_SPECS and PSP_SYNTECH_SPECS at 30 seeds, PSP_SEEDED_SPECS at 5). The pooled pass is 2026-11-20-psp-order-pooled (PLAN.md)."
+
+# Seeds pair every arm of a (spec, seed) on one host, split as
+# 2026-11-20-final-engine splits them: the specifications av2 0-14, av3
+# 15-29; the seeded corpus av2 0-2, av3 3-4. Not launched: declared on 20 Nov
+# for the user to enqueue.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+# Sweep F at the final engine's budget (2026-11-20-final-engine), the six
+# arms alone, at 2 threads a run.
+configs = "python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps F --schemes nsga2-apportion --parallel 2 --levels base,full,no-climb,no-gate,no-remove,no-novelty --out-dir experiments/configs-psp-order"
+
+# CPU windows. Every phase names its host, seeds, CPUs and memory on one
+# line, so a window moves with one substitution per host, for example
+#   sed -i '/av2 = { cpus/ s/cpus = "0-29"/cpus = "0-15"/' campaign.toml
+# and `jobs` must then shrink with it (CPUs over threads a run). CPUs 30-31
+# stay free for the Ollama server on both hosts. The windows are the
+# final engine's once its campaigns have left the hosts; set them against
+# whatever else is running at enqueue.
+
+# Subject counts are read from the registries at plan time
+# (`run_experiments.py --profile psp-order[-seeded] --dry-run`), so the counts
+# below are those of this branch on 20 Nov and grow with the registries.
+#
+# The specifications: PSP_SPECS and PSP_SYNTECH_SPECS (14 subjects here) x 6
+# arms x 15 seeds = 1,260 runs a host, 15 jobs x 2 threads. Smoke runs on psp-crossing took 40-60 s a run, so at
+# about 60 s a run this is about 42 slot-h, 1.5 h a host (+-50%; the SYNTECH17
+# imports are unmeasured beyond realize, PLAN.md).
+[[phases]]
+name = "specs-av2"
+profile = "psp-order"
+hosts = { av2 = "0-14" }
+confine = { av2 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15
+
+[[phases]]
+name = "specs-av3"
+profile = "psp-order"
+hosts = { av3 = "15-29" }
+confine = { av3 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15
+
+# The seeded corpus: PSP_SEEDED_SPECS (39 subjects here, 70 once
+# feat/psp-front-end's SYNTECH-based mutants of 6edc75e8 are merged) x 6 arms,
+# 3 seeds on av2 and 2 on av3: 702 and 468 runs at 39 subjects (about 12 and 8
+# slot-h), 1,260 and 840 at 70 (about 21 and 14 slot-h, 1.5 h and 1 h a host).
+[[phases]]
+name = "seeded-av2"
+profile = "psp-order-seeded"
+hosts = { av2 = "0-2" }
+confine = { av2 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15
+
+[[phases]]
+name = "seeded-av3"
+profile = "psp-order-seeded"
+hosts = { av3 = "3-4" }
+confine = { av3 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15

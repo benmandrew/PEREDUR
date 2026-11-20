@@ -397,6 +397,36 @@ check(("controller_reuse_min_guarantees = 10" in _toml,
 check("controller_reuse" in G.make_toml({}), False,
       "a config not overriding the store keys leaves them out")
 
+# ── PSP campaign profiles ───────────────────────────────────────────────────
+
+# The PSP campaign reads its subjects from the registries, so a subject added
+# to one joins the campaign without a hand-copied list.
+for _name, _specs, _seeds in (
+        ("psp-order", [*R.PSP_SPECS, *R.PSP_SYNTECH_SPECS], 30),
+        ("psp-order-seeded", list(R.PSP_SEEDED_SPECS), 5)):
+    _prof = P[_name]
+    check(_prof["specs"], _specs, f"{_name} runs its registries' subjects")
+    check(set(_prof["timeout_caps"]), set(_specs), f"{_name} caps every subject")
+    check(_prof["seeds"], list(range(_seeds)), f"{_name} seeds")
+    check(_prof["levels"], {"F": ["base", "full", "no-climb", "no-gate",
+                                  "no-remove", "no-novelty"]},
+          f"{_name} runs base, full and every no-<f>")
+    check(_prof["schemes"], ["nsga2-apportion"], f"{_name} scheme")
+check(P["psp-order"]["results_dir"] != P["psp-order-seeded"]["results_dir"],
+      True, "the two PSP profiles write separate result trees")
+
+# A PSP run writes repair_N.psp beside a repair_N.fitness.json sidecar; the
+# sidecars are not repairs, and the best total is read from them.
+with tempfile.TemporaryDirectory() as tmp:
+    _out = Path(tmp)
+    for _k, _total in ((1, 0.5), (2, 0.75)):
+        (_out / f"repair_{_k}.psp").write_text("{}\n")
+        (_out / f"repair_{_k}.fitness.json").write_text(
+            f'{{"total": {_total}}}\n')
+    (_out / "run.json").write_text("{}\n")
+    check(R.parse_repair_files(_out), (2, 0.75),
+          "PSP repairs are counted by .psp file, best total from the sidecar")
+
 # ── Staleness check ──────────────────────────────────────────────────────────
 
 HEAD = "c38f582109c1c3ea7fa9b935a9a37f40f0fbba99"

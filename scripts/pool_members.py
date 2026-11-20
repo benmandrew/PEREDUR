@@ -17,7 +17,8 @@ DESIGN.toml is read by scripts/pooled_design.py. For each subject, every arm
 its contrasts name is read at every seed declared for it, from
 `<root>/<results>/<run_dir>` (the group's, or the arm's `sources` entry). A member is a file named in the run's
 `accumulated/maximal.tsv` (`members = "maximal"`, the default) or one of its
-`repair_N.json` with the fitness record dropped (`members = "output"`).
+`repair_N.json` (or a PSP run's `repair_N.psp`) with the fitness record dropped
+(`members = "output"`).
 Members whose JSON is identical once its keys are sorted are one node, as in
 the 2026-10-08 FRETISH pass. Nodes are numbered in order of first appearance,
 walking arms in design order, seeds in ascending order, and each run's members
@@ -60,7 +61,9 @@ import time
 import pooled_design as D
 from common import write_manifest
 
-REPAIR = re.compile(r"^repair_(\d+)\.json$")
+# A FRETISH repair is repair_N.json; a PSP one is repair_N.psp (JSON too),
+# beside a repair_N.fitness.json sidecar the pattern leaves out.
+REPAIR = re.compile(r"^repair_(\d+)\.(?:json|psp)$")
 
 
 def run_members(run: str, source: str) -> list:

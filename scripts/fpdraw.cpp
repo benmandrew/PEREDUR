@@ -1,11 +1,13 @@
-// Scratch tool: fingerprint FRETISH repairs over targeted lasso words.
+// Scratch tool: fingerprint FRETISH or PSP repairs over targeted lasso words.
 // usage: fpdraw words max_prefix max_cycle seed max_steps threads spec list
 // Each word aims at one repair drawn uniformly from <list>: a random lasso is
 // improved by greedy bit flips (with noise) until it satisfies every live
 // assumption and guarantee of that repair, so the word lies in the repair's
 // language non-vacuously. Words that never get there are dropped. Then every
 // listed repair is fingerprinted over the kept words, printed as fpcal does.
-// Stats go to stderr.
+// Stats go to stderr. A spec (in ltl and draw mode) or a first listed repair
+// (in eval mode) ending in .psp reads every file as PSP, whose lowering
+// carries no atom prefix; otherwise every file is FRETISH JSON.
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
@@ -24,6 +26,8 @@
 #include <vector>
 
 #include "fingerprint/lasso.hpp"
+#include "psp/requirement.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "serialisation.hpp"
 
@@ -32,7 +36,8 @@ namespace {
 // FPDRAW_UNGLUE=1 rewrites a temporal letter glued to an atom (`Xiap_m`, as
 // start_of_mode emits) into `X(iap_m)`, the reading SPOT gives it; PEREDUR's
 // own parser reads the glued form as a separate, never-true atom.
-std::string spelled(const Specification& spec) {
+template <typename Spec>
+std::string spelled(const Spec& spec) {
     static const bool unglue = [] {
         const char* v = std::getenv("FPDRAW_UNGLUE");
         return v != nullptr && std::string(v) == "1";
@@ -56,10 +61,40 @@ void add_signals(const Specification& spec, std::vector<std::string>& out) {
     }
 }
 
-std::vector<std::string> requirement_ltls(const Specification& spec) {
+void add_signals(const psp::Specification& spec,
+                 std::vector<std::string>& out) {
+    for (const auto* atoms : {&spec.m_in_atoms, &spec.m_out_atoms}) {
+        for (const std::string& signal : *atoms) {
+            out.push_back(signal);
+        }
+    }
+}
+
+// The file's specification, without the fitness a FRETISH repair carries.
+template <typename Spec>
+Spec load_spec(const std::string& path);
+
+template <>
+Specification load_spec<Specification>(const std::string& path) {
+    return load_scored_specification(path).spec;
+}
+
+template <>
+psp::Specification load_spec<psp::Specification>(const std::string& path) {
+    return psp::load_specification(path);
+}
+
+bool is_psp(const std::string& path) {
+    const std::string ext = ".psp";
+    return path.size() >= ext.size() &&
+           path.compare(path.size() - ext.size(), ext.size(), ext) == 0;
+}
+
+template <typename Spec>
+std::vector<std::string> requirement_ltls(const Spec& spec) {
     std::vector<std::string> out;
     for (const auto* reqs : {&spec.m_assumptions, &spec.m_guarantees}) {
-        for (const Requirement& req : *reqs) {
+        for (const auto& req : *reqs) {
             if (!req.m_removed) {
                 out.push_back(requirement_to_ltl(req));
             }
@@ -107,12 +142,13 @@ struct Drawn {
     std::size_t n_reqs = 0;
 };
 
-Drawn draw(const std::vector<Specification>& targets,
+template <typename Spec>
+Drawn draw(const std::vector<Spec>& targets,
            const std::vector<std::string>& signals, std::size_t max_prefix,
            std::size_t max_cycle, std::size_t max_steps, std::uint64_t seed) {
     std::mt19937_64 rng(seed);
     const std::size_t target_index = rng() % targets.size();
-    const Specification& target = targets[target_index];
+    const Spec& target = targets[target_index];
     const std::vector<std::string> reqs = requirement_ltls(target);
     std::vector<std::vector<std::string>> req_atoms;
     for (const std::string& req : reqs) {
@@ -195,8 +231,9 @@ Drawn draw(const std::vector<Specification>& targets,
 }
 
 
+template <typename Spec>
 int fingerprint_all(const std::vector<std::string>& paths,
-                    const std::vector<Specification>& specs,
+                    const std::vector<Spec>& specs,
                     const std::vector<LassoWord>& words,
                     std::size_t n_threads) {
     std::atomic<std::size_t> next{0};
@@ -235,9 +272,10 @@ int fingerprint_all(const std::vector<std::string>& paths,
 }
 
 // Each live requirement's LTL, joined by the unit separator.
-std::string each(const std::vector<Requirement>& reqs) {
+template <typename Req>
+std::string each(const std::vector<Req>& reqs) {
     std::string out;
-    for (const Requirement& req : reqs) {
+    for (const Req& req : reqs) {
         if (!req.m_removed) {
             out += (out.empty() ? "" : "\x1f") + requirement_to_ltl(req);
         }
@@ -245,9 +283,10 @@ std::string each(const std::vector<Requirement>& reqs) {
     return out;
 }
 
-std::string conjunction(const std::vector<Requirement>& reqs) {
+template <typename Req>
+std::string conjunction(const std::vector<Req>& reqs) {
     std::string out;
-    for (const Requirement& req : reqs) {
+    for (const Req& req : reqs) {
         if (req.m_removed) {
             continue;
         }
@@ -258,16 +297,17 @@ std::string conjunction(const std::vector<Requirement>& reqs) {
 
 // ltl mode: "signals\t<sig> <sig>..." then per repair
 // "<path>\t<assumptions>\t<guarantees>".
+template <typename Spec>
 int print_ltl(const char* spec_path, const char* list_path) {
     std::vector<std::string> signals;
-    add_signals(load_scored_specification(spec_path).spec, signals);
+    add_signals(load_spec<Spec>(spec_path), signals);
     std::vector<std::string> rows;
     std::ifstream list(list_path);
     for (std::string line; std::getline(list, line);) {
         if (line.empty()) {
             continue;
         }
-        const Specification spec = load_scored_specification(line).spec;
+        const Spec spec = load_spec<Spec>(line);
         add_signals(spec, signals);
         rows.push_back(line + '\t' + conjunction(spec.m_assumptions) + '\t' +
                        conjunction(spec.m_guarantees) + '\t' +
@@ -288,6 +328,7 @@ int print_ltl(const char* spec_path, const char* list_path) {
 
 // eval mode: words file has one word a line, "<loop> <n> <sig>=<hexmask>...",
 // and every listed repair is fingerprinted over those words.
+template <typename Spec>
 int eval_words(const char* words_path, const char* list_path,
                std::size_t n_threads) {
     std::vector<LassoWord> words;
@@ -304,11 +345,11 @@ int eval_words(const char* words_path, const char* list_path,
         words.push_back(std::move(word));
     }
     std::vector<std::string> paths;
-    std::vector<Specification> specs;
+    std::vector<Spec> specs;
     std::ifstream list(list_path);
     for (std::string line; std::getline(list, line);) {
         if (!line.empty()) {
-            specs.push_back(load_scored_specification(line).spec);
+            specs.push_back(load_spec<Spec>(line));
             paths.push_back(line);
         }
     }
@@ -317,18 +358,9 @@ int eval_words(const char* words_path, const char* list_path,
 }
 }  // namespace
 
-int main(int argc, char** argv) {
-    if (argc == 4 && std::string(argv[1]) == "ltl") {
-        return print_ltl(argv[2], argv[3]);
-    }
-    if (argc == 5 && std::string(argv[1]) == "eval") {
-        return eval_words(argv[2], argv[3], std::stoul(argv[4]));
-    }
-    if (argc != 9) {
-        std::cerr << "usage: fpdraw words max_prefix max_cycle seed max_steps "
-                     "threads spec list\n";
-        return 2;
-    }
+// draw mode: the words, then every listed repair fingerprinted over them.
+template <typename Spec>
+int draw_words(char** argv) {
     const std::size_t n_words = std::stoul(argv[1]);
     const std::size_t max_prefix = std::stoul(argv[2]);
     const std::size_t max_cycle = std::stoul(argv[3]);
@@ -336,15 +368,15 @@ int main(int argc, char** argv) {
     const std::size_t max_steps = std::stoul(argv[5]);
     const std::size_t n_threads = std::stoul(argv[6]);
     std::vector<std::string> signals;
-    add_signals(load_scored_specification(argv[7]).spec, signals);
+    add_signals(load_spec<Spec>(argv[7]), signals);
     std::vector<std::string> paths;
-    std::vector<Specification> specs;
+    std::vector<Spec> specs;
     std::ifstream list(argv[8]);
     for (std::string line; std::getline(list, line);) {
         if (line.empty()) {
             continue;
         }
-        Specification spec = load_scored_specification(line).spec;
+        Spec spec = load_spec<Spec>(line);
         add_signals(spec, signals);
         paths.push_back(line);
         specs.push_back(std::move(spec));
@@ -391,4 +423,35 @@ int main(int argc, char** argv) {
     }
 
     return fingerprint_all(paths, specs, words, n_threads);
+}
+
+// The first non-empty line of a list file, or "".
+std::string first_listed(const char* list_path) {
+    std::ifstream list(list_path);
+    for (std::string line; std::getline(list, line);) {
+        if (!line.empty()) {
+            return line;
+        }
+    }
+    return "";
+}
+
+int main(int argc, char** argv) {
+    if (argc == 4 && std::string(argv[1]) == "ltl") {
+        return is_psp(argv[2]) ? print_ltl<psp::Specification>(argv[2], argv[3])
+                               : print_ltl<Specification>(argv[2], argv[3]);
+    }
+    if (argc == 5 && std::string(argv[1]) == "eval") {
+        const std::size_t n_threads = std::stoul(argv[4]);
+        return is_psp(first_listed(argv[3]))
+                   ? eval_words<psp::Specification>(argv[2], argv[3], n_threads)
+                   : eval_words<Specification>(argv[2], argv[3], n_threads);
+    }
+    if (argc != 9) {
+        std::cerr << "usage: fpdraw words max_prefix max_cycle seed max_steps "
+                     "threads spec list\n";
+        return 2;
+    }
+    return is_psp(argv[7]) ? draw_words<psp::Specification>(argv)
+                           : draw_words<Specification>(argv);
 }

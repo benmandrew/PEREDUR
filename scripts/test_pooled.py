@@ -792,6 +792,42 @@ finally:
     shutil.rmtree(pd_root, ignore_errors=True)
 
 
+# ── PSP members ──────────────────────────────────────────────────────────────
+
+# A PSP run writes repair_N.psp beside a repair_N.fitness.json sidecar: the
+# repairs are members, in index order, and the sidecars are not.
+import fingerprint_members as FMP  # noqa: E402
+import pool_members as PMP  # noqa: E402
+import run_experiments as REX  # noqa: E402
+
+psp_run = Path(tempfile.mkdtemp(prefix="pooled-psp-"))
+try:
+    for k in (10, 2):
+        (psp_run / f"repair_{k}.psp").write_text(json.dumps({"guarantees": [k]}))
+        (psp_run / f"repair_{k}.fitness.json").write_text('{"total": 0.5}')
+    (psp_run / "run.json").write_text("{}")
+    check(PMP.run_members(str(psp_run), "output"),
+          [("repair_2.psp", {"guarantees": [2]}),
+           ("repair_10.psp", {"guarantees": [10]})],
+          "a PSP run's members are its repair_N.psp files, sidecars left out")
+finally:
+    shutil.rmtree(psp_run, ignore_errors=True)
+
+# A registered PSP subject writes its nodes as .psp, so fpdraw and compare
+# read them as PSP, and fpdraw ltl reads its registered input; a FRETISH one
+# keeps .json and examples/<subject>/spec.json.
+if REX.PSP_SPECS:
+    psp_subject = next(iter(REX.PSP_SPECS))
+    check(Path(FMP.node_path("w", psp_subject, 3)).name, "00003.psp",
+          "a PSP subject's nodes are .psp files")
+    check(FMP.subject_input(psp_subject), REX.PSP_SPECS[psp_subject]["input"],
+          "a PSP subject's input is its registered .psp")
+check(Path(FMP.node_path("w", "fsm", 3)).name, "00003.json",
+      "a FRETISH subject's nodes stay .json")
+check(FMP.subject_input("not-a-subject"),
+      FMP.REPO_ROOT / "examples" / "not-a-subject" / "spec.json",
+      "an unregistered subject falls back to examples/<subject>/spec.json")
+
 if FAILURES:
     print(f"\n{len(FAILURES)} pooled-pass test(s) failed.")
     sys.exit(1)
