@@ -239,21 +239,30 @@ H2H_TLSF_READY: list[str] = [
 SEEDED_DIR = EXPERIMENTS_DIR / "2026-11-13-seeded-corpus"
 
 
-def _seeded_specs() -> dict[str, dict[str, Path]]:
-    listing = SEEDED_DIR / "selected.txt"
+def _seeded_specs(root: Path = SEEDED_DIR,
+                  prefix: str = "") -> dict[str, dict[str, Path]]:
+    listing = root / "selected.txt"
     if not listing.is_file():
         return {}
     names = [ln.strip() for ln in listing.read_text().splitlines()
              if ln.strip() and not ln.startswith("#")]
-    return {n: {"input": SEEDED_DIR / "subjects" / n / "spec.json",
-                "ideals_dir": SEEDED_DIR / "subjects" / n / "fixes"}
+    return {prefix + n: {"input": root / "subjects" / n / "spec.json",
+                         "ideals_dir": root / "subjects" / n / "fixes"}
             for n in names}
 
 
 SEEDED_SPECS: dict[str, dict[str, Path]] = _seeded_specs()
 
+# The sideways seeded corpus (experiments/2026-11-18-seeded-corpus-sideways),
+# as campaign/seeded-corpus-sideways registers it: the same bases, with fault
+# classes that include incomparable edits. Its subject ids repeat the old
+# corpus's, so its spec names carry the prefix "sw-" (the directories under
+# subjects/ do not). The corpus is untracked and copied into each checkout.
+SIDEWAYS_DIR = EXPERIMENTS_DIR / "2026-11-18-seeded-corpus-sideways"
+SIDEWAYS_SPECS: dict[str, dict[str, Path]] = _seeded_specs(SIDEWAYS_DIR, "sw-")
+
 SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **SEEDED_SPECS,
-                                     **TLSF_SPECS}
+                                     **SIDEWAYS_SPECS, **TLSF_SPECS}
 
 # compare runs n_repairs * n_ideals * 2 implication checks, each with compare's
 # own 20s black budget. fsm-timing (bounded-interval operators) is slow, and
@@ -721,6 +730,84 @@ PROFILES: dict[str, dict] = {
         "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb-blame",
         "results_dir": EXPERIMENTS_DIR / "results-diversity-tiebreak-blame",
         "results_csv": EXPERIMENTS_DIR / "results-diversity-tiebreak-blame.csv",
+        "default_jobs": 15,
+    },
+    # The final engine (experiments/2026-11-20-final-engine): every paper arm
+    # of sweep F at one commit. random/ holds base (the random arm) and
+    # only-climb (random+climb). The small set and rad's cores at 2 threads a
+    # run, as fretish-exchange-rerun ran them.
+    "final-engine": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-final-engine",
+        "results_dir": EXPERIMENTS_DIR / "results-final-engine",
+        "results_csv": EXPERIMENTS_DIR / "results-final-engine.csv",
+        "default_jobs": 15,
+    },
+    # The same arms on whole rad and lift-plus-cruise-full, from a tree with
+    # no parallel line, so threads are CPUs over jobs.
+    "final-engine-large": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {},
+        "specs": ["rad", "lift-plus-cruise-full"],
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in ("rad", "lift-plus-cruise-full")},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-final-engine-large",
+        "results_dir": EXPERIMENTS_DIR / "results-final-engine-large",
+        "results_csv": EXPERIMENTS_DIR / "results-final-engine-large.csv",
+        "default_jobs": 4,
+    },
+    # ventilator-controller under full, base and random alone, since every
+    # run reaches the cap; its own tree holds only those three configs.
+    "final-engine-vent": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {"F": ["base", "full"]},
+        "specs": ["ventilator-controller"],
+        "seeds": list(range(30)),
+        "timeout_caps": {"ventilator-controller": 7200},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-final-engine-vent",
+        "results_dir": EXPERIMENTS_DIR / "results-final-engine-vent",
+        "results_csv": EXPERIMENTS_DIR / "results-final-engine-vent.csv",
+        "default_jobs": 4,
+    },
+    # The sideways seeded corpus under base, full and every no-<f> and
+    # only-<f> of sweep F, no random arm, at 2 threads a run.
+    "final-engine-seeded": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {},
+        "specs": list(SIDEWAYS_SPECS),
+        "seeds": list(range(5)),
+        "timeout_caps": {s: 7200 for s in SIDEWAYS_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-final-engine",
+        "results_dir": EXPERIMENTS_DIR / "results-final-engine-seeded",
+        "results_csv": EXPERIMENTS_DIR / "results-final-engine-seeded.csv",
         "default_jobs": 15,
     },
 }

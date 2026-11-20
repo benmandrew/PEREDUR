@@ -1,0 +1,60 @@
+name = "2026-11-20-final-engine-large"
+branch = "campaign/final-engine"
+profile = "final-engine-large"
+description = "The final engine's twelve arms on lift-plus-cruise-full (seeds 0-2 and 15-17), then full, base and random on ventilator-controller (10 seeds, every run expected at the 7,200 s cap). Same commit, configs and arms as 2026-11-20-final-engine; its own entry so it can be dropped, resized or queued after the pooled passes (2026-11-20-final-engine PLAN.md)."
+
+# Seeds as 2026-11-18-fretish-exchange-rerun split them: lift-plus-cruise-full
+# av2 0-2, av3 15-17; ventilator-controller av2 0-4, av3 15-19. Not
+# launched: prepared on 20 Nov for the user to enqueue.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+# One tree per thread setting: configs-final-engine at 2 threads a run (the
+# small set, rad's cores and the seeded corpus), configs-final-engine-large
+# with no parallel line (threads are CPUs over jobs), and
+# configs-final-engine-vent with full, base and random alone. random/ holds
+# sweep F's base (random) and only-climb (random+climb).
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps F\"; $G --schemes nsga2-apportion --parallel 2 --out-dir experiments/configs-final-engine && $G --schemes random --levels base,only-climb --parallel 2 --out-dir experiments/configs-final-engine && $G --schemes nsga2-apportion --out-dir experiments/configs-final-engine-large && $G --schemes random --levels base,only-climb --out-dir experiments/configs-final-engine-large && $G --schemes nsga2-apportion --levels base,full --out-dir experiments/configs-final-engine-vent && $G --schemes random --levels base --out-dir experiments/configs-final-engine-vent'"
+
+# CPU windows. Every phase names its host, seeds, CPUs and memory on one
+# line, so a window moves with one substitution per host, for example
+#   sed -i '/av2 = { cpus/ s/cpus = "0-29"/cpus = "0-15"/' campaign.toml
+# and `jobs` must then shrink with it (CPUs over threads a run). CPUs 30-31
+# stay free for the Ollama server on both hosts.
+
+# lift-plus-cruise-full: 12 arms x 3 seeds = 36 runs a host, 3 jobs x 10
+# threads, as its earlier runs had. 45-90 min a run: about 300 slot-h, 9-10 h
+# a host. The controller store stays on here (screen 441-942 ms > 150 ms).
+[[phases]]
+name = "lpc-av2"
+profile = "final-engine-large"
+specs = ["lift-plus-cruise-full"]
+hosts = { av2 = "0-2" }
+confine = { av2 = { cpus = "0-29", memory_max = "110G" } }
+jobs = 3
+
+[[phases]]
+name = "lpc-av3"
+profile = "final-engine-large"
+specs = ["lift-plus-cruise-full"]
+hosts = { av3 = "15-17" }
+confine = { av3 = { cpus = "0-29", memory_max = "110G" } }
+jobs = 3
+
+# ventilator-controller, last: full, base and random x 5 seeds = 15 runs a
+# host at 4 threads, each expected to reach the 7,200 s cap. 120 slot-h a
+# host; 7 jobs give three rounds, 6 h.
+[[phases]]
+name = "vent-av2"
+profile = "final-engine-vent"
+hosts = { av2 = "0-4" }
+confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 7
+
+[[phases]]
+name = "vent-av3"
+profile = "final-engine-vent"
+hosts = { av3 = "15-19" }
+confine = { av3 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 7
