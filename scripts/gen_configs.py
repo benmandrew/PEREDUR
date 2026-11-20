@@ -244,13 +244,14 @@ DEFAULTS: dict = {
     # at GA_POPULATION_SIZE = 100, so the cap alone at a different population
     # buys a different number of generations for the same number of individuals.
     "max_individuals": 0,
-    # The fewest guarantees a FRETISH realizability query needs before the
-    # controller store is tried on it; 0 turns the store off. Mirrors
-    # config.hpp. Emitted into [runtime] only when a sweep overrides it (see
-    # make_toml). Sweep F pins it at 0: the store's gate reads the startup
-    # screen's ltlsynt time, so host load, not the seed, decided whether a run
-    # used it.
+    # The controller store's two gates, mirroring config.hpp: the fewest
+    # guarantees a FRETISH realizability query needs before stored
+    # controllers are tried on it (0 turns the store off), and how long the
+    # startup screen's input query must take, in ms. Emitted into [runtime]
+    # only when a sweep overrides them (see make_toml). Sweep F pins the
+    # screen gate at 150 ms (see _final_sweep).
     "controller_reuse_min_guarantees": 10,
+    "controller_reuse_min_screen_ms": 40,
     # Scoring thread pool size. 0 is make_toml's "emit nothing" sentinel rather
     # than a mirror of config.hpp, whose default is available_parallelism() and
     # so has no literal to track. Emitted into [runtime] only when positive, so
@@ -369,6 +370,9 @@ def make_toml(overrides: dict, defaults: dict = DEFAULTS) -> str:
         [f"controller_reuse_min_guarantees = "
          f"{d['controller_reuse_min_guarantees']}"]
         if "controller_reuse_min_guarantees" in overrides else []) + (
+        [f"controller_reuse_min_screen_ms = "
+         f"{d['controller_reuse_min_screen_ms']}"]
+        if "controller_reuse_min_screen_ms" in overrides else []) + (
         [f"ltlsynt_timeout_ms = {d['ltlsynt_timeout_ms']}"]
         if d.get("ltlsynt_timeout_ms") else []) + (
         [f"ltl2tgba_timeout_ms = {d['ltl2tgba_timeout_ms']}"]
@@ -570,11 +574,15 @@ def _final_sweep() -> list[tuple[str, dict]]:
     """The final engine's arms: base, full, every no-<f> and every only-<f>.
 
     Every arm states every mechanism key, on or off, so none inherits a
-    default a later commit may move. Two keys are the same in every arm:
-    blame-targeted slots are on, as an engine optimisation the ablation does
-    not vary, and the controller store is off, so that every run is fixed by
-    its seed. The random selection scheme runs base (random) and only-climb
-    (random+climb) of this sweep.
+    default a later commit may move. Blame-targeted slots are on in every
+    arm, as an engine optimisation the ablation does not vary. The controller
+    store's screen gate is 150 ms in every arm, against the default 40: its
+    gate reads the startup screen's ltlsynt time, which in
+    experiments/2026-11-18-fretish-exchange-rerun was 441-942 ms on
+    lift-plus-cruise-full (store on in every run, 69% of tries answered) and
+    at most 47 ms on every other subject, so at 150 ms host load moves no
+    subject across the gate. The random selection scheme runs base (random)
+    and only-climb (random+climb) of this sweep.
     """
     feats = dict(FINAL_FEATURES)
     k1 = dict(SWEEP_K)["full-k1"]
@@ -586,7 +594,9 @@ def _final_sweep() -> list[tuple[str, dict]]:
         "flip_tabu", "flip_sideways", "blame_realizable", "elitism_rate",
         "p_stop", "p_add_assumption", "p_remove_guarantee")}
     fixed.update({"blame_targeted_slots": True,
-                  "controller_reuse_min_guarantees": 0})
+                  "controller_reuse_min_guarantees":
+                      DEFAULTS["controller_reuse_min_guarantees"],
+                  "controller_reuse_min_screen_ms": 150})
     full = {**fixed, **full, **fixed}
     on = {k: v for f in feats.values() for k, v in f.items()}
     base = {**full, **{k: DEFAULTS[k] for k in on}}

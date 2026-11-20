@@ -377,9 +377,10 @@ check(sorted(F), sorted(["base", "full"] + [f"{d}-{n}" for d in ("no", "only")
       "sweep F holds base, full and every no-<f> and only-<f>")
 check({frozenset(lv) for lv in F.values()}, {frozenset(F["full"])},
       "every sweep F arm states the same keys")
-check({(lv["blame_targeted_slots"], lv["controller_reuse_min_guarantees"])
-       for lv in F.values()}, {(True, 0)},
-      "every sweep F arm has blame on and the controller store off")
+check({(lv["blame_targeted_slots"], lv["controller_reuse_min_guarantees"],
+        lv["controller_reuse_min_screen_ms"]) for lv in F.values()},
+      {(True, 10, 150)},
+      "every sweep F arm has blame on and the store's screen gate at 150 ms")
 check(F["full"], {**F["full"], **dict(G.SWEEP_K)["full-k1"], "novelty": True},
       "sweep F's full is full-k1 plus novelty")
 for _n, _keys in G.FINAL_FEATURES:
@@ -390,10 +391,11 @@ for _n, _keys in G.FINAL_FEATURES:
           {k: v for k, v in _keys.items() if F["base"][k] != v},
           f"only-{_n} differs from base in {_n}'s keys alone")
 _toml = G.make_toml(F["base"])
-check("controller_reuse_min_guarantees = 0" in _toml, True,
-      "a sweep F config writes the controller store off")
-check("controller_reuse_min_guarantees" in G.make_toml({}), False,
-      "a config not overriding the store key leaves it out")
+check(("controller_reuse_min_guarantees = 10" in _toml,
+       "controller_reuse_min_screen_ms = 150" in _toml), (True, True),
+      "a sweep F config writes both store gates")
+check("controller_reuse" in G.make_toml({}), False,
+      "a config not overriding the store keys leaves them out")
 
 # ── Staleness check ──────────────────────────────────────────────────────────
 
