@@ -1,0 +1,34 @@
+{
+  "assumptions": [
+    {
+      "pattern": "universality",
+      "scope": "globally",
+      "s": "!(methane & reset)"
+    }
+  ],
+  "guarantees": [
+    {
+      "pattern": "response",
+      "scope": "globally",
+      "p": "high",
+      "s": "pump"
+    },
+    {
+      "pattern": "universality",
+      "scope": "afteruntil",
+      "s": "!pump",
+      "q": "methane",
+      "r": "reset"
+    },
+    {
+      "pattern": "bounded-existence",
+      "count": 2,
+      "scope": "between",
+      "p": "pump",
+      "q": "reset",
+      "r": "methane"
+    }
+  ],
+  "in_atoms": ["high", "methane", "reset"],
+  "out_atoms": ["pump"]
+}
