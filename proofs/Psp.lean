@@ -8,3 +8,4 @@ import Psp.ScopeExact
 import Psp.Cpp
 import Psp.Polarity
 import Psp.Chain
+import Psp.Syntax
