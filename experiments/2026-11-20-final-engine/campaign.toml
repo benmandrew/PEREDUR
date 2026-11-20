@@ -13,10 +13,9 @@ build = "sh -c 'cmake --build build-release -j 8'"
 
 # One tree per thread setting: configs-final-engine at 2 threads a run (the
 # small set, rad's cores and the seeded corpus), configs-final-engine-large
-# with no parallel line (threads are CPUs over jobs), and
-# configs-final-engine-vent with full, base and random alone. random/ holds
+# with no parallel line (threads are CPUs over jobs). random/ holds
 # sweep F's base (random) and only-climb (random+climb).
-configs = "sh -c 'G=\"python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps F\"; $G --schemes nsga2-apportion --parallel 2 --out-dir experiments/configs-final-engine && $G --schemes random --levels base,only-climb --parallel 2 --out-dir experiments/configs-final-engine && $G --schemes nsga2-apportion --out-dir experiments/configs-final-engine-large && $G --schemes random --levels base,only-climb --out-dir experiments/configs-final-engine-large && $G --schemes nsga2-apportion --levels base,full --out-dir experiments/configs-final-engine-vent && $G --schemes random --levels base --out-dir experiments/configs-final-engine-vent'"
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps F\"; $G --schemes nsga2-apportion --parallel 2 --out-dir experiments/configs-final-engine && $G --schemes random --levels base,only-climb --parallel 2 --out-dir experiments/configs-final-engine && $G --schemes nsga2-apportion --out-dir experiments/configs-final-engine-large && $G --schemes random --levels base,only-climb --out-dir experiments/configs-final-engine-large'"
 
 # CPU windows. Every phase names its host, seeds, CPUs and memory on one
 # line, so a window moves with one substitution per host, for example
