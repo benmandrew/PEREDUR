@@ -1,5 +1,8 @@
 name = "fretish"
-defaultTargets = ["Fretish"]
+defaultTargets = ["Fretish", "Psp"]
 
 [[lean_lib]]
 name = "Fretish"
+
+[[lean_lib]]
+name = "Psp"
