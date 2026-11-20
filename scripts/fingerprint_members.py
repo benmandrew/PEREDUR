@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fingerprint pooled FRETISH repairs on drawn lasso words, then plan the pairs
+"""Fingerprint pooled FRETISH or PSP repairs on drawn lasso words, then plan the pairs
 that `compare` must decide.
 
     python3 scripts/fingerprint_members.py SUBJECTS.txt MEMBERS_DIR WORK_DIR OUT_DIR \\
@@ -12,9 +12,13 @@ one subject a line. For each, MEMBERS_DIR/<subject>.jsonl.gz holds its pooled
 nodes (scripts/pool_members.py), and the steps are those of the archive's
 draw (the local attempt's draw.sh, after the frontier-approx batch5.sh):
 
-1. Write each node to WORK_DIR/<subject>/nodes/<node>.json.
-2. `fpdraw ltl examples/<subject>/spec.json` over the members, each node listed
-   once per member that holds it, so a word's target is drawn by member.
+1. Write each node to WORK_DIR/<subject>/nodes/<node>.json, or <node>.psp
+   for a subject whose input is a .psp file, so that fpdraw and compare read
+   it as PSP.
+2. `fpdraw ltl <input>` over the members, each node listed once per member
+   that holds it, so a word's target is drawn by member. <input> is the
+   subject's input in run_experiments.SPECS, or examples/<subject>/spec.json
+   for a subject it does not register.
 3. scripts/draw_black.py: WORDS black lasso models at SEED, WORKERS in
    parallel.
 4. `fpdraw eval` of every node on those words (FPDRAW_UNGLUE=1 on rad-core-*
@@ -85,8 +89,21 @@ def log(*parts) -> None:
     print(time.strftime("%H:%M:%S"), *parts, flush=True)
 
 
+def subject_input(subject: str) -> Path:
+    """The subject's specification: its run_experiments.SPECS input where it
+    registers one (the seeded and PSP corpora live outside examples/<name>/),
+    else examples/<subject>/spec.json."""
+    try:
+        import run_experiments  # noqa: PLC0415
+        spec = run_experiments.SPECS.get(subject)
+    except Exception:  # noqa: BLE001 - a registry that fails to load is no registry
+        spec = None
+    return Path(spec["input"]) if spec else REPO_ROOT / "examples" / subject / "spec.json"
+
+
 def node_path(work: str, subject: str, node: int) -> str:
-    return os.path.join(work, subject, "nodes", f"{node:05d}.json")
+    ext = ".psp" if subject_input(subject).suffix == ".psp" else ".json"
+    return os.path.join(work, subject, "nodes", f"{node:05d}{ext}")
 
 
 def write_whole(path: str, text: str) -> None:
@@ -198,7 +215,7 @@ def do_subject(subject: str, args, env: dict) -> dict:
         lines = [paths[k] + "\n" for k, n in enumerate(nodes)
                  for _ in range(len(n["members"]))]
         write_whole(draw_list, "".join(lines))
-        spec = str(REPO_ROOT / "examples" / subject / "spec.json")
+        spec = str(subject_input(subject))
         run_to(ltl, [args.fpdraw, "ltl", spec, draw_list], env,
                os.path.join(sdir, "ltl.err"))
     words = os.path.join(sdir, "words")
