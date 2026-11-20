@@ -60,6 +60,8 @@ Versions 2 to 63 are in "Run manifest schema versions" in `docs/dev/history.md`.
 - **73** records the new `[mutation] slot_coverage` key in `config` and adds the `slot_coverage` block (`draws`, `weighted`), both zero at the default `false`, which behaves as at 72.
 - **74** records the new `[genetic] spread_init` key in `config` and adds the `spread_init` block (`targets`, `seeded`, `failed`), all zero at the default `false`, which behaves as at 73.
 - **75** records the new `[mutation] flip_tabu` and `flip_sideways` keys in `config` and adds the `flip_lineage` block (`flips`, `tabu`, `skipped`, `fallbacks`, `sideways`, `sideways_kept`), all zero at the default `flip_tabu = 0`, which behaves as at 74.
+- **76** is taken by the port of `[genetic] maximality_removal` on `campaign/diversity-climb` (48884d5b), which this branch does not hold.
+- **77** records the new `[genetic] novelty_tiebreak` key in `config` and adds the `novelty_tiebreak` block (`sorts`, `evaluations`, `reordered`, `survivors_changed`), all zero at the default `false`, which behaves as at 75 (or 76). Under the key the `novelty` block counts the tie-break's evaluations and rule checks.
 
 ## Where the campaign records are
 

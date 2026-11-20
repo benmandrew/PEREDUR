@@ -58,6 +58,9 @@ crowding = "objective"
 # FRETISH only, under nsga2-apportion: minimise the number of accumulated repairs
 # that rule-imply a realizable candidate. Off by default.
 novelty = false
+# FRETISH only, under nsga2-apportion: order each front by the novelty count,
+# then by crowding. Not with novelty. Off by default.
+novelty_tiebreak = false
 # FRETISH only: seed the population with one-step weakenings of the original
 # spread over its refused guarantees and its assumptions. Off by default.
 spread_init = false

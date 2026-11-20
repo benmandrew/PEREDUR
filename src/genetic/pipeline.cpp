@@ -290,8 +290,10 @@ std::vector<bool> demotion_flags(
 
 /// The NSGA-II options the diversity keys ask for over @p population, which
 /// must outlive the sort: under `genetic.crowding = "specification"`, crowding
-/// by farthest-point order under specification_distance, and under
-/// `genetic.novelty` the novelty objective. Empty where every key is at its
+/// by farthest-point order under specification_distance, under
+/// `genetic.novelty` the novelty objective, and under
+/// `genetic.novelty_tiebreak` the novelty count as the key before crowding
+/// within a front. Empty where every key is at its
 /// default or @p Spec is not FRETISH. Draws nothing.
 template <typename Spec>
 Nsga2Options selection_options(
@@ -311,6 +313,14 @@ Nsga2Options selection_options(
             options.extra_objective = novelty_objective(
                 *ctx.m_diversity, population, ctx.m_status_objective);
         }
+        if (ctx.m_cfg.novelty_tiebreak && ctx.m_diversity != nullptr) {
+            NoveltyTiebreakStats::n_sorts++;
+            NoveltyTiebreakStats::n_evaluations += population.size();
+            // novelty_objective is minus the count, so higher is better as
+            // the tie-break key reads it.
+            options.tiebreak = novelty_objective(*ctx.m_diversity, population,
+                                                 ctx.m_status_objective);
+        }
     }
     return options;
 }
@@ -329,8 +339,13 @@ void stage_order_parents(GenerationContext<Spec>& ctx) {
     if (uses_nsga2_ranking(ctx.m_cfg)) {
         // The rule is applied again here, or a candidate demoted at the last
         // selection would breed and stand as an elite from its old front.
-        nsga2_sort(ctx.m_scored, demotion_flags(ctx, ctx.m_scored),
-                   selection_options(ctx, ctx.m_scored));
+        Nsga2Options options = selection_options(ctx, ctx.m_scored);
+        TiebreakReport report;
+        options.report = &report;
+        nsga2_sort(ctx.m_scored, demotion_flags(ctx, ctx.m_scored), options);
+        if (report.reordered) {
+            NoveltyTiebreakStats::n_reordered++;
+        }
         return;
     }
     order_population(ctx.m_cfg, ctx.m_scored);
@@ -505,7 +520,17 @@ void stage_select(GenerationContext<Spec>& ctx) {
     const std::vector<bool> demoted = demotion_flags(ctx, pool);
     DemotionStats::n_demoted += static_cast<std::size_t>(
         std::count(demoted.begin(), demoted.end(), true));
-    nsga2_sort(pool, demoted, selection_options(ctx, pool));
+    Nsga2Options options = selection_options(ctx, pool);
+    TiebreakReport report;
+    options.report = &report;
+    options.keep = ctx.m_target_size;
+    nsga2_sort(pool, demoted, options);
+    if (report.reordered) {
+        NoveltyTiebreakStats::n_reordered++;
+    }
+    if (report.kept_changed) {
+        NoveltyTiebreakStats::n_survivors_changed++;
+    }
 
     if (pool.size() > ctx.m_target_size) {
         if (std::is_same_v<Spec, Specification> &&

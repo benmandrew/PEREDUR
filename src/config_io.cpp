@@ -300,6 +300,17 @@ void require_elitism_below_selection(const Config& cfg) {
     }
 }
 
+// The tie-breaker is the novelty count used within a front alone; with the
+// novelty objective also on, the count would both rank and break ties, which
+// is neither arm. Rejected rather than one silently winning.
+void require_one_novelty_mode(const Config& cfg) {
+    if (cfg.novelty && cfg.novelty_tiebreak) {
+        throw std::runtime_error(
+            "config: genetic.novelty and genetic.novelty_tiebreak cannot both "
+            "be true");
+    }
+}
+
 Config apply_toml(const toml::table& tbl) {
     warn_unknown_keys(tbl, config_key_spec(), "");
     Config cfg;
@@ -313,6 +324,8 @@ Config apply_toml(const toml::table& tbl) {
             require_termination_budget(cfg);
         } else if (entry.member == ConfigMember{&Config::selection_scheme}) {
             require_elitism_below_selection(cfg);
+        } else if (entry.member == ConfigMember{&Config::novelty_tiebreak}) {
+            require_one_novelty_mode(cfg);
         }
     }
     return cfg;

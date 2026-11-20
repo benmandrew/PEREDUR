@@ -149,6 +149,21 @@ TEST(test_config_io_elitism_not_less_than_selection_throws) {
         "elitism_rate");
 }
 
+TEST(test_config_io_novelty_with_novelty_tiebreak_throws) {
+    expect(!Config{}.novelty_tiebreak,
+           "config_io: novelty_tiebreak should default to off");
+    expect(config_from_toml_string("[genetic]\nnovelty_tiebreak = true\n")
+               .novelty_tiebreak,
+           "config_io: novelty_tiebreak should be parsed from TOML");
+    expect_throws(
+        [&] {
+            config_from_toml_string(
+                "[genetic]\nnovelty = true\nnovelty_tiebreak = true\n");
+        },
+        "config_io: novelty with novelty_tiebreak should throw",
+        "novelty_tiebreak");
+}
+
 // An enum-valued key: its default, every spelling it accepts, and one it
 // rejects. The default is read both from a bare Config and from a file that
 // omits the key, since an archived config inherits it either way.

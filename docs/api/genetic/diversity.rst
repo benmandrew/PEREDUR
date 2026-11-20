@@ -11,6 +11,10 @@ The FRETISH mechanisms that spread the search over unlike repairs, each behind a
 
 ``novelty_objective``
   The extra objective ``genetic.novelty`` ranks by: minus that count for a realizable candidate, 0 for an unrealizable one.
+  ``genetic.novelty_tiebreak`` reads the same values as the key that orders each front before crowding (``Nsga2Options::tiebreak`` in ``nsga2.hpp``).
+
+``NoveltyTiebreakStats``
+  What ``genetic.novelty_tiebreak`` did: the sorts it ordered, the values it read, and how often the order or the survivors differed from crowding alone.
 
 ``SlotCoverage``
   For ``mutation.slot_coverage``, how many members of M edit each slot of the original. ``DiversityState::slot_coverage`` brings it up to date once per generation, and mutation weights its slot draw by ``1 / (1 + c)``.

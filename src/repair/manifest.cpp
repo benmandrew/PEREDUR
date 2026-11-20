@@ -55,7 +55,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 75;
+constexpr int k_schema_version = 77;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -501,6 +501,16 @@ void write_run_manifest(const std::string& output_dir,
           {"checks", NoveltyStats::n_checks.load()},
           {"implied", NoveltyStats::n_implied.load()},
           {"covered", NoveltyStats::n_covered.load()}}},
+        // What genetic.novelty_tiebreak did: sorts ordered by the novelty
+        // count within each front, the values read there, the sorts whose
+        // order and the survivor selections whose kept set differ from
+        // crowding alone. Zero whenever the key is off.
+        {"novelty_tiebreak",
+         {{"sorts", NoveltyTiebreakStats::n_sorts.load()},
+          {"evaluations", NoveltyTiebreakStats::n_evaluations.load()},
+          {"reordered", NoveltyTiebreakStats::n_reordered.load()},
+          {"survivors_changed",
+           NoveltyTiebreakStats::n_survivors_changed.load()}}},
         // What mutation.slot_coverage did: slot draws made with coverage
         // counts, and those whose unequal weights replaced the uniform draw.
         // Zero whenever the key is off.

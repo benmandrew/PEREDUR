@@ -179,6 +179,12 @@ struct Config {
     /// candidate, and 0 for an unrealizable one (see "Diversity mechanisms" in
     /// docs/dev/algorithm.md). Off by default. Draws nothing.
     bool novelty = false;
+    /// Under NSGA-II on the FRETISH path, order each front by the novelty
+    /// count first (fewer accumulated repairs rule-implying a realizable
+    /// candidate ranks better), then by crowding (see "Diversity mechanisms" in
+    /// docs/dev/algorithm.md). Ranking across fronts is unchanged. Off by
+    /// default; refused together with novelty. Draws nothing.
+    bool novelty_tiebreak = false;
     /// FRETISH only: seed the search with the original plus one-step
     /// weakenings spread round-robin over the guarantees its MRS walk refused
     /// and its weakenable assumptions, in place of population_size copies of

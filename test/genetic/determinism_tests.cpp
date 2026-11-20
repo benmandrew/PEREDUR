@@ -154,6 +154,7 @@ Config golden_config() {
     // default fails here rather than re-recording.
     cfg.crowding = Crowding::Objective;
     cfg.novelty = false;
+    cfg.novelty_tiebreak = false;
     cfg.slot_coverage = false;
     cfg.spread_init = false;
     cfg.flip_tabu = 0;

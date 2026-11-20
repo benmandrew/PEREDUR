@@ -265,6 +265,12 @@ void print_diagnostics_report() {
               << NoveltyStats::n_implied << " proved), "
               << NoveltyStats::n_covered
               << " realizable candidates implied by a repair\n";
+    std::cout << "Novelty tie-break: " << NoveltyTiebreakStats::n_sorts
+              << " sorts, " << NoveltyTiebreakStats::n_evaluations
+              << " evaluations, " << NoveltyTiebreakStats::n_reordered
+              << " reordered against crowding alone, "
+              << NoveltyTiebreakStats::n_survivors_changed
+              << " survivor sets changed\n";
     std::cout << "Slot coverage: " << SlotCoverageStats::n_draws
               << " slot draws with coverage counts, "
               << SlotCoverageStats::n_weighted << " weighted\n";

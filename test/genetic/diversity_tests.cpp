@@ -428,3 +428,74 @@ TEST(test_flip_sideways_keeps_only_incomparable_rewrites) {
 }
 
 }  // namespace
+
+namespace {
+
+// --- novelty tie-break ---
+
+Scored<Specification> scored_at(Specification spec, double first,
+                                double second) {
+    Scored<Specification> scored;
+    scored.specification = std::move(spec);
+    scored.objectives = {1.0, first, second};
+    return scored;
+}
+
+std::vector<double> firsts(const std::vector<Scored<Specification>>& pop) {
+    std::vector<double> values;
+    for (const Scored<Specification>& scored : pop) {
+        values.push_back(scored.objectives[1]);
+    }
+    return values;
+}
+
+TEST(test_novelty_tiebreak_orders_a_front_before_crowding) {
+    const Specification strong({}, {guarantee0(), guarantee1()}, inputs(),
+                               outputs());
+    const Specification gutted({}, {guarantee0(), removed(guarantee1())},
+                               inputs(), outputs());
+    const Specification other({}, {make_req("b", "x"), guarantee1()}, inputs(),
+                              outputs());
+    const std::vector<Specification> accumulated = {strong};
+    // Four realizable members on one front (first + second = 4) and one
+    // dominated member. The front's extremes are first = 0, which a found
+    // repair implies, and first = 4; first = 2 is less crowded than 1.
+    const std::vector<Scored<Specification>> population = {
+        scored_at(gutted, 0.0, 4.0), scored_at(other, 1.0, 3.0),
+        scored_at(other, 2.0, 2.0), scored_at(other, 4.0, 0.0),
+        scored_at(other, 0.5, 2.5)};
+
+    std::vector<Scored<Specification>> by_crowding = population;
+    nsga2_sort(by_crowding);
+    expect(firsts(by_crowding) == std::vector<double>{0.0, 4.0, 2.0, 1.0, 0.5},
+           "novelty_tiebreak: crowding alone puts both extremes first");
+
+    DiversityState state(&accumulated);
+    std::vector<Scored<Specification>> tiebroken = population;
+    Nsga2Options options;
+    options.tiebreak = novelty_objective(state, tiebroken, 0);
+    TiebreakReport report;
+    options.report = &report;
+    options.keep = 1;
+    nsga2_sort(tiebroken, {}, options);
+    expect(firsts(tiebroken) == std::vector<double>{4.0, 2.0, 1.0, 0.0, 0.5},
+           "novelty_tiebreak: the implied member drops to the end of its "
+           "front, the rest keep their crowding order, and the dominated "
+           "member stays in the next front");
+    expect(tiebroken[3].rank == 0 && tiebroken[4].rank == 1,
+           "novelty_tiebreak: ranks are unchanged");
+    expect(report.reordered && report.kept_changed,
+           "novelty_tiebreak: the report sees the new order and the new "
+           "first member");
+
+    // Where the key ties throughout, the order is crowding's.
+    Nsga2Options flat;
+    flat.tiebreak.assign(population.size(), 0.0);
+    flat.report = &report;
+    std::vector<Scored<Specification>> untouched = population;
+    nsga2_sort(untouched, {}, flat);
+    expect(firsts(untouched) == firsts(by_crowding) && !report.reordered,
+           "novelty_tiebreak: a constant key leaves crowding's order");
+}
+
+}  // namespace
