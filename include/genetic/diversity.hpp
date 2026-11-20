@@ -105,6 +105,20 @@ struct SlotFlips {
 /// A lineage's flips per slot, carried from parent to offspring.
 using Lineage = std::map<SlotKey, SlotFlips>;
 
+/// What `genetic.novelty_tiebreak` did over a run. Reported under
+/// `--diagnostics` and in run.json; zero whenever the key is off. The rule
+/// checks behind its values count in NoveltyStats, as novelty's do.
+struct NoveltyTiebreakStats {
+    /// Sorts whose fronts were ordered by the novelty count first.
+    inline static std::atomic<std::size_t> n_sorts{0};
+    /// Novelty values read for a population member at those sorts.
+    inline static std::atomic<std::size_t> n_evaluations{0};
+    /// Of the sorts, those whose order differs from crowding alone.
+    inline static std::atomic<std::size_t> n_reordered{0};
+    /// Survivor selections that kept another set than crowding alone would.
+    inline static std::atomic<std::size_t> n_survivors_changed{0};
+};
+
 /// The run-scoped state the FRETISH diversity mechanisms keep across
 /// generations. One per run, owned by the generation loop and lent to each
 /// generation; nothing in it draws from the RandomSource.

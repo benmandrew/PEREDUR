@@ -14,6 +14,7 @@
 #include <cassert>
 #include <cstddef>
 #include <functional>
+#include <utility>
 #include <vector>
 
 #include "genetic/scored.hpp"
@@ -63,6 +64,15 @@ using PairDistance = std::function<double(std::size_t, std::size_t)>;
 std::vector<double> farthest_point_scores(const std::vector<std::size_t>& ranks,
                                           const PairDistance& distance);
 
+/// What Nsga2Options::tiebreak changed in one sort, against the order the
+/// same sort gives by rank and crowding alone.
+struct TiebreakReport {
+    /// Some member stands at another position.
+    bool reordered = false;
+    /// The first Nsga2Options::keep members are another set.
+    bool kept_changed = false;
+};
+
 /// Optional changes to how nsga2_sort ranks and spreads a population. The
 /// default changes nothing.
 struct Nsga2Options {
@@ -73,7 +83,27 @@ struct Nsga2Options {
     /// Where set, crowding is farthest_point_scores under this distance in
     /// place of crowding_distances.
     PairDistance distance;
+    /// Where non-empty, one within-front key per element (higher is better),
+    /// compared after the rank and before crowding, which then only breaks
+    /// its ties. Takes no part in ranking or crowding.
+    std::vector<double> tiebreak;
+    /// Where set alongside @c tiebreak, receives what the key changed against
+    /// the order by rank and crowding alone.
+    TiebreakReport* report = nullptr;
+    /// The number of leading members the caller keeps, read for the report;
+    /// 0 where it keeps them all.
+    std::size_t keep = 0;
 };
+
+/// The crowded-comparison order of @p ranks and @p crowding, both one per
+/// element: indices by rank ascending, then by @p tiebreak descending where
+/// it is non-empty, then by crowding descending, stably. Fills @p report, where
+/// given, against the order without @p tiebreak.
+std::vector<std::size_t> tiebroken_order(const std::vector<std::size_t>& ranks,
+                                         const std::vector<double>& crowding,
+                                         const std::vector<double>& tiebreak,
+                                         TiebreakReport* report,
+                                         std::size_t keep);
 
 /// Each element's per-objective vector, in population order: the matrix the
 /// free functions above take.
@@ -99,8 +129,9 @@ std::vector<std::vector<double>> objectives_of(
 /// in, and a 1 / (1 + rank) apportionment reads its demoted rank. An empty
 /// @p demoted demotes nothing; otherwise it is one flag per element.
 ///
-/// @p options may add an objective and replace the crowding measure (see
-/// Nsga2Options); its default leaves the sort as above.
+/// @p options may add an objective, replace the crowding measure and put a key
+/// before crowding within each front (see Nsga2Options); its default leaves the
+/// sort as above.
 template <typename Spec>
 void nsga2_sort(std::vector<Scored<Spec>>& population,
                 const std::vector<bool>& demoted = {},
@@ -128,6 +159,18 @@ void nsga2_sort(std::vector<Scored<Spec>>& population,
     for (std::size_t i = 0; i < population.size(); ++i) {
         population[i].rank = ranks[i];
         population[i].crowding_distance = distances[i];
+    }
+    if (!options.tiebreak.empty()) {
+        assert(options.tiebreak.size() == population.size());
+        const std::vector<std::size_t> order = tiebroken_order(
+            ranks, distances, options.tiebreak, options.report, options.keep);
+        std::vector<Scored<Spec>> sorted;
+        sorted.reserve(population.size());
+        for (const std::size_t i : order) {
+            sorted.push_back(std::move(population[i]));
+        }
+        population = std::move(sorted);
+        return;
     }
     std::stable_sort(population.begin(), population.end(),
                      [](const Scored<Spec>& lhs, const Scored<Spec>& rhs) {

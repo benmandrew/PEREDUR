@@ -44,7 +44,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 60> k_config_keys{{
+inline constexpr std::array<ConfigKey, 61> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -190,6 +190,17 @@ inline constexpr std::array<ConfigKey, 60> k_config_keys{{
      "FRETISH only, under nsga2-apportion: minimise the number of accumulated "
      "repairs\n"
      "that rule-imply a realizable candidate. Off by default.\n"},
+    {"genetic", "novelty_tiebreak", &Config::novelty_tiebreak, KeyCheck::None,
+     KeyReader::Fretish,
+     "Under nsga2-apportion, order the members of each non-domination front "
+     "by the novelty count first (fewer accumulated repairs that the "
+     "implication rule proves imply a realizable candidate ranks better) and "
+     "by crowding second. Ranking across fronts and the objectives are "
+     "unchanged. Cannot be combined with genetic.novelty. Draws nothing. "
+     "FRETISH only.",
+     "FRETISH only, under nsga2-apportion: order each front by the novelty "
+     "count,\n"
+     "then by crowding. Not with novelty. Off by default.\n"},
     {"genetic", "spread_init", &Config::spread_init, KeyCheck::None,
      KeyReader::Fretish,
      "Seed the first generation with the original plus one-step weakenings "

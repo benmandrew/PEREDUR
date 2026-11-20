@@ -137,6 +137,8 @@ All three schemes still emit the weighted-average scalar in each repair's fitnes
 
 ``genetic.maximality_removal`` (``false``) removes each candidate the rule flags from the survivor pool instead of demoting it, so it keeps no slot even when the pool is smaller than ``population_size``. The stronger candidate stays. It requires ``maximality_demotion = true``.
 
+``genetic.novelty`` and ``genetic.novelty_tiebreak`` (both ``false``) use one count under ``nsga2-apportion`` on FRETISH runs: the number of repairs already accumulated that the implication rule proves imply a realizable candidate. A candidate with a higher count adds less that is new. ``novelty`` adds minus the count as a fourth objective for ranking. ``novelty_tiebreak`` keeps the three objectives and the fronts, and uses the count only to order the members of each front: a lower count goes first, and crowding distance orders the members with equal counts. This order is what parent selection and survivor truncation read. The two keys cannot both be on, and a config that sets both is an error. See "Diversity mechanisms" in ``docs/dev/algorithm.md``.
+
 Search size and operators
 -------------------------
 

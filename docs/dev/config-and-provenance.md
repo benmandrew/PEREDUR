@@ -61,6 +61,7 @@ Versions 2 to 63 are in "Run manifest schema versions" in `docs/dev/history.md`.
 - **74** records the new `[genetic] spread_init` key in `config` and adds the `spread_init` block (`targets`, `seeded`, `failed`), all zero at the default `false`, which behaves as at 73.
 - **75** records the new `[mutation] flip_tabu` and `flip_sideways` keys in `config` and adds the `flip_lineage` block (`flips`, `tabu`, `skipped`, `fallbacks`, `sideways`, `sideways_kept`), all zero at the default `flip_tabu = 0`, which behaves as at 74.
 - **76** added `config.genetic.maximality_removal`, `n_maximality_removals`, `n_maximality_removal_fallbacks` (selections where removal would have emptied the pool and demoted instead) and the `survivor_selection` object (`selections`, `truncated`, `replicated`, `pool_size_sum`). The removal count reads 0 with the key off, which is the default; `survivor_selection` is counted on every `nsga2-apportion` run and reads 0 under the other schemes. None of them moves a draw. See "Maximality demotion" in `docs/dev/algorithm.md`.
+- **77** records the new `[genetic] novelty_tiebreak` key in `config` and adds the `novelty_tiebreak` block (`sorts`, `evaluations`, `reordered`, `survivors_changed`), all zero at the default `false`, which behaves as at 76. Under the key the `novelty` block counts the tie-break's evaluations and rule checks.
 
 ## Where the campaign records are
 
