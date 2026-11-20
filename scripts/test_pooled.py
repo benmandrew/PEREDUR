@@ -736,6 +736,48 @@ contrasts = [
           "an arm identical to base run for run reads as base's own control")
     check_true(trows[0]["b_in_a"] < 1.0,
                "and the shared seeds do not count as overlap")
+    # The seed-half reach control. n0 is held at seeds 0 and 1, so in both
+    # halves; n1 at seed 0 alone, n2 at seed 1 alone, and n1 strictly implies
+    # n2. The halves' joint front is {n0, n1}: the even half holds both, the
+    # odd half n0 alone.
+    import joint_measures as JM  # noqa: E402
+    hnodes = [{"node": 0, "arms": ["x/a"],
+               "members": [["x/a", 0, "f"], ["x/a", 1, "f"]]},
+              {"node": 1, "arms": ["x/a"], "members": [["x/a", 0, "f"]]},
+              {"node": 2, "arms": ["x/a"], "members": [["x/a", 1, "f"]]}]
+    hV = {(1, 2): "1", (2, 1): "0", (0, 1): "0", (1, 0): "0",
+          (0, 2): "0", (2, 0): "0"}
+    hbits = [0b0011, 0b0100, 0b1100]
+    got = JM.half_control(hnodes, hbits, hV, "x/a", {"sampled": False}, None, 4)
+    check(got, {"even": 1.0, "odd": 0.5, "control": 0.75, "joint_front": 2},
+          "each half's reach is on the joint front of the two halves, and the "
+          "control is their mean")
+    got = JM.half_control(hnodes, hbits, hV, "x/a",
+                          {"sampled": True, "draws": 3}, {"x/a": [2, 1, 0]}, 4)
+    check(got, {"even": 1.0, "odd": 0.5, "control": 0.75, "joint_front": 2},
+          "the sampled estimator agrees when every node is drawn")
+    lone = [dict(n, members=[["x/a", 0, "f"]]) for n in hnodes]
+    check(JM.half_control(lone, hbits, hV, "x/a", {"sampled": False}, None,
+                          4)["control"], None,
+          "an arm with no odd seed has no control")
+    jout = pd_root / "joint"
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / "joint_measures.py"), str(design),
+         str(pmembers), str(collected), str(jout), "--half-control"],
+        capture_output=True, text=True)
+    check(proc.returncode, 0, f"joint_measures.py --half-control exits 0: "
+                              f"{proc.stderr}")
+    crow = list(csv.DictReader(open(jout / "half-control.csv", newline="")))
+    check((len(crow), {r["control"] for r in crow}), (6, {""}),
+          "a row per subject and arm, blank where an arm's odd seed is empty")
+    check_true("reach control, odd against even seeds" in
+               (jout / "summary.txt").read_text(),
+               "and the summary reports the control")
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / "joint_measures.py"), str(design),
+         str(pmembers), str(collected), str(jout), "--half-control",
+         "--share-only"], capture_output=True, text=True)
+    check(proc.returncode, 2, "--half-control with --share-only is refused")
     proc = subprocess.run(
         [sys.executable, str(POOLED_REDUCE_PY), str(design), str(pmembers),
          str(collected), str(rout), "--pooled-only", "--pooled-draws", "2"],

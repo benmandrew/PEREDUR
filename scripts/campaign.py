@@ -1798,6 +1798,7 @@ REDUCE_PATH_KEYS = ("design", "members", "outputs", "collected", "out")
 REDUCE_FLAG_KEYS = ("pooled_balls", "pooled_only", "no_balls")
 REDUCE_PHASE_KEYS = {"name", "kind", "host", "sources", "confine", "jobs",
                      "ball_k", "pooled_draws", "joint", "share_only",
+                     "half_control",
                      *REDUCE_PATH_KEYS, *REDUCE_FLAG_KEYS}
 KIND_PHASE_KEYS = {"run": RUN_PHASE_KEYS, "score": SCORE_PHASE_KEYS,
                    "compare": COMPARE_PHASE_KEYS,
@@ -2452,7 +2453,7 @@ def normalise_reduce_phase(phase: dict, where: str, campaign: str,
     if paths["out"][0] != "experiments" or len(paths["out"]) < 2:
         raise CampaignError(f"{where}: out = {record['out']!r} must lie under "
                             f"experiments/, where `collect --outputs` reads")
-    for key in (*REDUCE_FLAG_KEYS, "joint", "share_only"):
+    for key in (*REDUCE_FLAG_KEYS, "joint", "share_only", "half_control"):
         value = phase.get(key, False)
         if not isinstance(value, bool):
             raise CampaignError(f"{where}: {key} must be true or false")
@@ -2464,6 +2465,11 @@ def normalise_reduce_phase(phase: dict, where: str, campaign: str,
     if record["share_only"] and not record["joint"]:
         raise CampaignError(f"{where}: share_only is a joint_measures.py "
                             f"option, and joint is false")
+    if record["half_control"] and (record["share_only"]
+                                   or not record["joint"]):
+        raise CampaignError(f"{where}: half_control is joint_measures.py's "
+                            f"reach control, so it needs joint = true and "
+                            f"share_only = false")
     for key, default in (("jobs", 1), ("pooled_draws", None)):
         value = phase.get(key, default)
         if value is not None and (isinstance(value, bool)
@@ -2687,7 +2693,8 @@ def joint_phase_args(phase: dict) -> list:
     other's summary.txt."""
     args = [phase["design"], phase["members"], phase["collected"],
             f"{phase['out']}/joint"]
-    return args + (["--share-only"] if phase.get("share_only") else [])
+    return (args + (["--share-only"] if phase.get("share_only") else [])
+            + (["--half-control"] if phase.get("half_control") else []))
 
 
 def reduce_steps(phase: dict) -> list:

@@ -22,6 +22,14 @@ Pairs of arms are compared on the paired difference over subjects with the
 exact Wilcoxon signed-rank p, Holm over the pairs, and the Hodges-Lehmann
 shift with its exact 95% interval. Exhaustive subjects make the main result;
 sampled subjects are reported apart.
+
+With --half-control, each arm's seeds also split by parity into two
+half-pools, as pooled_reduce.py --pooled-balls splits them, and each half's
+reach is measured on the joint front of the two halves alone. An arm's
+control is the mean of its two halves' reaches: the reach that seed noise
+alone leaves one sample of the arm short of another. A node held at seeds of
+both parities is in both halves. Writes OUT_DIR/half-control.csv and a
+section of summary.txt.
 """
 
 import argparse
@@ -92,7 +100,10 @@ def exhaustive(nodes, bits, V, arms, nwords):
     return score, reach, len(front), {a: len(fronts[a]) for a in arms}
 
 
-def sampled(nodes, bits, V, arms, rec, orders, nwords):
+def sampled(nodes, bits, V, arms, rec, orders, nwords, merge_shared=False):
+    """With merge_shared, a node two arms both drew joins the joint front
+    once, as the exhaustive estimator merges it; the seed-half control needs
+    this, since its halves share many nodes."""
     pool = {a: [n["node"] for n in nodes if a in n["arms"]] for a in arms}
     draws = {}
     for a in arms:
@@ -109,12 +120,15 @@ def sampled(nodes, bits, V, arms, rec, orders, nwords):
     score = {a: (statistics.median(bits[x].bit_count() / nwords
                                    for x, _ in sorted(set(draws[a])))
                  if draws[a] else None) for a in arms}
-    jf = []
+    jf, seen = [], set()
     for a in arms:
         for x, size in draws[a]:
+            if merge_shared and x in seen:
+                continue
             if not any(strictly(V, y, x) for b in arms if b != a
                        for y in pool[b] if y != x):
                 jf.append((x, 1 / size))
+                seen.add(x)
     reach = {}
     total = sum(w for _, w in jf)
     for a in arms:
@@ -147,6 +161,68 @@ def share_only(nodes, bits, V, rec, sdir, nwords):
                                    for c in f) if f else None)
              for a, f in fronts.items()},
             {a: len(f) for a, f in fronts.items()})
+
+
+HALVES = (("even", 0), ("odd", 1))
+
+
+def half_label(arm: str, half: str) -> str:
+    return f"{arm}#{half}"
+
+
+def half_nodes(nodes: list, arm: str) -> list:
+    """The subject's nodes relabelled so that each of `arm`'s seed halves is
+    an arm of its own; nodes the arm does not hold are dropped."""
+    out = []
+    for n in nodes:
+        held = [half_label(arm, h) for h, p in HALVES
+                if any(m[0] == arm and m[1] % 2 == p for m in n["members"])]
+        if held:
+            out.append({**n, "arms": held})
+    return out
+
+
+def half_control(nodes, bits, V, arm, rec, orders, nwords) -> dict:
+    """One arm's odd-against-even reach control on one subject: each half's
+    reach on the joint front of the two halves, their mean, and that front's
+    size."""
+    halves = half_nodes(nodes, arm)
+    labels = [half_label(arm, h) for h, _ in HALVES]
+    if rec["sampled"]:
+        held = {lab: {n["node"] for n in halves if lab in n["arms"]}
+                for lab in labels}
+        drawn = orders[arm][:rec["draws"]]
+        sub_orders = {lab: [x for x in drawn if x in held[lab]]
+                      for lab in labels}
+        _, reach, nfront, _ = sampled(halves, bits, V, labels, rec,
+                                      sub_orders, nwords, merge_shared=True)
+        reach = {lab: (reach[lab] if held[lab] else None) for lab in labels}
+    else:
+        _, reach, nfront, _ = exhaustive(halves, bits, V, labels, nwords)
+    got = [reach[lab] for lab in labels]
+    control = (None if any(r is None for r in got)
+               else sum(got) / len(got))
+    return {"even": got[0], "odd": got[1], "control": control,
+            "joint_front": nfront}
+
+
+def control_report(rows: list, arms: list) -> str:
+    """Each arm's odd-against-even reach control beside its reach, as the
+    median over subjects."""
+    lines = []
+    for label, sub in (("exhaustive subjects",
+                        [r for r in rows if not r["sampled"]]),
+                       ("all subjects", rows)):
+        lines.append(f"== reach control, odd against even seeds, {label} "
+                     f"(median over subjects)")
+        for a in arms:
+            ctl = [r["control"][a]["control"] for r in sub
+                   if r["control"][a]["control"] is not None]
+            rch = [r["reach"][a] for r in sub if r["reach"][a] is not None]
+            med = (lambda v: f"{statistics.median(v):.4f}" if v else "   n/a")
+            lines.append(f"  {short(a):>16} n={len(ctl):2d} control "
+                         f"{med(ctl)}  reach {med(rch)}")
+    return "\n".join(lines) + "\n"
 
 
 def hodges_lehmann(d: list) -> tuple:
@@ -217,7 +293,12 @@ def main(argv=None) -> int:
                     help="measure 1 alone, for a pass whose design contrasts "
                          "only some pairs of arms, so the joint front is "
                          "not decided")
+    ap.add_argument("--half-control", action="store_true",
+                    help="also measure each arm's odd-against-even seed-half "
+                         "reach control")
     args = ap.parse_args(argv)
+    if args.half_control and args.share_only:
+        ap.error("--half-control measures reach, which --share-only skips")
     design = D.load_design(args.design)
     by = R.load_rows(args.collected)
     rows = []
@@ -229,6 +310,7 @@ def main(argv=None) -> int:
         nwords = words(sdir)
         V, _ = R.verdicts(by.get(name, {}))
         arms = arms or list(rec["arms"])
+        orders = None
         if args.share_only:
             score, nf = share_only(nodes, bits, V, rec, sdir, nwords)
             reach, nfront = dict.fromkeys(rec["arms"]), ""
@@ -239,9 +321,12 @@ def main(argv=None) -> int:
         else:
             score, reach, nfront, nf = exhaustive(nodes, bits, V, rec["arms"],
                                                   nwords)
+        control = ({a: half_control(nodes, bits, V, a, rec, orders, nwords)
+                    for a in rec["arms"]} if args.half_control else None)
         rows.append({"subject": name, "sampled": rec["sampled"],
                      "words": nwords, "joint_front": nfront,
-                     "score": score, "reach": reach, "front": nf})
+                     "score": score, "reach": reach, "front": nf,
+                     "control": control})
         print(f"{name}: joint front {nfront}, "
               + " ".join(f"{short(a)}={score.get(a)}" for a in rec["arms"]),
               flush=True)
@@ -256,6 +341,19 @@ def main(argv=None) -> int:
                             r["joint_front"], short(a), r["front"][a],
                             "" if r["score"][a] is None else round(r["score"][a], 6),
                             "" if r["reach"][a] is None else round(r["reach"][a], 4)])
+    if args.half_control:
+        with open(os.path.join(args.out, "half-control.csv"), "w",
+                  newline="") as h:
+            w = csv.writer(h)
+            w.writerow(["subject", "sampled", "arm", "joint_front",
+                        "reach_even", "reach_odd", "control"])
+            for r in rows:
+                for a in sorted(r["control"]):
+                    c = r["control"][a]
+                    w.writerow([r["subject"], int(r["sampled"]), short(a),
+                                c["joint_front"]]
+                               + ["" if c[k] is None else round(c[k], 4)
+                                  for k in ("even", "odd", "control")])
     exh = [r for r in rows if not r["sampled"]]
     text = ""
     for label, sub in (("exhaustive subjects", exh), ("all subjects", rows)):
@@ -267,6 +365,8 @@ def main(argv=None) -> int:
         text += fmt(compare(sub, arms, "reach", False),
                     f"measure 3, joint-front reach, {label}",
                     "HL in share of the joint front")
+    if args.half_control:
+        text += control_report(rows, arms)
     with open(os.path.join(args.out, "summary.txt"), "w") as h:
         h.write(text)
     print(text, end="")

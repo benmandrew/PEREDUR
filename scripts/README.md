@@ -20,7 +20,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `catalogue.py` | Checks and renders `experiments/catalogue.toml`, which records what each result set under `experiments/` is: the paper it serves, the question, whether it is cited or superseded, and where it lives. `check` fails on an uncatalogued entry; `render` writes `experiments/CATALOGUE.md`. |
 | `pooled_design.py` | Reads the TOML design of a pooled pass (arms, seeds, contrasts) that `pool_members.py`, `fingerprint_members.py` and `pooled_reduce.py` share. |
 | `pooled_reduce.py` | Reduces a pooled pass's collected fingerprints and verdicts to strength and ball-radii tables, with Holm-corrected signed-rank tests. Run locally, or on a host by a `kind = "reduce"` phase. |
-| `joint_measures.py` | Computes accepted-trace share and joint-front reach from the same inputs as `pooled_reduce.py`, with signed-rank tests and Hodges–Lehmann shifts. Run locally, or on a host by a `kind = "reduce"` phase with `joint = true`. |
+| `joint_measures.py` | Computes accepted-trace share and joint-front reach from the same inputs as `pooled_reduce.py`, with signed-rank tests and Hodges–Lehmann shifts, and with `--half-control` each arm's odd-against-even seed-half reach control. Run locally, or on a host by a `kind = "reduce"` phase with `joint = true`. |
 | `gen_configs.py` | Writes the config tree a sweep runs over. Vendored likewise. |
 | `merge_experiments.py` | Joins per-host CSVs on `KEY_FIELDS`, keeping one row per key. Vendored likewise. |
 | `common.py` | Helpers several scripts share: `write_manifest`, `git_field`, `load_nodes` and `lean_output`. A script vendored into a campaign archive takes it along. |

@@ -1654,6 +1654,9 @@ phases = [ { kind = "fingerprint", subjects = "s-{host}.txt", members = "m", wor
              "experiments/x-reduced-av2/joint"])],
           "pooled_reduce.py then joint_measures.py, on one gathered tree, the "
           "joint tables in a directory of their own")
+    check(C.joint_phase_args({**red, "half_control": True})[-1],
+          "--half-control",
+          "half_control = true passes joint_measures.py --half-control")
     check_true(C.phase_command(red, [], "av2").startswith(C.REDUCE_CMD + " "),
                "and its command is pooled_reduce.py's")
     check(C.confine_prefix(red, "av2", "u"),
@@ -1706,6 +1709,13 @@ phases = [ { kind = "fingerprint", subjects = "s-{host}.txt", members = "m", wor
         ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
          'collected = "experiments/c", out = "experiments/r", share_only = true',
          "joint is false", "share_only without joint"),
+        ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r", half_control = true',
+         "needs joint = true", "half_control without joint"),
+        ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
+         'collected = "experiments/c", out = "experiments/r", joint = true, '
+         'share_only = true, half_control = true',
+         "needs joint = true", "half_control with share_only"),
         ('host = "av2", design = "d", members = "m", outputs = "experiments/o", '
          'collected = "experiments/c", out = "experiments/r", jobs = 0',
          "jobs must be a positive integer", "zero jobs"),
