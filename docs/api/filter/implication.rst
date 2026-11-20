@@ -13,4 +13,4 @@ Population filters based on the logical implication partial order between specif
 
 ``ImplicationFilterStats`` exposes atomic counters for comparisons, skips, duplicates, and timeouts from the most recent implication-filter sweep.
 
-.. doxygenfile:: implication.hpp
+.. doxygenfile:: filter/implication.hpp
