@@ -19,6 +19,10 @@
 #include "genetic/order_moves.hpp"
 #include "genetic/ordered_language.hpp"
 #include "prop_formula.hpp"
+#include "psp/mutation.hpp"
+#include "psp/ordered_language.hpp"
+#include "psp/requirement.hpp"
+#include "psp/specification.hpp"
 
 namespace {
 
@@ -791,11 +795,13 @@ namespace {
 // Appends @p offset plus the index of each requirement in @p reqs that is
 // weakenable and not removed. Rewriting or removing a removed requirement
 // spends the operator on content nothing reads.
-void append_live_weakenable(const std::vector<Requirement>& reqs,
-                            std::size_t offset,
-                            std::vector<std::size_t>& indices) {
+template <typename Spec>
+void append_live_weakenable(
+    const std::vector<typename OrderedLanguage<Spec>::Requirement>& reqs,
+    std::size_t offset, std::vector<std::size_t>& indices) {
+    using Language = OrderedLanguage<Spec>;
     for (std::size_t i = 0; i < reqs.size(); ++i) {
-        if (reqs[i].m_weakenable && !reqs[i].m_removed) {
+        if (Language::is_weakenable(reqs[i]) && Language::is_live(reqs[i])) {
             indices.push_back(offset + i);
         }
     }
@@ -803,12 +809,12 @@ void append_live_weakenable(const std::vector<Requirement>& reqs,
 
 // Global indices (assumptions first, then guarantees) of requirements that may
 // be mutated.
-std::vector<std::size_t> collect_weakenable_indices(
-    const Specification& specification) {
+template <typename Spec>
+std::vector<std::size_t> collect_weakenable_indices(const Spec& specification) {
     std::vector<std::size_t> indices;
-    append_live_weakenable(specification.m_assumptions, 0, indices);
-    append_live_weakenable(specification.m_guarantees,
-                           specification.m_assumptions.size(), indices);
+    append_live_weakenable<Spec>(specification.m_assumptions, 0, indices);
+    append_live_weakenable<Spec>(specification.m_guarantees,
+                                 specification.m_assumptions.size(), indices);
     return indices;
 }
 
@@ -910,12 +916,56 @@ Specification add_assumption(const Specification& specification,
                          specification.m_modes);
 }
 
+// The PSP mirror of add_assumption above: `globally, whenever <literal|true>
+// holds, <input literal> eventually holds`, the response pattern under the
+// globally scope, which lowers to the same G(c -> F r). The draws are those
+// of the FRETISH operator, in the same order.
+psp::Specification add_assumption(const psp::Specification& specification,
+                                  const RandomSource& random_source,
+                                  const Config& cfg) {
+    const std::vector<std::string>& inputs = specification.m_in_atoms;
+    if (inputs.empty()) {
+        return specification;
+    }
+    Formula response =
+        Formula::make_atom(inputs[random_source.next_index(inputs.size())]);
+    if (random_source.next_bool()) {
+        response = Formula::make_unary(Formula::Kind::Not, response);
+    }
+    std::vector<std::string> pool = specification.m_in_atoms;
+    pool.insert(pool.end(), specification.m_out_atoms.begin(),
+                specification.m_out_atoms.end());
+    Formula condition = add_assumption_condition(pool, random_source,
+                                                 cfg.p_conditional_assumption);
+    if (condition == response) {
+        condition = Formula::make_unary(Formula::Kind::Not, condition);
+        condition.remove_double_negation();
+    }
+    std::vector<psp::Requirement> assumptions = specification.m_assumptions;
+    assumptions.emplace_back(psp::pattern::Response{},
+                             psp::PspScopeKind::Globally, std::move(condition),
+                             std::move(response));
+    return psp::Specification(
+        std::move(assumptions), specification.m_guarantees,
+        specification.m_in_atoms, specification.m_out_atoms);
+}
+
 // Guarantee slots that removal may take: weakenable, and not already removed.
+template <typename Spec>
 std::vector<std::size_t> removable_guarantee_indices(
-    const Specification& specification) {
+    const Spec& specification) {
     std::vector<std::size_t> indices;
-    append_live_weakenable(specification.m_guarantees, 0, indices);
+    append_live_weakenable<Spec>(specification.m_guarantees, 0, indices);
     return indices;
+}
+
+template <typename Spec>
+std::size_t count_live_guarantees(const Spec& specification) {
+    using Language = OrderedLanguage<Spec>;
+    const auto& guarantees = Language::guarantees(specification);
+    return static_cast<std::size_t>(
+        std::count_if(guarantees.begin(), guarantees.end(),
+                      [](const auto& req) { return Language::is_live(req); }));
 }
 
 // Deletes one guarantee by tombstoning it in place. The slot stays so that
@@ -924,24 +974,28 @@ std::vector<std::size_t> removable_guarantee_indices(
 // The mirror of add_assumption: that one strengthens the environment, this one
 // weakens the system's obligations, and some repairs are only reachable by
 // dropping a guarantee outright.
-Specification remove_guarantee(const Specification& specification,
-                               const std::vector<std::size_t>& removable,
-                               const RandomSource& random_source) {
+template <typename Spec>
+Spec remove_guarantee(const Spec& specification,
+                      const std::vector<std::size_t>& removable,
+                      const RandomSource& random_source) {
+    using Language = OrderedLanguage<Spec>;
     assert(!removable.empty());
-    std::vector<Requirement> guarantees = specification.m_guarantees;
+    std::vector<typename Language::Requirement> guarantees =
+        Language::guarantees(specification);
     const std::size_t choice =
         removable[random_source.next_index(removable.size())];
     guarantees[choice].m_removed = true;
-    return Specification(specification.m_assumptions, std::move(guarantees),
-                         specification.m_in_atoms, specification.m_out_atoms,
-                         specification.m_modes);
+    return Language::with_slots(specification,
+                                Language::assumptions(specification),
+                                std::move(guarantees));
 }
 
 // The structural actions, tried before any rewrite: the specification with an
 // assumption added or a guarantee removed, or nothing where neither fired.
-std::optional<Specification> structural_action(
-    const Specification& specification, const RandomSource& random_source,
-    const Config& cfg, StepScale scale) {
+template <typename Spec>
+std::optional<Spec> structural_action(const Spec& specification,
+                                      const RandomSource& random_source,
+                                      const Config& cfg, StepScale scale) {
     // Low-probability structural action: add a new environment assumption. The
     // Specification constructor deduplicates, so re-adding an existing
     // assumption is a harmless no-op. Available only when the specification
@@ -967,7 +1021,7 @@ std::optional<Specification> structural_action(
             scale.m_factor.has_value()
                 ? scaled_share(cfg.p_remove_guarantee, *scale.m_factor)
                 : cfg.p_remove_guarantee;
-        if (!removable.empty() && count_live(specification.m_guarantees) > 1 &&
+        if (!removable.empty() && count_live_guarantees(specification) > 1 &&
             random_source.next_real() < rate) {
             if (scale.m_factor.has_value()) {
                 StepScalingStats::n_large++;
@@ -1334,6 +1388,9 @@ std::vector<std::size_t> targeted_mutation_slots(
 template std::vector<std::size_t> targeted_mutation_slots(
     const Specification&, const std::vector<std::size_t>&, const ParentContext&,
     const Config&);
+template std::vector<std::size_t> targeted_mutation_slots(
+    const psp::Specification&, const std::vector<std::size_t>&,
+    const ParentContextT<psp::Specification>&, const Config&);
 
 namespace {
 
@@ -1359,33 +1416,41 @@ void narrow_by_blame(const Spec& specification,
 
 }  // namespace
 
-Specification mutate_specification(const Specification& specification,
-                                   const RandomSource& random_source,
-                                   const Config& cfg,
-                                   const ParentContext* parent, bool* stepped) {
+namespace {
+
+// The whole-specification mutation of every language with an OrderedLanguage:
+// a structural action, two-way mutation, blame narrowing and one slot
+// rewrite. FRETISH and PSP each instantiate it.
+template <typename Spec>
+Spec mutate_specification_impl(const Spec& specification,
+                               const RandomSource& random_source,
+                               const Config& cfg,
+                               const ParentContextT<Spec>* parent,
+                               bool* stepped) {
+    using Language = OrderedLanguage<Spec>;
+    using Req = typename Language::Requirement;
     assert(random_source);
     MutationStats::n_mutations++;
     report(stepped, false);
-    const std::size_t n_assumptions = specification.m_assumptions.size();
-    assert(n_assumptions + specification.m_guarantees.size() > 0);
+    const std::size_t n_assumptions =
+        Language::assumptions(specification).size();
+    assert(n_assumptions + Language::guarantees(specification).size() > 0);
     const Gate gate = gate_of(cfg, parent);
     const StepScale scale = step_scale(cfg, parent);
     // Both structural actions weaken the specification, so a realizable parent
     // under the gate skips them before their draws.
     const bool strengthening = gate == Gate::Strengthen;
-    std::optional<Specification> acted =
+    std::optional<Spec> acted =
         strengthening
             ? std::nullopt
             : structural_action(specification, random_source, cfg, scale);
     if (acted.has_value()) {
         return std::move(*acted);
     }
-    std::vector<std::string> atoms;
-    atoms.insert(atoms.end(), specification.m_in_atoms.begin(),
-                 specification.m_in_atoms.end());
-    atoms.insert(atoms.end(), specification.m_out_atoms.begin(),
-                 specification.m_out_atoms.end());
-    const std::vector<Timing> timing_pool = collect_timing_pool(specification);
+    const typename Language::PoolData pool_data =
+        Language::pool_data(specification);
+    const typename Language::MutationPools pools =
+        Language::pools_of(pool_data);
     std::vector<std::size_t> weakenable_indices =
         collect_weakenable_indices(specification);
     // How a realizable parent strengthens; Towards for every other parent, so
@@ -1395,17 +1460,14 @@ Specification mutate_specification(const Specification& specification,
     // A realizable parent's strengthenings, each proved by classify_move and
     // moving one field, tombstone or appended assumption back towards the
     // original. Empty without the gate, and under Free, which takes none.
-    BackSteps<Specification> back =
-        strengthening && mode != GateRealizable::Free
-            ? steps_back(specification, parent, cfg)
-            : BackSteps<Specification>{};
-    const std::vector<Step>& steps = back.m_steps;
+    BackSteps<Spec> back = strengthening && mode != GateRealizable::Free
+                               ? steps_back(specification, parent, cfg)
+                               : BackSteps<Spec>{};
+    const std::vector<typename Language::Step>& steps = back.m_steps;
     if (weakenable_indices.empty() && steps.empty()) {
         return specification;
     }
     if (mode == GateRealizable::Exchange && parent->original != nullptr) {
-        const OrderedLanguage<Specification>::MutationPools pools{atoms,
-                                                                  timing_pool};
         return exchange(specification, back, weakenable_indices,
                         *parent->original, pools, random_source, cfg, scale,
                         stepped, parent);
@@ -1423,8 +1485,8 @@ Specification mutate_specification(const Specification& specification,
         return take_step(back, choice, stepped);
     }
     const std::size_t idx = weakenable_indices[choice - steps.size()];
-    std::vector<Requirement> assumptions = specification.m_assumptions;
-    std::vector<Requirement> guarantees = specification.m_guarantees;
+    std::vector<Req> assumptions = Language::assumptions(specification);
+    std::vector<Req> guarantees = Language::guarantees(specification);
     // Weakening the assume-guarantee specification means weakening a guarantee
     // but *strengthening* an assumption, so the direction follows the side. It
     // was a config flag until 2026-08-26, kept only so the two directions could
@@ -1434,47 +1496,33 @@ Specification mutate_specification(const Specification& specification,
     const Direction direction = is_assumption != strengthening
                                     ? Direction::Strengthen
                                     : Direction::Weaken;
-    // An existing assumption draws from the same pool as a freshly added one,
-    // inputs plus outputs, as guarantees do.
-    const std::vector<std::string>& mutation_atoms = atoms;
-    if (mutation_atoms.empty()) {
-        // Without atoms, mutate_formula's structural rewrites cannot draw a
-        // replacement atom; leave the specification unchanged.
+    // Without atoms, mutate_formula's structural rewrites cannot draw a
+    // replacement atom; leave the specification unchanged. An existing
+    // assumption draws from the same pool as a freshly added one, inputs plus
+    // outputs, as guarantees do; which atoms a trigger may draw from is the
+    // language's own (see OrderedLanguage<Specification>::mutate_slot).
+    if (!Language::can_rewrite(pools)) {
         return specification;
     }
-    // Triggers are evaluated at the current timepoint, where the current state
-    // is available through input atoms; output atoms denote the next state, so
-    // letting one into a trigger produces a self-referential guard the
-    // synthesiser can vacuously discharge. Draw trigger atoms from inputs only.
-    // Fall back to the mutation pool when there are no inputs, since mutation
-    // cannot then draw an atom for a trigger at all — and that fallback is the
-    // second route an output could reach an assumption, so it falls back to the
-    // gated pool rather than to the full one.
-    const std::vector<std::string>& condition_atoms =
-        specification.m_in_atoms.empty() ? mutation_atoms
-                                         : specification.m_in_atoms;
     // Both requirement lists live behind the same mutate-then-dedup-check
     // logic; pick the target and its local index so that logic appears once.
-    // Exactly one mutate_requirement call happens either way, keeping the RNG
-    // draw sequence (and thus seed reproducibility) identical to the two-arm
-    // form.
-    std::vector<Requirement>& target = is_assumption ? assumptions : guarantees;
+    // Exactly one slot rewrite happens either way, keeping the RNG draw
+    // sequence (and thus seed reproducibility) identical to the two-arm form.
+    std::vector<Req>& target = is_assumption ? assumptions : guarantees;
     const std::size_t local_idx = is_assumption ? idx : idx - n_assumptions;
     bool free_rewrite = false;
     const bool sideways = sideways_slot(parent, cfg, idx);
-    target[local_idx] = mutate_requirement_tracked(
-        target[local_idx], mutation_atoms, condition_atoms, direction,
-        timing_pool, specification.m_modes, random_source,
+    target[local_idx] = Language::mutate_slot(
+        target[local_idx], specification, pools, direction, random_source,
         sideways || (strengthening && mode == GateRealizable::Towards)
-            ? OrderedLanguage<Specification>::free_rewrite_rates(cfg)
+            ? Language::free_rewrite_rates(cfg)
             : cfg,
         &free_rewrite, scale);
     if (creates_duplicate(target, local_idx)) {
         return specification;
     }
-    Specification mutated(std::move(assumptions), std::move(guarantees),
-                          specification.m_in_atoms, specification.m_out_atoms,
-                          specification.m_modes);
+    Spec mutated = Language::with_slots(specification, std::move(assumptions),
+                                        std::move(guarantees));
     if (sideways && !sideways_kept(specification, mutated)) {
         return specification;
     }
@@ -1488,10 +1536,55 @@ Specification mutate_specification(const Specification& specification,
     return mutated;
 }
 
+}  // namespace
+
+Specification mutate_specification(const Specification& specification,
+                                   const RandomSource& random_source,
+                                   const Config& cfg,
+                                   const ParentContext* parent, bool* stepped) {
+    return mutate_specification_impl(specification, random_source, cfg, parent,
+                                     stepped);
+}
+
+psp::Specification psp::mutate_specification(
+    const psp::Specification& specification, const RandomSource& random_source,
+    const Config& cfg, const ParentContextT<psp::Specification>* parent,
+    bool* stepped) {
+    return mutate_specification_impl(specification, random_source, cfg, parent,
+                                     stepped);
+}
+
 namespace {
 
 std::mutex g_step_pending_mutex;
 std::vector<Specification> g_step_pending;
+std::vector<psp::Specification> g_psp_step_pending;
+
+// Counts the offspring in @p pending that @p scored proves realizable, and
+// clears @p pending.
+template <typename Spec>
+void settle_steps(const std::vector<Scored<Spec>>& scored,
+                  std::optional<std::size_t> status_index,
+                  std::vector<Spec>& pending) {
+    if (pending.empty()) {
+        return;
+    }
+    if (status_index.has_value()) {
+        std::unordered_set<Spec> realizable;
+        for (const Scored<Spec>& entry : scored) {
+            if (*status_index < entry.objectives.size() &&
+                entry.objectives[*status_index] >= k_status_realizable) {
+                realizable.insert(entry.specification);
+            }
+        }
+        for (const Spec& offspring : pending) {
+            if (realizable.count(offspring) != 0) {
+                DirectionGateStats::n_steps_realizable++;
+            }
+        }
+    }
+    pending.clear();
+}
 
 }  // namespace
 
@@ -1508,22 +1601,21 @@ void DirectionGateStats::settle(
     const std::vector<Scored<Specification>>& scored,
     std::optional<std::size_t> status_index) {
     const std::scoped_lock lock(g_step_pending_mutex);
-    if (g_step_pending.empty()) {
+    settle_steps(scored, status_index, g_step_pending);
+}
+
+void DirectionGateStats::note_offspring(bool stepped,
+                                        const psp::Specification& offspring) {
+    if (!stepped) {
         return;
     }
-    if (status_index.has_value()) {
-        std::unordered_set<Specification> realizable;
-        for (const Scored<Specification>& entry : scored) {
-            if (*status_index < entry.objectives.size() &&
-                entry.objectives[*status_index] >= k_status_realizable) {
-                realizable.insert(entry.specification);
-            }
-        }
-        for (const Specification& offspring : g_step_pending) {
-            if (realizable.count(offspring) != 0) {
-                n_steps_realizable++;
-            }
-        }
-    }
-    g_step_pending.clear();
+    const std::scoped_lock lock(g_step_pending_mutex);
+    g_psp_step_pending.push_back(offspring);
+}
+
+void DirectionGateStats::settle(
+    const std::vector<Scored<psp::Specification>>& scored,
+    std::optional<std::size_t> status_index) {
+    const std::scoped_lock lock(g_step_pending_mutex);
+    settle_steps(scored, status_index, g_psp_step_pending);
 }

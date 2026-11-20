@@ -81,13 +81,13 @@ int main(int argc, const char* const argv[]) {
     }
     const std::optional<std::string> format_arg =
         parse_string_arg(argc, argv, "--format");
-    const std::optional<bool> is_tlsf =
-        resolve_is_tlsf(format_arg, *input_path);
-    if (!is_tlsf.has_value()) {
-        // resolve_is_tlsf only declines when --format was given, so the
+    const std::optional<RepairInput> format =
+        resolve_input_format(format_arg, *input_path);
+    if (!format.has_value()) {
+        // resolve_input_format only declines when --format was given, so the
         // fallback here is unreachable; it is what lets the access be checked.
         std::cerr << "Unknown --format value: '" << format_arg.value_or("")
-                  << "' (expected 'fretish' or 'tlsf')\n";
+                  << "' (expected 'fretish', 'tlsf' or 'psp')\n";
         return 1;
     }
     const std::optional<std::string> seed_arg =
@@ -101,6 +101,13 @@ int main(int argc, const char* const argv[]) {
             return 1;
         }
     }
-    return *is_tlsf ? run_tlsf_repair(cfg, *input_path, *output_dir, seed)
-                    : run_fretish_repair(cfg, *input_path, *output_dir, seed);
+    switch (*format) {
+        case RepairInput::Tlsf:
+            return run_tlsf_repair(cfg, *input_path, *output_dir, seed);
+        case RepairInput::Psp:
+            return run_psp_repair(cfg, *input_path, *output_dir, seed);
+        case RepairInput::Fretish:
+            break;
+    }
+    return run_fretish_repair(cfg, *input_path, *output_dir, seed);
 }

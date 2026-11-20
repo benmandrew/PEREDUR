@@ -58,6 +58,7 @@ add_executable(peredur_tests
     tlsf/pipeline_tests.cpp
     psp/lowering_tests.cpp
     psp/implication_tests.cpp
+    psp/operators_tests.cpp
     fingerprint/lasso_tests.cpp
     fingerprint/prefilter_tests.cpp
     drivers/e2e_tests.cpp
@@ -177,6 +178,7 @@ set(peredur_test_suites
     tlsf_pipeline
     psp_lowering
     psp_implication
+    psp_operators
     driver_peredur
     driver_realize
     driver_ltl

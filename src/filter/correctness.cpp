@@ -5,6 +5,8 @@
 
 #include "filter/vacuity.hpp"
 #include "filter/well_separation.hpp"
+#include "psp/fitness.hpp"
+#include "psp/specification.hpp"
 #include "tlsf/filter.hpp"
 #include "tlsf/specification.hpp"
 
@@ -16,6 +18,10 @@ bool is_vacuous(const Specification& spec, SatisfiabilityChecker& sat) {
 
 bool is_vacuous(const tlsf::Specification& spec, SatisfiabilityChecker& sat) {
     return tlsf_is_vacuous(spec, sat);
+}
+
+bool is_vacuous(const psp::Specification& spec, SatisfiabilityChecker& sat) {
+    return psp::specification_is_vacuous(spec, sat);
 }
 
 }  // namespace
@@ -60,3 +66,6 @@ correctness_checks<Specification>(SatisfiabilityChecker&,
 template std::vector<CorrectnessCheckT<tlsf::Specification>>
 correctness_checks<tlsf::Specification>(SatisfiabilityChecker&,
                                         RealizabilityChecker&);
+template std::vector<CorrectnessCheckT<psp::Specification>>
+correctness_checks<psp::Specification>(SatisfiabilityChecker&,
+                                       RealizabilityChecker&);

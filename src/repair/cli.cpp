@@ -11,8 +11,9 @@ void print_help(const char* prog) {
         << " --input <spec> --output-dir <dir> [--seed <n>]\n"
         << "\n"
         << "Repair an unrealisable reactive specification using a genetic\n"
-        << "algorithm. The input is either FRETISH requirements as JSON or a\n"
-        << "TLSF specification; the algorithm evolves a population of\n"
+        << "algorithm. The input is FRETISH requirements as JSON, a TLSF\n"
+        << "specification or a PSP specification; the algorithm evolves a\n"
+        << "population of\n"
         << "candidate repairs, scoring each by syntactic similarity, semantic\n"
         << "similarity, and LTL realisability.\n"
         << "\n"
@@ -22,19 +23,20 @@ void print_help(const char* prog) {
         << "                       FRETISH JSON, accepting either a plain\n"
         << "                       Specification or a ScoredSpecification "
            "with\n"
-        << "                       an optional \"fitness\" field; or a .tlsf\n"
-        << "                       file.\n"
+        << "                       an optional \"fitness\" field; a .tlsf\n"
+        << "                       file; or a .psp file.\n"
         << "  --output-dir <dir>   Directory to write maximal realizable\n"
         << "                       repairs to as repair_0.json, "
            "repair_1.json,\n"
-        << "                       ... (or repair_0.tlsf ... for TLSF input;\n"
+        << "                       ... (repair_0.tlsf or repair_0.psp ... for\n"
+        << "                       TLSF or PSP input;\n"
         << "                       required, and must already exist).\n"
         << "  --config <file>      Path to a TOML configuration file.\n"
         << "                       Absent keys use built-in defaults.\n"
-        << "  --format <fmt>       Input format: fretish or tlsf. If omitted,\n"
-        << "                       inferred from the --input extension (a\n"
-        << "                       .tlsf file is auto-detected as TLSF, any\n"
-        << "                       other extension as FRETISH).\n"
+        << "  --format <fmt>       Input format: fretish, tlsf or psp. If\n"
+        << "                       omitted, inferred from the --input\n"
+        << "                       extension (.tlsf as TLSF, .psp as PSP,\n"
+        << "                       any other extension as FRETISH).\n"
         << "  --seed <n>           RNG seed for reproducible runs. If omitted\n"
         << "                       a random seed is chosen and printed.\n"
         << "  --diagnostics        Print the filter report and the\n"
@@ -85,17 +87,28 @@ void print_help(const char* prog) {
         << "              Never (loaded as Always over the negated response)\n";
 }
 
-std::optional<bool> resolve_is_tlsf(
+std::optional<RepairInput> resolve_input_format(
     const std::optional<std::string>& format_arg,
     const std::string& input_path) {
     if (!format_arg.has_value()) {
-        return std::filesystem::path(input_path).extension() == ".tlsf";
+        const std::filesystem::path extension =
+            std::filesystem::path(input_path).extension();
+        if (extension == ".tlsf") {
+            return RepairInput::Tlsf;
+        }
+        if (extension == ".psp") {
+            return RepairInput::Psp;
+        }
+        return RepairInput::Fretish;
     }
     if (*format_arg == "tlsf") {
-        return true;
+        return RepairInput::Tlsf;
+    }
+    if (*format_arg == "psp") {
+        return RepairInput::Psp;
     }
     if (*format_arg == "fretish") {
-        return false;
+        return RepairInput::Fretish;
     }
     return std::nullopt;
 }

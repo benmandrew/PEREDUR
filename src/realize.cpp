@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "driver_support.hpp"
+#include "psp/ordered_language.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "runner/atom_names.hpp"
 #include "runner/spot.hpp"
@@ -16,11 +18,11 @@ namespace {
 
 void print_usage(const char* prog) {
     std::cerr
-        << "Usage: " << prog << " <spec.json|spec.tlsf> [...]\n"
+        << "Usage: " << prog << " <spec.json|spec.tlsf|spec.psp> [...]\n"
         << "\n"
-        << "Checks whether specification(s) are realisable. FRETISH JSON\n"
-        << "and basic-TLSF (.tlsf) inputs are both accepted; the format\n"
-        << "is chosen from the file extension.\n"
+        << "Checks whether specification(s) are realisable. FRETISH JSON,\n"
+        << "basic-TLSF (.tlsf) and PSP (.psp) inputs are all accepted; the\n"
+        << "format is chosen from the file extension.\n"
         << "Single file: prints REALIZABLE or UNREALIZABLE.\n"
         << "Multiple files: prints \"<path>: REALIZABLE\" or \"<path>: "
            "UNREALIZABLE\" per line.\n"
@@ -57,7 +59,29 @@ std::optional<bool> check_tlsf_realizable(const std::string& path,
     }
 }
 
-// Resolves a single path's realizability, dispatching on the .tlsf extension.
+std::optional<bool> check_psp_realizable(const std::string& path, bool multi) {
+    const std::string prefix = multi ? path + ": " : "";
+    try {
+        const psp::Specification spec = psp::load_specification(path);
+        if (const std::optional<std::string> unsafe =
+                runner::first_unsafe_atom_name(spec.m_in_atoms,
+                                               spec.m_out_atoms)) {
+            std::cerr << prefix << *unsafe << "\n";
+            return std::nullopt;
+        }
+        const std::optional<bool> realizable = psp::check_realizability(spec);
+        if (!realizable.has_value()) {
+            std::cerr << prefix
+                      << "ltlsynt timed out, realizability undecided\n";
+        }
+        return realizable;
+    } catch (const std::exception& exc) {
+        std::cerr << prefix << exc.what() << "\n";
+        return std::nullopt;
+    }
+}
+
+// Resolves a single path's realizability, dispatching on the extension.
 // Returns nullopt (after printing the error) if the file cannot be loaded, or
 // if ltlsynt hit its timeout: this tool reports what was decided, so undecided
 // is an error rather than a verdict in either direction.
@@ -65,6 +89,9 @@ std::optional<bool> realize_one(const std::string& path,
                                 RealizabilityChecker& checker, bool multi) {
     if (std::filesystem::path(path).extension() == ".tlsf") {
         return check_tlsf_realizable(path, checker);
+    }
+    if (std::filesystem::path(path).extension() == ".psp") {
+        return check_psp_realizable(path, multi);
     }
     Specification spec;
     try {

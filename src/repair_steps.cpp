@@ -9,6 +9,7 @@
 
 #include "config.hpp"
 #include "filter/correctness.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "runner/atom_names.hpp"
 #include "runner/black.hpp"
@@ -46,6 +47,11 @@ template bool screen_original(const Specification&, const std::string&,
                               const std::function<std::optional<bool>()>&,
                               const Config&);
 template bool screen_original(const tlsf::Specification&, const std::string&,
+                              const std::vector<std::string>&,
+                              const std::vector<std::string>&,
+                              const std::function<std::optional<bool>()>&,
+                              const Config&);
+template bool screen_original(const psp::Specification&, const std::string&,
                               const std::vector<std::string>&,
                               const std::vector<std::string>&,
                               const std::function<std::optional<bool>()>&,

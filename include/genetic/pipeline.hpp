@@ -5,7 +5,8 @@
 ///        PipelineStage, and the stage list a generation runs through.
 ///
 /// The stage and breeding templates are defined in src/genetic/pipeline.cpp
-/// and instantiated there for Specification and tlsf::Specification only.
+/// and instantiated there for Specification, tlsf::Specification and
+/// psp::Specification.
 
 #include <algorithm>
 #include <atomic>
@@ -30,6 +31,26 @@
 template <typename Spec>
 class BasicDiversityState;
 using DiversityState = BasicDiversityState<Specification>;
+
+namespace tlsf {
+struct Specification;
+}  // namespace tlsf
+
+/// The diversity state a run of @p Spec lends breeding and selection: its
+/// own for each language with an OrderedLanguage, and the FRETISH type, always
+/// null, on the TLSF path, which has none.
+template <typename Spec>
+struct DiversityStateFor {
+    using type = BasicDiversityState<Spec>;
+};
+
+template <>
+struct DiversityStateFor<tlsf::Specification> {
+    using type = DiversityState;
+};
+
+template <typename Spec>
+using DiversityStateOf = typename DiversityStateFor<Spec>::type;
 
 /// Which representation of the population is live. A generation begins and ends
 /// scored; between breeding and scoring the individuals have no fitness yet, so
@@ -265,7 +286,7 @@ std::vector<Spec> breed_offspring(
     const Spec* original = nullptr,
     std::optional<std::size_t> status_objective = std::nullopt,
     std::vector<OffspringOrigin>* origins = nullptr,
-    DiversityState* diversity = nullptr);
+    DiversityStateOf<Spec>* diversity = nullptr);
 
 /// Cycles through the existing survivors to pad the population back up to
 /// @p target_size. Padding duplicates carry zero crowding distance, so later
@@ -426,8 +447,9 @@ struct GenerationContext {
     /// when the run scores none. Read by breeding to build a ParentContext.
     std::optional<std::size_t> m_status_objective;
     /// The run's diversity state (diversity.hpp), lent to every generation of
-    /// a FRETISH run; null on the TLSF path and where the caller gives none.
-    DiversityState* m_diversity = nullptr;
+    /// a FRETISH or PSP run; null on the TLSF path and where the caller gives
+    /// none.
+    DiversityStateOf<Spec>* m_diversity = nullptr;
 
     std::size_t m_target_size;
     std::size_t m_top_n;

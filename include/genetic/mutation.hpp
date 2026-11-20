@@ -17,6 +17,10 @@
 #include "prop_formula.hpp"
 #include "requirement.hpp"
 
+namespace psp {
+struct Specification;
+}  // namespace psp
+
 /// Draws a literal from @p pool: an atom drawn uniformly, negated on a coin
 /// flip. Two draws, in that order.
 Formula draw_literal(const std::vector<std::string>& pool,
@@ -223,6 +227,11 @@ struct DirectionGateStats {
     /// Counts each held offspring that @p scored rates realizable, then
     /// forgets them all: an offspring a filter dropped was never scored.
     static void settle(const std::vector<Scored<Specification>>& scored,
+                       std::optional<std::size_t> status_index);
+    /// The same for a PSP offspring and population.
+    static void note_offspring(bool stepped,
+                               const psp::Specification& offspring);
+    static void settle(const std::vector<Scored<psp::Specification>>& scored,
                        std::optional<std::size_t> status_index);
 };
 

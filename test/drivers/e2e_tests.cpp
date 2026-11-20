@@ -390,6 +390,92 @@ TEST_IN("driver_peredur", test_peredur_repairs_tlsf) {
     }
 }
 
+// examples/psp-arbiter: two bounded responses that conflict under one
+// assumption.
+const char* const k_psp_arbiter = R"json({
+  "assumptions": [
+    {
+      "pattern": "universality",
+      "scope": "globally",
+      "s": "!(start & stop)"
+    }
+  ],
+  "guarantees": [
+    {
+      "pattern": "bounded-response",
+      "count": 1,
+      "scope": "afteruntil",
+      "p": "req",
+      "s": "grant",
+      "q": "start",
+      "r": "stop"
+    },
+    {
+      "pattern": "bounded-response",
+      "count": 1,
+      "scope": "afteruntil",
+      "p": "req",
+      "s": "!grant",
+      "q": "start",
+      "r": "stop"
+    }
+  ],
+  "in_atoms": ["req", "start", "stop"],
+  "out_atoms": ["grant"]
+}
+)json";
+
+TEST_IN("driver_peredur", test_peredur_repairs_psp) {
+    const TempDir dir("e2e_peredur_psp");
+    const std::string input =
+        write_text(dir.path() / "spec.psp", k_psp_arbiter).string();
+    const std::string config =
+        write_text(dir.path() / "config.toml", k_config_with_tlsf_key).string();
+    const std::filesystem::path first = dir.path() / "first";
+    const std::filesystem::path second = dir.path() / "second";
+    std::filesystem::create_directories(first);
+    std::filesystem::create_directories(second);
+
+    const DriverRun run = run_driver(
+        "peredur", {"--input", input, "--output-dir", first.string(),
+                    "--config", config, "--seed", "3", "--repair-summary"});
+    expect(run.m_exit_code == 0, "peredur: a PSP run exits zero");
+    expect(contains(run.m_output, "Done in"),
+           "peredur: the PSP run prints its closing line");
+    const nlohmann::json manifest =
+        expect_run_manifest(first, input, 3, "peredur/psp");
+    expect(contains(run.m_output,
+                    "config key tlsf.mutation.p_temporal is read "
+                    "only on the TLSF path; this PSP run ignores it"),
+           "peredur: a PSP run warns about a changed TLSF-only key");
+    const nlohmann::json& config_block = manifest.at("config");
+    expect(config_block.at("mutation").at("p_trigger").is_null(),
+           "peredur: a PSP manifest records FRETISH-only keys as null");
+    expect(config_block.at("psp").at("p_pattern").is_number() &&
+               config_block.at("genetic").at("novelty").is_boolean(),
+           "peredur: a PSP manifest records the PSP and ordered keys");
+
+    const DriverRun again = run_driver(
+        "peredur", {"--input", input, "--output-dir", second.string(),
+                    "--config", config, "--seed", "3"});
+    expect(again.m_exit_code == 0, "peredur: the repeat PSP run exits zero");
+    const std::vector<std::filesystem::path> first_repairs =
+        repair_files(first);
+    const std::vector<std::filesystem::path> second_repairs =
+        repair_files(second);
+    expect(first_repairs.size() == second_repairs.size(),
+           "peredur: one seed writes the same PSP repairs twice");
+    for (std::size_t i = 0; i < first_repairs.size(); ++i) {
+        expect(first_repairs[i].filename() == second_repairs[i].filename() &&
+                   read_text(first_repairs[i]) == read_text(second_repairs[i]),
+               "peredur: one seed writes byte-identical PSP repairs twice");
+    }
+    for (const auto& repair : first_repairs) {
+        expect(repair.extension() == ".psp",
+               "peredur: a PSP run writes PSP repairs");
+    }
+}
+
 TEST_IN("driver_peredur", test_peredur_repairs_fretish) {
     const TempDir dir("e2e_peredur_fretish");
     const std::string input =

@@ -349,6 +349,24 @@ struct Config {
     /// to copy.
     double tlsf_p_clone_assumption = 0.25;
 
+    /// PSP-mode mutation: per-requirement probability of moving the pattern
+    /// one covering edge along the pattern order of the scope's class.
+    double psp_p_pattern = 0.15;
+    /// PSP-mode mutation: per-requirement probability of moving the scope
+    /// one covering edge along the scope order of the pattern's cell.
+    double psp_p_scope_kind = 0.15;
+    /// PSP-mode mutation: per-requirement probability of halving or doubling
+    /// the count of a bounded pattern, or moving it to a donated count, in
+    /// the direction of the move. Draws nothing on a pattern without one.
+    double psp_p_count = 0.15;
+    /// PSP-mode mutation: per-requirement probabilities of rewriting P, S, Q
+    /// and R, each along its polarity under p_monotone. A field the
+    /// requirement does not read draws nothing.
+    double psp_p_p = 0.5;
+    double psp_p_s = 0.5;
+    double psp_p_q = 0.15;
+    double psp_p_r = 0.15;
+
     /// Scoring thread pool size. The default is available_parallelism(), which
     /// is the hardware concurrency narrowed by the CPU affinity mask and the
     /// cgroup CPU quota where those apply -- so a containerised run is sized by

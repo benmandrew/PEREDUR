@@ -16,6 +16,8 @@
 #include "config.hpp"
 #include "genetic/ordered_language.hpp"
 #include "genetic/output_gate.hpp"
+#include "psp/ordered_language.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "runner/spot.hpp"
 #include "thread_pool.hpp"
@@ -269,3 +271,16 @@ template ClimbPredicate climb_gate(const Config&, FitnessFunction);
 template std::vector<Specification> climb_repairs(
     const std::vector<Specification>&, const Specification&,
     const ClimbPredicate&, std::size_t);
+template void order_steps(std::vector<psp::Step>&, std::size_t);
+template std::optional<psp::Specification> furthest_accepted(
+    const psp::Specification&, const psp::Step&,
+    const ClimbPredicateT<psp::Specification>&);
+template psp::Specification climb(const psp::Specification&,
+                                  const psp::Specification&,
+                                  const ClimbPredicateT<psp::Specification>&,
+                                  std::size_t);
+template ClimbPredicateT<psp::Specification> climb_gate(
+    const Config&, FitnessFunctionT<psp::Specification>);
+template std::vector<psp::Specification> climb_repairs(
+    const std::vector<psp::Specification>&, const psp::Specification&,
+    const ClimbPredicateT<psp::Specification>&, std::size_t);

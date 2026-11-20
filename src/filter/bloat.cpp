@@ -2,9 +2,12 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <optional>
 #include <utility>
 #include <vector>
 
+#include "psp/requirement.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "tlsf/specification.hpp"
 
@@ -45,6 +48,25 @@ std::size_t max_formula_size(const tlsf::Specification& spec) {
     return max;
 }
 
+std::size_t max_formula_size(const psp::Specification& spec) {
+    std::size_t max = 0;
+    for (const std::vector<psp::Requirement>* reqs :
+         {&spec.m_assumptions, &spec.m_guarantees}) {
+        for (const psp::Requirement& req : *reqs) {
+            if (req.m_removed) {
+                continue;
+            }
+            for (const std::optional<Formula>* field :
+                 {&req.m_p, &req.m_s, &req.m_q, &req.m_r, &req.m_fixed}) {
+                if (field->has_value()) {
+                    max = std::max(max, (*field)->n_subformulae());
+                }
+            }
+        }
+    }
+    return max;
+}
+
 }  // namespace
 
 template <typename Spec>
@@ -76,3 +98,5 @@ template FilterFunctionT<Specification> make_bloat_cap_filter(
     const Specification&, double);
 template FilterFunctionT<tlsf::Specification> make_bloat_cap_filter(
     const tlsf::Specification&, double);
+template FilterFunctionT<psp::Specification> make_bloat_cap_filter(
+    const psp::Specification&, double);
