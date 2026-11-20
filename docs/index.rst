@@ -113,3 +113,8 @@ The overview pages describe the algorithm, the tuning knobs, and the TLSF path. 
    api/psp/specification
    api/psp/filter
    api/psp/implication
+   api/psp/order_moves
+   api/psp/ordered_language
+   api/psp/mutation
+   api/psp/fitness
+   api/psp/pipeline

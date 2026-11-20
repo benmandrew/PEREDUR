@@ -16,6 +16,8 @@
 #include "genetic/ordered_language.hpp"
 #include "hash_combine.hpp"
 #include "profile.hpp"
+#include "psp/ordered_language.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 
 namespace {
@@ -178,3 +180,7 @@ template std::vector<bool> proved_weaker_realizable(
     const std::vector<Scored<Specification>>&, std::size_t);
 template FrontGutting final_front_gutting(
     const std::vector<Scored<Specification>>&, std::size_t);
+template std::vector<bool> proved_weaker_realizable(
+    const std::vector<Scored<psp::Specification>>&, std::size_t);
+template FrontGutting final_front_gutting(
+    const std::vector<Scored<psp::Specification>>&, std::size_t);

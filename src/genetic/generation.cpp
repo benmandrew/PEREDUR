@@ -16,6 +16,7 @@
 #include "filter/correctness.hpp"
 #include "filter/implication.hpp"
 #include "prop_formula.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
@@ -117,6 +118,10 @@ template FilterFunctionT<tlsf::Specification>
 make_predicate_filter<tlsf::Specification>(
     std::string, std::function<bool(const tlsf::Specification&)>, std::size_t,
     FilterKind, double);
+template FilterFunctionT<psp::Specification>
+make_predicate_filter<psp::Specification>(
+    std::string, std::function<bool(const psp::Specification&)>, std::size_t,
+    FilterKind, double);
 
 template <typename Spec>
 std::vector<FilterFunctionT<Spec>> get_filter_functions(
@@ -172,3 +177,5 @@ template std::vector<FilterFunctionT<Specification>> get_filter_functions(
     const Specification&, SatisfiabilityChecker&, double);
 template std::vector<FilterFunctionT<tlsf::Specification>> get_filter_functions(
     const tlsf::Specification&, SatisfiabilityChecker&, double);
+template std::vector<FilterFunctionT<psp::Specification>> get_filter_functions(
+    const psp::Specification&, SatisfiabilityChecker&, double);

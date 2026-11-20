@@ -16,6 +16,8 @@
 #include "genetic/order_moves.hpp"
 #include "genetic/ordered_language.hpp"
 #include "profile.hpp"
+#include "psp/ordered_language.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 
 namespace {
@@ -395,3 +397,7 @@ template class BasicDiversityState<Specification>;
 template std::vector<double> novelty_objective(
     DiversityState&, const std::vector<Scored<Specification>>&,
     std::optional<std::size_t>);
+template class BasicDiversityState<psp::Specification>;
+template std::vector<double> novelty_objective(
+    BasicDiversityState<psp::Specification>&,
+    const std::vector<Scored<psp::Specification>>&, std::optional<std::size_t>);

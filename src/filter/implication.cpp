@@ -11,6 +11,7 @@
 #include "filter/implication_check.hpp"
 #include "fitness/syntactic_similarity.hpp"
 #include "psp/filter.hpp"
+#include "psp/fitness.hpp"
 #include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "tlsf/filter.hpp"
@@ -47,6 +48,12 @@ double similarity_to(const Specification& spec, const Specification& original,
 double similarity_to(const tlsf::Specification& spec,
                      const tlsf::Specification& original, const Config& cfg) {
     return tlsf_syntactic_similarity(spec, original, cfg);
+}
+
+double similarity_to(const psp::Specification& spec,
+                     const psp::Specification& original,
+                     const Config& /*cfg*/) {
+    return psp::syntactic_similarity(spec, original);
 }
 
 }  // namespace
@@ -113,6 +120,8 @@ SimilarityKeyT<Spec> syntactic_similarity_key(Spec original,
 template FilterFunctionT<Specification> make_dedup_filter<Specification>();
 template FilterFunctionT<tlsf::Specification>
 make_dedup_filter<tlsf::Specification>();
+template FilterFunctionT<psp::Specification>
+make_dedup_filter<psp::Specification>();
 template FilterFunctionT<Specification> make_implication_filter<Specification>(
     SatisfiabilityChecker&, SimilarityKeyT<Specification>,
     const GenerationProgressCallback&);
@@ -129,3 +138,5 @@ template SimilarityKeyT<Specification> syntactic_similarity_key<Specification>(
 template SimilarityKeyT<tlsf::Specification>
 syntactic_similarity_key<tlsf::Specification>(tlsf::Specification,
                                               const Config&);
+template SimilarityKeyT<psp::Specification>
+syntactic_similarity_key<psp::Specification>(psp::Specification, const Config&);

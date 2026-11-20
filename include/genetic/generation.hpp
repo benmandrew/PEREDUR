@@ -729,7 +729,8 @@ std::vector<Scored<Spec>> evolve_generation(
     const RandomSource& random_source,
     const GenerationProgressCallback& on_progress = nullptr,
     const StageObserver& on_stage = nullptr, SearchBudget* budget = nullptr,
-    const Spec* original = nullptr, DiversityState* diversity = nullptr) {
+    const Spec* original = nullptr,
+    DiversityStateOf<Spec>* diversity = nullptr) {
     assert(random_source);
     assert(!fitness_functions.empty());
     assert(cfg.crossover_rate >= 0.0 && cfg.crossover_rate <= 1.0);

@@ -297,6 +297,14 @@ std::vector<std::size_t> project_admission_order(
 std::vector<std::size_t> conflict_degree_order(
     std::size_t n_parts, const SubsetRealizability& subset_realizable);
 
+/// A walk order over live guarantee positions, from a reference order over
+/// guarantee slots @p slot_order. @p slots maps each position to its slot.
+/// Slots the reference does not name sort last, in walk order. Empty where
+/// @p slot_order is. The FRETISH and PSP walks both read it.
+std::vector<std::size_t> position_order_from_slots(
+    const std::vector<std::size_t>& slot_order,
+    const std::vector<std::size_t>& slots);
+
 /// Status score of a FRETISH specification. Its components are each
 /// requirement's condition and response, tested apart (see
 /// specification_status_components). They are a screen that spares the

@@ -7,6 +7,14 @@
 #include "genetic/random_source.hpp"
 #include "requirement.hpp"
 
+/// A subformula graft of @p second_parent into @p first_parent: a replaced
+/// subformula or a fresh binary join, with equal probability, at a site drawn
+/// uniformly over the nodes of @p first_parent. The PSP crossover reuses it
+/// for each formula field.
+Formula crossover_formula(const Formula& first_parent,
+                          const Formula& second_parent,
+                          const RandomSource& random_source);
+
 /// Produces an offspring requirement by crossing over every field of the
 /// parents but the two flags. Each of the two formula fields is grafted as in
 /// AuRUS: with equal probability a subformula of the first parent's field is

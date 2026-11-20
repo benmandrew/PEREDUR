@@ -26,6 +26,9 @@
 #include "genetic/generation.hpp"
 #include "genetic/pipeline.hpp"
 #include "genetic/scored.hpp"
+#include "psp/filter.hpp"
+#include "psp/fitness.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
 #include "runner/spot.hpp"
@@ -52,6 +55,12 @@ double gate_status(const tlsf::Specification& spec, const Config& cfg) {
     return tlsf_status(spec, cfg);
 }
 
+double gate_status(const psp::Specification& spec, const Config& cfg) {
+    return psp::specification_status(
+        spec, global_sat_checker(), global_real_checker(), cfg.status_grading,
+        {}, ComponentCheck::Included, cfg.mrs_speculation_depth, nullptr);
+}
+
 bool stream_implies(const Specification& lhs, const Specification& rhs,
                     SatisfiabilityChecker& checker) {
     return spec_implies(lhs, rhs, checker).value_or(false);
@@ -61,6 +70,12 @@ bool stream_implies(const tlsf::Specification& lhs,
                     const tlsf::Specification& rhs,
                     SatisfiabilityChecker& checker) {
     return tlsf_spec_implies(lhs, rhs, checker).value_or(false);
+}
+
+bool stream_implies(const psp::Specification& lhs,
+                    const psp::Specification& rhs,
+                    SatisfiabilityChecker& checker) {
+    return psp::spec_implies(lhs, rhs, checker).value_or(false);
 }
 
 // The correctness checks, built once. Their predicates capture the global
@@ -354,3 +369,21 @@ template SearchOutput<tlsf::Specification> finish_search(
     const AggregateWeightedFitnessFunctionT<tlsf::Specification>&,
     StreamingMaximalFilter<tlsf::Specification>*,
     const RepairTransform<tlsf::Specification>&);
+template bool passes_output_gate(const psp::Specification&, const Config&,
+                                 const FitnessFunctionT<psp::Specification>&);
+template std::vector<char> gate_verdicts(
+    const std::vector<Scored<psp::Specification>>&, const Config&,
+    const FitnessFunctionT<psp::Specification>&);
+template std::size_t accumulate_gate_passing(
+    const std::vector<Scored<psp::Specification>>&, const Config&, std::size_t,
+    RepairAccumulator<psp::Specification>&,
+    const FitnessFunctionT<psp::Specification>&);
+template std::unique_ptr<StreamingMaximalFilter<psp::Specification>>
+make_maximal_stream(const psp::Specification&, const Config&,
+                    const std::string&);
+template SearchOutput<psp::Specification> finish_search(
+    const Config&, SearchResult<psp::Specification>,
+    const std::vector<psp::Specification>&,
+    const AggregateWeightedFitnessFunctionT<psp::Specification>&,
+    StreamingMaximalFilter<psp::Specification>*,
+    const RepairTransform<psp::Specification>&);

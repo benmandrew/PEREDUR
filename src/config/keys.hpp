@@ -18,9 +18,11 @@ enum class KeyCheck : std::uint8_t {
     Positive,     // > 0, which for an integer is >= 1
 };
 
-// Which repair path reads a key. A run warns about a key only the other path
-// reads when it is set away from its default, and records it as null.
-enum class KeyReader : std::uint8_t { Both, Fretish, Tlsf };
+// Which repair paths read a key. A run warns about a key that its path does
+// not read when it is set away from its default, and records it as null.
+// Both is every path. Ordered is FRETISH and PSP: the order-directed
+// mechanisms, which read a language through OrderedLanguage.
+enum class KeyReader : std::uint8_t { Both, Fretish, Tlsf, Psp, Ordered };
 
 using ConfigMember =
     std::variant<double Config::*, std::size_t Config::*, bool Config::*,
@@ -44,7 +46,7 @@ struct ConfigKey {
 // schemas/config-schema.json and example-config.toml are generated from it
 // (src/config/reference.cpp). Listed in read order, which decides the error
 // reported for a config with more than one.
-inline constexpr std::array<ConfigKey, 61> k_config_keys{{
+inline constexpr std::array<ConfigKey, 68> k_config_keys{{
     {"genetic", "generations", &Config::generations, KeyCheck::Positive,
      KeyReader::Both, "Number of evolution rounds.", ""},
     {"genetic", "population_size", &Config::population_size, KeyCheck::Positive,
@@ -157,14 +159,16 @@ inline constexpr std::array<ConfigKey, 61> k_config_keys{{
      "\"nsga2-truncate\", the default until 2026-08-14, was removed on "
      "2026-10-30.\n"},
     {"genetic", "maximality_demotion", &Config::maximality_demotion,
-     KeyCheck::None, KeyReader::Fretish,
+     KeyCheck::None, KeyReader::Ordered,
      "Under nsga2-apportion, move a realizable candidate of the (mu + lambda) "
      "pool one front down when another realizable candidate is proved "
      "strictly stronger than it, slot by slot and by rule alone. A weaker "
      "timing or a removed guarantee costs nothing on similarity, so without "
      "this a gutted repair can sit on the first front beside the one it "
-     "weakens. FRETISH only; the TLSF path has no rule to prove the order.",
-     "FRETISH only, under nsga2-apportion: demote a realizable candidate one "
+     "weakens. FRETISH and PSP only; the TLSF path has no rule to prove the "
+     "order.",
+     "FRETISH and PSP only, under nsga2-apportion: demote a realizable "
+     "candidate one "
      "front\n"
      "when another realizable one is proved strictly stronger.\n"},
     {"genetic", "crowding", &Config::crowding, KeyCheck::None,
@@ -180,25 +184,27 @@ inline constexpr std::array<ConfigKey, 61> k_config_keys{{
      "or\n"
      "\"specification\" (farthest-point by slot Hamming distance). "
      "\"objective\" by default.\n"},
-    {"genetic", "novelty", &Config::novelty, KeyCheck::None, KeyReader::Fretish,
+    {"genetic", "novelty", &Config::novelty, KeyCheck::None, KeyReader::Ordered,
      "Under nsga2-apportion, rank by one more minimised objective: the number "
      "of repairs accumulated so far that the implication rule proves imply a "
      "realizable candidate, so a repair below one already found ranks lower. "
      "An unrealizable candidate scores 0, since no realizable repair implies "
      "it. Rule implication only, cached per candidate; launches no process "
-     "and draws nothing. FRETISH only.",
-     "FRETISH only, under nsga2-apportion: minimise the number of accumulated "
+     "and draws nothing. FRETISH and PSP only.",
+     "FRETISH and PSP only, under nsga2-apportion: minimise the number of "
+     "accumulated "
      "repairs\n"
      "that rule-imply a realizable candidate. Off by default.\n"},
     {"genetic", "novelty_tiebreak", &Config::novelty_tiebreak, KeyCheck::None,
-     KeyReader::Fretish,
+     KeyReader::Ordered,
      "Under nsga2-apportion, order the members of each non-domination front "
      "by the novelty count first (fewer accumulated repairs that the "
      "implication rule proves imply a realizable candidate ranks better) and "
      "by crowding second. Ranking across fronts and the objectives are "
      "unchanged. Cannot be combined with genetic.novelty. Draws nothing. "
-     "FRETISH only.",
-     "FRETISH only, under nsga2-apportion: order each front by the novelty "
+     "FRETISH and PSP only.",
+     "FRETISH and PSP only, under nsga2-apportion: order each front by the "
+     "novelty "
      "count,\n"
      "then by crowding. Not with novelty. Off by default.\n"},
     {"genetic", "spread_init", &Config::spread_init, KeyCheck::None,
@@ -214,7 +220,7 @@ inline constexpr std::array<ConfigKey, 61> k_config_keys{{
      "spread over its refused guarantees and its assumptions. Off by "
      "default.\n"},
     {"genetic", "maximality_removal", &Config::maximality_removal,
-     KeyCheck::None, KeyReader::Fretish,
+     KeyCheck::None, KeyReader::Ordered,
      "With maximality_demotion on, remove a candidate the rule flags from the "
      "(mu + lambda) pool at survivor selection instead of moving it one front "
      "down, so a gutted repair keeps no slot even when the pool is smaller "
@@ -350,50 +356,56 @@ inline constexpr std::array<ConfigKey, 61> k_config_keys{{
      "rather than by 'true'.",
      ""},
     {"mutation", "blame_targeted_slots", &Config::blame_targeted_slots,
-     KeyCheck::None, KeyReader::Fretish,
-     "FRETISH only: draw a rewrite's slot from where the parent's status "
+     KeyCheck::None, KeyReader::Ordered,
+     "FRETISH and PSP only: draw a rewrite's slot from where the parent's "
+     "status "
      "points. An unrealizable parent draws from the guarantees its MRS walk "
      "refused plus every assumption, a realizable one from the slots that "
      "differ from the original; an empty list or a crossover offspring keeps "
      "every live weakenable slot. Costs no draw.",
-     "FRETISH only: aim a rewrite at the guarantees the parent's MRS walk "
+     "FRETISH and PSP only: aim a rewrite at the guarantees the parent's MRS "
+     "walk "
      "refused\n"
      "(and the assumptions) when the parent is unrealizable, or at the slots "
      "that\n"
      "differ from the original when it is realizable. Off by default.\n"},
     {"mutation", "blame_realizable", &Config::blame_realizable, KeyCheck::None,
-     KeyReader::Fretish,
-     "FRETISH only, under blame_targeted_slots: whether a realizable parent's "
+     KeyReader::Ordered,
+     "FRETISH and PSP only, under blame_targeted_slots: whether a realizable "
+     "parent's "
      "slot is drawn from the slots that differ from the original. False "
      "leaves a realizable parent every live weakenable slot, while an "
      "unrealizable parent is still narrowed. Costs no draw.",
-     "FRETISH only, under blame_targeted_slots: narrow a realizable parent's "
+     "FRETISH and PSP only, under blame_targeted_slots: narrow a realizable "
+     "parent's "
      "rewrite\n"
      "to the slots that differ from the original. Set to false to narrow only "
      "an\n"
      "unrealizable parent. On by default.\n"},
     {"mutation", "direction_gated", &Config::direction_gated_mutation,
-     KeyCheck::None, KeyReader::Fretish,
-     "FRETISH only: aim a mutation's direction by the parent's status where "
+     KeyCheck::None, KeyReader::Ordered,
+     "FRETISH and PSP only: aim a mutation's direction by the parent's status "
+     "where "
      "crossover did not fire. An unrealizable parent keeps the weakening "
      "moves; a realizable one skips the added assumption and the removed "
      "guarantee and takes its directed moves from the steps back towards the "
      "original. A free rewrite moving the forbidden way returns the parent.",
-     "FRETISH only: weaken an unrealizable parent and strengthen a realizable "
+     "FRETISH and PSP only: weaken an unrealizable parent and strengthen a "
+     "realizable "
      "one\n"
      "towards the original, and return the parent when a free rewrite moves "
      "the\n"
      "forbidden way. Off by default.\n"},
     {"mutation", "gate_realizable", &Config::gate_realizable, KeyCheck::None,
-     KeyReader::Fretish,
-     "FRETISH only, under direction_gated: how a realizable parent "
+     KeyReader::Ordered,
+     "FRETISH and PSP only, under direction_gated: how a realizable parent "
      "strengthens. \"towards\" steps back towards the original and rewrites "
      "freely otherwise. \"free\" takes no step towards the original and "
      "rewrites with the directed arms strengthening, so a slot may move above "
      "the original. \"exchange\" takes one step towards the original in a "
      "slot that differs from it and one weakening in a slot still equal to "
      "it, in the same mutation.",
-     "FRETISH only, under direction_gated: how a realizable parent "
+     "FRETISH and PSP only, under direction_gated: how a realizable parent "
      "strengthens:\n"
      "\"towards\" the original, \"free\" in any direction, or "
      "\"exchange\" (one step back\n"
@@ -429,19 +441,22 @@ inline constexpr std::array<ConfigKey, 61> k_config_keys{{
      "of\n"
      "skipping it. Off by default.\n"},
     {"mutation", "step_scaling", &Config::step_scaling, KeyCheck::Probability,
-     KeyReader::Fretish,
-     "FRETISH only: how far the parent's status scales the choice between a "
+     KeyReader::Ordered,
+     "FRETISH and PSP only: how far the parent's status scales the choice "
+     "between a "
      "large move and a single edge. Each large move's probability (removing a "
      "guarantee, moving a timing off Always or Eventually, a tick-count jump) "
      "is multiplied by 1 + step_scaling * (1 - 2 * status). A crossover "
      "offspring is unscaled. Draws nothing at 0.",
-     "FRETISH only: take more large moves from a parent far from realizable "
+     "FRETISH and PSP only: take more large moves from a parent far from "
+     "realizable "
      "and\n"
      "fewer from one near it, scaled by the parent's status. Off (0) by "
      "default.\n"},
     {"mutation", "bisect_steps", &Config::bisect_steps, KeyCheck::None,
-     KeyReader::Fretish,
-     "FRETISH only, under direction_gated: a realizable parent's timing step "
+     KeyReader::Ordered,
+     "FRETISH and PSP only, under direction_gated: a realizable parent's "
+     "timing step "
      "on a within or for chain moves to the chain's midpoint rather than to "
      "the original's value. Costs no draw.",
      ""},
@@ -452,7 +467,7 @@ inline constexpr std::array<ConfigKey, 61> k_config_keys{{
      KeyCheck::None, KeyReader::Both,
      "Enable final implication maximality filter.", ""},
     {"filters", "climb_output", &Config::climb_output, KeyCheck::None,
-     KeyReader::Fretish,
+     KeyReader::Ordered,
      "Strengthen each repair that passes the output gate towards the "
      "original before deduplication and the implication filter. A step is a "
      "one-field move towards the original that is proved a strengthening by "
@@ -463,7 +478,7 @@ inline constexpr std::array<ConfigKey, 61> k_config_keys{{
      "towards\n"
      "the original one proved step at a time, while it stays a repair.\n"},
     {"filters", "climb_orders", &Config::climb_orders, KeyCheck::Positive,
-     KeyReader::Fretish,
+     KeyReader::Ordered,
      "Climbs per repair under climb_output. The first tries its steps in slot "
      "order and each later one under a fixed pseudo-random step priority of "
      "its own; every distinct result goes on to the final filters. Draws no "
@@ -623,6 +638,34 @@ inline constexpr std::array<ConfigKey, 61> k_config_keys{{
      "an existing one instead of building from the template, which emits at "
      "most\n"
      "seven nodes where the assumption-shaped ideals run to thirty.\n"},
+    {"psp", "p_pattern", &Config::psp_p_pattern, KeyCheck::Probability,
+     KeyReader::Psp,
+     "Per-requirement probability of moving a PSP pattern one covering edge "
+     "along the pattern order of its scope's class.",
+     "Per-requirement probabilities of the PSP arms. Pattern, scope and count "
+     "move\n"
+     "along their orders; P, S, Q and R are rewritten along their polarity "
+     "under\n"
+     "[mutation] p_monotone. An arm at 0 costs no draw.\n"},
+    {"psp", "p_scope_kind", &Config::psp_p_scope_kind, KeyCheck::Probability,
+     KeyReader::Psp,
+     "Per-requirement probability of moving a PSP scope one covering edge "
+     "along the scope order of its pattern's cell.",
+     ""},
+    {"psp", "p_count", &Config::psp_p_count, KeyCheck::Probability,
+     KeyReader::Psp,
+     "Per-requirement probability of halving or doubling the count of a "
+     "bounded PSP pattern, or moving it to a donated count. Draws nothing on "
+     "a pattern without one.",
+     ""},
+    {"psp", "p_p", &Config::psp_p_p, KeyCheck::Probability, KeyReader::Psp,
+     "Per-requirement probability of rewriting P.", ""},
+    {"psp", "p_s", &Config::psp_p_s, KeyCheck::Probability, KeyReader::Psp,
+     "Per-requirement probability of rewriting S.", ""},
+    {"psp", "p_q", &Config::psp_p_q, KeyCheck::Probability, KeyReader::Psp,
+     "Per-requirement probability of rewriting Q, the scope's opening.", ""},
+    {"psp", "p_r", &Config::psp_p_r, KeyCheck::Probability, KeyReader::Psp,
+     "Per-requirement probability of rewriting R, the scope's closing.", ""},
 }};
 
 // The table names along a dotted section, outermost first.

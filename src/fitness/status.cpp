@@ -538,6 +538,8 @@ std::string side_conjunction(const std::vector<Requirement>& requirements) {
     return conjunction.empty() ? "true" : conjunction;
 }
 
+}  // namespace
+
 // A walk order over live guarantee *positions*, from a reference order over
 // guarantee *slots*.
 //
@@ -577,8 +579,6 @@ std::vector<std::size_t> position_order_from_slots(
               });
     return order;
 }
-
-}  // namespace
 
 std::vector<std::string> specification_status_components(
     const Specification& specification) {

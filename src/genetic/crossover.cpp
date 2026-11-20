@@ -104,6 +104,8 @@ Formula combine_subformula(const Formula& formula, const Formula& donor,
         });
 }
 
+}  // namespace
+
 // AuRUS merges two conjuncts by grafting, and only by grafting: with equal
 // probability it replaces a subformula of the first with one drawn from the
 // second (replaceSubformula), or joins the two under a fresh binary operator
@@ -117,6 +119,8 @@ Formula crossover_formula(const Formula& first_parent,
     }
     return combine_subformula(first_parent, second_parent, random_source);
 }
+
+namespace {
 
 template <typename TimingVariant>
 Timing make_parameterized_timing(std::size_t ticks) {

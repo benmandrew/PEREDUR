@@ -187,6 +187,15 @@ Config golden_config() {
     // Off, its default. A faster Spot call decides some timeout-bounded
     // queries an exec does not, so a later default flip must fail here.
     cfg.spot_server = false;
+    // The PSP arms, at 0. A FRETISH golden never reaches them; pinned so that
+    // a golden that does fails here rather than re-recording.
+    cfg.psp_p_pattern = 0.0;
+    cfg.psp_p_scope_kind = 0.0;
+    cfg.psp_p_count = 0.0;
+    cfg.psp_p_p = 0.0;
+    cfg.psp_p_s = 0.0;
+    cfg.psp_p_q = 0.0;
+    cfg.psp_p_r = 0.0;
     return cfg;
 }
 

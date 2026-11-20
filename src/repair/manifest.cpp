@@ -34,6 +34,8 @@
 #include "genetic/order_crossover.hpp"
 #include "genetic/output_gate.hpp"
 #include "genetic/pipeline.hpp"
+#include "psp/mutation.hpp"
+#include "psp/pipeline.hpp"
 #include "runner/black.hpp"
 #include "runner/ganak.hpp"
 #include "runner/ltlfilt.hpp"
@@ -55,9 +57,9 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 77;
+constexpr int k_schema_version = 78;
 
-// True for a key only the other repair path reads.
+// True for a key the @p input path does not read.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
     switch (entry.reader) {
         case KeyReader::Both:
@@ -66,6 +68,10 @@ bool unread_on(const ConfigKey& entry, RepairInput input) {
             return input != RepairInput::Fretish;
         case KeyReader::Tlsf:
             return input != RepairInput::Tlsf;
+        case KeyReader::Psp:
+            return input != RepairInput::Psp;
+        case KeyReader::Ordered:
+            return input == RepairInput::Tlsf;
     }
     return false;
 }
@@ -362,6 +368,27 @@ std::vector<std::string> ignored_non_default_keys(const Config& cfg,
     return ignored;
 }
 
+std::string key_reader_name(const std::string& key) {
+    for (const ConfigKey& entry : k_config_keys) {
+        if (std::string(entry.section) + "." + entry.key != key) {
+            continue;
+        }
+        switch (entry.reader) {
+            case KeyReader::Both:
+                return "";
+            case KeyReader::Fretish:
+                return "FRETISH";
+            case KeyReader::Tlsf:
+                return "TLSF";
+            case KeyReader::Psp:
+                return "PSP";
+            case KeyReader::Ordered:
+                return "FRETISH and PSP";
+        }
+    }
+    return "";
+}
+
 void write_run_manifest(const std::string& output_dir,
                         const std::string& input_path, std::size_t seed,
                         const Config& cfg, double wall_s,
@@ -466,8 +493,8 @@ void write_run_manifest(const std::string& output_dir,
         // Rewrites whose slot blame_targeted_slots drew from a narrowed list.
         // Zero whenever the key is off.
         {"n_targeted_mutations", SlotTargetingStats::n_targeted.load()},
-        // Every FRETISH mutation, and those that reached the slot draw, which
-        // n_targeted_mutations is a subset of. Zero on the TLSF path.
+        // Every FRETISH and PSP mutation, and those that reached the slot draw,
+        // which n_targeted_mutations is a subset of. Zero on the TLSF path.
         {"n_mutations", MutationStats::n_mutations.load()},
         {"n_slot_draws", MutationStats::n_slot_draws.load()},
         // Candidates maximality demotion moved one front down at survivor
@@ -587,6 +614,20 @@ void write_run_manifest(const std::string& output_dir,
           {"unscaled", StepScalingStats::n_unscaled.load()},
           {"unscaled_large", StepScalingStats::n_unscaled_large.load()},
           {"unscaled_small", StepScalingStats::n_unscaled_small.load()}}},
+        // What the PSP arms did: moves of the pattern, the scope and the count
+        // along their orders, formula fields filled by donation after such a
+        // move, monotone and free formula rewrites, crossovers that changed
+        // the first parent, and repairs written with a gutted guarantee. Zero
+        // on the other paths.
+        {"psp",
+         {{"pattern_moves", psp::PspMoveStats::n_pattern.load()},
+          {"scope_moves", psp::PspMoveStats::n_scope.load()},
+          {"count_moves", psp::PspMoveStats::n_count.load()},
+          {"donated_fields", psp::PspMoveStats::n_donated.load()},
+          {"monotone_rewrites", psp::PspMoveStats::n_monotone.load()},
+          {"free_rewrites", psp::PspMoveStats::n_free.load()},
+          {"crossovers", psp::PspMoveStats::n_crossovers.load()},
+          {"gutted_repairs", psp::GuttingStats::n_gutted_repairs}}},
         // What the parent-verdict stage did: offspring dropped as proved
         // strengthenings of a parent the realizability memo showed
         // unrealizable, and proved strengthenings kept because the parent's

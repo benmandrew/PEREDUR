@@ -25,6 +25,7 @@
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "status_line.hpp"
+#include "tlsf/specification.hpp"
 
 // Each generation breeds `selection` offspring and carries the best `elitism`
 // parents over verbatim. Unlike selection, elitism has no floor of 1, so a
@@ -106,12 +107,12 @@ SearchResult<Spec> run_generations(
     const GenerationSizes sizes = generation_sizes(cfg, cfg.population_size);
     const std::string total_str = std::to_string(cfg.generations);
     const FitnessFunctionT<Spec> gate_status = status_objective_of(fitness);
-    // Read by the FRETISH diversity keys alone, and inert with each of them
-    // off.
-    DiversityState diversity_state(nullptr);
-    DiversityState* diversity = nullptr;
-    if constexpr (std::is_same_v<Spec, Specification>) {
-        diversity_state = DiversityState(&accumulator.specifications());
+    // Read by the diversity keys alone, and inert with each of them off.
+    // TLSF has no OrderedLanguage and so no diversity state.
+    DiversityStateOf<Spec> diversity_state(nullptr);
+    DiversityStateOf<Spec>* diversity = nullptr;
+    if constexpr (!std::is_same_v<Spec, tlsf::Specification>) {
+        diversity_state = DiversityStateOf<Spec>(&accumulator.specifications());
         diversity = &diversity_state;
     }
     for (std::size_t gen = 1; gen <= cfg.generations; ++gen) {

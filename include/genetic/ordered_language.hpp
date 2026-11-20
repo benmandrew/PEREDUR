@@ -4,7 +4,7 @@
 /// @brief The traits through which the order-directed mechanisms read a
 ///        specification language: the output climb, two-way mutation in
 ///        exchange mode, maximality removal, novelty and blame narrowing.
-///        FRETISH is the one instance.
+///        FRETISH and PSP are the instances.
 
 #include <cstddef>
 #include <optional>
@@ -44,8 +44,11 @@
 ///   `keyword_similarity`;
 /// - steps: `steps_towards`, `step_chain` and `with_slot_value`;
 /// - `check_realizability` of a whole specification;
-/// - directed mutation: `can_rewrite`, `mutate_slot` and
+/// - directed mutation: `PoolData`, `pool_data` and `pools_of` (the pools
+///   computed once per mutation), `can_rewrite`, `mutate_slot` and
 ///   `free_rewrite_rates`.
+///
+/// FRETISH is specialised here and PSP in psp/ordered_language.hpp.
 template <typename Spec>
 struct OrderedLanguage;
 
@@ -65,6 +68,26 @@ struct OrderedLanguage<Specification> {
         const std::vector<std::string>& atoms;
         const std::vector<Timing>& timings;
     };
+
+    /// What MutationPools refers to, computed once per mutation.
+    struct PoolData {
+        std::vector<std::string> atoms;
+        std::vector<Timing> timings;
+    };
+
+    static PoolData pool_data(const Specification& spec) {
+        PoolData data;
+        data.atoms.insert(data.atoms.end(), spec.m_in_atoms.begin(),
+                          spec.m_in_atoms.end());
+        data.atoms.insert(data.atoms.end(), spec.m_out_atoms.begin(),
+                          spec.m_out_atoms.end());
+        data.timings = collect_timing_pool(spec);
+        return data;
+    }
+
+    static MutationPools pools_of(const PoolData& data) {
+        return {data.atoms, data.timings};
+    }
 
     static const std::vector<Requirement>& assumptions(
         const Specification& spec) {

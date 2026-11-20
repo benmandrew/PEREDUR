@@ -30,6 +30,10 @@
 #include "genetic/random_source.hpp"
 #include "manifest.hpp"
 #include "profile.hpp"
+#include "psp/fitness.hpp"
+#include "psp/ordered_language.hpp"
+#include "psp/pipeline.hpp"
+#include "psp/specification.hpp"
 #include "repair_steps.hpp"
 #include "reports.hpp"
 #include "requirement.hpp"
@@ -64,11 +68,16 @@ std::string format_crash_metadata(std::size_t seed,
 // every key, so a shared config always carries the other path's keys, and only
 // a changed value says the config asked for something this run will not do.
 void warn_ignored_keys(const Config& cfg, RepairInput input) {
-    const char* const reader = input == RepairInput::Tlsf ? "FRETISH" : "TLSF";
-    const char* const run = input == RepairInput::Tlsf ? "TLSF" : "FRETISH";
+    const char* run = "FRETISH";
+    if (input == RepairInput::Tlsf) {
+        run = "TLSF";
+    } else if (input == RepairInput::Psp) {
+        run = "PSP";
+    }
     for (const std::string& key : ignored_non_default_keys(cfg, input)) {
         std::cerr << "warning: config key " << key << " is read only on the "
-                  << reader << " path; this " << run << " run ignores it\n";
+                  << key_reader_name(key) << " path; this " << run
+                  << " run ignores it\n";
     }
 }
 
@@ -242,6 +251,93 @@ int run_fretish_repair(const Config& cfg, const std::string& input_path,
         }
         end_run(cfg, output.filter_stats, input_path, output_dir,
                 effective_seed, budget, RepairInput::Fretish);
+    } catch (const std::exception& exc) {
+        std::cerr << "fatal: " << exc.what() << "\n";
+        return 1;
+    }
+    return 0;
+}
+
+int run_psp_repair(const Config& cfg, const std::string& input_path,
+                   const std::string& output_dir,
+                   const std::optional<std::size_t>& seed) {
+    const std::size_t effective_seed =
+        begin_run(cfg, input_path, seed, RepairInput::Psp);
+    const RandomSource random_source =
+        make_random_source_from_seed(effective_seed);
+    psp::Specification original_spec;
+    try {
+        original_spec = psp::load_specification(input_path);
+    } catch (const std::exception& exc) {
+        std::cerr << exc.what() << "\n";
+        return 1;
+    }
+    if (!screen_original(
+            original_spec, input_path, original_spec.m_in_atoms,
+            original_spec.m_out_atoms,
+            [&original_spec] {
+                return psp::check_realizability(original_spec);
+            },
+            cfg)) {
+        return 1;
+    }
+    AggregateWeightedFitnessFunctionT<psp::Specification> fitness_function =
+        psp::get_fitness_function(original_spec, cfg);
+    const std::vector<FilterFunctionT<psp::Specification>> filter_functions =
+        get_filter_functions(original_spec, global_sat_checker(),
+                             cfg.max_scoring_failure_rate);
+    std::vector<Scored<psp::Specification>> population =
+        psp::original_population(original_spec, fitness_function,
+                                 cfg.population_size);
+
+    announce_seed(effective_seed);
+
+    // Started after the seed population is scored, as on FRETISH.
+    SearchBudget budget(cfg, std::chrono::steady_clock::now());
+    try {
+        const std::unique_ptr<StreamingMaximalFilter<psp::Specification>>
+            stream = make_maximal_stream(original_spec, cfg, output_dir);
+        RepairAccumulator<psp::Specification> accumulator =
+            make_repair_accumulator<psp::Specification>(
+                output_dir, ".psp", psp::write_specification, budget,
+                stream.get());
+        SearchResult<psp::Specification> evolved = run_generations(
+            cfg, std::move(population), fitness_function, filter_functions,
+            random_source, accumulator, budget, &original_spec);
+        if (const std::optional<std::size_t> status_index =
+                status_objective_index(cfg)) {
+            DemotionStats::final_front =
+                final_front_gutting(evolved.population, *status_index);
+        }
+        RepairTransform<psp::Specification> climb;
+        if (cfg.climb_output) {
+            // As on FRETISH: each climb result is accumulated like any other
+            // gate-passing candidate.
+            climb = [&cfg, &original_spec, &accumulator, &budget,
+                     accepts = climb_gate<psp::Specification>(
+                         cfg, status_objective_of(fitness_function))](
+                        const std::vector<psp::Specification>& repairs) {
+                std::vector<psp::Specification> climbed = climb_repairs(
+                    repairs, original_spec, accepts, cfg.climb_orders);
+                const std::size_t generation = budget.generations() + 1;
+                for (const psp::Specification& spec : climbed) {
+                    accumulator.insert(spec, generation);
+                }
+                return climbed;
+            };
+        }
+        const SearchOutput<psp::Specification> output =
+            finish_search(cfg, std::move(evolved), accumulator.specifications(),
+                          fitness_function, stream.get(), climb);
+        psp::write_repairs(output.repairs, original_spec, fitness_function,
+                           output_dir);
+        print_repair_summary(output.n_realizable, output.repairs.size(),
+                             cfg.run_implication_filter, output_dir);
+        if (cfg.report_repair_summary) {
+            psp::print_repair_changes(original_spec, output.repairs);
+        }
+        end_run(cfg, output.filter_stats, input_path, output_dir,
+                effective_seed, budget, RepairInput::Psp);
     } catch (const std::exception& exc) {
         std::cerr << "fatal: " << exc.what() << "\n";
         return 1;

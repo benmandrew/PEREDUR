@@ -28,6 +28,9 @@
 #include "genetic/random_source.hpp"
 #include "genetic/scored.hpp"
 #include "genetic/simplify.hpp"
+#include "psp/mutation.hpp"
+#include "psp/ordered_language.hpp"
+#include "psp/specification.hpp"
 #include "tlsf/crossover.hpp"
 #include "tlsf/mutation.hpp"
 #include "tlsf/specification.hpp"
@@ -76,14 +79,15 @@ inline void record_origin(std::vector<OffspringOrigin>* origins,
     origins->push_back(origin);
 }
 
-/// What mutation is told about the FRETISH parent @p parent.
-inline ParentContext parent_context(const Scored<Specification>& parent,
-                                    bool crossed, const Specification* original,
+/// What mutation is told about the parent @p parent.
+template <typename Spec>
+ParentContextT<Spec> parent_context(const Scored<Spec>& parent, bool crossed,
+                                    const Spec* original,
                                     std::optional<std::size_t> status_objective,
                                     const SlotCoverage* coverage,
-                                    DiversityState* diversity,
+                                    DiversityStateOf<Spec>* diversity,
                                     const Config& cfg) {
-    ParentContext context;
+    ParentContextT<Spec> context;
     if (status_objective.has_value() &&
         *status_objective < parent.objectives.size()) {
         context.status = parent.objectives[*status_objective];
@@ -175,6 +179,116 @@ inline std::optional<OrderCrossoverKind> fretish_crossover(
     return kind;
 }
 
+/// What breeding needs to know about one slot to cross, mutate and push its
+/// offspring: the parents, the run state lent to mutation, and what the
+/// operators reported.
+template <typename Spec>
+struct BreedSlot {
+    BreedSlot(const Config& cfg_, const std::vector<Scored<Spec>>& sorted_pop_,
+              std::size_t index_, const RandomSource& random_source_,
+              const Spec* original_,
+              std::optional<std::size_t> status_objective_,
+              const SlotCoverage* coverage_, DiversityStateOf<Spec>* diversity_,
+              std::vector<OffspringOrigin>* origins_)
+        : cfg(cfg_),
+          sorted_pop(sorted_pop_),
+          index(index_),
+          random_source(random_source_),
+          original(original_),
+          status_objective(status_objective_),
+          coverage(coverage_),
+          diversity(diversity_),
+          origins(origins_) {}
+
+    const Config& cfg;
+    const std::vector<Scored<Spec>>& sorted_pop;
+    std::size_t index;
+    const RandomSource& random_source;
+    const Spec* original;
+    std::optional<std::size_t> status_objective;
+    const SlotCoverage* coverage;
+    DiversityStateOf<Spec>* diversity;
+    std::vector<OffspringOrigin>* origins;
+    bool crossed = false;
+    bool stepped = false;
+    std::optional<OrderCrossoverKind> order_kind;
+};
+
+inline void cross_offspring(BreedSlot<tlsf::Specification>& slot,
+                            std::size_t partner,
+                            tlsf::Specification& offspring) {
+    offspring = tlsf_crossover(
+        offspring, slot.sorted_pop[partner].specification, slot.random_source);
+}
+
+inline void cross_offspring(BreedSlot<Specification>& slot, std::size_t partner,
+                            Specification& offspring) {
+    slot.order_kind = fretish_crossover(slot.cfg, slot.sorted_pop, slot.index,
+                                        partner, slot.random_source, offspring);
+}
+
+inline void cross_offspring(BreedSlot<psp::Specification>& slot,
+                            std::size_t partner,
+                            psp::Specification& offspring) {
+    offspring = psp::crossover_specifications(
+        offspring, slot.sorted_pop[partner].specification, slot.random_source);
+}
+
+inline void mutate_offspring(BreedSlot<tlsf::Specification>& slot,
+                             tlsf::Specification& offspring) {
+    offspring = tlsf_mutate(offspring, slot.random_source, slot.cfg);
+}
+
+template <typename Spec>
+void mutate_offspring(BreedSlot<Spec>& slot, Spec& offspring) {
+    const ParentContextT<Spec> parent = parent_context(
+        slot.sorted_pop[slot.index], slot.crossed, slot.original,
+        slot.status_objective, slot.coverage, slot.diversity, slot.cfg);
+    offspring = mutate_specification(offspring, slot.random_source, slot.cfg,
+                                     &parent, &slot.stepped);
+}
+
+inline void push_offspring(BreedSlot<tlsf::Specification>& /*slot*/,
+                           tlsf::Specification offspring,
+                           std::vector<tlsf::Specification>& offspring_pop) {
+    offspring_pop.push_back(tlsf_simplify(std::move(offspring)));
+}
+
+inline void push_offspring(BreedSlot<Specification>& slot,
+                           Specification offspring,
+                           std::vector<Specification>& offspring_pop) {
+    const Scored<Specification>& parent = slot.sorted_pop[slot.index];
+    // The lineage reads the edit before simplification, which would
+    // otherwise show slots the mutation never touched.
+    const bool lineage = slot.cfg.flip_tabu > 0 && slot.diversity != nullptr &&
+                         !slot.crossed && slot.status_objective.has_value() &&
+                         !(offspring == parent.specification);
+    std::optional<Specification> edited;
+    if (lineage) {
+        edited = offspring;
+    }
+    offspring_pop.push_back(simplify_offspring(std::move(offspring)));
+    if (lineage) {
+        slot.diversity->note_offspring(
+            parent.specification,
+            status_proves_realizable(parent, slot.status_objective), *edited,
+            offspring_pop.back());
+    }
+    OrderCrossoverStats::note_offspring(slot.order_kind, offspring_pop.back());
+    DirectionGateStats::note_offspring(slot.stepped, offspring_pop.back());
+    record_origin(slot.origins, parent, slot.index, offspring_pop.back(),
+                  slot.status_objective);
+}
+
+/// PSP formulas are not simplified: a rewrite the simplifier would fold is
+/// left for deduplication, and no lineage or origin is kept.
+inline void push_offspring(BreedSlot<psp::Specification>& slot,
+                           psp::Specification offspring,
+                           std::vector<psp::Specification>& offspring_pop) {
+    offspring_pop.push_back(std::move(offspring));
+    DirectionGateStats::note_offspring(slot.stepped, offspring_pop.back());
+}
+
 template <typename Spec>
 std::vector<Spec> breed_offspring(const Config& cfg,
                                   const std::vector<Scored<Spec>>& sorted_pop,
@@ -183,7 +297,7 @@ std::vector<Spec> breed_offspring(const Config& cfg,
                                   SearchBudget* budget, const Spec* original,
                                   std::optional<std::size_t> status_objective,
                                   std::vector<OffspringOrigin>* origins,
-                                  [[maybe_unused]] DiversityState* diversity) {
+                                  DiversityStateOf<Spec>* diversity) {
     std::vector<Spec> offspring_pop;
     offspring_pop.reserve(offspring_n);
     // Read once: an inactive budget must not reach the loop body at all, or an
@@ -191,7 +305,7 @@ std::vector<Spec> breed_offspring(const Config& cfg,
     const bool budgeted = budget != nullptr && budget->active();
     // Counted once per generation, before any draw, and only where the key
     // asks for it.
-    [[maybe_unused]] const SlotCoverage* coverage = nullptr;
+    const SlotCoverage* coverage = nullptr;
     if constexpr (std::is_same_v<Spec, Specification>) {
         if (cfg.slot_coverage && diversity != nullptr && original != nullptr) {
             coverage = &diversity->slot_coverage(*original);
@@ -207,31 +321,15 @@ std::vector<Spec> breed_offspring(const Config& cfg,
         if (budgeted && budget->exhausted()) {
             break;
         }
+        BreedSlot<Spec> slot(cfg, sorted_pop, i, random_source, original,
+                             status_objective, coverage, diversity, origins);
         Spec offspring = sorted_pop[i].specification;
-        bool crossed = false;
-        [[maybe_unused]] std::optional<OrderCrossoverKind> order_kind;
-        [[maybe_unused]] bool stepped = false;
         if (probability_check(cfg.crossover_rate, random_source)) {
-            crossed = true;
-            const std::size_t partner = random_source.next_index(top_n);
-            const Spec& other = sorted_pop[partner].specification;
-            if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
-                offspring = tlsf_crossover(offspring, other, random_source);
-            } else {
-                order_kind = fretish_crossover(cfg, sorted_pop, i, partner,
-                                               random_source, offspring);
-            }
+            slot.crossed = true;
+            cross_offspring(slot, random_source.next_index(top_n), offspring);
         }
         if (probability_check(cfg.mutation_rate, random_source)) {
-            if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
-                offspring = tlsf_mutate(offspring, random_source, cfg);
-            } else {
-                const ParentContext parent =
-                    parent_context(sorted_pop[i], crossed, original,
-                                   status_objective, coverage, diversity, cfg);
-                offspring = mutate_specification(offspring, random_source, cfg,
-                                                 &parent, &stepped);
-            }
+            mutate_offspring(slot, offspring);
         }
         // Counted before simplification, and only when the slot actually
         // produced something new: AuRUS increments on `!chromosome.equals(
@@ -240,31 +338,7 @@ std::vector<Spec> breed_offspring(const Config& cfg,
         if (budgeted && !(offspring == sorted_pop[i].specification)) {
             budget->count_offspring();
         }
-        if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
-            offspring_pop.push_back(tlsf_simplify(std::move(offspring)));
-        } else {
-            // The lineage reads the edit before simplification, which would
-            // otherwise show slots the mutation never touched.
-            const bool lineage = cfg.flip_tabu > 0 && diversity != nullptr &&
-                                 !crossed && status_objective.has_value() &&
-                                 !(offspring == sorted_pop[i].specification);
-            std::optional<Spec> edited;
-            if (lineage) {
-                edited = offspring;
-            }
-            offspring_pop.push_back(simplify_offspring(std::move(offspring)));
-            if (lineage) {
-                diversity->note_offspring(
-                    sorted_pop[i].specification,
-                    status_proves_realizable(sorted_pop[i], status_objective),
-                    *edited, offspring_pop.back());
-            }
-            OrderCrossoverStats::note_offspring(order_kind,
-                                                offspring_pop.back());
-            DirectionGateStats::note_offspring(stepped, offspring_pop.back());
-            record_origin(origins, sorted_pop[i], i, offspring_pop.back(),
-                          status_objective);
-        }
+        push_offspring(slot, std::move(offspring), offspring_pop);
     }
     return offspring_pop;
 }
@@ -274,13 +348,13 @@ std::vector<Spec> breed_offspring(const Config& cfg,
 namespace pipeline_detail {
 
 /// The maximality-demotion flags over @p population (see
-/// proved_weaker_realizable), or none where demotion is off or @p Spec is not
-/// FRETISH: TLSF has no rule to prove one candidate stronger than another.
+/// proved_weaker_realizable), or none where demotion is off or @p Spec is
+/// TLSF, which has no rule to prove one candidate stronger than another.
 template <typename Spec>
 std::vector<bool> demotion_flags(
     [[maybe_unused]] const GenerationContext<Spec>& ctx,
     [[maybe_unused]] const std::vector<Scored<Spec>>& population) {
-    if constexpr (std::is_same_v<Spec, Specification>) {
+    if constexpr (!std::is_same_v<Spec, tlsf::Specification>) {
         if (ctx.m_cfg.maximality_demotion && ctx.m_status_index.has_value()) {
             return proved_weaker_realizable(population, *ctx.m_status_index);
         }
@@ -293,8 +367,8 @@ std::vector<bool> demotion_flags(
 /// by farthest-point order under specification_distance, under
 /// `genetic.novelty` the novelty objective, and under
 /// `genetic.novelty_tiebreak` the novelty count as the key before crowding
-/// within a front. Empty where every key is at its
-/// default or @p Spec is not FRETISH. Draws nothing.
+/// within a front. Empty where every key is at its default or @p Spec is
+/// TLSF; crowding by specification is FRETISH only. Draws nothing.
 template <typename Spec>
 Nsga2Options selection_options(
     [[maybe_unused]] const GenerationContext<Spec>& ctx,
@@ -309,6 +383,8 @@ Nsga2Options selection_options(
                                               population[rhs].specification);
             };
         }
+    }
+    if constexpr (!std::is_same_v<Spec, tlsf::Specification>) {
         if (ctx.m_cfg.novelty && ctx.m_diversity != nullptr) {
             options.extra_objective = novelty_objective(
                 *ctx.m_diversity, population, ctx.m_status_objective);
@@ -469,11 +545,13 @@ void stage_score(GenerationContext<Spec>& ctx) {
     ctx.m_scored = ctx.m_score(ctx.m_candidates);
     ctx.m_candidates.clear();
     ctx.m_view = PopulationView::Scored;
+    if constexpr (!std::is_same_v<Spec, tlsf::Specification>) {
+        DirectionGateStats::settle(ctx.m_scored,
+                                   status_objective_index(ctx.m_cfg));
+    }
     if constexpr (std::is_same_v<Spec, Specification>) {
         OrderCrossoverStats::settle(ctx.m_scored,
                                     status_objective_index(ctx.m_cfg));
-        DirectionGateStats::settle(ctx.m_scored,
-                                   status_objective_index(ctx.m_cfg));
         if (ctx.m_cfg.flip_tabu > 0 && ctx.m_diversity != nullptr &&
             ctx.m_status_objective.has_value()) {
             ctx.m_diversity->settle_offspring(
@@ -558,7 +636,7 @@ void stage_select(GenerationContext<Spec>& ctx) {
         // selection pressure is re-expressed as replication multiplicity.
         pool = generation_detail::replicate_to_size(pool, ctx.m_target_size);
     }
-    if constexpr (std::is_same_v<Spec, Specification>) {
+    if constexpr (!std::is_same_v<Spec, tlsf::Specification>) {
         if (ctx.m_diversity != nullptr) {
             ctx.m_diversity->retain(pool);
         }
@@ -636,4 +714,21 @@ template std::vector<PipelineStage<tlsf::Specification>>
 template std::vector<Scored<tlsf::Specification>> run_generation_pipeline(
     GenerationContext<tlsf::Specification>&,
     const std::vector<PipelineStage<tlsf::Specification>>&,
+    const StageObserver&);
+template void order_population(const Config&,
+                               std::vector<Scored<psp::Specification>>&);
+template std::vector<psp::Specification> generation_detail::breed_offspring(
+    const Config&, const std::vector<Scored<psp::Specification>>&, std::size_t,
+    std::size_t, const RandomSource&, SearchBudget*, const psp::Specification*,
+    std::optional<std::size_t>, std::vector<OffspringOrigin>*,
+    BasicDiversityState<psp::Specification>*);
+template void pipeline_detail::stage_parent_verdict(
+    GenerationContext<psp::Specification>&,
+    const ParentVerdictLookup<psp::Specification>&);
+template std::vector<PipelineStage<psp::Specification>>
+    make_generation_pipeline(std::vector<PipelineStage<psp::Specification>>,
+                             PopulationRescue<psp::Specification>);
+template std::vector<Scored<psp::Specification>> run_generation_pipeline(
+    GenerationContext<psp::Specification>&,
+    const std::vector<PipelineStage<psp::Specification>>&,
     const StageObserver&);

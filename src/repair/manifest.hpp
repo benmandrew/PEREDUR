@@ -27,9 +27,8 @@ nlohmann::json config_json(const Config& cfg);
 /// Where `entry` sits in config_json(), as a JSON pointer.
 nlohmann::json::json_pointer config_pointer(const ConfigKey& entry);
 
-/// Which of the two repair paths a run took, for the config keys only the
-/// other one reads.
-enum class RepairInput : std::uint8_t { Fretish, Tlsf };
+/// Which repair path a run took, for the config keys it does not read.
+enum class RepairInput : std::uint8_t { Fretish, Tlsf, Psp };
 
 /// Dotted paths of the config keys that @p input never reads and that @p cfg
 /// sets to something other than the built-in default, in a fixed order.
@@ -41,6 +40,11 @@ enum class RepairInput : std::uint8_t { Fretish, Tlsf };
 /// will not do.
 std::vector<std::string> ignored_non_default_keys(const Config& cfg,
                                                   RepairInput input);
+
+/// The paths that read the key at dotted path @p key, as the warning about an
+/// ignored key names them: "FRETISH", "TLSF", "PSP" or "FRETISH and PSP".
+/// Empty for a key both FRETISH and TLSF read or one no row names.
+std::string key_reader_name(const std::string& key);
 
 /// Writes `<output_dir>/run.json`: what produced this directory.
 ///
