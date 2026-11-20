@@ -115,6 +115,8 @@ target_sources(peredur_core PRIVATE
     src/prop_formula/simplify.cpp
     src/prop_formula/transform.cpp
     src/profile.cpp
+    src/psp/lowering.cpp
+    src/psp/requirement.cpp
     src/requirement.cpp
     src/tlsf/lexer.cpp
     src/tlsf/parser.cpp
@@ -191,6 +193,8 @@ target_sources(peredur_fitness PRIVATE
     src/config_io.cpp
     src/driver_support.cpp
     src/repair_steps.cpp
+    src/psp/filter.cpp
+    src/psp/serialisation.cpp
 )
 target_include_directories(peredur_fitness PUBLIC include)
 # As peredur_core does, and for the same reason: src/tlsf/filter.cpp names

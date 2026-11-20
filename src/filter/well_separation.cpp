@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "prop_formula/atoms.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "tlsf/specification.hpp"
 
@@ -45,6 +46,24 @@ std::unordered_set<std::string> assumption_atoms(
     return atoms;
 }
 
+// A PSP assumption contributes the formulas it carries, its fixed LTL included.
+std::unordered_set<std::string> assumption_atoms(
+    const psp::Specification& spec) {
+    std::unordered_set<std::string> atoms;
+    for (const psp::Requirement& req : spec.m_assumptions) {
+        if (req.m_removed) {
+            continue;
+        }
+        for (const std::optional<Formula>* field :
+             {&req.m_p, &req.m_s, &req.m_q, &req.m_r, &req.m_fixed}) {
+            if (field->has_value()) {
+                collect_atoms(**field, atoms);
+            }
+        }
+    }
+    return atoms;
+}
+
 std::string assumption_conjunction(const Specification& spec) {
     std::string conjunction;
     for (const Requirement& req : spec.m_assumptions) {
@@ -61,6 +80,28 @@ std::string assumption_conjunction(const Specification& spec) {
 
 std::string assumption_conjunction(const tlsf::Specification& spec) {
     return spec.assumption_ltl();
+}
+
+std::string assumption_conjunction(const psp::Specification& spec) {
+    std::string conjunction;
+    for (const psp::Requirement& req : spec.m_assumptions) {
+        if (req.m_removed) {
+            continue;
+        }
+        if (!conjunction.empty()) {
+            conjunction += " & ";
+        }
+        conjunction += "(" + req.m_ltl + ")";
+    }
+    return conjunction;
+}
+
+const std::vector<std::string>& input_signals(const psp::Specification& spec) {
+    return spec.m_in_atoms;
+}
+
+const std::vector<std::string>& output_signals(const psp::Specification& spec) {
+    return spec.m_out_atoms;
 }
 
 std::vector<std::string> input_signals(const Specification& spec) {
@@ -133,4 +174,6 @@ bool specification_is_not_well_separated(const Spec& specification,
 template bool specification_is_not_well_separated(const Specification&,
                                                   RealizabilityChecker&);
 template bool specification_is_not_well_separated(const tlsf::Specification&,
+                                                  RealizabilityChecker&);
+template bool specification_is_not_well_separated(const psp::Specification&,
                                                   RealizabilityChecker&);

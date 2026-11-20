@@ -85,6 +85,7 @@ const std::vector<Suite>& suites() {
         suite_named("tlsf_genetic"),
         suite_named("tlsf_monotone"),
         suite_named("tlsf_pipeline"),
+        suite_named("psp_lowering"),
         suite_named("driver_peredur"),
         suite_named("driver_realize"),
         suite_named("driver_ltl"),

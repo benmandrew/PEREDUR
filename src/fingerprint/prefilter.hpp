@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "fingerprint/lasso.hpp"
+#include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
 #include "thread_pool.hpp"
@@ -88,6 +89,11 @@ std::vector<PackedFingerprint> fingerprints_of(
 /// where its mode never holds.
 std::vector<PackedFingerprint> fingerprints_of(
     const std::vector<Specification>& specs,
+    TaskPriority priority = TaskPriority::Foreground);
+
+/// The PSP twin, over the declared inputs and outputs.
+std::vector<PackedFingerprint> fingerprints_of(
+    const std::vector<psp::Specification>& specs,
     TaskPriority priority = TaskPriority::Foreground);
 
 /// True when a model word refutes `lhs -> rhs` and no sampled word does: the

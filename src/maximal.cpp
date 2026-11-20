@@ -15,6 +15,7 @@
 #include "filter/implication.hpp"
 #include "fingerprint/lasso.hpp"
 #include "fingerprint/prefilter.hpp"
+#include "psp/specification.hpp"
 #include "repair/manifest.hpp"
 #include "requirement.hpp"
 #include "runner/black.hpp"
@@ -59,8 +60,9 @@ void print_usage(const char* prog) {
         << "Reports the maximal subset of a set of specifications under the\n"
         << "implication order (A dominates B when A implies B and B does not\n"
         << "imply A), then quotients the survivors by mutual implication.\n"
-        << "The input format is basic-TLSF (.tlsf) or FRETISH JSON (.json),\n"
-        << "chosen by the extensions present; the two cannot be mixed.\n"
+        << "The input format is basic-TLSF (.tlsf), PSP (.psp) or FRETISH\n"
+        << "JSON (.json), chosen by the extensions present; they cannot be\n"
+        << "mixed.\n"
         << "Directory arguments contribute every file of the chosen\n"
         << "extension in them, non-recursively.\n"
         << "\n"
@@ -346,6 +348,9 @@ int main(int argc, const char* const argv[]) {
         std::chrono::milliseconds{args.timeout_s * 1000}, true);
     set_thread_pool_size(args.jobs);
 
+    if (selects_psp(args.paths)) {
+        return run<psp::Specification>(args, checker);
+    }
     return selects_tlsf(args.paths) ? run<tlsf::Specification>(args, checker)
                                     : run<Specification>(args, checker);
 }
