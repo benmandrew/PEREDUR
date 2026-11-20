@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -187,6 +188,45 @@ TEST(psp_mutator_count_arm_weakens_by_count) {
         expect(psp::pattern_count(out.m_pattern).value_or(0) > 1,
                "mutate_requirement: bounded response weakens upwards");
     }
+}
+
+TEST(psp_mutator_donates_the_fields_a_move_newly_reads) {
+    // Universality reads S alone and the globally scope neither Q nor R, so
+    // any move to a pattern that reads P, or to a scope that reads Q or R,
+    // must take that field from the pool.
+    const Specification spec(
+        {},
+        {Requirement(psp::pattern::Universality{}, PspScopeKind::Globally,
+                     std::nullopt, Formula("grant"))},
+        {"req", "start", "stop"}, {"grant"});
+    const psp::MutationPoolData pools = psp::mutation_pool_data(spec);
+    Config cfg = psp_arms_off();
+    cfg.psp_p_pattern = 1.0;
+    cfg.psp_p_scope_kind = 1.0;
+    std::size_t n_changed = 0;
+    for (std::size_t seed = 0; seed < 16; ++seed) {
+        const RandomSource source = make_random_source_from_seed(seed);
+        const Requirement out =
+            psp::mutate_requirement(spec.m_guarantees[0], pools,
+                                    Direction::Weaken, source, cfg, nullptr);
+        if (out.m_scope != PspScopeKind::Globally ||
+            !std::holds_alternative<psp::pattern::Universality>(
+                out.m_pattern)) {
+            ++n_changed;
+        }
+        expect(out.m_s.has_value(), "mutate_requirement: S stays read");
+        const bool reads_q = out.m_scope == PspScopeKind::After ||
+                             out.m_scope == PspScopeKind::Between ||
+                             out.m_scope == PspScopeKind::AfterUntil;
+        const bool reads_r = out.m_scope == PspScopeKind::Before ||
+                             out.m_scope == PspScopeKind::Between ||
+                             out.m_scope == PspScopeKind::AfterUntil;
+        expect(out.m_q.has_value() == reads_q,
+               "mutate_requirement: Q is set exactly when the scope reads it");
+        expect(out.m_r.has_value() == reads_r,
+               "mutate_requirement: R is set exactly when the scope reads it");
+    }
+    expect(n_changed > 0, "mutate_requirement: the pattern or scope moves");
 }
 
 TEST(psp_mutator_monotone_rewrite_follows_polarity) {

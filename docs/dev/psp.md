@@ -60,3 +60,19 @@ The structural actions (add an assumption, tombstone a guarantee) and the whole-
 The objectives are those of FRETISH over the lowering: syntactic similarity is the mean of the keyword token similarity and the formula similarity of each field that either side reads, semantic similarity is the mean of the model-count similarity of each changed slot's lowering and `keyword_similarity` (pattern and scope downset Jaccard), and status is the MRS walk over the live guarantees, each subset checked by `ltlsynt` over `to_ltl()` with the well-separation test.
 
 **Gutting.** A rewrite of Q or R can empty a scope (R valid under before, Q unsatisfiable under after, Q implying R under between and after-until), after which the requirement holds vacuously. The search does not forbid it. `repair_N.fitness.json` carries `gutted`, the guarantee slots that the repair emptied and the original did not, the run prints a warning naming them, and `run.json` counts the gutted repairs under `psp.gutted_repairs`.
+
+## Mechanisms on PSP
+
+Each arm of sweep F (`base`, `full` and every `no-<f>`, with blame on in every arm and two-way mutation in exchange mode) ran to completion on `examples/psp-arbiter` with seed 7 on a release build, in 50 s to 75 s. The table lists the `run.json` counter that shows each mechanism acting, and its value in `full` and in the arm that turns the mechanism off.
+
+| Mechanism | Counter in `run.json` | `full` | Arm without it |
+| --- | --- | --- | --- |
+| climb | `climb.steps_accepted` (of `climb.steps_tried`) | 14 (of 39) | 0 in `no-climb` |
+| two-way mutation (exchange) | `direction_gate.steps`, `direction_gate.forbidden` | 108, 25 | 0, 0 in `no-gate` |
+| maximality removal | `n_maximality_removals` | 175 | 0 in `no-remove` |
+| novelty | `novelty.implied`, `novelty.covered` | 299, 2699 | 0, 0 in `no-novelty` |
+| blame narrowing | `n_targeted_mutations` | 607 | not ablated (1092 in `base`) |
+
+The `psp` block counts the PSP arms: in `full`, 112 pattern moves, 93 scope moves, 109 count moves, 303 monotone and 959 free rewrites, and 176 crossovers that changed a parent. No repair in any arm is gutted. `donated_fields` is 0 in every arm, because on this example the pattern and scope moves stay among patterns and scopes that read the same fields; `psp_mutator_donates_the_fields_a_move_newly_reads` covers donation. Climb runs on the output, so `no-climb` searches exactly as `full` does and differs only in the repairs climbed afterwards.
+
+`full` writes 68 repairs. `compare` against `fixes/grant-follows-request.psp` finds `repair_1.psp` strictly stronger than the known repair and none equivalent, so the known repair is found in the sense of the evaluation (some repair implies it), not as an exact output.
