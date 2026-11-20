@@ -594,8 +594,11 @@ class Formulas:
 
 
 class EnumLit(str):
-    """A bare enumeration value, before it meets the variable it is
-    compared with."""
+    """An enumeration value. A value of a declared type carries its
+    position in the type, which orders the values as Spectra does; a bare
+    literal takes the position of the value it is compared with."""
+
+    ordinal = None
 
 
 class Var:
@@ -619,7 +622,12 @@ def domain_values(base):
         return (False, True)
     if base[0] == "int":
         return tuple(range(base[1], base[2] + 1))
-    return tuple(EnumLit(v) for v in base[1])
+    out = []
+    for i, v in enumerate(base[1]):
+        lit = EnumLit(v)
+        lit.ordinal = i
+        out.append(lit)
+    return tuple(out)
 
 
 def cell_indices(dims):
@@ -816,6 +824,9 @@ class Lowering:
             return f.disj([f.conj([g, const_compare(f, op, a, v)])
                            for v, g in cb.items()])
         ca, cb = self.cases(a), self.cases(b)
+        if op not in ("=", "!=") and any(isinstance(v, EnumLit)
+                                         for v in list(ca) + list(cb)):
+            ca, cb = enum_ordinals(ca, cb)
         if len(ca) * len(cb) > CASE_LIMIT ** 2:
             raise Unsupported("a comparison over domains too large to "
                               "enumerate")
@@ -979,6 +990,21 @@ def is_formula(v):
 
 def is_const(v):
     return type(v) is int
+
+
+def enum_ordinals(ca, cb):
+    """Two enumeration case maps keyed by position in their type."""
+    pos = {}
+    for v in list(ca) + list(cb):
+        if not isinstance(v, EnumLit):
+            raise SpectraError("an enumeration compared with an integer")
+        if v.ordinal is not None:
+            pos.setdefault(str(v), v.ordinal)
+    try:
+        return ({pos[str(v)]: g for v, g in ca.items()},
+                {pos[str(v)]: g for v, g in cb.items()})
+    except KeyError as exc:
+        raise SpectraError(f"no order for {exc}") from None
 
 
 def int_op(op, x, y):
@@ -1150,6 +1176,17 @@ def slot_counts(spec):
     return out
 
 
+def monitor_in_assumptions(spec):
+    """Whether an assumption reads a monitor. Under `A -> G` the system can
+    then break the monitor's guarantees to falsify the assumption, which
+    Spectra, holding monitors outside both, does not allow."""
+    names = set()
+    for e in spec["assumptions"]:
+        for key in ("fixed", "p", "s", "q", "r"):
+            names.update(re.findall(r"\bm_\w+", e.get(key, "")))
+    return bool(names)
+
+
 # ---------------------------------------------------------------- checking
 
 
@@ -1198,7 +1235,22 @@ MANIFEST_FIELDS = [
     "assumptions_weakenable", "assumptions_fixed",
     "assumptions_event_scoped", "guarantees_weakenable", "guarantees_fixed",
     "guarantees_event_scoped", "weakenable", "event_scoped",
-    "eval_candidate"]
+    "monitor_in_assumptions", "eval_candidate"]
+
+
+def apply_verdict(row, verdict, secs):
+    """Record an ltlsynt verdict (True, False, or the failure text) on a
+    manifest row, excluding the specification unless it matches."""
+    row["ltlsynt_seconds"] = f"{secs:.1f}"
+    if verdict is True or verdict is False:
+        row["verdict"] = "realizable" if verdict else "unrealizable"
+        row["verdict_match"] = row["verdict"] == row["expected"]
+        if not row["verdict_match"]:
+            row.update(status="excluded",
+                       reason="verdict differs from Spectra")
+    else:
+        row.update(status="excluded", reason=f"ltlsynt {verdict}",
+                   verdict=verdict.split(":")[0])
 
 
 def main(argv=None):
@@ -1218,6 +1270,9 @@ def main(argv=None):
     ap.add_argument("--ltlsynt", default="ltlsynt")
     ap.add_argument("--timeout", type=float, default=300.0)
     ap.add_argument("--jobs", type=int, default=4)
+    ap.add_argument("--reuse-verdicts", type=Path, metavar="CSV",
+                    help="take the verdicts of an earlier manifest, and "
+                         "with --check ask ltlsynt only about the rest")
     args = ap.parse_args(argv)
 
     checkout = Path(args.checkout)
@@ -1246,31 +1301,32 @@ def main(argv=None):
                            weakenable=counts["assumptions_weakenable"] +
                            counts["guarantees_weakenable"],
                            event_scoped=counts["assumptions_event_scoped"] +
-                           counts["guarantees_event_scoped"])
+                           counts["guarantees_event_scoped"],
+                           monitor_in_assumptions=monitor_in_assumptions(spec))
             rows.append(row)
 
+    by_stem = {r["spec"]: r for r in rows}
+    if args.reuse_verdicts:
+        with args.reuse_verdicts.open(newline="") as fh:
+            for old in csv.DictReader(fh):
+                row = by_stem.get(old["spec"])
+                if row is None or old["spec"] not in specs or \
+                        not old.get("verdict"):
+                    continue
+                verdict = {"realizable": True, "unrealizable": False}.get(
+                    old["verdict"], old["reason"].removeprefix("ltlsynt "))
+                apply_verdict(row, verdict, float(old["ltlsynt_seconds"]))
     if args.check:
         def job(stem):
             start = time.monotonic()
             verdict = realizable(specs[stem], args.ltlsynt, args.timeout)
             return stem, verdict, time.monotonic() - start
-        by_stem = {r["spec"]: r for r in rows}
+        todo = sorted(s for s in specs if "verdict" not in by_stem[s])
         with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
-            for stem, verdict, secs in pool.map(job, sorted(specs)):
-                row = by_stem[stem]
-                row["ltlsynt_seconds"] = f"{secs:.1f}"
-                if verdict is True or verdict is False:
-                    row["verdict"] = "realizable" if verdict \
-                        else "unrealizable"
-                    row["verdict_match"] = row["verdict"] == row["expected"]
-                    if not row["verdict_match"]:
-                        row.update(status="excluded",
-                                   reason="verdict differs from Spectra")
-                else:
-                    row.update(status="excluded", reason=f"ltlsynt {verdict}",
-                               verdict=verdict.split(":")[0])
-                print(f"{stem}: {row.get('verdict')} ({secs:.1f} s)",
-                      file=sys.stderr, flush=True)
+            for stem, verdict, secs in pool.map(job, todo):
+                apply_verdict(by_stem[stem], verdict, secs)
+                print(f"{stem}: {by_stem[stem].get('verdict')} "
+                      f"({secs:.1f} s)", file=sys.stderr, flush=True)
 
     for row in rows:
         if row["status"] == "imported" and "guarantees_weakenable" in row:

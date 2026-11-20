@@ -297,6 +297,10 @@ env boolean[3] lit;
         assert truth(f, evaluate(low, "c != GREEN"), env) == \
             (colors[ci] != "GREEN")
         assert truth(f, evaluate(low, "lit[i]"), env) == lit[ii]
+        # Enumerations are ordered by declaration, not by name.
+        assert truth(f, evaluate(low, "c <= d"), env) == (ci <= di)
+        assert truth(f, evaluate(low, "c > BLUE"), env) is False
+        assert truth(f, evaluate(low, "GREEN < c"), env) == (ci == 2)
         assert truth(f, evaluate(low, "lit[2] & !lit[1]"), env)
 
 
