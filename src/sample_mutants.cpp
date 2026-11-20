@@ -1,11 +1,13 @@
-// sample-mutants: draw random mutation chains from a FRETISH specification
-// with the search's own mutation operator, and write the distinct results
-// with how often each was drawn at each depth.
+// sample-mutants: draw random mutation chains from a FRETISH or PSP
+// specification with the search's own mutation operator, and write the
+// distinct results with how often each was drawn at each depth.
 //
 // The seeded corpus (experiments/2026-11-13-seeded-corpus) uses it to
 // estimate how likely one or two undirected mutations of a seeded mutant are
 // to land on a repair at least as strong as its base, which would make the
-// subject a trivial reversion.
+// subject a trivial reversion. The PSP seeded corpus's probe
+// (experiments/2026-11-20-psp-order/scripts/probe.py) draws from a .psp
+// input the same way, with psp::mutate_specification.
 //
 // With --psp-seeded it instead writes every single-slot fault of a realisable
 // PSP specification (psp::seeded_edits): the candidates of the PSP seeded
@@ -27,17 +29,20 @@
 #include "driver_support.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/random_source.hpp"
+#include "psp/mutation.hpp"
 #include "psp/requirement.hpp"
 #include "psp/seeding.hpp"
 #include "psp/specification.hpp"
 #include "requirement.hpp"
 #include "serialisation.hpp"
+#include "spec_format.hpp"
 
 namespace {
 
 void print_usage(const char* prog) {
     std::cerr
-        << "Usage: " << prog << " <spec.json> --config <cfg.toml> --out <dir>\n"
+        << "Usage: " << prog
+        << " <spec.json|spec.psp> --config <cfg.toml> --out <dir>\n"
         << "       [--draws N] [--depth D] [--seed S] [--unrealizable-parent "
            "S]\n"
         << "       " << prog << " <base.psp> --psp-seeded --out <dir>\n"
@@ -46,7 +51,8 @@ void print_usage(const char* prog) {
         << "specification with mutate_specification under the config's\n"
         << "mutation keys, with no parent context unless one is given. Writes "
            "each distinct\n"
-        << "result once as <dir>/s<k>.json and <dir>/index.tsv with\n"
+        << "result once as <dir>/s<k>.json (s<k>.psp for a .psp input) and\n"
+        << "<dir>/index.tsv with "
         << "columns file, depth, count.\n"
         << "\n"
         << "  --unrealizable-parent S  Give every mutation the parent context\n"
@@ -119,24 +125,50 @@ struct Samples {
     std::map<std::string, std::size_t> file_of;
     // Key: (depth, serialised result) -> count.
     std::map<std::pair<std::size_t, std::string>, std::size_t> counts;
+    // The extension each result is written with: .json or .psp.
+    std::string extension;
 };
 
-Samples draw_samples(const Options& opts, const Specification& original,
-                     const Config& cfg) {
+std::string serialise(const Specification& spec) {
+    const nlohmann::json jobj = spec;
+    return jobj.dump(2) + "\n";
+}
+
+std::string serialise(const psp::Specification& spec) {
+    return psp::write_specification(spec);
+}
+
+Specification mutate(const Specification& spec,
+                     const RandomSource& random_source, const Config& cfg,
+                     const ParentContextT<Specification>* context) {
+    return mutate_specification(spec, random_source, cfg, context);
+}
+
+psp::Specification mutate(const psp::Specification& spec,
+                          const RandomSource& random_source, const Config& cfg,
+                          const ParentContextT<psp::Specification>* context) {
+    return psp::mutate_specification(spec, random_source, cfg, context);
+}
+
+// Draws the chains from @p original, FRETISH or PSP, with that language's
+// whole-specification mutation.
+template <typename Spec>
+Samples draw_samples(const Options& opts, const Spec& original,
+                     const Config& cfg, const std::string& extension) {
     const RandomSource random_source = make_random_source_from_seed(opts.seed);
-    ParentContext parent;
+    ParentContextT<Spec> parent;
     parent.status = opts.parent_status;
     parent.realizable = false;
     parent.original = &original;
-    const ParentContext* context = opts.parent_status ? &parent : nullptr;
+    const ParentContextT<Spec>* context =
+        opts.parent_status ? &parent : nullptr;
     Samples samples;
+    samples.extension = extension;
     for (std::size_t draw = 0; draw < opts.draws; ++draw) {
-        Specification current = original;
+        Spec current = original;
         for (std::size_t step = 1; step <= opts.depth; ++step) {
-            current =
-                mutate_specification(current, random_source, cfg, context);
-            const nlohmann::json jobj = current;
-            const std::string text = jobj.dump();
+            current = mutate(current, random_source, cfg, context);
+            const std::string text = serialise(current);
             if (samples.file_of.find(text) == samples.file_of.end()) {
                 const std::size_t index = samples.file_of.size();
                 samples.file_of.emplace(text, index);
@@ -151,14 +183,14 @@ void write_samples(const std::string& out_dir, const Samples& samples) {
     std::filesystem::create_directories(out_dir);
     for (const auto& [text, index] : samples.file_of) {
         std::ofstream out(std::filesystem::path(out_dir) /
-                          ("s" + std::to_string(index) + ".json"));
-        out << nlohmann::json::parse(text).dump(2) << "\n";
+                          ("s" + std::to_string(index) + samples.extension));
+        out << text;
     }
     std::ofstream index_out(std::filesystem::path(out_dir) / "index.tsv");
     index_out << "file\tdepth\tcount\n";
     for (const auto& [key, count] : samples.counts) {
-        index_out << "s" << samples.file_of.at(key.second) << ".json\t"
-                  << key.first << "\t" << count << "\n";
+        index_out << "s" << samples.file_of.at(key.second) << samples.extension
+                  << "\t" << key.first << "\t" << count << "\n";
     }
 }
 
@@ -205,9 +237,14 @@ int main(int argc, const char* const argv[]) {
             std::cout << written << " seeded faults\n";
             return 0;
         }
-        const Specification original = load_specification(opts.spec_path);
         const Config cfg = config_from_toml(opts.config_path);
-        const Samples samples = draw_samples(opts, original, cfg);
+        const bool psp_input = selects_psp({opts.spec_path});
+        const Samples samples =
+            psp_input
+                ? draw_samples(opts, psp::load_specification(opts.spec_path),
+                               cfg, ".psp")
+                : draw_samples(opts, load_specification(opts.spec_path), cfg,
+                               ".json");
         write_samples(opts.out_dir, samples);
         std::cout << samples.file_of.size() << " distinct specifications from "
                   << opts.draws << " chains of depth " << opts.depth << "\n";
