@@ -56,3 +56,17 @@ The reduce phase runs on av2 alone (av3 cannot ssh to av2) once av3's entry has 
 - 2026-11-21 00:09Z and 03:45Z: veribee released av3 and then av2. `2026-11-20-final-engine-large` enqueued as av3 098 (01:00Z) and av2 100 (03:52Z), on CPUs 0-29. Done at 11:35Z on av3 (10.4 h) and 11:59Z on av2 (8.1 h). lift-plus-cruise-full took about 3.2 h on av3 against the 5 h estimate; the seeded phase took 6.8 h on av3 against 4.5 h.
 - 2026-11-21 12:34Z: collected `final-engine` (6,840 rows), `final-engine-large` (120), `final-engine-lpc` (30) and `final-engine-seeded` (6,500) from av2 and then av3. Every source row is present once. All rows are at 8948138, clean, and none timed out. Found-repair counts: 6,253 of 6,840 on the small set and rad's cores, 5 of 120 on rad (as earlier campaigns, about 1 in 10 for the stronger arms and none for base), 30 of 30 on lift-plus-cruise-full, and 6,280 of 6,500 on the seeded corpus. Catalogue entries added.
 - 2026-11-21: veribee holds CPUs 14-29 (and up to 32G) on each host from the end of `-large` there until Mon 23 Nov 06:00Z (mailbox, 01:30Z), so both pooled passes run on CPUs 0-13 (d2df1e5b).
+- 2026-11-21 12:40Z: pooled locally under MemoryMax=20G. The specification pass has 18 subjects (15 on av2, 3 on av3; valu3s-uc6 and lift-plus-cruise-mini sampled) and 45 contrasts, every pair of the ten nsga2-apportion arms. The seeded pass first pooled all 130 subjects. Four subjects had an arm holding 3 or fewer members, all fsm-lmcps mutants (`sw-fsm-lmcps__paper-v2__m01`, `m02`, `m06`, `m07`), so the design was rewritten with `--drop` for them and pooled again: 126 subjects, 63 a host. Its largest pool is 4,423 nodes (`sw-rad__s3-9-32-56-71-72__m07`), so none is sampled. The inputs were copied to both hosts by rsync and checked there against these sums:
+
+```
+3fa1f043197ebc27a059035b6b40e4c85d2a9d264cf100ac5ef13ddfc9d77a7d  2026-11-20-final-engine-pooled/design.toml
+20896dc9b89dde698d76254432975e6e4ce4b7370d33d50f7cd9f6915a0bb785  2026-11-20-final-engine-pooled/subjects-av2.txt
+855f78e4c637cbe7837c5da9cc7c40be51c4afd02754f6d6d7f9ea8567b4abf8  2026-11-20-final-engine-pooled/subjects-av3.txt
+0e170061696bdc5e9156792029c5632e1229a88941480d1109ac59381a8ebbbd  2026-11-20-final-engine-pooled/members/index.csv
+48b2b9d11bfc058e015e187a9c80e65909d33721dc7f30ce7a99876b8ef1578b  2026-11-20-final-engine-pooled/members/done.csv
+aa0da1329ac9f77f2e5dfb5b19c34f189e6fa95db10edef45d4caf4ba1d76c25  2026-11-20-final-engine-seeded-pooled/design.toml
+ce1f64aaca4ca1112961c82f668036822b8431375c38f558b262f602173d8216  2026-11-20-final-engine-seeded-pooled/subjects-av2.txt
+045c6a17455f778c4a7c00c69f7093fb76253390febbba06fdf871357cca130e  2026-11-20-final-engine-seeded-pooled/subjects-av3.txt
+ad3dfa029274b7f7d91cca14152d9705002bed1ba2b6ed09c56a1d0d10d6802b  2026-11-20-final-engine-seeded-pooled/members/index.csv
+5e60e69f6fb0cbe7c6d658a214faca34debc65a0e8507a4fe6aaeaf6da19b7cd  2026-11-20-final-engine-seeded-pooled/members/done.csv
+```
