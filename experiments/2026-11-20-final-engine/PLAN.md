@@ -49,3 +49,10 @@ The reduce phase runs on av2 alone (av3 cannot ssh to av2) once av3's entry has 
 4. Locally, one at a time under a memory cap: `make_design.py specs` and `make_design.py seeded`, then `scripts/pool_members.py <design> <campaign>/members --root .` for each pooled campaign, and record the SHA-256 sums of the inputs in that campaign's directory.
 5. `rsync -a` each pooled campaign's `design.toml`, `subjects-*.txt` and `members/` to both hosts' checkouts, then enqueue both pooled campaigns on both hosts.
 6. `campaign.py collect --outputs final-engine-pooled-reduced --host av2`, and likewise for the seeded pass.
+
+## Log
+
+- 2026-11-20 14:15Z: `2026-11-20-final-engine` enqueued at 8948138 as av2 099 and av3 097, on CPUs 0-13 beside veribee's re-run. Done at 23:45Z on av2 and 00:03Z on av3, about 9.5 h a host against the 11 h estimate.
+- 2026-11-21 00:09Z and 03:45Z: veribee released av3 and then av2. `2026-11-20-final-engine-large` enqueued as av3 098 (01:00Z) and av2 100 (03:52Z), on CPUs 0-29. Done at 11:35Z on av3 (10.4 h) and 11:59Z on av2 (8.1 h). lift-plus-cruise-full took about 3.2 h on av3 against the 5 h estimate; the seeded phase took 6.8 h on av3 against 4.5 h.
+- 2026-11-21 12:34Z: collected `final-engine` (6,840 rows), `final-engine-large` (120), `final-engine-lpc` (30) and `final-engine-seeded` (6,500) from av2 and then av3. Every source row is present once. All rows are at 8948138, clean, and none timed out. Found-repair counts: 6,253 of 6,840 on the small set and rad's cores, 5 of 120 on rad (as earlier campaigns, about 1 in 10 for the stronger arms and none for base), 30 of 30 on lift-plus-cruise-full, and 6,280 of 6,500 on the seeded corpus. Catalogue entries added.
+- 2026-11-21: veribee holds CPUs 14-29 (and up to 32G) on each host from the end of `-large` there until Mon 23 Nov 06:00Z (mailbox, 01:30Z), so both pooled passes run on CPUs 0-13 (d2df1e5b).
