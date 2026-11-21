@@ -9,7 +9,7 @@ description = "The order-directed mechanisms on PSP (PLAN.md P8 on feat/psp-fron
 # for the user to enqueue.
 hosts = { av2 = "", av3 = "" }
 
-build = "sh -c 'cmake --build build-release -j 8'"
+build = "sh -c 'taskset -c 0-13 cmake --build build-release -j 12'"
 
 # Sweep F at the final engine's budget (2026-11-20-final-engine), the six
 # arms alone, at 2 threads a run.
