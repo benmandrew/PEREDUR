@@ -123,6 +123,36 @@ TEST(test_ltlfilt_decides_a_formula_over_the_argv_limit) {
            "long-formula: --remove-wm should rewrite a long formula");
 }
 
+// The shape PSP's `at_most` lowers a bounded existence to: W nested in the
+// right operand, alternating `p` and `!p`. `--remove-wm` copies each level's
+// right operand, so its output doubles with each level while its input grows
+// by a few bytes. A guarantee with `count: 16` under `before` printed several
+// GB and OOM-killed compare.
+std::string nested_weak_untils(std::size_t depth) {
+    std::string formula = "wmq";
+    for (std::size_t level = 0; level < depth; ++level) {
+        formula = (level % 2 == 0 ? "(!wmp W (" : "(wmp W (") + formula + "))";
+    }
+    return formula;
+}
+
+TEST(test_rewrite_gives_up_on_an_exponential_rewrite) {
+    // Depth 8 prints about 5.6 KB: an ordinary rewrite, which must still come
+    // back.
+    const std::optional<std::string> small =
+        rewrite_weak_operators(nested_weak_untils(8));
+    expect(small.has_value() && !has_weak_operator(*small),
+           "long-formula: --remove-wm should rewrite eight nested W");
+    // Depth 20 prints 23 MB from 213 bytes, past the 4 MiB cap: no
+    // answer, rather than a capture as large as the output.
+    const std::optional<std::string> huge =
+        rewrite_weak_operators(nested_weak_untils(20));
+    expect(!huge.has_value(),
+           "long-formula: a rewrite past the output cap should give no answer, "
+           "got " +
+               std::to_string(huge.has_value() ? huge->size() : 0) + " bytes");
+}
+
 TEST(test_black_decides_a_formula_over_the_argv_limit) {
     const std::vector<std::string> atoms = long_atoms();
     const std::string formula = conjunction(atoms);

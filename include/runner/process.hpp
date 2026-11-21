@@ -29,6 +29,10 @@ struct ProcessResult {
     /// True if the deadline expired: the output is partial and the process
     /// group was killed.
     bool m_timed_out = false;
+    /// True if the output passed the cap of execute_and_capture_capped: the
+    /// output is partial and the process group was killed. Never set by the
+    /// other entry points, which have no cap.
+    bool m_output_capped = false;
 };
 
 /// Raised by execute_and_capture and execute_and_capture_with_input when the
@@ -106,6 +110,22 @@ ProcessResult execute_and_capture(
 /// Throws std::runtime_error if the input file cannot be created or written.
 ProcessResult execute_and_capture_with_input(
     const std::vector<std::string>& arguments, const std::string& input,
+    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+    ExecutableLookup lookup = ExecutableLookup::AbsolutePath);
+
+/// As execute_and_capture_with_input, but stops reading, and kills the child's
+/// process group, as soon as the output is longer than `max_output_bytes`
+/// (which must be non-zero), and sets `m_output_capped`. A call whose output
+/// fits returns exactly what execute_and_capture_with_input would.
+///
+/// For a tool whose output can grow without bound against a small input, so
+/// that the capture itself, and not the tool, would exhaust memory before the
+/// timeout: `ltlfilt --remove-wm` on nested W prints a formula that doubles
+/// with each level of nesting. The call never goes to a tool server, whose
+/// protocol takes the whole output into memory before the length is known.
+ProcessResult execute_and_capture_capped(
+    const std::vector<std::string>& arguments, const std::string& input,
+    std::size_t max_output_bytes,
     std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
     ExecutableLookup lookup = ExecutableLookup::AbsolutePath);
 
