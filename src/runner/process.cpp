@@ -164,15 +164,25 @@ double rusage_cpu_seconds(const struct rusage& usage) {
     return user_s + sys_s;
 }
 
+// What read_until read, and why it stopped.
+struct ReadOutcome {
+    std::string m_output;
+    // Stopped short of EOF, at the deadline or a cancellation.
+    bool m_stopped = false;
+    // Stopped short of EOF because the output passed `max_bytes`.
+    bool m_capped = false;
+};
+
 // Reads read_fd until the child closes it (EOF) or `deadline` passes, if there
-// is one, or `signal` cancels the exec started at `start`. Returns the bytes
-// read so far and whether it stopped short of EOF; the caller kills and reaps.
-// With no deadline and no cancel signal, poll blocks indefinitely and this
-// only returns on EOF.
-std::pair<std::string, bool> read_until(
-    int read_fd, const std::optional<Clock::time_point>& deadline,
-    const ExecCancelScope::Signal& signal = {},
-    Clock::time_point start = Clock::time_point{}) {
+// is one, or `signal` cancels the exec started at `start`, or the output is
+// longer than a non-zero `max_bytes`. Returns the bytes read so far and why it
+// stopped; the caller kills and reaps. With no deadline, no cancel signal and
+// no cap, poll blocks indefinitely and this only returns on EOF.
+ReadOutcome read_until(int read_fd,
+                       const std::optional<Clock::time_point>& deadline,
+                       const ExecCancelScope::Signal& signal = {},
+                       Clock::time_point start = Clock::time_point{},
+                       std::size_t max_bytes = 0) {
     // The child's own runtime: the parent sits in poll()/read() until the tool
     // closes its stdout. Wall greatly exceeding CPU here is expected and
     // healthy -- it means the parent is blocked, not spinning.
@@ -181,17 +191,20 @@ std::pair<std::string, bool> read_until(
     std::array<char, 4096> read_buf{};
     while (true) {
         if (!wait_readable(read_fd, deadline, signal, start)) {
-            return {output, true};
+            return {std::move(output), true, false};
         }
         const ssize_t bytes_read =
             read(read_fd, read_buf.data(), read_buf.size());
         if (bytes_read > 0) {
             output.append(read_buf.data(),
                           static_cast<std::size_t>(bytes_read));
+            if (max_bytes != 0 && output.size() > max_bytes) {
+                return {std::move(output), false, true};
+            }
             continue;
         }
         if (bytes_read == 0) {
-            return {output, false};
+            return {std::move(output), false, false};
         }
         if (errno == EINTR) {
             continue;
@@ -845,16 +858,21 @@ std::optional<ProcessResult> charge_server_time(
 }
 
 // execute_and_capture, with `input` as the child's stdin when it is non-null.
-// Without one the child inherits this process's stdin, as it always has.
+// Without one the child inherits this process's stdin, as it always has. A
+// non-zero `max_output_bytes` is execute_and_capture_capped's cap, and keeps
+// the call off the tool server.
 ProcessResult run_and_capture(const std::vector<std::string>& arguments,
                               const std::string* input,
                               std::chrono::milliseconds timeout,
-                              ExecutableLookup lookup) {
+                              ExecutableLookup lookup,
+                              std::size_t max_output_bytes = 0) {
     assert(!arguments.empty());
     Clock::time_point charged_from = Clock::now();
-    if (std::optional<ProcessResult> served =
-            try_tool_server(arguments, input, timeout, lookup, charged_from)) {
-        return std::move(*served);
+    if (max_output_bytes == 0) {
+        if (std::optional<ProcessResult> served = try_tool_server(
+                arguments, input, timeout, lookup, charged_from)) {
+            return std::move(*served);
+        }
     }
     if (std::optional<ProcessResult> spent =
             charge_server_time(timeout, charged_from)) {
@@ -923,14 +941,15 @@ ProcessResult run_and_capture(const std::vector<std::string>& arguments,
         }
     }
     const std::optional<Clock::time_point> deadline = deadline_after(timeout);
-    auto [output, timed_out] =
-        read_until(pipe_fds[0], deadline, t_exec_cancel, start);
+    ReadOutcome read = read_until(pipe_fds[0], deadline, t_exec_cancel, start,
+                                  max_output_bytes);
     close(pipe_fds[0]);
+    bool timed_out = read.m_stopped;
     // Read once the read has stopped, so a flag set after EOF still leaves
     // the call its answer.
     const bool cancelled = timed_out && watched(t_exec_cancel) &&
                            exec_cancelled(t_exec_cancel, start);
-    if (timed_out) {
+    if (timed_out || read.m_capped) {
         kill_process_tree(child_pid);
     }
     double cpu_s = 0.0;
@@ -940,13 +959,15 @@ ProcessResult run_and_capture(const std::vector<std::string>& arguments,
     // wait4 — the one place the old per-runner wrappers could still hang on a
     // call that nominally had a budget.
     const int exit_code =
-        reap(child_pid, timed_out ? std::nullopt : deadline, cpu_s, timed_out);
+        reap(child_pid, (timed_out || read.m_capped) ? std::nullopt : deadline,
+             cpu_s, timed_out);
     if (cancelled) {
         throw ExecCancelled{};
     }
     const double wall_s =
         std::chrono::duration<double>(Clock::now() - start).count();
-    return {exit_code, std::move(output), cpu_s, wall_s, timed_out};
+    return {exit_code,    std::move(read.m_output), cpu_s, wall_s, timed_out,
+            read.m_capped};
 }
 
 }  // namespace
@@ -970,4 +991,13 @@ ProcessResult execute_and_capture_with_input(
     const std::vector<std::string>& arguments, const std::string& input,
     std::chrono::milliseconds timeout, ExecutableLookup lookup) {
     return run_and_capture(arguments, &input, timeout, lookup);
+}
+
+ProcessResult execute_and_capture_capped(
+    const std::vector<std::string>& arguments, const std::string& input,
+    std::size_t max_output_bytes, std::chrono::milliseconds timeout,
+    ExecutableLookup lookup) {
+    assert(max_output_bytes != 0);
+    return run_and_capture(arguments, &input, timeout, lookup,
+                           max_output_bytes);
 }

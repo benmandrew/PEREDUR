@@ -44,6 +44,17 @@ std::atomic<std::int64_t> g_ltlfilt_timeout_ms{10'000};
 // nothing against a subprocess spawn.
 std::mutex g_ltlfilt_mutex;
 
+// The longest rewrite rewrite_weak_operators accepts from `ltlfilt
+// --remove-wm`, in bytes. SPOT keeps a formula as a DAG, so the rewrite of
+// nested W, which copies each level's right operand, costs ltlfilt nothing
+// to build, but printing it writes out every copy: the output doubles with
+// each level. A PSP `bounded-existence` with `count: 16` under `before` reached
+// several GB within the 300 s ltlfilt budget of compare, all of it buffered
+// here, and was OOM-killed. 4 MiB is about three thousand times the 1000-1600
+// characters of a whole-spec implication, and far beyond any query black
+// decides in its 20 s budget; a rewrite this long is already no answer.
+constexpr std::size_t k_remove_wm_output_limit = std::size_t{4} * 1024 * 1024;
+
 std::chrono::milliseconds ltlfilt_timeout() {
     return std::chrono::milliseconds(g_ltlfilt_timeout_ms.load());
 }
@@ -103,14 +114,17 @@ std::optional<std::string> rewrite_weak_operators(const std::string& formula) {
     if (access(binary.c_str(), F_OK) != 0) {
         return remember(std::nullopt);
     }
-    const ProcessResult result = execute_and_capture_with_input(
+    const ProcessResult result = execute_and_capture_capped(
         {binary, "--remove-wm", "-p", "-F", "-"}, spot_formula_line(key),
-        ltlfilt_timeout());
+        k_remove_wm_output_limit, ltlfilt_timeout());
     {
         std::scoped_lock lock(g_ltlfilt_mutex);
         record_exec<LtlfiltStats>(result);
     }
-    if (result.m_exit_code != 0 || result.m_output.empty()) {
+    // A capped rewrite is cached as a failure: the same input prints the same
+    // output, so it would pass the cap again.
+    if (result.m_output_capped || result.m_exit_code != 0 ||
+        result.m_output.empty()) {
         return remember(std::nullopt);
     }
     std::string rewritten = result.m_output;

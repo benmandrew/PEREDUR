@@ -68,7 +68,8 @@ bool has_weak_operator(const std::string& formula);
 
 /// Returns `formula` with the weak-until (`W`) and strong-release (`M`)
 /// operators rewritten in terms of `U` and `R`, via `ltlfilt --remove-wm`.
-/// std::nullopt if the binary is inaccessible, the call fails or times out, or
+/// std::nullopt if the binary is inaccessible, the call fails or times out,
+/// the rewrite is longer than 4 MiB (nested W doubles it with each level), or
 /// the result still carries either operator.
 ///
 /// This never falls back to returning `formula` unchanged. Its caller needs
