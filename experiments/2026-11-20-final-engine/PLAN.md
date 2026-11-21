@@ -70,3 +70,4 @@ ce1f64aaca4ca1112961c82f668036822b8431375c38f558b262f602173d8216  2026-11-20-fin
 ad3dfa029274b7f7d91cca14152d9705002bed1ba2b6ed09c56a1d0d10d6802b  2026-11-20-final-engine-seeded-pooled/members/index.csv
 5e60e69f6fb0cbe7c6d658a214faca34debc65a0e8507a4fe6aaeaf6da19b7cd  2026-11-20-final-engine-seeded-pooled/members/done.csv
 ```
+- 2026-11-21 16:35Z: the specification pass ended on av3, after its compare (2.37 M rows), and reached reduce on av2 at 16:45Z, after 8.0 M rows. The seeded pass's fingerprint phase failed twice on av3 (16:2xZ), because `fingerprint_members.py` read every spec from `examples/<subject>/spec.json`, where no seeded mutant has one. It was fixed in acb3231d. Both seeded entries were dequeued (av3 100, av2 102) and enqueued again at acb3231d as av3 102 and av2 104, behind peredur-psp's `2026-11-20-psp-order` (av3 101, av2 103), which was agreed in the mailbox.
