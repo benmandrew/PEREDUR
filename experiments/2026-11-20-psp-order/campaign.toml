@@ -22,6 +22,10 @@ configs = "python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 
 # stay free for the Ollama server on both hosts. The windows are the
 # final engine's once its campaigns have left the hosts; set them against
 # whatever else is running at enqueue.
+# Set on 21 Nov to CPUs 0-13, 7 jobs, 28G on both hosts: veribee's hunt holds
+# CPUs 14-31 on both until Mon 2026-11-23 06:00Z (~/agent-mailbox). At 7 jobs
+# the phases take about 1.3 h (specifications) and 3 h (av2) or 2 h (av3)
+# (seeded corpus) a host.
 
 # Subject counts are read from the registries at plan time
 # (`run_experiments.py --profile psp-order[-seeded] --dry-run`), so the counts
@@ -36,15 +40,15 @@ configs = "python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 
 name = "specs-av2"
 profile = "psp-order"
 hosts = { av2 = "0-14" }
-confine = { av2 = { cpus = "0-29", memory_max = "48G" } }
-jobs = 15
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
 
 [[phases]]
 name = "specs-av3"
 profile = "psp-order"
 hosts = { av3 = "15-29" }
-confine = { av3 = { cpus = "0-29", memory_max = "48G" } }
-jobs = 15
+confine = { av3 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
 
 # The seeded corpus: PSP_SEEDED_SPECS (70 subjects) x 6 arms, 3 seeds on av2
 # and 2 on av3: 1,260 and 840 runs (about 21 and 14 slot-h, 1.5 h and 1 h a
@@ -53,12 +57,12 @@ jobs = 15
 name = "seeded-av2"
 profile = "psp-order-seeded"
 hosts = { av2 = "0-2" }
-confine = { av2 = { cpus = "0-29", memory_max = "48G" } }
-jobs = 15
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
 
 [[phases]]
 name = "seeded-av3"
 profile = "psp-order-seeded"
 hosts = { av3 = "3-4" }
-confine = { av3 = { cpus = "0-29", memory_max = "48G" } }
-jobs = 15
+confine = { av3 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
