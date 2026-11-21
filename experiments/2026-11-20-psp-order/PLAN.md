@@ -45,6 +45,12 @@ python3 scripts/campaign.py enqueue 2026-11-20-psp-order
 
 This queues one entry on each of av2 and av3.
 
+## Rerun of the seeded phases (2026-11-21)
+
+The first launch, at 392a5539 (av2 103, av3 101), ran the specification phases to completion on both hosts, and their rows stand. On av3 the seeded phase was OOM-killed twice at its 28G cap (18:44Z and 18:59Z) and was dequeued. The cause was in scoring, not in the search: `compare` buffered the output of `ltlfilt --remove-wm` with no bound, and on the no-twoway arm's repair 61 of `psp-cruise__m81` at seed 3 (a `bounded-existence` guarantee with `count: 16` under `before`) that output doubles with each level of W nesting, 739 MB in 8 s. 42a10e03 (merged at b7376a94) caps that one capture at 4 MiB and reports the rewrite as unresolved, so the pair reads `?`. Every other capture is unchanged, and on the 65 other repairs of that run the old and new `compare` print identical verdicts.
+
+av2 103 was dequeued once its specification phase finished, before its seeded phase began. The 233 seeded rows that av3 wrote at 392a5539 were set aside on av3 as `results-psp-order-seeded-392a553.csv` and `results-psp-order-seeded-392a553/`, so every seeded row comes from the fixed commit. The campaign was enqueued again at the fixed commit. Its specification phases find every run done and run nothing, since the resume key carries no commit. The specification CSV is therefore entirely at 392a5539, and the seeded CSV is entirely at the later commit.
+
 ## After the runs
 
 1. `python3 scripts/campaign.py collect --profile psp-order --host av2`, then `--host av3`, and likewise `--profile psp-order-seeded`.
