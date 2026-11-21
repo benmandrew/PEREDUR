@@ -13,11 +13,14 @@ hosts = { av2 = "", av3 = "" }
 #   sed -i '/av2 = { cpus/ s/cpus = "0-29"/cpus = "0-15"/' campaign.toml
 # and `jobs` must then shrink with it (CPUs over threads a run). CPUs 30-31
 # stay free for the Ollama server on both hosts.
-confine = { av2 = { cpus = "0-29", memory_max = "64G" }, av3 = { cpus = "0-29", memory_max = "64G" } }
+# CPUs 0-13 on both hosts from 21 Nov: veribee holds CPUs 14-29 (and up to
+# 32G) from when -large ends on each host until Mon 23 Nov 06:00Z (mailbox,
+# 01:30Z), so the reduce cap drops from 96G to 80G to leave room for it.
+confine = { av2 = { cpus = "0-13", memory_max = "64G" }, av3 = { cpus = "0-13", memory_max = "64G" } }
 
 # fpdraw is EXCLUDE_FROM_ALL, so the build names it. `confine` does not reach
 # the build, so taskset holds it to the same CPUs.
-build = "sh -c 'taskset -c 0-29 sh -c \"cmake --build build-release -j 16 && cmake --build build-release -j 16 --target fpdraw\"'"
+build = "sh -c 'taskset -c 0-13 sh -c \"cmake --build build-release -j 12 && cmake --build build-release -j 12 --target fpdraw\"'"
 
 # Estimate: the sideways runs returned a median of 777 repairs a subject over ten arms and five seeds (most a few hundred nodes after pooling), so compare is small, about 5-10 call-h; the 130 fingerprint draws dominate, 20-60 CPU-h, so 1-2 h a host (+-50%; no earlier pass of this shape).
 
@@ -74,7 +77,7 @@ members = "experiments/2026-11-20-final-engine-seeded-pooled/members"
 outputs = "experiments/final-engine-seeded-pooled"
 collected = "experiments/final-engine-seeded-pooled-collected"
 out = "experiments/final-engine-seeded-pooled-reduced"
-confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+confine = { av2 = { cpus = "0-13", memory_max = "80G" } }
 jobs = 4
 pooled_balls = true
 ball_k = [3]
