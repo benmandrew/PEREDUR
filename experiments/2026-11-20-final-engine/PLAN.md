@@ -71,3 +71,10 @@ ad3dfa029274b7f7d91cca14152d9705002bed1ba2b6ed09c56a1d0d10d6802b  2026-11-20-fin
 5e60e69f6fb0cbe7c6d658a214faca34debc65a0e8507a4fe6aaeaf6da19b7cd  2026-11-20-final-engine-seeded-pooled/members/done.csv
 ```
 - 2026-11-21 16:35Z: the specification pass ended on av3, after its compare (2.37 M rows), and reached reduce on av2 at 16:45Z, after 8.0 M rows. The seeded pass's fingerprint phase failed twice on av3 (16:2xZ), because `fingerprint_members.py` read every spec from `examples/<subject>/spec.json`, where no seeded mutant has one. It was fixed in acb3231d. Both seeded entries were dequeued (av3 100, av2 102) and enqueued again at acb3231d as av3 102 and av2 104, behind peredur-psp's `2026-11-20-psp-order` (av3 101, av2 103), which was agreed in the mailbox.
+- 2026-11-21 18:30Z: the specification pass's reduce ended on av2 (pooled at 18:21Z, joint at 18:30Z), and `campaign.py collect --outputs final-engine-pooled-reduced --host av2` copied its 11 files into `experiments/final-engine-pooled-reduced/av2/` (strength, ball radii, pooled ball radii and joint measures over 18 subjects). The seeded entries wait behind peredur-psp's: av3 102 behind psp's av3 101 (182 of 840 runs at 18:43Z), and av2 104 behind psp's av2 103, which started at 18:3xZ. Sums of the main outputs:
+
+```
+9a89431010d8061ce1c556ef0eda4d1558991b2dfa3eb2583fba6b5f930dfd3d  strength/contrasts.csv
+cedc8be2b37726421e885da382dd12c9aaf4dd67671b5bce1ccfbbaae5be015f  joint/per-subject.csv
+f8818df380aa468857fb71233258bacf8abb1d32016978e441fe0bbf00eea8db  ball-radii-pooled/pooled.csv
+```
