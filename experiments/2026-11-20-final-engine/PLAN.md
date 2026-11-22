@@ -78,3 +78,11 @@ ad3dfa029274b7f7d91cca14152d9705002bed1ba2b6ed09c56a1d0d10d6802b  2026-11-20-fin
 cedc8be2b37726421e885da382dd12c9aaf4dd67671b5bce1ccfbbaae5be015f  joint/per-subject.csv
 f8818df380aa468857fb71233258bacf8abb1d32016978e441fe0bbf00eea8db  ball-radii-pooled/pooled.csv
 ```
+- 2026-11-21 22:05Z: the seeded pass ended on av3 (entry 102: fingerprint from 19:10Z, compare of 1.45 M pairs from 21:10Z). peredur-psp's av3 entry had been dequeued at 19:02Z after its own compare ran out of memory (an unbounded `ltlfilt --remove-wm` capture, fixed on psp's branch in 42a10e03), so our 102 started early. That fix is not on this branch: no compare of ours ran out of memory.
+- 2026-11-22 00:05Z: the seeded pass ended on av2 (entry 104: fingerprint from 19:45Z, compare of 1.54 M pairs from 21:35Z, reduce from 23:40Z to 23:53Z). Its compare slowed to about 18 pairs a second on one subject, `sw-fsm-timing__add-not-supported__m00` (60,041 pairs), and ran at its usual rate on the rest. `campaign.py collect --outputs final-engine-seeded-pooled-reduced --host av2` copied its 11 files into `experiments/final-engine-seeded-pooled-reduced/av2/`: 126 subjects, 45 contrasts each (5,670 contrast rows). Both pooled sets are now in `experiments/catalogue.toml`. Every step of the order of work is done. Sums of the main outputs:
+
+```
+056fff8c291d0d8902a04270427c1b62cd3eea7cae398364e59678a13083e9d0  strength/contrasts.csv
+520797b04cdcfe9950b60a64c1fa1a8fac75134f898009c7663c9a0a0c71c882  joint/per-subject.csv
+dba80150ee7656fd1e725927eb328e435666c9556074c65c40ff9715923ece20  ball-radii-pooled/pooled.csv
+```

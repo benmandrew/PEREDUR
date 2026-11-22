@@ -288,6 +288,30 @@ date = "2026-11-21"
 commits = ["8948138c"]
 purpose = "The final engine on the 130 sideways seeded mutants: 10 arms (no random) x 5 seeds, 6,500 runs."
 
+[[set]]
+name = "final-engine-pooled"
+paths = ["2026-11-20-final-engine-pooled", "final-engine-pooled-reduced"]
+paper = "ext"
+status = "supporting"
+question = "RQ2 strength and diversity"
+campaign = "2026-11-20-final-engine-pooled"
+date = "2026-11-21"
+commits = ["47c0b76a"]
+purpose = "Pooled pass of the final engine on the specifications: 18 subjects, the ten nsga2-apportion arms and all 45 contrasts (strength, pooled ball radii at K = 3, share and joint-front reach, with seed-half controls)."
+note = "The reduced outputs are av2's, collected 2026-11-21. The pooled inputs (design, subject lists, members) are untracked; their sums are in the campaign's PLAN log."
+
+[[set]]
+name = "final-engine-seeded-pooled"
+paths = ["2026-11-20-final-engine-seeded-pooled", "final-engine-seeded-pooled-reduced"]
+paper = "ext"
+status = "supporting"
+question = "seeded corpus"
+campaign = "2026-11-20-final-engine-seeded-pooled"
+date = "2026-11-22"
+commits = ["acb3231d"]
+purpose = "Pooled pass of the final engine on the seeded corpus: 126 of the 130 sideways mutants (four fsm-lmcps mutants dropped, where an arm held 3 or fewer members), ten arms and all 45 contrasts."
+note = "The reduced outputs are av2's, collected 2026-11-22. The pooled inputs are untracked; their sums are in the final-engine PLAN log."
+
 # --- Extension paper: development, pilots and inputs --------------------------
 
 [[set]]
