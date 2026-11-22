@@ -4,7 +4,9 @@
    "fixed": "G(!s_count_time_c -> !(X(e_seconds20) | X(e_seconds3)))"
   },
   {
-   "fixed": "G(!e_seconds3 -> !e_seconds20)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!e_seconds3 -> !e_seconds20"
   },
   {
    "pattern": "existence",
@@ -70,13 +72,19 @@
    "fixed": "!a_mem_calls__i0 & !a_mem_calls__i1 & !a_mem_calls__i2 & !a_mem_calls__i3"
   },
   {
-   "fixed": "G(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1 -> !m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3 & s_door_m_c__b0 & !s_door_m_c__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1 -> !m_distance_between_doors__b0 & !m_distance_between_doors__b1 & !m_distance_between_doors__b2 & !m_distance_between_doors__b3 & s_door_m_c__b0 & !s_door_m_c__b1"
   },
   {
-   "fixed": "G(!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 -> !(!s_lift_m_c__b0 & s_lift_m_c__b1))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 -> !(!s_lift_m_c__b0 & s_lift_m_c__b1)"
   },
   {
-   "fixed": "G(m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 -> !(!s_lift_m_c__b0 & !s_lift_m_c__b1))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 -> !(!s_lift_m_c__b0 & !s_lift_m_c__b1)"
   },
   {
    "fixed": "G(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1 -> !(!X(s_lamp_c__b0) <-> !s_lamp_c__b0))"
@@ -121,10 +129,14 @@
    "fixed": "G((!m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & !e_calls_c__i0 -> !X(a_mem_calls__i0)) & (m_above_the_ground__b0 & m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3 & !e_calls_c__i1 -> !X(a_mem_calls__i1)) & (!m_above_the_ground__b0 & m_above_the_ground__b1 & m_above_the_ground__b2 & !m_above_the_ground__b3 & !e_calls_c__i2 -> !X(a_mem_calls__i2)) & (m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & m_above_the_ground__b3 & !e_calls_c__i3 -> !X(a_mem_calls__i3)))"
   },
   {
-   "fixed": "G(!(a_mem_calls__i0 | a_mem_calls__i1 | a_mem_calls__i2 | a_mem_calls__i3) & !m_return_to0 -> !(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!(a_mem_calls__i0 | a_mem_calls__i1 | a_mem_calls__i2 | a_mem_calls__i3) & !m_return_to0 -> !(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1)"
   },
   {
-   "fixed": "G(!(a_mem_calls__i0 | a_mem_calls__i1 | a_mem_calls__i2 | a_mem_calls__i3 | !m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3) | m_take_care_of_floor & !(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1) <-> s_count_time_c)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!(a_mem_calls__i0 | a_mem_calls__i1 | a_mem_calls__i2 | a_mem_calls__i3 | !m_above_the_ground__b0 & !m_above_the_ground__b1 & !m_above_the_ground__b2 & !m_above_the_ground__b3) | m_take_care_of_floor & !(!s_lift_m_c__b0 & !s_lift_m_c__b1 | !s_lift_m_c__b0 & s_lift_m_c__b1) <-> s_count_time_c"
   },
   {
    "pattern": "existence",

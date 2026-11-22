@@ -25,7 +25,10 @@
    "s": "e_color__b0 & !e_color__b1 | !e_color__b0 & e_color__b1 | !(!s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 & (!s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2))"
   },
   {
-   "fixed": "G(F((!e_status__b0 & !e_status__b1 | e_status__b0 & !e_status__b1) & e_color__b0 & !e_color__b1))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "(!e_status__b0 & !e_status__b1 | e_status__b0 & !e_status__b1) & e_color__b0 & !e_color__b1"
   },
   {
    "fixed": "G(!e_status__b0 & !e_status__b1 -> !X(e_status__b0) & !X(e_status__b1))"
@@ -42,25 +45,36 @@
    "fixed": "!s_mode__b0 & s_mode__b1 & s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 & s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2"
   },
   {
-   "fixed": "G((s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 | !s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | !s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | !s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2) & (!s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 | s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | !s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | !s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2) & (!s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 | !s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | !s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | !s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "(s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 | !s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | !s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | !s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2) & (!s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 | s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | !s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | !s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2) & (!s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 | !s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 | !s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 | !s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2 | s_steering_motor__b0 & s_steering_motor__b1 & s_steering_motor__b2)"
   },
   {
-   "fixed": "G((!s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2) & (!s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2) & (!s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2) & (!s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2) & (!s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "(!s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2) & (!s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2) & (!s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2) & (!s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2) & (!s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | s_drive_motor__b0 & s_drive_motor__b1 & !s_drive_motor__b2 | !s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | s_drive_motor__b0 & !s_drive_motor__b1 & s_drive_motor__b2 | !s_drive_motor__b0 & s_drive_motor__b1 & s_drive_motor__b2)"
   },
   {
-   "fixed": "G(!s_mode__b0 & s_mode__b1 <-> s_velocity__b0 & !s_velocity__b1 & !s_velocity__b2)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!s_mode__b0 & s_mode__b1 <-> s_velocity__b0 & !s_velocity__b1 & !s_velocity__b2"
   },
   {
    "fixed": "G(!s_mode__b0 & s_mode__b1 -> !X(s_mode__b0) & X(s_mode__b1) | X(s_mode__b0) & X(s_mode__b1))"
   },
   {
-   "fixed": "G(F(s_mode__b0 & s_mode__b1))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "s_mode__b0 & s_mode__b1"
   },
   {
    "fixed": "G((!e_status__b0 & !e_status__b1 | e_status__b0 & !e_status__b1) & e_color__b0 & !e_color__b1 <-> X(s_mode__b0) & X(s_mode__b1))"
   },
   {
-   "fixed": "G(s_mode__b0 & s_mode__b1 -> s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 & !s_velocity__b0 & !s_velocity__b1 & !s_velocity__b2)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "s_mode__b0 & s_mode__b1 -> s_drive_motor__b0 & !s_drive_motor__b1 & !s_drive_motor__b2 & !s_velocity__b0 & !s_velocity__b1 & !s_velocity__b2"
   },
   {
    "fixed": "G(!e_side_sense__b2 & !e_side_sense__b1 -> !(!X(s_steering_motor__b0) & X(s_steering_motor__b1) & X(s_steering_motor__b2) | X(s_steering_motor__b0) & X(s_steering_motor__b1) & X(s_steering_motor__b2)))"

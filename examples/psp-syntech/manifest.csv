@@ -1,150 +1,150 @@
-spec,folder,expected,status,reason,verdict,verdict_match,ltlsynt_seconds,in_atoms,out_atoms,assumptions_weakenable,assumptions_fixed,assumptions_event_scoped,guarantees_weakenable,guarantees_fixed,guarantees_event_scoped,weakenable,event_scoped,monitor_in_assumptions,eval_candidate
-AirportShuttleProject_AirportShuttle1_AirportShuttleWithTechnicalJob_275,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,16,23,3,13,0,0,82,0,3,0,True,
-AirportShuttleProject_AirportShuttle1_AirportShuttle_144,SYNTECH17/all_realizable,realizable,imported,,realizable,True,180.4,7,13,2,11,0,0,24,0,2,0,True,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_145,SYNTECH17/all_realizable,realizable,imported,,realizable,True,159.1,7,13,2,12,0,0,25,0,2,0,True,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_153,SYNTECH17/all_realizable,realizable,imported,,realizable,True,187.6,14,24,2,15,0,0,26,0,2,0,True,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_158,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,29,6,14,0,1,42,0,7,0,True,
-AirportShuttleProject_AirportShuttle1_AirportShuttle_160,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,29,6,13,0,1,42,0,7,0,True,
-AirportShuttleProject_AirportShuttle1_AirportShuttle_161,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,29,6,13,0,1,42,0,7,0,True,
-AirportShuttleProject_AirportShuttle1_AirportShuttle_162,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,9,27,1,12,0,2,32,0,3,0,True,
-AirportShuttleProject_AirportShuttle1_AirportShuttle_163,SYNTECH17/all_realizable,realizable,imported,,realizable,True,2.3,7,6,3,7,2,0,6,0,3,2,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_169,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,7,6,3,7,2,0,6,0,3,2,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_174,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,7,6,4,7,2,0,6,0,4,2,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_188,SYNTECH17/all_realizable,realizable,imported,,realizable,True,26.5,7,6,0,9,0,0,10,0,0,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_196,SYNTECH17/all_realizable,realizable,imported,,realizable,True,13.5,7,6,0,8,0,0,10,0,0,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_199,SYNTECH17/all_realizable,realizable,imported,,realizable,True,11.8,7,6,0,9,0,0,12,0,0,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_200,SYNTECH17/all_realizable,realizable,imported,,realizable,True,8.7,7,6,0,9,0,0,14,0,0,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_201,SYNTECH17/all_realizable,realizable,imported,,realizable,True,4.1,7,6,0,9,0,0,15,0,0,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_203,SYNTECH17/all_realizable,realizable,imported,,realizable,True,5.3,7,6,0,9,0,0,16,0,0,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_204,SYNTECH17/all_realizable,realizable,imported,,realizable,True,4.9,7,6,0,9,0,0,35,0,0,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_213,SYNTECH17/all_realizable,realizable,imported,,realizable,True,8.7,8,7,0,10,0,0,43,0,0,0,True,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_214,SYNTECH17/all_realizable,realizable,imported,,realizable,True,135.0,9,9,1,11,0,0,48,0,1,0,True,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_218,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,10,11,1,11,0,0,57,0,1,0,True,
-AirportShuttleProject_AirportShuttle1_AirportShuttle_221,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,11,14,2,12,0,0,67,0,2,0,True,
-AirportShuttleProject_AirportShuttle1_AirportShuttle_242,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,15,18,2,12,0,0,71,0,2,0,True,
-AirportShuttle_AirportShuttle_49,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,4,5,1,3,0,0,7,0,1,0,True,False
-ConvoyCar_ConvoyCarSpec_121,SYNTECH17/all_realizable,realizable,imported,,realizable,True,20.1,8,17,0,3,0,0,17,0,0,0,False,False
-ConvoyCar_ConvoyCarSpec_255,SYNTECH17/all_realizable,realizable,excluded,unsupported: SINCE,,,,,,,,,,,,,,,
-ConvoyCar_ConvoyCarSpec_285,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,6,13,3,6,2,0,19,0,3,2,False,
-ConvoyCar_ConvoyCarSpec_288,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,4,5,0,0,19,0,4,0,False,
-ConvoyCar_ConvoyCarSpec_290,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,4,4,0,0,19,0,4,0,False,
-ConvoyCar_ConvoyCarSpec_303,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,6,13,4,1,0,0,19,0,4,0,False,
-ConvoyCar_ConvoyCarSpec_307,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,4,1,0,0,19,0,4,0,False,
-ConvoyCar_ConvoyCarSpec_311,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,6,13,4,1,0,0,19,0,4,0,False,
-ConvoyCar_ConvoyCarSpec_85,SYNTECH17/all_realizable,realizable,imported,,realizable,True,32.6,8,16,0,1,0,0,14,0,0,0,False,False
-ConvoyCar_ConvoyCarSpec_86,SYNTECH17/all_realizable,realizable,imported,,realizable,True,62.7,8,17,0,4,0,0,17,0,0,0,False,False
-Elevator_cmp_Elevator_120,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,12,11,6,14,0,3,33,3,9,3,False,
-Elevator_cmp_Elevator_156,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,12,13,0,23,0,0,59,0,0,0,False,
-Elevator_cmp_Elevator_181,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,14,0,25,0,0,67,0,0,0,False,
-Elevator_cmp_Elevator_318,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,14,0,25,0,0,67,0,0,0,False,
-Elevator_cmp_Elevator_321,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,14,14,0,25,0,0,64,0,0,0,False,
-Elevator_cmp_Elevator_42,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,9,24,0,1,0,1,24,0,1,0,False,
-Elevator_cmp_Elevator_54,SYNTECH17/all_realizable,realizable,excluded,verdict differs from Spectra,unrealizable,False,232.1,6,21,0,1,0,2,28,0,2,0,False,
-Elevator_cmp_Elevator_55,SYNTECH17/all_realizable,realizable,imported,,realizable,True,34.0,6,20,1,2,1,6,29,2,7,3,True,False
-Elevator_cmp_Elevator_71,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,7,20,1,4,1,6,33,2,7,3,True,
-Elevator_cmp_Elevator_80,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,12,12,8,11,0,0,29,0,8,0,True,
-Elevator_cmp_Elevator_94,SYNTECH17/all_realizable,realizable,imported,,realizable,True,71.6,12,10,1,8,0,3,28,3,4,3,True,False
-Elevator_cmp_EqualFloorsNoGF_321,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,14,0,25,0,0,62,0,0,0,False,
-Elevator_cmp_EqualFloorsWithGF_321,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,14,14,0,25,0,0,66,0,0,0,False,
-Elevator_cmp_FavoriteFloor3NoGF_321,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,14,13,0,25,0,0,57,0,0,0,False,
-Elevator_cmp_FavoriteFloor3WithGF_321,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,14,13,0,25,0,0,61,0,0,0,False,
-Elevator_cmp_beckup_Elevator_118,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,12,10,6,14,0,3,31,3,9,3,False,
-Elevator_cmp_beckup_Elevator_72,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,7,20,1,4,1,6,33,2,7,3,True,
-Elevator_cmp_beckup_Elevator_88,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,12,12,8,12,0,0,29,0,8,0,True,
-ExitModule_ParkingSpec_194,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,14,11,2,20,0,0,18,0,2,0,False,
-ParkingModule_ParkingSpec_168,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,12,12,1,9,0,0,5,0,1,0,False,False
-ParkingModule_ParkingSpec_173,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,12,12,1,9,0,0,10,0,1,0,False,False
-ParkingModule_ParkingSpec_187,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,14,11,2,25,0,0,13,0,2,0,False,
-ParkingModule_ParkingSpec_192,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,11,2,22,0,0,17,0,2,0,False,
-SimpleVehicle2_VehicleSpec_103,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,13,10,2,6,0,0,19,0,2,0,False,False
-SimpleVehicle_VehicleSpecNoManualWithButtonRealizable_286,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,15,12,4,29,0,0,49,0,4,0,False,
-SimpleVehicle_VehicleSpecNoManualWithOutButtonRealizable_286,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,12,4,29,0,0,48,0,4,0,False,
-SimpleVehicle_VehicleSpec_101,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.1,13,10,2,6,0,0,19,0,2,0,False,False
-SimpleVehicle_VehicleSpec_125,SYNTECH17/all_realizable,realizable,imported,,realizable,True,7.5,10,11,2,6,0,0,17,0,2,0,False,False
-SimpleVehicle_VehicleSpec_131,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,10,11,2,7,0,0,23,0,2,0,False,
-SimpleVehicle_VehicleSpec_148,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,10,11,2,24,0,0,25,0,2,0,False,
-SimpleVehicle_VehicleSpec_151,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,10,11,2,25,0,0,25,0,2,0,False,
-SimpleVehicle_VehicleSpec_197,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,11,3,26,0,0,29,0,3,0,False,
-SimpleVehicle_VehicleSpec_202,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,14,11,3,27,0,0,35,0,3,0,False,
-SimpleVehicle_VehicleSpec_209,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,14,12,4,29,0,0,48,0,4,0,False,
-SimpleVehicle_VehicleSpec_21,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,7,10,1,2,0,0,6,0,1,0,False,False
-SimpleVehicle_VehicleSpec_210,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,15,12,4,29,0,0,48,0,4,0,False,
-SimpleVehicle_VehicleSpec_211,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,12,4,29,0,0,48,0,4,0,False,
-SimpleVehicle_VehicleSpec_212,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,15,12,4,29,0,0,49,0,4,0,False,
-SimpleVehicle_VehicleSpec_22,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,8,10,1,2,0,0,15,0,1,0,False,False
-SimpleVehicle_VehicleSpec_24,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,10,10,1,3,0,2,15,0,3,0,False,False
-SimpleVehicle_VehicleSpec_248,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,22,12,4,31,0,0,51,0,4,0,False,
-SimpleVehicle_VehicleSpec_254,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,22,12,4,33,0,0,51,0,4,0,False,
-SimpleVehicle_VehicleSpec_257,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,22,12,4,33,0,0,51,0,4,0,False,
-SimpleVehicle_VehicleSpec_272,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,22,12,4,33,0,0,52,0,4,0,False,
-SimpleVehicle_VehicleSpec_33,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.1,12,15,1,7,0,2,19,0,3,0,False,False
-SimpleVehicle_VehicleSpec_39,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.1,12,15,1,7,0,2,20,0,3,0,False,False
-SimpleVehicle_VehicleSpec_52,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.1,12,15,1,7,0,2,18,0,3,0,False,False
-SimpleVehicle_VehicleSpec_56,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,6,9,1,3,0,0,14,0,1,0,False,False
-SimpleVehicle_VehicleSpec_6,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,2,5,1,1,0,0,8,0,1,0,True,False
-SimpleVehicle_VehicleSpec_63,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,6,9,2,3,0,0,14,0,2,0,False,False
-SimpleVehicle_VehicleSpec_70,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,13,11,2,6,0,0,15,0,2,0,False,False
-V0_ConvoyCar_ConvoyCarSpec_293,SYNTECH17/all_realizable,realizable,imported,,realizable,True,54.1,8,16,0,1,0,0,14,0,0,0,False,False
-V2_ConvoyCar_ConvoyCarSpec_296,SYNTECH17/all_realizable,realizable,imported,,realizable,True,21.6,8,17,0,3,0,0,17,0,0,0,False,False
-V4_ConvoyCar_ConvoyCarSpec_298,SYNTECH17/all_realizable,realizable,excluded,unsupported: SINCE,,,,,,,,,,,,,,,
-V5_ConvoyCar_ConvoyCarSpec_299,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,3,6,2,0,19,0,3,2,False,
-V6_ConvoyCar_ConvoyCarSpec_300,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,4,5,0,0,19,0,4,0,False,
-V7_ConvoyCar_ConvoyCarSpec_301,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,4,4,0,0,19,0,4,0,False,
-V8_ConvoyCar_ConvoyCarSpec_302,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,6,13,4,1,0,0,19,0,4,0,False,
-moveAndScan_moveAndScan_178,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,12,11,2,13,0,0,21,0,2,0,False,
-moveAndScan_moveAndScan_184,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,12,11,2,13,0,0,20,0,2,0,False,
-moveAndScan_moveAndScan_186,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,12,11,2,13,0,1,20,0,3,0,False,
-roboticarm_Robot_122,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,19,9,0,10,0,0,11,0,0,0,False,
-roboticarm_Robot_223,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,9,10,0,4,0,0,6,0,0,0,False,False
-roboticarm_Robot_225,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,9,10,0,4,0,0,7,0,0,0,False,False
-roboticarm_Robot_226,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,19,9,0,10,0,0,11,0,0,0,False,
-roboticarm_Robot_227,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.1,10,13,0,9,0,0,11,0,0,0,False,False
-roboticarm_Robot_228,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,19,13,0,13,0,0,11,0,0,0,False,
-roboticarm_Robot_229,SYNTECH17/all_realizable,realizable,imported,,realizable,True,165.6,20,8,0,13,0,0,6,0,0,0,False,False
-roboticarm_Robot_230,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,21,13,0,23,0,0,20,0,0,0,False,
-roboticarm_Robot_231,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,19,13,0,17,0,0,9,0,0,0,False,False
-roboticarm_Robot_232,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,19,0,0,10,0,0,0,0,0,0,False,False
-roboticarm_Robot_233,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,21,13,0,22,0,0,20,0,0,0,False,
-roboticarm_Robot_234,SYNTECH17/all_realizable,realizable,imported,,realizable,True,3.0,12,11,0,14,0,0,11,0,0,0,False,False
-roboticarm_Robot_235,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,30,24,0,29,0,0,29,0,0,0,False,
-roboticarm_Robot_236,SYNTECH17/all_realizable,realizable,imported,,realizable,True,152.7,15,11,0,17,0,0,15,0,0,0,False,False
-roboticarm_Robot_237,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,24,22,0,28,0,0,26,0,0,0,False,
-roboticarm_Robot_238,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,24,22,0,27,0,0,26,0,0,0,False,
-roboticarm_Robot_241,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,24,22,0,29,0,0,26,0,0,0,False,
-roboticarm_Robot_256,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,24,22,0,29,0,0,34,0,0,0,False,
-roboticarm_Robot_289,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,24,22,0,29,0,0,32,0,0,0,False,
-roboticarm_Robot_304,SYNTECH17/all_realizable,realizable,excluded,parse: unknown predicate Pred,,,,,,,,,,,,,,,
-roboticarm_Robot_313,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,24,28,0,26,0,0,36,0,0,0,False,
-roboticarm_Robot_74,SYNTECH17/all_realizable,realizable,imported,,realizable,True,3.7,26,8,0,16,0,0,10,0,0,0,False,False
-roboticarm_Robot_76,SYNTECH17/all_realizable,realizable,imported,,realizable,True,28.5,26,8,0,19,0,0,10,0,0,0,False,False
-roboticarm_Robot_82,SYNTECH17/all_realizable,realizable,imported,,realizable,True,1.0,14,10,0,11,0,0,12,0,0,0,False,False
-roboticarm_Robot_87,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.6,14,10,0,11,0,0,12,0,0,0,False,False
-trunk_spectraExperiments_Elevator_cmp_Elevator_281,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,14,0,25,0,0,67,0,0,0,False,
-trunk_spectraExperiments_Elevator_cmp_Elevator_314,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,14,0,25,0,0,67,0,0,0,False,
-v1_ConvoyCar_ConvoyCarSpec_294,SYNTECH17/all_realizable,realizable,imported,,realizable,True,76.0,8,17,0,4,0,0,17,0,0,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttleWithTechnicalJobUnrealizable_283,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.3,16,23,3,13,0,0,82,0,3,0,True,
-AirportShuttleProject_AirportShuttle1_AirportShuttle_143,SYNTECH17/all_unrealizable,unrealizable,excluded,verdict differs from Spectra,realizable,False,171.2,7,13,2,11,0,0,24,0,2,0,True,
-AirportShuttleProject_AirportShuttle1_AirportShuttle_176,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,32.7,7,6,2,7,0,0,9,0,2,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_177,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,0.1,7,6,2,7,0,0,10,0,2,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_182,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,0.4,7,6,2,10,0,0,13,0,2,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_183,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,23.4,7,6,2,11,0,0,13,0,2,0,False,False
-AirportShuttleProject_AirportShuttle1_AirportShuttle_208,SYNTECH17/all_unrealizable,unrealizable,excluded,verdict differs from Spectra,realizable,False,7.9,8,8,0,10,0,0,46,0,0,0,True,
-ConvoyCar_ConvoyCarSpec_250,SYNTECH17/all_unrealizable,unrealizable,excluded,unsupported: SINCE,,,,,,,,,,,,,,,
-Elevator_cmp_Elevator_135,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.2,12,10,2,19,0,2,35,2,4,2,False,
-Elevator_cmp_Elevator_58,SYNTECH17/all_unrealizable,unrealizable,excluded,verdict differs from Spectra,realizable,False,7.9,6,28,1,2,1,6,41,2,7,3,True,
-Elevator_cmp_Elevator_59,SYNTECH17/all_unrealizable,unrealizable,excluded,verdict differs from Spectra,realizable,False,14.3,6,28,1,2,1,6,41,2,7,3,True,
-Elevator_cmp_Elevator_60,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.3,6,30,1,2,1,6,52,2,7,3,True,
-Elevator_cmp_Elevator_62,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.1,6,31,1,2,1,6,54,2,7,3,True,
-Elevator_cmp_Elevator_88,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,3.2,12,11,1,8,0,1,35,0,2,0,False,False
-SimpleVehicle_VehicleSpecNoManualWithButtonUnealizable_286,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.3,15,12,4,29,0,0,49,0,4,0,False,
-SimpleVehicle_VehicleSpecNoManualWithOutButtonUnealizable_286,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.3,14,12,4,28,0,0,48,0,4,0,False,
-SimpleVehicle_VehicleSpec_133,SYNTECH17/all_unrealizable,unrealizable,excluded,verdict differs from Spectra,realizable,False,5.5,10,11,0,9,0,0,23,0,0,0,False,
-SimpleVehicle_VehicleSpec_134,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,3.4,10,11,0,8,0,0,23,0,0,0,False,False
-SimpleVehicle_VehicleSpec_139,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.2,10,11,1,23,0,0,22,0,1,0,False,
-SimpleVehicle_VehicleSpec_31,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,0.1,12,15,1,6,0,2,19,0,3,0,False,True
-SimpleVehicle_VehicleSpec_78,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,0.2,14,12,2,9,0,0,20,0,2,0,False,False
-SimpleVehicle_VehicleSpec_79,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,0.0,14,12,2,8,0,1,19,0,3,0,False,False
-V3_ConvoyCar_ConvoyCarSpec_297,SYNTECH17/all_unrealizable,unrealizable,excluded,unsupported: SINCE,,,,,,,,,,,,,,,
-moveAndScan_moveAndScan_185,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.2,12,11,2,13,0,1,20,0,3,0,False,
-roboticarm_Robot_224,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.3,21,13,0,12,0,0,16,0,0,0,False,
-roboticarm_Robot_312,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.2,24,28,0,26,0,0,36,0,0,0,False,
+spec,folder,expected,status,reason,verdict,verdict_match,ltlsynt_seconds,in_atoms,out_atoms,assumptions_weakenable,assumptions_fixed,assumptions_event_scoped,guarantees_weakenable,guarantees_fixed,guarantees_event_scoped,weakenable,event_scoped,monitor_in_assumptions,eval_candidate,dropped_valid
+AirportShuttleProject_AirportShuttle1_AirportShuttleWithTechnicalJob_275,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,16,23,4,12,0,19,63,0,23,0,True,,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_144,SYNTECH17/all_realizable,realizable,imported,,realizable,True,180.4,7,13,5,8,0,6,17,0,11,0,True,False,gar:monitor:stopAtNearestStation
+AirportShuttleProject_AirportShuttle1_AirportShuttle_145,SYNTECH17/all_realizable,realizable,imported,,realizable,True,159.1,7,13,5,9,0,6,18,0,11,0,True,False,gar:monitor:stopAtNearestStation
+AirportShuttleProject_AirportShuttle1_AirportShuttle_153,SYNTECH17/all_realizable,realizable,imported,,realizable,True,187.6,14,24,5,12,0,6,19,0,11,0,True,False,gar:monitor:stopAtNearestStation
+AirportShuttleProject_AirportShuttle1_AirportShuttle_158,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,29,9,11,0,10,32,0,19,0,True,,gar:monitor:stopAtNearestStation
+AirportShuttleProject_AirportShuttle1_AirportShuttle_160,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,29,8,11,0,10,32,0,18,0,True,,gar:monitor:stopAtNearestStation
+AirportShuttleProject_AirportShuttle1_AirportShuttle_161,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,29,8,11,0,10,32,0,18,0,True,,gar:monitor:stopAtNearestStation
+AirportShuttleProject_AirportShuttle1_AirportShuttle_162,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,9,27,2,11,0,10,23,0,12,0,True,,gar:monitor:stopAtNearestStation
+AirportShuttleProject_AirportShuttle1_AirportShuttle_163,SYNTECH17/all_realizable,realizable,imported,,realizable,True,2.3,7,6,5,5,2,2,4,0,7,2,False,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_169,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,7,6,5,5,2,2,4,0,7,2,False,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_174,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,7,6,6,5,2,2,4,0,8,2,False,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_188,SYNTECH17/all_realizable,realizable,imported,,realizable,True,26.5,7,6,1,8,0,7,3,0,8,0,False,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_196,SYNTECH17/all_realizable,realizable,imported,,realizable,True,13.5,7,6,0,8,0,7,3,0,7,0,False,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_199,SYNTECH17/all_realizable,realizable,imported,,realizable,True,11.8,7,6,0,9,0,8,4,0,8,0,False,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_200,SYNTECH17/all_realizable,realizable,imported,,realizable,True,8.7,7,6,0,9,0,8,6,0,8,0,False,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_201,SYNTECH17/all_realizable,realizable,imported,,realizable,True,4.1,7,6,0,9,0,11,4,0,11,0,False,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_203,SYNTECH17/all_realizable,realizable,imported,,realizable,True,5.3,7,6,0,9,0,12,4,0,12,0,False,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_204,SYNTECH17/all_realizable,realizable,imported,,realizable,True,4.9,7,6,0,9,0,12,23,0,12,0,False,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_213,SYNTECH17/all_realizable,realizable,imported,,realizable,True,8.7,8,7,1,9,0,13,30,0,14,0,True,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_214,SYNTECH17/all_realizable,realizable,imported,,realizable,True,135.0,9,9,2,10,0,13,35,0,15,0,True,False,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_218,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,10,11,2,10,0,16,41,0,18,0,True,,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_221,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,11,14,3,11,0,18,49,0,21,0,True,,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_242,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,15,18,3,11,0,18,53,0,21,0,True,,
+AirportShuttle_AirportShuttle_49,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,4,5,2,2,0,2,5,0,4,0,True,False,
+ConvoyCar_ConvoyCarSpec_121,SYNTECH17/all_realizable,realizable,imported,,realizable,True,20.1,8,17,0,0,0,7,10,0,7,0,False,False,asm:#1;asm:#2;asm:#3
+ConvoyCar_ConvoyCarSpec_255,SYNTECH17/all_realizable,realizable,excluded,unsupported: SINCE,,,,,,,,,,,,,,,,
+ConvoyCar_ConvoyCarSpec_285,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,6,13,4,2,2,6,13,0,10,2,False,,asm:#5;asm:#6;asm:#7
+ConvoyCar_ConvoyCarSpec_288,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,4,2,0,8,11,0,12,0,False,,asm:#5;asm:#6;asm:#7
+ConvoyCar_ConvoyCarSpec_290,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,4,1,0,8,11,0,12,0,False,,asm:#5;asm:#6;asm:#7
+ConvoyCar_ConvoyCarSpec_303,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,6,13,4,1,0,8,11,0,12,0,False,,
+ConvoyCar_ConvoyCarSpec_307,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,4,1,0,8,11,0,12,0,False,,
+ConvoyCar_ConvoyCarSpec_311,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,6,13,4,1,0,8,11,0,12,0,False,,
+ConvoyCar_ConvoyCarSpec_85,SYNTECH17/all_realizable,realizable,imported,,realizable,True,32.6,8,16,0,1,0,2,12,0,2,0,False,False,
+ConvoyCar_ConvoyCarSpec_86,SYNTECH17/all_realizable,realizable,imported,,realizable,True,62.7,8,17,0,1,0,7,10,0,7,0,False,False,asm:#1;asm:#2;asm:#3
+Elevator_cmp_Elevator_120,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,12,11,8,12,0,13,23,3,21,3,False,,
+Elevator_cmp_Elevator_156,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,12,13,0,23,0,20,39,0,20,0,False,,
+Elevator_cmp_Elevator_181,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,14,0,25,0,20,47,0,20,0,False,,
+Elevator_cmp_Elevator_318,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,14,0,25,0,20,47,0,20,0,False,,
+Elevator_cmp_Elevator_321,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,14,14,0,25,0,17,47,0,17,0,False,,
+Elevator_cmp_Elevator_42,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,9,24,0,1,0,5,20,0,5,0,False,,
+Elevator_cmp_Elevator_54,SYNTECH17/all_realizable,realizable,excluded,verdict differs from Spectra,unrealizable,False,232.1,6,21,0,1,0,5,25,0,5,0,False,,
+Elevator_cmp_Elevator_55,SYNTECH17/all_realizable,realizable,imported,,realizable,True,34.0,6,20,2,1,1,11,24,2,13,3,True,False,
+Elevator_cmp_Elevator_71,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,7,20,2,3,1,12,27,2,14,3,True,,
+Elevator_cmp_Elevator_80,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,12,12,10,9,0,12,17,0,22,0,True,,
+Elevator_cmp_Elevator_94,SYNTECH17/all_realizable,realizable,imported,,realizable,True,71.6,12,10,1,8,0,12,19,3,13,3,True,False,
+Elevator_cmp_EqualFloorsNoGF_321,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,14,0,25,0,17,45,0,17,0,False,,
+Elevator_cmp_EqualFloorsWithGF_321,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,14,14,0,25,0,21,45,0,21,0,False,,
+Elevator_cmp_FavoriteFloor3NoGF_321,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,14,13,0,25,0,17,40,0,17,0,False,,
+Elevator_cmp_FavoriteFloor3WithGF_321,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,14,13,0,25,0,21,40,0,21,0,False,,
+Elevator_cmp_beckup_Elevator_118,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,12,10,8,12,0,13,21,3,21,3,False,,
+Elevator_cmp_beckup_Elevator_72,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,7,20,2,3,1,12,27,2,14,3,True,,
+Elevator_cmp_beckup_Elevator_88,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,12,12,10,10,0,12,17,0,22,0,True,,
+ExitModule_ParkingSpec_194,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,14,11,5,17,0,6,12,0,11,0,False,,
+ParkingModule_ParkingSpec_168,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,12,12,2,8,0,2,3,0,4,0,False,False,
+ParkingModule_ParkingSpec_173,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,12,12,2,8,0,5,5,0,7,0,False,False,
+ParkingModule_ParkingSpec_187,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,14,11,5,22,0,7,6,0,12,0,False,,
+ParkingModule_ParkingSpec_192,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,11,5,19,0,6,11,0,11,0,False,,
+SimpleVehicle2_VehicleSpec_103,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,13,10,4,4,0,9,10,0,13,0,False,False,
+SimpleVehicle_VehicleSpecNoManualWithButtonRealizable_286,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,15,12,8,25,0,11,38,0,19,0,False,,
+SimpleVehicle_VehicleSpecNoManualWithOutButtonRealizable_286,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,12,8,25,0,11,37,0,19,0,False,,
+SimpleVehicle_VehicleSpec_101,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.1,13,10,4,4,0,9,10,0,13,0,False,False,
+SimpleVehicle_VehicleSpec_125,SYNTECH17/all_realizable,realizable,imported,,realizable,True,7.5,10,11,4,4,0,6,11,0,10,0,False,False,
+SimpleVehicle_VehicleSpec_131,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,10,11,4,5,0,9,14,0,13,0,False,,
+SimpleVehicle_VehicleSpec_148,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,10,11,5,21,0,9,16,0,14,0,False,,
+SimpleVehicle_VehicleSpec_151,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,10,11,5,22,0,9,16,0,14,0,False,,
+SimpleVehicle_VehicleSpec_197,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,11,7,22,0,12,17,0,19,0,False,,
+SimpleVehicle_VehicleSpec_202,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,14,11,7,23,0,11,24,0,18,0,False,,
+SimpleVehicle_VehicleSpec_209,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,14,12,8,25,0,11,37,0,19,0,False,,
+SimpleVehicle_VehicleSpec_21,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,7,10,1,2,0,3,3,0,4,0,False,False,
+SimpleVehicle_VehicleSpec_210,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,15,12,8,25,0,11,37,0,19,0,False,,
+SimpleVehicle_VehicleSpec_211,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,12,8,25,0,11,37,0,19,0,False,,
+SimpleVehicle_VehicleSpec_212,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,15,12,8,25,0,11,38,0,19,0,False,,
+SimpleVehicle_VehicleSpec_22,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,8,10,1,2,0,9,4,0,10,0,False,False,gar:eyesOnTheRoad;gar:useYourRearviewMirror
+SimpleVehicle_VehicleSpec_24,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,10,10,2,2,0,11,4,0,13,0,False,False,gar:eyesOnTheRoad;gar:useYourRearviewMirror
+SimpleVehicle_VehicleSpec_248,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,22,12,10,25,0,13,38,0,23,0,False,,
+SimpleVehicle_VehicleSpec_254,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,22,12,8,29,0,12,39,0,20,0,False,,
+SimpleVehicle_VehicleSpec_257,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,22,12,8,29,0,12,39,0,20,0,False,,
+SimpleVehicle_VehicleSpec_272,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,22,12,8,29,0,13,39,0,21,0,False,,
+SimpleVehicle_VehicleSpec_33,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.1,12,15,3,5,0,15,6,0,18,0,False,False,
+SimpleVehicle_VehicleSpec_39,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.1,12,15,3,5,0,15,7,0,18,0,False,False,
+SimpleVehicle_VehicleSpec_52,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.1,12,15,3,5,0,15,5,0,18,0,False,False,
+SimpleVehicle_VehicleSpec_56,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,6,9,1,3,0,10,4,0,11,0,False,False,
+SimpleVehicle_VehicleSpec_6,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,2,5,2,0,0,3,5,0,5,0,True,False,
+SimpleVehicle_VehicleSpec_63,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,6,9,2,3,0,10,4,0,12,0,False,False,
+SimpleVehicle_VehicleSpec_70,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,13,11,3,5,0,7,8,0,10,0,False,False,
+V0_ConvoyCar_ConvoyCarSpec_293,SYNTECH17/all_realizable,realizable,imported,,realizable,True,54.1,8,16,0,1,0,2,12,0,2,0,False,False,
+V2_ConvoyCar_ConvoyCarSpec_296,SYNTECH17/all_realizable,realizable,imported,,realizable,True,21.6,8,17,0,0,0,7,10,0,7,0,False,False,asm:#1;asm:#2;asm:#3
+V4_ConvoyCar_ConvoyCarSpec_298,SYNTECH17/all_realizable,realizable,excluded,unsupported: SINCE,,,,,,,,,,,,,,,,
+V5_ConvoyCar_ConvoyCarSpec_299,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,4,2,2,6,13,0,10,2,False,,asm:#5;asm:#6;asm:#7
+V6_ConvoyCar_ConvoyCarSpec_300,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,4,2,0,8,11,0,12,0,False,,asm:#5;asm:#6;asm:#7
+V7_ConvoyCar_ConvoyCarSpec_301,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,6,13,4,1,0,8,11,0,12,0,False,,asm:#5;asm:#6;asm:#7
+V8_ConvoyCar_ConvoyCarSpec_302,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,6,13,4,1,0,8,11,0,12,0,False,,
+moveAndScan_moveAndScan_178,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,12,11,4,11,0,12,9,0,16,0,False,,
+moveAndScan_moveAndScan_184,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,12,11,4,11,0,11,9,0,15,0,False,,
+moveAndScan_moveAndScan_186,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,12,11,4,11,0,11,9,0,15,0,False,,gar:#3
+roboticarm_Robot_122,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,19,9,0,10,0,4,7,0,4,0,False,,
+roboticarm_Robot_223,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,9,10,0,4,0,2,4,0,2,0,False,False,
+roboticarm_Robot_225,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,9,10,0,4,0,1,6,0,1,0,False,False,
+roboticarm_Robot_226,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,19,9,0,10,0,4,7,0,4,0,False,,
+roboticarm_Robot_227,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.1,10,13,1,8,0,5,6,0,6,0,False,False,
+roboticarm_Robot_228,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,19,13,1,12,0,5,6,0,6,0,False,,
+roboticarm_Robot_229,SYNTECH17/all_realizable,realizable,imported,,realizable,True,165.6,20,8,1,12,0,3,3,0,4,0,False,False,
+roboticarm_Robot_230,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,21,13,0,23,0,12,8,0,12,0,False,,
+roboticarm_Robot_231,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,19,13,0,17,0,1,8,0,1,0,False,False,
+roboticarm_Robot_232,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.0,19,0,0,10,0,0,0,0,0,0,False,False,
+roboticarm_Robot_233,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,21,13,0,22,0,10,10,0,10,0,False,,
+roboticarm_Robot_234,SYNTECH17/all_realizable,realizable,imported,,realizable,True,3.0,12,11,0,14,0,4,7,0,4,0,False,False,
+roboticarm_Robot_235,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.4,30,24,0,29,0,12,17,0,12,0,False,,
+roboticarm_Robot_236,SYNTECH17/all_realizable,realizable,imported,,realizable,True,152.7,15,11,0,17,0,7,8,0,7,0,False,False,
+roboticarm_Robot_237,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,24,22,0,28,0,11,15,0,11,0,False,,
+roboticarm_Robot_238,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,24,22,0,27,0,11,15,0,11,0,False,,
+roboticarm_Robot_241,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,24,22,0,29,0,11,15,0,11,0,False,,
+roboticarm_Robot_256,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,24,22,0,29,0,15,19,0,15,0,False,,
+roboticarm_Robot_289,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.2,24,22,0,29,0,13,19,0,13,0,False,,
+roboticarm_Robot_304,SYNTECH17/all_realizable,realizable,excluded,parse: unknown predicate Pred,,,,,,,,,,,,,,,,
+roboticarm_Robot_313,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.1,24,28,0,26,0,14,22,0,14,0,False,,
+roboticarm_Robot_74,SYNTECH17/all_realizable,realizable,imported,,realizable,True,3.7,26,8,2,14,0,4,6,0,6,0,False,False,
+roboticarm_Robot_76,SYNTECH17/all_realizable,realizable,imported,,realizable,True,28.5,26,8,6,13,0,4,6,0,10,0,False,False,
+roboticarm_Robot_82,SYNTECH17/all_realizable,realizable,imported,,realizable,True,1.0,14,10,2,9,0,4,8,0,6,0,False,False,
+roboticarm_Robot_87,SYNTECH17/all_realizable,realizable,imported,,realizable,True,0.6,14,10,2,9,0,4,8,0,6,0,False,False,
+trunk_spectraExperiments_Elevator_cmp_Elevator_281,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,14,0,25,0,20,47,0,20,0,False,,
+trunk_spectraExperiments_Elevator_cmp_Elevator_314,SYNTECH17/all_realizable,realizable,excluded,ltlsynt timeout,timeout,,300.3,14,14,0,25,0,20,47,0,20,0,False,,
+v1_ConvoyCar_ConvoyCarSpec_294,SYNTECH17/all_realizable,realizable,imported,,realizable,True,76.0,8,17,0,1,0,7,10,0,7,0,False,False,asm:#1;asm:#2;asm:#3
+AirportShuttleProject_AirportShuttle1_AirportShuttleWithTechnicalJobUnrealizable_283,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.3,16,23,4,12,0,19,63,0,23,0,True,,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_143,SYNTECH17/all_unrealizable,unrealizable,excluded,verdict differs from Spectra,realizable,False,171.2,7,13,5,8,0,6,18,0,11,0,True,,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_176,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,32.7,7,6,4,5,0,2,7,0,6,0,False,True,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_177,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,0.1,7,6,4,5,0,2,8,0,6,0,False,True,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_182,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,0.4,7,6,7,5,0,5,8,0,12,0,False,True,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_183,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,23.4,7,6,7,6,0,7,6,0,14,0,False,True,
+AirportShuttleProject_AirportShuttle1_AirportShuttle_208,SYNTECH17/all_unrealizable,unrealizable,excluded,verdict differs from Spectra,realizable,False,7.9,8,8,1,9,0,13,33,0,14,0,True,,
+ConvoyCar_ConvoyCarSpec_250,SYNTECH17/all_unrealizable,unrealizable,excluded,unsupported: SINCE,,,,,,,,,,,,,,,,
+Elevator_cmp_Elevator_135,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.2,12,10,4,17,0,14,23,2,18,2,False,,
+Elevator_cmp_Elevator_58,SYNTECH17/all_unrealizable,unrealizable,excluded,verdict differs from Spectra,realizable,False,7.9,6,28,2,1,1,12,35,2,14,3,True,,
+Elevator_cmp_Elevator_59,SYNTECH17/all_unrealizable,unrealizable,excluded,verdict differs from Spectra,realizable,False,14.3,6,28,2,1,1,12,35,2,14,3,True,,
+Elevator_cmp_Elevator_60,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.3,6,30,2,1,1,12,46,2,14,3,True,,
+Elevator_cmp_Elevator_62,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.1,6,31,2,1,1,12,48,2,14,3,True,,
+Elevator_cmp_Elevator_88,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,3.2,12,11,0,8,0,11,25,0,11,0,False,True,asm:returnToOBringsUsToFloor0
+SimpleVehicle_VehicleSpecNoManualWithButtonUnealizable_286,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.3,15,12,8,25,0,11,38,0,19,0,False,,
+SimpleVehicle_VehicleSpecNoManualWithOutButtonUnealizable_286,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.3,14,12,7,25,0,11,37,0,18,0,False,,
+SimpleVehicle_VehicleSpec_133,SYNTECH17/all_unrealizable,unrealizable,excluded,verdict differs from Spectra,realizable,False,5.5,10,11,2,7,0,7,16,0,9,0,False,,
+SimpleVehicle_VehicleSpec_134,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,3.4,10,11,2,6,0,7,16,0,9,0,False,True,
+SimpleVehicle_VehicleSpec_139,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.2,10,11,4,20,0,8,14,0,12,0,False,,
+SimpleVehicle_VehicleSpec_31,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,0.1,12,15,2,5,0,13,6,0,15,0,False,True,gar:eyesOnTheRoad;gar:useYourRearviewMirror
+SimpleVehicle_VehicleSpec_78,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,0.2,14,12,5,6,0,9,11,0,14,0,False,True,
+SimpleVehicle_VehicleSpec_79,SYNTECH17/all_unrealizable,unrealizable,imported,,unrealizable,True,0.0,14,12,4,6,0,9,11,0,13,0,False,True,
+V3_ConvoyCar_ConvoyCarSpec_297,SYNTECH17/all_unrealizable,unrealizable,excluded,unsupported: SINCE,,,,,,,,,,,,,,,,
+moveAndScan_moveAndScan_185,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.2,12,11,4,11,0,12,9,0,16,0,False,,
+roboticarm_Robot_224,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.3,21,13,0,12,0,8,8,0,8,0,False,,
+roboticarm_Robot_312,SYNTECH17/all_unrealizable,unrealizable,excluded,ltlsynt timeout,timeout,,300.2,24,28,0,26,0,14,22,0,14,0,False,,

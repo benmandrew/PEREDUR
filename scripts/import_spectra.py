@@ -24,7 +24,11 @@ The subset of Spectra read is what SYNTECH17 uses:
   variable one step on.
 - `asm`/`assumption` and `gar`/`guarantee`, each optionally named, as an
   initial constraint (no operator, or `ini`), a safety constraint (`G`, `alw`)
-  or a justice constraint (`GF`, `alwEv`). Each becomes a fixed entry: the
+  or a justice constraint (`GF`, `alwEv`). A safety or justice constraint whose
+  body reads the current state only (no `next`, no `PREV`) is lifted to the
+  PSP pattern it equals (`lift_constraint`): `G phi` to universality globally
+  with S = phi, and `G F phi` to response globally with P = true and S = phi.
+  Both are weakenable. Every other constraint becomes a fixed entry: the
   initial constraint at time 0, the safety one under `G`, the justice one under
   `G F`.
 - `monitor`s: Spectra reads a monitor as neither an assumption nor a guarantee
@@ -73,7 +77,23 @@ names are the variable's name in snake_case behind a prefix for its kind
 and `__b<j>` for code bit j. Every name is lowercase and starts with one of
 those prefixes, so it passes the atom screen (`src/runner/atom_names.hpp`).
 
-Patterns are weakenable; fixed entries never are. The validation lowers a
+Patterns are weakenable; fixed entries never are. Domain and monitor entries
+stay fixed, so are never lifted.
+
+An assumption or guarantee that is valid on its own is dropped
+(`drop_valid`), and the manifest's `dropped_valid` column names each one
+(`asm:` or `gar:` and its Spectra name, or `#` and its position on that side).
+SYNTECH17 holds such tautologies, for example SimpleVehicle's
+`G(forwarding -> senseMotor=DRIVE)` where `forwarding` already says
+`senseMotor=DRIVE`. A valid guarantee makes PEREDUR's vacuity filter discard
+every candidate that keeps it, so a run could score only its input. A valid
+assumption constrains nothing. Dropping either leaves the specification
+equivalent, so an earlier verdict still holds (`--reuse-verdicts`). Validity
+is decided by `ltlfilt --equivalent-to=1` (`--ltlfilt`), on a Boolean
+abstraction where the formula reads only the current and next states, with a
+300 s limit; an undecided entry is kept.
+
+The validation lowers a
 specification to `(A1 & ... & An) -> (G1 & ... & Gm)` and calls
 `ltlsynt --realizability --decompose=no` with every input and output named.
 `--decompose=no` avoids the Spot 2.15.1 bug (Spot issue #651) that answers
@@ -1034,11 +1054,14 @@ def int_op(op, x, y):
 # ---------------------------------------------------------------- import
 
 
-def pattern_ltl(pattern, fields):
-    """The LTL of one of the three library patterns, in Spot syntax."""
+def pattern_ltl(pattern, fields, scope=None):
+    """The LTL, in Spot syntax, of one of the three library patterns or of
+    universality globally (a lifted safety constraint)."""
     g = {k: f"({v})" for k, v in fields.items()}
     if pattern == "response":
         return f"G({g['p']} -> F{g['s']})"
+    if pattern == "universality" and scope == "globally":
+        return f"G{g['s']}"
     if pattern == "universality":
         return f"G(({g['q']} & !{g['r']}) -> ({g['s']} W {g['r']}))"
     if pattern == "existence":
@@ -1106,12 +1129,39 @@ def import_spec(text, source="", commit=""):
                 (expr[1] in PATTERNS or LIBRARY_PATTERN_NAME.match(expr[1])):
             target.append(import_pattern(low, name, expr))
             continue
+        lifted = lift_constraint(low, name, kind, expr)
+        if lifted is not None:
+            target.append(lifted)
+            continue
         ltl = lower_constraint(low, kind, expr)
         if ltl == "true":
             continue
         target.append({"fixed": ltl, "name": name, "kind": kind,
                        "weakenable": False})
     return spec
+
+
+def lift_constraint(low, name, kind, expr):
+    """A safety or justice constraint over the current state only, as the PSP
+    pattern it equals: `G phi` is universality globally (S = phi) and `G F phi`
+    is response globally (P = true, S = phi). None for anything else: an
+    initial constraint, a body that reads `next` or `PREV`, or a constant
+    body."""
+    if kind not in ("safety", "justice"):
+        return None
+    f = low.f
+    low.prev_underflow = False
+    body = low.boolean(low.eval(expr, 0, {}))
+    if low.prev_underflow or f.is_temporal(body) or body in (f.T, f.F):
+        return None
+    if kind == "safety":
+        entry = {"pattern": "universality", "scope": "globally",
+                 "s": f.show(body)}
+    else:
+        entry = {"pattern": "response", "scope": "globally", "p": "true",
+                 "s": f.show(body)}
+    entry.update({"name": name, "kind": f"lifted-{kind}", "weakenable": True})
+    return entry
 
 
 def import_pattern(low, name, expr):
@@ -1145,7 +1195,8 @@ def entry_ltl(entry):
     if "fixed" in entry:
         return entry["fixed"]
     return pattern_ltl(entry["pattern"],
-                       {k: entry[k] for k in "psqr" if k in entry})
+                       {k: entry[k] for k in "psqr" if k in entry},
+                       entry["scope"])
 
 
 def spec_ltl(spec):
@@ -1218,6 +1269,86 @@ def realizable(spec, ltlsynt, timeout):
     return "error: " + (res.stderr.strip().splitlines() or ["?"])[0][:120]
 
 
+def unwrap_globally(ltl):
+    """`phi` when `ltl` is `G(phi)` as a whole, else None."""
+    if not (ltl.startswith("G(") and ltl.endswith(")")):
+        return None
+    depth = 0
+    for i, ch in enumerate(ltl[1:], 1):
+        depth += {"(": 1, ")": -1}.get(ch, 0)
+        if depth == 0 and i != len(ltl) - 1:
+            return None
+    return ltl[2:-1]
+
+
+TEMPORAL_TOKEN = re.compile(r"\b[XFGURWM]\b")
+
+
+def state_abstraction(ltl):
+    """`ltl` as a Boolean formula, when it is `G(phi)` or `phi` with phi a
+    Boolean combination of atoms under `X` chains: each `X^k(a)` becomes the
+    fresh atom `a__x<k>`. Such an `ltl` is valid exactly when the Boolean
+    formula is, since any assignment to the `X^k(a)` is met by some word at
+    position 0. None for anything else."""
+    body = unwrap_globally(ltl)
+    body = ltl if body is None else body
+    prev = None
+    while prev != body:
+        prev = body
+        body = re.sub(r"\bX\((\w+)\)", r"\1__x", body)
+    body = re.sub(r"(\w+?)((?:__x)+)\b",
+                  lambda m: f"{m.group(1)}__x{len(m.group(2)) // 3}", body)
+    return None if TEMPORAL_TOKEN.search(body) else body
+
+
+def is_valid(ltl, ltlfilt, timeout):
+    """Whether Spot (`ltlfilt --equivalent-to=1`) finds `ltl` valid. A
+    formula over the current and next states is first reduced to a Boolean
+    one (`state_abstraction`), which Spot decides in seconds where the LTL
+    took minutes on some SYNTECH17 constraints. A timeout or a failure reads
+    as not valid, so the entry is kept, as the vacuity filter keeps a
+    candidate whose query times out."""
+    query = state_abstraction(ltl) or ltl
+    try:
+        res = subprocess.run([ltlfilt, "--equivalent-to=1", "-f", query],
+                             capture_output=True, text=True, timeout=timeout,
+                             check=False)
+    except subprocess.TimeoutExpired:
+        print(f"validity check timed out: {ltl[:80]}", file=sys.stderr)
+        return False
+    return res.returncode == 0 and bool(res.stdout.strip())
+
+
+def entry_label(side, position, entry):
+    """The name of an entry for the manifest, behind its side (`asm:` or
+    `gar:`): its Spectra name, or `#` and its 1-based position on that side
+    of the intermediate specification when the constraint has none."""
+    tag = "asm" if side == "assumptions" else "gar"
+    return f"{tag}:{entry.get('name') or f'#{position}'}"
+
+
+def drop_valid(spec, ltlfilt, timeout=300.0):
+    """Remove every assumption and guarantee that is valid on its own, and
+    record their labels in `spec["dropped_valid"]`.
+
+    A valid guarantee makes PEREDUR's vacuity filter
+    (`psp::specification_is_vacuous`) discard every candidate that keeps it,
+    so a run could score nothing but its input. A valid assumption is `true`
+    in the antecedent: it constrains nothing, and weakening it changes
+    nothing. Dropping either leaves the specification equivalent."""
+    dropped = []
+    for side in ("assumptions", "guarantees"):
+        kept = []
+        for index, entry in enumerate(spec[side]):
+            if is_valid(entry_ltl(entry), ltlfilt, timeout):
+                dropped.append(entry_label(side, index + 1, entry))
+            else:
+                kept.append(entry)
+        spec[side] = kept
+    spec["dropped_valid"] = dropped
+    return dropped
+
+
 def read_commit(checkout):
     """The checked-out commit, read from `.git` without running git."""
     git = Path(checkout) / ".git"
@@ -1243,7 +1374,7 @@ MANIFEST_FIELDS = [
     "assumptions_weakenable", "assumptions_fixed",
     "assumptions_event_scoped", "guarantees_weakenable", "guarantees_fixed",
     "guarantees_event_scoped", "weakenable", "event_scoped",
-    "monitor_in_assumptions", "eval_candidate"]
+    "monitor_in_assumptions", "eval_candidate", "dropped_valid"]
 
 
 def apply_verdict(row, verdict, secs):
@@ -1276,6 +1407,8 @@ def main(argv=None):
     ap.add_argument("--check", action="store_true",
                     help="check each verdict with ltlsynt")
     ap.add_argument("--ltlsynt", default="ltlsynt")
+    ap.add_argument("--ltlfilt", default="ltlfilt",
+                    help="Spot's ltlfilt, to find valid constraints")
     ap.add_argument("--timeout", type=float, default=300.0)
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--reuse-verdicts", type=Path, metavar="CSV",
@@ -1302,16 +1435,26 @@ def main(argv=None):
                 row.update(status="excluded", reason=f"parse: {exc}")
             else:
                 specs[stem] = spec
-                counts = slot_counts(spec)
-                row.update(counts)
-                row.update(in_atoms=len(spec["in_atoms"]),
-                           out_atoms=len(spec["out_atoms"]),
-                           weakenable=counts["assumptions_weakenable"] +
-                           counts["guarantees_weakenable"],
-                           event_scoped=counts["assumptions_event_scoped"] +
-                           counts["guarantees_event_scoped"],
-                           monitor_in_assumptions=monitor_in_assumptions(spec))
             rows.append(row)
+
+    def screen(stem):
+        return stem, drop_valid(specs[stem], args.ltlfilt)
+    with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
+        dropped = dict(pool.map(screen, sorted(specs)))
+    for row in rows:
+        spec = specs.get(row["spec"])
+        if spec is None:
+            continue
+        row["dropped_valid"] = ";".join(dropped[row["spec"]])
+        counts = slot_counts(spec)
+        row.update(counts)
+        row.update(in_atoms=len(spec["in_atoms"]),
+                   out_atoms=len(spec["out_atoms"]),
+                   weakenable=counts["assumptions_weakenable"] +
+                   counts["guarantees_weakenable"],
+                   event_scoped=counts["assumptions_event_scoped"] +
+                   counts["guarantees_event_scoped"],
+                   monitor_in_assumptions=monitor_in_assumptions(spec))
 
     by_stem = {r["spec"]: r for r in rows}
     if args.reuse_verdicts:

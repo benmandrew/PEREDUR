@@ -125,12 +125,13 @@ weight w: -3 next(on);
     assert a[0]["fixed"] == "G(e_req -> !X(e_req))"
     assert a[1]["fixed"] == "!e_req"
     g = entries(s, "guarantees")
-    assert [e["kind"] for e in g] == ["justice", "justice", "safety"]
-    assert g[0]["fixed"] == "G(F(s_mode__b0 & !s_mode__b1))", g[0]
-    assert g[1]["fixed"] == "G(F(a_busy))"
-    assert g[2]["fixed"] == "G(s_grant__i0 -> s_mode__b0 & !s_mode__b1)"
-    assert all(not e["weakenable"] for e in s["assumptions"] +
-               s["guarantees"])
+    assert [e["kind"] for e in g] == ["lifted-justice", "lifted-justice",
+                                      "lifted-safety"]
+    assert I.entry_ltl(g[0]) == "G((true) -> F(s_mode__b0 & !s_mode__b1))"
+    assert I.entry_ltl(g[1]) == "G((true) -> F(a_busy))"
+    assert g[2]["s"] == "s_grant__i0 -> s_mode__b0 & !s_mode__b1"
+    assert all(e["weakenable"] for e in g)
+    assert all(not e["weakenable"] for e in s["assumptions"])
     assert s["commit"] == "c0ffee" and s["source"] == "snippet.spectra"
 
 
@@ -353,13 +354,80 @@ gar G (c -> !a);
     assert set(doc) == {"assumptions", "guarantees", "in_atoms", "out_atoms"}
     assert doc["assumptions"] == [
         {"fixed": "G(!e_x__b1 | !e_x__b0)"},
-        {"fixed": "G(e_a -> e_x__b0 & !e_x__b1)"}]
+        {"pattern": "universality", "scope": "globally",
+         "s": "e_a -> e_x__b0 & !e_x__b1"}]
     assert doc["guarantees"] == [
         {"pattern": "response", "scope": "globally", "p": "e_a", "s": "s_c"},
-        {"fixed": "G(s_c -> !e_a)"}]
+        {"pattern": "universality", "scope": "globally", "s": "s_c -> !e_a"}]
     assert I.spec_ltl(s) == (
         "((G(!e_x__b1 | !e_x__b0)) & (G(e_a -> e_x__b0 & !e_x__b1))) -> "
         "((G((e_a) -> F(s_c))) & (G(s_c -> !e_a)))")
+
+
+def test_state_constraints_are_lifted_to_patterns():
+    s = spec("""
+env boolean a;
+sys boolean b;
+gar G (a -> b);
+gar GF (b & !a);
+gar G (a -> next(b));
+gar GF next(b);
+gar G (PREV(a) -> b);
+gar a -> b;
+gar G true;
+gar G false;
+""")
+    g = s["guarantees"]
+    assert g[0] == {"pattern": "universality", "scope": "globally",
+                    "s": "e_a -> s_b", "name": None, "kind": "lifted-safety",
+                    "weakenable": True}, g[0]
+    assert g[1] == {"pattern": "response", "scope": "globally", "p": "true",
+                    "s": "s_b & !e_a", "name": None,
+                    "kind": "lifted-justice", "weakenable": True}, g[1]
+    # next, PREV, an initial constraint and a constant body stay fixed;
+    # `G true` is dropped as before.
+    assert [e["kind"] for e in g[2:]] == ["safety", "justice", "safety",
+                                          "ini", "safety"], g[2:]
+    assert not any(e["weakenable"] for e in g[2:])
+    assert g[-1]["fixed"] == "G(false)", g[-1]
+
+
+def ltlfilt_or_none():
+    return shutil.which("ltlfilt")
+
+
+def test_valid_constraints_are_dropped():
+    ltlfilt = ltlfilt_or_none()
+    if ltlfilt is None:
+        return
+    s = spec("""
+type M = {DRIVE, STOP};
+env boolean a;
+sys M m;
+define fwd := a & m = DRIVE;
+asm fine: G (next(a) -> (a | next(a)));
+asm G (a -> next(a));
+gar eyes: G (fwd -> m = DRIVE);
+gar G (a -> m = DRIVE);
+gar GF (fwd -> a);
+gar pRespondsToS(a, true);
+""")
+    dropped = I.drop_valid(s, ltlfilt)
+    assert dropped == ["asm:fine", "gar:eyes", "gar:#3", "gar:#4"], dropped
+    assert s["dropped_valid"] == dropped
+    assert [e["kind"] for e in s["assumptions"]] == ["safety"]
+    assert [e.get("kind") for e in s["guarantees"]] == ["lifted-safety"]
+    assert not I.is_valid("G(e_a)", ltlfilt, 60)
+
+
+def test_state_abstraction():
+    assert I.unwrap_globally("G(a) & G(b)") is None
+    assert I.unwrap_globally("G(a & (b | c))") == "a & (b | c)"
+    assert I.state_abstraction("G(e_a -> X(X(s_b)) | X(e_a))") == \
+        "e_a -> s_b__x2 | e_a__x1"
+    assert I.state_abstraction("e_a & X(s_b)") == "e_a & s_b__x1"
+    assert I.state_abstraction("G(F(e_a))") is None
+    assert I.state_abstraction("G(e_a) & G(s_b)") is None
 
 
 def test_spot_parses_the_lowering():

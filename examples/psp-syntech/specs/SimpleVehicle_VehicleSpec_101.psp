@@ -25,10 +25,16 @@
    "s": "!(!e_front_sense__b2 & !e_front_sense__b1 & !e_front_sense__b0)"
   },
   {
-   "fixed": "G(F(!(!e_front_sense__b0 & !e_front_sense__b1 & !e_front_sense__b2) | !(!e_back_sense__b0 & !e_back_sense__b1 & !e_back_sense__b2)))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!(!e_front_sense__b0 & !e_front_sense__b1 & !e_front_sense__b2) | !(!e_back_sense__b0 & !e_back_sense__b1 & !e_back_sense__b2)"
   },
   {
-   "fixed": "G(F(e_parking_type_found__b0 & !e_parking_type_found__b1 | !e_parking_type_found__b0 & !e_parking_type_found__b1))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "e_parking_type_found__b0 & !e_parking_type_found__b1 | !e_parking_type_found__b0 & !e_parking_type_found__b1"
   }
  ],
  "guarantees": [
@@ -54,16 +60,23 @@
    "fixed": "s_drive_motor__b0 & !s_drive_motor__b1 & s_sense_motor__b0"
   },
   {
-   "fixed": "G(F(m_scanning))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "m_scanning"
   },
   {
-   "fixed": "G(m_scanning -> !s_drive_motor__b0 & !s_drive_motor__b1 & !s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "m_scanning -> !s_drive_motor__b0 & !s_drive_motor__b1 & !s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2"
   },
   {
    "fixed": "(!(!s_drive_motor__b0 & s_drive_motor__b1)) & (G(!X(s_drive_motor__b0) & X(s_drive_motor__b1) -> s_sense_motor__b0))"
   },
   {
-   "fixed": "G(!e_front_sense__b0 & !e_front_sense__b1 & !e_front_sense__b2 -> s_drive_motor__b0 & !s_drive_motor__b1 | !s_drive_motor__b0 & s_drive_motor__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!e_front_sense__b0 & !e_front_sense__b1 & !e_front_sense__b2 -> s_drive_motor__b0 & !s_drive_motor__b1 | !s_drive_motor__b0 & s_drive_motor__b1"
   },
   {
    "fixed": "G(!X(e_back_sense__b0) & !X(e_back_sense__b1) & !X(e_back_sense__b2) & s_sense_motor__b0 -> !X(s_drive_motor__b0) & !X(s_drive_motor__b1) | X(s_drive_motor__b0) & !X(s_drive_motor__b1))"
@@ -72,22 +85,34 @@
    "fixed": "(!(!s_drive_motor__b0 & s_drive_motor__b1)) & (G(!X(s_drive_motor__b0) & X(s_drive_motor__b1) -> s_sense_motor__b0 & !X(s_velocity__b0) & !X(s_velocity__b1) & !X(s_velocity__b2)))"
   },
   {
-   "fixed": "G(e_front_sense__b0 & !e_front_sense__b1 & e_front_sense__b2 & !s_sense_motor__b0 -> !s_velocity__b0 & !s_velocity__b1 & s_velocity__b2)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_front_sense__b0 & !e_front_sense__b1 & e_front_sense__b2 & !s_sense_motor__b0 -> !s_velocity__b0 & !s_velocity__b1 & s_velocity__b2"
   },
   {
-   "fixed": "G(!e_front_sense__b0 & !e_front_sense__b1 & e_front_sense__b2 & !s_sense_motor__b0 -> s_velocity__b0 & s_velocity__b1 & !s_velocity__b2)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!e_front_sense__b0 & !e_front_sense__b1 & e_front_sense__b2 & !s_sense_motor__b0 -> s_velocity__b0 & s_velocity__b1 & !s_velocity__b2"
   },
   {
-   "fixed": "G(e_front_sense__b0 & e_front_sense__b1 & !e_front_sense__b2 & !s_sense_motor__b0 -> !s_velocity__b0 & s_velocity__b1 & !s_velocity__b2)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_front_sense__b0 & e_front_sense__b1 & !e_front_sense__b2 & !s_sense_motor__b0 -> !s_velocity__b0 & s_velocity__b1 & !s_velocity__b2"
   },
   {
-   "fixed": "G(!e_front_sense__b0 & e_front_sense__b1 & !e_front_sense__b2 & !s_sense_motor__b0 -> s_velocity__b0 & !s_velocity__b1 & !s_velocity__b2)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!e_front_sense__b0 & e_front_sense__b1 & !e_front_sense__b2 & !s_sense_motor__b0 -> s_velocity__b0 & !s_velocity__b1 & !s_velocity__b2"
   },
   {
-   "fixed": "G(e_front_sense__b0 & !e_front_sense__b1 & !e_front_sense__b2 -> !s_velocity__b0 & !s_velocity__b1 & !s_velocity__b2)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_front_sense__b0 & !e_front_sense__b1 & !e_front_sense__b2 -> !s_velocity__b0 & !s_velocity__b1 & !s_velocity__b2"
   },
   {
-   "fixed": "G(!s_sense_motor__b0 & !e_side_sense__b0 & !e_side_sense__b1 & !e_side_sense__b2 -> !(s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & !s_drive_motor__b1 | s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & s_drive_motor__b1 | !s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & !s_drive_motor__b1 | !s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & s_drive_motor__b1 | s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & !s_drive_motor__b1 | s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & s_drive_motor__b1 | !s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 & !s_drive_motor__b0 & !s_drive_motor__b1 | !s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 & !s_drive_motor__b0 & s_drive_motor__b1))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!s_sense_motor__b0 & !e_side_sense__b0 & !e_side_sense__b1 & !e_side_sense__b2 -> !(s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & !s_drive_motor__b1 | s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & s_drive_motor__b1 | !s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & !s_drive_motor__b1 | !s_steering_motor__b0 & !s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & s_drive_motor__b1 | s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & !s_drive_motor__b1 | s_steering_motor__b0 & s_steering_motor__b1 & !s_steering_motor__b2 & !s_drive_motor__b0 & s_drive_motor__b1 | !s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 & !s_drive_motor__b0 & !s_drive_motor__b1 | !s_steering_motor__b0 & !s_steering_motor__b1 & s_steering_motor__b2 & !s_drive_motor__b0 & s_drive_motor__b1)"
   }
  ],
  "in_atoms": [

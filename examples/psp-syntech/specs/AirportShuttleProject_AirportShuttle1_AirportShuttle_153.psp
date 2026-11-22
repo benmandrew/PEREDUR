@@ -22,7 +22,10 @@
    "fixed": "G(s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1 -> !e_station__b0 & !e_station__b1 & !e_station__b2 & !X(e_station__b0) & !X(e_station__b1) & !X(e_station__b2) | e_station__b0 & !e_station__b1 & !e_station__b2 & X(e_station__b0) & !X(e_station__b1) & !X(e_station__b2) | !e_station__b0 & e_station__b1 & !e_station__b2 & !X(e_station__b0) & X(e_station__b1) & !X(e_station__b2) | e_station__b0 & e_station__b1 & !e_station__b2 & X(e_station__b0) & X(e_station__b1) & !X(e_station__b2) | !e_station__b0 & !e_station__b1 & e_station__b2 & !X(e_station__b0) & !X(e_station__b1) & X(e_station__b2))"
   },
   {
-   "fixed": "G(F(!m_stop_at_nearest_station))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!m_stop_at_nearest_station"
   },
   {
    "fixed": "e_stop_button__b0"
@@ -31,7 +34,10 @@
    "fixed": "e_door_status__b0 & !e_door_status__b1"
   },
   {
-   "fixed": "G(F(!e_door_status__b0 & !e_door_status__b1 | e_door_status__b0 & !e_door_status__b1))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!e_door_status__b0 & !e_door_status__b1 | e_door_status__b0 & !e_door_status__b1"
   },
   {
    "fixed": "G(!X(e_door_status__b0) & !X(e_door_status__b1) -> !e_door_status__b0 & e_door_status__b1)"
@@ -43,7 +49,9 @@
    "fixed": "G(!X(e_door_status__b0) & X(e_door_status__b1) -> !e_door_status__b0 & e_door_status__b1 | !s_door_req__b0 & !s_door_req__b1 | s_door_req__b0 & !s_door_req__b1)"
   },
   {
-   "fixed": "G(!e_station__b0 & !e_station__b1 & !e_station__b2 | e_station__b0 & !e_station__b1 & !e_station__b2 | !e_station__b0 & e_station__b1 & !e_station__b2 | e_station__b0 & e_station__b1 & !e_station__b2 -> e_stop_button__b0)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!e_station__b0 & !e_station__b1 & !e_station__b2 | e_station__b0 & !e_station__b1 & !e_station__b2 | !e_station__b0 & e_station__b1 & !e_station__b2 | e_station__b0 & e_station__b1 & !e_station__b2 -> e_stop_button__b0"
   },
   {
    "fixed": "!e_technician_ack"
@@ -81,9 +89,6 @@
    "fixed": "(!e_stop_button__b0 -> X(m_stop_at_nearest_station)) & (G(!X(e_stop_button__b0) & !(X(m_door_operations_counter__b0) & !X(m_door_operations_counter__b1) & !X(m_door_operations_counter__b2) & !X(m_door_operations_counter__b3) & !m_door_operations_counter__b0 & !m_door_operations_counter__b1 & !m_door_operations_counter__b2 & !m_door_operations_counter__b3 | !X(m_door_operations_counter__b0) & X(m_door_operations_counter__b1) & !X(m_door_operations_counter__b2) & !X(m_door_operations_counter__b3) & m_door_operations_counter__b0 & !m_door_operations_counter__b1 & !m_door_operations_counter__b2 & !m_door_operations_counter__b3 | X(m_door_operations_counter__b0) & X(m_door_operations_counter__b1) & !X(m_door_operations_counter__b2) & !X(m_door_operations_counter__b3) & !m_door_operations_counter__b0 & m_door_operations_counter__b1 & !m_door_operations_counter__b2 & !m_door_operations_counter__b3 | !X(m_door_operations_counter__b0) & !X(m_door_operations_counter__b1) & X(m_door_operations_counter__b2) & !X(m_door_operations_counter__b3) & m_door_operations_counter__b0 & m_door_operations_counter__b1 & !m_door_operations_counter__b2 & !m_door_operations_counter__b3 | X(m_door_operations_counter__b0) & !X(m_door_operations_counter__b1) & X(m_door_operations_counter__b2) & !X(m_door_operations_counter__b3) & !m_door_operations_counter__b0 & !m_door_operations_counter__b1 & m_door_operations_counter__b2 & !m_door_operations_counter__b3 | !X(m_door_operations_counter__b0) & X(m_door_operations_counter__b1) & X(m_door_operations_counter__b2) & !X(m_door_operations_counter__b3) & m_door_operations_counter__b0 & !m_door_operations_counter__b1 & m_door_operations_counter__b2 & !m_door_operations_counter__b3 | X(m_door_operations_counter__b0) & X(m_door_operations_counter__b1) & X(m_door_operations_counter__b2) & !X(m_door_operations_counter__b3) & !m_door_operations_counter__b0 & m_door_operations_counter__b1 & m_door_operations_counter__b2 & !m_door_operations_counter__b3 | !X(m_door_operations_counter__b0) & !X(m_door_operations_counter__b1) & !X(m_door_operations_counter__b2) & X(m_door_operations_counter__b3) & m_door_operations_counter__b0 & m_door_operations_counter__b1 & m_door_operations_counter__b2 & !m_door_operations_counter__b3 | X(m_door_operations_counter__b0) & !X(m_door_operations_counter__b1) & !X(m_door_operations_counter__b2) & X(m_door_operations_counter__b3) & !m_door_operations_counter__b0 & !m_door_operations_counter__b1 & !m_door_operations_counter__b2 & m_door_operations_counter__b3 | !X(m_door_operations_counter__b0) & X(m_door_operations_counter__b1) & !X(m_door_operations_counter__b2) & X(m_door_operations_counter__b3) & m_door_operations_counter__b0 & !m_door_operations_counter__b1 & !m_door_operations_counter__b2 & m_door_operations_counter__b3) -> X(X(m_stop_at_nearest_station))))"
   },
   {
-   "fixed": "true"
-  },
-  {
    "fixed": "G(e_stop_button__b0 -> (m_stop_at_nearest_station <-> X(m_stop_at_nearest_station)))"
   },
   {
@@ -117,25 +122,38 @@
    "fixed": "s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1 & !s_door_req__b0 & s_door_req__b1"
   },
   {
-   "fixed": "G((!e_station__b0 & !e_station__b1 & !e_station__b2 | e_station__b0 & !e_station__b1 & !e_station__b2 | !e_station__b0 & e_station__b1 & !e_station__b2 | e_station__b0 & e_station__b1 & !e_station__b2) & m_stop_at_nearest_station -> s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "(!e_station__b0 & !e_station__b1 & !e_station__b2 | e_station__b0 & !e_station__b1 & !e_station__b2 | !e_station__b0 & e_station__b1 & !e_station__b2 | e_station__b0 & e_station__b1 & !e_station__b2) & m_stop_at_nearest_station -> s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1"
   },
   {
-   "fixed": "G(!e_door_status__b0 & e_door_status__b1 -> !s_door_req__b0 & s_door_req__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!e_door_status__b0 & e_door_status__b1 -> !s_door_req__b0 & s_door_req__b1"
   },
   {
-   "fixed": "G((!e_station__b0 & !e_station__b1 & !e_station__b2 | e_station__b0 & !e_station__b1 & !e_station__b2 | !e_station__b0 & e_station__b1 & !e_station__b2 | e_station__b0 & e_station__b1 & !e_station__b2) & m_stop_at_nearest_station & e_door_status__b0 & !e_door_status__b1 <-> !s_door_req__b0 & !s_door_req__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "(!e_station__b0 & !e_station__b1 & !e_station__b2 | e_station__b0 & !e_station__b1 & !e_station__b2 | !e_station__b0 & e_station__b1 & !e_station__b2 | e_station__b0 & e_station__b1 & !e_station__b2) & m_stop_at_nearest_station & e_door_status__b0 & !e_door_status__b1 <-> !s_door_req__b0 & !s_door_req__b1"
   },
   {
-   "fixed": "G(!e_door_status__b0 & !e_door_status__b1 <-> s_door_req__b0 & !s_door_req__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!e_door_status__b0 & !e_door_status__b1 <-> s_door_req__b0 & !s_door_req__b1"
   },
   {
-   "fixed": "G(m_tech_guy_in_action -> s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "m_tech_guy_in_action -> s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1"
   },
   {
    "fixed": "(!s_start_technical_job) & (G(!m_tech_guy_in_action & X(m_tech_guy_in_action) <-> X(s_start_technical_job)))"
   },
   {
-   "fixed": "G(F(!s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1"
   }
  ],
  "in_atoms": [
