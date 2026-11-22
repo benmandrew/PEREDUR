@@ -13,7 +13,10 @@
    "fixed": "G(s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1 -> !e_station__b0 & !e_station__b1 & !e_station__b2 & !X(e_station__b0) & !X(e_station__b1) & !X(e_station__b2) | e_station__b0 & !e_station__b1 & !e_station__b2 & X(e_station__b0) & !X(e_station__b1) & !X(e_station__b2) | !e_station__b0 & e_station__b1 & !e_station__b2 & !X(e_station__b0) & X(e_station__b1) & !X(e_station__b2) | e_station__b0 & e_station__b1 & !e_station__b2 & X(e_station__b0) & X(e_station__b1) & !X(e_station__b2) | !e_station__b0 & !e_station__b1 & e_station__b2 & !X(e_station__b0) & !X(e_station__b1) & X(e_station__b2))"
   },
   {
-   "fixed": "G(F(!m_stop_at_nearest_station))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!m_stop_at_nearest_station"
   }
  ],
  "guarantees": [
@@ -33,10 +36,15 @@
    "fixed": "s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1"
   },
   {
-   "fixed": "G((!e_station__b0 & !e_station__b1 & !e_station__b2 | e_station__b0 & !e_station__b1 & !e_station__b2 | !e_station__b0 & e_station__b1 & !e_station__b2 | e_station__b0 & e_station__b1 & !e_station__b2) & m_stop_at_nearest_station -> s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "(!e_station__b0 & !e_station__b1 & !e_station__b2 | e_station__b0 & !e_station__b1 & !e_station__b2 | !e_station__b0 & e_station__b1 & !e_station__b2 | e_station__b0 & e_station__b1 & !e_station__b2) & m_stop_at_nearest_station -> s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1"
   },
   {
-   "fixed": "G(F(!s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1"
   }
  ],
  "in_atoms": [

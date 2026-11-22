@@ -10,7 +10,7 @@
    "s": "!e_at_station | s_motors__b0 & !s_motors__b1"
   },
   {
-   "fixed": "((X(e_station__b0) <-> e_station__b0) & (X(e_station__b1) <-> e_station__b1)) & (G(!(X(e_at_station) & !e_at_station) <-> (X(X(e_station__b0)) <-> X(e_station__b0)) & (X(X(e_station__b1)) <-> X(e_station__b1))))"
+   "fixed": "G((X(e_station__b0) <-> e_station__b0) & (X(e_station__b1) <-> e_station__b1))"
   },
   {
    "fixed": "G(X(e_at_station) & !e_at_station & !s_motors__b0 & !s_motors__b1 <-> X(e_station__b0) & !X(e_station__b1) & !e_station__b0 & !e_station__b1 | !X(e_station__b0) & X(e_station__b1) & e_station__b0 & !e_station__b1 | X(e_station__b0) & X(e_station__b1) & !e_station__b0 & e_station__b1)"
@@ -36,10 +36,15 @@
    "fixed": "G(s_motors__b0 & !s_motors__b1 -> (e_at_station <-> X(e_at_station)) & (e_station__b0 <-> X(e_station__b0)) & (e_station__b1 <-> X(e_station__b1)))"
   },
   {
-   "fixed": "G((e_at_station & !e_station__b0 & !e_station__b1 -> !e_pressed_station_one) & (e_at_station & e_station__b0 & !e_station__b1 -> !e_pressed_station_two) & (e_at_station & !e_station__b0 & e_station__b1 -> !e_pressed_station_three) & (e_at_station & e_station__b0 & e_station__b1 -> !e_pressed_station_four))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "(e_at_station & !e_station__b0 & !e_station__b1 -> !e_pressed_station_one) & (e_at_station & e_station__b0 & !e_station__b1 -> !e_pressed_station_two) & (e_at_station & !e_station__b0 & e_station__b1 -> !e_pressed_station_three) & (e_at_station & e_station__b0 & e_station__b1 -> !e_pressed_station_four)"
   },
   {
-   "fixed": "G(F(!e_pressed_station_one & !e_pressed_station_two & !e_pressed_station_three & !e_pressed_station_four))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!e_pressed_station_one & !e_pressed_station_two & !e_pressed_station_three & !e_pressed_station_four"
   }
  ],
  "guarantees": [
@@ -56,10 +61,15 @@
    "fixed": "G((!e_pressed_station_one & (!(e_at_station & !e_station__b0 & !e_station__b1) | !s_shuttle_tasks__i0) -> (X(s_shuttle_tasks__i0) <-> s_shuttle_tasks__i0)) & (!e_pressed_station_two & (!(e_at_station & e_station__b0 & !e_station__b1) | !s_shuttle_tasks__i1) -> (X(s_shuttle_tasks__i1) <-> s_shuttle_tasks__i1)) & (!e_pressed_station_three & (!(e_at_station & !e_station__b0 & e_station__b1) | !s_shuttle_tasks__i2) -> (X(s_shuttle_tasks__i2) <-> s_shuttle_tasks__i2)) & (!e_pressed_station_four & (!(e_at_station & e_station__b0 & e_station__b1) | !s_shuttle_tasks__i3) -> (X(s_shuttle_tasks__i3) <-> s_shuttle_tasks__i3)))"
   },
   {
-   "fixed": "G(e_at_station & !s_shuttle_tasks__i0 & !s_shuttle_tasks__i1 & !s_shuttle_tasks__i2 & !s_shuttle_tasks__i3 -> s_motors__b0 & !s_motors__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_at_station & !s_shuttle_tasks__i0 & !s_shuttle_tasks__i1 & !s_shuttle_tasks__i2 & !s_shuttle_tasks__i3 -> s_motors__b0 & !s_motors__b1"
   },
   {
-   "fixed": "G(F(!s_shuttle_tasks__i0 & !s_shuttle_tasks__i1 & !s_shuttle_tasks__i2 & !s_shuttle_tasks__i3))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!s_shuttle_tasks__i0 & !s_shuttle_tasks__i1 & !s_shuttle_tasks__i2 & !s_shuttle_tasks__i3"
   }
  ],
  "in_atoms": [

@@ -302,12 +302,28 @@ PSP_SYNTECH_SPECS: dict[str, dict[str, Path]] = {
     for name in PSP_SYNTECH_UNREALISABLE
 }
 # PLAN.md P7 drops an import with fewer than 2 weakenable guarantee slots from
-# the evaluation set; import_spectra.py marks the rest eval_candidate.
+# the evaluation set; import_spectra.py marks the rest eval_candidate. Since
+# the importer lifted state constraints to patterns (22 Nov), all 9 qualify.
 with (SYNTECH_DIR / "manifest.csv").open(newline="") as _f:
     PSP_SYNTECH_EVAL: tuple[str, ...] = tuple(
         "syntech-" + r["spec"] for r in csv.DictReader(_f)
         if r["eval_candidate"] == "True"
         and "syntech-" + r["spec"] in PSP_SYNTECH_SPECS)
+# The imports the psp-order campaign ran, from the import before lifting, when
+# only this one was an eval candidate. The profile keeps the list it ran; the
+# file it names is now the lifted import.
+PSP_ORDER_SYNTECH_EVAL: tuple[str, ...] = ("syntech-SimpleVehicle_VehicleSpec_31",)
+# The eval candidates the psp-syntech profile leaves out: in local smoke runs
+# (2026-11-22-psp-syntech/PLAN.md) both arms reached a 1200 s cap, where the
+# others take 1 to 13 minutes, so each would cost the cap on every run.
+PSP_SYNTECH_OUT_OF_BUDGET: tuple[str, ...] = (
+    "syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_176",
+    "syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_182",
+    "syntech-AirportShuttleProject_AirportShuttle1_AirportShuttle_183",
+    "syntech-Elevator_cmp_Elevator_88",
+)
+PSP_SYNTECH_RUN: tuple[str, ...] = tuple(
+    s for s in PSP_SYNTECH_EVAL if s not in PSP_SYNTECH_OUT_OF_BUDGET)
 
 # The PSP seeded corpus (examples/psp-seeded, written by
 # experiments/2026-11-20-psp-seeded-corpus/scripts/seed.py): each subject is a
@@ -317,14 +333,34 @@ with (SYNTECH_DIR / "manifest.csv").open(newline="") as _f:
 PSP_SEEDED_DIR = EXAMPLES_DIR / "psp-seeded"
 PSP_SEEDED_SPECS: dict[str, dict[str, Path]] = _seeded_specs(
     PSP_SEEDED_DIR, ext="psp")
+# The seeded subjects built on the lifted SYNTECH17 imports (22 Nov). Their
+# base ids carry this prefix, so no subject id repeats one of the earlier
+# SYNTECH-based subjects, whose rows stay in results-psp-order-seeded.csv.
+PSP_SEEDED_LIFT_PREFIX = "syntech-lift-"
+PSP_SEEDED_SYNTECH: tuple[str, ...] = tuple(
+    s for s in PSP_SEEDED_SPECS if s.startswith(PSP_SEEDED_LIFT_PREFIX))
+# Bases whose seeded subjects the psp-syntech-seeded profile leaves out: both
+# smoke arms on one of them reached the 1200 s cap, and compare reached the
+# probe's 3600 s limit on 3 of their 6 subjects.
+PSP_SEEDED_SYNTECH_OUT_OF_BUDGET_BASES: tuple[str, ...] = (
+    "syntech-lift-roboticarm_Robot_82",
+    "syntech-lift-roboticarm_Robot_87",
+)
+PSP_SEEDED_SYNTECH_RUN: tuple[str, ...] = tuple(
+    s for s in PSP_SEEDED_SYNTECH
+    if s.split("__")[0] not in PSP_SEEDED_SYNTECH_OUT_OF_BUDGET_BASES)
 # The seeded subjects the psp-order campaign runs. Those built on the SYNTECH17
 # import Elevator_cmp_Elevator_94 are dropped: on 2026-11-22, 27 of their
 # first 28 runs reached the 7200 s cap, where every other subject takes about
 # a minute, so they alone would have run the campaign a day past its slot.
+# The other SYNTECH-based subjects it ran were built on imports that kept
+# tautologies; the corpus replaced them on 22 Nov with PSP_SEEDED_SYNTECH, and
+# campaign/psp-order keeps them. Here the profile keeps the hand-written ones.
 PSP_SEEDED_DROPPED_BASES: tuple[str, ...] = ("syntech-Elevator_cmp_Elevator_94",)
 PSP_SEEDED_EVAL: tuple[str, ...] = tuple(
     s for s in PSP_SEEDED_SPECS
-    if s.split("__")[0] not in PSP_SEEDED_DROPPED_BASES)
+    if s.split("__")[0] not in PSP_SEEDED_DROPPED_BASES
+    and not s.startswith("syntech-"))
 
 SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **SEEDED_SPECS,
                                      **SIDEWAYS_SPECS, **TLSF_SPECS,
@@ -496,6 +532,12 @@ DROPPED_RE = re.compile(r"^(\d+) individual\(s\) dropped", re.MULTILINE)
 # The arms of the PSP campaign: sweep F's base, full and every no-<f>.
 PSP_ORDER_ARMS: tuple[str, ...] = (
     "base", "full", "no-climb", "no-gate", "no-remove", "no-novelty")
+
+# Seeds and the per-run cap of the 2026-11-22-psp-syntech campaign (its
+# PLAN.md gives the smoke runs they rest on).
+PSP_SYNTECH_SEEDS = 10
+PSP_SYNTECH_SEEDED_SEEDS = 2
+PSP_SYNTECH_CAP = 1800
 
 PROFILES: dict[str, dict] = {
     # The head-to-head at AuRUS's own budget. Separate from the retired
@@ -892,9 +934,10 @@ PROFILES: dict[str, dict] = {
         "repair_modes": None,
         "sweeps": ["F"],
         "levels": {"F": list(PSP_ORDER_ARMS)},
-        "specs": list(PSP_SPECS) + list(PSP_SYNTECH_EVAL),
+        "specs": list(PSP_SPECS) + list(PSP_ORDER_SYNTECH_EVAL),
         "seeds": list(range(30)),
-        "timeout_caps": {s: 7200 for s in [*PSP_SPECS, *PSP_SYNTECH_EVAL]},
+        "timeout_caps": {s: 7200 for s in [*PSP_SPECS,
+                                           *PSP_ORDER_SYNTECH_EVAL]},
         "compare_timeout": 1800,
         "baseline_aliases": {},
         "configs_dir": EXPERIMENTS_DIR / "configs-psp-order",
@@ -918,6 +961,47 @@ PROFILES: dict[str, dict] = {
         "results_dir": EXPERIMENTS_DIR / "results-psp-order-seeded",
         "results_csv": EXPERIMENTS_DIR / "results-psp-order-seeded.csv",
         "default_jobs": 15,
+    },
+    # The lifted SYNTECH17 subjects (experiments/2026-11-22-psp-syntech): the
+    # unrealisable imports that are eval candidates since the importer lifted
+    # state constraints (PSP_SYNTECH_EVAL, all 9), and the seeded subjects
+    # built on the lifted realisable imports (PSP_SEEDED_SYNTECH), each less
+    # the subjects out of budget (PSP_SYNTECH_RUN, PSP_SEEDED_SYNTECH_RUN).
+    # The arms, budget and configs are psp-order's; seeds and caps are the
+    # campaign's PLAN.md, set from local smoke runs.
+    "psp-syntech": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {"F": list(PSP_ORDER_ARMS)},
+        "specs": list(PSP_SYNTECH_RUN),
+        "seeds": list(range(PSP_SYNTECH_SEEDS)),
+        "timeout_caps": {s: PSP_SYNTECH_CAP for s in PSP_SYNTECH_RUN},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-psp-syntech",
+        "results_dir": EXPERIMENTS_DIR / "results-psp-syntech",
+        "results_csv": EXPERIMENTS_DIR / "results-psp-syntech.csv",
+        "default_jobs": 7,
+    },
+    "psp-syntech-seeded": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {"F": list(PSP_ORDER_ARMS)},
+        "specs": list(PSP_SEEDED_SYNTECH_RUN),
+        "seeds": list(range(PSP_SYNTECH_SEEDED_SEEDS)),
+        "timeout_caps": {s: PSP_SYNTECH_CAP for s in PSP_SEEDED_SYNTECH_RUN},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-psp-syntech",
+        "results_dir": EXPERIMENTS_DIR / "results-psp-syntech-seeded",
+        "results_csv": EXPERIMENTS_DIR / "results-psp-syntech-seeded.csv",
+        "default_jobs": 7,
     },
 }
 

@@ -28,7 +28,10 @@
    "fixed": "G((X(e_at_station) & !X(e_station__b0) & !X(e_station__b1) -> !X(e_pressed_station_zero)) & (X(e_at_station) & X(e_station__b0) & !X(e_station__b1) -> !X(e_pressed_station_one)) & (X(e_at_station) & !X(e_station__b0) & X(e_station__b1) -> !X(e_pressed_station_two)) & (X(e_at_station) & X(e_station__b0) & X(e_station__b1) -> !X(e_pressed_station_three)))"
   },
   {
-   "fixed": "G(F(!m_at_emg_state))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!m_at_emg_state"
   }
  ],
  "guarantees": [
@@ -120,46 +123,76 @@
    "fixed": "s_motors__b0 & !s_motors__b1"
   },
   {
-   "fixed": "G(e_at_station & m_at_emg_state -> s_motors__b0 & !s_motors__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_at_station & m_at_emg_state -> s_motors__b0 & !s_motors__b1"
   },
   {
-   "fixed": "G(e_at_station & (!e_station__b0 & !e_station__b1 & m_task_at_station_zero | e_station__b0 & !e_station__b1 & m_task_at_station_one | !e_station__b0 & e_station__b1 & m_task_at_station_two | e_station__b0 & e_station__b1 & m_task_at_station_three) -> s_motors__b0 & !s_motors__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_at_station & (!e_station__b0 & !e_station__b1 & m_task_at_station_zero | e_station__b0 & !e_station__b1 & m_task_at_station_one | !e_station__b0 & e_station__b1 & m_task_at_station_two | e_station__b0 & e_station__b1 & m_task_at_station_three) -> s_motors__b0 & !s_motors__b1"
   },
   {
-   "fixed": "G(e_at_station & !e_station__b0 & !e_station__b1 -> !(!s_motors__b0 & s_motors__b1))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_at_station & !e_station__b0 & !e_station__b1 -> !(!s_motors__b0 & s_motors__b1)"
   },
   {
-   "fixed": "G(e_at_station & e_station__b0 & e_station__b1 -> !(!s_motors__b0 & !s_motors__b1))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_at_station & e_station__b0 & e_station__b1 -> !(!s_motors__b0 & !s_motors__b1)"
   },
   {
-   "fixed": "G(!m_task_at_station_zero & !m_task_at_station_one & !m_task_at_station_two & !m_task_at_station_three & e_at_station -> s_motors__b0 & !s_motors__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!m_task_at_station_zero & !m_task_at_station_one & !m_task_at_station_two & !m_task_at_station_three & e_at_station -> s_motors__b0 & !s_motors__b1"
   },
   {
-   "fixed": "G(e_at_station & !e_station__b0 & !e_station__b1 & !m_task_at_station_one & !m_task_at_station_two & !m_task_at_station_three | e_at_station & e_station__b0 & !e_station__b1 & !m_task_at_station_two & !m_task_at_station_three | e_at_station & !e_station__b0 & e_station__b1 & !m_task_at_station_three -> !(!s_motors__b0 & !s_motors__b1))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_at_station & !e_station__b0 & !e_station__b1 & !m_task_at_station_one & !m_task_at_station_two & !m_task_at_station_three | e_at_station & e_station__b0 & !e_station__b1 & !m_task_at_station_two & !m_task_at_station_three | e_at_station & !e_station__b0 & e_station__b1 & !m_task_at_station_three -> !(!s_motors__b0 & !s_motors__b1)"
   },
   {
-   "fixed": "G(e_at_station & e_station__b0 & e_station__b1 & !m_task_at_station_two & !m_task_at_station_one & !m_task_at_station_zero | e_at_station & !e_station__b0 & e_station__b1 & !m_task_at_station_one & !m_task_at_station_zero | e_at_station & e_station__b0 & !e_station__b1 & !m_task_at_station_zero -> !(!s_motors__b0 & s_motors__b1))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_at_station & e_station__b0 & e_station__b1 & !m_task_at_station_two & !m_task_at_station_one & !m_task_at_station_zero | e_at_station & !e_station__b0 & e_station__b1 & !m_task_at_station_one & !m_task_at_station_zero | e_at_station & e_station__b0 & !e_station__b1 & !m_task_at_station_zero -> !(!s_motors__b0 & s_motors__b1)"
   },
   {
-   "fixed": "G(e_at_station & !(e_at_station & (!e_station__b0 & !e_station__b1 & m_task_at_station_zero | e_station__b0 & !e_station__b1 & m_task_at_station_one | !e_station__b0 & e_station__b1 & m_task_at_station_two | e_station__b0 & e_station__b1 & m_task_at_station_three)) & !(!m_task_at_station_zero & !m_task_at_station_one & !m_task_at_station_two & !m_task_at_station_three) -> !(s_motors__b0 & !s_motors__b1))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_at_station & !(e_at_station & (!e_station__b0 & !e_station__b1 & m_task_at_station_zero | e_station__b0 & !e_station__b1 & m_task_at_station_one | !e_station__b0 & e_station__b1 & m_task_at_station_two | e_station__b0 & e_station__b1 & m_task_at_station_three)) & !(!m_task_at_station_zero & !m_task_at_station_one & !m_task_at_station_two & !m_task_at_station_three) -> !(s_motors__b0 & !s_motors__b1)"
   },
   {
-   "fixed": "G(!e_at_station -> !(s_motors__b0 & !s_motors__b1))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "!e_at_station -> !(s_motors__b0 & !s_motors__b1)"
   },
   {
    "fixed": "G(!(s_motors__b0 & !s_motors__b1) -> !X(s_motors__b0) & !X(s_motors__b1) & !s_motors__b0 & !s_motors__b1 | X(s_motors__b0) & !X(s_motors__b1) & s_motors__b0 & !s_motors__b1 | !X(s_motors__b0) & X(s_motors__b1) & !s_motors__b0 & s_motors__b1 | X(s_motors__b0) & !X(s_motors__b1))"
   },
   {
-   "fixed": "G(F(!m_task_at_station_zero))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!m_task_at_station_zero"
   },
   {
-   "fixed": "G(F(!m_task_at_station_one))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!m_task_at_station_one"
   },
   {
-   "fixed": "G(F(!m_task_at_station_two))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!m_task_at_station_two"
   },
   {
-   "fixed": "G(F(!m_task_at_station_three))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!m_task_at_station_three"
   }
  ],
  "in_atoms": [

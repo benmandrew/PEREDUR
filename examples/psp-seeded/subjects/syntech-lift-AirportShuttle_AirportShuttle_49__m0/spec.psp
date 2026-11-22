@@ -1,0 +1,63 @@
+{
+  "assumptions": [
+    {
+      "fixed": "G((!(e_station__b2)) | ((!(e_station__b1)) & (!(e_station__b0))))"
+    },
+    {
+      "p": "(((!(s_m_left__b0)) & (!(s_m_left__b1))) & (!(s_m_right__b0))) & (!(s_m_right__b1))",
+      "pattern": "response",
+      "s": "!((((((!(e_station__b0)) & (!(e_station__b1))) & (!(e_station__b2))) | (((e_station__b0) & (!(e_station__b1))) & (!(e_station__b2)))) | (((!(e_station__b0)) & (e_station__b1)) & (!(e_station__b2)))) | (((e_station__b0) & (e_station__b1)) & (!(e_station__b2))))",
+      "scope": "globally"
+    },
+    {
+      "fixed": "G(((((s_m_left__b0) & (!(s_m_left__b1))) & (s_m_right__b0)) & (!(s_m_right__b1))) -> ((((((((((!(e_station__b0)) & (!(e_station__b1))) & (!(e_station__b2))) & (!(X(e_station__b0)))) & (!(X(e_station__b1)))) & (!(X(e_station__b2)))) | ((((((e_station__b0) & (!(e_station__b1))) & (!(e_station__b2))) & (X(e_station__b0))) & (!(X(e_station__b1)))) & (!(X(e_station__b2))))) | ((((((!(e_station__b0)) & (e_station__b1)) & (!(e_station__b2))) & (!(X(e_station__b0)))) & (X(e_station__b1))) & (!(X(e_station__b2))))) | ((((((e_station__b0) & (e_station__b1)) & (!(e_station__b2))) & (X(e_station__b0))) & (X(e_station__b1))) & (!(X(e_station__b2))))) | ((((((!(e_station__b0)) & (!(e_station__b1))) & (e_station__b2)) & (!(X(e_station__b0)))) & (!(X(e_station__b1)))) & (X(e_station__b2)))))"
+    },
+    {
+      "p": "true",
+      "pattern": "response",
+      "s": "!(m_stop_at_nearest_station)",
+      "scope": "globally"
+    }
+  ],
+  "guarantees": [
+    {
+      "fixed": "G((!(s_m_left__b1)) | (!(s_m_left__b0)))"
+    },
+    {
+      "fixed": "G((!(s_m_right__b1)) | (!(s_m_right__b0)))"
+    },
+    {
+      "fixed": "!(m_stop_at_nearest_station)"
+    },
+    {
+      "fixed": "G((!(e_stop_button__b0)) <-> ((X(m_stop_at_nearest_station)) <-> (!(m_stop_at_nearest_station))))"
+    },
+    {
+      "fixed": "(((s_m_left__b0) & (!(s_m_left__b1))) & (s_m_right__b0)) & (!(s_m_right__b1))"
+    },
+    {
+      "pattern": "universality",
+      "s": "((((((((!(e_station__b0)) & (!(e_station__b1))) & (!(e_station__b2))) | (((e_station__b0) & (!(e_station__b1))) & (!(e_station__b2)))) | (((!(e_station__b0)) & (e_station__b1)) & (!(e_station__b2)))) | (((e_station__b0) & (e_station__b1)) & (!(e_station__b2)))) & (m_stop_at_nearest_station)) -> ((((s_m_left__b0) & (!(s_m_left__b1))) & (s_m_right__b0)) & (!(s_m_right__b1)))) & (e_stop_button__b0)",
+      "scope": "globally"
+    },
+    {
+      "p": "true",
+      "pattern": "response",
+      "s": "(((!(s_m_left__b0)) & (!(s_m_left__b1))) & (!(s_m_right__b0))) & (!(s_m_right__b1))",
+      "scope": "globally"
+    }
+  ],
+  "in_atoms": [
+    "e_station__b0",
+    "e_station__b1",
+    "e_station__b2",
+    "e_stop_button__b0"
+  ],
+  "out_atoms": [
+    "s_m_left__b0",
+    "s_m_left__b1",
+    "s_m_right__b0",
+    "s_m_right__b1",
+    "m_stop_at_nearest_station"
+  ]
+}

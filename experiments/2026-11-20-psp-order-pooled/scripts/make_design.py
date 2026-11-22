@@ -19,6 +19,11 @@ every no-<f>. Families: "base" holds full and no-climb against base;
 is in "joint", so every cross-arm pair is planned and joint_measures.py can
 decide the joint front over all six arms.
 
+`--profiles` and `--out` point the script at another campaign of the same
+arms: 2026-11-22-psp-syntech-pooled runs it with
+`--profiles psp-syntech psp-syntech-seeded --out
+experiments/2026-11-22-psp-syntech-pooled`.
+
 After pooling, rerun with --drop for any subject where an arm holds 3 or
 fewer members (or none: a SYNTECH17 import where no arm finds a repair), and
 with --sampled for any pool too large to compare exhaustively.
@@ -82,17 +87,25 @@ def main(argv=None) -> int:
     ap.add_argument("--av2", nargs="*", default=None,
                     help="subjects for av2; the rest go to av3 (default: "
                          "alternate subjects in sorted order, per group)")
+    ap.add_argument("--profiles", nargs="+",
+                    default=["psp-order", "psp-order-seeded"],
+                    choices=list(R.PROFILES),
+                    help="one group per profile (default: 2026-11-20-psp-order's)")
+    ap.add_argument("--out", type=Path, default=OUT,
+                    help="directory for design.toml and the subject lists")
     args = ap.parse_args(argv)
-    groups = {"psp-order": list(R.PROFILES["psp-order"]["specs"]),
-              "psp-order-seeded": list(R.PROFILES["psp-order-seeded"]["specs"])}
+    groups = {p: list(R.PROFILES[p]["specs"]) for p in args.profiles}
+    out = args.out if args.out.is_absolute() else ROOT / args.out
     every = {s for names in groups.values() for s in names}
     unknown = set(args.drop + args.sampled + (args.av2 or [])) - every
     if unknown:
         sys.exit(f"make_design: not a subject of the campaign: {sorted(unknown)}")
-    lines = ["# Pooled pass over 2026-11-20-psp-order: sweep F's base, full and",
+    lines = [f"# Pooled pass over {out.name.removesuffix('-pooled')}: sweep F's "
+             "base, full and",
              "# every no-<f> under nsga2-apportion. Written by",
-             "# experiments/2026-11-20-psp-order-pooled/scripts/make_design.py;",
-             "# see 2026-11-20-psp-order/PLAN.md.", "", "draws = 100"]
+             "# experiments/2026-11-20-psp-order-pooled/scripts/make_design.py",
+             f"# --profiles {' '.join(args.profiles)}; see "
+             f"{out.name.removesuffix('-pooled')}/PLAN.md.", "", "draws = 100"]
     av2, av3 = [], []
     for profile, names in groups.items():
         names = sorted(n for n in names if n not in set(args.drop))
@@ -103,11 +116,11 @@ def main(argv=None) -> int:
                 else names[0::2])
         av2 += mine
         av3 += [n for n in names if n not in set(mine)]
-    OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "design.toml").write_text("\n".join(lines) + "\n")
-    (OUT / "subjects-av2.txt").write_text("".join(f"{s}\n" for s in av2))
-    (OUT / "subjects-av3.txt").write_text("".join(f"{s}\n" for s in av3))
-    print(f"{OUT}: {len(av2)} + {len(av3)} subjects, "
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "design.toml").write_text("\n".join(lines) + "\n")
+    (out / "subjects-av2.txt").write_text("".join(f"{s}\n" for s in av2))
+    (out / "subjects-av3.txt").write_text("".join(f"{s}\n" for s in av3))
+    print(f"{out}: {len(av2)} + {len(av3)} subjects, "
           f"{len(contrasts())} contrasts a subject")
     return 0
 

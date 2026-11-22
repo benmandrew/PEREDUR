@@ -1,0 +1,129 @@
+{
+  "assumptions": [
+    {
+      "fixed": "G((!(e_front_sense__b2)) | (!(e_front_sense__b1)))"
+    },
+    {
+      "fixed": "G((!(e_back_sense__b2)) | (!(e_back_sense__b1)))"
+    },
+    {
+      "fixed": "G((!(e_side_sense__b2)) | (!(e_side_sense__b1)))"
+    },
+    {
+      "fixed": "G((!(e_status__b1)) | (!(e_status__b0)))"
+    },
+    {
+      "fixed": "G((!(e_parking_type_found__b1)) | (!(e_parking_type_found__b0)))"
+    },
+    {
+      "p": "true",
+      "pattern": "response",
+      "s": "(!(((!(e_front_sense__b0)) & (!(e_front_sense__b1))) & (!(e_front_sense__b2)))) | (!(((!(e_back_sense__b0)) & (!(e_back_sense__b1))) & (!(e_back_sense__b2))))",
+      "scope": "globally"
+    },
+    {
+      "p": "((!(s_drive_motor__b0)) & (!(s_drive_motor__b1))) | ((((((((!(s_steering_motor__b0)) & (!(s_steering_motor__b1))) & (!(s_steering_motor__b2))) | (((!(s_steering_motor__b0)) & (!(s_steering_motor__b1))) & (s_steering_motor__b2))) | (((s_steering_motor__b0) & (!(s_steering_motor__b1))) & (!(s_steering_motor__b2)))) | (((s_steering_motor__b0) & (s_steering_motor__b1)) & (!(s_steering_motor__b2)))) & (!(s_drive_motor__b0))) & (!(s_drive_motor__b1)))",
+      "pattern": "response",
+      "s": "!(((!(e_back_sense__b2)) & (!(e_back_sense__b1))) & (!(e_back_sense__b0)))",
+      "scope": "globally"
+    },
+    {
+      "p": "((!(s_drive_motor__b0)) & (s_drive_motor__b1)) | ((((((((!(s_steering_motor__b0)) & (!(s_steering_motor__b1))) & (!(s_steering_motor__b2))) | (((!(s_steering_motor__b0)) & (!(s_steering_motor__b1))) & (s_steering_motor__b2))) | (((s_steering_motor__b0) & (!(s_steering_motor__b1))) & (!(s_steering_motor__b2)))) | (((s_steering_motor__b0) & (s_steering_motor__b1)) & (!(s_steering_motor__b2)))) & (!(s_drive_motor__b0))) & (s_drive_motor__b1))",
+      "pattern": "response",
+      "s": "!(((!(e_front_sense__b2)) & (!(e_front_sense__b1))) & (!(e_front_sense__b0)))",
+      "scope": "globally"
+    }
+  ],
+  "guarantees": [
+    {
+      "fixed": "G((!(s_drive_motor__b1)) | (!(s_drive_motor__b0)))"
+    },
+    {
+      "fixed": "G((!(s_steering_motor__b2)) | ((!(s_steering_motor__b1)) & (!(s_steering_motor__b0))))"
+    },
+    {
+      "fixed": "G((!(s_velocity__b2)) | ((!(s_velocity__b1)) & (!(s_velocity__b0))))"
+    },
+    {
+      "fixed": "G((!(s_parking_mode__b1)) | (!(s_parking_mode__b0)))"
+    },
+    {
+      "fixed": "(((((s_drive_motor__b0) & (!(s_drive_motor__b1))) & (!(s_steering_motor__b0))) & (s_steering_motor__b1)) & (!(s_steering_motor__b2))) & (s_sense_motor__b0)"
+    },
+    {
+      "fixed": "(!((!(s_drive_motor__b0)) & (s_drive_motor__b1))) & (G(((!(X(s_drive_motor__b0))) & (X(s_drive_motor__b1))) -> (s_sense_motor__b0)))"
+    },
+    {
+      "pattern": "universality",
+      "s": "(((!(e_front_sense__b0)) & (!(e_front_sense__b1))) & (!(e_front_sense__b2))) -> (((s_drive_motor__b0) & (!(s_drive_motor__b1))) | ((!(s_drive_motor__b0)) & (s_drive_motor__b1)))",
+      "scope": "globally"
+    },
+    {
+      "fixed": "G(((((!(X(e_back_sense__b0))) & (!(X(e_back_sense__b1)))) & (!(X(e_back_sense__b2)))) & (s_sense_motor__b0)) -> (((!(X(s_drive_motor__b0))) & (!(X(s_drive_motor__b1)))) | ((X(s_drive_motor__b0)) & (!(X(s_drive_motor__b1))))))"
+    },
+    {
+      "p": "true",
+      "pattern": "response",
+      "q": "e_back_sense__b0",
+      "r": "e_parking_type_found__b1",
+      "s": "((((!(s_drive_motor__b0)) & (!(s_drive_motor__b1))) & (!(s_steering_motor__b0))) & (s_steering_motor__b1)) & (!(s_steering_motor__b2))",
+      "scope": "afteruntil"
+    },
+    {
+      "fixed": "(!((!(s_drive_motor__b0)) & (s_drive_motor__b1))) & (G(((!(X(s_drive_motor__b0))) & (X(s_drive_motor__b1))) -> ((((s_sense_motor__b0) & (!(X(s_velocity__b0)))) & (!(X(s_velocity__b1)))) & (!(X(s_velocity__b2))))))"
+    },
+    {
+      "pattern": "universality",
+      "s": "(((e_front_sense__b0) & (!(e_front_sense__b1))) & (e_front_sense__b2)) -> (((!(s_velocity__b0)) & (!(s_velocity__b1))) & (s_velocity__b2))",
+      "scope": "globally"
+    },
+    {
+      "pattern": "universality",
+      "s": "(((!(e_front_sense__b0)) & (!(e_front_sense__b1))) & (e_front_sense__b2)) -> (((s_velocity__b0) & (s_velocity__b1)) & (!(s_velocity__b2)))",
+      "scope": "globally"
+    },
+    {
+      "pattern": "universality",
+      "s": "(((e_front_sense__b0) & (e_front_sense__b1)) & (!(e_front_sense__b2))) -> (((!(s_velocity__b0)) & (s_velocity__b1)) & (!(s_velocity__b2)))",
+      "scope": "globally"
+    },
+    {
+      "pattern": "universality",
+      "s": "(((!(e_front_sense__b0)) & (e_front_sense__b1)) & (!(e_front_sense__b2))) -> (((s_velocity__b0) & (!(s_velocity__b1))) & (!(s_velocity__b2)))",
+      "scope": "globally"
+    },
+    {
+      "pattern": "universality",
+      "s": "(((e_front_sense__b0) & (!(e_front_sense__b1))) & (!(e_front_sense__b2))) -> (((!(s_velocity__b0)) & (!(s_velocity__b1))) & (!(s_velocity__b2)))",
+      "scope": "globally"
+    }
+  ],
+  "in_atoms": [
+    "e_front_sense__b0",
+    "e_front_sense__b1",
+    "e_front_sense__b2",
+    "e_back_sense__b0",
+    "e_back_sense__b1",
+    "e_back_sense__b2",
+    "e_side_sense__b0",
+    "e_side_sense__b1",
+    "e_side_sense__b2",
+    "e_status__b0",
+    "e_status__b1",
+    "e_parking_type_found__b0",
+    "e_parking_type_found__b1"
+  ],
+  "out_atoms": [
+    "s_drive_motor__b0",
+    "s_drive_motor__b1",
+    "s_sense_motor__b0",
+    "s_steering_motor__b0",
+    "s_steering_motor__b1",
+    "s_steering_motor__b2",
+    "s_velocity__b0",
+    "s_velocity__b1",
+    "s_velocity__b2",
+    "s_parking_mode__b0",
+    "s_parking_mode__b1"
+  ]
+}

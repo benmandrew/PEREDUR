@@ -7,7 +7,10 @@
    "s": "!e_sense__b0"
   },
   {
-   "fixed": "G(F(!m_clapped & !e_sense__b0))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!m_clapped & !e_sense__b0"
   }
  ],
  "guarantees": [
@@ -27,13 +30,20 @@
    "fixed": "s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1"
   },
   {
-   "fixed": "G(e_sense__b0 -> !(!s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1))"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "e_sense__b0 -> !(!s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1)"
   },
   {
-   "fixed": "G(F(!s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1))"
+   "pattern": "response",
+   "scope": "globally",
+   "p": "true",
+   "s": "!s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1"
   },
   {
-   "fixed": "G(m_clapped -> !s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1 | !s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & s_m_right__b1 | s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1 | s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & s_m_right__b1 | !s_m_left__b0 & s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1 | !s_m_left__b0 & s_m_left__b1 & s_m_right__b0 & !s_m_right__b1)"
+   "pattern": "universality",
+   "scope": "globally",
+   "s": "m_clapped -> !s_m_left__b0 & !s_m_left__b1 & s_m_right__b0 & !s_m_right__b1 | !s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & s_m_right__b1 | s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1 | s_m_left__b0 & !s_m_left__b1 & !s_m_right__b0 & s_m_right__b1 | !s_m_left__b0 & s_m_left__b1 & !s_m_right__b0 & !s_m_right__b1 | !s_m_left__b0 & s_m_left__b1 & s_m_right__b0 & !s_m_right__b1"
   }
  ],
  "in_atoms": [
