@@ -317,6 +317,14 @@ with (SYNTECH_DIR / "manifest.csv").open(newline="") as _f:
 PSP_SEEDED_DIR = EXAMPLES_DIR / "psp-seeded"
 PSP_SEEDED_SPECS: dict[str, dict[str, Path]] = _seeded_specs(
     PSP_SEEDED_DIR, ext="psp")
+# The seeded subjects the psp-order campaign runs. Those built on the SYNTECH17
+# import Elevator_cmp_Elevator_94 are dropped: on 2026-11-22, 27 of their
+# first 28 runs reached the 7200 s cap, where every other subject takes about
+# a minute, so they alone would have run the campaign a day past its slot.
+PSP_SEEDED_DROPPED_BASES: tuple[str, ...] = ("syntech-Elevator_cmp_Elevator_94",)
+PSP_SEEDED_EVAL: tuple[str, ...] = tuple(
+    s for s in PSP_SEEDED_SPECS
+    if s.split("__")[0] not in PSP_SEEDED_DROPPED_BASES)
 
 SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **SEEDED_SPECS,
                                      **SIDEWAYS_SPECS, **TLSF_SPECS,
@@ -901,9 +909,9 @@ PROFILES: dict[str, dict] = {
         "repair_modes": None,
         "sweeps": ["F"],
         "levels": {"F": list(PSP_ORDER_ARMS)},
-        "specs": list(PSP_SEEDED_SPECS),
+        "specs": list(PSP_SEEDED_EVAL),
         "seeds": list(range(5)),
-        "timeout_caps": {s: 7200 for s in PSP_SEEDED_SPECS},
+        "timeout_caps": {s: 7200 for s in PSP_SEEDED_EVAL},
         "compare_timeout": 1800,
         "baseline_aliases": {},
         "configs_dir": EXPERIMENTS_DIR / "configs-psp-order",

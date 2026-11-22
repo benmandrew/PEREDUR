@@ -403,7 +403,7 @@ check("controller_reuse" in G.make_toml({}), False,
 # to one joins the campaign without a hand-copied list.
 for _name, _specs, _seeds in (
         ("psp-order", [*R.PSP_SPECS, *R.PSP_SYNTECH_EVAL], 30),
-        ("psp-order-seeded", list(R.PSP_SEEDED_SPECS), 5)):
+        ("psp-order-seeded", list(R.PSP_SEEDED_EVAL), 5)):
     _prof = P[_name]
     check(_prof["specs"], _specs, f"{_name} runs its registries' subjects")
     check(set(_prof["timeout_caps"]), set(_specs), f"{_name} caps every subject")

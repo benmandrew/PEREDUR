@@ -9,7 +9,7 @@ The order-directed mechanisms on PSP, as `2026-11-20-final-engine` measures them
 The subjects come from the registries in `scripts/run_experiments.py`, not from a list here:
 
 - Profile `psp-order`: `PSP_SPECS` (the 5 hand-written subjects, which have fixes, so a known repair) and `PSP_SYNTECH_EVAL` (the unrealisable SYNTECH17 imports with 2 or more weakenable guarantee slots, which have no fix; PSP plan P7 drops the rest, and `PSP_SYNTECH_SPECS` keeps all 9), at seeds 0-29. On `feat/psp-front-end` that is 6 subjects (5 hand-written, 1 SYNTECH17), 1,080 runs.
-- Profile `psp-order-seeded`: `PSP_SEEDED_SPECS` (every entry of `examples/psp-seeded/selected.txt`, with its base as the one ideal), at seeds 0-4. On `feat/psp-front-end` that is 70 subjects (39 from the hand-written bases, 31 from the SYNTECH17 bases), 2,100 runs.
+- Profile `psp-order-seeded`: `PSP_SEEDED_EVAL` (the entries of `examples/psp-seeded/selected.txt`, with its base as the one ideal, less the 7 built on `syntech-Elevator_cmp_Elevator_94`), at seeds 0-4. That is 63 subjects (39 from the hand-written bases, 24 from the SYNTECH17 bases), 1,890 runs. The corpus itself keeps 70 subjects; see "Elevator_94 dropped" below.
 
 The counts are read from the registries whenever the runner plans, so a subject added to a registry before enqueue joins the campaign. Check them with `python3 scripts/run_experiments.py --profile psp-order --dry-run` and `--profile psp-order-seeded --dry-run`.
 
@@ -59,3 +59,7 @@ av2 103 was dequeued once its specification phase finished, before its seeded ph
 4. `rsync -a` the pooled campaign's `design.toml`, `subjects-*.txt` and `members/` to both hosts' checkouts. After the user's go-ahead: `python3 scripts/campaign.py enqueue 2026-11-20-psp-order-pooled`.
 5. `python3 scripts/campaign.py collect --outputs psp-order-pooled-reduced --host av2`.
 6. In the paper (`scripts/import_data.py --psp <this checkout>`, then `scripts/summarise.py`), the results reach `data/stats.json` under `psp-*` keys.
+
+## Elevator_94 dropped (2026-11-22)
+
+The 7 seeded subjects built on `syntech-Elevator_cmp_Elevator_94` hit the 7,200 s run cap: of their first 28 runs (seed 0 on av2, seed 3 on av3, at ed84849d), 27 timed out and 1 (`no-remove` on `__m653`) found a repair at 7,090 s. Every other seeded subject takes about a minute a run (mean 59 s over 468 runs). At 7 jobs, the Elevator runs alone would have kept av2 busy until about Mon 23 Nov 13:00Z, past the slot that ends at 06:00Z. With the user's agreement (22 Nov), `PSP_SEEDED_EVAL` leaves them out, and the campaign was enqueued again at the commit that drops them. Their rows already in `results-psp-order-seeded.csv` stay there. The pooled design reads the profile's subject list, so it leaves them out, and the analysis reports Elevator_94 as out of budget from those rows.
