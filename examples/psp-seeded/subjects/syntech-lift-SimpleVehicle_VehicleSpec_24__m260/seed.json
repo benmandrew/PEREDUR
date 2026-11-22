@@ -1,0 +1,12 @@
+{
+  "base": "syntech-lift-SimpleVehicle_VehicleSpec_24",
+  "source": "SYNTECH17",
+  "edit": "scope-swap",
+  "field": "scope",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "Globally, it is always the case that if true holds, then (((((((!(s_drive_motor__b0)) & (!(s_drive_motor__b1))) & (s_steering_motor__b0)) & (!(s_steering_motor__b1))) & (s_steering_motor__b2)) & (!(s_steering_motor__b3))) & (!(s_sense_motor__b0))) eventually holds.",
+  "after": "Between e_emg_off and e_sense__b0, it is always the case that if true holds, then (((((((!(s_drive_motor__b0)) & (!(s_drive_motor__b1))) & (s_steering_motor__b0)) & (!(s_steering_motor__b1))) & (s_steering_motor__b2)) & (!(s_steering_motor__b3))) & (!(s_sense_motor__b0))) eventually holds.",
+  "slot": 6,
+  "base_path": "examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_24.psp"
+}

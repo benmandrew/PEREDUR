@@ -1,0 +1,12 @@
+{
+  "base": "syntech-lift-ParkingModule_ParkingSpec_168",
+  "source": "SYNTECH17",
+  "edit": "swap-signal",
+  "field": "s",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "Globally, it is always the case that (((s_mode__b0) & (s_mode__b1)) <-> (((((!(e_status__b0)) & (!(e_status__b1))) | ((e_status__b0) & (!(e_status__b1)))) & (e_color__b0)) & (!(e_color__b1)))) holds.",
+  "after": "Globally, it is always the case that (((s_mode__b0) & (s_mode__b1)) <-> (((((!(e_side_sense__b0)) & (!(e_status__b1))) | ((e_status__b0) & (!(e_status__b1)))) & (e_color__b0)) & (!(e_color__b1)))) holds.",
+  "slot": 3,
+  "base_path": "examples/psp-syntech/specs/ParkingModule_ParkingSpec_168.psp"
+}

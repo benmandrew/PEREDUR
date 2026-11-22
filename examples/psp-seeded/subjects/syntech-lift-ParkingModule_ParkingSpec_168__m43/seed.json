@@ -1,0 +1,12 @@
+{
+  "base": "syntech-lift-ParkingModule_ParkingSpec_168",
+  "source": "SYNTECH17",
+  "edit": "scope-swap",
+  "field": "scope",
+  "rule": "sideways",
+  "relation": "strictly stronger than",
+  "before": "Globally, it is always the case that if true holds, then ((s_mode__b0) & (s_mode__b1)) eventually holds.",
+  "after": "Between e_front_sense__b2 and e_side_status__b0, it is always the case that if true holds, then ((s_mode__b0) & (s_mode__b1)) eventually holds.",
+  "slot": 2,
+  "base_path": "examples/psp-syntech/specs/ParkingModule_ParkingSpec_168.psp"
+}

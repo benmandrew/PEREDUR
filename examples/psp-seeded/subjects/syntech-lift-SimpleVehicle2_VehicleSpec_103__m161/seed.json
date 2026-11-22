@@ -1,0 +1,12 @@
+{
+  "base": "syntech-lift-SimpleVehicle2_VehicleSpec_103",
+  "source": "SYNTECH17",
+  "edit": "scope-swap",
+  "field": "scope",
+  "rule": "sideways",
+  "relation": "incomparable",
+  "before": "Globally, it is always the case that if true holds, then m_scanning eventually holds.",
+  "after": "Between e_parking_type_found__b1 and e_front_sense__b2, it is always the case that if true holds, then m_scanning eventually holds.",
+  "slot": 7,
+  "base_path": "examples/psp-syntech/specs/SimpleVehicle2_VehicleSpec_103.psp"
+}

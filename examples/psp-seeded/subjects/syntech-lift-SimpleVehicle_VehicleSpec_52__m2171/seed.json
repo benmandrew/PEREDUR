@@ -1,0 +1,12 @@
+{
+  "base": "syntech-lift-SimpleVehicle_VehicleSpec_52",
+  "source": "SYNTECH17",
+  "edit": "swap-signal",
+  "field": "s",
+  "rule": "sideways",
+  "relation": "strictly stronger than",
+  "before": "Globally, it is always the case that ((((e_sense__b0) & (!(e_sense__b1))) & (e_sense__b2)) -> (((!(s_velocity__b0)) & (!(s_velocity__b1))) & (s_velocity__b2))) holds.",
+  "after": "Globally, it is always the case that ((((e_sense__b0) & (!(e_sense__b1))) & (e_sense__b2)) -> (((!(s_steering_motor__b4)) & (!(s_velocity__b1))) & (s_velocity__b2))) holds.",
+  "slot": 15,
+  "base_path": "examples/psp-syntech/specs/SimpleVehicle_VehicleSpec_52.psp"
+}

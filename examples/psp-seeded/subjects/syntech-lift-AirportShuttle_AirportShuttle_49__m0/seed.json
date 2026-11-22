@@ -1,0 +1,12 @@
+{
+  "base": "syntech-lift-AirportShuttle_AirportShuttle_49",
+  "source": "SYNTECH17",
+  "edit": "narrow-field",
+  "field": "s",
+  "rule": "stronger",
+  "relation": "strictly stronger than",
+  "before": "Globally, it is always the case that ((((((((!(e_station__b0)) & (!(e_station__b1))) & (!(e_station__b2))) | (((e_station__b0) & (!(e_station__b1))) & (!(e_station__b2)))) | (((!(e_station__b0)) & (e_station__b1)) & (!(e_station__b2)))) | (((e_station__b0) & (e_station__b1)) & (!(e_station__b2)))) & (m_stop_at_nearest_station)) -> ((((s_m_left__b0) & (!(s_m_left__b1))) & (s_m_right__b0)) & (!(s_m_right__b1)))) holds.",
+  "after": "Globally, it is always the case that (((((((((!(e_station__b0)) & (!(e_station__b1))) & (!(e_station__b2))) | (((e_station__b0) & (!(e_station__b1))) & (!(e_station__b2)))) | (((!(e_station__b0)) & (e_station__b1)) & (!(e_station__b2)))) | (((e_station__b0) & (e_station__b1)) & (!(e_station__b2)))) & (m_stop_at_nearest_station)) -> ((((s_m_left__b0) & (!(s_m_left__b1))) & (s_m_right__b0)) & (!(s_m_right__b1)))) & (e_stop_button__b0)) holds.",
+  "slot": 5,
+  "base_path": "examples/psp-syntech/specs/AirportShuttle_AirportShuttle_49.psp"
+}
