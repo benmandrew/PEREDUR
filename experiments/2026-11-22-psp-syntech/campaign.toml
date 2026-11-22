@@ -1,0 +1,53 @@
+name = "2026-11-22-psp-syntech"
+branch = "campaign/psp-syntech"
+profile = "psp-syntech"
+description = "The order-directed mechanisms on the lifted SYNTECH17 subjects (PLAN.md): sweep F's base, full and every no-<f> (climb, twoway in exchange mode, maximality removal, novelty; blame on in every arm) under nsga2-apportion at the final engine's budget, on the unrealisable lifted imports (PSP_SYNTECH_EVAL less PSP_SYNTECH_OUT_OF_BUDGET) and the seeded subjects built on the lifted realisable imports (PSP_SEEDED_SYNTECH less PSP_SEEDED_SYNTECH_OUT_OF_BUDGET_BASES). The pooled pass is 2026-11-22-psp-syntech-pooled."
+
+# Seeds pair every arm of a (spec, seed) on one host, as 2026-11-20-psp-order
+# splits them. Not launched: declared on 22 Nov for the user to enqueue.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'taskset -c 0-13 cmake --build build-release -j 12'"
+
+# psp-order's configs, under this campaign's own directory.
+configs = "python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps F --schemes nsga2-apportion --parallel 2 --levels base,full,no-climb,no-gate,no-remove,no-novelty --out-dir experiments/configs-psp-syntech"
+
+# CPU windows: CPUs 0-13, 7 jobs of 2 threads, 28G on both hosts, as
+# psp-order ran beside veribee's hunt on CPUs 14-31. A window moves with one
+# substitution per host, for example
+#   sed -i '/av2 = { cpus/ s/cpus = "0-13"/cpus = "0-29"/' campaign.toml
+# and `jobs` must then change with it (CPUs over threads a run).
+#
+# Size and estimate: PLAN.md, "Size". Subject counts are read from the
+# registries at plan time (`run_experiments.py --profile psp-syntech[-seeded]
+# --dry-run`).
+
+# The specifications: 5 subjects x 6 arms x 5 seeds = 150 runs a host.
+[[phases]]
+name = "specs-av2"
+profile = "psp-syntech"
+hosts = { av2 = "0-4" }
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
+
+[[phases]]
+name = "specs-av3"
+profile = "psp-syntech"
+hosts = { av3 = "5-9" }
+confine = { av3 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
+
+# The seeded subjects: 49 subjects x 6 arms x 1 seed = 294 runs a host.
+[[phases]]
+name = "seeded-av2"
+profile = "psp-syntech-seeded"
+hosts = { av2 = "0" }
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
+
+[[phases]]
+name = "seeded-av3"
+profile = "psp-syntech-seeded"
+hosts = { av3 = "1" }
+confine = { av3 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7

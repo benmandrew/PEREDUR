@@ -402,8 +402,11 @@ check("controller_reuse" in G.make_toml({}), False,
 # The PSP campaign reads its subjects from the registries, so a subject added
 # to one joins the campaign without a hand-copied list.
 for _name, _specs, _seeds in (
-        ("psp-order", [*R.PSP_SPECS, *R.PSP_SYNTECH_EVAL], 30),
-        ("psp-order-seeded", list(R.PSP_SEEDED_EVAL), 5)):
+        ("psp-order", [*R.PSP_SPECS, *R.PSP_ORDER_SYNTECH_EVAL], 30),
+        ("psp-order-seeded", list(R.PSP_SEEDED_EVAL), 5),
+        ("psp-syntech", list(R.PSP_SYNTECH_RUN), R.PSP_SYNTECH_SEEDS),
+        ("psp-syntech-seeded", list(R.PSP_SEEDED_SYNTECH_RUN),
+         R.PSP_SYNTECH_SEEDED_SEEDS)):
     _prof = P[_name]
     check(_prof["specs"], _specs, f"{_name} runs its registries' subjects")
     check(set(_prof["timeout_caps"]), set(_specs), f"{_name} caps every subject")
@@ -414,6 +417,16 @@ for _name, _specs, _seeds in (
     check(_prof["schemes"], ["nsga2-apportion"], f"{_name} scheme")
 check(P["psp-order"]["results_dir"] != P["psp-order-seeded"]["results_dir"],
       True, "the two PSP profiles write separate result trees")
+check(len({str(P[_n]["results_dir"]) for _n in (
+    "psp-order", "psp-order-seeded", "psp-syntech", "psp-syntech-seeded")}),
+      4, "the four PSP profiles write separate result trees")
+check(set(R.PSP_SEEDED_SYNTECH) & set(R.PSP_SEEDED_EVAL), set(),
+      "psp-order-seeded runs none of the lifted SYNTECH17 subjects")
+check(all(s.startswith(R.PSP_SEEDED_LIFT_PREFIX)
+          for s in R.PSP_SEEDED_SYNTECH_RUN) and bool(R.PSP_SEEDED_SYNTECH_RUN),
+      True, "psp-syntech-seeded runs only the lifted SYNTECH17 subjects")
+check(set(R.PSP_SYNTECH_OUT_OF_BUDGET) <= set(R.PSP_SYNTECH_EVAL), True,
+      "every out-of-budget SYNTECH17 import is an eval candidate")
 
 # A PSP run writes repair_N.psp beside a repair_N.fitness.json sidecar; the
 # sidecars are not repairs, and the best total is read from them.
