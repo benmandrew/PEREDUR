@@ -301,6 +301,18 @@ purpose = "Pooled pass of the final engine on the specifications: 18 subjects, t
 note = "The reduced outputs are av2's, collected 2026-11-21. The pooled inputs (design, subject lists, members) are untracked; their sums are in the campaign's PLAN log."
 
 [[set]]
+name = "final-engine-pooled-random"
+paths = ["2026-11-23-final-engine-pooled-random", "final-engine-pooled-random-reduced"]
+paper = "ext"
+status = "supporting"
+question = "Baseline: random selection against base on strength and diversity"
+campaign = "2026-11-23-final-engine-pooled-random"
+date = "2026-11-23"
+commits = ["ee4ef285"]
+purpose = "Two-arm pooled pass of the final engine on the specifications: random/base against nsga2-apportion/base on the 18 subjects, on the ten-arm pass's word sample (strength, pooled ball radii at K = 3 and share; joint-front reach is over two arms and not the paper's measure)."
+note = "The reduced outputs are av2's, collected 2026-11-23. joint_measures.py labels both arms 'base' (it prints the level alone); in joint/per-subject.csv the first row of each subject is nsga2-apportion/base and the second random/base, and the first reproduces the ten-arm pass's base row on all 16 exhaustive subjects."
+
+[[set]]
 name = "final-engine-seeded-pooled"
 paths = ["2026-11-20-final-engine-seeded-pooled", "final-engine-seeded-pooled-reduced"]
 paper = "ext"

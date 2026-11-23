@@ -99,3 +99,10 @@ dba80150ee7656fd1e725927eb328e435666c9556074c65c40ff9715923ece20  ball-radii-poo
 a2937dd5d09b377da42327080f4d24413df3b58f8e46700cd306bb6727db56e8  members/index.csv
 7125856c24fb4fd9a1eacaa198a00e28fbb5988717b42cf1559fa45dbb6dddbf  members/done.csv
 ```
+- 2026-11-23 19:56Z: `2026-11-23-final-engine-pooled-random` ran as av2 108 and av3 106 from 19:15Z (fingerprint about 10 min with no word drawn, compare of 353,067 pairs on av2 and 224,244 on av3, reduce on av2) and ended at 19:55Z. `campaign.py collect --outputs final-engine-pooled-random-reduced --host av2` copied its 11 files. `joint_measures.py` labels both arms `base`, since it prints the level alone; in `joint/per-subject.csv` the first row of each subject is nsga2-apportion/base, whose frontier and share equal the ten-arm pass's on all 16 exhaustive subjects. random against base: net strength median -0.033 (5 of 18 subjects random stronger, p = 0.39); share HL -0.080 [-0.122, -0.034] over 18 subjects (random weaker on 14, p = 0.0034); pooled balls, random's halves against base's, +0.027 (p = 0.55). Sums of the main outputs:
+
+```
+7ea5c056da4f2aef8cf1c5cd24f4fa350140647b532913e2185344bd0931bce6  strength/contrasts.csv
+3a3422b2233dc463592f4dcc956c48a160d651c226cf2f65e34d7574e9fb91a8  joint/per-subject.csv
+519f829b606e148dd7699df9ce1bc29e42be3d97e20d6eb74627deb7a657cee7  ball-radii-pooled/pooled.csv
+```
