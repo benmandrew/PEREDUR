@@ -45,6 +45,7 @@ const std::vector<Suite>& suites() {
         suite_named("pipeline"),
         suite_named("termination"),
         suite_named("nsga2"),
+        suite_named("diversity"),
         suite_named("mutation"),
         suite_named("blame_targeting"),
         suite_named("direction_gate"),
@@ -92,6 +93,7 @@ const std::vector<Suite>& suites() {
         suite_named("driver_maximal"),
         suite_named("driver_lint_ideals"),
         suite_named("driver_signal_tracer"),
+        suite_named("driver_climb_replay"),
         Suite{"thread_pool", false, {}},
         // Opt-in: sends 213,605 requirement pairs to SPOT, and no ctest entry
         // runs it.

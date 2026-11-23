@@ -28,6 +28,7 @@ The operating manual is docs/dev/campaigns.md.
 """
 
 import argparse
+import csv
 import errno
 import fcntl
 import getpass
@@ -118,6 +119,14 @@ FINGERPRINT_CMD = os.environ.get("PEREDUR_FINGERPRINT_CMD",
 # (scripts/pool_members.py).
 POOL_CMD = os.environ.get("PEREDUR_POOL_CMD",
                           f"{REMOTE_PYTHON} scripts/pool_members.py")
+# The two reductions of a `kind = "reduce"` phase, run one after the other on
+# one host over every host's gathered outputs (scripts/pooled_reduce.py, then
+# optionally scripts/joint_measures.py).
+REDUCE_CMD = os.environ.get("PEREDUR_REDUCE_CMD",
+                            f"{REMOTE_PYTHON} scripts/pooled_reduce.py")
+JOINT_SCRIPT = "scripts/joint_measures.py"
+JOINT_CMD = os.environ.get("PEREDUR_JOINT_CMD",
+                           f"{REMOTE_PYTHON} {JOINT_SCRIPT}")
 # Where a compare phase's manifest goes on the host. A fixed directory rather
 # than beside the output CSV, which may sit at any depth: status finds the
 # manifests with one shallow `find` instead of a walk of experiments/.
@@ -256,6 +265,13 @@ def detail_script(root: str, campaigns: list[dict]) -> str:
                 f'  echo "{MARK}OUTMTIME $(stat -c %Y {q_out})"',
                 "fi",
             ]
+            if c.get("log"):
+                # A reduce step writes its tables only at its end, so its
+                # progress lines in the entry log are the sign of life.
+                q_log = shlex.quote(c["log"])
+                lines += [f"if [ -f {q_log} ]; then",
+                          f'  echo "{MARK}LOGMTIME $(stat -c %Y {q_log})"',
+                          "fi"]
             continue
         if c.get("kind") == "score":
             # A score phase's progress is a directory listing: one CSV per
@@ -530,7 +546,33 @@ def live_processes(ps_lines: list[str]) -> list[dict]:
             found.append({"comm": comm, "profile": None, "kind": "pool",
                           "manifest": option_of_args(args, "--manifest"),
                           "args": args})
+        elif comm.startswith("python") and (
+                "pooled_reduce.py" in args or "joint_measures.py" in args):
+            # Neither takes a manifest. A reduce phase is known by the output
+            # directory, the script's fourth positional argument.
+            found.append({"comm": comm, "profile": None, "kind": "reduce",
+                          "out": reduce_out_of_args(args), "args": args})
+        elif comm == "rsync":
+            # A reduce phase's gather: claimed by the destination it names.
+            found.append({"comm": comm, "profile": None, "kind": "gather",
+                          "args": args})
     return found
+
+
+def reduce_out_of_args(args: str):
+    """The OUT_DIR of a pooled_reduce.py or joint_measures.py command line:
+    the fourth positional argument after the script."""
+    try:
+        words = shlex.split(args)
+    except ValueError:
+        words = args.split()
+    script = next((i for i, w in enumerate(words)
+                   if w.endswith(("pooled_reduce.py", "joint_measures.py"))),
+                  None)
+    if script is None:
+        return None
+    positional = [w for w in words[script + 1:] if not w.startswith("-")]
+    return positional[3] if len(positional) > 3 else None
 
 
 def option_of_args(args: str, option: str):
@@ -651,6 +693,12 @@ def campaigns_from_compare_manifests(manifests: list[dict]) -> list[dict]:
             "rows_planned": m.get("pairs_total", m.get("planned")),
             "seeds": [],
         })
+        if kind == "reduce":
+            # Steps done against steps planned, from the progress CSV `out`;
+            # staleness from the entry's log, which the reductions print to.
+            out[-1].update({"reduce_out": str(m.get("reduce_out") or ""),
+                            "collected": str(m.get("collected") or ""),
+                            "log": str(m.get("log") or "")})
     out.sort(key=lambda c: (c.get("started") or "", c["profile"]))
     return out
 
@@ -760,11 +808,31 @@ def claims_campaign(proc: dict, c: dict) -> bool:
     if c.get("kind") == "score":
         return (proc.get("kind") == "score" and bool(proc.get("out"))
                 and Path(proc["out"]).name == Path(c.get("out", "")).name)
+    if c.get("kind") == "reduce":
+        return reduce_claims(proc, c)
     if c.get("kind") in UNSEEDED_KINDS:
         return (proc.get("kind") == c["kind"] and bool(proc.get("manifest"))
                 and Path(proc["manifest"]).name
                 == Path(c.get("manifest", "")).name)
     return bool(proc.get("profile")) and proc["profile"] == c["profile"]
+
+
+def reduce_claims(proc: dict, c: dict) -> bool:
+    """Whether a live process is this reduce phase's: a reduction writing
+    under its output directory, or the gather's rsync into its collected
+    tree. Paths compare by their trailing parts, since one side may be
+    absolute and the other relative to the checkout."""
+    def under(path, top) -> bool:
+        if not path or not top:
+            return False
+        p, t = Path(path).parts, Path(top).parts
+        return any(p[i:i + len(t)] == t for i in range(len(p) - len(t) + 1))
+    if proc.get("kind") == "reduce":
+        return under(proc.get("out"), c.get("reduce_out"))
+    if proc.get("kind") == "gather":
+        return bool(c.get("collected")) and any(
+            under(w, c["collected"]) for w in proc.get("args", "").split())
+    return False
 
 
 def parse_started(value: str | None) -> float | None:
@@ -980,6 +1048,9 @@ def status_notes(reports: list[dict]) -> list[str]:
             elif p.get("kind") == "score":
                 notes.append(f"{r['host']}: scorer live on "
                              f"--out {p.get('out') or '?'}")
+            elif p.get("kind") == "reduce":
+                notes.append(f"{r['host']}: reduction live on "
+                             f"{p.get('out') or '?'}")
             elif p.get("kind") in UNSEEDED_KINDS:
                 notes.append(f"{r['host']}: {p['kind']} pass live on "
                              f"--manifest {p.get('manifest') or '?'}")
@@ -1697,30 +1768,42 @@ CAMPAIGN_KEYS = {"name", "branch", "profile", "hosts", "phases", "build",
 # fingerprint phase reads (scripts/pool_members.py), for subjects whose every
 # seed that host ran. With `copy_from`, a subject already in that committed
 # pool is copied instead. Unseeded, as the two above.
-PHASE_KINDS = ("run", "score", "compare", "fingerprint", "pool")
-UNSEEDED_KINDS = ("compare", "fingerprint", "pool")
+#
+# A sixth, `kind = "reduce"`, runs on the one host its `host` names. It copies
+# every source host's output set into a `<host>/` tree on that host, then runs
+# scripts/pooled_reduce.py and optionally scripts/joint_measures.py over it.
+PHASE_KINDS = ("run", "score", "compare", "fingerprint", "pool", "reduce")
+UNSEEDED_KINDS = ("compare", "fingerprint", "pool", "reduce")
 RUN_PHASE_KEYS = {"name", "kind", "profile", "jobs", "sweeps", "specs", "hosts",
                   "confine"}
-# What `confine` may set for one host: a CPU set and a memory cap on a run
-# phase's runner, for a campaign that shares a host with other users' jobs.
+# What `confine` may set for one host: a CPU set and a memory cap on the
+# runner of a run, compare, fingerprint or pool phase, for a campaign that
+# shares a host with other users' jobs. A score phase pins its own workers.
 CONFINE_KEYS = ("cpus", "memory_max")
 SCORE_BUDGET_KEYS = ("workers", "cores", "cuts", "maximal_timeout",
                      "compare_timeout", "deadline_s", "wall_cap_s")
 SCORE_PHASE_KEYS = {"name", "kind", "profile", "results", "out", "hosts",
                     "specs", *SCORE_BUDGET_KEYS}
 COMPARE_BUDGET_KEYS = ("jobs", "black_timeout", "wall_timeout", "vmem_kb")
-COMPARE_PHASE_KEYS = {"name", "kind", "pairs", "out", "hosts",
+COMPARE_PHASE_KEYS = {"name", "kind", "pairs", "out", "hosts", "confine",
                       *COMPARE_BUDGET_KEYS}
 FINGERPRINT_BUDGET_KEYS = ("words", "seed", "workers", "black_timeout")
 FINGERPRINT_PATH_KEYS = ("subjects", "members", "work", "out")
-FINGERPRINT_PHASE_KEYS = {"name", "kind", "pairs", "hosts", "design",
+FINGERPRINT_PHASE_KEYS = {"name", "kind", "pairs", "hosts", "design", "confine",
                           *FINGERPRINT_PATH_KEYS, *FINGERPRINT_BUDGET_KEYS}
 POOL_PATH_KEYS = ("design", "subjects", "out")
-POOL_PHASE_KEYS = {"name", "kind", "hosts", "copy_from", *POOL_PATH_KEYS}
+POOL_PHASE_KEYS = {"name", "kind", "hosts", "copy_from", "confine",
+                   *POOL_PATH_KEYS}
+REDUCE_PATH_KEYS = ("design", "members", "outputs", "collected", "out")
+REDUCE_FLAG_KEYS = ("pooled_balls", "pooled_only", "no_balls")
+REDUCE_PHASE_KEYS = {"name", "kind", "host", "sources", "confine", "jobs",
+                     "ball_k", "pooled_draws", "joint", "share_only",
+                     "half_control",
+                     *REDUCE_PATH_KEYS, *REDUCE_FLAG_KEYS}
 KIND_PHASE_KEYS = {"run": RUN_PHASE_KEYS, "score": SCORE_PHASE_KEYS,
                    "compare": COMPARE_PHASE_KEYS,
                    "fingerprint": FINGERPRINT_PHASE_KEYS,
-                   "pool": POOL_PHASE_KEYS}
+                   "pool": POOL_PHASE_KEYS, "reduce": REDUCE_PHASE_KEYS}
 
 
 def parse_seed_range(text: str, where: str) -> list:
@@ -1997,17 +2080,17 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
             raise CampaignError(f"{where}: unknown key(s) {', '.join(unknown)} "
                                 f"on a {kind} phase; known: "
                                 f"{', '.join(sorted(allowed))}")
-        if kind == "compare":
-            normalised.append(normalise_compare_phase(phase, where, name,
-                                                      seeds_by_host))
-            continue
-        if kind == "fingerprint":
-            normalised.append(normalise_fingerprint_phase(phase, where, name,
-                                                          seeds_by_host))
-            continue
-        if kind == "pool":
-            normalised.append(normalise_pool_phase(phase, where, name,
-                                                   seeds_by_host))
+        if kind in UNSEEDED_KINDS:
+            normalise = {"compare": normalise_compare_phase,
+                         "fingerprint": normalise_fingerprint_phase,
+                         "pool": normalise_pool_phase,
+                         "reduce": normalise_reduce_phase}[kind]
+            record = normalise(phase, where, name, seeds_by_host)
+            record["confine"] = merge_confine(confine, phase, where,
+                                              seeds_by_host)
+            if kind == "reduce":
+                check_reduce_jobs(record, where)
+            normalised.append(record)
             continue
         profile = phase.get("profile", raw.get("profile"))
         if kind == "score":
@@ -2068,20 +2151,13 @@ def load_campaign(name: str, root: Path | None = None) -> dict:
                     and all(isinstance(v, str) for v in value)):
                 raise CampaignError(f"{where}: {key} must be an array of "
                                     f"strings")
-        # A phase's table replaces the campaign's entry for each host it
-        # names; the others keep the campaign's.
-        phase_confine = dict(confine)
-        if phase.get("confine") is not None:
-            phase_confine.update(parse_confine(phase["confine"],
-                                               f"{where}: confine",
-                                               seeds_by_host))
         normalised.append({"name": phase.get("name", profile), "kind": "run",
                            "profile": profile, "jobs": jobs,
                            "sweeps": phase.get("sweeps"),
                            "specs": phase.get("specs"),
                            "hosts": phase_hosts,
-                           "confine": {h: c for h, c in phase_confine.items()
-                                       if c}})
+                           "confine": merge_confine(confine, phase, where,
+                                                    seeds_by_host)})
 
     build = raw.get("build", DEFAULT_BUILD_CMD)
     if not isinstance(build, str) or not build:
@@ -2138,6 +2214,18 @@ def normalise_score_phase(phase: dict, where: str, profile,
     return {"name": phase.get("name", Path(out).name), "kind": "score",
             "profile": profile, "jobs": None, "sweeps": None, "specs": specs,
             "hosts": phase_hosts, "results": results, "out": out, **budgets}
+
+
+def merge_confine(confine: dict, phase: dict, where: str,
+                  seeds_by_host: dict) -> dict:
+    """The phase's host -> limits map: the campaign's ``confine``, with the
+    phase's own table replacing the entry of each host it names. A host left
+    with ``{}`` runs unconfined, so it is dropped."""
+    merged = dict(confine)
+    if phase.get("confine") is not None:
+        merged.update(parse_confine(phase["confine"], f"{where}: confine",
+                                    seeds_by_host))
+    return {h: c for h, c in merged.items() if c}
 
 
 def normalise_compare_phase(phase: dict, where: str, campaign: str,
@@ -2297,6 +2385,127 @@ def normalise_pool_phase(phase: dict, where: str, campaign: str,
     return record
 
 
+def normalise_reduce_phase(phase: dict, where: str, campaign: str,
+                           seeds_by_host: dict) -> dict:
+    """A reduce phase's record: the one host it runs on, the hosts whose
+    output sets it gathers, its five paths, and pooled_reduce.py's and
+    joint_measures.py's options, each carried explicitly to the command line.
+
+    Paths are relative to the checkout: `outputs` is read at the same path in
+    every source host's checkout, and `out` sits under experiments/ so that
+    `collect --outputs` can bring it home.
+    """
+    record: dict = {"name": phase.get("name") or "reduce", "kind": "reduce",
+                    "campaign": campaign, "profile": None, "jobs": None,
+                    "sweeps": None, "specs": None}
+    if not isinstance(record["name"], str) or any(
+            c in record["name"] for c in "/{} "):
+        raise CampaignError(f"{where}: name must be a non-empty string "
+                            f"without '/', spaces or braces")
+    host = phase.get("host")
+    if not isinstance(host, str) or not host:
+        raise CampaignError(f"{where}: a reduce phase needs host = \"...\", "
+                            f"the one host that gathers and reduces")
+    if host not in seeds_by_host:
+        raise CampaignError(f"{where}: host {host} is not declared at the "
+                            f"campaign level; declared: "
+                            f"{', '.join(seeds_by_host)}")
+    record["host"] = host
+    # Runs only on its host: every other host's entry skips it.
+    record["hosts"] = [host]
+    sources = phase.get("sources")
+    if sources is None:
+        sources = list(seeds_by_host)
+    elif (not isinstance(sources, list) or not sources
+          or not all(isinstance(h, str) and h for h in sources)):
+        raise CampaignError(f"{where}: sources is an array of host names, "
+                            f"e.g. sources = [\"av2\", \"av3\"]")
+    extra = sorted(set(sources) - set(seeds_by_host))
+    if extra:
+        raise CampaignError(f"{where}: sources {', '.join(extra)} are not "
+                            f"declared at the campaign level")
+    record["sources"] = list(dict.fromkeys(sources))
+    for key in REDUCE_PATH_KEYS:
+        value = phase.get(key)
+        if not isinstance(value, str) or not value:
+            raise CampaignError(f"{where}: a reduce phase needs {key} = "
+                                f"\"...\", a path relative to the checkout")
+        try:
+            value = expand_host(value, host)
+        except (KeyError, IndexError, ValueError):
+            raise CampaignError(f"{where}: {key} = {value!r} may use only "
+                                f"{{host}} as a placeholder") from None
+        parts = Path(value).parts
+        if Path(value).is_absolute() or ".." in parts:
+            raise CampaignError(f"{where}: {key} = {value!r} must be relative "
+                                f"to the checkout, without '..'")
+        record[key] = value.rstrip("/")
+    paths = {key: Path(record[key]).parts
+             for key in ("outputs", "collected", "out")}
+    for a, b in (("collected", "outputs"), ("out", "outputs"),
+                 ("out", "collected"), ("outputs", "collected"),
+                 ("outputs", "out"), ("collected", "out")):
+        if paths[a][:len(paths[b])] == paths[b]:
+            raise CampaignError(
+                f"{where}: {a} = {record[a]!r} lies in {b} = {record[b]!r}. "
+                f"outputs, collected and out must be three separate trees, "
+                f"or a later `collect --outputs` copies one inside another")
+    if paths["out"][0] != "experiments" or len(paths["out"]) < 2:
+        raise CampaignError(f"{where}: out = {record['out']!r} must lie under "
+                            f"experiments/, where `collect --outputs` reads")
+    for key in (*REDUCE_FLAG_KEYS, "joint", "share_only", "half_control"):
+        value = phase.get(key, False)
+        if not isinstance(value, bool):
+            raise CampaignError(f"{where}: {key} must be true or false")
+        record[key] = value
+    if record["pooled_balls"] and record["pooled_only"]:
+        raise CampaignError(f"{where}: pooled_balls and pooled_only are "
+                            f"exclusive; pooled_only already writes the "
+                            f"pooled ball radii, and nothing else")
+    if record["share_only"] and not record["joint"]:
+        raise CampaignError(f"{where}: share_only is a joint_measures.py "
+                            f"option, and joint is false")
+    if record["half_control"] and (record["share_only"]
+                                   or not record["joint"]):
+        raise CampaignError(f"{where}: half_control is joint_measures.py's "
+                            f"reach control, so it needs joint = true and "
+                            f"share_only = false")
+    for key, default in (("jobs", 1), ("pooled_draws", None)):
+        value = phase.get(key, default)
+        if value is not None and (isinstance(value, bool)
+                                  or not isinstance(value, int) or value < 1):
+            raise CampaignError(f"{where}: {key} must be a positive integer")
+        record[key] = value
+    ball_k = phase.get("ball_k")
+    if ball_k is not None and not (
+            isinstance(ball_k, list) and ball_k
+            and all(isinstance(k, int) and not isinstance(k, bool) and k >= 1
+                    for k in ball_k)):
+        raise CampaignError(f"{where}: ball_k must be a non-empty array of "
+                            f"positive integers")
+    record["ball_k"] = ball_k
+    return record
+
+
+def cpu_list_size(text: str) -> int:
+    """How many CPUs a checked `taskset -c` list names."""
+    total = 0
+    for part in text.split(","):
+        lo, _, hi = part.partition("-")
+        total += int(hi or lo) - int(lo) + 1
+    return total
+
+
+def check_reduce_jobs(record: dict, where: str) -> None:
+    """A reduce phase confined to fewer CPUs than its jobs would oversubscribe
+    the set it shares with other users' work."""
+    cpus = (record.get("confine") or {}).get(record["host"], {}).get("cpus")
+    if cpus and record["jobs"] > cpu_list_size(cpus):
+        raise CampaignError(f"{where}: jobs = {record['jobs']} is more "
+                            f"than the {cpu_list_size(cpus)} CPU(s) confine "
+                            f"gives {record['host']} ({cpus})")
+
+
 def expand_host(path: str, host: str) -> str:
     """A compare phase's path with ``{host}`` replaced. format() rather than
     replace() so a stray brace or another placeholder fails at load time."""
@@ -2403,6 +2612,8 @@ def phase_args(phase: dict, seeds: list, host: str | None = None) -> list:
         return fingerprint_phase_args(phase, host or "")
     if phase_kind(phase) == "pool":
         return pool_phase_args(phase, host or "")
+    if phase_kind(phase) == "reduce":
+        return reduce_phase_args(phase)
     if phase_kind(phase) == "score":
         return score_phase_args(phase, seeds)
     args = ["--profile", phase["profile"]]
@@ -2461,6 +2672,39 @@ def pool_phase_args(phase: dict, host: str) -> list:
     return args + ["--manifest", compare_manifest_path(phase)]
 
 
+def reduce_phase_args(phase: dict) -> list:
+    """pooled_reduce.py's arguments: the design, the members, the gathered
+    tree and the output directory, then every option the phase sets."""
+    args = [phase["design"], phase["members"], phase["collected"],
+            phase["out"], "--jobs", str(phase["jobs"])]
+    for key in REDUCE_FLAG_KEYS:
+        if phase.get(key):
+            args.append(f"--{key.replace('_', '-')}")
+    if phase.get("ball_k"):
+        args += ["--ball-k", *[str(k) for k in phase["ball_k"]]]
+    if phase.get("pooled_draws"):
+        args += ["--pooled-draws", str(phase["pooled_draws"])]
+    return args
+
+
+def joint_phase_args(phase: dict) -> list:
+    """joint_measures.py's arguments: pooled_reduce.py's inputs, and a
+    `joint/` directory under the same output so neither overwrites the
+    other's summary.txt."""
+    args = [phase["design"], phase["members"], phase["collected"],
+            f"{phase['out']}/joint"]
+    return (args + (["--share-only"] if phase.get("share_only") else [])
+            + (["--half-control"] if phase.get("half_control") else []))
+
+
+def reduce_steps(phase: dict) -> list:
+    """(step, launcher, arguments) for each reduction, in the order run."""
+    steps = [("reduce", REDUCE_CMD, reduce_phase_args(phase))]
+    if phase.get("joint"):
+        steps.append(("joint", JOINT_CMD, joint_phase_args(phase)))
+    return steps
+
+
 def phase_launcher(phase: dict) -> str:
     """The command a phase's arguments follow: runner, scorer or comparer."""
     kind = phase_kind(phase)
@@ -2470,6 +2714,8 @@ def phase_launcher(phase: dict) -> str:
         return FINGERPRINT_CMD
     if kind == "pool":
         return POOL_CMD
+    if kind == "reduce":
+        return REDUCE_CMD
     return SCORER_CMD if kind == "score" else RUNNER_CMD
 
 
@@ -2484,7 +2730,7 @@ def confine_unit(entry: dict, index: int) -> str:
 
 
 def confine_prefix(phase: dict, host: str | None, unit: str) -> list:
-    """The words a confined run phase's launch starts with, or none.
+    """The words a confined phase's launch starts with, or none.
 
     `systemd-run --user --scope` sets the memory cap and `taskset -c` the CPU
     set. AllowedCPUs= is not used: the lab hosts' user managers lack the
@@ -3144,17 +3390,23 @@ def run_step(root: Path, command, log_path: Path, shell: bool = False,
     return proc.returncode
 
 
-def run_phase(root: Path, phase: dict, seeds: list, log_path: Path,
-              host: str | None = None, prefix: list | None = None) -> int:
-    env = None
+def confine_env(prefix: list | None):
+    """The environment a confined launch needs, or None for the tick's own.
+    """
     if prefix and prefix[0] == "systemd-run" and not (
             os.environ.get("XDG_RUNTIME_DIR")
             or os.environ.get("DBUS_SESSION_BUS_ADDRESS")):
         # cron sets neither, and `systemd-run --user` then cannot find the
         # user manager's bus and exits 1.
-        env = dict(os.environ, XDG_RUNTIME_DIR=f"/run/user/{os.getuid()}")
+        return dict(os.environ, XDG_RUNTIME_DIR=f"/run/user/{os.getuid()}")
+    return None
+
+
+def run_phase(root: Path, phase: dict, seeds: list, log_path: Path,
+              host: str | None = None, prefix: list | None = None) -> int:
     return run_step(root, list(prefix or []) + shlex.split(phase_launcher(phase))
-                    + phase_args(phase, seeds, host), log_path, env=env)
+                    + phase_args(phase, seeds, host), log_path,
+                    env=confine_env(prefix))
 
 
 def pairs_file_missing(root: Path, phase: dict, host: str):
@@ -3207,6 +3459,30 @@ def pool_inputs_missing(root: Path, phase: dict, host: str):
     return None
 
 
+def reduce_inputs_missing(root: Path, phase: dict, host: str):
+    """Why a reduce phase cannot run here, or None: the design and members
+    are inputs the checkout must hold, this host's own output set must be
+    there when it is a source, and joint_measures.py must exist when the
+    phase asks for it."""
+    name = phase["name"]
+    if not (root / phase["design"]).is_file():
+        return (f"no design at {root / phase['design']} for reduce phase "
+                f"{name} — fix design = ... in campaign.toml")
+    if not (root / phase["members"]).is_dir():
+        return (f"no members directory at {root / phase['members']} for "
+                f"reduce phase {name}; it must hold every subject's pool — "
+                f"fix members = ... in campaign.toml")
+    if host in phase["sources"] and not (root / phase["outputs"]).is_dir():
+        return (f"no output set at {root / phase['outputs']} for reduce "
+                f"phase {name} — the phases before it have not written it "
+                f"on this host, or outputs = ... names the wrong directory")
+    if (phase.get("joint") and JOINT_CMD.endswith(JOINT_SCRIPT)
+            and not (root / JOINT_SCRIPT).is_file()):
+        return (f"reduce phase {name} sets joint = true, and this checkout "
+                f"has no {JOINT_SCRIPT}")
+    return None
+
+
 def phase_inputs_missing(root: Path, phase: dict, host: str):
     """Why an unseeded phase cannot run here, or None."""
     kind = phase_kind(phase)
@@ -3214,6 +3490,8 @@ def phase_inputs_missing(root: Path, phase: dict, host: str):
         return pairs_file_missing(root, phase, host)
     if kind == "pool":
         return pool_inputs_missing(root, phase, host)
+    if kind == "reduce":
+        return reduce_inputs_missing(root, phase, host)
     return fingerprint_inputs_missing(root, phase, host)
 
 
@@ -3592,10 +3870,11 @@ def tick_entry(entry: dict, campaign: dict, root: Path,
 
 
 def finish_phase(entry: dict, campaign: dict, phase: dict, index: int,
-                 code: int) -> int:
+                 code: int, why: str | None = None) -> int:
     """Record a phase's exit: advance on 0, spend an attempt otherwise."""
     if code != 0:
-        fail_or_requeue(entry, f"phase {index} ({phase['name']}) exited {code}")
+        fail_or_requeue(entry, f"phase {index} ({phase['name']}) "
+                               + (why or f"exited {code}"))
     else:
         entry["phase"] = index + 1
         entry["attempts"] = 0
@@ -3637,9 +3916,14 @@ def tick_compare_phase(entry: dict, campaign: dict, phase: dict, index: int,
         write_entry(entry["path"], entry)
         print(f"tick: {entry['file']} {entry['state']}: {entry['last_error']}")
         return 1
+    if phase_kind(phase) == "reduce":
+        return tick_reduce_phase(entry, campaign, phase, index, root, args,
+                                 blocked)
+    prefix = confine_prefix(phase, host, confine_unit(entry, index))
     entry["state"] = "running"
     entry["pid"] = os.getpid()
-    log_line(entry, f"phase {index} ({phase['name']}) started")
+    log_line(entry, f"phase {index} ({phase['name']}) started"
+             + (f" under {' '.join(prefix)}" if prefix else ""))
     write_entry(entry["path"], entry)
     what = ("pairs" if phase_kind(phase) == "compare" else "subjects")
     print(f"tick: {entry['file']} phase {index} ({phase['name']}) on {what} "
@@ -3648,12 +3932,251 @@ def tick_compare_phase(entry: dict, campaign: dict, phase: dict, index: int,
         entry["state"] = "queued"
         log_line(entry, "dry run, phase not executed")
         write_entry(entry["path"], entry)
-        print(f"  would run: {phase_command(phase, [], host)}")
+        print(f"  would run: {phase_command(phase, [], host, prefix=prefix)}")
         if blocked is not None:
             print(f"  blocked: {blocked}")
         return 0
-    code = run_phase(root, phase, [], entry_log_path(entry, root), host)
+    code = run_phase(root, phase, [], entry_log_path(entry, root), host,
+                     prefix=prefix)
     return finish_phase(entry, campaign, phase, index, code)
+
+
+QUEUE_PROBE_SCRIPT = r"""
+cd @ROOT@ 2>/dev/null || { echo "@M@ERR not a directory: @ROOT@"; exit 3; }
+""" + QUEUE_BLOCK
+
+
+def source_readiness(entry: dict, index: int, source: str) -> tuple:
+    """Whether a source host has finished every phase before a reduce phase.
+
+    Read off that host's queue: its newest live entry for the same campaign
+    at the same commit must have moved past phase ``index - 1``. Returns
+    ("ready" | "waiting" | "error", why). A host that cannot be read is an
+    error, so a broken route between hosts spends attempts and says so,
+    rather than waiting in silence.
+    """
+    script = render_script(QUEUE_PROBE_SCRIPT,
+                           ROOT=shlex.quote(source_path(source)),
+                           QUEUE=shlex.quote(QUEUE_DIR))
+    text, err = run_shell(source, script)
+    if text and f"{MARK}ERR" in text:
+        err = text.split(f"{MARK}ERR", 1)[1].splitlines()[0].strip()
+    if err is not None or not text or f"{MARK}END" not in text:
+        return "error", (f"cannot read {source}'s queue from "
+                         f"{entry.get('host')}: {err or 'no answer'}")
+    commit = str(entry.get("commit", ""))
+    mine = [e for e in parse_toml_blocks(text, "QFILE")
+            if e.get("campaign") == entry.get("campaign")
+            and str(e.get("commit", "")) == commit
+            and e.get("state") != "cancelled"]
+    if not mine:
+        return "waiting", (f"{source} has no entry for {entry['campaign']} "
+                           f"at {commit[:7]}")
+    newest = max(mine, key=lambda e: entry_index(e["file"]))
+    if newest.get("state") == "done" or int(newest.get("phase", 0)) >= index:
+        return "ready", ""
+    return "waiting", (f"{source} {newest['file']} is {newest.get('state')} "
+                       f"at phase {newest.get('phase')}/{newest.get('phases')}"
+                       + (f" ({newest['last_error']})"
+                          if newest.get("last_error") else ""))
+
+
+def gather_command(phase: dict, source: str, host: str, root: Path) -> list:
+    """rsync of one source host's output set into ``<collected>/<source>/``.
+
+    The reduce host's own set is copied locally; another host's comes over
+    ssh from source_root, the route `collect --outputs` pulls along, so the
+    tests can point it at a local tree. ``--delete`` keeps the copy exact on a
+    rerun; ``collected`` is the phase's own tree and nothing else writes it.
+    """
+    if source == host:
+        src = f"{root / phase['outputs']}/"
+    else:
+        src = f"{source_root(source)}/{phase['outputs']}/"
+    return ["rsync", "-a", "--delete", "-e", " ".join(["ssh", *SSH_OPTS]),
+            src, f"{root / phase['collected'] / source}/"]
+
+
+def reduce_inputs_digest(root: Path, phase: dict) -> str:
+    """A digest of everything the reductions read: the gathered trees, the
+    design and the members, by path, size and mtime. rsync -a keeps mtimes,
+    so a rerun that copied nothing new leaves it unchanged."""
+    import hashlib  # noqa: PLC0415
+    lines = []
+    tops = [root / phase["design"], root / phase["members"],
+            *[root / phase["collected"] / s for s in phase["sources"]]]
+    for top in tops:
+        files = [top] if top.is_file() else sorted(
+            f for f in top.rglob("*") if f.is_file())
+        for f in files:
+            st = f.stat()
+            lines.append(f"{f.relative_to(root)}\t{st.st_size}\t"
+                         f"{st.st_mtime_ns}")
+    return hashlib.sha256("\n".join(lines).encode()).hexdigest()
+
+
+REDUCE_PROGRESS_FIELDS = ["step", "inputs", "command", "finished"]
+
+
+def reduce_progress_path(root: Path, phase: dict) -> Path:
+    return root / phase["out"] / "done.csv"
+
+
+def read_reduce_progress(path: Path) -> dict:
+    if not path.is_file():
+        return {}
+    with open(path, newline="") as handle:
+        return {r["step"]: r for r in csv.DictReader(handle) if r.get("step")}
+
+
+def write_reduce_progress(path: Path, rows: dict) -> None:
+    """One row per finished step, written whole and renamed into place."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "w", newline="") as handle:
+        writer = csv.DictWriter(handle, REDUCE_PROGRESS_FIELDS)
+        writer.writeheader()
+        for step in ("gather", "reduce", "joint"):
+            if step in rows:
+                writer.writerow({k: rows[step].get(k, "")
+                                 for k in REDUCE_PROGRESS_FIELDS})
+    os.replace(tmp, path)
+
+
+def write_reduce_manifest(root: Path, phase: dict, entry: dict,
+                          steps: list, finished: bool,
+                          started: str | None = None) -> str:
+    """The manifest status reads for a reduce phase, beside the compare
+    manifests: planned is the step count, done the progress CSV's rows."""
+    path = root / compare_manifest_path(phase)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    _, branch = git_output(["rev-parse", "--abbrev-ref", "HEAD"], root)
+    _, head = git_output(["rev-parse", "HEAD"], root)
+    manifest = {
+        "kind": "reduce", "hostname": os.uname().nodename,
+        "started": started or stamp, "finished": stamp if finished else None,
+        "out": str(Path(phase["out"]) / "done.csv"),
+        "reduce_out": phase["out"], "collected": phase["collected"],
+        "sources": phase["sources"], "planned": 1 + len(steps),
+        "steps": [" ".join([launcher, *map(shlex.quote, a)])
+                  for _, launcher, a in steps],
+        "log": str(entry_log_path(entry, root).relative_to(root)),
+        "git": {"branch": branch or "?", "head": head or "?"},
+    }
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(manifest, indent=2) + "\n")
+    os.replace(tmp, path)
+    return manifest["started"]
+
+
+def tick_reduce_phase(entry: dict, campaign: dict, phase: dict, index: int,
+                      root: Path, args: argparse.Namespace,
+                      blocked: str | None) -> int:
+    """tick_entry for a reduce phase, on the one host it names.
+
+    Waits, spending no attempt, until every other source host's entry for
+    the campaign has finished the phases before this one. Then gathers each
+    source's output set into ``<collected>/<host>/`` and runs the reductions
+    in turn, each under the phase's confine. A step is skipped when the
+    progress CSV records it with the same command over the same inputs, so a
+    rerun after a failure resumes at the first step left to do, and a rerun
+    after success repeats nothing.
+    """
+    host = entry.get("host") or ""
+    waits, errors = [], []
+    for source in phase["sources"]:
+        if source == host:
+            continue
+        verdict, why = source_readiness(entry, index, source)
+        (waits if verdict == "waiting" else
+         errors if verdict == "error" else []).append(why)
+    steps = reduce_steps(phase)
+    unit = confine_unit(entry, index)
+    if args.dry_run:
+        print(f"tick: {entry['file']} phase {index} ({phase['name']}) would "
+              f"reduce on {host} over {', '.join(phase['sources'])}")
+        for why in errors + waits:
+            print(f"  not ready: {why}")
+        for source in phase["sources"]:
+            cmd = (confine_prefix(phase, host, f"{unit}-gather")
+                   + gather_command(phase, source, host, root))
+            print(f"  would gather: {' '.join(map(shlex.quote, cmd))}")
+        for step, launcher, step_args in steps:
+            prefix = confine_prefix(phase, host, f"{unit}-{step}")
+            print("  would run: "
+                  + " ".join([*map(shlex.quote, prefix), launcher,
+                              *map(shlex.quote, step_args)]))
+        if blocked is not None:
+            print(f"  blocked: {blocked}")
+        return 0
+    if errors:
+        fail_or_requeue(entry, "; ".join(errors))
+        write_entry(entry["path"], entry)
+        print(f"tick: {entry['file']} {entry['state']}: {entry['last_error']}")
+        return 1
+    if waits:
+        why = "waiting: " + "; ".join(waits)
+        if entry.get("last_error") != why:
+            log_line(entry, f"phase {index} ({phase['name']}) {why}")
+        entry["last_error"] = why
+        write_entry(entry["path"], entry)
+        print(f"tick: {entry['file']} phase {index} ({phase['name']}) {why}")
+        return 0
+
+    log_path = entry_log_path(entry, root)
+    entry["state"] = "running"
+    entry["pid"] = os.getpid()
+    prefix = confine_prefix(phase, host, unit)
+    log_line(entry, f"phase {index} ({phase['name']}) started"
+             + (f" under {' '.join(prefix)}" if prefix else ""))
+    write_entry(entry["path"], entry)
+    started = write_reduce_manifest(root, phase, entry, steps, False)
+    progress_path = reduce_progress_path(root, phase)
+    progress = read_reduce_progress(progress_path)
+
+    for source in phase["sources"]:
+        (root / phase["collected"] / source).mkdir(parents=True, exist_ok=True)
+        gather_prefix = confine_prefix(phase, host, f"{unit}-gather")
+        code = run_step(root, gather_prefix
+                        + gather_command(phase, source, host, root), log_path,
+                        env=confine_env(gather_prefix))
+        if code != 0:
+            return finish_phase(entry, campaign, phase, index, code,
+                                f"gathering {source}'s {phase['outputs']} "
+                                f"exited {code}")
+        if not any(f.is_file() for f in
+                   (root / phase["collected"] / source).rglob("*")):
+            return finish_phase(entry, campaign, phase, index, 1,
+                                f"gathered no files from {source}'s "
+                                f"{phase['outputs']}")
+    digest = reduce_inputs_digest(root, phase)
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%S")
+    progress["gather"] = {"step": "gather", "inputs": digest,
+                          "command": " ".join(phase["sources"]),
+                          "finished": stamp}
+    # A step whose inputs moved is no longer done.
+    progress = {k: v for k, v in progress.items() if v.get("inputs") == digest}
+    write_reduce_progress(progress_path, progress)
+
+    for step, launcher, step_args in steps:
+        command = " ".join([launcher, *map(shlex.quote, step_args)])
+        done = progress.get(step)
+        if done and done.get("command") == command:
+            log_line(entry, f"phase {index} ({phase['name']}) {step} already "
+                            f"done over these inputs; skipped")
+            continue
+        step_prefix = confine_prefix(phase, host, f"{unit}-{step}")
+        code = run_step(root, step_prefix + shlex.split(launcher) + step_args,
+                        log_path, env=confine_env(step_prefix))
+        if code != 0:
+            return finish_phase(entry, campaign, phase, index, code,
+                                f"{step} exited {code}")
+        progress[step] = {"step": step, "inputs": digest, "command": command,
+                          "finished": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        write_reduce_progress(progress_path, progress)
+    write_reduce_manifest(root, phase, entry, steps, True, started)
+    return finish_phase(entry, campaign, phase, index, 0)
 
 
 def checkout_branch(root: Path) -> tuple:

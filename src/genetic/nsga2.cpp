@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstddef>
 #include <limits>
+#include <numeric>
 #include <utility>
 #include <vector>
 
@@ -133,4 +134,104 @@ std::vector<double> crowding_distances(
     }
 
     return distances;
+}
+
+std::vector<double> farthest_point_scores(const std::vector<std::size_t>& ranks,
+                                          const PairDistance& distance) {
+    const std::size_t count = ranks.size();
+    std::vector<double> scores(count, 0.0);
+    if (count == 0) {
+        return scores;
+    }
+    const std::size_t max_rank = *std::max_element(ranks.begin(), ranks.end());
+    std::vector<std::vector<std::size_t>> fronts(max_rank + 1);
+    for (std::size_t i = 0; i < count; ++i) {
+        fronts[ranks[i]].push_back(i);
+    }
+    constexpr double k_infinity = std::numeric_limits<double>::infinity();
+    std::vector<std::size_t> kept;
+    kept.reserve(count);
+    for (const std::vector<std::size_t>& front : fronts) {
+        if (front.empty()) {
+            continue;
+        }
+        std::vector<double> nearest(front.size(), k_infinity);
+        for (std::size_t k = 0; k < front.size(); ++k) {
+            for (const std::size_t member : kept) {
+                nearest[k] = std::min(nearest[k], distance(member, front[k]));
+            }
+        }
+        // The members not yet picked, in index order, so a tie goes to the
+        // earliest.
+        std::vector<std::size_t> open(front.size());
+        for (std::size_t k = 0; k < front.size(); ++k) {
+            open[k] = k;
+        }
+        while (!open.empty()) {
+            std::size_t best = 0;
+            for (std::size_t k = 1; k < open.size(); ++k) {
+                if (nearest[open[k]] > nearest[open[best]]) {
+                    best = k;
+                }
+            }
+            const std::size_t picked = open[best];
+            open.erase(open.begin() + static_cast<std::ptrdiff_t>(best));
+            scores[front[picked]] = static_cast<double>(open.size() + 1);
+            for (const std::size_t slot : open) {
+                nearest[slot] = std::min(nearest[slot],
+                                         distance(front[picked], front[slot]));
+            }
+        }
+        kept.insert(kept.end(), front.begin(), front.end());
+    }
+    return scores;
+}
+
+std::vector<std::size_t> tiebroken_order(const std::vector<std::size_t>& ranks,
+                                         const std::vector<double>& crowding,
+                                         const std::vector<double>& tiebreak,
+                                         TiebreakReport* report,
+                                         std::size_t keep) {
+    assert(crowding.size() == ranks.size());
+    assert(tiebreak.empty() || tiebreak.size() == ranks.size());
+    const std::size_t count = ranks.size();
+    std::vector<std::size_t> untied(count);
+    std::iota(untied.begin(), untied.end(), std::size_t{0});
+    const auto by_crowding = [&ranks, &crowding](std::size_t lhs,
+                                                 std::size_t rhs) {
+        if (ranks[lhs] != ranks[rhs]) {
+            return ranks[lhs] < ranks[rhs];
+        }
+        return crowding[lhs] > crowding[rhs];
+    };
+    std::vector<std::size_t> order = untied;
+    std::stable_sort(
+        order.begin(), order.end(), [&](std::size_t lhs, std::size_t rhs) {
+            if (ranks[lhs] != ranks[rhs]) {
+                return ranks[lhs] < ranks[rhs];
+            }
+            if (!tiebreak.empty() && tiebreak[lhs] != tiebreak[rhs]) {
+                return tiebreak[lhs] > tiebreak[rhs];
+            }
+            return crowding[lhs] > crowding[rhs];
+        });
+    if (report == nullptr) {
+        return order;
+    }
+    std::stable_sort(untied.begin(), untied.end(), by_crowding);
+    report->reordered = order != untied;
+    report->kept_changed = false;
+    if (keep > 0 && keep < count && report->reordered) {
+        std::vector<bool> kept(count, false);
+        for (std::size_t i = 0; i < keep; ++i) {
+            kept[untied[i]] = true;
+        }
+        for (std::size_t i = 0; i < keep; ++i) {
+            if (!kept[order[i]]) {
+                report->kept_changed = true;
+                break;
+            }
+        }
+    }
+    return order;
 }

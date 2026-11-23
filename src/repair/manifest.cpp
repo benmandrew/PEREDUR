@@ -28,6 +28,7 @@
 #include "genetic/accumulator.hpp"
 #include "genetic/climb.hpp"
 #include "genetic/demotion.hpp"
+#include "genetic/diversity.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/order_crossover.hpp"
@@ -54,7 +55,7 @@ namespace {
 // Bumped when a key changes meaning or leaves, so a reader can tell which
 // shape it is holding. Each version is described under "Run manifest schema
 // versions" in docs/dev/config-and-provenance.md.
-constexpr int k_schema_version = 69;
+constexpr int k_schema_version = 77;
 
 // True for a key only the other repair path reads.
 bool unread_on(const ConfigKey& entry, RepairInput input) {
@@ -472,6 +473,22 @@ void write_run_manifest(const std::string& output_dir,
         // Candidates maximality demotion moved one front down at survivor
         // selection, over every generation. Zero wherever the key is off.
         {"n_maximality_demotions", DemotionStats::n_demoted},
+        // Candidates maximality_removal erased from the survivor pool instead
+        // of demoting, over every generation. Zero wherever the key is off.
+        {"n_maximality_removals", DemotionStats::n_removed},
+        // Selections where removal would have emptied the pool and demoted
+        // instead. Zero wherever the key is off.
+        {"n_maximality_removal_fallbacks", DemotionStats::n_removal_fallbacks},
+        // Every Nsga2Apportion survivor selection, and those whose distinct
+        // pool (after any removal) was truncated to population_size or
+        // replicated up to it; pool_size_sum / selections is the mean distinct
+        // pool. Counted whether or not demotion is on; zero under the other
+        // schemes.
+        {"survivor_selection",
+         {{"selections", SurvivorSelectionStats::n_selections.load()},
+          {"truncated", SurvivorSelectionStats::n_truncated.load()},
+          {"replicated", SurvivorSelectionStats::n_replicated.load()},
+          {"pool_size_sum", SurvivorSelectionStats::pool_size_sum.load()}}},
         // The final population's first front by objectives alone, and its
         // realizable members another realizable member is proved strictly
         // stronger than. Measured whether or not demotion is on; null without
@@ -483,6 +500,59 @@ void write_run_manifest(const std::string& output_dir,
                     {"realizable", DemotionStats::final_front->n_realizable},
                     {"gutted", DemotionStats::final_front->n_gutted}})
              : nlohmann::json(nullptr)},
+        // What genetic.crowding = "specification" did: sorts crowded by
+        // farthest-point order, survivor selections that cut a front, and the
+        // specification distances computed. Zero whenever the key is
+        // "objective".
+        {"specification_crowding",
+         {{"sorts", SpecificationCrowdingStats::n_sorts.load()},
+          {"cut_fronts", SpecificationCrowdingStats::n_cut_fronts.load()},
+          {"distances", SpecificationCrowdingStats::n_distances.load()}}},
+        // What genetic.novelty did: novelty values read at a sort, rule
+        // checks of an accumulated repair against a candidate and those
+        // proved, and evaluations of a realizable candidate some repair
+        // implied. Zero whenever the key is off.
+        {"novelty",
+         {{"evaluations", NoveltyStats::n_evaluations.load()},
+          {"checks", NoveltyStats::n_checks.load()},
+          {"implied", NoveltyStats::n_implied.load()},
+          {"covered", NoveltyStats::n_covered.load()}}},
+        // What genetic.novelty_tiebreak did: sorts ordered by the novelty
+        // count within each front, the values read there, the sorts whose
+        // order and the survivor selections whose kept set differ from
+        // crowding alone. Zero whenever the key is off.
+        {"novelty_tiebreak",
+         {{"sorts", NoveltyTiebreakStats::n_sorts.load()},
+          {"evaluations", NoveltyTiebreakStats::n_evaluations.load()},
+          {"reordered", NoveltyTiebreakStats::n_reordered.load()},
+          {"survivors_changed",
+           NoveltyTiebreakStats::n_survivors_changed.load()}}},
+        // What mutation.slot_coverage did: slot draws made with coverage
+        // counts, and those whose unequal weights replaced the uniform draw.
+        // Zero whenever the key is off.
+        {"slot_coverage",
+         {{"draws", SlotCoverageStats::n_draws.load()},
+          {"weighted", SlotCoverageStats::n_weighted.load()}}},
+        // What genetic.spread_init did to the seed population: the slots the
+        // weakenings were spread over, the seeds proved weaker than the
+        // original, and those left as the original. Zero whenever the key is
+        // off.
+        {"spread_init",
+         {{"targets", SpreadInitStats::n_targets},
+          {"seeded", SpreadInitStats::n_seeded},
+          {"failed", SpreadInitStats::n_failed}}},
+        // What mutation.flip_tabu and flip_sideways did: realizability flips
+        // recorded against a lineage's slots, slots gone tabu, slot draws that
+        // skipped a tabu slot or kept the full list for want of another, and
+        // sideways rewrites of a flipped slot and those kept. Zero whenever
+        // flip_tabu is 0.
+        {"flip_lineage",
+         {{"flips", FlipLineageStats::n_flips.load()},
+          {"tabu", FlipLineageStats::n_tabu.load()},
+          {"skipped", FlipLineageStats::n_skipped.load()},
+          {"fallbacks", FlipLineageStats::n_fallbacks.load()},
+          {"sideways", FlipLineageStats::n_sideways.load()},
+          {"sideways_kept", FlipLineageStats::n_sideways_kept.load()}}},
         // The output climb, all zero unless filters.climb_output is on.
         {"climb",
          {{"climbed", ClimbStats::n_climbed.load()},

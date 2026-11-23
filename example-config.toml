@@ -52,6 +52,21 @@ selection_scheme = "nsga2-apportion"
 # FRETISH only, under nsga2-apportion: demote a realizable candidate one front
 # when another realizable one is proved strictly stronger.
 maximality_demotion = false
+# FRETISH only, under nsga2-apportion: "objective" crowding distance, or
+# "specification" (farthest-point by slot Hamming distance). "objective" by default.
+crowding = "objective"
+# FRETISH only, under nsga2-apportion: minimise the number of accumulated repairs
+# that rule-imply a realizable candidate. Off by default.
+novelty = false
+# FRETISH only, under nsga2-apportion: order each front by the novelty count,
+# then by crowding. Not with novelty. Off by default.
+novelty_tiebreak = false
+# FRETISH only: seed the population with one-step weakenings of the original
+# spread over its refused guarantees and its assumptions. Off by default.
+spread_init = false
+# With maximality_demotion: remove the flagged candidate at survivor selection
+# instead of demoting it. Requires maximality_demotion.
+maximality_removal = false
 
 [fitness]
 # AuRUS's weights (Settings.java): its lost- and won-model terms, 0.1 each, are
@@ -115,6 +130,15 @@ direction_gated = false
 # "towards" the original, "free" in any direction, or "exchange" (one step back
 # and one weakening of an untouched slot). "exchange" by default.
 gate_realizable = "exchange"
+# FRETISH only: favour slots the accumulated repairs have not edited when drawing
+# a rewrite's slot. Off by default.
+slot_coverage = false
+# FRETISH only: generations a slot is tabu for a lineage that flipped realizability
+# on it both ways. 0 (off) by default.
+flip_tabu = 0
+# FRETISH only, under flip_tabu: rewrite a flipped slot sideways instead of
+# skipping it. Off by default.
+flip_sideways = false
 # FRETISH only: take more large moves from a parent far from realizable and
 # fewer from one near it, scaled by the parent's status. Off (0) by default.
 step_scaling = 0.0
@@ -128,6 +152,7 @@ run_implication = true
 # The lattice climb at the output: each gated repair is strengthened towards
 # the original one proved step at a time, while it stays a repair.
 climb_output = false
+climb_orders = 1
 # FRETISH only: drop, before scoring, each offspring proved stronger than a parent
 # an unrealizable query already asked proves unrealizable. Off by default.
 parent_verdict = false

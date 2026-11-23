@@ -52,6 +52,13 @@ struct EnumNames<GateRealizable> {
                  {GateRealizable::Exchange, "exchange"}}};
 };
 
+template <>
+struct EnumNames<Crowding> {
+    static constexpr std::array<std::pair<Crowding, const char*>, 2> k_names{
+        {{Crowding::Objective, "objective"},
+         {Crowding::Specification, "specification"}}};
+};
+
 template <typename Enum>
 const char* enum_name(Enum value) {
     for (const auto& [candidate, name] : EnumNames<Enum>::k_names) {

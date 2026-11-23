@@ -9,6 +9,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "genetic/diversity.hpp"
 #include "repair_file.hpp"
 #include "serialisation.hpp"
 
@@ -28,6 +29,18 @@ std::vector<ScoredSpecification> original_population(
         population.push_back(std::move(scored));
     }
     return population;
+}
+
+std::vector<ScoredSpecification> spread_population(
+    const Specification& original_spec,
+    const AggregateWeightedFitnessFunction& fitness_function, const Config& cfg,
+    const RandomSource& random_source) {
+    const auto [record, fitness] =
+        fitness_function.record_and_fitness(original_spec);
+    (void)fitness;
+    const std::vector<Specification> seeds = spread_initial_population(
+        original_spec, record.refused, cfg.population_size, cfg, random_source);
+    return score_population(cfg, seeds, fitness_function);
 }
 
 namespace {

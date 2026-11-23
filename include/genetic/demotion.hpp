@@ -30,6 +30,15 @@ struct DemotionStats {
     /// Candidates demoted at survivor selection, summed over every generation.
     /// The parent ordering applies the same rule again and is not counted.
     inline static std::size_t n_demoted{0};
+    /// Candidates removed from the survivor pool under
+    /// Config::maximality_removal, summed over every generation. A candidate
+    /// removed is not also counted in n_demoted.
+    inline static std::size_t n_removed{0};
+    /// Survivor selections under Config::maximality_removal whose flags
+    /// covered the whole pool, so that removal would have emptied it. Such a
+    /// selection demotes instead, and its demotions count in n_demoted. Only a
+    /// cycle the rule proves in one direction alone can cause one.
+    inline static std::size_t n_removal_fallbacks{0};
     /// The final population's first front, measured once when the search
     /// ends, whether or not demotion is on. Nothing where the run scored no
     /// status objective or is not FRETISH.

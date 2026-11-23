@@ -239,21 +239,30 @@ H2H_TLSF_READY: list[str] = [
 SEEDED_DIR = EXPERIMENTS_DIR / "2026-11-13-seeded-corpus"
 
 
-def _seeded_specs() -> dict[str, dict[str, Path]]:
-    listing = SEEDED_DIR / "selected.txt"
+def _seeded_specs(root: Path = SEEDED_DIR,
+                  prefix: str = "") -> dict[str, dict[str, Path]]:
+    listing = root / "selected.txt"
     if not listing.is_file():
         return {}
     names = [ln.strip() for ln in listing.read_text().splitlines()
              if ln.strip() and not ln.startswith("#")]
-    return {n: {"input": SEEDED_DIR / "subjects" / n / "spec.json",
-                "ideals_dir": SEEDED_DIR / "subjects" / n / "fixes"}
+    return {prefix + n: {"input": root / "subjects" / n / "spec.json",
+                         "ideals_dir": root / "subjects" / n / "fixes"}
             for n in names}
 
 
 SEEDED_SPECS: dict[str, dict[str, Path]] = _seeded_specs()
 
+# The sideways seeded corpus (experiments/2026-11-18-seeded-corpus-sideways),
+# as campaign/seeded-corpus-sideways registers it: the same bases, with fault
+# classes that include incomparable edits. Its subject ids repeat the old
+# corpus's, so its spec names carry the prefix "sw-" (the directories under
+# subjects/ do not). The corpus is untracked and copied into each checkout.
+SIDEWAYS_DIR = EXPERIMENTS_DIR / "2026-11-18-seeded-corpus-sideways"
+SIDEWAYS_SPECS: dict[str, dict[str, Path]] = _seeded_specs(SIDEWAYS_DIR, "sw-")
+
 SPECS: dict[str, dict[str, Path]] = {**FRETISH_SPECS, **SEEDED_SPECS,
-                                     **TLSF_SPECS}
+                                     **SIDEWAYS_SPECS, **TLSF_SPECS}
 
 # compare runs n_repairs * n_ideals * 2 implication checks, each with compare's
 # own 20s black budget. fsm-timing (bounded-interval operators) is slow, and
@@ -622,6 +631,206 @@ PROFILES: dict[str, dict] = {
         "results_dir": EXPERIMENTS_DIR / "results-fretish-order-cores",
         "results_csv": EXPERIMENTS_DIR / "results-fretish-order-cores.csv",
         "default_jobs": 16,
+    },
+    # The paper's full (sweep D's remove-no-blame-exchange at e117a76) at one
+    # and four climb orders, on the small set and rad's cores at 2 threads a
+    # run, as fretish-exchange-rerun ran it. See
+    # experiments/2026-11-19-diversity-screen-runs.
+    "diversity-climb": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["full-k1", "full-k4"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-climb",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-climb.csv",
+        "default_jobs": 14,
+    },
+    # full-k1 plus one diversity mechanism per arm, on seeds 0-9 so that each
+    # pairs with diversity-climb's full-k1. Same config tree, its own results.
+    "diversity-screen": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["crowd-spec", "novelty", "slot-coverage",
+                         "spread-init", "flip-tabu", "flip-sideways"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(10)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-screen",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-screen.csv",
+        "default_jobs": 14,
+    },
+    # The same two profiles after the user kept blame on (19 Nov): sweep K's
+    # full is now remove-exchange, so its configs and results get their own
+    # directories and never mix with the cancelled no-blame runs above. See
+    # experiments/2026-11-19-diversity-screen-blame.
+    "diversity-climb-blame": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["full-k1", "full-k4"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb-blame",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-climb-blame",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-climb-blame.csv",
+        "default_jobs": 14,
+    },
+    "diversity-screen-blame": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["crowd-spec", "novelty", "slot-coverage",
+                         "spread-init", "flip-tabu", "flip-sideways"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(10)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb-blame",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-screen-blame",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-screen-blame.csv",
+        "default_jobs": 14,
+    },
+    # Seeds 10-29 of the four screen arms that passed or were promising
+    # (2026-11-19-diversity-screen PLAN.md). They write into
+    # diversity-screen-blame's tree and CSV, so each arm has seeds 0-29 in one
+    # place for the pooled pass.
+    "diversity-followup-blame": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["novelty", "slot-coverage", "flip-tabu",
+                         "flip-sideways"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(10, 30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb-blame",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-screen-blame",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-screen-blame.csv",
+        "default_jobs": 14,
+    },
+    # The novelty count as a within-front tie-breaker in place of crowding
+    # (experiments/2026-11-20-diversity-tiebreak): full-k1 plus
+    # novelty_tiebreak, seeds 0-29, in sweep K's config tree. Its own results
+    # tree and CSV, so the arm pools with the diversity-screen-blame arms.
+    "diversity-tiebreak-blame": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["K"],
+        "levels": {"K": ["novelty-tiebreak"]},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(0, 30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-diversity-climb-blame",
+        "results_dir": EXPERIMENTS_DIR / "results-diversity-tiebreak-blame",
+        "results_csv": EXPERIMENTS_DIR / "results-diversity-tiebreak-blame.csv",
+        "default_jobs": 15,
+    },
+    # The final engine (experiments/2026-11-20-final-engine): every paper arm
+    # of sweep F at one commit. random/ holds base (the random arm) and
+    # only-climb (random+climb). The small set and rad's cores at 2 threads a
+    # run, as fretish-exchange-rerun ran them.
+    "final-engine": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {},
+        "specs": list(FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL + FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-final-engine",
+        "results_dir": EXPERIMENTS_DIR / "results-final-engine",
+        "results_csv": EXPERIMENTS_DIR / "results-final-engine.csv",
+        "default_jobs": 15,
+    },
+    # The same arms on whole rad, from a tree with
+    # no parallel line, so threads are CPUs over jobs.
+    "final-engine-large": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {},
+        "specs": ["rad"],
+        "seeds": list(range(30)),
+        "timeout_caps": {"rad": 7200},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-final-engine-large",
+        "results_dir": EXPERIMENTS_DIR / "results-final-engine-large",
+        "results_csv": EXPERIMENTS_DIR / "results-final-engine-large.csv",
+        "default_jobs": 4,
+    },
+    # lift-plus-cruise-full under full, base and random alone, at seeds 0-4
+    # and 15-19 (user, 20 Nov: option B). A run costs about 8.4 slot-h, so the
+    # ablation arms are not run here and the ablation leaves it out.
+    "final-engine-lpc": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {"F": ["base", "full"]},
+        "specs": ["lift-plus-cruise-full"],
+        "seeds": list(range(30)),
+        "timeout_caps": {"lift-plus-cruise-full": 7200},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-final-engine-large",
+        "results_dir": EXPERIMENTS_DIR / "results-final-engine-lpc",
+        "results_csv": EXPERIMENTS_DIR / "results-final-engine-lpc.csv",
+        "default_jobs": 3,
+    },
+    "final-engine-seeded": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {},
+        "specs": list(SIDEWAYS_SPECS),
+        "seeds": list(range(5)),
+        "timeout_caps": {s: 7200 for s in SIDEWAYS_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-final-engine",
+        "results_dir": EXPERIMENTS_DIR / "results-final-engine-seeded",
+        "results_csv": EXPERIMENTS_DIR / "results-final-engine-seeded.csv",
+        "default_jobs": 15,
     },
 }
 

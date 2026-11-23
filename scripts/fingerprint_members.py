@@ -81,6 +81,25 @@ DEFAULTS = {
 PAIRS_HEADER = ["id", "a_path", "b_path", "dirs"]
 
 
+def spec_path(subject: str) -> Path:
+    """The specification a subject's members repair.
+
+    A specification under examples/ by its own name; a mutant of the
+    sideways seeded corpus by its id less the prefix "sw-", and one of the
+    strengthening-only corpus by its id, under that campaign's subjects/
+    (as scripts/run_experiments.py resolves them).
+    """
+    plain = REPO_ROOT / "examples" / subject / "spec.json"
+    if plain.is_file():
+        return plain
+    if subject.startswith("sw-"):
+        return (REPO_ROOT / "experiments" / "2026-11-18-seeded-corpus-sideways"
+                / "subjects" / subject[3:] / "spec.json")
+    seeded = (REPO_ROOT / "experiments" / "2026-11-13-seeded-corpus"
+              / "subjects" / subject / "spec.json")
+    return seeded if seeded.is_file() else plain
+
+
 def log(*parts) -> None:
     print(time.strftime("%H:%M:%S"), *parts, flush=True)
 
@@ -198,7 +217,7 @@ def do_subject(subject: str, args, env: dict) -> dict:
         lines = [paths[k] + "\n" for k, n in enumerate(nodes)
                  for _ in range(len(n["members"]))]
         write_whole(draw_list, "".join(lines))
-        spec = str(REPO_ROOT / "examples" / subject / "spec.json")
+        spec = str(spec_path(subject))
         run_to(ltl, [args.fpdraw, "ltl", spec, draw_list], env,
                os.path.join(sdir, "ltl.err"))
     words = os.path.join(sdir, "words")

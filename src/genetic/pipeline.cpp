@@ -20,6 +20,7 @@
 #include "fitness/status.hpp"
 #include "genetic/crossover.hpp"
 #include "genetic/demotion.hpp"
+#include "genetic/diversity.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/nsga2.hpp"
 #include "genetic/order_crossover.hpp"
@@ -76,10 +77,12 @@ inline void record_origin(std::vector<OffspringOrigin>* origins,
 }
 
 /// What mutation is told about the FRETISH parent @p parent.
-inline ParentContext parent_context(
-    const Scored<Specification>& parent, bool crossed,
-    const Specification* original,
-    std::optional<std::size_t> status_objective) {
+inline ParentContext parent_context(const Scored<Specification>& parent,
+                                    bool crossed, const Specification* original,
+                                    std::optional<std::size_t> status_objective,
+                                    const SlotCoverage* coverage,
+                                    DiversityState* diversity,
+                                    const Config& cfg) {
     ParentContext context;
     if (status_objective.has_value() &&
         *status_objective < parent.objectives.size()) {
@@ -89,6 +92,10 @@ inline ParentContext parent_context(
     context.refused_guarantees = parent.refused_guarantees;
     context.crossed = crossed;
     context.original = original;
+    context.coverage = coverage;
+    if (cfg.flip_tabu > 0 && diversity != nullptr) {
+        context.flipped_slots = diversity->flipped_slots(parent.specification);
+    }
     return context;
 }
 
@@ -168,6 +175,63 @@ inline std::optional<OrderCrossoverKind> fretish_crossover(
     return kind;
 }
 
+/// The slot coverage over @p original that `genetic.slot_coverage` asks for,
+/// counted once per generation and before any draw, or null where the key is
+/// off or @p Spec is not FRETISH.
+template <typename Spec>
+const SlotCoverage* generation_coverage(
+    [[maybe_unused]] const Config& cfg,
+    [[maybe_unused]] DiversityState* diversity,
+    [[maybe_unused]] const Spec* original) {
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        if (cfg.slot_coverage && diversity != nullptr && original != nullptr) {
+            return &diversity->slot_coverage(*original);
+        }
+    }
+    return nullptr;
+}
+
+/// Simplifies @p offspring, bred from @p parent at slot @p index, onto
+/// @p offspring_pop and records it in every FRETISH counter it touches.
+/// Draws nothing.
+template <typename Spec>
+void push_offspring(
+    [[maybe_unused]] const Config& cfg,
+    [[maybe_unused]] const Scored<Spec>& parent,
+    [[maybe_unused]] std::size_t index, Spec offspring,
+    [[maybe_unused]] bool crossed,
+    [[maybe_unused]] std::optional<OrderCrossoverKind> order_kind,
+    [[maybe_unused]] bool stepped,
+    [[maybe_unused]] std::optional<std::size_t> status_objective,
+    [[maybe_unused]] DiversityState* diversity,
+    [[maybe_unused]] std::vector<OffspringOrigin>* origins,
+    std::vector<Spec>& offspring_pop) {
+    if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
+        offspring_pop.push_back(tlsf_simplify(std::move(offspring)));
+    } else {
+        // The lineage reads the edit before simplification, which would
+        // otherwise show slots the mutation never touched.
+        const bool lineage = cfg.flip_tabu > 0 && diversity != nullptr &&
+                             !crossed && status_objective.has_value() &&
+                             !(offspring == parent.specification);
+        std::optional<Spec> edited;
+        if (lineage) {
+            edited = offspring;
+        }
+        offspring_pop.push_back(simplify_offspring(std::move(offspring)));
+        if (lineage) {
+            diversity->note_offspring(
+                parent.specification,
+                status_proves_realizable(parent, status_objective), *edited,
+                offspring_pop.back());
+        }
+        OrderCrossoverStats::note_offspring(order_kind, offspring_pop.back());
+        DirectionGateStats::note_offspring(stepped, offspring_pop.back());
+        record_origin(origins, parent, index, offspring_pop.back(),
+                      status_objective);
+    }
+}
+
 template <typename Spec>
 std::vector<Spec> breed_offspring(const Config& cfg,
                                   const std::vector<Scored<Spec>>& sorted_pop,
@@ -175,12 +239,15 @@ std::vector<Spec> breed_offspring(const Config& cfg,
                                   const RandomSource& random_source,
                                   SearchBudget* budget, const Spec* original,
                                   std::optional<std::size_t> status_objective,
-                                  std::vector<OffspringOrigin>* origins) {
+                                  std::vector<OffspringOrigin>* origins,
+                                  [[maybe_unused]] DiversityState* diversity) {
     std::vector<Spec> offspring_pop;
     offspring_pop.reserve(offspring_n);
     // Read once: an inactive budget must not reach the loop body at all, or an
     // unbudgeted run pays a specification comparison and a clock read per slot.
     const bool budgeted = budget != nullptr && budget->active();
+    [[maybe_unused]] const SlotCoverage* coverage =
+        generation_coverage(cfg, diversity, original);
     for (std::size_t i = 0; i < offspring_n; ++i) {
         // Tested between slots rather than after the whole generation, which is
         // where AuRUS tests it: its mutation and crossover loops both carry
@@ -210,8 +277,9 @@ std::vector<Spec> breed_offspring(const Config& cfg,
             if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
                 offspring = tlsf_mutate(offspring, random_source, cfg);
             } else {
-                const ParentContext parent = parent_context(
-                    sorted_pop[i], crossed, original, status_objective);
+                const ParentContext parent =
+                    parent_context(sorted_pop[i], crossed, original,
+                                   status_objective, coverage, diversity, cfg);
                 offspring = mutate_specification(offspring, random_source, cfg,
                                                  &parent, &stepped);
             }
@@ -223,16 +291,9 @@ std::vector<Spec> breed_offspring(const Config& cfg,
         if (budgeted && !(offspring == sorted_pop[i].specification)) {
             budget->count_offspring();
         }
-        if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
-            offspring_pop.push_back(tlsf_simplify(std::move(offspring)));
-        } else {
-            offspring_pop.push_back(simplify_offspring(std::move(offspring)));
-            OrderCrossoverStats::note_offspring(order_kind,
-                                                offspring_pop.back());
-            DirectionGateStats::note_offspring(stepped, offspring_pop.back());
-            record_origin(origins, sorted_pop[i], i, offspring_pop.back(),
-                          status_objective);
-        }
+        push_offspring(cfg, sorted_pop[i], i, std::move(offspring), crossed,
+                       order_kind, stepped, status_objective, diversity,
+                       origins, offspring_pop);
     }
     return offspring_pop;
 }
@@ -256,6 +317,43 @@ std::vector<bool> demotion_flags(
     return {};
 }
 
+/// The NSGA-II options the diversity keys ask for over @p population, which
+/// must outlive the sort: under `genetic.crowding = "specification"`, crowding
+/// by farthest-point order under specification_distance, under
+/// `genetic.novelty` the novelty objective, and under
+/// `genetic.novelty_tiebreak` the novelty count as the key before crowding
+/// within a front. Empty where every key is at its
+/// default or @p Spec is not FRETISH. Draws nothing.
+template <typename Spec>
+Nsga2Options selection_options(
+    [[maybe_unused]] const GenerationContext<Spec>& ctx,
+    [[maybe_unused]] const std::vector<Scored<Spec>>& population) {
+    Nsga2Options options;
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        if (ctx.m_cfg.crowding == Crowding::Specification) {
+            SpecificationCrowdingStats::n_sorts++;
+            options.distance = [&population](std::size_t lhs, std::size_t rhs) {
+                SpecificationCrowdingStats::n_distances++;
+                return specification_distance(population[lhs].specification,
+                                              population[rhs].specification);
+            };
+        }
+        if (ctx.m_cfg.novelty && ctx.m_diversity != nullptr) {
+            options.extra_objective = novelty_objective(
+                *ctx.m_diversity, population, ctx.m_status_objective);
+        }
+        if (ctx.m_cfg.novelty_tiebreak && ctx.m_diversity != nullptr) {
+            NoveltyTiebreakStats::n_sorts++;
+            NoveltyTiebreakStats::n_evaluations += population.size();
+            // novelty_objective is minus the count, so higher is better as
+            // the tie-break key reads it.
+            options.tiebreak = novelty_objective(*ctx.m_diversity, population,
+                                                 ctx.m_status_objective);
+        }
+    }
+    return options;
+}
+
 template <typename Spec>
 void stage_order_parents(GenerationContext<Spec>& ctx) {
     // Parents are selected from the whole population, unfiltered: the filters
@@ -270,7 +368,18 @@ void stage_order_parents(GenerationContext<Spec>& ctx) {
     if (uses_nsga2_ranking(ctx.m_cfg)) {
         // The rule is applied again here, or a candidate demoted at the last
         // selection would breed and stand as an elite from its old front.
-        nsga2_sort(ctx.m_scored, demotion_flags(ctx, ctx.m_scored));
+        // Under maximality_removal it demotes here all the same: the
+        // population holds no candidate flagged at the survivor step, and one
+        // flagged only now (its stronger partner is new to the pool) still
+        // breeds from one front lower rather than being dropped from a
+        // population that must keep target_size slots.
+        Nsga2Options options = selection_options(ctx, ctx.m_scored);
+        TiebreakReport report;
+        options.report = &report;
+        nsga2_sort(ctx.m_scored, demotion_flags(ctx, ctx.m_scored), options);
+        if (report.reordered) {
+            NoveltyTiebreakStats::n_reordered++;
+        }
         return;
     }
     order_population(ctx.m_cfg, ctx.m_scored);
@@ -288,7 +397,8 @@ void stage_breed(GenerationContext<Spec>& ctx) {
     ctx.m_candidates = generation_detail::breed_offspring(
         ctx.m_cfg, ctx.m_sorted_parents, ctx.m_offspring_n, ctx.m_top_n,
         ctx.m_random_source, ctx.m_budget, ctx.m_original,
-        ctx.m_status_objective, record_origins ? &ctx.m_origins : nullptr);
+        ctx.m_status_objective, record_origins ? &ctx.m_origins : nullptr,
+        ctx.m_diversity);
     // The filter chain is judged as a whole rather than filter by filter, so
     // the unfiltered offspring have to survive until every filter has run.
     ctx.m_pre_filter = ctx.m_candidates;
@@ -393,6 +503,11 @@ void stage_score(GenerationContext<Spec>& ctx) {
                                     status_objective_index(ctx.m_cfg));
         DirectionGateStats::settle(ctx.m_scored,
                                    status_objective_index(ctx.m_cfg));
+        if (ctx.m_cfg.flip_tabu > 0 && ctx.m_diversity != nullptr &&
+            ctx.m_status_objective.has_value()) {
+            ctx.m_diversity->settle_offspring(
+                ctx.m_scored, *ctx.m_status_objective, ctx.m_cfg.flip_tabu);
+        }
     }
 }
 
@@ -436,17 +551,46 @@ void stage_select(GenerationContext<Spec>& ctx) {
     // holding them stops the truncation below from cutting arbitrarily through
     // the rank-0 front.
     pool = generation_detail::dedup_by_specification(std::move(pool));
-    const std::vector<bool> demoted = demotion_flags(ctx, pool);
-    DemotionStats::n_demoted += static_cast<std::size_t>(
-        std::count(demoted.begin(), demoted.end(), true));
-    nsga2_sort(pool, demoted);
+    std::vector<bool> demoted = demotion_flags(ctx, pool);
+    if (ctx.m_cfg.maximality_removal) {
+        generation_detail::remove_flagged(pool, demoted);
+    } else {
+        DemotionStats::n_demoted += static_cast<std::size_t>(
+            std::count(demoted.begin(), demoted.end(), true));
+    }
+    Nsga2Options options = selection_options(ctx, pool);
+    TiebreakReport report;
+    options.report = &report;
+    options.keep = ctx.m_target_size;
+    nsga2_sort(pool, demoted, options);
+    if (report.reordered) {
+        NoveltyTiebreakStats::n_reordered++;
+    }
+    if (report.kept_changed) {
+        NoveltyTiebreakStats::n_survivors_changed++;
+    }
 
+    SurvivorSelectionStats::n_selections++;
+    SurvivorSelectionStats::pool_size_sum += pool.size();
     if (pool.size() > ctx.m_target_size) {
+        SurvivorSelectionStats::n_truncated++;
+        if (std::is_same_v<Spec, Specification> &&
+            ctx.m_cfg.crowding == Crowding::Specification &&
+            ctx.m_target_size > 0 &&
+            pool[ctx.m_target_size - 1].rank == pool[ctx.m_target_size].rank) {
+            SpecificationCrowdingStats::n_cut_fronts++;
+        }
         pool.resize(ctx.m_target_size);
     } else if (pool.size() < ctx.m_target_size) {
+        SurvivorSelectionStats::n_replicated++;
         // Deduplication alone would leave too few slots to breed from, so
         // selection pressure is re-expressed as replication multiplicity.
         pool = generation_detail::replicate_to_size(pool, ctx.m_target_size);
+    }
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        if (ctx.m_diversity != nullptr) {
+            ctx.m_diversity->retain(pool);
+        }
     }
     ctx.m_scored = std::move(pool);
 }
@@ -497,7 +641,7 @@ template void order_population(const Config&,
 template std::vector<Specification> generation_detail::breed_offspring(
     const Config&, const std::vector<Scored<Specification>>&, std::size_t,
     std::size_t, const RandomSource&, SearchBudget*, const Specification*,
-    std::optional<std::size_t>, std::vector<OffspringOrigin>*);
+    std::optional<std::size_t>, std::vector<OffspringOrigin>*, DiversityState*);
 template void pipeline_detail::stage_parent_verdict(
     GenerationContext<Specification>&,
     const ParentVerdictLookup<Specification>&);
@@ -511,7 +655,7 @@ template void order_population(const Config&,
 template std::vector<tlsf::Specification> generation_detail::breed_offspring(
     const Config&, const std::vector<Scored<tlsf::Specification>>&, std::size_t,
     std::size_t, const RandomSource&, SearchBudget*, const tlsf::Specification*,
-    std::optional<std::size_t>, std::vector<OffspringOrigin>*);
+    std::optional<std::size_t>, std::vector<OffspringOrigin>*, DiversityState*);
 template void pipeline_detail::stage_parent_verdict(
     GenerationContext<tlsf::Specification>&,
     const ParentVerdictLookup<tlsf::Specification>&);

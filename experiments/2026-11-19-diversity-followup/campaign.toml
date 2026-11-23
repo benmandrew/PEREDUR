@@ -1,0 +1,27 @@
+name = "2026-11-19-diversity-followup"
+branch = "campaign/diversity-climb"
+profile = "diversity-followup-blame"
+description = "Seeds 10-29 of the four diversity mechanisms that passed or were promising on the screen of 2026-11-19-diversity-screen-blame (novelty, slot-coverage, flip-tabu, flip-sideways), so that each has 30 seeds, like full-k1 and full-k4, for the pooled pass. Same sweep K, config tree and settings."
+
+# veribee-d3's bug hunt holds CPUs 14-29 on both hosts, so each host runs 7
+# jobs x 2 threads on CPUs 0-13. CPUs 30-31 stay free for Ollama.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+configs = "sh -c 'python3 scripts/gen_configs.py --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps K --parallel 2 --out-dir experiments/configs-diversity-climb-blame'"
+
+# 19 subjects x 4 arms x 10 seeds: 760 runs per host.
+[[phases]]
+name = "followup-av2"
+profile = "diversity-followup-blame"
+hosts = { av2 = "10-19" }
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
+
+[[phases]]
+name = "followup-av3"
+profile = "diversity-followup-blame"
+hosts = { av3 = "20-29" }
+confine = { av3 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7

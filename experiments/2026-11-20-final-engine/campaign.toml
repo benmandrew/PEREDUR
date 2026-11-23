@@ -1,0 +1,40 @@
+name = "2026-11-20-final-engine"
+branch = "campaign/final-engine"
+profile = "final-engine"
+description = "Every paper arm on the final engine at one commit (sweep F: climb, twoway in exchange mode, maximality removal, novelty; blame on in every arm; the controller store gated at a 150 ms screen): base, random, random+climb, full, the four no-<f> and the four only-<f> on the small set and rad's cores, on CPUs 0-13 beside veribee's re-run. rad, lift-plus-cruise-full and the seeded corpus are 2026-11-20-final-engine-large (PLAN.md)."
+
+# Seeds pair every arm of a (spec, seed) on one host: the small set and the
+# cores av2 0-14, av3 15-29, as 2026-11-18-fretish-exchange-rerun split them. Not launched:
+# prepared on 20 Nov for the user to enqueue.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+# One tree per thread setting: configs-final-engine at 2 threads a run (the
+# small set, rad's cores and the seeded corpus), configs-final-engine-large
+# with no parallel line (threads are CPUs over jobs). random/ holds
+# sweep F's base (random) and only-climb (random+climb).
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps F\"; $G --schemes nsga2-apportion --parallel 2 --out-dir experiments/configs-final-engine && $G --schemes random --levels base,only-climb --parallel 2 --out-dir experiments/configs-final-engine && $G --schemes nsga2-apportion --out-dir experiments/configs-final-engine-large && $G --schemes random --levels base,only-climb --out-dir experiments/configs-final-engine-large'"
+
+# CPU windows. Every phase names its host, seeds, CPUs and memory on one
+# line, so a window moves with one substitution per host, for example
+#   sed -i '/av2 = { cpus/ s/cpus = "0-29"/cpus = "0-15"/' campaign.toml
+# and `jobs` must then shrink with it (CPUs over threads a run). CPUs 30-31
+# stay free for the Ollama server on both hosts.
+
+# Small set and rad's cores: 19 subjects x 12 arms x 15 seeds = 3,420 runs a
+# host, 7 jobs x 2 threads on CPUs 0-13, beside veribee's re-run on 14-29
+# (mailbox, 20 Nov 13:42Z). About 155 slot-h, 11 h a host (PLAN.md).
+[[phases]]
+name = "small-av2"
+profile = "final-engine"
+hosts = { av2 = "0-14" }
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
+
+[[phases]]
+name = "small-av3"
+profile = "final-engine"
+hosts = { av3 = "15-29" }
+confine = { av3 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7

@@ -66,6 +66,14 @@ enum class TerminationMode : std::uint8_t { Generations, Individuals };
 /// all three.
 enum class GateRealizable : std::uint8_t { Towards, Free, Exchange };
 
+/// How NSGA-II spreads the members of one front (@ref Config::crowding).
+/// Objective is Deb's crowding distance in objective space. Specification
+/// orders each front by greedy farthest-point selection under the slot
+/// Hamming distance between specifications (see diversity.hpp), seeded with
+/// every member of the better fronts, so truncation keeps the members of the
+/// last front most unlike what is already kept.
+enum class Crowding : std::uint8_t { Objective, Specification };
+
 struct Config {
     std::size_t generations = 10;
     /// Offspring budget for the whole run under
@@ -106,6 +114,11 @@ struct Config {
     /// final filters, one proved step at a time, keeping a step only where the
     /// result still passes the output gate.
     bool climb_output = false;
+    /// Climbs per repair under climb_output. The first tries the steps in slot
+    /// order and each later one under a fixed pseudo-random step priority of
+    /// its own (order_steps in `genetic/climb.hpp`); every distinct result
+    /// goes on to the final filters. None draws a random number.
+    std::size_t climb_orders = 1;
     /// FRETISH only: after deduplication, drop each offspring proved stronger
     /// than a parent that an unrealizable query already asked proves
     /// unrealizable (RealizabilityChecker::proved_unrealizable). Off, nothing
@@ -158,6 +171,31 @@ struct Config {
     /// down when a rule proves another realizable candidate in the pool
     /// strictly stronger (see "Maximality demotion" in docs/dev/algorithm.md).
     bool maximality_demotion = false;
+    /// Under NSGA-II on the FRETISH path, how a front is spread (see
+    /// Crowding). Objective by default. Draws nothing either way.
+    Crowding crowding = Crowding::Objective;
+    /// Under NSGA-II on the FRETISH path, rank by one more objective: minus
+    /// the number of accumulated repairs that rule-imply a realizable
+    /// candidate, and 0 for an unrealizable one (see "Diversity mechanisms" in
+    /// docs/dev/algorithm.md). Off by default. Draws nothing.
+    bool novelty = false;
+    /// Under NSGA-II on the FRETISH path, order each front by the novelty
+    /// count first (fewer accumulated repairs rule-implying a realizable
+    /// candidate ranks better), then by crowding (see "Diversity mechanisms" in
+    /// docs/dev/algorithm.md). Ranking across fronts is unchanged. Off by
+    /// default; refused together with novelty. Draws nothing.
+    bool novelty_tiebreak = false;
+    /// FRETISH only: seed the search with the original plus one-step
+    /// weakenings spread round-robin over the guarantees its MRS walk refused
+    /// and its weakenable assumptions, in place of population_size copies of
+    /// the original. Off by default; off, it draws nothing.
+    bool spread_init = false;
+    /// With maximality_demotion on, remove a flagged candidate from the
+    /// survivor pool instead of moving it one front down. The candidate proved
+    /// stronger stays, so the pool cannot empty. The parent ordering still
+    /// demotes (see "Maximality demotion" in docs/dev/algorithm.md). Requires
+    /// maximality_demotion.
+    bool maximality_removal = false;
     double selection_rate = 0.5;
     /// The top elitism_rate fraction of the population carries over into the
     /// next generation verbatim, bypassing crossover, mutation and the
@@ -263,6 +301,24 @@ struct Config {
     /// 2026-11-18; Towards is the behaviour before the key existed, and costs
     /// no draw beyond it.
     GateRealizable gate_realizable = GateRealizable::Exchange;
+    /// FRETISH only: weight a rewrite's slot draw by 1 / (1 + c), where c
+    /// counts the accumulated repairs whose same slot differs from the
+    /// original, so slots the found repairs have not edited are drawn more.
+    /// Off by default; off, and while every weight is equal, the draw is the
+    /// unweighted one.
+    bool slot_coverage = false;
+    /// FRETISH only: generations a slot stays tabu for a lineage once that
+    /// lineage has flipped realizability on it both ways (a weakening that
+    /// made it realizable and a strengthening that made it unrealizable, in
+    /// either order). A tabu slot is skipped by the slot draw, which falls
+    /// back to the full list where nothing else is left. 0, the default,
+    /// keeps no lineage and draws nothing.
+    std::size_t flip_tabu = 0;
+    /// FRETISH only, under flip_tabu above 0: a flipped slot takes only a
+    /// direction-free rewrite, kept where the rule finds the result
+    /// incomparable with the parent, in place of being skipped. Off by
+    /// default.
+    bool flip_sideways = false;
     /// FRETISH only: how far the parent's status scales the choice between a
     /// large move and a single edge, in [0, 1]. Each large move's probability
     /// (removing a guarantee, moving a timing off Always or Eventually, and

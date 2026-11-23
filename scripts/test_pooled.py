@@ -384,6 +384,33 @@ contrasts = [
         except PD.DesignError as exc:
             got = str(exc)
         check_true(expect_in in got, f"{why} must be refused ({got!r})")
+    src = PD.parse_design({"groups": [{
+        "results": "r", "run_dir": "d", "seeds": "0-3", "members": "output",
+        "subjects": ["s"],
+        "contrasts": [{"name": "c", "a": "s/a", "b": "s/b"}],
+        "sources": {"s/b": {"results": "r2", "seeds": "0-1,5"}}}]})["subjects"]["s"]
+    check((src["sources"]["s/a"], src["sources"]["s/b"], src["seeds"]),
+          ({"results": "r", "run_dir": "d", "seeds": [0, 1, 2, 3],
+            "members": "output"},
+           {"results": "r2", "run_dir": "d", "seeds": [0, 1, 5],
+            "members": "output"}, [0, 1, 2, 3, 5]),
+          "a sources entry replaces only the keys it names, for its arm alone, "
+          "and the subject's seeds are the union over its arms")
+    for sources, expect_in, why in (
+        ({"s/z": {"results": "r2"}}, "which no contrast names",
+         "a source for an arm no contrast names"),
+        ({"s/b": {"subjects": ["s"]}}, "unknown key(s) subjects",
+         "a source key that is not results, run_dir, seeds or members"),
+    ):
+        try:
+            PD.parse_design({"groups": [{
+                "results": "r", "run_dir": "d", "seeds": "0", "subjects": ["s"],
+                "contrasts": [{"name": "c", "a": "s/a", "b": "s/b"}],
+                "sources": sources}]})
+            got = "accepted"
+        except PD.DesignError as exc:
+            got = str(exc)
+        check_true(expect_in in got, f"{why} must be refused ({got!r})")
     check(PD.draw_order("s", "x/a", 3, [5, 1, 9, 2]),
           PD.draw_order("s", "x/a", 3, [2, 9, 1, 5]),
           "a draw order depends on the node set, not the order it is given in")
@@ -460,6 +487,19 @@ contrasts = [
           [({"fp": "01", "i": 0}, "repair_0.json"),
            ({"fp": "03", "i": 1}, "repair_0.json")],
           "members = \"output\" pools repair files without their fitness")
+    # x/only read from another results tree at seed 0 alone.
+    shutil.copytree(pd_root / "res" / "only_x_fsm_seed00",
+                    pd_root / "res2" / "only_x_fsm_seed00")
+    write_design("0-1", '[groups.sources]\n'
+                        '"x/only" = { results = "res2", seeds = "0" }')
+    proc = run_pool("--subjects", "fsm")
+    with _gzip.open(pmembers / "fsm.jsonl.gz", "rt") as handle:
+        srcd = [json.loads(line) for line in handle]
+    check((proc.returncode, [n["node"] for n in srcd] == [n["node"] for n in pooled],
+           [r["runs"] for r in csv.DictReader(open(pmembers / "index.csv"))
+            if r["subject"] == "fsm" and r["arm"] == "x/only"]),
+          (0, True, ["1"]), f"an arm with a sources entry is pooled from its "
+                            f"own tree and seeds: {proc.stderr}")
     write_design("0-1")
     run_pool()
 
@@ -696,6 +736,48 @@ contrasts = [
           "an arm identical to base run for run reads as base's own control")
     check_true(trows[0]["b_in_a"] < 1.0,
                "and the shared seeds do not count as overlap")
+    # The seed-half reach control. n0 is held at seeds 0 and 1, so in both
+    # halves; n1 at seed 0 alone, n2 at seed 1 alone, and n1 strictly implies
+    # n2. The halves' joint front is {n0, n1}: the even half holds both, the
+    # odd half n0 alone.
+    import joint_measures as JM  # noqa: E402
+    hnodes = [{"node": 0, "arms": ["x/a"],
+               "members": [["x/a", 0, "f"], ["x/a", 1, "f"]]},
+              {"node": 1, "arms": ["x/a"], "members": [["x/a", 0, "f"]]},
+              {"node": 2, "arms": ["x/a"], "members": [["x/a", 1, "f"]]}]
+    hV = {(1, 2): "1", (2, 1): "0", (0, 1): "0", (1, 0): "0",
+          (0, 2): "0", (2, 0): "0"}
+    hbits = [0b0011, 0b0100, 0b1100]
+    got = JM.half_control(hnodes, hbits, hV, "x/a", {"sampled": False}, None, 4)
+    check(got, {"even": 1.0, "odd": 0.5, "control": 0.75, "joint_front": 2},
+          "each half's reach is on the joint front of the two halves, and the "
+          "control is their mean")
+    got = JM.half_control(hnodes, hbits, hV, "x/a",
+                          {"sampled": True, "draws": 3}, {"x/a": [2, 1, 0]}, 4)
+    check(got, {"even": 1.0, "odd": 0.5, "control": 0.75, "joint_front": 2},
+          "the sampled estimator agrees when every node is drawn")
+    lone = [dict(n, members=[["x/a", 0, "f"]]) for n in hnodes]
+    check(JM.half_control(lone, hbits, hV, "x/a", {"sampled": False}, None,
+                          4)["control"], None,
+          "an arm with no odd seed has no control")
+    jout = pd_root / "joint"
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / "joint_measures.py"), str(design),
+         str(pmembers), str(collected), str(jout), "--half-control"],
+        capture_output=True, text=True)
+    check(proc.returncode, 0, f"joint_measures.py --half-control exits 0: "
+                              f"{proc.stderr}")
+    crow = list(csv.DictReader(open(jout / "half-control.csv", newline="")))
+    check((len(crow), {r["control"] for r in crow}), (6, {""}),
+          "a row per subject and arm, blank where an arm's odd seed is empty")
+    check_true("reach control, odd against even seeds" in
+               (jout / "summary.txt").read_text(),
+               "and the summary reports the control")
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / "joint_measures.py"), str(design),
+         str(pmembers), str(collected), str(jout), "--half-control",
+         "--share-only"], capture_output=True, text=True)
+    check(proc.returncode, 2, "--half-control with --share-only is refused")
     proc = subprocess.run(
         [sys.executable, str(POOLED_REDUCE_PY), str(design), str(pmembers),
          str(collected), str(rout), "--pooled-only", "--pooled-draws", "2"],

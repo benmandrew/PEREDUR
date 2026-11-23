@@ -14,8 +14,8 @@ others are pooled from results. The phase writes under an ignored directory,
 so the checkout stays clean for the next stage.
 
 DESIGN.toml is read by scripts/pooled_design.py. For each subject, every arm
-its contrasts name is read at every declared seed, from
-`<root>/<results>/<run_dir>`. A member is a file named in the run's
+its contrasts name is read at every seed declared for it, from
+`<root>/<results>/<run_dir>` (the group's, or the arm's `sources` entry). A member is a file named in the run's
 `accumulated/maximal.tsv` (`members = "maximal"`, the default) or one of its
 `repair_N.json` with the fitness record dropped (`members = "output"`).
 Members whose JSON is identical once its keys are sorted are one node, as in
@@ -95,15 +95,16 @@ def pool(root: str, subject: dict, allow_missing: bool) -> tuple:
              for arm in subject["arms"]}
     missing = []
     for arm in subject["arms"]:
-        for seed in subject["seeds"]:
-            run = os.path.join(root, subject["results"],
+        source = subject["sources"][arm]
+        for seed in source["seeds"]:
+            run = os.path.join(root, source["results"],
                                D.run_dir_name(subject, arm, seed))
             if not os.path.isfile(os.path.join(run, "run.json")):
                 stats[arm]["missing"] += 1
                 missing.append(run)
                 continue
             stats[arm]["runs"] += 1
-            members = run_members(run, subject["members"])
+            members = run_members(run, source["members"])
             if not members:
                 stats[arm]["empty"] += 1
             for rel, spec in members:

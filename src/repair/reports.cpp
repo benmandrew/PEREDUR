@@ -15,6 +15,7 @@
 #include "genetic/accumulator.hpp"
 #include "genetic/climb.hpp"
 #include "genetic/demotion.hpp"
+#include "genetic/diversity.hpp"
 #include "genetic/generation.hpp"
 #include "genetic/mutation.hpp"
 #include "genetic/order_crossover.hpp"
@@ -245,7 +246,15 @@ void print_diagnostics_report() {
               << " drawn from a blame-targeted slot list\n";
     std::cout << "Candidates demoted as proved weaker than another realizable "
                  "one: "
-              << DemotionStats::n_demoted << "\n";
+              << DemotionStats::n_demoted
+              << ", removed: " << DemotionStats::n_removed
+              << ", removal fallbacks: " << DemotionStats::n_removal_fallbacks
+              << "\n";
+    std::cout << "Survivor selections: " << SurvivorSelectionStats::n_selections
+              << ", " << SurvivorSelectionStats::n_truncated << " truncated, "
+              << SurvivorSelectionStats::n_replicated
+              << " replicated, distinct pool sizes summing to "
+              << SurvivorSelectionStats::pool_size_sum << "\n";
     if (DemotionStats::final_front.has_value()) {
         std::cout << "Final first front: "
                   << DemotionStats::final_front->n_members << " members, "
@@ -253,6 +262,36 @@ void print_diagnostics_report() {
                   << DemotionStats::final_front->n_gutted
                   << " proved weaker than another realizable member\n";
     }
+    std::cout << "Specification crowding: "
+              << SpecificationCrowdingStats::n_sorts << " sorts, "
+              << SpecificationCrowdingStats::n_cut_fronts
+              << " cut fronts filled farthest-point, "
+              << SpecificationCrowdingStats::n_distances << " distances\n";
+    std::cout << "Novelty: " << NoveltyStats::n_evaluations << " evaluations, "
+              << NoveltyStats::n_checks
+              << " rule checks against accumulated repairs ("
+              << NoveltyStats::n_implied << " proved), "
+              << NoveltyStats::n_covered
+              << " realizable candidates implied by a repair\n";
+    std::cout << "Novelty tie-break: " << NoveltyTiebreakStats::n_sorts
+              << " sorts, " << NoveltyTiebreakStats::n_evaluations
+              << " evaluations, " << NoveltyTiebreakStats::n_reordered
+              << " reordered against crowding alone, "
+              << NoveltyTiebreakStats::n_survivors_changed
+              << " survivor sets changed\n";
+    std::cout << "Slot coverage: " << SlotCoverageStats::n_draws
+              << " slot draws with coverage counts, "
+              << SlotCoverageStats::n_weighted << " weighted\n";
+    std::cout << "Spread seed population: " << SpreadInitStats::n_seeded
+              << " weakenings over " << SpreadInitStats::n_targets << " slots, "
+              << SpreadInitStats::n_failed << " left as the original\n";
+    std::cout << "Flip lineage: " << FlipLineageStats::n_flips
+              << " flips recorded, " << FlipLineageStats::n_tabu
+              << " slots gone tabu, " << FlipLineageStats::n_skipped
+              << " draws skipping a tabu slot, "
+              << FlipLineageStats::n_fallbacks << " with every slot tabu, "
+              << FlipLineageStats::n_sideways << " sideways rewrites ("
+              << FlipLineageStats::n_sideways_kept << " kept)\n";
     if (ClimbStats::n_climbed > 0) {
         std::cout << "Output climb: " << ClimbStats::n_climbed
                   << " repairs climbed, " << ClimbStats::n_steps_tried
