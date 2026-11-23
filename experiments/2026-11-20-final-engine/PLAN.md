@@ -41,6 +41,10 @@ Both designs come from `experiments/2026-11-20-final-engine-pooled/scripts/make_
 
 The reduce phase runs on av2 alone (av3 cannot ssh to av2) once av3's entry has passed its compare phase: `pooled_reduce.py --pooled-balls --ball-k 3` (strength, containment with each arm's seed-half control) and `joint_measures.py --half-control` (share, joint-front reach, and each arm's odd-against-even reach control, bennote item 6).
 
+## Random against base
+
+Added 2026-11-23 at the user's request: the paper measures no strength or diversity for `random`. `2026-11-23-final-engine-pooled-random` pools `random/base` and `nsga2-apportion/base` alone on the specification pass's 18 subjects and host split, with the one contrast random against base (`make_design.py random`). Strength and pooled balls read one pair of arms and share reads one arm's frontier, so on the same words they equal what an eleventh arm in the ten-arm pass would give, and the ten-arm pass's outputs stay as they are. The words are drawn from the pool's members, so a fresh draw would differ: before enqueue, each host copies `words` and `words.meta` from `experiments/final-engine-pooled/fp/<subject>/` into `experiments/final-engine-pooled-random/fp/<subject>/`, and the fingerprint phase draws none. Joint-front reach in its output is over two arms and is not the paper's measure. Order of work: pool locally, rsync the inputs, copy the words on each host, enqueue on both hosts (CPUs 0-13), collect the reduce from av2.
+
 ## Order of work
 
 1. Copy nothing for the runs: the sideways corpus (`selected.txt`, `subjects/`) is already in both hosts' checkouts (checked 2026-11-20). Enqueue `2026-11-20-final-engine` on av2 and av3 (CPUs 0-13).
@@ -85,4 +89,13 @@ f8818df380aa468857fb71233258bacf8abb1d32016978e441fe0bbf00eea8db  ball-radii-poo
 056fff8c291d0d8902a04270427c1b62cd3eea7cae398364e59678a13083e9d0  strength/contrasts.csv
 520797b04cdcfe9950b60a64c1fa1a8fac75134f898009c7663c9a0a0c71c882  joint/per-subject.csv
 dba80150ee7656fd1e725927eb328e435666c9556074c65c40ff9715923ece20  ball-radii-pooled/pooled.csv
+```
+- 2026-11-23 18:30Z: pooled `2026-11-23-final-engine-pooled-random` locally under MemoryMax=20G: 18 subjects, 75,721 nodes (32% of the ten-arm pool's 235,515). random holds 10 to 5,202 members a subject; on rad-core-10, 23 of its 30 runs are empty and 10 members remain. Sums of the inputs:
+
+```
+8eb626cb25c87546edadf0daeb18541e5f9a51bb6bdd48479a4ffa9018f2e3ae  design.toml
+20896dc9b89dde698d76254432975e6e4ce4b7370d33d50f7cd9f6915a0bb785  subjects-av2.txt
+855f78e4c637cbe7837c5da9cc7c40be51c4afd02754f6d6d7f9ea8567b4abf8  subjects-av3.txt
+a2937dd5d09b377da42327080f4d24413df3b58f8e46700cd306bb6727db56e8  members/index.csv
+7125856c24fb4fd9a1eacaa198a00e28fbb5988717b42cf1559fa45dbb6dddbf  members/done.csv
 ```

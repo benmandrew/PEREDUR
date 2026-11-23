@@ -1,0 +1,85 @@
+name = "2026-11-23-final-engine-pooled-random"
+branch = "campaign/final-engine"
+description = "Pooled pass over 2026-11-20-final-engine: sweep F's random/base against nsga2-apportion/base, 30 seeds, on the 18 subjects of 2026-11-20-final-engine-pooled and on its word sample (each subject's words and words.meta copied into this pass's fp directory before enqueue, so fingerprint draws none), for strength, pooled balls at K = 3 with seed-half controls, and accepted-trace share of random against base. Joint-front reach here is over two arms and is not the paper's measure."
+
+# The pool is built locally, then copied with the design and subject lists
+# (untracked, written by 2026-11-20-final-engine-pooled/scripts/make_design.py
+# random) to each host's checkout by rsync before enqueue, with the words of
+# experiments/final-engine-pooled/fp/<subject>/ copied on each host into
+# experiments/final-engine-pooled-random/fp/<subject>/ (PLAN.md).
+hosts = { av2 = "", av3 = "" }
+
+# CPU windows. Every phase names its host, seeds, CPUs and memory on one
+# line, so a window moves with one substitution per host, for example
+#   sed -i '/av2 = { cpus/ s/cpus = "0-29"/cpus = "0-15"/' campaign.toml
+# and `jobs` must then shrink with it (CPUs over threads a run). CPUs 30-31
+# stay free for the Ollama server on both hosts.
+# CPUs 0-13 on both hosts: veribee-v0split holds CPUs 14-29 (up to 32G) and
+# Ollama 30-31 from 23 Nov 17:32Z, to about 00:00Z on av2 and 03:30Z on av3
+# (mailbox).
+confine = { av2 = { cpus = "0-13", memory_max = "64G" }, av3 = { cpus = "0-13", memory_max = "64G" } }
+
+# fpdraw is EXCLUDE_FROM_ALL, so the build names it. `confine` does not reach
+# the build, so taskset holds it to the same CPUs.
+build = "sh -c 'taskset -c 0-13 sh -c \"cmake --build build-release -j 12 && cmake --build build-release -j 12 --target fpdraw\"'"
+
+# Estimate: the pool holds 75,721 nodes, 32% of the ten-arm pass's 235,515, most of them random's and new, so about 3-4 CPU-h of fingerprints; random's arm is about twice a Pareto arm's size, so its within-arm and cross pairs are about 7 of the ten-arm pass's 55 arm-pair units, about 3-4 call-h of compare. Roughly 1-2 h a host on 14 CPUs, rad-core-33 the tail on av3 (+-50%).
+
+# Every subject is in the copied pool, so this phase only copies it, after
+# checking each file against its index row.
+[[phases]]
+name = "pool"
+kind = "pool"
+design = "experiments/2026-11-23-final-engine-pooled-random/design.toml"
+subjects = "experiments/2026-11-23-final-engine-pooled-random/subjects-{host}.txt"
+copy_from = "experiments/2026-11-23-final-engine-pooled-random/members"
+out = "experiments/final-engine-pooled-random-members"
+
+# The ten-arm pass's 32768 words a subject, copied in, so draw_black.py does
+# not run; every node evaluated on them, and every pair the design plans.
+[[phases]]
+name = "fingerprint"
+kind = "fingerprint"
+subjects = "experiments/2026-11-23-final-engine-pooled-random/subjects-{host}.txt"
+members = "experiments/final-engine-pooled-random-members"
+design = "experiments/2026-11-23-final-engine-pooled-random/design.toml"
+work = "experiments/final-engine-pooled-random-work"
+out = "experiments/final-engine-pooled-random/fp"
+pairs = "experiments/final-engine-pooled-random-work/pairs-{host}.csv"
+words = 32768
+seed = 3
+workers = 8
+black_timeout = 30
+
+# Each unrefuted direction at the archive's 20 s, 12 jobs as the earlier
+# pooled passes ran, so a 20 s comparison is not timed out by contention.
+[[phases]]
+name = "compare"
+kind = "compare"
+pairs = "experiments/final-engine-pooled-random-work/pairs-{host}.csv"
+out = "experiments/final-engine-pooled-random/subsumption-{host}.csv"
+jobs = 12
+black_timeout = 20
+wall_timeout = 180
+vmem_kb = 8388608
+
+# On av2 alone, once av3's entry has passed its compare phase: gather both
+# hosts' outputs, then pooled_reduce.py (strength, and pooled ball radii at
+# K = 3 with each arm's seed-half control) and joint_measures.py (share,
+# joint-front reach, and each arm's odd-against-even reach control). av3
+# cannot ssh to av2, so av2 gathers.
+[[phases]]
+name = "reduce"
+kind = "reduce"
+host = "av2"
+design = "experiments/2026-11-23-final-engine-pooled-random/design.toml"
+members = "experiments/2026-11-23-final-engine-pooled-random/members"
+outputs = "experiments/final-engine-pooled-random"
+collected = "experiments/final-engine-pooled-random-collected"
+out = "experiments/final-engine-pooled-random-reduced"
+confine = { av2 = { cpus = "0-13", memory_max = "80G" } }
+jobs = 4
+pooled_balls = true
+ball_k = [3]
+joint = true
+half_control = true

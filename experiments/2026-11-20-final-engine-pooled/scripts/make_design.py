@@ -4,10 +4,12 @@
     python3 experiments/2026-11-20-final-engine-pooled/scripts/make_design.py specs
     python3 experiments/2026-11-20-final-engine-pooled/scripts/make_design.py seeded \
         [--drop SUBJECT ...] [--sampled SUBJECT ...] [--av2 SUBJECT ...]
+    python3 experiments/2026-11-20-final-engine-pooled/scripts/make_design.py random
 
 `specs` writes experiments/2026-11-20-final-engine-pooled/{design.toml,
 subjects-av2.txt,subjects-av3.txt}; `seeded` writes the same files under
-experiments/2026-11-20-final-engine-seeded-pooled/. All are untracked, like
+experiments/2026-11-20-final-engine-seeded-pooled/; `random` writes them
+under experiments/2026-11-23-final-engine-pooled-random/. All are untracked, like
 every pooled pass's inputs, and copied to each host by rsync; this script is
 the tracked record of what they hold.
 
@@ -16,6 +18,13 @@ Arms are sweep F's base, full, every no-<f> and every only-<f>. Families:
 each no-<f> against full; every other pair of the ten arms is in "joint", so
 every cross-arm pair is planned and joint_measures.py can decide the joint
 front over all ten arms.
+
+`random` pools sweep F's random/base and nsga2-apportion/base alone, on the
+18 subjects and host split of `specs`, with the one contrast random against
+base. Strength and pooled balls read one pair of arms and share one arm's
+frontier, so on the specs pass's word sample (copied into its fp directory
+before enqueue) they equal what an eleventh arm in that pass would give.
+Joint-front reach does not: its front is that of two arms.
 """
 
 import argparse
@@ -41,10 +50,12 @@ SPEC_SAMPLED = ["valu3s-uc6", "lift-plus-cruise-mini"]
 
 
 def arm(level: str) -> str:
-    return f"nsga2-apportion/{level}"
+    return level if "/" in level else f"nsga2-apportion/{level}"
 
 
-def contrasts() -> list:
+def contrasts(which: str = "specs") -> list:
+    if which == "random":
+        return [("random", "random/base", "base", "base")]
     out = [("full", "full", "base", "base")]
     out += [(f"only-{f}", f"only-{f}", "base", "base") for f in FEATURES]
     out += [("no-climb-over-base", "no-climb", "base", "base")]
@@ -57,7 +68,7 @@ def contrasts() -> list:
 
 
 def design(header: str, results: str, seeds: str, subjects: list,
-           sampled: list) -> str:
+           sampled: list, which: str = "specs") -> str:
     lines = [f"# {line}".rstrip() for line in header.splitlines()]
     lines += ["", "draws = 100", "", "[[groups]]", f'results = "{results}"',
               f'run_dir = "{RUN_DIR}"', f'seeds = "{seeds}"',
@@ -66,24 +77,25 @@ def design(header: str, results: str, seeds: str, subjects: list,
     lines += ["]", "sampled = [" + ", ".join(f'"{s}"' for s in sampled) + "]",
               "contrasts = ["]
     lines += [f'  {{ name = "{n}", a = "{arm(a)}", b = "{arm(b)}", '
-              f'family = "{fam}" }},' for n, a, b, fam in contrasts()]
+              f'family = "{fam}" }},' for n, a, b, fam in contrasts(which)]
     lines += ["]", ""]
     return "\n".join(lines)
 
 
-def write(out: Path, text: str, av2: list, av3: list) -> None:
+def write(out: Path, text: str, av2: list, av3: list,
+          which: str = "specs") -> None:
     out.mkdir(parents=True, exist_ok=True)
     (out / "design.toml").write_text(text)
     (out / "subjects-av2.txt").write_text("".join(f"{s}\n" for s in av2))
     (out / "subjects-av3.txt").write_text("".join(f"{s}\n" for s in av3))
     print(f"{out}: {len(av2)} + {len(av3)} subjects, "
-          f"{len(contrasts())} contrasts")
+          f"{len(contrasts(which))} contrasts")
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("which", choices=["specs", "seeded"])
+    ap.add_argument("which", choices=["specs", "seeded", "random"])
     ap.add_argument("--drop", nargs="*", default=[],
                     help="seeded subjects to leave out, such as those where "
                          "an arm holds 3 or fewer members")
@@ -103,6 +115,17 @@ def main(argv=None) -> int:
             SPEC_AV2 + SPEC_AV3, SPEC_SAMPLED)
         write(ROOT / "experiments" / "2026-11-20-final-engine-pooled", text,
               SPEC_AV2, SPEC_AV3)
+        return 0
+    if args.which == "random":
+        text = design(
+            "Pooled pass over 2026-11-20-final-engine (profile final-engine):\n"
+            "sweep F's random/base against nsga2-apportion/base, 30 seeds, on\n"
+            "the 18 subjects of 2026-11-20-final-engine-pooled, on its word\n"
+            "sample. Written by scripts/make_design.py random; see PLAN.md.",
+            "experiments/results-final-engine", "0-29",
+            SPEC_AV2 + SPEC_AV3, SPEC_SAMPLED, "random")
+        write(ROOT / "experiments" / "2026-11-23-final-engine-pooled-random",
+              text, SPEC_AV2, SPEC_AV3, "random")
         return 0
     listing = (ROOT / "experiments" / "2026-11-18-seeded-corpus-sideways"
                / "selected.txt")
