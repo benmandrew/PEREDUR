@@ -7,13 +7,14 @@ description = "The order-directed mechanisms on the lifted SYNTECH17 subjects (P
 # splits them. Not launched: declared on 22 Nov for the user to enqueue.
 hosts = { av2 = "", av3 = "" }
 
-build = "sh -c 'taskset -c 0-13 cmake --build build-release -j 12'"
+build = "sh -c 'taskset -c 0-29 cmake --build build-release -j 24'"
 
 # psp-order's configs, under this campaign's own directory.
 configs = "python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps F --schemes nsga2-apportion --parallel 2 --levels base,full,no-climb,no-gate,no-remove,no-novelty --out-dir experiments/configs-psp-syntech"
 
-# CPU windows: CPUs 0-13, 7 jobs of 2 threads, 28G on both hosts, as
-# psp-order ran beside veribee's hunt on CPUs 14-31. A window moves with one
+# CPU windows: CPUs 0-29, 15 jobs of 2 threads, 48G on both hosts (widened
+# on 23 Nov once veribee released both hosts; declared at CPUs 0-13 as
+# psp-order ran beside veribee's hunt on CPUs 14-31). A window moves with one
 # substitution per host, for example
 #   sed -i '/av2 = { cpus/ s/cpus = "0-13"/cpus = "0-29"/' campaign.toml
 # and `jobs` must then change with it (CPUs over threads a run).
@@ -27,27 +28,27 @@ configs = "python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 
 name = "specs-av2"
 profile = "psp-syntech"
 hosts = { av2 = "0-4" }
-confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
-jobs = 7
+confine = { av2 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15
 
 [[phases]]
 name = "specs-av3"
 profile = "psp-syntech"
 hosts = { av3 = "5-9" }
-confine = { av3 = { cpus = "0-13", memory_max = "28G" } }
-jobs = 7
+confine = { av3 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15
 
 # The seeded subjects: 49 subjects x 6 arms x 1 seed = 294 runs a host.
 [[phases]]
 name = "seeded-av2"
 profile = "psp-syntech-seeded"
 hosts = { av2 = "0" }
-confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
-jobs = 7
+confine = { av2 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15
 
 [[phases]]
 name = "seeded-av3"
 profile = "psp-syntech-seeded"
 hosts = { av3 = "1" }
-confine = { av3 = { cpus = "0-13", memory_max = "28G" } }
-jobs = 7
+confine = { av3 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15

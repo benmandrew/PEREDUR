@@ -82,3 +82,7 @@ This queues one entry on each of av2 and av3. Check the subject counts first wit
 1. `python3 scripts/campaign.py collect --profile psp-syntech --host av2`, then `--host av3`, and likewise `--profile psp-syntech-seeded`. Then add the result sets to `experiments/catalogue.toml` (this campaign, its pooled pass and `configs-psp-syntech` are not yet catalogued, as `psp-order` is not) and run `scripts/catalogue.py render`.
 2. The pooled pass is `2026-11-22-psp-syntech-pooled`, built as `2026-11-20-psp-order/PLAN.md` step 3 describes, with `make_design.py --profiles psp-syntech psp-syntech-seeded --out experiments/2026-11-22-psp-syntech-pooled`. It holds two groups, one per profile, with every pair of the six arms planned. Drop a subject where an arm holds 3 or fewer members.
 3. In the paper, the SYNTECH17 rows come from this campaign, and the hand-written rows from `psp-order`. The trivial subjects of the probe are reported apart, as on FRETISH.
+
+## Windows widened (2026-11-23)
+
+veribee released both hosts on 23 Nov (av3 at 04:30Z, av2 at 08:45Z), and peredur-extension-83 had nothing queued. With the user's agreement the phases run on CPUs 0-29 at 15 jobs under 48G, as psp-order was first declared, so each host takes about 57 slot-h over 15 jobs, about 4 h, against the 8.2 h at 7 jobs above. CPUs 30-31 stay free for the Ollama server.
