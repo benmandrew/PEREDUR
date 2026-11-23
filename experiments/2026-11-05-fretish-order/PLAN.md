@@ -109,6 +109,27 @@ python scripts/campaign.py enqueue 2026-11-05-fretish-order
 python scripts/campaign.py status
 ```
 
+## Follow-up: `rad`
+
+In this campaign (`results-fretish-order-large.csv`), `full` finds a repair on 1 of 10 `rad` runs and `base` on none. Every run stops on `max_individuals` after 31–32 generations, at a median of 154 s under `full` and 760 s under `base`, so the 7,200 s cap never binds. The final-engine rerun (`2026-11-20-final-engine-large`) gives the same counts at medians of 190 s for both arms. The 10 cores in `examples/rad-core-*` fall into 8 groups that share no guarantee: 7 single guarantees (10, 33, 45, 55, 61, 65, 68) and guarantee 18 with 1, 12 or 17. A repair must change at least 8 of the 74 guarantees. The one repair (seed 18) changes exactly those 8, plus 20 and 24.
+
+Each core alone is easy except one. Under `full` (`results-fretish-order-cores.csv`), 9 cores are repaired on 30 of 30 runs, almost all in generation 1. Core 10 is repaired on 9 of 30, first in generations 5–32. Its stop is an input under a `true` trigger. Neither timing mutation moves `before s`, and `true` rewrites only to `false`. Its repairs need two edits in one child: a literal condition such as `!dressing_process_initiated` and a change from trigger to continual.
+
+Three properties of the search limit it on `rad`:
+
+- **One requirement per child.** The MRS status gives 1/74 per fixed guarantee, so the 8 fixes must build up in one line of descent within about 31 generations. `base` picks a slot from all 74; blame targeting in `full` picks from the refused slots (1,010 targeted mutations in seed 18).
+- **Crossover drops fixes.** Both parents stay unrealisable until the end, so the order crossover takes the meet (`src/genetic/order_crossover.cpp:206`), the stronger value in each slot, which undoes both parents' fixes. Seed 18 tried the meet 44 times with no realisable child and the join 0 times. The graft writes one merged slot.
+- **Core 10 is slow alone,** and inside `rad` its slot gets about 1/8 of the targeted mutations.
+
+Not yet determined: whether guarantee 10 is the slot left unfixed in the 9 failed `full` runs (best fitness 0.959–0.967, against 0.970 in seed 18). `run.json` does not save the final front, so this needs the refused slots of the best individual at the end of a run.
+
+Changes to test, cheapest first:
+
+1. **Larger budget.** Raise `max_individuals` on `rad`, which uses a median of 154 s of the 7,200 s cap under `full`. This is a configuration change only.
+2. **Crossover that keeps fixes.** When two unrealisable parents have disjoint refused slots, take each parent's value in the slots it fixed, in place of the meet.
+3. **Repair by core.** The cores share no guarantee, so repair each core alone and compose the results.
+4. **More than one edit per child.** Let a mutation edit several requirements when the parent has many refused slots.
+
 ## Out of scope
 
 - **Flattened TLSF and AuRUS.** A comparison with PEREDUR's TLSF mode and with AuRUS needs a FRETISH-to-TLSF converter, which does not exist (`src/tlsf/writer.cpp` writes TLSF specifications only). It also needs the AuRUS launcher that `1b12cb7e` removed. Their repairs are not FRETISH, so they would support the semantic measures alone.
