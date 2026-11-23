@@ -1,0 +1,20 @@
+name = "2026-11-11-fretish-order-counters"
+branch = "campaign/fretish-order-counters"
+profile = "fretish-order-counters"
+description = "The small set of 2026-11-05-fretish-order run again at be57f58f, whose run.json records the counters the paper's mechanism table lacks (climb wall time, mutation totals, gate steps that scored realisable, unscaled moves, the final front's gutting). The search is unchanged, so the runs reproduce the first pass's repairs. PLAN.md gives the check."
+
+# Every seed on av2: GAWAIN holds av3 until about 19:00 on 2026-11-12, and
+# veribee uses av2's CPUs 0-15 until it hands them back.
+hosts = { av2 = "0-29" }
+
+build = "sh -c 'cmake --build build-release'"
+
+configs = "python3 scripts/gen_configs.py --sweeps O --schemes nsga2-apportion --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order --pin-vintage && python3 scripts/gen_configs.py --sweeps O --levels base,only-climb --schemes random --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --out-dir experiments/configs-fretish-order --pin-vintage"
+
+# 9 small specs x 18 arms x 30 seeds = 4,860 runs at 16 jobs, the share of
+# av2 agreed with the sessions sharing it. The first pass took 1-2 h on two
+# hosts at 15 jobs each, so estimate 2-4 h.
+[[phases]]
+name = "small"
+profile = "fretish-order-counters"
+jobs = 16
