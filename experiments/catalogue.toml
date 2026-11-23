@@ -33,57 +33,61 @@ note = "The paper's `data/*/PROVENANCE*.txt` name every input. Its cited sets we
 name = "fretish-order"
 paths = ["2026-11-05-fretish-order", "results-fretish-order", "results-fretish-order.csv"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ1, RQ2"
 campaign = "2026-11-05-fretish-order"
 date = "2026-11-05"
 commits = ["f7ffb997", "43b2fce2"]
 purpose = "The small set's 4,860 runs: every arm of the order-directed search against base and random, 30 seeds."
-note = "Since 2026-11-17 the paper takes `full` and `no-<f>` from the removal campaigns; `base`, `random` and `only-<f>` still come from here."
+note = "Since `00885da` (2026-11-22) the paper takes every arm from `final-engine`."
+superseded_by = "final-engine"
 
 [[set]]
 name = "fretish-order-large"
 paths = ["results-fretish-order-large", "results-fretish-order-large.csv"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ3"
 campaign = "2026-11-05-fretish-order"
 date = "2026-11-06"
 commits = ["f7ffb997", "43b2fce2"]
 purpose = "The large set's runs (lift-plus-cruise-full, rad, ventilator-controller), from the `lift-full` and `rad-vent` phases."
+superseded_by = "final-engine-large"
 
 [[set]]
 name = "curves-fretish-order-v2"
 paths = ["curves-fretish-order-v2", "curves-fretish-order-v2.csv"]
 paper = "ext"
-status = "cited"
+status = "supporting"
 question = "RQ1 anytime"
 date = "2026-11-12"
 commits = ["fb9ec73c"]
 purpose = "Anytime curves of the small set, re-scored after the counter and climbed-repair fixes."
-note = "`extract_curves.py` reads the per-host directory; the CSV is its merged copy."
+note = "`extract_curves.py` reads the per-host directory; the CSV is its merged copy. The paper has not read it since `00885da` (2026-11-22)."
 
 [[set]]
 name = "curves-fretish-order-large-v2"
 paths = ["curves-fretish-order-large-v2", "curves-fretish-order-large-v2.csv"]
 paper = "ext"
-status = "cited"
+status = "supporting"
 question = "RQ3 anytime"
 date = "2026-11-12"
 commits = ["fb9ec73c"]
 purpose = "Anytime curves of the large set, re-scored after the climbed-repair fix."
-note = "`extract_curves.py` reads the per-host directory."
+note = "`extract_curves.py` reads the per-host directory. The paper has not read it since `00885da` (2026-11-22)."
 
 [[set]]
 name = "fretish-order-counters"
-paths = ["results-fretish-order-counters", "results-fretish-order-counters.csv"]
+paths = ["2026-11-11-fretish-order-counters", "results-fretish-order-counters", "results-fretish-order-counters.csv"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ2 mechanism counters"
 date = "2026-11-12"
 commits = ["fb9ec73c"]
 purpose = "The small set rerun at a commit whose run.json records each mechanism's counters."
-note = "`extract_counters_rerun.py` writes `data/counters-fretish-order-v2.csv` and `data/repro-fretish-order.csv` from it."
+note = "Before `00885da` (2026-11-22), `extract_counters_rerun.py` wrote the paper's `data/counters-fretish-order-v2.csv` and `data/repro-fretish-order.csv` from it. Tag `provenance/2026-11-11-fretish-order-counters` holds the campaign branch."
+superseded_by = "final-engine"
+campaign = "2026-11-11-fretish-order-counters"
 
 [[set]]
 name = "fretish-order-large-counters"
@@ -95,35 +99,37 @@ campaign = "2026-11-13-fretish-order-large-counters"
 date = "2026-11-13"
 commits = ["f557c5dd"]
 purpose = "The large set's full arm rerun to record the climb's wall time and the final front's gutting; ventilator-controller under a 3000 s deadline."
-note = "`extract_large_counters.py` reads both run directories."
+note = "`import_data.py` no longer re-imports it, since no final-engine run exists on ventilator-controller. The paper's committed `data/counters-fretish-order-large.csv`, which the limitations read for ventilator-controller, came from it through `extract_large_counters.py`."
 
 [[set]]
 name = "fretish-order-pooled-v2"
 paths = ["2026-11-09-fretish-order-pooled", "fretish-order-pooled-v2"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ2 strength and diversity"
 campaign = "2026-11-09-fretish-order-pooled"
 date = "2026-11-11"
 purpose = "Pooled strength and diversity of each only-<f> arm and full against base, over the 9 small specs and rad's 10 cores, after the audit of 2026-11-11."
 note = "Source of `data/pooled-strength.csv`, `pooled-balls.csv` and `pooled-share.csv`. The tracked reduction is in the campaign directory."
+superseded_by = "final-engine-pooled"
 
 [[set]]
 name = "fretish-order-pooled-noclimb"
 paths = ["fretish-order-pooled-noclimb"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ2 strength and diversity"
 campaign = "2026-11-09-fretish-order-pooled"
 date = "2026-11-12"
 purpose = "The pooled pass with the output climb's repairs left out, to read each arm's strength without the climb."
 note = "Source of `data/pooled-*-noclimb.csv`."
+superseded_by = "final-engine-pooled"
 
 [[set]]
 name = "seeded-corpus"
 paths = ["2026-11-13-seeded-corpus", "results-fretish-seeded", "results-fretish-seeded.csv", "results-fretish-seeded-manifest-ben.json"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "Seeded corpus"
 campaign = "2026-11-13-seeded-corpus"
 date = "2026-11-15"
@@ -131,43 +137,47 @@ commits = ["b2d3b91c", "de2ebcda", "1077b43b"]
 purpose = "Specifications seeded with known fault classes, run under every arm; REPORT.md gives the campaign's own analysis."
 note = "`import_data.py` copies `2026-11-13-seeded-corpus/data/`; `summarise.py` ports `scripts/seeded/analyse.py`."
 
-# The removal campaigns of 2026-11-17 live in campaign worktrees, where each
-# collect wrote its data. import_data.py reads them there (REMOVAL).
+# The removal campaigns of 2026-11-17 and the exchange rerun. Their results
+# were copied into this checkout on 2026-11-18, apart from the exchange rerun.
+superseded_by = "seeded-corpus-sideways"
 
 [[set]]
 name = "fretish-order-remove-no-f"
-location = "~/projects/peredur-wt-demote/experiments"
-paths = ["2026-11-17-fretish-order-remove-no-f", "results-fretish-order-remove-no-f", "results-fretish-order-remove-no-f.csv", "configs-fretish-order-remove-no-f"]
+paths = ["results-fretish-order-remove-no-f", "results-fretish-order-remove-no-f.csv", "configs-fretish-order-remove-no-f"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ1, RQ2"
 campaign = "2026-11-17-fretish-order-remove-no-f"
 date = "2026-11-17"
 commits = ["580a6cc"]
 purpose = "`remove-full` (a rerun of lean-remove, the paper's `full`) and each `remove-no-<f>` on the small set."
+superseded_by = "fretish-exchange-rerun"
+note = "Copied from `~/projects/peredur-wt-demote` on 2026-11-18. The paper has not read it since `00885da` (2026-11-22). A backup is in `~/backups/peredur-experiments/` on av2 and av3, apart from the hosts' own per-host halves at the campaign paths. The campaign definition `2026-11-17-fretish-order-remove-no-f` is on its campaign branch."
 
 [[set]]
 name = "fretish-order-only-remove"
-location = "~/projects/peredur-wt-demote/experiments"
 paths = ["results-fretish-order-only-remove", "results-fretish-order-only-remove.csv", "configs-fretish-order-only-remove"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ2"
 campaign = "2026-11-17-fretish-order-removal-followup"
 date = "2026-11-17"
 commits = ["612876c"]
 purpose = "The `only-remove` arm on the small set."
+note = "Copied from `~/projects/peredur-wt-demote` on 2026-11-18. The paper has not read it since `00885da` (2026-11-22). A backup is in `~/backups/peredur-experiments/` on av2 and av3, apart from the hosts' own per-host halves at the campaign paths."
+superseded_by = "final-engine"
 
 [[set]]
 name = "fretish-seeded-removal"
-location = "~/projects/peredur-wt-demote/experiments"
 paths = ["results-fretish-seeded-removal", "results-fretish-seeded-removal.csv", "configs-fretish-seeded-removal"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "Seeded corpus"
 date = "2026-11-17"
 commits = ["612876c"]
 purpose = "`lean-remove` on the seeded corpus."
+note = "Copied from `~/projects/peredur-wt-demote` on 2026-11-18. The paper has not read it since `00885da` (2026-11-22). A backup is in `~/backups/peredur-experiments/` on av2 and av3, apart from the hosts' own per-host halves at the campaign paths."
+superseded_by = "final-engine-seeded"
 
 [[set]]
 name = "fretish-order-full4-no-f"
@@ -183,52 +193,68 @@ note = "`import_data.py` does not read it."
 
 [[set]]
 name = "fretish-order-removal"
-location = "~/projects/peredur-removal-pooled/experiments"
 paths = ["results-fretish-order-removal", "results-fretish-order-removal.csv"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ2 removal against demotion"
 campaign = "2026-11-17-fretish-order-removal"
 date = "2026-11-17"
 commits = ["d815233", "56bfb69"]
 purpose = "`lean` (the paper's `no-remove`), `lean-demote` and `lean-remove` on the small set."
-note = "The campaign directory is on the worktrees `peredur-wt-demote` and `peredur-ext-share`. `~/projects/peredur-ext-share/experiments/results-fretish-order-removal` holds a 452 MB run tree without a CSV."
+superseded_by = "fretish-exchange-rerun"
+note = "The campaign directory is on the worktrees `peredur-wt-demote` and `peredur-ext-share`. `~/projects/peredur-ext-share/experiments/results-fretish-order-removal` holds a 452 MB run tree without a CSV. Copied from `~/projects/peredur-removal-pooled` on 2026-11-18. The paper has not read it since `00885da` (2026-11-22). A backup is in `~/backups/peredur-experiments/` on av2 and av3, apart from the hosts' own per-host halves at the campaign paths."
 
 [[set]]
 name = "fretish-seeded-remove"
-location = "~/projects/peredur-ext-share/experiments"
 paths = ["results-fretish-seeded-remove", "results-fretish-seeded-remove.csv", "configs-fretish-seeded-remove"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "Seeded corpus"
 campaign = "2026-11-17-fretish-extension-share"
 date = "2026-11-17"
 commits = ["739edd4"]
 purpose = "`remove-no-<f>`, `lean` and `base` on the seeded corpus."
+note = "Copied from `~/projects/peredur-ext-share` on 2026-11-18. The paper has not read it since `00885da` (2026-11-22). A backup is in `~/backups/peredur-experiments/` on av2 and av3, apart from the hosts' own per-host halves at the campaign paths."
+superseded_by = "final-engine-seeded"
 
 [[set]]
 name = "fretish-order-large-remove"
-location = "~/projects/peredur-ext-share/experiments"
 paths = ["results-fretish-order-large-remove", "results-fretish-order-large-remove.csv", "configs-fretish-order-large-remove"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ3"
 campaign = "2026-11-17-fretish-extension-share"
 date = "2026-11-18"
 commits = ["739edd4", "c1a35b6"]
 purpose = "`lean-remove`, `remove-no-<f>`, `lean`, `only-remove` and `only-<f>` on rad and lift-plus-cruise-full."
+note = "Copied from `~/projects/peredur-ext-share` on 2026-11-18. The paper has not read it since `00885da` (2026-11-22). A backup is in `~/backups/peredur-experiments/` on av2 and av3, apart from the hosts' own per-host halves at the campaign paths."
+superseded_by = "final-engine-large"
+
+[[set]]
+name = "fretish-exchange-rerun"
+location = "~/projects/peredur-exchange-rerun/experiments"
+paths = ["results-fretish-exchange-rerun", "results-fretish-exchange-rerun.csv", "results-fretish-exchange-rerun-large.csv", "results-fretish-exchange-rerun-vent.csv"]
+paper = "ext"
+status = "superseded"
+question = "RQ1, RQ2, RQ3"
+campaign = "2026-11-18-fretish-exchange-rerun"
+date = "2026-11-18"
+commits = ["e117a76"]
+purpose = "Every gated arm under the gate's exchange mode (`remove-exchange` = `full`, `lean-exchange` = `no-remove`, `remove-no-climb-exchange`, `remove-no-blame-exchange`, `only-gate-exchange`), with `remove-no-gate` and `base` under the same load, on the small set and rad's cores; the same arms less `base` on rad and lift-plus-cruise-full; `full` alone on ventilator-controller."
+note = "Collected on 2026-11-19 into the campaign's worktree, run trees for the small set only. The paper has not read it since `00885da` (2026-11-22). The large and ventilator-controller run trees stay on av2 and av3 under `~/projects/counter/experiments`. Every ventilator-controller run reached the 7200 s cap and wrote no run.json; the deadline rerun meant to record its counters (2026-11-19-fretish-exchange-vent-deadline) was cancelled, and the paper labels the older figure."
+superseded_by = "final-engine"
 
 [[set]]
 name = "fretish-order-only-remove-pooled"
-location = "~/projects/peredur-removal-pooled/experiments"
-paths = ["2026-11-17-fretish-order-only-remove-pooled", "fretish-order-only-remove-pooled", "fretish-order-only-remove-pooled-reduced", "results-fretish-order-only-remove-pooled-runs"]
+paths = ["fretish-order-only-remove-pooled", "fretish-order-only-remove-pooled-reduced", "results-fretish-order-only-remove-pooled-runs"]
 paper = "ext"
-status = "cited"
+status = "superseded"
 question = "RQ2 strength and diversity"
 campaign = "2026-11-17-fretish-order-only-remove-pooled"
 date = "2026-11-17"
 purpose = "Pooled pass of `only-remove` against `base`."
-note = "Source of `data/pooled-share-remove.csv` and `data/pooled-balls-remove.csv`."
+note = "Source of `data/pooled-share-remove.csv` and `data/pooled-balls-remove.csv`. Copied from `~/projects/peredur-removal-pooled` on 2026-11-18. The paper has not read it since `00885da` (2026-11-22). A backup is in `~/backups/peredur-experiments/` on av2 and av3, apart from the hosts' own per-host halves at the campaign paths. The campaign definition `2026-11-17-fretish-order-only-remove-pooled` is on its campaign branch."
+superseded_by = "final-engine-pooled"
 
 [[set]]
 name = "fretish-order-pooled-joint"
@@ -246,71 +272,103 @@ name = "fretish-order-removal-pooled"
 location = "~/projects/peredur-removal-pooled/experiments"
 paths = ["2026-11-17-fretish-order-removal-pooled", "fretish-order-removal-pooled", "fretish-order-removal-pooled-reduced", "2026-11-17-fretish-order-remove-no-f-pooled", "fretish-order-remove-no-f-pooled", "fretish-order-remove-no-f-pooled-reduced", "results-fretish-order-remove-no-f-exchange"]
 paper = "ext"
-status = "supporting"
+status = "superseded"
 question = "RQ2 strength and diversity"
 date = "2026-11-17"
 purpose = "Pooled passes of the removal arms (`full`, `no-<f>`, `no-remove`)."
-note = "Not yet merged into the paper: its draft keeps pooled `full` and `no-<f>` as to-dos."
+note = "The paper has not read it since `00885da` (2026-11-22)."
 
-# --- Extension paper: final engine (collected 2026-11-21, not yet imported) ---
+# --- Extension paper: final engine (imported by the paper on 2026-11-22) -------
+superseded_by = "final-engine-pooled"
 
 [[set]]
 name = "final-engine"
 paths = ["2026-11-20-final-engine", "configs-final-engine", "configs-final-engine-vent", "results-final-engine", "results-final-engine.csv"]
 paper = "ext"
-status = "supporting"
+status = "cited"
 question = "RQ1, RQ2"
 campaign = "2026-11-20-final-engine"
 date = "2026-11-21"
 commits = ["8948138c"]
 purpose = "Sweep F on the final engine (blame on in every arm, four mechanisms with novelty): 12 arms x 30 seeds on the 9 small specs and rad's 10 cores, 6,840 runs."
-note = "Meant to replace every run-derived set the paper cites once the user imports it. configs-final-engine-vent is declared but not run: ventilator-controller counts as a timeout for every arm (user, 2026-11-20)."
+note = "configs-final-engine-vent is declared but not run: ventilator-controller counts as a timeout for every arm (user, 2026-11-20). The results are in `~/projects/peredur-final-engine/experiments` (15 GB, not copied here); the paper's `import_data.py` reads them there as `FINAL_CHECKOUT`. Tag `provenance/2026-11-20-final-engine` holds the campaign branch."
+absent_ok = true
 
 [[set]]
 name = "final-engine-large"
 paths = ["2026-11-20-final-engine-large", "configs-final-engine-large", "results-final-engine-large", "results-final-engine-large.csv", "results-final-engine-lpc", "results-final-engine-lpc.csv"]
 paper = "ext"
-status = "supporting"
+status = "cited"
 question = "RQ3"
 campaign = "2026-11-20-final-engine-large"
 date = "2026-11-21"
 commits = ["8948138c"]
 purpose = "The final engine on rad (12 arms x 10 seeds, 120 runs) and lift-plus-cruise-full (full, base and random x 10 seeds, 30 runs)."
+absent_ok = true
+note = "The results are in `~/projects/peredur-final-engine/experiments` (15 GB, not copied here); the paper's `import_data.py` reads them there as `FINAL_CHECKOUT`. Tag `provenance/2026-11-20-final-engine` holds the campaign branch."
 
 [[set]]
 name = "final-engine-seeded"
 paths = ["results-final-engine-seeded", "results-final-engine-seeded.csv"]
 paper = "ext"
-status = "supporting"
+status = "cited"
 question = "seeded corpus"
 campaign = "2026-11-20-final-engine-large"
 date = "2026-11-21"
 commits = ["8948138c"]
 purpose = "The final engine on the 130 sideways seeded mutants: 10 arms (no random) x 5 seeds, 6,500 runs."
+absent_ok = true
+note = "The results are in `~/projects/peredur-final-engine/experiments` (15 GB, not copied here); the paper's `import_data.py` reads them there as `FINAL_CHECKOUT`. Tag `provenance/2026-11-20-final-engine` holds the campaign branch."
 
 [[set]]
 name = "final-engine-pooled"
 paths = ["2026-11-20-final-engine-pooled", "final-engine-pooled-reduced"]
 paper = "ext"
-status = "supporting"
+status = "cited"
 question = "RQ2 strength and diversity"
 campaign = "2026-11-20-final-engine-pooled"
 date = "2026-11-21"
 commits = ["47c0b76a"]
 purpose = "Pooled pass of the final engine on the specifications: 18 subjects, the ten nsga2-apportion arms and all 45 contrasts (strength, pooled ball radii at K = 3, share and joint-front reach, with seed-half controls)."
-note = "The reduced outputs are av2's, collected 2026-11-21. The pooled inputs (design, subject lists, members) are untracked; their sums are in the campaign's PLAN log."
+note = "The reduced outputs are av2's, collected 2026-11-21. The pooled inputs (design, subject lists, members) are untracked; their sums are in the campaign's PLAN log. The results are in `~/projects/peredur-final-engine/experiments` (15 GB, not copied here); the paper's `import_data.py` reads them there as `FINAL_CHECKOUT`. Tag `provenance/2026-11-20-final-engine` holds the campaign branch."
+absent_ok = true
 
 [[set]]
 name = "final-engine-seeded-pooled"
 paths = ["2026-11-20-final-engine-seeded-pooled", "final-engine-seeded-pooled-reduced"]
 paper = "ext"
-status = "supporting"
+status = "cited"
 question = "seeded corpus"
 campaign = "2026-11-20-final-engine-seeded-pooled"
 date = "2026-11-22"
 commits = ["acb3231d"]
 purpose = "Pooled pass of the final engine on the seeded corpus: 126 of the 130 sideways mutants (four fsm-lmcps mutants dropped, where an arm held 3 or fewer members), ten arms and all 45 contrasts."
-note = "The reduced outputs are av2's, collected 2026-11-22. The pooled inputs are untracked; their sums are in the final-engine PLAN log."
+note = "The reduced outputs are av2's, collected 2026-11-22. The pooled inputs are untracked; their sums are in the final-engine PLAN log. The results are in `~/projects/peredur-final-engine/experiments` (15 GB, not copied here); the paper's `import_data.py` reads them there as `FINAL_CHECKOUT`. Tag `provenance/2026-11-20-final-engine` holds the campaign branch."
+absent_ok = true
+
+[[set]]
+name = "seeded-corpus-sideways"
+paths = ["2026-11-18-seeded-corpus-sideways", "configs-fretish-seeded-sideways", "results-fretish-seeded-sideways", "results-fretish-seeded-sideways.csv"]
+paper = "ext"
+status = "cited"
+question = "Seeded corpus"
+campaign = "2026-11-18-seeded-corpus-sideways"
+date = "2026-11-19"
+commits = ["e117a76"]
+purpose = "The seeded corpus regenerated with three sideways fault classes (`swap-signal`, `flip-literal`, `reverse-implication`), admitting mutants incomparable with their base; 130 subjects, and their runs under the exchange arms."
+absent_ok = true
+note = "The paper's `import_data.py` copies the corpus files (subjects, mutants, probe) from `~/projects/peredur/.claude/worktrees/seeded-corpus-sideways` (`SEEDED_CHECKOUT`), where the results also are. Its runs are superseded by `final-engine-seeded`; the corpus itself is still cited."
+
+[[set]]
+name = "diversity-study"
+paths = ["2026-11-19-diversity-screen", "2026-11-19-diversity-screen-runs", "2026-11-19-diversity-screen-blame", "2026-11-19-diversity-followup", "2026-11-19-diversity-pooled", "2026-11-20-diversity-tiebreak", "configs-diversity-climb", "results-diversity-climb-blame", "results-diversity-climb-blame.csv", "results-diversity-screen-blame", "results-diversity-screen-blame.csv", "diversity-pooled-v2", "diversity-pooled-v2-reduced"]
+paper = "ext"
+status = "supporting"
+question = "Engine choice (novelty)"
+date = "2026-11-20"
+purpose = "The diversity screen, its 30-seed follow-up, the BLACK pooled pass over six arms and the cancelled novelty tie-break arm, which chose novelty for the paper's `full`; `2026-11-19-diversity-screen/REPORT.md` gives the verdicts."
+absent_ok = true
+note = "Results are in `~/projects/peredur-div-climb-campaign/experiments`; only the campaign directories are tracked. The screen tools are on the unmerged `feat/diversity-screen`. Tag `provenance/2026-11-20-final-engine` also holds these campaigns' commits."
 
 # --- Extension paper: development, pilots and inputs --------------------------
 
@@ -672,6 +730,8 @@ paper = "none"
 status = "development"
 date = "2026-07-10"
 purpose = "The earliest archived FRETISH sweeps (generations, population, fitness weights) on four specs."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "fretish-sweeps-2026-07-13"
@@ -681,6 +741,8 @@ status = "superseded"
 superseded_by = "factorial"
 date = "2026-07-13"
 purpose = "The same sweeps after an engine change; 130 of 889 repair rows have pruned run directories."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "factorial"
@@ -689,6 +751,8 @@ paper = "none"
 status = "development"
 date = "2026-07-14"
 purpose = "One-factor-at-a-time FRETISH screen (sweeps A-J); first showed the weakening filter hurts."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "cj-large"
@@ -697,7 +761,8 @@ paper = "none"
 status = "development"
 date = "2026-07-15"
 purpose = "The weakening filter as a crossed factor at 40 generations and population 1000 on FRETISH; turning it off raised implies_ideal."
-note = "20 GB, the largest set here."
+note = "20 GB. Deleted from this checkout on 2026-11-18."
+absent_ok = true
 
 [[set]]
 name = "genpop-sweeps"
@@ -706,6 +771,8 @@ paper = "none"
 status = "development"
 date = "2026-07-16"
 purpose = "Generation and population capacity sweeps on FRETISH and TLSF; the FRETISH ideal columns are stale lower bounds."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "metric"
@@ -714,6 +781,8 @@ paper = "none"
 status = "development"
 date = "2026-07-16"
 purpose = "Log against direct semantic-similarity metric, 800 FRETISH runs; the direct metric was retired on 2026-10-30."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "tlsf-genpop"
@@ -722,6 +791,8 @@ paper = "none"
 status = "development"
 date = "2026-07-17"
 purpose = "TLSF rerun testing the ltlsynt timeout guard (ltlsynt_timeout_ms = 500) later campaigns adopted."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "muc"
@@ -730,6 +801,8 @@ paper = "none"
 status = "development"
 date = "2026-07-21"
 purpose = "Monolithic against MUC-guided TLSF repair; MUC mode was removed on 2026-10-30."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "padd"
@@ -738,6 +811,8 @@ paper = "none"
 status = "development"
 date = "2026-07-22"
 purpose = "p_add_assumption sweep crossed with repair mode on five TLSF specs; a weak lever."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "arbiter-hp"
@@ -746,6 +821,8 @@ paper = "none"
 status = "development"
 date = "2026-07-23"
 purpose = "Sweep-W arms on the arbiter family; no repairs in any cell."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "arbiter-padd"
@@ -754,6 +831,8 @@ paper = "none"
 status = "development"
 date = "2026-07-23"
 purpose = "p_add 0.1 to 0.8 crossed with filter arms on arbiter; no repairs, so p_add is not what unlocks arbiter."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "wellsep"
@@ -762,6 +841,8 @@ paper = "none"
 status = "development"
 date = "2026-07-23"
 purpose = "The well-separation filter crossed with output assumptions on TLSF; inert until output assumptions fire."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "libspot-soak"
@@ -770,6 +851,8 @@ paper = "none"
 status = "development"
 date = "2026-08-03"
 purpose = "24-hour soak of in-process libspot on av2 and av3, 2,656 runs: drift, leaks or differing answers."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "wellsep-timing"
@@ -778,6 +861,8 @@ paper = "none"
 status = "development"
 date = "2026-08-06"
 purpose = "Well-separation every generation, once at the end, or never; every generation is cheaper."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "elitism"
@@ -786,6 +871,8 @@ paper = "none"
 status = "development"
 date = "2026-08-07"
 purpose = "elitism_rate 0 against 0.1 under nsga2-truncate on FRETISH and TLSF; kept 0.1 on cost."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "arbiter-probe"
@@ -795,6 +882,8 @@ status = "development"
 date = "2026-08-10"
 commits = ["b093374f"]
 purpose = "Whether nsga2-apportion's yield on arbiter is family-wide; only examples/arbiter unlocks."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "seldefault"
@@ -804,6 +893,8 @@ status = "development"
 date = "2026-08-13"
 commits = ["7500759a"]
 purpose = "The selection-default A/B on FRETISH and TLSF that led to the nsga2-apportion default."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18; a per-host copy remains on av2 and av3 under `~/projects/counter/experiments`."
 
 [[set]]
 name = "ops-grammar"
@@ -813,6 +904,8 @@ status = "development"
 date = "2026-08-20"
 commits = ["201d925d"]
 purpose = "The repaired mutation and crossover grammar; TLSF repair rate 0.333 to 0.388 (p = 0.047), FRETISH 0.667 to 0.717 (p = 0.146)."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18; a per-host copy remains on av2 and av3 under `~/projects/counter/experiments`."
 
 [[set]]
 name = "constrained-dom"
@@ -821,6 +914,8 @@ paper = "none"
 status = "development"
 date = "2026-09-08"
 purpose = "Constrained-domination NSGA-II, 630 paired cases; the primary was null (McNemar p = 0.68), so it did not become the default."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18; a per-host copy remains on av2 and av3 under `~/projects/counter/experiments`."
 
 [[set]]
 name = "gradsel-fret-m"
@@ -830,6 +925,8 @@ status = "development"
 date = "2026-09-12"
 commits = ["c365aa51"]
 purpose = "FRETISH selection by status grading at the matched operating point, five families, 30 seeds."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18; a per-host copy remains on av2 under `~/projects/counter/experiments`."
 
 [[set]]
 name = "fretish-frontier-approx"
@@ -839,6 +936,8 @@ status = "superseded"
 superseded_by = "fretish-order-pooled-v2"
 date = "2026-10-01"
 purpose = "Offline placement filling four rows of the October directed-against-uniform frontier table, a study cut on 2026-11-12."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "keyword-weight"
@@ -847,6 +946,8 @@ paper = "none"
 status = "development"
 date = "2026-10-06"
 purpose = "Offline re-score of 4,694 FRETISH candidates under keyword-similarity weights 0.25 to 0.75; they agree, so 0.5 stayed."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
 
 [[set]]
 name = "mrs-screen-rate"
@@ -856,3 +957,5 @@ status = "development"
 date = "2026-10-06"
 commits = ["b694a000"]
 purpose = "How often the MRS whole-specification screen fires, from 120 s runs over TLSF and FRETISH subjects."
+absent_ok = true
+note = "Deleted from this checkout on 2026-11-18."
