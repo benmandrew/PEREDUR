@@ -175,6 +175,63 @@ inline std::optional<OrderCrossoverKind> fretish_crossover(
     return kind;
 }
 
+/// The slot coverage over @p original that `genetic.slot_coverage` asks for,
+/// counted once per generation and before any draw, or null where the key is
+/// off or @p Spec is not FRETISH.
+template <typename Spec>
+const SlotCoverage* generation_coverage(
+    [[maybe_unused]] const Config& cfg,
+    [[maybe_unused]] DiversityState* diversity,
+    [[maybe_unused]] const Spec* original) {
+    if constexpr (std::is_same_v<Spec, Specification>) {
+        if (cfg.slot_coverage && diversity != nullptr && original != nullptr) {
+            return &diversity->slot_coverage(*original);
+        }
+    }
+    return nullptr;
+}
+
+/// Simplifies @p offspring, bred from @p parent at slot @p index, onto
+/// @p offspring_pop and records it in every FRETISH counter it touches.
+/// Draws nothing.
+template <typename Spec>
+void push_offspring(
+    [[maybe_unused]] const Config& cfg,
+    [[maybe_unused]] const Scored<Spec>& parent,
+    [[maybe_unused]] std::size_t index, Spec offspring,
+    [[maybe_unused]] bool crossed,
+    [[maybe_unused]] std::optional<OrderCrossoverKind> order_kind,
+    [[maybe_unused]] bool stepped,
+    [[maybe_unused]] std::optional<std::size_t> status_objective,
+    [[maybe_unused]] DiversityState* diversity,
+    [[maybe_unused]] std::vector<OffspringOrigin>* origins,
+    std::vector<Spec>& offspring_pop) {
+    if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
+        offspring_pop.push_back(tlsf_simplify(std::move(offspring)));
+    } else {
+        // The lineage reads the edit before simplification, which would
+        // otherwise show slots the mutation never touched.
+        const bool lineage = cfg.flip_tabu > 0 && diversity != nullptr &&
+                             !crossed && status_objective.has_value() &&
+                             !(offspring == parent.specification);
+        std::optional<Spec> edited;
+        if (lineage) {
+            edited = offspring;
+        }
+        offspring_pop.push_back(simplify_offspring(std::move(offspring)));
+        if (lineage) {
+            diversity->note_offspring(
+                parent.specification,
+                status_proves_realizable(parent, status_objective), *edited,
+                offspring_pop.back());
+        }
+        OrderCrossoverStats::note_offspring(order_kind, offspring_pop.back());
+        DirectionGateStats::note_offspring(stepped, offspring_pop.back());
+        record_origin(origins, parent, index, offspring_pop.back(),
+                      status_objective);
+    }
+}
+
 template <typename Spec>
 std::vector<Spec> breed_offspring(const Config& cfg,
                                   const std::vector<Scored<Spec>>& sorted_pop,
@@ -189,14 +246,8 @@ std::vector<Spec> breed_offspring(const Config& cfg,
     // Read once: an inactive budget must not reach the loop body at all, or an
     // unbudgeted run pays a specification comparison and a clock read per slot.
     const bool budgeted = budget != nullptr && budget->active();
-    // Counted once per generation, before any draw, and only where the key
-    // asks for it.
-    [[maybe_unused]] const SlotCoverage* coverage = nullptr;
-    if constexpr (std::is_same_v<Spec, Specification>) {
-        if (cfg.slot_coverage && diversity != nullptr && original != nullptr) {
-            coverage = &diversity->slot_coverage(*original);
-        }
-    }
+    [[maybe_unused]] const SlotCoverage* coverage =
+        generation_coverage(cfg, diversity, original);
     for (std::size_t i = 0; i < offspring_n; ++i) {
         // Tested between slots rather than after the whole generation, which is
         // where AuRUS tests it: its mutation and crossover loops both carry
@@ -240,31 +291,9 @@ std::vector<Spec> breed_offspring(const Config& cfg,
         if (budgeted && !(offspring == sorted_pop[i].specification)) {
             budget->count_offspring();
         }
-        if constexpr (std::is_same_v<Spec, tlsf::Specification>) {
-            offspring_pop.push_back(tlsf_simplify(std::move(offspring)));
-        } else {
-            // The lineage reads the edit before simplification, which would
-            // otherwise show slots the mutation never touched.
-            const bool lineage = cfg.flip_tabu > 0 && diversity != nullptr &&
-                                 !crossed && status_objective.has_value() &&
-                                 !(offspring == sorted_pop[i].specification);
-            std::optional<Spec> edited;
-            if (lineage) {
-                edited = offspring;
-            }
-            offspring_pop.push_back(simplify_offspring(std::move(offspring)));
-            if (lineage) {
-                diversity->note_offspring(
-                    sorted_pop[i].specification,
-                    status_proves_realizable(sorted_pop[i], status_objective),
-                    *edited, offspring_pop.back());
-            }
-            OrderCrossoverStats::note_offspring(order_kind,
-                                                offspring_pop.back());
-            DirectionGateStats::note_offspring(stepped, offspring_pop.back());
-            record_origin(origins, sorted_pop[i], i, offspring_pop.back(),
-                          status_objective);
-        }
+        push_offspring(cfg, sorted_pop[i], i, std::move(offspring), crossed,
+                       order_kind, stepped, status_objective, diversity,
+                       origins, offspring_pop);
     }
     return offspring_pop;
 }

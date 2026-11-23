@@ -166,8 +166,8 @@ void nsga2_sort(std::vector<Scored<Spec>>& population,
             ranks, distances, options.tiebreak, options.report, options.keep);
         std::vector<Scored<Spec>> sorted;
         sorted.reserve(population.size());
-        for (const std::size_t i : order) {
-            sorted.push_back(std::move(population[i]));
+        for (const std::size_t index : order) {
+            sorted.push_back(std::move(population[index]));
         }
         population = std::move(sorted);
         return;

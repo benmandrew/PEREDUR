@@ -27,6 +27,8 @@ constexpr std::string_view k_test_suite = "diversity";
 TEST(test_specification_distance_counts_differing_slots) {
     const Specification lhs({assumption0()}, {guarantee0(), guarantee1()},
                             inputs(), outputs());
+    // A copy, so the test compares two distinct objects.
+    // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
     const Specification same = lhs;
     const Specification one_guarantee({assumption0()},
                                       {guarantee0(), removed(guarantee1())},
@@ -36,12 +38,13 @@ TEST(test_specification_distance_counts_differing_slots) {
         {guarantee0(), guarantee1()}, inputs(), outputs());
     expect(specification_distance(lhs, same) == 0.0,
            "specification_distance: equal specifications are at 0");
-    expect(std::abs(specification_distance(lhs, one_guarantee) - 1.0 / 3.0) <
+    expect(std::abs(specification_distance(lhs, one_guarantee) - (1.0 / 3.0)) <
                1e-12,
            "specification_distance: a tombstone differs in one of 3 slots");
-    expect(std::abs(specification_distance(lhs, appended) - 1.0 / 4.0) < 1e-12,
-           "specification_distance: an appended assumption differs in one of "
-           "4 slots");
+    expect(
+        std::abs(specification_distance(lhs, appended) - (1.0 / 4.0)) < 1e-12,
+        "specification_distance: an appended assumption differs in one of "
+        "4 slots");
     expect(specification_distance(Specification(), Specification()) == 0.0,
            "specification_distance: no slots is distance 0");
 }
@@ -443,6 +446,7 @@ Scored<Specification> scored_at(Specification spec, double first,
 
 std::vector<double> firsts(const std::vector<Scored<Specification>>& pop) {
     std::vector<double> values;
+    values.reserve(pop.size());
     for (const Scored<Specification>& scored : pop) {
         values.push_back(scored.objectives[1]);
     }

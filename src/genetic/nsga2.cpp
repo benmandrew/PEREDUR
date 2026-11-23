@@ -177,9 +177,9 @@ std::vector<double> farthest_point_scores(const std::vector<std::size_t>& ranks,
             const std::size_t picked = open[best];
             open.erase(open.begin() + static_cast<std::ptrdiff_t>(best));
             scores[front[picked]] = static_cast<double>(open.size() + 1);
-            for (const std::size_t k : open) {
-                nearest[k] =
-                    std::min(nearest[k], distance(front[picked], front[k]));
+            for (const std::size_t slot : open) {
+                nearest[slot] = std::min(nearest[slot],
+                                         distance(front[picked], front[slot]));
             }
         }
         kept.insert(kept.end(), front.begin(), front.end());
