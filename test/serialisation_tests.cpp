@@ -579,4 +579,53 @@ TEST(test_scoped_requirement_needs_a_mode) {
            "be rejected");
 }
 
+nlohmann::json formula_mode_spec(const std::string& mode,
+                                 const std::vector<std::string>& modes) {
+    return {{"assumptions", nlohmann::json::array()},
+            {"guarantees",
+             {{{"condition", "a"},
+               {"condition-type", "continual"},
+               {"response", "b"},
+               {"timing", {{"type", "Immediately"}}},
+               {"scope", {{"type", "In"}, {"mode", mode}}}}}},
+            {"in_atoms", {"a", "p"}},
+            {"out_atoms", {"b", "q"}},
+            {"modes", modes}};
+}
+
+TEST(test_formula_mode_atoms_must_be_declared) {
+    expect(!validate_specification_json(formula_mode_spec("p | q & !m", {"m"}))
+                .has_value(),
+           "validate_specification_json: a formula mode over an input, an "
+           "output and a declared mode must be accepted");
+    const auto err =
+        validate_specification_json(formula_mode_spec("p | z", {}));
+    expect(err.has_value() && err->find("'z'") != std::string::npos,
+           "validate_specification_json: a formula mode over an undeclared "
+           "atom must be rejected, naming it");
+    expect(validate_specification_json(formula_mode_spec("p | F q", {}))
+               .has_value(),
+           "validate_specification_json: a temporal formula mode must be "
+           "rejected");
+    expect(
+        validate_specification_json(formula_mode_spec("p |", {})).has_value(),
+        "validate_specification_json: a malformed formula mode must be "
+        "rejected");
+}
+
+TEST(test_formula_mode_loads_in_one_spelling) {
+    const Specification spec =
+        formula_mode_spec("((p | q))", {}).get<Specification>();
+    expect(spec.m_guarantees.at(0).m_scope.m_mode == "(p) | (q)",
+           "from_json(Scope): a formula mode must load in Formula::to_string "
+           "spelling, got " +
+               spec.m_guarantees.at(0).m_scope.m_mode);
+    const nlohmann::json written = spec;
+    expect(written.at("guarantees").at(0).at("scope").at("mode") == "(p) | (q)",
+           "to_json(Scope): a formula mode must be written without the atom "
+           "prefix");
+    expect(written.get<Specification>() == spec,
+           "a formula mode must round-trip");
+}
+
 }  // namespace

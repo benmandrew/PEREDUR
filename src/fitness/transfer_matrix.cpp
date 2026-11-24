@@ -60,9 +60,11 @@ std::size_t count_joint_atoms(const Requirement& req1,
     // error in the count: the mode still reaches the automaton's atomic
     // propositions, so n_mentioned in count_guard_models exceeds n_total_atoms
     // and its unsigned subtraction wraps.
+    // A formula mode adds each of its atoms, which is what reaches the
+    // automaton, rather than its spelling.
     const auto add_mode = [&atoms](const Requirement& req) {
-        if (!req.m_scope.is_global()) {
-            atoms.insert(req.m_scope.m_mode);
+        for (const std::string& atom : scope_mode_atoms(req.m_scope)) {
+            atoms.insert(atom);
         }
     };
     add_mode(req1);

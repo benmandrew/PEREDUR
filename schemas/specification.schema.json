@@ -85,7 +85,7 @@
           ]
         },
         "mode": {
-          "description": "Name of the mode, which must appear in the specification's modes list. Required for every type but Global, and forbidden for Global.",
+          "description": "The mode: a signal name, which must appear in the specification's modes list, or a propositional formula (such as \"pcv_mode | psv_mode\") whose every atom appears in modes, in_atoms or out_atoms. Required for every type but Global, and forbidden for Global.",
           "type": "string",
           "minLength": 1
         }

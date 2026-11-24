@@ -910,4 +910,77 @@ TEST(test_requirement_implies_trigger_condition_at_coincidence) {
            "requirement_implies: a trigger condition away from a "
            "coincidence must stay unproved");
 }
+
+// Replaces every occurrence of @p target in @p text with @p replacement.
+std::string replace_all(std::string text, const std::string& target,
+                        const std::string& replacement) {
+    for (std::size_t at = text.find(target); at != std::string::npos;
+         at = text.find(target, at + replacement.size())) {
+        text.replace(at, target.size(), replacement);
+    }
+    return text;
+}
+
+// A formula mode lowers to the bare-mode lowering with the formula, bracketed,
+// in place of the mode. The bare mode `zmode` occurs in no other atom, so a
+// plain text replacement is exact.
+TEST(test_formula_mode_lowering_substitutes_the_formula) {
+    const std::string formula = canonical_mode("p | (q & !r)");
+    for (const ScopeCase& scope_case : scope_cases()) {
+        if (scope_case.m_kind == ScopeKind::Global) {
+            continue;
+        }
+        for (const Timing& timing : timing_cases()) {
+            for (const ConditionType ctype :
+                 {ConditionType::Trigger, ConditionType::Continual}) {
+                const auto lower = [&](const std::string& mode) {
+                    return Requirement(Formula("c"), Formula("x"), timing,
+                                       ctype, /*weakenable=*/true,
+                                       /*removed=*/false,
+                                       Scope{scope_case.m_kind, mode});
+                };
+                const Requirement bare = lower("zmode");
+                const Requirement over_formula = lower(formula);
+                expect(over_formula.m_ltl == replace_all(bare.m_ltl, "zmode",
+                                                         "(" + formula + ")"),
+                       std::string("scope: a formula mode must lower as the "
+                                   "bare mode with the formula substituted, "
+                                   "under ") +
+                           scope_case.m_name + ": " + over_formula.m_ltl);
+            }
+        }
+    }
+}
+
+TEST(test_atom_prefix_reaches_formula_mode_atoms) {
+    const Requirement req(Formula("c"), Formula("x"), timing::always(),
+                          ConditionType::Continual, /*weakenable=*/true,
+                          /*removed=*/false,
+                          Scope{ScopeKind::In, canonical_mode("p | !q")});
+    const Requirement tagged = add_atom_prefix(req);
+    const std::string prefix(k_atom_prefix);
+    expect(
+        tagged.m_scope.m_mode == "(" + prefix + "p) | (!(" + prefix + "q))",
+        "scope: add_atom_prefix must tag every atom of a formula mode, got " +
+            tagged.m_scope.m_mode);
+    expect(scope_mode_atoms(tagged.m_scope) ==
+               std::vector<std::string>{prefix + "p", prefix + "q"},
+           "scope: the tagged formula mode must name the tagged atoms");
+    expect(strip_atom_prefix(tagged) == req,
+           "scope: strip_atom_prefix must invert the tagging of a formula "
+           "mode");
+}
+
+TEST(test_bare_mode_is_unchanged_by_canonical_mode) {
+    for (const char* mode : {"m", "standby_mode", "Grant"}) {
+        expect(
+            is_bare_mode(mode) && canonical_mode(mode) == mode,
+            std::string("scope: a bare mode must keep its spelling: ") + mode);
+        expect(scope_mode_atoms(Scope{ScopeKind::In, mode}) ==
+                   std::vector<std::string>{mode},
+               std::string("scope: a bare mode is its own one atom: ") + mode);
+    }
+    expect(!is_bare_mode("a | b") && !is_bare_mode(""),
+           "scope: a formula and the empty string are not bare modes");
+}
 }  // namespace

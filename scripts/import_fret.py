@@ -26,10 +26,10 @@ rule below matches the formula FRET itself emits (`semantics.ft`):
 - `=>` becomes `->`, and `TRUE`/`FALSE` become `true`/`false`.
 - Names become snake_case, since SPOT mishandles uppercase inputs, and `%`
   becomes `_pct`: `measureO2%` is `measure_o2_pct`.
-- A scope keeps its kind and mode. A formula mode such as `in (a | b)` gets
-  a fresh output atom, `mode_a_or_b`, defined by a non-weakenable guarantee
-  `G(mode_a_or_b <-> (a | b))`. The definition is exact: the system sees each
-  step's inputs before it chooses its outputs.
+- A scope keeps its kind and mode. A formula mode such as `in (b | a)` stays
+  a formula, written as PEREDUR stores it, `(a) | (b)`: operands bracketed
+  and each chain of `&` or `|` sorted, so one formula has one spelling. Its
+  atoms are read, like a condition's, and are not added to `modes`.
 - A mode that a requirement also mentions, such as one the controller sets,
   is declared as an atom too and takes that atom's side. A mode only scopes
   name is a pure mode, which PEREDUR reads as an input, unless an Output
@@ -145,6 +145,77 @@ def strip_parens(expr):
                 return expr
         expr = expr[1:-1].strip()
     return expr
+
+
+def canonical_mode(formula, reqid):
+    """`formula`, a propositional formula over `&`, `|`, `!` and brackets,
+    in the spelling PEREDUR stores a formula mode in (`Formula::to_string`):
+    every operand bracketed, `!(x)`, `(x) & (y)`. The operands of a chain of
+    `&` or `|` are sorted, so `a | b` and `b | a` give one string."""
+    toks = re.findall(r"[A-Za-z_][A-Za-z0-9_]*|[&|!()]|\S", formula)
+    pos = 0
+
+    def peek():
+        return toks[pos] if pos < len(toks) else None
+
+    def take(expected=None):
+        nonlocal pos
+        tok = peek()
+        if tok is None or (expected and tok != expected):
+            raise FretImportError(f"{reqid}: cannot read formula mode "
+                                  f"{formula!r}")
+        pos += 1
+        return tok
+
+    def chain(op, operand):
+        kids = [operand()]
+        while peek() == op:
+            take(op)
+            kids.append(operand())
+        return ("chain", op, kids) if len(kids) > 1 else kids[0]
+
+    def disj():
+        return chain("|", conj)
+
+    def conj():
+        return chain("&", neg)
+
+    def neg():
+        if peek() == "!":
+            take("!")
+            return ("not", neg())
+        if peek() == "(":
+            take("(")
+            node = disj()
+            take(")")
+            return node
+        tok = take()
+        if not IDENT.fullmatch(tok):
+            raise FretImportError(f"{reqid}: unsupported operator {tok!r} "
+                                  f"in formula mode {formula!r}")
+        return ("atom", tok)
+
+    def flatten(node, op):
+        if node[0] == "chain" and node[1] == op:
+            return [leaf for k in node[2] for leaf in flatten(k, op)]
+        return [node]
+
+    def render(node):
+        if node[0] == "atom":
+            return node[1]
+        if node[0] == "not":
+            return f"!({render(node[1])})"
+        op = node[1]
+        parts = sorted(render(k) for k in flatten(node, op))
+        out = parts[0]
+        for part in parts[1:]:
+            out = f"({out}) {op} ({part})"
+        return out
+
+    tree = disj()
+    if peek() is not None:
+        raise FretImportError(f"{reqid}: cannot read formula mode {formula!r}")
+    return render(tree)
 
 
 class Node:
@@ -292,8 +363,6 @@ class Converter:
         self.labels = collections.defaultdict(set)
         self.roles = collections.defaultdict(set)
         self.modes = set()
-        # Each formula mode's fresh atom, mapped to the formula it names.
-        self.defined = {}
         self.original = {}
         self.notes = collections.defaultdict(list)
         self.atomise, self.merge_case = atomise, merge_case
@@ -479,30 +548,17 @@ class Converter:
         if SCOPES[kind] is None:
             return None
         mode = self.formula(s["scope_mode"], reqid)
-        if not IDENT.fullmatch(mode):
-            mode = self.define(mode, reqid)
-        self.modes.add(mode)
-        return {"type": SCOPES[kind], "mode": mode}
-
-    def define(self, formula, reqid):
-        """A fresh output atom naming the formula mode `formula`.
-
-        Its definition `G(name <-> formula)` is exact as a guarantee: the
-        system sees each step's inputs before it chooses its outputs, so it
-        can always match the formula, and can never do otherwise.
-        """
-        words = re.sub(r"\s+", "_", formula.replace("|", " or ")
-                       .replace("&", " and ").replace("!", " not ")
-                       .replace("(", " ").replace(")", " ")).strip("_")
-        name = f"mode_{words}"
-        if self.defined.get(name, formula) != formula or name in self.original:
-            raise FretImportError(f"{reqid}: formula mode {formula!r} would "
-                                  f"be named {name!r}, which is taken")
-        self.defined[name] = formula
-        for a in set(IDENT.findall(formula)) - LITERALS:
+        if IDENT.fullmatch(mode):
+            self.modes.add(mode)
+            return {"type": SCOPES[kind], "mode": mode}
+        # A formula mode stays a formula. Its atoms are read like a
+        # condition's, so they are atoms with a side, and need no entry in
+        # `modes`.
+        canonical = canonical_mode(mode, reqid)
+        for a in set(IDENT.findall(mode)) - LITERALS:
             self.roles[a].add("read")
-        self.notes["formula mode"].append(f"{reqid}: {formula} -> {name}")
-        return name
+        self.notes["formula mode"].append(f"{reqid}: {canonical}")
+        return {"type": SCOPES[kind], "mode": canonical}
 
     def fields(self, r, component):
         """The FRET fields of `r` to convert, or None to leave `r` out."""
@@ -606,10 +662,6 @@ class Converter:
             self.labels[self.atom(v["variable_name"])].add(v["idType"])
 
     def partition(self, force_in, force_out):
-        taken = set(self.defined) & set(self.original)
-        if taken:
-            raise FretImportError(f"formula mode names {sorted(taken)} are "
-                                  f"also FRET names")
         def forced(a, patterns):
             return any(fnmatch.fnmatchcase(a, pat) for pat in patterns)
 
@@ -658,11 +710,11 @@ class Converter:
         # already reads as an input, unless a label or a flag makes it an
         # output. Declaring it an input atom as well would change nothing
         # but let mutation draw it into conditions and responses.
-        for m in sorted(self.modes - set(self.roles) - set(self.defined)):
+        for m in sorted(self.modes - set(self.roles)):
             if side(m):
                 outs.append(m)
                 self.notes["mode made an output by label or flag"].append(m)
-        return ins, sorted(outs + list(self.defined))
+        return ins, sorted(outs)
 
     def shared_side(self, atom, names, side, forced, force_in, force_out):
         """The side of a comparison over several variables, which only its
@@ -1105,9 +1157,6 @@ def load(paths, component, force_in, force_out, all_components=False,
                                {conv.atom(a) for a in force_out})
     spec = {"assumptions": [], "guarantees": conv.guarantees,
             "in_atoms": ins, "out_atoms": outs}
-    for name, formula in sorted(conv.defined.items()):
-        spec["guarantees"].append(always(f"{name} <-> ({formula})"))
-        conv.reqids.append(["mode definition"])
     for group in exclusive:
         names = sorted({conv.atom(n.strip()) for n in group.split(",")
                         if n.strip()})

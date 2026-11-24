@@ -2,11 +2,14 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <functional>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -267,6 +270,13 @@ std::string negated_timing_body(const Timing& timing,
     return timing_body(dual_timing(timing), negated, boundary);
 }
 
+// The mode as an operand of the scope templates. A bare name stands alone, so
+// every bare-mode lowering is the string it always was; a formula mode is
+// bracketed, since the templates place the mode beside `&`, `->` and `X`.
+std::string mode_operand(const std::string& mode) {
+    return is_bare_mode(mode) ? mode : "(" + mode + ")";
+}
+
 // The boundary marker whose truth ends the scope's interval, or the empty
 // string where the interval runs to the end of the trace and nothing is ever
 // discharged early.
@@ -278,11 +288,11 @@ std::string scope_boundary(const Scope& scope) {
             return "";
         case ScopeKind::In:
         case ScopeKind::OnlyAfter:
-            return end_of_mode(scope.m_mode);
+            return end_of_mode(mode_operand(scope.m_mode));
         case ScopeKind::NotIn:
         case ScopeKind::Before:
         case ScopeKind::OnlyIn:
-            return start_of_mode(scope.m_mode);
+            return start_of_mode(mode_operand(scope.m_mode));
     }
     assert(false);
     __builtin_unreachable();
@@ -291,7 +301,7 @@ std::string scope_boundary(const Scope& scope) {
 // Places the conditioned obligation @p inner at the start of the scope's
 // interval, and at every later re-entry where the interval repeats.
 std::string scope_wrap(const Scope& scope, const std::string& inner) {
-    const std::string& mode = scope.m_mode;
+    const std::string mode = mode_operand(scope.m_mode);
     const std::string som = start_of_mode(mode);
     const std::string eom = end_of_mode(mode);
     switch (scope.m_kind) {
@@ -392,6 +402,44 @@ bool operator<(const Scope& lhs, const Scope& rhs) {
 
 bool operator==(const Scope& lhs, const Scope& rhs) {
     return lhs.m_kind == rhs.m_kind && lhs.m_mode == rhs.m_mode;
+}
+
+bool is_bare_mode(const std::string& mode) {
+    return !mode.empty() && std::all_of(mode.begin(), mode.end(), [](char chr) {
+        return std::isalnum(static_cast<unsigned char>(chr)) != 0 || chr == '_';
+    });
+}
+
+std::string canonical_mode(const std::string& mode) {
+    if (is_bare_mode(mode)) {
+        return mode;
+    }
+    const std::optional<Formula> formula = Formula::try_parse(mode);
+    if (!formula || !formula->is_propositional()) {
+        throw std::invalid_argument("scope mode '" + mode +
+                                    "' is neither a signal name nor a "
+                                    "propositional formula");
+    }
+    return formula->to_string();
+}
+
+std::vector<std::string> scope_mode_atoms(const Scope& scope) {
+    if (scope.is_global()) {
+        return {};
+    }
+    if (is_bare_mode(scope.m_mode)) {
+        return {scope.m_mode};
+    }
+    std::unordered_set<std::string> found;
+    collect_atoms(Formula(scope.m_mode), found);
+    std::vector<std::string> atoms;
+    for (const std::string& name : found) {
+        if (!is_constant_atom(name)) {
+            atoms.push_back(name);
+        }
+    }
+    std::sort(atoms.begin(), atoms.end());
+    return atoms;
 }
 
 bool is_only_scope(ScopeKind kind) {
@@ -734,7 +782,12 @@ Scope rewrite_scope_mode(
     if (scope.is_global()) {
         return scope;
     }
-    return Scope{scope.m_kind, transform(scope.m_mode)};
+    if (is_bare_mode(scope.m_mode)) {
+        return Scope{scope.m_kind, transform(scope.m_mode)};
+    }
+    return Scope{
+        scope.m_kind,
+        rewrite_atom_names(Formula(scope.m_mode), transform).to_string()};
 }
 
 // A stop condition is a formula over the specification's atoms, tagged like the
@@ -862,26 +915,27 @@ std::string to_string(ConditionType condition_type) {
 }
 
 std::string to_string(const Scope& scope) {
+    const std::string mode = mode_operand(scope.m_mode);
     switch (scope.m_kind) {
         case ScopeKind::Global:
             return "";
         case ScopeKind::In:
-            return "in " + scope.m_mode;
+            return "in " + mode;
         // FRET's grammar spells this one "except in" (or "unless in", or "when
         // not in"). A bare "not in" is a parse error there, so the internal
         // NotIn name and the FRETish text deliberately differ.
         case ScopeKind::NotIn:
-            return "except in " + scope.m_mode;
+            return "except in " + mode;
         case ScopeKind::Before:
-            return "before " + scope.m_mode;
+            return "before " + mode;
         case ScopeKind::After:
-            return "after " + scope.m_mode;
+            return "after " + mode;
         case ScopeKind::OnlyIn:
-            return "only in " + scope.m_mode;
+            return "only in " + mode;
         case ScopeKind::OnlyBefore:
-            return "only before " + scope.m_mode;
+            return "only before " + mode;
         case ScopeKind::OnlyAfter:
-            return "only after " + scope.m_mode;
+            return "only after " + mode;
     }
     assert(false);
     __builtin_unreachable();

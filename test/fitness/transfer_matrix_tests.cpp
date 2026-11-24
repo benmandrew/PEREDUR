@@ -506,4 +506,23 @@ TEST(test_count_traces_rounds_faithfully_above_64_bits) {
 }
 #endif
 
+// A formula mode's atoms reach the automaton one by one, so the count must
+// take them one by one. Counting the mode's spelling as a single atom leaves
+// n_mentioned above n_total_atoms, and count_guard_models asserts.
+TEST(test_formula_mode_atoms_are_counted) {
+    const Requirement req(Formula("c"), Formula("x"), timing::always(),
+                          ConditionType::Continual, /*weakenable=*/true,
+                          /*removed=*/false,
+                          Scope{ScopeKind::In, canonical_mode("p & q")});
+    expect(count_joint_atoms(req, req) == 4,
+           "count_joint_atoms: c, x, p and q make four atoms, got " +
+               std::to_string(count_joint_atoms(req, req)));
+    const std::size_t steps = 3;
+    const Count traces = count_traces(transfer_system_for(req), steps);
+    expect(std::isfinite(traces) && traces > 0 &&
+               traces < exact_power_of_two(4 * static_cast<int>(steps)),
+           "count_traces: a formula-mode requirement must count some, not "
+           "all, traces over its four atoms");
+}
+
 }  // namespace
