@@ -442,23 +442,22 @@ scoped = [req("F", scope={"type": "in"}, scope_mode="((a | b))",
 spec, conv = load({"requirements": scoped,
                    "variables": [var("labelledMode", "Output"),
                                  var("pureMode", "Input")]})
-check(spec["guarantees"][0]["scope"], {"type": "In", "mode": "mode_a_or_b"},
-      "a formula mode is named by a fresh atom")
-check(spec["guarantees"][-1], {"condition": "true",
-                               "condition-type": "continual",
-                               "response": "mode_a_or_b <-> (a | b)",
-                               "timing": {"type": "Always"},
-                               "weakenable": False},
-      "the fresh atom's definition is a non-weakenable guarantee")
-check(conv.reqids[-1], ["mode definition"], "--ids names the definition")
-check(spec["modes"], ["labelled_mode", "mode_a_or_b", "pure_mode",
-                      "standby_mode"], "every scope's mode is declared")
-check({"mode_a_or_b", "standby_mode", "labelled_mode"}
-      <= set(spec["out_atoms"]), True,
-      "the fresh atom, a mode a response sets and a mode labelled Output are "
-      "outputs")
+check(spec["guarantees"][0]["scope"], {"type": "In", "mode": "(a) | (b)"},
+      "a formula mode stays a formula, in PEREDUR's spelling")
+check(len(spec["guarantees"]), len(scoped),
+      "a formula mode adds no definition guarantee")
+check(spec["modes"], ["labelled_mode", "pure_mode", "standby_mode"],
+      "every bare scope mode is declared, and a formula mode is not")
+check({"standby_mode", "labelled_mode"} <= set(spec["out_atoms"]), True,
+      "a mode a response sets and a mode labelled Output are outputs")
 check({"a", "b"} <= set(spec["in_atoms"]), True,
       "a formula mode's atoms are read, so inputs by the role rule")
+check(I.canonical_mode("c & (b | a) & !d", "T"),
+      "((!(d)) & ((a) | (b))) & (c)",
+      "a formula mode's chains are flattened and sorted")
+check(I.canonical_mode("(a | b) | c", "T"),
+      I.canonical_mode("c | (b | a)", "T"),
+      "one formula mode has one spelling however it is bracketed")
 check("pure_mode" in spec["in_atoms"] + spec["out_atoms"], False,
       "a mode only scopes name stays a pure mode, even labelled Input")
 check(spec["guarantees"][4]["scope"], {"type": "After",
@@ -466,12 +465,14 @@ check(spec["guarantees"][4]["scope"], {"type": "After",
       "after keeps its kind")
 check(spec["guarantees"][4]["response"], "measure_o2_pct & y",
       "% in a name becomes _pct")
-rejects_with({"requirements": [
+spec, _ = load({"requirements": [
     req("G1", scope={"type": "in"}, scope_mode="((a | b) & c)",
         timing="always", post_condition="(x)"),
     req("G2", scope={"type": "in"}, scope_mode="(a | (b & c))",
-        timing="always", post_condition="(y)")], "variables": []},
-    "which is taken", "two groupings with one fresh name are rejected")
+        timing="always", post_condition="(y)")], "variables": []})
+check([g["scope"]["mode"] for g in spec["guarantees"]],
+      ["((a) | (b)) & (c)", "((b) & (c)) | (a)"],
+      "two groupings of one set of atoms stay two formula modes")
 
 spec, conv = load({"requirements": scoped,
                    "variables": [var("labelledMode", "Output")]},

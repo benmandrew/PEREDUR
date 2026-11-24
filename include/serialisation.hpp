@@ -143,7 +143,7 @@ inline void from_json(const nlohmann::json& jobj, Scope& scope) {
         scope.m_kind = kind;
         scope.m_mode = kind == ScopeKind::Global
                            ? std::string()
-                           : jobj.at("mode").get<std::string>();
+                           : canonical_mode(jobj.at("mode").get<std::string>());
         return;
     }
     throw std::invalid_argument("unknown scope type: " + type);
@@ -367,6 +367,14 @@ inline std::optional<std::string> validate_scope_json(
         scope.at("mode").get<std::string>().empty()) {
         return path + ".mode: must be a non-empty string";
     }
+    const std::string mode = scope.at("mode").get<std::string>();
+    if (!is_bare_mode(mode)) {
+        const std::optional<Formula> formula = Formula::try_parse(mode);
+        if (!formula || !formula->is_propositional()) {
+            return path + ".mode: '" + mode +
+                   "' is neither a signal name nor a propositional formula";
+        }
+    }
     return std::nullopt;
 }
 
@@ -414,7 +422,9 @@ inline std::optional<std::string> validate_requirement_json(
 
 /// Checks the declared modes against the scopes that use them. A mode may also
 /// be declared in `in_atoms` or `out_atoms`, and then takes that side (see
-/// `Specification::m_modes`).
+/// `Specification::m_modes`). A bare mode must be in `modes`; each atom of a
+/// formula mode must be in `modes`, `in_atoms` or `out_atoms`, so a pure mode
+/// inside a formula is still declared in `modes` and reaches the input side.
 ///
 /// This is the one cross-field check in the file. Nothing validates that a
 /// condition or response mentions only declared atoms, but a scope's mode has
@@ -431,6 +441,16 @@ inline std::optional<std::string> validate_modes_json(
         return std::find(declared.begin(), declared.end(), name) !=
                declared.end();
     };
+    std::vector<std::string> signals = declared;
+    for (const char* field : {"in_atoms", "out_atoms"}) {
+        if (jobj.contains(field)) {
+            const auto atoms = jobj.at(field).get<std::vector<std::string>>();
+            signals.insert(signals.end(), atoms.begin(), atoms.end());
+        }
+    }
+    const auto is_signal = [&signals](const std::string& name) {
+        return std::find(signals.begin(), signals.end(), name) != signals.end();
+    };
     for (const char* field : {"assumptions", "guarantees"}) {
         const nlohmann::json& reqs = jobj.at(field);
         for (std::size_t i = 0; i < reqs.size(); ++i) {
@@ -439,9 +459,21 @@ inline std::optional<std::string> validate_modes_json(
                 continue;
             }
             const auto mode = req.at("scope").at("mode").get<std::string>();
-            if (!is_declared(mode)) {
-                return std::string(field) + "[" + std::to_string(i) +
-                       "].scope.mode: '" + mode + "' is not declared in modes";
+            const std::string where = std::string(field) + "[" +
+                                      std::to_string(i) + "].scope.mode: '";
+            if (is_bare_mode(mode)) {
+                if (!is_declared(mode)) {
+                    return where + mode + "' is not declared in modes";
+                }
+                continue;
+            }
+            const Scope scope{ScopeKind::In, canonical_mode(mode)};
+            for (const std::string& atom : scope_mode_atoms(scope)) {
+                if (!is_signal(atom)) {
+                    return where + atom +
+                           "' in a formula mode is not declared in modes, "
+                           "in_atoms or out_atoms";
+                }
             }
         }
     }

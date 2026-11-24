@@ -1,6 +1,10 @@
 #include <poll.h>
 #include <unistd.h>
 
+#ifdef __linux__
+#include <sys/syscall.h>
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -1503,7 +1507,15 @@ TEST_IN("driver_peredur", test_peredur_writes_a_crash_report) {
         read_until_marker(child.m_read_fd, "Seed: 7\n");
     expect(contains(announced, "Seed: 7\n"),
            "peredur: the endless run reached its search");
+    // The search builds the thread pool as it starts. glibc blocks every
+    // signal in the thread calling pthread_create, so a process-directed
+    // signal lands on the new worker, and TSan aborts on a thread it has not
+    // yet attached. The main thread holds the signal pending until it unblocks.
+#ifdef __linux__
+    syscall(SYS_tgkill, child.m_pid, child.m_pid, SIGSEGV);
+#else
     kill(child.m_pid, SIGSEGV);
+#endif
 
     const std::pair<std::string, bool> read =
         read_until_eof(child.m_read_fd, k_deadline);

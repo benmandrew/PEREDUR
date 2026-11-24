@@ -130,11 +130,15 @@ enum class ScopeKind : std::uint8_t {
 };
 
 /// A scope kind together with the mode it is relative to. `Global` carries an
-/// empty mode; every other kind requires one, and that mode must be declared in
-/// `Specification::m_modes`.
+/// empty mode; every other kind requires one. A bare mode is one signal name,
+/// which must be declared in `Specification::m_modes`. A formula mode such as
+/// `(a) | (b)` is a propositional formula over declared signals, each in
+/// `m_modes`, `m_in_atoms` or `m_out_atoms`, held in `Formula::to_string`
+/// spelling (see `canonical_mode`).
 struct Scope {
     ScopeKind m_kind = ScopeKind::Global;
-    /// Name of the mode. Empty exactly when `m_kind` is `Global`.
+    /// The mode: a signal name or a formula. Empty exactly when `m_kind` is
+    /// `Global`.
     std::string m_mode;
 
     friend bool operator<(const Scope& lhs, const Scope& rhs);
@@ -144,6 +148,21 @@ struct Scope {
     /// the whole execution.
     [[nodiscard]] bool is_global() const { return m_kind == ScopeKind::Global; }
 };
+
+/// True when @p mode is a single signal name, the only form a mode took before
+/// formula modes. Every bare mode lowers, hashes and serialises as it did then.
+bool is_bare_mode(const std::string& mode);
+
+/// The stored spelling of the mode @p mode: a bare name unchanged, a formula
+/// in `Formula::to_string` form, so one formula has one spelling however its
+/// source was bracketed.
+/// @throws std::invalid_argument when @p mode is neither a name nor a
+///         propositional formula.
+std::string canonical_mode(const std::string& mode);
+
+/// Every signal the scope's mode mentions, without the constants: the mode
+/// itself when bare, nothing for `Global`.
+std::vector<std::string> scope_mode_atoms(const Scope& scope);
 
 /// True for the three "only" scopes, whose lowering negates the requirement's
 /// obligation and applies it outside the named interval.

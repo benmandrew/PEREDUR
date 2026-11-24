@@ -115,7 +115,7 @@
       },
       "scope": {
         "type": "In",
-        "mode": "mode_psv_mode_and_inspiratory_pause_button"
+        "mode": "(inspiratory_pause_button) & (psv_mode)"
       }
     },
     {
@@ -127,7 +127,7 @@
       },
       "scope": {
         "type": "In",
-        "mode": "mode_start_up_mode_or_standby_mode"
+        "mode": "(standby_mode) | (start_up_mode)"
       }
     },
     {
@@ -139,7 +139,7 @@
       },
       "scope": {
         "type": "In",
-        "mode": "mode_pcv_mode_or_psv_mode"
+        "mode": "(pcv_mode) | (psv_mode)"
       }
     },
     {
@@ -209,7 +209,7 @@
       },
       "scope": {
         "type": "In",
-        "mode": "mode_psv_mode_and_rm_button"
+        "mode": "(psv_mode) & (rm_button)"
       }
     },
     {
@@ -235,7 +235,7 @@
       },
       "scope": {
         "type": "In",
-        "mode": "mode_pcv_mode_and_inspiratory_pause_button"
+        "mode": "(inspiratory_pause_button) & (pcv_mode)"
       }
     },
     {
@@ -268,7 +268,7 @@
       },
       "scope": {
         "type": "In",
-        "mode": "mode_pcv_mode_or_psv_mode"
+        "mode": "(pcv_mode) | (psv_mode)"
       }
     },
     {
@@ -316,7 +316,7 @@
       },
       "scope": {
         "type": "In",
-        "mode": "mode_pcv_mode_or_psv_mode_and_rm_button_and_not_inspiratory_pause_button"
+        "mode": "((!(inspiratory_pause_button)) & ((pcv_mode) | (psv_mode))) & (rm_button)"
       }
     },
     {
@@ -340,7 +340,7 @@
       },
       "scope": {
         "type": "In",
-        "mode": "mode_pcv_mode_and_rm_button"
+        "mode": "(pcv_mode) & (rm_button)"
       }
     },
     {
@@ -352,7 +352,7 @@
       },
       "scope": {
         "type": "In",
-        "mode": "mode_pcv_mode_or_psv_mode_and_expiratory_pause_button"
+        "mode": "((pcv_mode) | (psv_mode)) & (expiratory_pause_button)"
       }
     },
     {
@@ -388,7 +388,7 @@
       },
       "scope": {
         "type": "In",
-        "mode": "mode_pcv_mode_or_psv_mode_and_inspiratory_pause_button"
+        "mode": "((pcv_mode) | (psv_mode)) & (inspiratory_pause_button)"
       }
     },
     {
@@ -595,7 +595,7 @@
       },
       "scope": {
         "type": "In",
-        "mode": "mode_psv_mode_and_expiratory_phase"
+        "mode": "(expiratory_phase) & (psv_mode)"
       }
     },
     {
@@ -661,96 +661,6 @@
         "type": "In",
         "mode": "final_state"
       }
-    },
-    {
-      "condition": "true",
-      "condition-type": "continual",
-      "response": "mode_pcv_mode_and_inspiratory_pause_button <-> (pcv_mode & inspiratory_pause_button)",
-      "timing": {
-        "type": "Always"
-      },
-      "weakenable": false
-    },
-    {
-      "condition": "true",
-      "condition-type": "continual",
-      "response": "mode_pcv_mode_and_rm_button <-> (pcv_mode & rm_button)",
-      "timing": {
-        "type": "Always"
-      },
-      "weakenable": false
-    },
-    {
-      "condition": "true",
-      "condition-type": "continual",
-      "response": "mode_pcv_mode_or_psv_mode <-> (pcv_mode | psv_mode)",
-      "timing": {
-        "type": "Always"
-      },
-      "weakenable": false
-    },
-    {
-      "condition": "true",
-      "condition-type": "continual",
-      "response": "mode_pcv_mode_or_psv_mode_and_expiratory_pause_button <-> (( pcv_mode | psv_mode ) & expiratory_pause_button)",
-      "timing": {
-        "type": "Always"
-      },
-      "weakenable": false
-    },
-    {
-      "condition": "true",
-      "condition-type": "continual",
-      "response": "mode_pcv_mode_or_psv_mode_and_inspiratory_pause_button <-> (( pcv_mode | psv_mode ) & inspiratory_pause_button)",
-      "timing": {
-        "type": "Always"
-      },
-      "weakenable": false
-    },
-    {
-      "condition": "true",
-      "condition-type": "continual",
-      "response": "mode_pcv_mode_or_psv_mode_and_rm_button_and_not_inspiratory_pause_button <-> (( pcv_mode | psv_mode ) & rm_button & ! inspiratory_pause_button)",
-      "timing": {
-        "type": "Always"
-      },
-      "weakenable": false
-    },
-    {
-      "condition": "true",
-      "condition-type": "continual",
-      "response": "mode_psv_mode_and_expiratory_phase <-> (psv_mode & expiratory_phase)",
-      "timing": {
-        "type": "Always"
-      },
-      "weakenable": false
-    },
-    {
-      "condition": "true",
-      "condition-type": "continual",
-      "response": "mode_psv_mode_and_inspiratory_pause_button <-> (psv_mode & inspiratory_pause_button)",
-      "timing": {
-        "type": "Always"
-      },
-      "weakenable": false
-    },
-    {
-      "condition": "true",
-      "condition-type": "continual",
-      "response": "mode_psv_mode_and_rm_button <-> (psv_mode & rm_button)",
-      "timing": {
-        "type": "Always"
-      },
-      "weakenable": false
-    },
-    {
-      "condition": "true",
-      "condition-type": "continual",
-      "response": "mode_start_up_mode_or_standby_mode <-> (start_up_mode | standby_mode)",
-      "timing": {
-        "type": "Always"
-      },
-      "weakenable": false
     },
     {
       "condition": "true",
@@ -829,16 +739,6 @@
     "min_expiratory_time_eq_insp_clock_div_2",
     "min_expiratory_time_ge_0p4",
     "min_expiratory_time_le_2",
-    "mode_pcv_mode_and_inspiratory_pause_button",
-    "mode_pcv_mode_and_rm_button",
-    "mode_pcv_mode_or_psv_mode",
-    "mode_pcv_mode_or_psv_mode_and_expiratory_pause_button",
-    "mode_pcv_mode_or_psv_mode_and_inspiratory_pause_button",
-    "mode_pcv_mode_or_psv_mode_and_rm_button_and_not_inspiratory_pause_button",
-    "mode_psv_mode_and_expiratory_phase",
-    "mode_psv_mode_and_inspiratory_pause_button",
-    "mode_psv_mode_and_rm_button",
-    "mode_start_up_mode_or_standby_mode",
     "monitor_inhale_trigger",
     "off",
     "out_of_service_warning",
@@ -869,16 +769,6 @@
     "fail_safe_mode",
     "final_state",
     "inspiratory_phase",
-    "mode_pcv_mode_and_inspiratory_pause_button",
-    "mode_pcv_mode_and_rm_button",
-    "mode_pcv_mode_or_psv_mode",
-    "mode_pcv_mode_or_psv_mode_and_expiratory_pause_button",
-    "mode_pcv_mode_or_psv_mode_and_inspiratory_pause_button",
-    "mode_pcv_mode_or_psv_mode_and_rm_button_and_not_inspiratory_pause_button",
-    "mode_psv_mode_and_expiratory_phase",
-    "mode_psv_mode_and_inspiratory_pause_button",
-    "mode_psv_mode_and_rm_button",
-    "mode_start_up_mode_or_standby_mode",
     "pcv_mode",
     "psv_mode",
     "rm",
