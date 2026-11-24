@@ -1,0 +1,22 @@
+name = "2026-11-24-one-way-lpc"
+branch = "campaign/final-engine"
+profile = "one-way-lpc"
+description = "Sweep T's full (sweep F's no-gate) on lift-plus-cruise-full at av2's seeds 0-4, on CPUs 0-29. Its own entry because it starts only once veribee-v0split releases av2's CPUs 14-29 (2026-11-24-one-way PLAN.md)."
+
+# Enqueue only after veribee-v0split posts "released av2" (about 23:30Z on
+# 2026-11-24; mailbox, 17:19Z). campaign.py has no start time, so this is a
+# separate entry. av3's seeds 15-19 are 2026-11-24-one-way's lpc-av3.
+hosts = { av2 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+configs = "sh -c 'python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps T --schemes nsga2-apportion --out-dir experiments/configs-one-way-large'"
+
+# full x 5 seeds, 3 jobs x 10 threads. 50-85 slot-h, 2-3 h. CPUs 30-31 stay
+# free for Ollama.
+[[phases]]
+name = "lpc-av2"
+profile = "one-way-lpc"
+hosts = { av2 = "0-4" }
+confine = { av2 = { cpus = "0-29", memory_max = "110G" } }
+jobs = 3

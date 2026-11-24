@@ -610,6 +610,29 @@ def _final_sweep() -> list[tuple[str, dict]]:
 
 SWEEP_F: list[tuple[str, dict]] = _final_sweep()
 
+
+def _one_way_sweep() -> list[tuple[str, dict]]:
+    """Sweep F's arms with two-way mutation (the gate) off in every one.
+
+    The paper drops two-way mutation (user, 2026-11-24), so its full search is
+    sweep F's no-gate, and its leave-one-out arms are no-gate with one more
+    feature off. base and the only-<f> of the other three already have the
+    gate off, so this sweep holds only what sweep F lacks: full (sweep F's
+    no-gate under the new name, for lift-plus-cruise-full, which ran no
+    no-gate) and no-climb, no-remove and no-novelty against it.
+    """
+    f = dict(SWEEP_F)
+    base, full = f["base"], f["no-gate"]
+    levels: list[tuple[str, dict]] = [("full", dict(full))]
+    for name, keys in FINAL_FEATURES:
+        if name != "gate":
+            levels.append((f"no-{name}", {**full, **{k: base[k] for k in keys}}))
+    return levels
+
+
+# Sweep T: sweep F without two-way mutation (experiments/2026-11-24-one-way).
+SWEEP_T: list[tuple[str, dict]] = _one_way_sweep()
+
 # Keys whose built-in default has changed at least once since campaigns began
 # being archived. A generated config states a key only where a sweep overrides
 # it, so everything else is inherited from the binary at run time — which means
@@ -634,9 +657,10 @@ SWEEPS: list[tuple[str, list]] = [
     ("P", SWEEP_P),
     ("K", SWEEP_K),
     ("F", SWEEP_F),
+    ("T", SWEEP_T),
 ]
 
-# Sweeps emitted when --sweeps is omitted. O, P, K and F are held back, so a grid
+# Sweeps emitted when --sweeps is omitted. O, P, K, F and T are held back, so a grid
 # generated without --sweeps stays byte-identical to the one before they
 # existed.
 DEFAULT_SWEEPS: list[str] = ["A", "B", "C", "R"]

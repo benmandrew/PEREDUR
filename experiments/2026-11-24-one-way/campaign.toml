@@ -1,0 +1,84 @@
+name = "2026-11-24-one-way"
+branch = "campaign/final-engine"
+profile = "one-way"
+description = "The final engine without two-way mutation (sweep T): no-climb, no-remove and no-novelty against sweep F's no-gate, which becomes the paper's full, on the small set, rad's cores, rad and the sideways seeded corpus, and full itself on lift-plus-cruise-full at av3's seeds. av2's lift-plus-cruise-full seeds are 2026-11-24-one-way-lpc (PLAN.md)."
+
+# Seeds pair every arm with sweep F's runs of the same (spec, seed): the small
+# set and the cores av2 0-14, av3 15-29; rad and lift-plus-cruise-full av2 0-4,
+# av3 15-19. The seeded corpus takes 4 seeds on av3 and 1 on av2, since av2
+# has CPUs 0-13 alone until veribee-v0split releases 14-29 (mailbox,
+# 2026-11-24 17:19Z). Pairing is by key, so this split need not match
+# sweep F's.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+# configs-one-way at 2 threads a run (the small set, rad's cores and the
+# seeded corpus), configs-one-way-large with no parallel line (threads are
+# CPUs over jobs).
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps T --schemes nsga2-apportion\"; $G --parallel 2 --out-dir experiments/configs-one-way && $G --out-dir experiments/configs-one-way-large'"
+
+# CPU windows: av3 CPUs 0-29; av2 CPUs 0-13 beside v0split's lane on 14-29.
+# CPUs 30-31 stay free for Ollama on both hosts. Slot-h estimates (PLAN.md)
+# scale each subject's sweep F no-<f> wall time by its no-gate/full ratio.
+
+# av3. lift-plus-cruise-full first, as the longest phase: full x 5 seeds,
+# 3 jobs x 10 threads. 50-85 slot-h.
+[[phases]]
+name = "lpc-av3"
+profile = "one-way-lpc"
+hosts = { av3 = "15-19" }
+confine = { av3 = { cpus = "0-29", memory_max = "110G" } }
+jobs = 3
+
+# Small set and rad's cores: 19 subjects x 3 arms x 15 seeds = 855 runs,
+# 15 jobs x 2 threads. About 45 slot-h.
+[[phases]]
+name = "small-av3"
+profile = "one-way"
+hosts = { av3 = "15-29" }
+confine = { av3 = { cpus = "0-29", memory_max = "60G" } }
+jobs = 15
+
+# rad: 3 arms x 5 seeds, 7 jobs x 4 threads. About 3 slot-h.
+[[phases]]
+name = "rad-av3"
+profile = "one-way-large"
+specs = ["rad"]
+hosts = { av3 = "15-19" }
+confine = { av3 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 7
+
+# Seeded corpus: 130 subjects x 3 arms x 4 seeds = 1,560 runs, 15 jobs x 2
+# threads. About 140 slot-h.
+[[phases]]
+name = "seeded-av3"
+profile = "one-way-seeded"
+hosts = { av3 = "0-3" }
+confine = { av3 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15
+
+# av2, on CPUs 0-13: 7 jobs x 2 threads, rad 3 jobs x 4 threads.
+# Small set and rad's cores: 855 runs, about 45 slot-h.
+[[phases]]
+name = "small-av2"
+profile = "one-way"
+hosts = { av2 = "0-14" }
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
+
+[[phases]]
+name = "rad-av2"
+profile = "one-way-large"
+specs = ["rad"]
+hosts = { av2 = "0-4" }
+confine = { av2 = { cpus = "0-13", memory_max = "48G" } }
+jobs = 3
+
+# Seeded corpus: 130 subjects x 3 arms x 1 seed = 390 runs, about 35 slot-h.
+[[phases]]
+name = "seeded-av2"
+profile = "one-way-seeded"
+hosts = { av2 = "4" }
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
