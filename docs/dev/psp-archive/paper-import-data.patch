@@ -1,0 +1,451 @@
+From d5d8da65cd97e11d1bc3406c1ce5f7c35e76930f Mon Sep 17 00:00:00 2001
+From: benmandrew <benmandrew@gmail.com>
+Date: Fri, 20 Nov 2026 21:47:16 +0000
+Subject: [PATCH] feat(data): import and summarise the PSP campaign
+
+The PSP campaign (peredur experiments/2026-11-20-psp-order) had no
+path into the draft. Its results, seeded corpus, pooled pass and
+trivial-reversion probe were not imported, and summarise.py did not
+reduce them, so every PSP number would have to be typed by hand, which
+the data rules forbid.
+
+import_data.py gains import_psp(). It copies the campaign's CSVs from
+a peredur checkout (~/projects/peredur-psp by default; --psp DIR or
+$PEREDUR_PSP overrides it). --psp-only imports nothing else. A file
+absent from the checkout keeps data/'s copy. No PSP data is committed.
+
+summarise.py gains psp(), which writes psp-* levels:
+
+- found-repair and known-repair rates, with McNemar and a wall-time
+  Hodges-Lehmann shift against base and against full, and Holm over
+  four features (novelty is one of them)
+- the seeded corpus, through seeded_levels and clustered by base
+  system, with a headline subset taken from the probe
+- pooled measures for the specifications and the seeded subjects
+
+To share code, pooled_share and pooled_reach take a pairs argument and
+seeded_levels takes a features argument. The defaults keep the old
+behaviour.
+
+Interval recording stops after interval_check, so the PSP intervals do
+not change the counts it reports.
+
+Tested. With no PSP files, stats.json and stats.tex are byte-identical
+to before. With the 2026-11-20 smoke runs (6 runs on psp-crossing, 12
+on two seeded subjects, a 2-subject probe) and synthetic pooled CSVs,
+in a scratch copy of data/, the non-PSP keys did not change and 32
+psp-* levels appeared.
+---
+ CLAUDE.md              |   2 +
+ scripts/import_data.py |  63 ++++++++++++-
+ scripts/summarise.py   | 209 ++++++++++++++++++++++++++++++++++++++---
+ 3 files changed, 259 insertions(+), 15 deletions(-)
+
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 79fde98..0ffeded 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -38,6 +38,8 @@ The evaluation uses one set of 12 specifications (merged on 2026-11-17). `ventil
+ 
+ The October directed-against-uniform preliminary study was cut from the draft on 2026-11-12: its numbers were hand-typed from another repository and may predate the scoped-timing fix. Its measures (found-repair and known-repair rates, McNemar, the `random` arms) are now computed from the CSVs.
+ 
++The PSP campaign (peredur `experiments/2026-11-20-psp-order`, its seeded corpus and its pooled pass `2026-11-20-psp-order-pooled`) is imported by `import_psp()` from `PSP_CHECKOUT` (`~/projects/peredur-psp`; `--psp DIR` or `$PEREDUR_PSP` overrides it, and `--psp-only` imports nothing else) into `results-psp-order*.csv`, `counters-psp-order*.csv`, `pooled-*-psp.csv` and `psp-seeded-probe.csv`. `psp()` in `summarise.py` reduces them under `psp-*` levels: `psp-<arm>` (rates, McNemar and wall-time Hodges–Lehmann against `base` and `full`, Holm over `PSP_FEATURES`, the four features with novelty), `psp-seeded-<arm>` and `psp-seeded-headline-<arm>` (as `seeded()`, clustered by base, headline from the probe), and `psp-pooled-<contrast>` and `psp-seeded-pooled-<contrast>`. The known-repair rate is over the `psp-` subjects only, since the SYNTECH17 imports have no fixes. Every PSP file is optional, and its keys run after `interval_check`, which they leave unchanged. No PSP data is committed yet; the smoke runs of 2026-11-20 were tested in a scratch copy only.
++
+ ## Figures
+ 
+ `figures/timing-orders.typ` (Typst, fletcher) draws the four timing orders, one per page of `figures/timing-orders.pdf`. `figures/field-orders.typ` draws the scope order (page 1) and the dependencies between fields (page 2) into `figures/field-orders.pdf`. `orders.tex` includes both. Each PDF is committed so a LaTeX build does not need Typst. A plain `make` never redraws them; `make figures` does, and `make watch` does on save when Typst is installed.
+diff --git a/scripts/import_data.py b/scripts/import_data.py
+index 5148a66..3ef315e 100644
+--- a/scripts/import_data.py
++++ b/scripts/import_data.py
+@@ -20,11 +20,20 @@ run.json counters are flattened like the removal campaigns'. Without that
+ worktree, the committed copies here stay as they are. A probe rerun that has
+ not run yet has its stale copy removed, so it never mixes with the other corpus.
+ 
+-Usage: scripts/import_data.py [PEREDUR_DIR]
++The PSP campaign (peredur experiments/2026-11-20-psp-order, its seeded corpus
++and its pooled pass 2026-11-20-psp-order-pooled) is read from PSP_CHECKOUT,
++the checkout where its collect and pooled reduce wrote their data: --psp DIR
++or $PEREDUR_PSP overrides it. Its results CSVs and probe are copied, its
++run.json counters are flattened, and its pooled outputs are copied to
++pooled-*-psp.csv. A file that is absent there keeps data/'s copy, if any.
++--psp-only imports the PSP files alone.
++
++Usage: scripts/import_data.py [PEREDUR_DIR] [--psp DIR] [--psp-only]
+ """
+ 
+ import csv
+ import json
++import os
+ import shutil
+ import sys
+ from pathlib import Path
+@@ -83,6 +92,20 @@ POOLED_EXCHANGE = ((POOLED_EXCHANGE_DIR / "per-subject.csv", "pooled-share-excha
+                    (POOLED_EXCHANGE_DIR / "balls" / "ball-radii-pooled" / "pooled.csv",
+                     "pooled-balls-exchange.csv"))
+ 
++# The PSP campaign's checkout (see the docstring), its two results sets (by
++# runner profile), and its pooled outputs and probe: (path in the checkout,
++# name in data/).
++PSP_CHECKOUT = Path(os.environ.get("PEREDUR_PSP", PROJECTS / "peredur-psp")).expanduser()
++PSP_RUNS = ("psp-order", "psp-order-seeded")
++PSP_POOLED_DIR = Path("experiments") / "psp-order-pooled-reduced"
++PSP_FILES = ((PSP_POOLED_DIR / "per-subject.csv", "pooled-share-psp.csv"),
++             (PSP_POOLED_DIR / "balls" / "strength" / "contrasts.csv",
++              "pooled-strength-psp.csv"),
++             (PSP_POOLED_DIR / "balls" / "ball-radii-pooled" / "pooled.csv",
++              "pooled-balls-psp.csv"),
++             (Path("experiments") / "2026-11-20-psp-order" / "probe.csv",
++              "psp-seeded-probe.csv"))
++
+ # run.json sections that hold per-run counters the paper reports.
+ SECTIONS = ("climb", "direction_gate", "step_scaling", "order_crossover",
+             "parent_verdict", "final_front")
+@@ -157,10 +180,44 @@ def counters(run_json):
+     return row
+ 
+ 
++def import_psp(checkout):
++    """Copy the PSP campaign's results and pooled outputs from checkout, and
++    flatten its run.json counters into counters-<profile>.csv."""
++    experiments = checkout / "experiments"
++    for name in PSP_RUNS:
++        results = experiments / f"results-{name}.csv"
++        if not results.exists():
++            print(f"{name}: no {results}; keeping data/")
++            continue
++        shutil.copyfile(results, DATA / results.name)
++        rows = [{**run_labels(run_json.parent), **counters(run_json)}
++                for run_json in sorted((experiments / f"results-{name}").glob("*/run.json"))]
++        if rows:
++            write_rows(DATA / f"counters-{name}.csv", rows)
++        print(f"{name}: {len(rows)} runs from {experiments}")
++    for source, name in PSP_FILES:
++        if (checkout / source).exists():
++            shutil.copyfile(checkout / source, DATA / name)
++            print(f"{name} from {checkout / source}")
++        else:
++            print(f"{name}: no {checkout / source}; keeping data/")
++
++
+ def main(argv):
+-    peredur = Path(argv[1] if len(argv) > 1 else "~/projects/peredur").expanduser()
+-    experiments = peredur / "experiments"
++    args = argv[1:]
++    psp_checkout = PSP_CHECKOUT
++    if "--psp" in args:
++        at = args.index("--psp")
++        psp_checkout = Path(args[at + 1]).expanduser()
++        del args[at:at + 2]
++    psp_only = "--psp-only" in args
++    args = [a for a in args if a != "--psp-only"]
+     DATA.mkdir(exist_ok=True)
++    import_psp(psp_checkout)
++    if psp_only:
++        return
++    peredur = Path(args[0] if args else "~/projects/peredur").expanduser()
++    experiments = peredur / "experiments"
+ 
+     for suffix in ("", "-large"):
+         shutil.copyfile(experiments / f"results-{CAMPAIGN}{suffix}.csv",
+diff --git a/scripts/summarise.py b/scripts/summarise.py
+index d737a91..ec2c312 100644
+--- a/scripts/summarise.py
++++ b/scripts/summarise.py
+@@ -283,7 +283,7 @@ def hodges_lehmann(diffs, record=True):
+     qu = max(signrank_quantile(n, ALPHA / 2), 1)
+     ql = n * (n + 1) // 2 - qu
+     low, high = float(walsh[qu - 1]), float(walsh[ql])
+-    if record:
++    if record and RECORDING:
+         INTERVALS.append((low, high, *normal_bounds(d), len(set(np.abs(d))) < n))
+     return {"estimate": float(np.median(walsh)), "low": low, "high": high, "n": n}
+ 
+@@ -291,6 +291,9 @@ def hodges_lehmann(diffs, record=True):
+ # Every interval hodges_lehmann() returns, beside R's normal-approximation
+ # bounds for the same differences, as (low, high, r_low, r_high, tied).
+ INTERVALS = []
++# Off once interval_check has run, so later intervals (the PSP ones) neither
++# change its counts nor need R's bounds.
++RECORDING = True
+ 
+ 
+ def normal_bounds(d):
+@@ -495,11 +498,12 @@ def pooled_families(out, strength, balls, families):
+                                           "shift": pooled_shift(v)}
+ 
+ 
+-def pooled_share(out, rows, families, sources=None):
++def pooled_share(out, rows, families, sources=None, pairs=POOLED_PAIRS):
+     """Fill out[contrast]["share"]: the accepted-trace share of b less that of
+     a over subjects where both arms have a frontier, positive when a's
+     repairs accept fewer sampled words, so are the stronger. sources maps a
+-    contrast to rows of its own pass, read in place of rows."""
++    contrast to rows of its own pass, read in place of rows; pairs maps a
++    contrast to its arms (a, b)."""
+     def table(rows):
+         return {(r["subject"], r["arm"]): float(r["accepted_share"])
+                 for r in rows if r["accepted_share"] != ""}
+@@ -510,7 +514,7 @@ def pooled_share(out, rows, families, sources=None):
+         for c in names:
+             share = tables.get(c, default)
+             subjects = sorted({s for s, _ in share})
+-            a, b = POOLED_PAIRS[c]
++            a, b = pairs[c]
+             diffs[c] = [share[s, b] - share[s, a] for s in subjects
+                         if (s, a) in share and (s, b) in share]
+             if not diffs[c]:
+@@ -518,7 +522,7 @@ def pooled_share(out, rows, families, sources=None):
+         ps = {c: signrank_p(v) for c, v in diffs.items()}
+         adj = holm(ps)
+         for c, v in diffs.items():
+-            a, b = POOLED_PAIRS[c]
++            a, b = pairs[c]
+             share = tables.get(c, default)
+             subjects = sorted({s for s, _ in share})
+             out[c]["share"] = {
+@@ -530,10 +534,11 @@ def pooled_share(out, rows, families, sources=None):
+                 "p": ps[c], "holm": adj[c], "shift": pooled_shift(v)}
+ 
+ 
+-def pooled_reach(out, rows, families, sources=None):
++def pooled_reach(out, rows, families, sources=None, pairs=POOLED_PAIRS):
+     """Fill out[contrast]["reach"]: the joint-front reach of a less that of b
+     over subjects where both arms have a reach, positive when a reaches more.
+-    sources maps a contrast to rows of its own pass, read in place of rows."""
++    sources maps a contrast to rows of its own pass, read in place of rows;
++    pairs maps a contrast to its arms (a, b)."""
+     def table(rows):
+         return {(r["subject"], r["arm"]): float(r["reach"])
+                 for r in rows if r["reach"] != ""}
+@@ -543,7 +548,7 @@ def pooled_reach(out, rows, families, sources=None):
+         diffs = {}
+         for c in names:
+             reach = tables.get(c, default)
+-            a, b = POOLED_PAIRS[c]
++            a, b = pairs[c]
+             diffs[c] = [reach[s, a] - reach[s, b] for s in sorted({s for s, _ in reach})
+                         if (s, a) in reach and (s, b) in reach]
+             if not diffs[c]:
+@@ -920,8 +925,9 @@ def seeded_contrast(cells, arm, ref, subjects, cluster_of):
+     return out
+ 
+ 
+-def seeded_levels(cells, subjects, cluster_of, prefix):
+-    """Per-arm means and every contrast over `subjects`, keyed by arm."""
++def seeded_levels(cells, subjects, cluster_of, prefix, features=FEATURES):
++    """Per-arm means and every contrast over `subjects`, keyed by arm, with
++    Holm over `features` in each direction."""
+     levels = {}
+     for arm in sorted({a for a, _ in cells}):
+         vals = [cells[(arm, s)] for s in subjects if (arm, s) in cells]
+@@ -939,11 +945,11 @@ def seeded_levels(cells, subjects, cluster_of, prefix):
+ 
+     add(FULL, BASELINE)
+     for fmt, ref in (("only-{}", BASELINE), ("no-{}", FULL)):
+-        for f in FEATURES:
++        for f in features:
+             add(fmt.format(f), ref)
+         for o in SEEDED_OUTCOMES:
+             adjusted = holm({f: levels[f"{prefix}{fmt.format(f)}"]["vs"][ref][o]["p"]
+-                             for f in FEATURES if f"{prefix}{fmt.format(f)}" in levels})
++                             for f in features if f"{prefix}{fmt.format(f)}" in levels})
+             for f, h in adjusted.items():
+                 levels[f"{prefix}{fmt.format(f)}"]["vs"][ref][o]["holm"] = h
+     return levels
+@@ -1028,6 +1034,181 @@ def seeded():
+     return levels
+ 
+ 
++# The PSP campaign (peredur experiments/2026-11-20-psp-order): sweep F's base,
++# full and every no-<f> under nsga2-apportion, blame on in every arm, on the
++# PSP specifications (results-psp-order.csv: the hand-written subjects and the
++# unrealisable SYNTECH17 imports) and the PSP seeded corpus
++# (results-psp-order-seeded.csv), with its pooled pass (pooled-*-psp.csv) and
++# trivial-reversion probe (psp-seeded-probe.csv). Every file is optional: a
++# missing one leaves its keys missing. Its keys sit under psp-* levels.
++PSP_RESULTS = "results-psp-order.csv"
++PSP_SEEDED_RESULTS = "results-psp-order-seeded.csv"
++PSP_FEATURES = ("climb", "gate", "remove", "novelty")
++PSP_CONTRASTS = ((FULL, BASELINE),) + tuple((f"no-{f}", FULL) for f in PSP_FEATURES)
++# The hand-written subjects have fixes, so a known repair; the SYNTECH17
++# imports (prefix syntech-) have none, so the known-repair rate is over these.
++PSP_IDEAL_PREFIX = "psp-"
++# A seeded subject is <base>__m<k>; its cluster is its base.
++PSP_SEEDED_SEP = "__"
++PSP_PROBE = "psp-seeded-probe.csv"
++PSP_PROBE_THRESHOLD = 0.01
++PSP_POOLED_STRENGTH = "pooled-strength-psp.csv"
++PSP_POOLED_BALLS = "pooled-balls-psp.csv"
++PSP_POOLED_SHARE = "pooled-share-psp.csv"
++# The pooled design's contrasts the paper reads (make_design.py of
++# 2026-11-20-psp-order-pooled); its family joint only fixes the joint front.
++PSP_POOLED_PAIRS = {FULL: (FULL, BASELINE), "no-climb-over-base": ("no-climb", BASELINE),
++                    **{f"no-{f}": (f"no-{f}", FULL) for f in PSP_FEATURES}}
++PSP_POOLED_FAMILIES = {"base": (FULL, "no-climb-over-base"),
++                       "ablation": tuple(f"no-{f}" for f in PSP_FEATURES)}
++
++
++def psp_runs(name):
++    """The file's nsga2-apportion runs by arm, then (spec, seed); {} when the
++    file has not been imported."""
++    arms = defaultdict(dict)
++    if (DATA / name).exists():
++        for row in read_csv(name):
++            if row["selection"] == SELECTION:
++                arms[row["level_name"]][(row["spec"], int(row["seed"]))] = row
++    return arms
++
++
++def psp_rates(results, prefix):
++    """Per arm: runs, found-repair and known-repair rates, repairs and wall
++    time, overall and per specification; per contrast of PSP_CONTRASTS: McNemar
++    on both rates and the Hodges-Lehmann wall-time shift over paired runs,
++    Holm over the four features within each measure."""
++    levels = {}
++    for arm, runs in results.items():
++        keys = sorted(runs)
++        ideal_keys = [k for k in keys if k[0].startswith(PSP_IDEAL_PREFIX)]
++        entry = levels[f"{prefix}{arm}"] = {
++            "runs": len(keys), "specs": len({k[0] for k in keys}),
++            "repairs": describe([int(runs[k]["n_repairs"] or 0) for k in keys]),
++            "wall": describe([float(runs[k]["wall_time_s"]) for k in keys]),
++            "found": {"rate": rate(runs, keys, "found_repair"), "runs": len(keys)},
++            "spec": {}}
++        if ideal_keys:
++            entry["ideal"] = {"rate": rate(runs, ideal_keys, "implies_ideal"),
++                              "runs": len(ideal_keys)}
++        for spec in sorted({k[0] for k in keys}):
++            sk = [k for k in keys if k[0] == spec]
++            entry["spec"][spec] = {"found": rate(runs, sk, "found_repair"),
++                                   "ideal": rate(runs, sk, "implies_ideal"),
++                                   "runs": len(sk),
++                                   "wall": describe([float(runs[k]["wall_time_s"])
++                                                     for k in sk])}
++
++    def contrast(arm, ref):
++        a, b = results[arm], results[ref]
++        keys = sorted(a.keys() & b.keys())
++        ideal_keys = [k for k in keys if k[0].startswith(PSP_IDEAL_PREFIX)]
++        aw = [float(a[k]["wall_time_s"]) for k in keys]
++        bw = [float(b[k]["wall_time_s"]) for k in keys]
++        diffs = [x - y for x, y in zip(aw, bw)]
++        out = {"found": mcnemar(outcome(a, keys, "found_repair"),
++                                outcome(b, keys, "found_repair")),
++               "wall": {**hodges_lehmann(diffs, record=False), "p": signrank_p(diffs),
++                        "median": {"arm": float(np.median(aw)),
++                                   "ref": float(np.median(bw))}}}
++        if ideal_keys:
++            out["ideal"] = mcnemar(outcome(a, ideal_keys, "implies_ideal"),
++                                   outcome(b, ideal_keys, "implies_ideal"))
++        return out
++
++    for arm, ref in PSP_CONTRASTS:
++        if arm in results and ref in results:
++            levels[f"{prefix}{arm}"].setdefault("vs", {})[ref] = contrast(arm, ref)
++    ablated = [f"{prefix}no-{f}" for f in PSP_FEATURES
++               if FULL in levels.get(f"{prefix}no-{f}", {}).get("vs", {})]
++    summary = {}
++    for measure in ("found", "ideal", "wall"):
++        ps = {arm: levels[arm]["vs"][FULL][measure]["p"] for arm in ablated
++              if measure in levels[arm]["vs"][FULL]}
++        for arm, h in holm(ps).items():
++            levels[arm]["vs"][FULL][measure]["holm"] = h
++        summary[f"significant_{measure}"] = sum(
++            levels[arm]["vs"][FULL][measure]["holm"] < ALPHA for arm in ps)
++    if ablated:
++        levels[f"{prefix}ablation"] = summary
++    return levels
++
++
++def psp_seeded():
++    """The PSP seeded corpus as seeded() reads the FRETISH one: per-subject
++    means over seeds, contrasts with a cluster bootstrap over bases, Holm over
++    the four features; over every subject, and over the probe's headline
++    subjects (both reversion shares under PSP_PROBE_THRESHOLD) once it has run."""
++    if not (DATA / PSP_SEEDED_RESULTS).exists():
++        return {}
++    rows = [r for r in read_csv(PSP_SEEDED_RESULTS) if r["selection"] == SELECTION]
++    cells = seeded_cells(rows)
++    subjects = sorted({r["spec"] for r in rows})
++    cluster_of = {s: s.split(PSP_SEEDED_SEP)[0] for s in subjects}
++    levels = seeded_levels(cells, subjects, cluster_of, "psp-seeded-", PSP_FEATURES)
++    summary = {"runs": len(rows), "subjects": len(subjects),
++               "clusters": len(set(cluster_of.values()))}
++    if (DATA / PSP_PROBE).exists():
++        probe = {r["subject"]: r for r in read_csv(PSP_PROBE)}
++        probed = [s for s in subjects if s in probe]
++        p1 = {s: float(probe[s]["p1"]) for s in probed}
++        p2 = {s: float(probe[s]["p2"]) for s in probed}
++        headline = [s for s in probed
++                    if p1[s] < PSP_PROBE_THRESHOLD and p2[s] < PSP_PROBE_THRESHOLD]
++        summary["probe"] = {
++            "threshold": PSP_PROBE_THRESHOLD, "subjects": len(probed),
++            "headline": len(headline), "trivial": len(probed) - len(headline),
++            "p1_mean": math.fsum(p1.values()) / len(p1) if p1 else float("nan"),
++            "p2_mean": math.fsum(p2.values()) / len(p2) if p2 else float("nan"),
++            "p1_max": max(p1.values(), default=float("nan")),
++            "p2_max": max(p2.values(), default=float("nan"))}
++        if headline:
++            levels.update(seeded_levels(cells, headline, cluster_of,
++                                        "psp-seeded-headline-", PSP_FEATURES))
++    levels["psp-seeded"] = summary
++    return levels
++
++
++def psp_pooled():
++    """The pooled measures of the PSP pass, as pooled() computes them, apart
++    for the specifications (psp-pooled-<contrast>) and the seeded corpus
++    (psp-seeded-pooled-<contrast>)."""
++    def rows(name, seeded):
++        if not (DATA / name).exists():
++            return []
++        out = []
++        for r in read_csv(name):
++            if (PSP_SEEDED_SEP in r["subject"]) != seeded:
++                continue
++            if "contrast" in r:
++                if r["contrast"] not in PSP_POOLED_PAIRS:
++                    continue
++            if "arm" in r:
++                r = {**r, "arm": r["arm"].rsplit("/", 1)[-1]}
++            out.append(r)
++        return out
++
++    levels = {}
++    for seeded, prefix in ((False, "psp-pooled-"), (True, "psp-seeded-pooled-")):
++        out = defaultdict(dict)
++        strength = rows(PSP_POOLED_STRENGTH, seeded)
++        balls = rows(PSP_POOLED_BALLS, seeded)
++        share = rows(PSP_POOLED_SHARE, seeded)
++        if strength:
++            pooled_families(out, strength, balls, PSP_POOLED_FAMILIES)
++        if share:
++            pooled_share(out, share, PSP_POOLED_FAMILIES, pairs=PSP_POOLED_PAIRS)
++            pooled_reach(out, share, PSP_POOLED_FAMILIES, pairs=PSP_POOLED_PAIRS)
++        levels.update({f"{prefix}{c}": entry for c, entry in out.items()})
++    return levels
++
++
++def psp():
++    return (psp_rates(psp_runs(PSP_RESULTS), "psp-")
++            | psp_seeded() | psp_pooled())
++
++
+ def describe(values):
+     v = np.asarray(values, dtype=float)
+     q1, med, q3 = np.percentile(v, [25, 50, 75])
+@@ -1058,6 +1239,10 @@ def main():
+     exchange_base(stats["levels"], {spec for spec, _ in counters[BASELINE]})
+     stats["levels"].update(interval_check())
+     stats["levels"].update(seeded())
++    # After interval_check, so the PSP intervals leave its counts as they were.
++    global RECORDING
++    RECORDING = False
++    stats["levels"].update(psp())
+ 
+     (DATA / "stats.json").write_text(json.dumps(stats, indent=1) + "\n")
+     (DATA / "stats.tex").write_text(to_tex(stats))
+-- 
+2.56.1
+
