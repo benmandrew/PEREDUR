@@ -28,3 +28,6 @@ Collect the four profiles, then rerun both pooled passes on 8 nsga2 arms: base, 
 ## Log
 
 - 2026-11-24: prepared and launched at e127243c+ (this commit).
+- 2026-11-25 01:34Z: av3 107 done; av2 109 done at 22:30Z on 24 Nov. The lpc entry was not enqueued on "released av2" (no watcher); enqueued at 12:27Z as av2 110, killed at 12:36Z when the lab hosts restarted, and rerun by the tick from 12:40Z (try 2 of 3).
+- 2026-11-25 13:15Z: collected one-way (1,710 rows), one-way-large (30) and one-way-seeded (1,950); every key once.
+- 2026-11-25 14:40Z: the two 8-arm pooled passes, `2026-11-25-one-way-pooled` and `2026-11-25-one-way-seeded-pooled`, written by `experiments/2026-11-25-one-way-pooled/scripts/make_design.py` (full from sweep F's `no-gate` and each no-<f> from sweep T, through `[groups.sources]`), on CPUs 0-29 of both hosts. Pooled locally under MemoryMax=20G: specifications 18 subjects, 244,777 nodes (the ten-arm pool had 235,515), host split and sampled subjects as before; seeded 126 subjects, 145,461 nodes (largest 4,571), after dropping the same 4 fsm-lmcps mutants, where every arm holds 0 members. `make_design.py random` also writes `2026-11-25-one-way-pooled-random` (random/base against base on this pass's words), not yet a campaign. Input sums are in each campaign's INPUTS.sha256 (untracked, with the inputs).
