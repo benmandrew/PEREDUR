@@ -1,7 +1,7 @@
 #!/bin/sh
 # Entry point for the PEREDUR image. Dispatches the first argument over the
-# binaries the image installs, so `docker run <image> realize spec.tlsf` reads
-# the same as the command table in README.md rather than needing a path.
+# binaries the image installs, so `docker run <image> realize spec.tlsf` runs a
+# binary by its name without needing its path.
 set -eu
 
 k_commands="peredur realize ltl compare mucs maximal lint-ideals signal_tracer"
