@@ -344,9 +344,9 @@ status = "supporting"
 question = "RQ2 wall time without two-way mutation"
 campaign = "2026-11-26-one-way-wall"
 date = "2026-11-26"
-commits = []
-purpose = "Sweep T's full, no-climb, no-remove and no-novelty in one campaign on the small set and rad, at sweep F's host split and load, so the leave-one-out wall time pairs within one campaign (user, 2026-11-26). Launched 2026-11-26; not yet collected."
-note = "Sweeps F and T ran at different host speeds (av3 29-39% slower per call in T, av2 7-10% faster), so their wall times do not pair."
+commits = ["63c3d0fb"]
+purpose = "Sweep T's full, no-climb, no-remove and no-novelty in one campaign on the small set and rad, at sweep F's host split and load, so the leave-one-out wall time pairs within one campaign (user, 2026-11-26). Collected and imported 2026-11-26."
+note = "Sweeps F and T ran at different host speeds (av3 29-39% slower per call in T, av2 7-10% faster), so their wall times do not pair. 33 of 1,120 runs (lift-plus-cruise-mini and valu3s-uc6) return a different repair set from their sweep F or T twin, from tool-call timeouts (PLAN.md)."
 
 # --- Extension paper: development, pilots and inputs --------------------------
 

@@ -21,3 +21,5 @@ These match sweep F's host split, jobs and CPU windows. Estimates come from swee
 ## Log
 
 - 2026-11-26: prepared at this commit.
+- 2026-11-26 17:00Z: enqueued at 63c3d0f as av2 114 and av3 111. av2 started 17:05Z and av3 17:10Z; both done by 20:33Z.
+- 2026-11-26 21:02Z: collected one-way-wall (1,080 rows) and one-way-wall-large (40); every key once. `scripts/check_repairs.py` (which ignores the elapsed-time column of `accumulated/index.tsv`): 1,120 pairs, 33 differ, all on lift-plus-cruise-mini (17) and valu3s-uc6 (16), 7 of them full against sweep F's no-gate, on both hosts. No found-repair outcome changes; n_repairs moves by 1-25. The cause is tool-call timeouts, which move with host speed (one pair: 782 against 635 BLACK timeouts, 48 against 35 implication timeouts), so the repairs on those two specifications depend on load in every sweep. rad matches on all 40. The new full's median wall time is 58.0 s against sweep F's 74.0 s, since both hosts were otherwise idle. Imported into the paper; the pooled passes are not rerun (user to decide).
