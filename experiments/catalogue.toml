@@ -348,6 +348,18 @@ commits = ["63c3d0fb"]
 purpose = "Sweep T's full, no-climb, no-remove and no-novelty in one campaign on the small set and rad, at sweep F's host split and load, so the leave-one-out wall time pairs within one campaign (user, 2026-11-26). Collected and imported 2026-11-26."
 note = "Sweeps F and T ran at different host speeds (av3 29-39% slower per call in T, av2 7-10% faster), so their wall times do not pair. 33 of 1,120 runs (lift-plus-cruise-mini and valu3s-uc6) return a different repair set from their sweep F or T twin, from tool-call timeouts (PLAN.md)."
 
+[[set]]
+name = "one-way-wall-cores"
+paths = ["2026-11-26-one-way-wall-cores", "results-one-way-wall-cores", "results-one-way-wall-cores.csv"]
+paper = "ext"
+status = "supporting"
+question = "RQ2 wall time without two-way mutation, on rad's cores"
+campaign = "2026-11-26-one-way-wall-cores"
+date = "2026-11-26"
+commits = []
+purpose = "one-way-wall's full, no-climb, no-remove and no-novelty on rad's 10 cores at 30 seeds, so the paper can read the cores as a per-run subject with leave-one-out wall time paired within one campaign (user, 2026-11-26). Prepared 2026-11-26; not yet run."
+note = "The cores' no-<f> runs are sweep T's, whose host speed differs from sweep F's full."
+
 # --- Extension paper: development, pilots and inputs --------------------------
 
 [[set]]

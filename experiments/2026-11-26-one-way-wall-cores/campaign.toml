@@ -1,0 +1,29 @@
+name = "2026-11-26-one-way-wall-cores"
+branch = "campaign/final-engine"
+profile = "one-way-wall-cores"
+description = "one-way-wall's full, no-climb, no-remove and no-novelty on rad's 10 cores (30 seeds), at sweep F's host split and jobs, so the paper can read the cores as a per-run subject with leave-one-out wall time paired within one campaign (user, 2026-11-26). Repairs should match sweeps F and T byte for byte (PLAN.md)."
+
+# Seeds as sweep F's cores: av2 0-14, av3 15-29.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+configs = "sh -c 'python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps T --schemes nsga2-apportion --parallel 2 --out-dir experiments/configs-one-way'"
+
+# 10 cores x 4 arms x 15 seeds = 600 runs a host, 7 jobs x 2 threads on CPUs
+# 0-13, as sweep F's small phases (which held the cores) and one-way-wall's
+# ran. Sweeps F and T took about 16 h of summed run time for these four arms
+# over both hosts' seeds: about 8 h a host, 1.2 h at 7 jobs.
+[[phases]]
+name = "cores-av2"
+profile = "one-way-wall-cores"
+hosts = { av2 = "0-14" }
+confine = { av2 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7
+
+[[phases]]
+name = "cores-av3"
+profile = "one-way-wall-cores"
+hosts = { av3 = "15-29" }
+confine = { av3 = { cpus = "0-13", memory_max = "28G" } }
+jobs = 7

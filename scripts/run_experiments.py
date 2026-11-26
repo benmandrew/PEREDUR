@@ -919,6 +919,26 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-one-way-wall-large.csv",
         "default_jobs": 7,
     },
+    # one-way-wall's four arms on rad's cores (experiments/2026-11-26-one-way-
+    # wall-cores), so the paper can read the cores as a per-run subject: their
+    # no-<f> runs are sweep T's, whose host speed differs from sweep F's full.
+    "one-way-wall-cores": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["T"],
+        "levels": {"T": ["full", "no-climb", "no-remove", "no-novelty"]},
+        "specs": list(FRETISH_ORDER_CORES),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_CORES},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-one-way",
+        "results_dir": EXPERIMENTS_DIR / "results-one-way-wall-cores",
+        "results_csv": EXPERIMENTS_DIR / "results-one-way-wall-cores.csv",
+        "default_jobs": 7,
+    },
     # More seeds for the pooled passes only (experiments/2026-11-26-extra-seeds).
     # Every Pareto arm repairs fsm-lmcps on 1 of seeds 0-29, so the pooled pass
     # left it out; these are its 8 Pareto arms and random at seeds 30-329.
