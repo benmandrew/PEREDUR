@@ -336,6 +336,18 @@ commits = ["e127243c"]
 purpose = "Sweep T, the final engine without two-way mutation (user, 2026-11-24): no-climb, no-remove and no-novelty against sweep F's no-gate (the new full) on the small set, rad's cores, rad and the seeded corpus, and full on lift-plus-cruise-full. Launched 2026-11-24; not yet collected."
 note = "The search code is unchanged since 8948138: four sweep F no-gate runs rerun at e127243c gave byte-identical repairs and accumulated sets (only timings and climb memo hits differ)."
 
+[[set]]
+name = "one-way-wall"
+paths = ["2026-11-26-one-way-wall", "results-one-way-wall", "results-one-way-wall.csv", "results-one-way-wall-large", "results-one-way-wall-large.csv"]
+paper = "ext"
+status = "supporting"
+question = "RQ2 wall time without two-way mutation"
+campaign = "2026-11-26-one-way-wall"
+date = "2026-11-26"
+commits = []
+purpose = "Sweep T's full, no-climb, no-remove and no-novelty in one campaign on the small set and rad, at sweep F's host split and load, so the leave-one-out wall time pairs within one campaign (user, 2026-11-26). Launched 2026-11-26; not yet collected."
+note = "Sweeps F and T ran at different host speeds (av3 29-39% slower per call in T, av2 7-10% faster), so their wall times do not pair."
+
 # --- Extension paper: development, pilots and inputs --------------------------
 
 [[set]]

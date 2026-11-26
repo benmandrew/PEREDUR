@@ -881,6 +881,44 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-one-way-seeded.csv",
         "default_jobs": 15,
     },
+    # Sweep T's full beside its leave-one-out arms in one campaign
+    # (experiments/2026-11-26-one-way-wall), so wall time pairs within one
+    # campaign: sweeps F and T ran at different host speeds. The small set and
+    # whole rad; rad's cores are read only by the pooled pass.
+    "one-way-wall": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["T"],
+        "levels": {"T": ["full", "no-climb", "no-remove", "no-novelty"]},
+        "specs": list(FRETISH_ORDER_SMALL),
+        "seeds": list(range(30)),
+        "timeout_caps": {s: 7200 for s in FRETISH_ORDER_SMALL},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-one-way",
+        "results_dir": EXPERIMENTS_DIR / "results-one-way-wall",
+        "results_csv": EXPERIMENTS_DIR / "results-one-way-wall.csv",
+        "default_jobs": 7,
+    },
+    "one-way-wall-large": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["T"],
+        "levels": {"T": ["full", "no-climb", "no-remove", "no-novelty"]},
+        "specs": ["rad"],
+        "seeds": list(range(30)),
+        "timeout_caps": {"rad": 7200},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-one-way-large",
+        "results_dir": EXPERIMENTS_DIR / "results-one-way-wall-large",
+        "results_csv": EXPERIMENTS_DIR / "results-one-way-wall-large.csv",
+        "default_jobs": 7,
+    },
 }
 
 
