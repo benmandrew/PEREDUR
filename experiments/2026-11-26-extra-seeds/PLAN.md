@@ -22,3 +22,4 @@ Load does not matter here: the pooled passes read repairs, not wall time, and fs
 ## Log
 
 - 2026-11-26: prepared.
+- 2026-11-26 23:55Z: fsm-lmcps phases done (av2 23:40Z, av3 23:46Z), collected: 2,700 rows. Over seeds 0-329 every Pareto arm repairs on 12 seeds; members base 70, full 69, only-climb 60, only-remove 56, only-novelty 148, no-climb 91, no-remove 113, no-novelty 44; random 116 from 70 seeds. fsm-lmcps joins. Pooled locally (2026-11-26-extra-pooled, with lift-plus-cruise-mini and valu3s-uc6 reading sweep W's no-<f>): 513, 13,316 and 28,980 nodes; random pass 186. Inputs rsynced and checked; the two sampled subjects' words copied on av3 from one-way-pooled/fp.
