@@ -30,6 +30,7 @@ The sections below cover the harness in depth. This table is the index, so that 
 | `check_lean_lowering.py` | Checks that the Lean model of the lowering in `proofs/` agrees with the C++ `ltl` driver, formula by formula, through SPOT. |
 | `check_lean_scope_order.py` | Checks the Lean `scopeImplies` table against the C++ `scope_implies`, cell by cell. |
 | `check_lean_timing_order.py` | Checks the Lean `timingImplies` table against the C++ `timing_implies`, cell by cell. |
+| `lean_rule_diagrams.py` | Checks that each Lean timing table in `proofs/Fretish/Rules.lean` is a preorder on a grid of tick counts 0 to 4, and prints its covering pairs, the edges the paper's timing figure draws. |
 | `field_orders.py` | Measures the FRETISH timing, scope and condition-type orders and field polarities from the engine's lowering and Spot. |
 | `docker_build.sh` | Builds the PEREDUR Docker image, stamped with the commit and whether the tree is dirty. |
 | `docker_smoke.sh` | Runs a built image through one short call per tool it carries. CI's Docker job runs it. |

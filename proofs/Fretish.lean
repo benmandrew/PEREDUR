@@ -12,3 +12,4 @@ import Fretish.CondOrder
 import Fretish.Cross
 import Fretish.Chain
 import Fretish.TimingLift
+import Fretish.Rules
