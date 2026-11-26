@@ -1,0 +1,42 @@
+name = "2026-11-26-extra-seeds"
+branch = "campaign/final-engine"
+profile = "extra-seeds"
+description = "More seeds for the pooled passes only (user, 2026-11-26): fsm-lmcps at seeds 30-329 on the 8 Pareto arms and random, where every Pareto arm repairs 1 of seeds 0-29; and the 4 seeded fsm-lmcps mutants no arm repairs at seeds 0-4 (paper-v2 m01, m02, m06, m07) at seeds 5-29 on the 8 Pareto arms. Configs are byte-identical to sweeps F and T. PLAN.md."
+
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --parallel 2 --out-dir experiments/configs-extra-seeds\"; $G --sweeps F --schemes nsga2-apportion --levels base,only-climb,only-remove,only-novelty,no-gate && $G --sweeps F --schemes random --levels base && $G --sweeps T --schemes nsga2-apportion --levels no-climb,no-remove,no-novelty'"
+
+# fsm-lmcps: 9 arms x 150 seeds = 1,350 runs a host, 15 jobs x 2 threads on
+# CPUs 0-29. Median run 42 s at 7 jobs; about 1.4 h a host at 15 jobs.
+[[phases]]
+name = "lmcps-av2"
+profile = "extra-seeds"
+hosts = { av2 = "30-179" }
+confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 15
+
+[[phases]]
+name = "lmcps-av3"
+profile = "extra-seeds"
+hosts = { av3 = "180-329" }
+confine = { av3 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 15
+
+# Seeded: 4 mutants x 8 arms x 13 (av2) or 12 (av3) seeds = 416 / 384 runs.
+# Median seeded fsm-lmcps run 85 s at 15 jobs; about 40 min a host.
+[[phases]]
+name = "seeded-av2"
+profile = "extra-seeds-seeded"
+hosts = { av2 = "5-17" }
+confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 15
+
+[[phases]]
+name = "seeded-av3"
+profile = "extra-seeds-seeded"
+hosts = { av3 = "18-29" }
+confine = { av3 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 15

@@ -919,6 +919,48 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-one-way-wall-large.csv",
         "default_jobs": 7,
     },
+    # More seeds for the pooled passes only (experiments/2026-11-26-extra-seeds).
+    # Every Pareto arm repairs fsm-lmcps on 1 of seeds 0-29, so the pooled pass
+    # left it out; these are its 8 Pareto arms and random at seeds 30-329.
+    # Sweep F gives base, only-<f> and full (no-gate), sweep T the no-<f> arms.
+    "extra-seeds": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F", "T"],
+        "levels": {"F": ["base", "only-climb", "only-remove", "only-novelty", "no-gate"],
+                   "T": ["no-climb", "no-remove", "no-novelty"]},
+        "specs": ["fsm-lmcps"],
+        "seeds": list(range(330)),
+        "timeout_caps": {"fsm-lmcps": 7200},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-extra-seeds",
+        "results_dir": EXPERIMENTS_DIR / "results-extra-seeds",
+        "results_csv": EXPERIMENTS_DIR / "results-extra-seeds.csv",
+        "default_jobs": 15,
+    },
+    # The 4 seeded mutants no arm repairs at seeds 0-4, at seeds 5-29, on the
+    # 8 Pareto arms (no random: the seeded corpus never ran it).
+    "extra-seeds-seeded": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F", "T"],
+        "levels": {"F": ["base", "only-climb", "only-remove", "only-novelty", "no-gate"],
+                   "T": ["no-climb", "no-remove", "no-novelty"]},
+        "specs": [f"sw-fsm-lmcps__paper-v2__m{m:02d}" for m in (1, 2, 6, 7)],
+        "seeds": list(range(30)),
+        "timeout_caps": {f"sw-fsm-lmcps__paper-v2__m{m:02d}": 7200 for m in (1, 2, 6, 7)},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-extra-seeds",
+        "results_dir": EXPERIMENTS_DIR / "results-extra-seeds-seeded",
+        "results_csv": EXPERIMENTS_DIR / "results-extra-seeds-seeded.csv",
+        "default_jobs": 15,
+    },
 }
 
 
