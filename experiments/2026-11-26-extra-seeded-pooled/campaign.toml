@@ -1,0 +1,83 @@
+name = "2026-11-26-extra-seeded-pooled"
+branch = "campaign/final-engine"
+description = "Pooled pass over the seeded fsm-lmcps mutants that no arm repaired at seeds 0-4 and that pass the join rule at seeds 0-29 (paper-v2 m01, m02, m07; m06 holds 2 members an arm and stays out), on the paper's 8 arms: seeds 0-4 from sweeps F and T as 2026-11-25-one-way-seeded-pooled read them, 5-29 from 2026-11-26-extra-seeds (2026-11-26-extra-pooled/scripts/make_design.py). Same parameters as that pass; its rows join it at import."
+
+# The runs' seeds are split over av2 and av3, so the pool is built locally
+# after `collect`, then copied with the design and subject lists (untracked,
+# written by 2026-11-25-one-way-pooled/scripts/make_design.py) to each
+# host's checkout by rsync before enqueue (2026-11-24-one-way PLAN.md).
+hosts = { av2 = "", av3 = "" }
+
+# CPU windows. Every phase names its host, seeds, CPUs and memory on one
+# line, so a window moves with one substitution per host, for example
+#   sed -i '/av2 = { cpus/ s/cpus = "0-29"/cpus = "0-15"/' campaign.toml
+# and `jobs` must then shrink with it (CPUs over threads a run). CPUs 30-31
+# stay free for the Ollama server on both hosts.
+# CPUs 0-29 on both hosts (2026-11-25): nothing else is planned there.
+confine = { av2 = { cpus = "0-29", memory_max = "96G" }, av3 = { cpus = "0-29", memory_max = "96G" } }
+
+# fpdraw is EXCLUDE_FROM_ALL, so the build names it. `confine` does not reach
+# the build, so taskset holds it to the same CPUs.
+build = "sh -c 'taskset -c 0-29 sh -c \"cmake --build build-release -j 24 && cmake --build build-release -j 24 --target fpdraw\"'"
+
+# Estimate: the ten-arm seeded pass took about 4 h on av2 (fingerprint 2 h, compare 2 h, one slow subject) on CPUs 0-13; 8 arms on twice the CPUs, so about 1.5-2.5 h a host (+-50%).
+
+# Every subject is in the copied pool, so this phase only copies it, after
+# checking each file against its index row.
+[[phases]]
+name = "pool"
+kind = "pool"
+design = "experiments/2026-11-26-extra-seeded-pooled/design.toml"
+subjects = "experiments/2026-11-26-extra-seeded-pooled/subjects-{host}.txt"
+copy_from = "experiments/2026-11-26-extra-seeded-pooled/members"
+out = "experiments/extra-seeded-pooled-members"
+
+# 32768 words a subject (black, 30 s a draw, 16 at a time), every node
+# evaluated on them, and every pair the design plans: every pair of the 8
+# arms is a contrast.
+[[phases]]
+name = "fingerprint"
+kind = "fingerprint"
+subjects = "experiments/2026-11-26-extra-seeded-pooled/subjects-{host}.txt"
+members = "experiments/extra-seeded-pooled-members"
+design = "experiments/2026-11-26-extra-seeded-pooled/design.toml"
+work = "experiments/extra-seeded-pooled-work"
+out = "experiments/extra-seeded-pooled/fp"
+pairs = "experiments/extra-seeded-pooled-work/pairs-{host}.csv"
+words = 32768
+seed = 3
+workers = 16
+black_timeout = 30
+
+# Each unrefuted direction at the archive's 20 s, 24 jobs on twice the CPUs of the earlier
+# pooled passes ran, so a 20 s comparison is not timed out by contention.
+[[phases]]
+name = "compare"
+kind = "compare"
+pairs = "experiments/extra-seeded-pooled-work/pairs-{host}.csv"
+out = "experiments/extra-seeded-pooled/subsumption-{host}.csv"
+jobs = 24
+black_timeout = 20
+wall_timeout = 180
+vmem_kb = 8388608
+
+# On av2 alone, once av3's entry has passed its compare phase: gather both
+# hosts' outputs, then pooled_reduce.py (strength, and pooled ball radii at
+# K = 3 with each arm's seed-half control) and joint_measures.py (share,
+# joint-front reach, and each arm's odd-against-even reach control). av3
+# cannot ssh to av2, so av2 gathers.
+[[phases]]
+name = "reduce"
+kind = "reduce"
+host = "av2"
+design = "experiments/2026-11-26-extra-seeded-pooled/design.toml"
+members = "experiments/2026-11-26-extra-seeded-pooled/members"
+outputs = "experiments/extra-seeded-pooled"
+collected = "experiments/extra-seeded-pooled-collected"
+out = "experiments/extra-seeded-pooled-reduced"
+confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 6
+pooled_balls = true
+ball_k = [3]
+joint = true
+half_control = true
