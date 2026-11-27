@@ -5,6 +5,8 @@
     python3 experiments/2026-11-25-one-way-pooled/scripts/make_design.py seeded \
         [--drop SUBJECT ...] [--sampled SUBJECT ...] [--av2 SUBJECT ...]
     python3 experiments/2026-11-25-one-way-pooled/scripts/make_design.py random
+    python3 experiments/2026-11-25-one-way-pooled/scripts/make_design.py seeded-random \
+        [--drop SUBJECT ...]
 
 Two-way mutation (gate) was dropped from the paper on 2026-11-24
 (2026-11-24-one-way PLAN.md). These passes repeat 2026-11-20-final-engine-
@@ -19,7 +21,11 @@ subjects-av2.txt,subjects-av3.txt}; `seeded` the same under
 experiments/2026-11-25-one-way-seeded-pooled/; `random` under
 experiments/2026-11-25-one-way-pooled-random/, which pools sweep F's
 random/base against base on the specs pass's subjects, to be scored on that
-pass's word sample (copied into its fp directory before enqueue). All are
+pass's word sample (copied into its fp directory before enqueue);
+`seeded-random` under experiments/2026-11-27-seeded-random-pooled/, which
+does the same on the seeded pass's subjects and host split (its
+subjects-av2.txt and subjects-av3.txt, which must be present), with random/base
+from 2026-11-27-seeded-random and base from sweep F. All are
 untracked, like every pooled pass's inputs; this script is the record.
 
 Families: "base" holds full, every only-<f> and no-climb against base;
@@ -54,7 +60,7 @@ def arm(level: str) -> str:
 
 
 def contrasts(which: str = "specs") -> list:
-    if which == "random":
+    if which in ("random", "seeded-random"):
         return [("random", "random/base", "base", "base")]
     out = [("full", "full", "base", "base")]
     out += [(f"only-{f}", f"only-{f}", "base", "base") for f in FEATURES]
@@ -79,7 +85,11 @@ def design(header: str, results: str, results_t: str, seeds: str,
     lines += [f'  {{ name = "{n}", a = "{arm(a)}", b = "{arm(b)}", '
               f'family = "{fam}" }},' for n, a, b, fam in contrasts(which)]
     lines += ["]"]
-    if which != "random":
+    if which == "seeded-random":
+        lines += ["", "[groups.sources]",
+                  f'"{arm("random/base")}" = {{ results = "{results_t}", '
+                  f'run_dir = "{RUN_DIR}", seeds = "{seeds}", members = "output" }}']
+    elif which != "random":
         lines += ["", "[groups.sources]",
                   f'"{arm("full")}" = {{ results = "{results}", '
                   f'run_dir = "{FULL_RUN_DIR}", seeds = "{seeds}", members = "output" }}']
@@ -103,7 +113,7 @@ def write(out: Path, text: str, av2: list, av3: list,
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("which", choices=["specs", "seeded", "random"])
+    ap.add_argument("which", choices=["specs", "seeded", "random", "seeded-random"])
     ap.add_argument("--drop", nargs="*", default=[],
                     help="seeded subjects to leave out, such as those where "
                          "an arm holds 3 or fewer members")
@@ -129,6 +139,28 @@ def main(argv=None) -> int:
                       "experiments/results-one-way", "0-29",
                       SPEC_AV2 + SPEC_AV3, SPEC_SAMPLED, args.which)
         write(exp / name, text, SPEC_AV2, SPEC_AV3, args.which)
+        return 0
+    if args.which == "seeded-random":
+        seeded = exp / "2026-11-25-one-way-seeded-pooled"
+        lists = [seeded / f"subjects-{h}.txt" for h in ("av2", "av3")]
+        if not all(f.is_file() for f in lists):
+            sys.exit(f"make_design: no {lists[0]} or {lists[1]}; copy them from a host")
+        av2, av3 = ([ln.strip() for ln in f.read_text().splitlines()
+                     if ln.strip() and ln.strip() not in set(args.drop)]
+                    for f in lists)
+        unknown = set(args.drop) - set(av2 + av3) - set(
+            ln.strip() for f in lists for ln in f.read_text().splitlines())
+        if unknown:
+            sys.exit(f"make_design: not in the seeded pass: {sorted(unknown)}")
+        text = design(
+            "Pooled pass of sweep F's random/base (2026-11-27-seeded-random) against\n"
+            "nsga2-apportion/base (sweep F), seeds 0-4, on the subjects, host split\n"
+            "and word sample of 2026-11-25-one-way-seeded-pooled\n"
+            "(make_design.py seeded-random).",
+            "experiments/results-final-engine-seeded",
+            "experiments/results-final-engine-seeded-random", "0-4",
+            sorted(av2 + av3), [], args.which)
+        write(exp / "2026-11-27-seeded-random-pooled", text, av2, av3, args.which)
         return 0
     listing = exp / "2026-11-18-seeded-corpus-sideways" / "selected.txt"
     if not listing.is_file():
