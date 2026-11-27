@@ -363,6 +363,30 @@ note = "The cores' no-<f> runs are sweep T's, whose host speed differs from swee
 # --- Extension paper: development, pilots and inputs --------------------------
 
 [[set]]
+name = "final-engine-seeded-random"
+paths = ["2026-11-27-seeded-random", "results-final-engine-seeded-random", "results-final-engine-seeded-random.csv"]
+paper = "ext"
+status = "supporting"
+question = "RQ1 random against base, seeded corpus"
+campaign = "2026-11-27-seeded-random"
+date = "2026-11-27"
+commits = ["b3828453", "26c3b887"]
+purpose = "Sweep F's random/base on the 130 sideways seeded mutants at seeds 0-4, with nsga2-apportion/base rerun beside it so wall time pairs within one campaign (user, 2026-11-27): 1,300 runs."
+note = "5 of the 650 rerun base runs differ from sweep F's in their repairs (tool-call timeouts; no found-repair outcome changes), so the pooled pass reads sweep F's base. This checkout's results-final-engine-seeded holds only sweep F's base runs, copied for the local pool."
+
+[[set]]
+name = "seeded-random-pooled"
+paths = ["2026-11-27-seeded-random-pooled", "seeded-random-pooled-reduced"]
+paper = "ext"
+status = "supporting"
+question = "RQ1 random against base, seeded corpus"
+campaign = "2026-11-27-seeded-random-pooled"
+date = "2026-11-27"
+commits = ["26c3b887"]
+purpose = "Pooled pass of random/base against sweep F's base on 125 seeded subjects (the 126 of one-way-seeded-pooled less fsm-lmcps paper-v2 m09, where random holds 1 member), on that pass's word sample."
+note = "The reduced outputs are av2's, collected 2026-11-27. The pooled inputs are untracked; their sums are in the campaign's INPUTS.sha256."
+
+[[set]]
 name = "fretish-order-pilot"
 paths = ["2026-11-05-fretish-order-pilot"]
 paper = "ext"
