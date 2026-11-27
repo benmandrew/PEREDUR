@@ -1,0 +1,31 @@
+name = "2026-11-27-seeded-random"
+branch = "campaign/final-engine"
+profile = "final-engine-seeded-random"
+description = "random (sweep F's random/base) on the sideways seeded corpus, 5 seeds, with base rerun beside it so their wall time pairs within one campaign, for the paper's Table of full against base and random (user, 2026-11-27). base's repairs should match sweep F's byte for byte (PLAN.md)."
+
+# Seeds as sweep F's seeded phases split them: av3 0-2, av2 3-4.
+hosts = { av2 = "", av3 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+# configs-final-engine at 2 threads a run, as 2026-11-20-final-engine-large
+# generated it: nsga2-apportion for base, random/ for random.
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --sweeps F\"; $G --schemes nsga2-apportion --parallel 2 --out-dir experiments/configs-final-engine && $G --schemes random --levels base,only-climb --parallel 2 --out-dir experiments/configs-final-engine'"
+
+# 130 subjects x 2 arms, 15 jobs x 2 threads on CPUs 0-29, as sweep F's
+# seeded phases. Sweep F's base summed 53,218 s over 650 runs (82 s a run);
+# random at 1.38x base's per-run time (the specifications) is about 113 s.
+# av3: 780 runs, about 76,000 s, 1.4 h at 15 jobs. av2: 520 runs, about 0.9 h.
+[[phases]]
+name = "seeded-random-av3"
+profile = "final-engine-seeded-random"
+hosts = { av3 = "0-2" }
+confine = { av3 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15
+
+[[phases]]
+name = "seeded-random-av2"
+profile = "final-engine-seeded-random"
+hosts = { av2 = "3-4" }
+confine = { av2 = { cpus = "0-29", memory_max = "48G" } }
+jobs = 15

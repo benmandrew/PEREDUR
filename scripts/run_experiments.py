@@ -809,6 +809,25 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-final-engine-seeded.csv",
         "default_jobs": 15,
     },
+    # random on the seeded corpus (experiments/2026-11-27-seeded-random), with
+    # base rerun beside it so their wall time pairs within one campaign.
+    "final-engine-seeded-random": {
+        "schemes": ["nsga2-apportion", "random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {"F": ["base"]},
+        "specs": list(SIDEWAYS_SPECS),
+        "seeds": list(range(5)),
+        "timeout_caps": {s: 7200 for s in SIDEWAYS_SPECS},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-final-engine",
+        "results_dir": EXPERIMENTS_DIR / "results-final-engine-seeded-random",
+        "results_csv": EXPERIMENTS_DIR / "results-final-engine-seeded-random.csv",
+        "default_jobs": 15,
+    },
     # Sweep T (experiments/2026-11-24-one-way): the final engine without
     # two-way mutation. Its full is sweep F's no-gate, already run on every
     # subject but lift-plus-cruise-full, so these profiles run only the
