@@ -1,0 +1,29 @@
+name = "2026-11-27-seeded-random-extra"
+branch = "campaign/final-engine"
+profile = "seeded-random-extra"
+description = "More seeds for the seeded pooled passes only, so random's seeded pool covers the same mutants as the Pareto arms' (user, 2026-11-27): random/base at seeds 5-29 on the seeded fsm-lmcps mutants paper-v2 m01, m02, m07 (which the Pareto arms pool at seeds 0-29, from 2026-11-26-extra-seeds) and m09 (where random holds 1 repair at seeds 0-4), and the 8 Pareto arms at seeds 5-29 on m09. Configs are those of 2026-11-26-extra-seeds, byte-identical to sweeps F and T. PLAN.md."
+
+# av2 alone: the GAWAIN session holds av3 (2026-11-27).
+hosts = { av2 = "" }
+
+build = "sh -c 'cmake --build build-release -j 8'"
+
+configs = "sh -c 'G=\"python3 scripts/gen_configs.py --weakening off --weights 0.1 0.2 0.7 --termination individuals --max-individuals 1000 --generations 500 --population-size 100 --pin-vintage --parallel 2 --out-dir experiments/configs-extra-seeds\"; $G --sweeps F --schemes nsga2-apportion --levels base,only-climb,only-remove,only-novelty,no-gate && $G --sweeps F --schemes random --levels base && $G --sweeps T --schemes nsga2-apportion --levels no-climb,no-remove,no-novelty'"
+
+# random: 4 mutants x 25 seeds = 100 runs. Median random run on these
+# mutants 60-70 s at 15 jobs (2026-11-27-seeded-random); about 10 min.
+[[phases]]
+name = "random-av2"
+profile = "seeded-random-extra"
+hosts = { av2 = "5-29" }
+confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 15
+
+# m09: 8 arms x 25 seeds = 200 runs. Median seeded fsm-lmcps run 85 s at 15
+# jobs (2026-11-26-extra-seeds); about 20 min.
+[[phases]]
+name = "m09-av2"
+profile = "seeded-m09-extra"
+hosts = { av2 = "5-29" }
+confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 15

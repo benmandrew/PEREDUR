@@ -1000,6 +1000,47 @@ PROFILES: dict[str, dict] = {
         "results_csv": EXPERIMENTS_DIR / "results-extra-seeds-seeded.csv",
         "default_jobs": 15,
     },
+    # experiments/2026-11-27-seeded-random-extra: random at seeds 5-29 on the
+    # seeded fsm-lmcps mutants where its pool would otherwise differ from the
+    # Pareto arms' (paper-v2 m01, m02, m07, which the Pareto arms pool at
+    # seeds 0-29, and m09, where random holds 1 repair at seeds 0-4).
+    "seeded-random-extra": {
+        "schemes": ["random"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F"],
+        "levels": {"F": ["base"]},
+        "specs": [f"sw-fsm-lmcps__paper-v2__m{m:02d}" for m in (1, 2, 7, 9)],
+        "seeds": list(range(30)),
+        "timeout_caps": {f"sw-fsm-lmcps__paper-v2__m{m:02d}": 7200 for m in (1, 2, 7, 9)},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-extra-seeds",
+        "results_dir": EXPERIMENTS_DIR / "results-seeded-random-extra",
+        "results_csv": EXPERIMENTS_DIR / "results-seeded-random-extra.csv",
+        "default_jobs": 15,
+    },
+    # The same campaign: the 8 Pareto arms at seeds 5-29 on m09, so its
+    # pooled passes read seeds 0-29 in every arm, as the extra-seeds mutants'.
+    "seeded-m09-extra": {
+        "schemes": ["nsga2-apportion"],
+        "weakenings": ["wkoff"],
+        "metrics": ["log"],
+        "repair_modes": None,
+        "sweeps": ["F", "T"],
+        "levels": {"F": ["base", "only-climb", "only-remove", "only-novelty", "no-gate"],
+                   "T": ["no-climb", "no-remove", "no-novelty"]},
+        "specs": ["sw-fsm-lmcps__paper-v2__m09"],
+        "seeds": list(range(30)),
+        "timeout_caps": {"sw-fsm-lmcps__paper-v2__m09": 7200},
+        "compare_timeout": 1800,
+        "baseline_aliases": {},
+        "configs_dir": EXPERIMENTS_DIR / "configs-extra-seeds",
+        "results_dir": EXPERIMENTS_DIR / "results-seeded-m09-extra",
+        "results_csv": EXPERIMENTS_DIR / "results-seeded-m09-extra.csv",
+        "default_jobs": 15,
+    },
 }
 
 

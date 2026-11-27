@@ -1,0 +1,77 @@
+name = "2026-11-27-extra-m09-pooled"
+branch = "campaign/final-engine"
+description = "Pooled pass over the seeded mutant fsm-lmcps paper-v2 m09 at seeds 0-29 on the paper's 8 arms: seeds 0-4 from sweeps F and T as 2026-11-25-one-way-seeded-pooled read them, 5-29 from 2026-11-27-seeded-random-extra (its scripts/make_design.py), so the Pareto arms and random pool m09 at the same seeds (user, 2026-11-27). Same parameters as that pass, drawing its own words; its rows replace m09's at import."
+
+# The pool is built locally after `collect` (the runs' seeds 0-4 are split
+# over av2 and av3), then copied with the design and subject list (untracked,
+# written by 2026-11-27-seeded-random-extra/scripts/make_design.py) to av2's
+# checkout by rsync before enqueue.
+# av2 alone: the GAWAIN session holds av3 (2026-11-27).
+hosts = { av2 = "" }
+
+# CPUs 0-29; 30-31 stay free for the Ollama server.
+confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+
+# fpdraw is EXCLUDE_FROM_ALL, so the build names it. `confine` does not reach
+# the build, so taskset holds it to the same CPUs.
+build = "sh -c 'taskset -c 0-29 sh -c \"cmake --build build-release -j 24 && cmake --build build-release -j 24 --target fpdraw\"'"
+
+# Estimate: one subject of about 50 seeded-pass nodes an arm; under 20 min.
+
+# Every subject is in the copied pool, so this phase only copies it, after
+# checking each file against its index row.
+[[phases]]
+name = "pool"
+kind = "pool"
+design = "experiments/2026-11-27-extra-m09-pooled/design.toml"
+subjects = "experiments/2026-11-27-extra-m09-pooled/subjects-{host}.txt"
+copy_from = "experiments/2026-11-27-extra-m09-pooled/members"
+out = "experiments/extra-m09-pooled-members"
+
+# 32768 words a subject (black, 30 s a draw, 16 at a time), every node
+# evaluated on them, and every pair the design plans: every pair of the 8
+# arms is a contrast.
+[[phases]]
+name = "fingerprint"
+kind = "fingerprint"
+subjects = "experiments/2026-11-27-extra-m09-pooled/subjects-{host}.txt"
+members = "experiments/extra-m09-pooled-members"
+design = "experiments/2026-11-27-extra-m09-pooled/design.toml"
+work = "experiments/extra-m09-pooled-work"
+out = "experiments/extra-m09-pooled/fp"
+pairs = "experiments/extra-m09-pooled-work/pairs-{host}.csv"
+words = 32768
+seed = 3
+workers = 16
+black_timeout = 30
+
+# Each unrefuted direction at the archive's 20 s, 24 jobs on twice the CPUs of the earlier
+# pooled passes ran, so a 20 s comparison is not timed out by contention.
+[[phases]]
+name = "compare"
+kind = "compare"
+pairs = "experiments/extra-m09-pooled-work/pairs-{host}.csv"
+out = "experiments/extra-m09-pooled/subsumption-{host}.csv"
+jobs = 24
+black_timeout = 20
+wall_timeout = 180
+vmem_kb = 8388608
+
+# On av2: pooled_reduce.py (strength, and pooled ball radii at K = 3 with
+# each arm's seed-half control) and joint_measures.py (share, joint-front
+# reach, and each arm's odd-against-even reach control).
+[[phases]]
+name = "reduce"
+kind = "reduce"
+host = "av2"
+design = "experiments/2026-11-27-extra-m09-pooled/design.toml"
+members = "experiments/2026-11-27-extra-m09-pooled/members"
+outputs = "experiments/extra-m09-pooled"
+collected = "experiments/extra-m09-pooled-collected"
+out = "experiments/extra-m09-pooled-reduced"
+confine = { av2 = { cpus = "0-29", memory_max = "96G" } }
+jobs = 6
+pooled_balls = true
+ball_k = [3]
+joint = true
+half_control = true
