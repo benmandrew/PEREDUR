@@ -22,3 +22,5 @@ Profiles `seeded-random-extra` (random/base, the four mutants) and `seeded-m09-e
 ## Log
 
 - 2026-11-27: prepared. av2 promised by the GAWAIN session for about 23:55Z.
+- 2026-11-27: enqueued on av2 (122) once the GAWAIN session released it; 300 rows collected.
+- 2026-11-28: members over seeds 0-29: random holds 40 on m01, 1 on m02, 9 on m07 and 14 on m09; every Pareto arm holds 24 or more on m09. m02 fails the join rule and leaves both seeded passes (the paper's `POOLED_DROP`). `2026-11-27-extra-m09-pooled` (av2 123, 318 nodes) finished 00:05Z; `2026-11-27-extra-seeded-random-pooled` (av2 124; m01, m07, m09 with 61, 16 and 77 nodes) finished 00:25Z. Reduced outputs collected; av2 handed back to the GAWAIN session 00:26Z. Imported into the paper: both seeded passes cover the same 128 mutants, and no Holm verdict or shift sign changed.

@@ -387,6 +387,42 @@ purpose = "Pooled pass of random/base against sweep F's base on 125 seeded subje
 note = "The reduced outputs are av2's, collected 2026-11-27. The pooled inputs are untracked; their sums are in the campaign's INPUTS.sha256."
 
 [[set]]
+name = "seeded-random-extra"
+paths = ["2026-11-27-seeded-random-extra", "results-seeded-random-extra", "results-seeded-random-extra.csv", "results-seeded-m09-extra", "results-seeded-m09-extra.csv", "results-seeded-random-extra-farm"]
+paper = "ext"
+status = "supporting"
+question = "RQ1 random against base, seeded corpus; RQ2 on fsm-lmcps paper-v2 m09"
+campaign = "2026-11-27-seeded-random-extra"
+date = "2026-11-27"
+commits = ["73addfb1"]
+purpose = "Seeds 5-29 for random/base on fsm-lmcps paper-v2 m01, m02, m07 and m09, and for the 8 Pareto arms on m09, so random's seeded pool covers the same mutants as the Pareto arms' (user, 2026-11-27): 300 runs. The farm links each pooled member to its results directory."
+note = "Pooled passes only; the paper's per-run seeded measures keep seeds 0-4. m02 leaves both seeded passes (random holds 1 member at seeds 0-29)."
+
+[[set]]
+name = "extra-m09-pooled"
+paths = ["2026-11-27-extra-m09-pooled", "extra-m09-pooled-reduced"]
+paper = "ext"
+status = "supporting"
+question = "RQ2 on fsm-lmcps paper-v2 m09"
+campaign = "2026-11-27-extra-m09-pooled"
+date = "2026-11-27"
+commits = ["73addfb1"]
+purpose = "Pooled pass of the 8 Pareto arms on m09 at seeds 0-29, on its own word sample; joins the seeded pass through the paper's POOLED_EXTRA."
+note = "The reduced outputs are av2's, collected 2026-11-28. The pooled inputs are untracked; their sums are in the campaign's INPUTS.sha256."
+
+[[set]]
+name = "extra-seeded-random-pooled"
+paths = ["2026-11-27-extra-seeded-random-pooled", "extra-seeded-random-pooled-reduced"]
+paper = "ext"
+status = "supporting"
+question = "RQ1 random against base, seeded corpus"
+campaign = "2026-11-27-extra-seeded-random-pooled"
+date = "2026-11-27"
+commits = ["73addfb1"]
+purpose = "Pooled pass of random/base against base on m01, m07 and m09 at seeds 0-29, on the words of extra-seeded-pooled (m01, m07) and extra-m09-pooled (m09)."
+note = "The reduced outputs are av2's, collected 2026-11-28. The pooled inputs are untracked; their sums are in the campaign's INPUTS.sha256."
+
+[[set]]
 name = "fretish-order-pilot"
 paths = ["2026-11-05-fretish-order-pilot"]
 paper = "ext"
